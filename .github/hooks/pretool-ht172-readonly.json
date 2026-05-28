@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "pwsh -File ./scripts/ops/check-ht172-readonly.ps1",
+        "windows": "powershell -ExecutionPolicy Bypass -File .\\scripts\\ops\\check-ht172-readonly.ps1",
+        "timeout": 10
+      }
+    ]
+  }
+}

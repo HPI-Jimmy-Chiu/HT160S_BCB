@@ -1,0 +1,62 @@
+{
+ ASSwitcher Component 1.2.1 Copyright © 1997
+       Andrey Abakumov (aga@oficina.rnd.su)
+       Sergey Hrusch
+
+The switch of a type TrackBar, but only round. Can show a scale
+and values.
+
+The component is written under influence
+of a seen  similar by the form component
+from a  package  Gadgets for Windows 1.1
+Universal Dynamics.
+
+Many thanks:
+  Ali Butaev behind component TWave
+   E-mail: alee@datacom.ru
+   
+  Alistair George behind found errors
+   E-mail: bigal@xtra.co.nz
+
+ and other.
+ 
+Properties:
+ Position    - current position on the switch;
+ Max         - maximum value
+               (Min - allways zero);
+ PrintValues - to print or not print values
+               (it is better to not print if
+                values more 25)
+
+ SoundType       - disabled playing if SoundType=wssNone
+                   of a sound at switching,
+                   enabled and (SoundType=wssExe) to keep in EXE the file,
+                   enabled and (SoundType=wssWav) to keep in Wav the file,
+
+ SoundChange - choice of a sound file or sound resource
+
+ ResourceType - type of a resource if SoundType=wssExe
+
+ WaveOptions -
+               woSync      - The sound is played synchronously and the
+                             function does not return until the sound ends.
+               woNoDefault - If the sound can't be found, the function returns
+                             silently without playing the default sound.
+               woLoop      - The sound will continue to play repeatedly.
+               woNoStop    - If a sound is currently playing, the function
+                             will immediately return FALSE without playing
+                             the requested sound.
+
+How to make *.WAV in resource?
+
+Create file filename.rc
+
+MYSUPERSOUND WAVE filename.wav
+             ^^^^ - resource type you defined
+                    You must spicify it in ResourceType property
+
+Then creating *.res file (brcc32 filename.rc)
+
+Append to our programm
+
+{$R filename.res}

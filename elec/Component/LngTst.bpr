@@ -1,0 +1,206 @@
+# ---------------------------------------------------------------------------
+#  Delphi VCL Extensions (RX)
+#  Copyright (c) 1998 Master-Bank
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+!if !$d(BCB)
+BCB = $(MAKEDIR)\..
+!endif
+
+# ---------------------------------------------------------------------------
+# IDE SECTION
+# ---------------------------------------------------------------------------
+# The following section of the project makefile is managed by the BCB IDE.
+# It is recommended to use the IDE to change any of the values in this
+# section.
+# ---------------------------------------------------------------------------
+
+VERSION = BCB.03
+# ---------------------------------------------------------------------------
+PROJECT = LngTst.exe
+OBJFILES = LngTst.obj LangTest.obj
+RESFILES = LngTst.res
+DEFFILE =
+RESDEPEN = $(RESFILES) LangTest.dfm
+LIBFILES =
+LIBRARIES = TEST.lib VCLDB35.lib bcbsmp35.lib vclx35.lib vcl35.lib
+SPARELIBS = vcl35.lib vclx35.lib bcbsmp35.lib VCLDB35.lib TEST.lib
+PACKAGES = VCLX35.bpi VCL35.bpi VCLDB35.bpi VCLDBX35.bpi dclocx35.bpi QRPT35.bpi \
+  NMFAST35.bpi DSS35.bpi TEEUI35.bpi TEEDB35.bpi TEE35.bpi VCLMID35.bpi \
+  INET35.bpi INETDB35.bpi bcbsmp35.bpi ibsmp35.bpi HkComp35.bpi Dclusr35.bpi \
+  TEST.bpi
+# ---------------------------------------------------------------------------
+PATHCPP = .;
+PATHASM = .;
+PATHPAS = .;
+PATHRC = .;
+DEBUGLIBPATH = $(BCB)\lib\debug
+RELEASELIBPATH = $(BCB)\lib\release
+# ---------------------------------------------------------------------------
+CFLAG1 = -Od -Hc -w- -Ve -r- -k -y -v -vi- -c -b- -w-par -w-inl -Vx
+CFLAG2 = -D_RTLDLL \
+  -I"..\..\program files\borland\cbuilder3\projects";"\\nt_server\source\bcb componet\component";"\\nt_server\source\bcb componet\calender";$(BCB)\include;$(BCB)\include\vcl \
+  -H=$(BCB)\lib\vcl35.csm
+CFLAG3 = -Tkh30000 -5
+PFLAGS = -D_RTLDLL \
+  -U..\packtest;"..\..\program files\borland\cbuilder3\projects";..\..\userpack;"\\nt_server\source\bcb componet\calender";"\\nt_server\source\bcb componet\component";$(BCB)\lib;$(BCB)\lib\obj;$(RELEASELIBPATH) \
+  -I"..\..\program files\borland\cbuilder3\projects";"\\nt_server\source\bcb componet\component";"\\nt_server\source\bcb componet\calender";$(BCB)\include;$(BCB)\include\vcl \
+  -$Y -$W -$V- -$O- -v -JPHN -M
+RFLAGS = -D_RTLDLL \
+  -i"..\..\program files\borland\cbuilder3\projects";"\\nt_server\source\bcb componet\component";"\\nt_server\source\bcb componet\calender";$(BCB)\include;$(BCB)\include\vcl
+AFLAGS = /i"..\..\program files\borland\cbuilder3\projects" \
+  /i"\\nt_server\source\bcb componet\component" /i"\\nt_server\source\bcb componet\calender" \
+  /i$(BCB)\include /i$(BCB)\include\vcl /d_RTLDLL /mx /w2 /zi
+LFLAGS = -L..\packtest;"..\..\program files\borland\cbuilder3\projects";..\..\userpack;"\\nt_server\source\bcb componet\calender";"\\nt_server\source\bcb componet\component";$(BCB)\lib;$(BCB)\lib\obj;$(RELEASELIBPATH) \
+  -D"User Component" -aa -Tpe -x -Gn -Gl -Gi -w -v
+IFLAGS =
+# ---------------------------------------------------------------------------
+ALLOBJ = c0w32.obj sysinit.obj $(OBJFILES)
+ALLRES = $(RESFILES)
+ALLLIB = $(LIBFILES) $(LIBRARIES) import32.lib cp32mti.lib
+# ---------------------------------------------------------------------------
+!ifdef IDEOPTIONS
+
+[Version Info]
+IncludeVerInfo=1
+AutoIncBuild=0
+MajorVer=1
+MinorVer=0
+Release=0
+Build=0
+Debug=0
+PreRelease=0
+Special=0
+Private=0
+DLL=0
+Locale=1028
+CodePage=950
+
+[Version Info Keys]
+CompanyName=
+FileDescription=
+FileVersion=1.0.0.0
+InternalName=
+LegalCopyright=
+LegalTrademarks=
+OriginalFilename=
+ProductName=
+ProductVersion=1.0.0.0
+Comments=
+
+[HistoryLists\hlIncludePath]
+Count=9
+Item0=..\component;\\nt_server\source\bcb componet\component;\\nt_server\source\bcb componet\calender;..\dateconvert;$(BCB)\include;$(BCB)\include\vcl
+Item1=\\nt_server\source\bcb componet\component;\\nt_server\source\bcb componet\calender;..\dateconvert;$(BCB)\include;$(BCB)\include\vcl
+Item2=$(BCB)\include;$(BCB)\include\vcl;..\..\hdbforms;..\waveplay;..\dateconv;..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\switch;..\aled
+Item3=\\nt_server\source\bcb componet\calender;..\waveplay;\\nt_server\source\bcb componet\waveplay;..\dateconvert;..\dateconv;..\..\hdbforms;..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\include;$(BCB)\include\vcl;$(BCB)\rx\units
+Item4=..\dateconvert;..\dateconv;..\..\hdbforms;..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\include;$(BCB)\include\vcl;$(BCB)\rx\units
+Item5=..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\include;$(BCB)\include\vcl;$(BCB)\rx\units
+Item6=..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\include;$(BCB)\include\vcl;$(BCB)\rx\units
+Item7=..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\include;$(BCB)\include\vcl;$(BCB)\rx\units
+Item8=$(BCB)\include;$(BCB)\include\vcl;$(BCB)\rx\units
+
+[HistoryLists\hlLibraryPath]
+Count=9
+Item0=\\nt_server\source\bcb componet\calender;..\dateconvert;..\component;\\nt_server\source\bcb componet\component;$(BCB)\lib;$(BCB)\lib\obj
+Item1=\\nt_server\source\bcb componet\component;$(BCB)\lib;$(BCB)\lib\obj
+Item2=$(BCB)\lib;$(BCB)\lib\obj;..\waveplay;..\dateconvert;..\dateconv;..\..\hdbforms;..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\switch;..\aled
+Item3=\\nt_server\source\bcb componet\calender;..\waveplay;\\nt_server\source\bcb componet\waveplay;..\dateconvert;..\dateconv;..\..\hdbforms;..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\lib\release;$(BCB)\lib\obj;$(BCB)\lib;$(BCB)\rx\units
+Item4=..\dateconvert;..\dateconv;..\..\hdbforms;..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\lib\release;$(BCB)\lib\obj;$(BCB)\lib;$(BCB)\rx\units
+Item5=..\adigit98;..\ctiphint;..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\lib\release;$(BCB)\lib\obj;$(BCB)\lib;$(BCB)\rx\units
+Item6=..\component;..\asswitch;..\hint97;..\menu97s;..\danhint;..\calender;..\captioncontrol\source;..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\lib\release;$(BCB)\lib\obj;$(BCB)\lib;$(BCB)\rx\units
+Item7=..\..\motech\98020\component;..\..\motech\98020\asswitch;..\switch;..\aled;c:\program files\borland\cbuilder3\lib;$(BCB)\lib\release;$(BCB)\lib\obj;$(BCB)\lib;$(BCB)\rx\units
+Item8=$(BCB)\lib\release;$(BCB)\lib\obj;$(BCB)\lib;$(BCB)\rx\units
+
+[HistoryLists\hlDebugSourcePath]
+Count=1
+Item0=$(BCB)\source\vcl
+
+[HistoryLists\hlConditionals]
+Count=2
+Item0=_RTLDLL;USEPACKAGES
+Item1=USEPACKAGES
+
+[Debugging]
+DebugSourceDirs=$(BCB)\source\vcl
+
+[Parameters]
+RunParams=
+HostApplication=
+
+!endif
+
+# ---------------------------------------------------------------------------
+# MAKE SECTION
+# ---------------------------------------------------------------------------
+# This section of the project file is not used by the BCB IDE.  It is for
+# the benefit of building from the command-line using the MAKE utility.
+# ---------------------------------------------------------------------------
+
+.autodepend
+# ---------------------------------------------------------------------------
+!if !$d(BCC32)
+BCC32 = bcc32
+!endif
+
+!if !$d(DCC32)
+DCC32 = dcc32
+!endif
+
+!if !$d(TASM32)
+TASM32 = tasm32
+!endif
+
+!if !$d(LINKER)
+LINKER = tlink32
+!endif
+
+!if !$d(BRCC32)
+BRCC32 = brcc32
+!endif
+# ---------------------------------------------------------------------------
+!if $d(PATHCPP)
+.PATH.CPP = $(PATHCPP)
+.PATH.C   = $(PATHCPP)
+!endif
+
+!if $d(PATHPAS)
+.PATH.PAS = $(PATHPAS)
+!endif
+
+!if $d(PATHASM)
+.PATH.ASM = $(PATHASM)
+!endif
+
+!if $d(PATHRC)
+.PATH.RC  = $(PATHRC)
+!endif
+# ---------------------------------------------------------------------------
+$(PROJECT): $(OBJFILES) $(RESDEPEN) $(DEFFILE)
+    $(BCB)\BIN\$(LINKER) @&&!
+    $(LFLAGS) +
+    $(ALLOBJ), +
+    $(PROJECT),, +
+    $(ALLLIB), +
+    $(DEFFILE), +
+    $(ALLRES)
+!
+# ---------------------------------------------------------------------------
+.pas.hpp:
+    $(BCB)\BIN\$(DCC32) $(PFLAGS) {$< }
+
+.pas.obj:
+    $(BCB)\BIN\$(DCC32) $(PFLAGS) {$< }
+
+.cpp.obj:
+    $(BCB)\BIN\$(BCC32) $(CFLAG1) $(CFLAG2) $(CFLAG3) -n$(@D) {$< }
+
+.c.obj:
+    $(BCB)\BIN\$(BCC32) $(CFLAG1) $(CFLAG2) $(CFLAG3) -n$(@D) {$< }
+
+.asm.obj:
+    $(BCB)\BIN\$(TASM32) $(AFLAGS) $<, $@
+
+.rc.res:
+    $(BCB)\BIN\$(BRCC32) $(RFLAGS) -fo$@ $<
+# ---------------------------------------------------------------------------

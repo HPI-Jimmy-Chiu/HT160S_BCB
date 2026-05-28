@@ -1,0 +1,36 @@
+# BCB6 build outputs
+Obj/
+EXE/
+*.obj
+*.exe
+*.tds
+*.csm
+*.pch
+*.bcc32pch
+*.#*
+*.d
+
+# BCB/IDE temporary and backup files
+*.~*
+*.bak
+*.ddp
+*.dsk
+
+# Logs and generated diagnostics
+logs/
+hang_data/
+ProductReport/
+*.log
+build_*.txt
+result.json
+
+# Local archives and backup workspaces
+*.7z
+*.zip
+HT160S_Program_BCB_V1.0.0.0_frank/
+
+# Local editor settings
+.vscode/
+
+# Local AI/session notes
+memories/

@@ -1,0 +1,106 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<!-- C++Builder XML Project -->
+<PROJECT>
+  <MACROS>
+    <VERSION value="BCB.05.03"/>
+    <PROJECT value="eVision.bpl"/>
+    <OBJFILES value="eVision.obj 
+      &quot;d:\Program Files\Borland\CBuilder5\Imports\EDISPLAYACLLib_OCX.obj&quot; 
+      &quot;d:\Program Files\Borland\CBuilder5\Imports\EPICOLOACLLib_OCX.obj&quot; 
+      &quot;d:\Program Files\Borland\CBuilder5\Imports\eVision_OCX.obj&quot; &quot;d:\Program Files\Borland\CBuilder5\Imports\MULTICAMLib_OCX.obj&quot;"/>
+    <RESFILES value="eVision.res 
+      &quot;d:\program files\borland\cbuilder5\Imports\EDISPLAYACLLib_OCX.dcr&quot; 
+      &quot;d:\program files\borland\cbuilder5\Imports\EPICOLOACLLib_OCX.dcr&quot; 
+      &quot;d:\program files\borland\cbuilder5\Imports\eVision_OCX.dcr&quot; &quot;d:\program files\borland\cbuilder5\Imports\MULTICAMLib_OCX.dcr&quot;"/>
+    <IDLFILES value=""/>
+    <IDLGENFILES value=""/>
+    <DEFFILE value=""/>
+    <RESDEPEN value="$(RESFILES)"/>
+    <LIBFILES value=""/>
+    <LIBRARIES value=""/>
+    <SPARELIBS value="Vcl50.lib"/>
+    <PACKAGES value="vcl50.bpi"/>
+    <PATHCPP value=".;d:\Program Files\Borland\CBuilder5\Imports\"/>
+    <PATHPAS value=".;"/>
+    <PATHRC value=".;"/>
+    <PATHASM value=".;"/>
+    <DEBUGLIBPATH value="$(BCB)\lib\debug"/>
+    <RELEASELIBPATH value="$(BCB)\lib\release"/>
+    <LINKER value="tlink32"/>
+    <USERDEFINES value="_DEBUG"/>
+    <SYSDEFINES value="_RTLDLL;NO_STRICT;USEPACKAGES"/>
+    <MAINSOURCE value="eVision.cpp"/>
+    <INCLUDEPATH value="&quot;C:\Program Files\Euresys\eVision\ActiveX&quot;;&quot;d:\Program Files\Borland\CBuilder5\Imports&quot;;$(BCB)\include;$(BCB)\include\vcl"/>
+    <LIBPATH value="&quot;C:\Program Files\Euresys\eVision\ActiveX&quot;;&quot;d:\Program Files\Borland\CBuilder5\Imports&quot;;$(BCB)\lib\obj;$(BCB)\lib"/>
+    <WARNINGS value="-w-par"/>
+  </MACROS>
+  <OPTIONS>
+    <IDLCFLAGS value="-I&quot;C:\Program Files\Euresys\eVision\ActiveX&quot; 
+      -I&quot;d:\Program Files\Borland\CBuilder5\Imports&quot; -I$(BCB)\include 
+      -I$(BCB)\include\vcl -src_suffix cpp -D_DEBUG -boa"/>
+    <CFLAG1 value="-Od -H=$(BCB)\lib\vcl50.csm -Hc -Vx -Ve -X- -r- -a8 -b- -k -y -v -vi- -c 
+      -tWM"/>
+    <PFLAGS value="-$YD -$W -$O- -v -JPHNE -M"/>
+    <RFLAGS value=""/>
+    <AFLAGS value="/mx /w2 /zd"/>
+    <LFLAGS value="-D&quot;&quot; -aa -Tpp -x -Gn -Gl -Gi -v"/>
+  </OPTIONS>
+  <LINKER>
+    <ALLOBJ value="c0pkg32.obj $(PACKAGES) Memmgr.Lib sysinit.obj $(OBJFILES)"/>
+    <ALLRES value="$(RESFILES)"/>
+    <ALLLIB value="$(LIBFILES) $(LIBRARIES) import32.lib cp32mti.lib"/>
+  </LINKER>
+  <IDEOPTIONS>
+[Version Info]
+IncludeVerInfo=1
+AutoIncBuild=0
+MajorVer=1
+MinorVer=0
+Release=0
+Build=0
+Debug=0
+PreRelease=0
+Special=0
+Private=0
+DLL=0
+Locale=1028
+CodePage=950
+
+[Version Info Keys]
+CompanyName=
+FileDescription=
+FileVersion=1.0.0.0
+InternalName=
+LegalCopyright=
+LegalTrademarks=
+OriginalFilename=
+ProductName=
+ProductVersion=1.0.0.0
+Comments=
+
+[Debugging]
+DebugSourceDirs=$(BCB)\source\vcl
+
+[Parameters]
+RunParams=
+HostApplication=
+RemoteHost=
+RemotePath=
+RemoteDebug=0
+
+[Compiler]
+ShowInfoMsgs=0
+LinkDebugVcl=0
+LinkCGLIB=0
+
+[CORBA]
+AddServerUnit=1
+AddClientUnit=1
+PrecompiledHeaders=1
+
+[Language]
+ActiveLang=
+ProjectLang=
+RootDir=
+  </IDEOPTIONS>
+</PROJECT>

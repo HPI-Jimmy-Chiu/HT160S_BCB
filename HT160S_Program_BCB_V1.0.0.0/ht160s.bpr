@@ -1,0 +1,194 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<!-- C++Builder XML Project -->
+<PROJECT>
+  <MACROS>
+    <VERSION value="BCB.06.00"/>
+    <PROJECT value="ht160s.exe"/>
+    <OBJFILES value="ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uQwertyKey.obj language.obj setup.obj 
+      data.obj maintenance.obj uOffset.obj uspeed.obj systools.obj mymessbox.obj 
+      note.obj 
+      cmydef.obj CosFunction.obj UserRoleManager.obj database.obj csystem.obj uruncontrol.obj 
+      HTimer.obj myio.obj myio_MN200.obj mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj 
+      MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj 
+      MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj 
+      MotorAndIO\myMC88X1motor.obj AutomationServer.obj ComPort.obj 
+      uPadInterface.obj SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj 
+      SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj"/>
+    <RESFILES value="ht160s.res"/>
+    <IDLFILES value=""/>
+    <IDLGENFILES value=""/>
+    <DEFFILE value=""/>
+    <RESDEPEN value="$(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uQwertyKey.dfm language.dfm setup.dfm 
+      data.dfm maintenance.dfm uOffset.dfm uspeed.dfm systools.dfm mymessbox.dfm 
+      note.dfm"/>
+    <LIBFILES value=""/>
+    <LIBRARIES value="ws2_32.lib"/>
+    <SPARELIBS value="vcl.lib rtl.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib"/>
+    <PACKAGES value="vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx.bpi 
+      bdertl.bpi vcldbx.bpi ibxpress.bpi dsnap.bpi cds.bpi bdecds.bpi qrpt.bpi 
+      teeui.bpi teedb.bpi tee.bpi dss.bpi teeqr.bpi visualclx.bpi 
+      visualdbclx.bpi dsnapcrba.bpi dsnapcon.bpi bcbsmp.bpi vclie.bpi xmlrtl.bpi 
+      inet.bpi inetdbbde.bpi inetdbxpress.bpi inetdb.bpi nmfast.bpi webdsnap.bpi 
+      bcbie.bpi websnap.bpi soaprtl.bpi dclocx.bpi dbexpress.bpi dbxcds.bpi 
+      indy.bpi dclusr60.bpi"/>
+    <PATHCPP value=".;MotorAndIO;SecsGem"/>
+    <PATHPAS value=".;"/>
+    <PATHRC value=".;"/>
+    <PATHASM value=".;"/>
+    <DEBUGLIBPATH value="$(BCB)\lib\debug"/>
+    <RELEASELIBPATH value="$(BCB)\lib\release"/>
+    <LINKER value="ilink32"/>
+    <USERDEFINES value="_DEBUG"/>
+    <SYSDEFINES value="_RTLDLL;NO_STRICT;USEPACKAGES"/>
+    <MAINSOURCE value="ht160s.cpp"/>
+    <INCLUDEPATH value="SecsGem;MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\Component;$(BCB)\include;$(BCB)\include\vcl;D:\HT160S_BCB\elec\myvcl"/>
+    <LIBPATH value="MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\myvcl;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib;D:\HT160S_BCB\elec\Component"/>
+    <WARNINGS value="-w-par"/>
+    <OTHERFILES value=""/>
+  </MACROS>
+  <OPTIONS>
+    <IDLCFLAGS value="-ISecsGem -IMotorAndIO -I$(BCB)\Projects -ID:\HT160S_BCB\elec\Component 
+      -I$(BCB)\include -I$(BCB)\include\vcl -ID:\HT160S_BCB\elec\myvcl 
+      -src_suffix cpp -D_DEBUG -boa"/>
+    <CFLAG1 value="-Od -H=..\Obj\ht160s.csm -Hc -Vx -Ve -X- -r- -a8 -b- -k -y -v -vi- -c 
+      -tW -tWM"/>
+    <PFLAGS value="-$YD -$W -$O- -$A8 -v -JPHNE -M"/>
+    <RFLAGS value=""/>
+    <AFLAGS value="/mx /w2 /zd"/>
+    <LFLAGS value="-D&quot;&quot; -aa -Tpe -x -Gn -v"/>
+    <OTHERFILES value=""/>
+  </OPTIONS>
+  <LINKER>
+    <ALLOBJ value="c0w32.obj $(PACKAGES) Memmgr.Lib sysinit.obj $(OBJFILES)"/>
+    <ALLRES value="$(RESFILES)"/>
+    <ALLLIB value="$(LIBFILES) $(LIBRARIES) import32.lib cp32mti.lib"/>
+    <OTHERFILES value=""/>
+  </LINKER>
+  <FILELIST>
+      <FILE FILENAME="ht160s.res" FORMNAME="" UNITNAME="ht160s.res" CONTAINERID="ResTool" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="ht160s.cpp" FORMNAME="" UNITNAME="ht160s" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="IncludeAllHeader.h" FORMNAME="" UNITNAME="IncludeAllHeader" CONTAINERID="" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MachineType.h" FORMNAME="" UNITNAME="MachineType" CONTAINERID="" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="main.cpp" FORMNAME="fMain" UNITNAME="main" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="iosetview.cpp" FORMNAME="fiosetview" UNITNAME="iosetview" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uteach.cpp" FORMNAME="fTeach" UNITNAME="uteach" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uMotorTest.cpp" FORMNAME="fMotorTest" UNITNAME="uMotorTest" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uQwertyKey.cpp" FORMNAME="fQwertyKey" UNITNAME="uQwertyKey" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="language.cpp" FORMNAME="fLan" UNITNAME="language" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="setup.cpp" FORMNAME="fSetup" UNITNAME="setup" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="data.cpp" FORMNAME="fData" UNITNAME="data" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="maintenance.cpp" FORMNAME="fMaintenance" UNITNAME="maintenance" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uOffset.cpp" FORMNAME="fOffset" UNITNAME="uOffset" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uspeed.cpp" FORMNAME="fSpeed" UNITNAME="uspeed" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="systools.cpp" FORMNAME="FormSysTools" UNITNAME="systools" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="mymessbox.cpp" FORMNAME="MyMessageBox" UNITNAME="mymessbox" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="note.cpp" FORMNAME="fNote" UNITNAME="note" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="cmydef.cpp" FORMNAME="" UNITNAME="cmydef" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="CosFunction.cpp" FORMNAME="" UNITNAME="CosFunction" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="UserRoleManager.cpp" FORMNAME="" UNITNAME="UserRoleManager" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="database.cpp" FORMNAME="" UNITNAME="database" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="csystem.cpp" FORMNAME="" UNITNAME="csystem" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uruncontrol.cpp" FORMNAME="" UNITNAME="uruncontrol" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="HTimer.cpp" FORMNAME="" UNITNAME="HTimer" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="myio.cpp" FORMNAME="" UNITNAME="myio" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="myio_MN200.cpp" FORMNAME="" UNITNAME="myio_MN200" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="mysensor.cpp" FORMNAME="" UNITNAME="mysensor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="myswitch.cpp" FORMNAME="" UNITNAME="myswitch" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="mycylin.cpp" FORMNAME="" UNITNAME="mycylin" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MyKitSuck.cpp" FORMNAME="" UNITNAME="MyKitSuck" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MotorAndIO\HTMotor.cpp" FORMNAME="" UNITNAME="HTMotor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MotorAndIO\MyMotor.cpp" FORMNAME="" UNITNAME="MyMotor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MotorAndIO\mySMCmotor.cpp" FORMNAME="" UNITNAME="mySMCmotor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MotorAndIO\myMN200motor.cpp" FORMNAME="" UNITNAME="myMN200motor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MotorAndIO\MC88X1PLazyLoad.cpp" FORMNAME="" UNITNAME="MC88X1PLazyLoad" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MotorAndIO\myMC88X1motor.cpp" FORMNAME="" UNITNAME="myMC88X1motor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="AutomationServer.cpp" FORMNAME="" UNITNAME="AutomationServer" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="ComPort.cpp" FORMNAME="" UNITNAME="ComPort" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="uPadInterface.cpp" FORMNAME="" UNITNAME="uPadInterface" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="SecsGem\uHGemEquipment.cpp" FORMNAME="" UNITNAME="uHGemEquipment" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="SecsGem\UsecegemMainFrom.cpp" FORMNAME="" UNITNAME="UsecegemMainFrom" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="SecsGem\uHGemClass.cpp" FORMNAME="" UNITNAME="uHGemClass" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="SecsGem\uHGemHT160.cpp" FORMNAME="" UNITNAME="uHGemHT160" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+  </FILELIST>
+  <BUILDTOOLS>
+  </BUILDTOOLS>
+
+  <IDEOPTIONS>
+[Version Info]
+IncludeVerInfo=0
+AutoIncBuild=0
+MajorVer=1
+MinorVer=0
+Release=0
+Build=0
+Debug=0
+PreRelease=0
+Special=0
+Private=0
+DLL=0
+Locale=1028
+CodePage=950
+
+[Version Info Keys]
+CompanyName=
+FileDescription=
+FileVersion=1.0.0.0
+InternalName=
+LegalCopyright=
+LegalTrademarks=
+OriginalFilename=
+ProductName=
+ProductVersion=1.0.0.0
+Comments=
+
+[HistoryLists\hlIncludePath]
+Count=3
+Item0=MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\Component;$(BCB)\include;$(BCB)\include\vcl;D:\HT160S_BCB\elec\myvcl
+Item1=MotorAndIO;$(BCB)\Projects;D:\HT9045\elec\Component;$(BCB)\include;$(BCB)\include\vcl;D:\HT9045\elec\myvcl
+Item2=MotorAndIO;$(BCB)\Projects;.;$(BCB)\include;$(BCB)\include\vcl
+
+[HistoryLists\hlLibraryPath]
+Count=3
+Item0=MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\myvcl;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib;D:\HT160S_BCB\elec\Component
+Item1=MotorAndIO;$(BCB)\Projects;D:\HT9045\elec\myvcl;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib;D:\HT9045\elec\Component
+Item2=MotorAndIO;$(BCB)\Projects;.;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib
+
+[HistoryLists\hlDebugSourcePath]
+Count=1
+Item0=$(BCB)\source\vcl
+
+[HistoryLists\hlConditionals]
+Count=1
+Item0=_DEBUG
+
+[Debugging]
+DebugSourceDirs=$(BCB)\source\vcl
+
+[Parameters]
+RunParams=
+Launcher=
+UseLauncher=0
+DebugCWD=
+HostApplication=
+RemoteHost=
+RemotePath=
+RemoteLauncher=
+RemoteCWD=
+RemoteDebug=0
+
+[Compiler]
+ShowInfoMsgs=0
+LinkDebugVcl=0
+LinkCGLIB=0
+
+[CORBA]
+AddServerUnit=1
+AddClientUnit=1
+PrecompiledHeaders=1
+
+[Language]
+ActiveLang=
+ProjectLang=
+RootDir=
+  </IDEOPTIONS>
+</PROJECT>

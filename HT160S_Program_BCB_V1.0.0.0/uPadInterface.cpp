@@ -1,0 +1,716 @@
+//---------------------------------------------------------------------------
+#include "IncludeAllHeader.h"
+#pragma hdrstop
+//---------------------------------------------------------------------------
+#include "uPadInterface.h"
+#include "database.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma link "SPComm"
+#pragma link "MyLed"
+#pragma link "BtnPanelLane"
+//---------------------------------------------------------------------------
+TfPadInterface *fPadInterface = NULL;
+//---------------------------------------------------------------------------
+static AnsiString NormalizePadInputName(AnsiString InputName)
+{
+    if(InputName==AnsiString("SnRKTray"))
+        return AnsiString("SnRKTrayEnd");
+    return InputName;
+}
+//---------------------------------------------------------------------------
+static void SyncHSysPadInputStatus(AnsiString InputName, bool State)
+{
+    AnsiString NormalName;
+
+    NormalName=NormalizePadInputName(InputName);
+    for(int Index=0; Index<HSys.iTotalSensor; Index++)
+    {
+        if(HSys.SenPtr[Index].Name==NormalName || HSys.SenPtr[Index].Name==InputName ||
+           (NormalName==AnsiString("SnRKTrayEnd") && HSys.SenPtr[Index].Name==AnsiString("SnRKTray")))
+            HSys.SenPtr[Index].iStatus=State?1:0;
+    }
+}
+//---------------------------------------------------------------------------
+static void SyncHSysPadSwitchStatus(AnsiString SwitchName, bool State)
+{
+    for(int Index=0; Index<HSys.iTotalSwitch; Index++)
+    {
+        if(HSys.SwPtr[Index].Name==SwitchName)
+        {
+            HSys.SwPtr[Index].OutValue=State;
+            HSys.SwPtr[Index].SetValue=State;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+struct TPadButtonDef
+{
+    const char *Caption;
+    const char *PadName;
+    const char *InputName;
+    int Data;
+    int PanelTag;
+};
+//---------------------------------------------------------------------------
+static const TPadButtonDef PadButtonDefs[] = {
+    {"Power Off",   "SwFKPowerOff",      "SnFKPowerOff",       PAD_PowerOff,      0},
+    {"Power On",    "SwFKPowerOn",       "SnFKPowerOn",        PAD_PowerOn,       0},
+    {"Front Enable","SwFrontActiveLed",  "SnFrontPadActive",   PAD_PannelEnable,  0},
+    {"Reset",       "SwFKReset",         "SnFKReset",          PAD_Reset,         0},
+    {"Pause",       "SwFKPause",         "SnFKPause",          PAD_Pause,         0},
+    {"Home",        "SwFKHome",          "SnFKHome",           PAD_Home,          0},
+    {"Start",       "SwFKStart",         "SnFKStart",          PAD_Start,         0},
+    {"One Cycle",   "SwFKOneCycle",      "SnFKOneCycle",       PAD_OneCycle,      0},
+    {"Retry",       "SwFKRetry",         "SnFKRetry",          PAD_Retry,         0},
+    {"Skip",        "SwFKSkip",          "SnFKSkip",           PAD_Skip,          0},
+    {"Clean Out",   "SwFKCleanOut",      "SnFKCleanOut",       PAD_CleanOut,      0},
+    {"Tray Feed",   "SwFKTrayFeed",      "SnFKTrayFeed",       PAD_TrayFeed,      0},
+    {"Tray End",    "SwFKTrayEnd",       "SnFKTrayEnd",        PAD_TrayEnd,       0},
+    {"Alarm Reset", "SwFKAlarmReset",    "SnFKAlarmReset",     PAD_AlarmReset,    0},
+    {"Power Off",   "SwRKPowerOff",      "SnRKPowerOff",       PAD_PowerOff,      1},
+    {"Power On",    "SwRKPowerOn",       "SnRKPowerOn",        PAD_PowerOn,       1},
+    {"Reset",       "SwRKReset",         "SnRKReset",          PAD_Reset,         1},
+    {"Pause",       "SwRKPause",         "SnRKPause",          PAD_Pause,         1},
+    {"Home",        "SwRKHome",          "SnRKHome",           PAD_Home,          1},
+    {"Start",       "SwRKStart",         "SnRKStart",          PAD_Start,         1},
+    {"One Cycle",   "SwRKOneCycle",      "SnRKOneCycle",       PAD_OneCycle,      1},
+    {"Retry",       "SwRKRetry",         "SnRKRetry",          PAD_Retry,         1},
+    {"Skip",        "SwRKSkip",          "SnRKSkip",           PAD_Skip,          1},
+    {"Clean Out",   "SwRKCleanOut",      "SnRKCleanOut",       PAD_CleanOut,      1},
+    {"Tray Feed",   "SwRKTrayFeed",      "SnRKTrayFeed",       PAD_TrayFeed,      1},
+    {"Tray End",    "SwRKTrayEnd",       "SnRKTrayEnd",        PAD_TrayEnd,       1},
+    {"Alarm Reset", "SwRKAlarmReset",    "SnRKAlarmReset",     PAD_AlarmReset,    1},
+    {"Safe Lock",   "SwRKSafeLock",      "SnRKSafeLock",       PAD_SafeLock,      1},
+    {"Step",        "SwRKManualStep",    "SnRKManualStep",     PAD_Step,          1},
+    {"T Start",     "SwRKManualTStart",  "SnRKManualTStart",   PAD_TStart,        1},
+    {"Rear Enable", "SwRearActiveLed",   "SnRearPadActive",    PAD_PannelEnable,  1}
+};
+//---------------------------------------------------------------------------
+void PAD_PTR::SetItem(TMyLed *_mlEvent, TBtnPanelLane *_btnEvent, AnsiString _PadName, int _iData, AnsiString _InputName)
+{
+    mlEvent=_mlEvent;
+    btnEvent=_btnEvent;
+    PadName=_PadName;
+    iData=_iData;
+    InputName=_InputName;
+    if(btnEvent!=NULL)
+        btnEvent->Enabled=true;
+}
+//---------------------------------------------------------------------------
+__fastcall TfPadInterface::TfPadInterface(TComponent* Owner)
+    : TForm(Owner)
+{
+    InitialVariable();
+    BuildUI();
+}
+//---------------------------------------------------------------------------
+__fastcall TfPadInterface::~TfPadInterface()
+{
+    delete CommReceiveList;
+    delete CommReceiveLength;
+    delete CommSendList;
+    delete CommSendLength;
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::InitialVariable()
+{
+    int i;
+
+    PadComm=NULL;
+    PadComPort="";
+    bRs232Ok=false;
+    bShow=false;
+    bRequestVer=false;
+    bScanSwitch=true;
+    bSendSwitchStatusing=false;
+    CheckPadItem=sizeof(PadButtonDefs)/sizeof(PadButtonDefs[0]);
+
+    CommReceiveList=new TStringList();
+    CommReceiveLength=new TStringList();
+    CommSendList=new TStringList();
+    CommSendLength=new TStringList();
+
+    for(i=0; i<32; i++)
+    {
+        PadItem[i].mlEvent=NULL;
+        PadItem[i].btnEvent=NULL;
+        PadItem[i].PadName="";
+        PadItem[i].InputName="";
+        PadItem[i].iData=0;
+        bPadInputStatus[i]=false;
+        bPadStatus[i]=false;
+    }
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::BuildUI()
+{
+    TPanel *BottomPanel;
+    TLabel *LabelPtr;
+
+    Caption="Pad Interface";
+    Width=840;
+    Height=610;
+    Position=poDesigned;
+    OnShow=FormShow;
+    OnClose=FormClose;
+
+    pn_PadInterfaceTitle=new TPanel(this);
+    pn_PadInterfaceTitle->Parent=this;
+    pn_PadInterfaceTitle->Align=alTop;
+    pn_PadInterfaceTitle->Height=40;
+    pn_PadInterfaceTitle->Caption="Pad Interface";
+    pn_PadInterfaceTitle->Font->Style=TFontStyles()<<fsBold;
+
+    sb_PadInterface_Exit=new TButton(this);
+    sb_PadInterface_Exit->Parent=pn_PadInterfaceTitle;
+    sb_PadInterface_Exit->Caption="Exit";
+    sb_PadInterface_Exit->Width=80;
+    sb_PadInterface_Exit->Height=26;
+    sb_PadInterface_Exit->Left=pn_PadInterfaceTitle->Width-90;
+    sb_PadInterface_Exit->Top=7;
+    sb_PadInterface_Exit->Anchors=TAnchors()<<akTop<<akRight;
+    sb_PadInterface_Exit->OnClick=sb_PadInterface_ExitClick;
+
+    BottomPanel=new TPanel(this);
+    BottomPanel->Parent=this;
+    BottomPanel->Align=alBottom;
+    BottomPanel->Height=150;
+    BottomPanel->BevelOuter=bvNone;
+
+    LabelPtr=new TLabel(this);
+    LabelPtr->Parent=BottomPanel;
+    LabelPtr->Caption="Manual Send";
+    LabelPtr->Left=8;
+    LabelPtr->Top=10;
+
+    ed_PadInterface_ManualSend=new TEdit(this);
+    ed_PadInterface_ManualSend->Parent=BottomPanel;
+    ed_PadInterface_ManualSend->Left=92;
+    ed_PadInterface_ManualSend->Top=6;
+    ed_PadInterface_ManualSend->Width=230;
+    ed_PadInterface_ManualSend->Text="t051400000000";
+
+    sb_PadInterface_ManualSend=new TButton(this);
+    sb_PadInterface_ManualSend->Parent=BottomPanel;
+    sb_PadInterface_ManualSend->Caption="Send";
+    sb_PadInterface_ManualSend->Left=330;
+    sb_PadInterface_ManualSend->Top=5;
+    sb_PadInterface_ManualSend->Width=70;
+    sb_PadInterface_ManualSend->OnClick=sb_PadInterface_ManualSendClick;
+
+    btnResetCom=new TButton(this);
+    btnResetCom->Parent=BottomPanel;
+    btnResetCom->Caption="Reset COM";
+    btnResetCom->Left=408;
+    btnResetCom->Top=5;
+    btnResetCom->Width=82;
+    btnResetCom->OnClick=sb_PadInterface_ManualSendClick;
+
+    btnClearLog=new TButton(this);
+    btnClearLog->Parent=BottomPanel;
+    btnClearLog->Caption="Clear Log";
+    btnClearLog->Left=498;
+    btnClearLog->Top=5;
+    btnClearLog->Width=82;
+    btnClearLog->OnClick=ClearLog1Click;
+
+    cb_PadInterface_PadLedBling=new TCheckBox(this);
+    cb_PadInterface_PadLedBling->Parent=BottomPanel;
+    cb_PadInterface_PadLedBling->Caption="Blink LED";
+    cb_PadInterface_PadLedBling->Left=590;
+    cb_PadInterface_PadLedBling->Top=9;
+    cb_PadInterface_PadLedBling->Width=100;
+
+    Memo_PadInterface=new TMemo(this);
+    Memo_PadInterface->Parent=BottomPanel;
+    Memo_PadInterface->Left=8;
+    Memo_PadInterface->Top=36;
+    Memo_PadInterface->Width=BottomPanel->Width-16;
+    Memo_PadInterface->Height=BottomPanel->Height-44;
+    Memo_PadInterface->Anchors=TAnchors()<<akLeft<<akTop<<akRight<<akBottom;
+    Memo_PadInterface->ScrollBars=ssVertical;
+
+    pc_PadInterface=new TPageControl(this);
+    pc_PadInterface->Parent=this;
+    pc_PadInterface->Align=alClient;
+
+    tsPadFront=new TTabSheet(this);
+    tsPadFront->PageControl=pc_PadInterface;
+    tsPadFront->Caption="Front Pad";
+
+    tsPadRear=new TTabSheet(this);
+    tsPadRear->PageControl=pc_PadInterface;
+    tsPadRear->Caption="Rear Pad";
+
+    pn_PadInterface_Front=new TPanel(this);
+    pn_PadInterface_Front->Parent=tsPadFront;
+    pn_PadInterface_Front->Align=alClient;
+    pn_PadInterface_Front->BevelOuter=bvNone;
+
+    pn_PadInterface_Rear=new TPanel(this);
+    pn_PadInterface_Rear->Parent=tsPadRear;
+    pn_PadInterface_Rear->Align=alClient;
+    pn_PadInterface_Rear->BevelOuter=bvNone;
+
+    BuildPadPage(pn_PadInterface_Front, 0, 14);
+    BuildPadPage(pn_PadInterface_Rear, 14, 17);
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::BuildPadPage(TPanel *ParentPanel, int BaseIndex, int Count)
+{
+    int i;
+    int Col;
+    int Row;
+
+    for(i=0; i<Count; i++)
+    {
+        Col=i/8;
+        Row=i%8;
+        AddPadItem(ParentPanel, BaseIndex+i, Row, Col);
+    }
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col)
+{
+    TPanel *ItemPanel;
+    TMyLed *LedPtr;
+    TBtnPanelLane *BtnPtr;
+    int LeftBase;
+    int TopBase;
+
+    if(Index<0 || Index>=CheckPadItem)
+        return;
+
+    LeftBase=18+(Col*390);
+    TopBase=18+(Row*48);
+
+    ItemPanel=new TPanel(this);
+    ItemPanel->Parent=ParentPanel;
+    ItemPanel->Left=LeftBase;
+    ItemPanel->Top=TopBase;
+    ItemPanel->Width=360;
+    ItemPanel->Height=38;
+    ItemPanel->BevelOuter=bvLowered;
+
+    LedPtr=new TMyLed(this);
+    LedPtr->Parent=ItemPanel;
+    LedPtr->Left=8;
+    LedPtr->Top=10;
+    LedPtr->Width=26;
+    LedPtr->Height=16;
+    LedPtr->Alias=PadButtonDefs[Index].InputName;
+    LedPtr->Tag=PadButtonDefs[Index].PanelTag;
+    LedPtr->Value=false;
+
+    BtnPtr=new TBtnPanelLane(this);
+    BtnPtr->Parent=ItemPanel;
+    BtnPtr->Left=44;
+    BtnPtr->Top=6;
+    BtnPtr->Width=130;
+    BtnPtr->Height=26;
+    BtnPtr->Caption=PadButtonDefs[Index].Caption;
+    BtnPtr->Alias=PadButtonDefs[Index].PadName;
+    BtnPtr->Tag=PadButtonDefs[Index].PanelTag;
+    BtnPtr->Down=false;
+    BtnPtr->OnMouseDown=PadButtonMouseDown;
+
+    PadItem[Index].SetItem(LedPtr, BtnPtr, PadButtonDefs[Index].PadName, PadButtonDefs[Index].Data, PadButtonDefs[Index].InputName);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::FormShow(TObject *Sender)
+{
+    (void)Sender;
+    Left=(1280-Width)/2;
+    Top=(1024-Height)/2;
+    bShow=true;
+    SendCommand("t050490000000");
+    SendCommand("t050491000000");
+    SendCommand("t051490000000");
+    SendCommand("t051491000000");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::FormClose(TObject *Sender, TCloseAction &Action)
+{
+    int i;
+
+    (void)Sender;
+    (void)Action;
+    bShow=false;
+    for(i=0; i<32; i++)
+        bPadStatus[i]=false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::sb_PadInterface_ExitClick(TObject *Sender)
+{
+    (void)Sender;
+    Close();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::PadButtonMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y)
+{
+    TBtnPanelLane *BtnPanelLane;
+
+    (void)Button;
+    (void)Shift;
+    (void)X;
+    (void)Y;
+
+    BtnPanelLane=dynamic_cast<TBtnPanelLane *>(Sender);
+    if(BtnPanelLane==NULL)
+        return;
+
+    BtnPanelLane->Down=!BtnPanelLane->Down;
+    PadButtonClick(Sender);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::PadButtonClick(TObject *Sender)
+{
+    TBtnPanelLane *BtnPanelLane;
+
+    BtnPanelLane=dynamic_cast<TBtnPanelLane *>(Sender);
+    if(BtnPanelLane==NULL)
+        return;
+
+    SendSwitchStatus(BtnPanelLane);
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::RecordLocalStatusCommand(int iAddress)
+{
+    AnsiString sData;
+    int i;
+    int iStatus;
+
+    iStatus=0;
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].btnEvent!=NULL && PadItem[i].btnEvent->Tag==iAddress && PadItem[i].btnEvent->Down)
+            iStatus|=PadItem[i].iData;
+    }
+
+    sData="t05";
+    sData+=IntToHex(iAddress, 1);
+    sData+=IntToHex(PAD_ControlDLC, 1);
+    sData+="9";
+    sData+=cb_PadInterface_PadLedBling->Checked?IntToHex(PAD_LedBling, 1):IntToHex(PAD_LedLight, 1);
+    sData+=IntToHex(iStatus, 6);
+    SendCommand(sData);
+}
+//---------------------------------------------------------------------------
+bool TfPadInterface::IsPadButton(AnsiString aName)
+{
+    int i;
+
+    if(aName=="")
+        return false;
+
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].PadName==aName)
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TfPadInterface::IsPadKey(AnsiString aName)
+{
+    int i;
+
+    if(aName=="")
+        return false;
+
+    aName=NormalizePadInputName(aName);
+
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].InputName==aName)
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TfPadInterface::GetPadSwitchStatus(AnsiString aName, bool *State)
+{
+    int i;
+
+    if(State!=NULL)
+        *State=false;
+    if(aName=="")
+        return false;
+
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].PadName==aName)
+        {
+            if(State!=NULL)
+                *State=bPadStatus[i];
+            return true;
+        }
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TfPadInterface::OpenCommPort()
+{
+    if(PadComm==NULL)
+    {
+        RecordCommunication("[Connect]", "PadComm is not assigned");
+        bRs232Ok=false;
+        return false;
+    }
+
+    try
+    {
+        PadComm->StartComm();
+        bRs232Ok=true;
+        RecordCommunication("[Connect]", "OK");
+    }
+    catch(...)
+    {
+        bRs232Ok=false;
+        RecordCommunication("[Connect]", "FAIL");
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TfPadInterface::CloseCommPort()
+{
+    if(PadComm==NULL)
+        return false;
+
+    try
+    {
+        PadComm->StopComm();
+        bRs232Ok=false;
+        RecordCommunication("[Disconnect]", "OK");
+    }
+    catch(...)
+    {
+        RecordCommunication("[Disconnect]", "FAIL");
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::ResetComm()
+{
+    CloseCommPort();
+    OpenCommPort();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::sb_PadInterface_ManualSendClick(TObject *Sender)
+{
+    if(Sender==btnResetCom)
+        ResetComm();
+    else
+        SendCommand(ed_PadInterface_ManualSend->Text);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::ClearLog1Click(TObject *Sender)
+{
+    (void)Sender;
+    Memo_PadInterface->Lines->Clear();
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::RequestPadVersion()
+{
+    bRequestVer=false;
+    SendCommand("t051120");
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::SendSwitchStatus(TBtnPanelLane *bpPtr)
+{
+    int i;
+
+    if(bpPtr==NULL)
+        return;
+
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].PadName==bpPtr->Alias)
+        {
+            bPadStatus[i]=bpPtr->Down;
+            SyncHSysPadSwitchStatus(PadItem[i].PadName, bPadStatus[i]);
+        }
+    }
+
+    RecordLocalStatusCommand((bpPtr->Tag==1)?PAD_RearControl:PAD_FrontControl);
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::SendSwitchStatus(AnsiString aName, bool Type)
+{
+    int i;
+
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].PadName==aName)
+        {
+            bPadStatus[i]=Type;
+            SyncHSysPadSwitchStatus(PadItem[i].PadName, Type);
+            if(PadItem[i].btnEvent!=NULL)
+                PadItem[i].btnEvent->Down=Type;
+            if(PadItem[i].mlEvent!=NULL)
+                PadItem[i].mlEvent->Value=Type;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::SendCommand(AnsiString sData)
+{
+    int iSize;
+    AnsiString SendText;
+
+    RecordCommunication("[Send]", sData);
+    if(bRs232Ok==false || PadComm==NULL)
+        return;
+
+    SendText=sData+AnsiString('\r');
+    iSize=SendText.Length();
+    if(iSize<=0)
+        return;
+
+    try
+    {
+        PadComm->WriteCommData(SendText.c_str(), iSize);
+    }
+    catch(...)
+    {
+        bRs232Ok=false;
+        RecordCommunication("[Send]", "FAIL");
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::DoScanPanelLed(int iAddress, int iKey)
+{
+    int i;
+    int iTag;
+    bool bValue;
+
+    iTag=(iAddress>0)?1:0;
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].mlEvent!=NULL && PadItem[i].mlEvent->Tag==iTag)
+        {
+            bValue=((PadItem[i].iData&iKey)!=0);
+            bPadInputStatus[i]=bValue;
+            PadItem[i].mlEvent->Value=bValue;
+            SyncHSysPadInputStatus(PadItem[i].InputName, bValue);
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::DoUpdataPadStatus(int iAddress, int iKey)
+{
+    int i;
+    int iTag;
+    bool bValue;
+
+    iTag=(iAddress>0)?1:0;
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].btnEvent!=NULL && PadItem[i].btnEvent->Tag==iTag)
+        {
+            bValue=((PadItem[i].iData&iKey)!=0);
+            bPadStatus[i]=bValue;
+            SyncHSysPadSwitchStatus(PadItem[i].PadName, bValue);
+            PadItem[i].btnEvent->Down=bValue;
+            if(PadItem[i].mlEvent!=NULL)
+                PadItem[i].mlEvent->Value=bValue;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::ProcessReceiceData()
+{
+    AnsiString S;
+    AnsiString sAddress;
+    AnsiString aPadKey;
+    int iAddress;
+    int iPadKey;
+
+    while(CommReceiveList->Count>0)
+    {
+        S=CommReceiveList->Strings[0];
+        CommReceiveList->Delete(0);
+        if(CommReceiveLength->Count>0)
+            CommReceiveLength->Delete(0);
+
+        if(S.Length()>=14)
+        {
+            sAddress=S.SubString(4, 1);
+            iAddress=atoi(sAddress.c_str());
+            aPadKey=S.SubString(8, 6);
+            iPadKey=StrToIntDef("0x"+aPadKey, 0);
+            if(S.SubString(6, 2)=="00")
+                DoScanPanelLed(iAddress, iPadKey);
+            else if(S.SubString(6, 2)=="90")
+                DoUpdataPadStatus(iAddress, iPadKey);
+        }
+        else if(S.Length()>=8 && S.SubString(6, 2)=="20")
+        {
+            bRequestVer=true;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::ProcessSendDataNew()
+{
+    int i;
+    static bool bOldPadStatus[32]={false};
+    bool bNeedSendFront;
+    bool bNeedSendRear;
+
+    bNeedSendFront=false;
+    bNeedSendRear=false;
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(bOldPadStatus[i]!=bPadStatus[i])
+        {
+            bOldPadStatus[i]=bPadStatus[i];
+            if(PadItem[i].btnEvent!=NULL && PadItem[i].btnEvent->Tag==1)
+                bNeedSendRear=true;
+            else
+                bNeedSendFront=true;
+            if(PadItem[i].btnEvent!=NULL)
+                PadItem[i].btnEvent->Down=bPadStatus[i];
+        }
+    }
+
+    if(bNeedSendFront)
+        RecordLocalStatusCommand(PAD_FrontControl);
+    if(bNeedSendRear)
+        RecordLocalStatusCommand(PAD_RearControl);
+}
+//---------------------------------------------------------------------------
+bool __fastcall TfPadInterface::ProcessScanKey(AnsiString aSenName)
+{
+    int i;
+
+    for(i=0; i<CheckPadItem; i++)
+    {
+        if(PadItem[i].InputName==NormalizePadInputName(aSenName))
+            return bPadInputStatus[i];
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfPadInterface::Main232()
+{
+    ProcessReceiceData();
+    ProcessSendDataNew();
+}
+//---------------------------------------------------------------------------
+void TfPadInterface::RecordCommunication(AnsiString aTitle, AnsiString Command)
+{
+    AnsiString LineText;
+
+    if(Memo_PadInterface==NULL)
+        return;
+
+    LineText=FormatDateTime("yyyy-mm-dd hh:nn:ss.zzz", Now())+AnsiString("   ")+aTitle+AnsiString(" => ")+Command;
+    Memo_PadInterface->Lines->Add(LineText);
+    if(Memo_PadInterface->Lines->Count>1000)
+        Memo_PadInterface->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------

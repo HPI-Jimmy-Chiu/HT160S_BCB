@@ -1,0 +1,89 @@
+//---------------------------------------------------------------------------
+#ifndef uHGemClassH
+#define uHGemClassH
+//---------------------------------------------------------------------------
+#include <Classes.hpp>
+#include <SysUtils.hpp>
+#include "uHGemEquipment.h"
+//---------------------------------------------------------------------------
+class HTGem
+{
+protected:
+    void SendUnsupported(AnsiString FunctionName);
+public:
+    THGem *HGemPtr;
+    AnsiString HandlerPath;
+    AnsiString DataPath;
+    TStringList *SecsAlarmMessage;
+
+    HTGem();
+    HTGem(THGem *GemPtr);
+    HTGem(AnsiString Path, THGem *GemPtr);
+    virtual ~HTGem();
+
+    void UpdateDataPath(AnsiString Path);
+
+    virtual void AddSV();
+    virtual void AddEC();
+    virtual void AddAlarmList();
+    virtual void AddCEID();
+    virtual void AddReprot();
+    virtual void LookForFile();
+    virtual void ReloadParameter();
+
+    virtual void S1F1_AreYouThereRequest();
+    virtual void S1F2_OnLineData();
+    virtual void S1F4_SelectedStatusReply();
+    virtual void S1F12_StatusVariableNamelistReply();
+    virtual void S1F13_EstablishCommunicationsRequest();
+    virtual void S1F14_ConnectRequestAcknowledge();
+    virtual void Process_S1F14_ConnectRequestAcknowledge();
+    virtual void S1F16_OFFLINEAcknowledge();
+    virtual void S1F18_ONLINEAcknowledge();
+    virtual void S1F24_CollectionEventNamelist();
+    virtual void S2F14_EquipmentConstanData();
+    virtual int S2F15_UpdateNewEquipmentConstant();
+    virtual int S2F15_CheckNewEquipmentConstant();
+    virtual void S2F16_NewEquipmentConstantSendAcknowledge();
+    virtual void S2F18_DateandTimeData();
+    virtual void S2F24_TraceInitializeAcknowledge();
+    virtual void S2F26_DiagnosticLoopbackData();
+    virtual void S2F30_EquipmentConstantNamelistReply();
+    virtual void S2F32_DateAndTimeAcknowledge();
+    virtual void S2F34_DefineReportAcknowledge();
+    virtual void S2F36_LinkEventReportAcknowledge();
+    virtual void S2F38_EnableDisableEventReportAcknowledge();
+    virtual int S2F42_Host_Command_Acknowledge();
+    virtual void S2F44_ResetSpoolingAcknowledge();
+    virtual void S5F4_EnableDisableAlarmAcknowledge();
+    virtual void S5F6_ListAlarmData();
+    virtual void S5F8_ListEnableAlarmAcknowledge();
+    virtual void S6F16_EventReportData();
+    virtual void S6F18_AnnotatedEventReportData();
+    virtual void S6F20_IndividualReportData();
+    virtual void S6F24_RequestSpooledDataAcknowledgementSend();
+    virtual int S7F2_ProcessProgramLoadGrant();
+    virtual void S7F4_ProcessProgramAcknowledge();
+    virtual void S7F6_ProcessProgramData();
+    virtual void S7F6_ProcessProgramData(AnsiString FileName);
+    virtual void S7F18_DeleteProcessProgramAcknowledge();
+    virtual void S7F20_CurrentEPPDData();
+    virtual void Process_S7F20_CurrentEPPIDData();
+    virtual int S7F24_FormattedProcessProgramSendAcknowledge();
+    virtual int S7F26_FormattedProcessProgramData();
+    virtual void S10F4_TerminalDisplaySingleAcknowledge();
+    virtual void S10F6_TerminalDisplayMultiBlockAcknowledge();
+    virtual void ProcessS14F1_GetAttrRequest(AnsiString asTrayID);
+    virtual unsigned char ProcessS14F2_GetAttrData();
+    virtual void S100F4_ReportAllAlarm();
+    virtual void S101F2_CurrentEPPDData();
+    virtual void S101F4_CurrentEPPDData();
+    virtual void S101F6();
+    virtual void S101F8();
+    virtual void S103F12_StatusVariableNamelistReply();
+    virtual void S125F2_EnableDisableECDataAcknowledge();
+    virtual void S125F4_LevelSettingChangeAcknowledge();
+    virtual void S9F3_Unrecognized_Stream_Function_Type(AnsiString ErrStr);
+};
+//---------------------------------------------------------------------------
+#endif

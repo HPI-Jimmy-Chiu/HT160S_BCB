@@ -1,0 +1,710 @@
+//---------------------------------------------------------------------------
+#include "IncludeAllHeader.h"
+#pragma hdrstop
+
+#include "note.h"
+#include "database.h"
+#include "cmydef.h"
+#include "csystem.h"
+#include "main.h"
+#include "mymessbox.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma link "HTray"
+#pragma resource "*.dfm"
+TfNote *fNote=NULL;
+//---------------------------------------------------------------------------
+DWORD RecordHappenTime=0;
+static const TColor NOTE_BG=(TColor)12761254;
+static const TColor MACHINE_NORMAL=(TColor)10398010;
+static const TColor TRAY_NORMAL=(TColor)14473944;
+static const TColor ALARM_COLOR=clRed;
+static const TColor SELECT_COLOR=clRed;
+static const TColor COMMAND_NORMAL=(TColor)8404992;
+static const TColor COMMAND_SKIP=(TColor)8421440;
+//---------------------------------------------------------------------------
+static void EnsureNote()
+{
+    if(fNote==NULL)
+        fNote=new TfNote(Application);
+}
+//---------------------------------------------------------------------------
+static AnsiString GetNoteLogFileName()
+{
+    AnsiString RootPath=HSys.CurrentDir;
+
+    if(RootPath=="")
+        RootPath="..";
+
+    return RootPath+AnsiString("\\logs\\note\\process_")+FormatDateTime("yyyymmdd", Now())+AnsiString(".log");
+}
+//---------------------------------------------------------------------------
+static void AppendNoteLog(AnsiString S)
+{
+    TStringList *List;
+    AnsiString FileName;
+    AnsiString Line;
+
+    FileName=GetNoteLogFileName();
+    ForceDirectories(ExtractFilePath(FileName));
+    Line=FormatDateTime("yyyy/mm/dd hh:nn:ss", Now())+AnsiString(" ")+S;
+
+    List=new TStringList;
+    try
+    {
+        if(FileExists(FileName))
+            List->LoadFromFile(FileName);
+        List->Add(Line);
+        List->SaveToFile(FileName);
+    }
+    __finally
+    {
+        delete List;
+    }
+}
+//---------------------------------------------------------------------------
+static void SetCommandButtonColor(TPanel *Panel, bool Selected)
+{
+    if(Panel==NULL)
+        return;
+
+    if(Selected)
+        Panel->Color=SELECT_COLOR;
+    else if(Panel->Name=="BtnSkip")
+        Panel->Color=COMMAND_SKIP;
+    else if(Panel->Name=="BtnStart")
+        Panel->Color=clBlue;
+    else
+        Panel->Color=COMMAND_NORMAL;
+}
+//---------------------------------------------------------------------------
+MyNoteStruct::MyNoteStruct()
+{
+    SystemErrorCode=new TStringList;
+    SysFlushPanelName=new TStringList;
+}
+//---------------------------------------------------------------------------
+MyNoteStruct::~MyNoteStruct()
+{
+    Clear();
+    delete SystemErrorCode;
+    delete SysFlushPanelName;
+}
+//---------------------------------------------------------------------------
+void MyNoteStruct::AddSysErr(AnsiString ErrorCode, AnsiString FlushPanel)
+{
+    SystemErrorCode->Add(ErrorCode);
+    SysFlushPanelName->Add(FlushPanel);
+}
+//---------------------------------------------------------------------------
+void MyNoteStruct::Clear()
+{
+    SystemErrorCode->Clear();
+    SysFlushPanelName->Clear();
+}
+//---------------------------------------------------------------------------
+__fastcall TfNote::TfNote(TComponent* Owner)
+    : TForm(Owner)
+{
+    int Index;
+
+    Code=0;
+    ReturnCode=0;
+    fShow=false;
+    KeyCode=0;
+    iBackOldMemo2Y=0;
+    iBackMemo2Height=0;
+    fMemoPos=false;
+    trayPtr=NullTray;
+    sObjName="";
+    FlushPanel=NULL;
+    FlushPanelColor=MACHINE_NORMAL;
+    SystemError=new MyNoteStruct;
+    bMachineLayoutBuilt=false;
+    bOffBuzzer=false;
+
+    for(Index=0; Index<6; Index++)
+        Select[Index]=false;
+
+    mtLoaderBuffer=NULL;
+    mtLoader=NULL;
+    mtFix1=NULL;
+    mtAuto1=NULL;
+    mtAuto2=NULL;
+    mtAuto3=NULL;
+    mtColor=NULL;
+    mtEmpty=NULL;
+    mtFix2=NULL;
+    mtFix3=NULL;
+    mtAuto1Buffer=NULL;
+    mtAuto2Buffer=NULL;
+    mtAuto3Buffer=NULL;
+    mtInCarrier=NULL;
+    mtStandbyBuffer1=NULL;
+    mtStandbyBuffer2=NULL;
+    mtOutCarrier=NULL;
+    mtOutCarrierShuttle=NULL;
+    mtInCarrierShuttle=NULL;
+    mtInCarrierBuffer=NULL;
+    mtOutCarrierShuttleBuffer=NULL;
+    mtTNTStation1=NULL;
+    mtTNTStation2=NULL;
+    mtTNTStation3=NULL;
+    mtAutoKnock=NULL;
+    mtCatchTray=NULL;
+    mtInShuttle=NULL;
+    mtOutShuttle=NULL;
+    mtEmptyBuffer=NULL;
+    mtColorBuffer=NULL;
+
+    pn_MachineFront=NULL;
+    pn_SafeDoor1=NULL;
+    pn_SafeDoor2=NULL;
+    pn_SafeDoor3=NULL;
+    pn_SafeDoor4=NULL;
+    pn_SafeDoor5=NULL;
+    pn_SafeDoor6=NULL;
+    pn_SafeDoor7=NULL;
+    pn_SafeDoor8=NULL;
+    pn_SafeDoor9=NULL;
+    pn_InShuttle=NULL;
+    pn_OutShuttle=NULL;
+    pn_System=NULL;
+    pn_InArmF=NULL;
+    pn_InArmR=NULL;
+    pn_OutArm=NULL;
+    pn_TrayArm=NULL;
+    pn_TempAndTest=NULL;
+    palSysErr=NULL;
+
+    BuildMachineLayout();
+}
+//---------------------------------------------------------------------------
+TPanel *__fastcall TfNote::CreateMachinePanel(TWinControl *ParentControl, AnsiString Name, AnsiString Caption, int Left, int Top, int Width, int Height, TColor Color)
+{
+    TPanel *Panel;
+
+    Panel=new TPanel(this);
+    Panel->Name=Name;
+    Panel->Parent=ParentControl;
+    Panel->Left=Left;
+    Panel->Top=Top;
+    Panel->Width=Width;
+    Panel->Height=Height;
+    Panel->Caption=Caption;
+    Panel->BevelInner=bvLowered;
+    Panel->BevelOuter=bvRaised;
+    Panel->Color=Color;
+    Panel->ParentColor=false;
+    Panel->Font->Color=clWhite;
+    Panel->Font->Name="Arial";
+    Panel->Font->Height=-11;
+    Panel->ParentFont=false;
+    return Panel;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::CreateMachineLabel(TWinControl *ParentControl, AnsiString Name, AnsiString Caption, int Left, int Top, int Width, int Height)
+{
+    TLabel *Label;
+
+    Label=new TLabel(this);
+    Label->Name=Name;
+    Label->Parent=ParentControl;
+    Label->Left=Left;
+    Label->Top=Top;
+    Label->Width=Width;
+    Label->Height=Height;
+    Label->Alignment=taCenter;
+    Label->AutoSize=false;
+    Label->Caption=Caption;
+    Label->Color=NOTE_BG;
+    Label->Font->Color=clWhite;
+    Label->Font->Name="Arial";
+    Label->Font->Height=-11;
+    Label->ParentColor=false;
+    Label->ParentFont=false;
+}
+//---------------------------------------------------------------------------
+TTMyTray *__fastcall TfNote::CreateMachineTray(TWinControl *ParentControl, AnsiString Name, AnsiString Caption, int Left, int Top, int Width, int Height)
+{
+    TTMyTray *Tray;
+
+    Tray=new TTMyTray(this);
+    Tray->Name=Name;
+    Tray->Parent=ParentControl;
+    Tray->Left=Left;
+    Tray->Top=Top;
+    Tray->Width=Width;
+    Tray->Height=Height;
+    Tray->Color=TRAY_NORMAL;
+    Tray->XItem=5;
+    Tray->YItem=8;
+    CreateMachineLabel(ParentControl, AnsiString("lab_")+Name, Caption, Left-10, Top-16, Width+20, 14);
+    return Tray;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::BuildMachineLayout()
+{
+    if(bMachineLayoutBuilt)
+        return;
+    if(PanelMain6==NULL)
+        return;
+
+    bMachineLayoutBuilt=true;
+    PanelMain6->Color=NOTE_BG;
+
+    palSysErr=CreateMachinePanel(PanelMain6, "palSysErr", "System Error", 790, 20, 150, 44, MACHINE_NORMAL);
+    pn_MachineFront=CreateMachinePanel(PanelMain6, "pn_MachineFront", "", 24, 462, 900, 16, MACHINE_NORMAL);
+
+    mtLoaderBuffer=CreateMachineTray(PanelMain6, "mtLoaderBuffer", "Loader Buf", 90, 380, 58, 88);
+    mtLoader=CreateMachineTray(PanelMain6, "mtLoader", "Loader", 90, 252, 58, 88);
+    mtEmpty=CreateMachineTray(PanelMain6, "mtEmpty", "Empty", 190, 252, 58, 88);
+    mtColor=CreateMachineTray(PanelMain6, "mtColor", "Color", 260, 252, 58, 88);
+    mtFix1=CreateMachineTray(PanelMain6, "mtFix1", "Fix1", 350, 252, 58, 88);
+    mtFix2=CreateMachineTray(PanelMain6, "mtFix2", "Fix2", 420, 252, 58, 88);
+    mtFix3=CreateMachineTray(PanelMain6, "mtFix3", "Fix3", 490, 252, 58, 88);
+    mtAuto1=CreateMachineTray(PanelMain6, "mtAuto1", "Auto1", 590, 252, 58, 88);
+    mtAuto2=CreateMachineTray(PanelMain6, "mtAuto2", "Auto2", 660, 252, 58, 88);
+    mtAuto3=CreateMachineTray(PanelMain6, "mtAuto3", "Auto3", 730, 252, 58, 88);
+
+    mtAuto1Buffer=CreateMachineTray(PanelMain6, "mtAuto1Buffer", "A1 Buf", 590, 380, 58, 88);
+    mtAuto2Buffer=CreateMachineTray(PanelMain6, "mtAuto2Buffer", "A2 Buf", 660, 380, 58, 88);
+    mtAuto3Buffer=CreateMachineTray(PanelMain6, "mtAuto3Buffer", "A3 Buf", 730, 380, 58, 88);
+    mtEmptyBuffer=CreateMachineTray(PanelMain6, "mtEmptyBuffer", "Empty Buf", 190, 380, 58, 88);
+    mtColorBuffer=CreateMachineTray(PanelMain6, "mtColorBuffer", "Color Buf", 260, 380, 58, 88);
+
+    pn_SafeDoor1=CreateMachinePanel(PanelMain6, "pn_SafeDoor1", "1", 24, 252, 18, 100, MACHINE_NORMAL);
+    pn_SafeDoor2=CreateMachinePanel(PanelMain6, "pn_SafeDoor2", "2", 24, 142, 18, 100, MACHINE_NORMAL);
+    pn_SafeDoor3=CreateMachinePanel(PanelMain6, "pn_SafeDoor3", "3", 24, 42, 18, 92, MACHINE_NORMAL);
+    pn_SafeDoor4=CreateMachinePanel(PanelMain6, "pn_SafeDoor4", "4", 44, 24, 150, 18, MACHINE_NORMAL);
+    pn_SafeDoor5=CreateMachinePanel(PanelMain6, "pn_SafeDoor5", "5", 690, 24, 150, 18, MACHINE_NORMAL);
+    pn_SafeDoor6=CreateMachinePanel(PanelMain6, "pn_SafeDoor6", "6", 860, 42, 18, 92, MACHINE_NORMAL);
+    pn_SafeDoor7=CreateMachinePanel(PanelMain6, "pn_SafeDoor7", "7", 860, 142, 18, 100, MACHINE_NORMAL);
+    pn_SafeDoor8=CreateMachinePanel(PanelMain6, "pn_SafeDoor8", "8", 860, 252, 18, 100, MACHINE_NORMAL);
+    pn_SafeDoor9=CreateMachinePanel(PanelMain6, "pn_SafeDoor9", "9", 792, 48, 54, 30, MACHINE_NORMAL);
+
+    pn_InShuttle=CreateMachinePanel(PanelMain6, "pn_InShuttle", "In Shuttle", 86, 202, 78, 26, MACHINE_NORMAL);
+    pn_OutShuttle=CreateMachinePanel(PanelMain6, "pn_OutShuttle", "Out Shuttle", 630, 202, 86, 26, MACHINE_NORMAL);
+    pn_System=CreateMachinePanel(PanelMain6, "pn_System", "System", 462, 372, 86, 76, MACHINE_NORMAL);
+    pn_InArmF=CreateMachinePanel(PanelMain6, "pn_InArmF", "In Arm F", 48, 232, 170, 16, MACHINE_NORMAL);
+    pn_InArmR=CreateMachinePanel(PanelMain6, "pn_InArmR", "In Arm R", 48, 184, 260, 16, MACHINE_NORMAL);
+    pn_OutArm=CreateMachinePanel(PanelMain6, "pn_OutArm", "Out Arm", 612, 184, 260, 16, MACHINE_NORMAL);
+    pn_TrayArm=CreateMachinePanel(PanelMain6, "pn_TrayArm", "", 330, 252, 18, 100, MACHINE_NORMAL);
+
+    mtInCarrierShuttle=CreateMachineTray(PanelMain6, "mtInCarrierShuttle", "In Shuttle", 54, 142, 88, 42);
+    mtInCarrier=CreateMachineTray(PanelMain6, "mtInCarrier", "In Carrier", 166, 142, 88, 42);
+    mtStandbyBuffer2=CreateMachineTray(PanelMain6, "mtStandbyBuffer2", "Standby2", 288, 142, 88, 42);
+    mtStandbyBuffer1=CreateMachineTray(PanelMain6, "mtStandbyBuffer1", "Standby1", 410, 142, 88, 42);
+    mtOutCarrier=CreateMachineTray(PanelMain6, "mtOutCarrier", "Out Carrier", 532, 142, 88, 42);
+    mtOutCarrierShuttle=CreateMachineTray(PanelMain6, "mtOutCarrierShuttle", "Out Shuttle", 654, 142, 88, 42);
+    mtInCarrierBuffer=CreateMachineTray(PanelMain6, "mtInCarrierBuffer", "In Buf", 166, 74, 88, 42);
+    mtOutCarrierShuttleBuffer=CreateMachineTray(PanelMain6, "mtOutCarrierShuttleBuffer", "Out Buf", 654, 74, 88, 42);
+
+    pn_TempAndTest=CreateMachinePanel(PanelMain6, "pn_TempAndTest", "Temp And Test", 292, 28, 330, 108, MACHINE_NORMAL);
+    mtTNTStation1=CreateMachineTray(pn_TempAndTest, "mtTNTStation1", "TNT1", 14, 48, 82, 40);
+    mtTNTStation2=CreateMachineTray(pn_TempAndTest, "mtTNTStation2", "TNT2", 124, 48, 82, 40);
+    mtTNTStation3=CreateMachineTray(pn_TempAndTest, "mtTNTStation3", "TNT3", 234, 48, 82, 40);
+
+    mtAutoKnock=CreateMachineTray(PanelMain6, "mtAutoKnock", "Auto Knock", 812, 380, 68, 88);
+    mtCatchTray=CreateMachineTray(PanelMain6, "mtCatchTray", "Catch Tray", 902, 380, 68, 88);
+    mtInShuttle=CreateMachineTray(PanelMain6, "mtInShuttle", "In Shutt", 52, 74, 88, 42);
+    mtOutShuttle=CreateMachineTray(PanelMain6, "mtOutShuttle", "Out Shutt", 770, 142, 88, 42);
+
+    Reset();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::SetMachinePanelColor(TPanel *Panel, TColor Color)
+{
+    if(Panel!=NULL)
+        Panel->Color=Color;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::Reset()
+{
+    SetMachinePanelColor(palSysErr, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_MachineFront, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor1, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor2, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor3, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor4, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor5, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor6, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor7, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor8, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_SafeDoor9, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_InShuttle, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_OutShuttle, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_System, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_InArmF, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_InArmR, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_OutArm, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_TrayArm, MACHINE_NORMAL);
+    SetMachinePanelColor(pn_TempAndTest, MACHINE_NORMAL);
+    FlushPanel=NULL;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::FormShow(TObject *Sender)
+{
+    TPanel *RecoveryButtons[6]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut, BtnHome};
+    int KeyComp[6]={K_SKIP, K_RETRY, K_TRAY_FEED, K_TRAY_END, K_CLEAN_OUT, K_HOME};
+    int Index;
+
+    fShow=true;
+    ReturnCode=0;
+    if(fMain!=NULL)
+    {
+        Left=fMain->Left+(fMain->Width-Width)/2;
+        Top=fMain->Top+(fMain->Height-Height)/2;
+    }
+
+    for(Index=0; Index<6; Index++)
+    {
+        Select[Index]=false;
+        SetCommandButtonColor(RecoveryButtons[Index], false);
+        if(KeyCode==0)
+            RecoveryButtons[Index]->Visible=false;
+        else
+            RecoveryButtons[Index]->Visible=((KeyCode & KeyComp[Index])!=0);
+    }
+
+    if(FlushPanel!=NULL)
+        FlushPanelColor=FlushPanel->Color;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
+{
+    CloseBuzzerOff();
+    bOffBuzzer=false;
+    fShow=false;
+    if(FlushPanel!=NULL)
+        FlushPanel->Color=FlushPanelColor;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::Timer1Timer(TObject *Sender)
+{
+    static bool Blink=false;
+
+    if(fShow==false)
+        return;
+    if(bOffBuzzer)
+        CloseBuzzerOff();
+    if(FlushPanel==NULL)
+        return;
+
+    Blink=!Blink;
+    if(Blink)
+        FlushPanel->Color=ALARM_COLOR;
+    else
+        FlushPanel->Color=FlushPanelColor;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::UpdateButtonStatus(TObject *Sender)
+{
+    TPanel *RecoveryButtons[6]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut, BtnHome};
+    TPanel *PanelPtr;
+    int Index;
+    int SelectIndex;
+
+    PanelPtr=dynamic_cast<TPanel *>(Sender);
+    if(PanelPtr==NULL)
+        return;
+
+    SelectIndex=PanelPtr->Tag-1;
+    if(SelectIndex<0 || SelectIndex>=6)
+        return;
+
+    for(Index=0; Index<6; Index++)
+    {
+        Select[Index]=(Index==SelectIndex);
+        SetCommandButtonColor(RecoveryButtons[Index], Select[Index]);
+    }
+    ReturnCode=PanelPtr->Tag;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::BtnSkipClick(TObject *Sender)
+{
+    UpdateButtonStatus(Sender);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::BtnStartClick(TObject *Sender)
+{
+    SoftStop=false;
+    SoftStart=true;
+    RecordProcess("START pressed");
+    Close();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::BtnPauseClick(TObject *Sender)
+{
+    SoftStart=false;
+    SoftStop=true;
+    HSys.DecStopAllMotor();
+    RecordProcess("PAUSE pressed");
+    Close();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::BtnOffBuzzerClick(TObject *Sender)
+{
+    bOffBuzzer=true;
+    CloseBuzzerOff();
+    RecordProcess("OFF BUZZER pressed");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::FlushLabel()
+{
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::ScanKey()
+{
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::Start()
+{
+    BtnStartClick(this);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::LevelProcessErrMessage()
+{
+}
+//---------------------------------------------------------------------------
+bool __fastcall TfNote::CheckCodeIsExist(AnsiString Str)
+{
+    return false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::ProcessErrMessage(AnsiString EC, AnsiString Str, int Type)
+{
+    if(EC=="" && Str=="")
+        return;
+    RecordHappenTime=GetTickCount();
+    AppendNoteLog(AnsiString("ALARM,")+EC+AnsiString(",")+Str+AnsiString(",TYPE=")+IntToStr(Type));
+}
+//---------------------------------------------------------------------------
+void TfNote::GetFlushPanel(TWinControl *PCtrl, AnsiString PanelName)
+{
+    TPanel *PanelPtr;
+    int Index;
+
+    if(PCtrl==PanelMain6)
+        FlushPanel=NULL;
+    if(PCtrl==NULL)
+        return;
+
+    PanelPtr=dynamic_cast<TPanel *>(PCtrl);
+    if(PanelPtr!=NULL && PanelPtr->Name==PanelName)
+    {
+        FlushPanel=PanelPtr;
+        return;
+    }
+
+    for(Index=0; Index<PCtrl->ControlCount; Index++)
+    {
+        TWinControl *ChildControl=dynamic_cast<TWinControl *>(PCtrl->Controls[Index]);
+        if(ChildControl!=NULL)
+            GetFlushPanel(ChildControl, PanelName);
+        if(FlushPanel!=NULL)
+            return;
+    }
+}
+//---------------------------------------------------------------------------
+void TfNote::ChangePalPos(TPanel *Panel, int Height, int Left, int Top, int Width, bool Visible)
+{
+    if(Panel==NULL)
+        return;
+    Panel->Height=Height;
+    Panel->Left=Left;
+    Panel->Top=Top;
+    Panel->Width=Width;
+    Panel->Visible=Visible;
+}
+//---------------------------------------------------------------------------
+static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail, int KCode, AnsiString FlushPanelName)
+{
+    EnsureNote();
+    if(fNote->fShow)
+        return 0;
+
+    HSys.DecStopAllMotor();
+    HSys.Sys.SystemStart=false;
+    SoftStop=false;
+    SoftStart=false;
+
+    fNote->Reset();
+    fNote->KeyCode=KCode;
+    fNote->edtAlarmCode->Text=Code;
+    fNote->edtAlarmMsg->Text=Message;
+    fNote->Memo1->Clear();
+    if(Detail!="")
+        fNote->Memo1->Lines->Add(Detail);
+    fNote->trayPtr=fNote->NullTray;
+
+    if(FlushPanelName!="")
+        fNote->GetFlushPanel(fNote->PanelMain6, FlushPanelName);
+    if(fNote->FlushPanel==NULL)
+        fNote->FlushPanel=fNote->pn_System;
+
+    fNote->ProcessErrMessage(Code, Message, 1);
+    fNote->ShowModal();
+    fNote->trayPtr=fNote->NullTray;
+    return fNote->ReturnCode;
+}
+//---------------------------------------------------------------------------
+void ShowCylinderError(int Code, int Type)
+{
+    AnsiString AlarmCode=AnsiString().sprintf("CYL%04d", Code);
+    ShowNoteAlarm(AlarmCode, "Cylinder Error", AnsiString().sprintf("Type=%d", Type), K_RETRY, "pn_System");
+}
+//---------------------------------------------------------------------------
+void ShowMotorError(AnsiString Code)
+{
+    ShowMotorError(Code, "");
+}
+//---------------------------------------------------------------------------
+void ShowMotorError(AnsiString Code, AnsiString sFunc)
+{
+    AnsiString Detail;
+
+    Detail="Motor error";
+    if(sFunc!="")
+        Detail=Detail+AnsiString("; Func=")+sFunc;
+    ShowNoteAlarm(Code, "Motor Error", Detail, K_RETRY, "pn_System");
+    fAllMotorHome=false;
+    ChangeRunMode(Run_Home);
+}
+//---------------------------------------------------------------------------
+int ShowSuckError(TMySucker &Ptr, int CodeType, int KCode, AnsiString HappenRegion)
+{
+    AnsiString Code;
+    AnsiString Message;
+
+    Code.sprintf("SUC%03d%d", Ptr.Tag, CodeType);
+    Message=Ptr.SuckerName+AnsiString(" Sucker Error");
+    return ShowNoteAlarm(Code, Message, HappenRegion, KCode, "pn_InArmF");
+}
+//---------------------------------------------------------------------------
+int ShowSuckError(TMyKitSuck &Ptr, int CodeType, int KCode, AnsiString errPart, int iDuplicate)
+{
+    AnsiString Code;
+    AnsiString Message;
+
+    Code.sprintf("SUC%03d%d", Ptr.Tag, CodeType);
+    Message=Ptr.Name+AnsiString(" Sucker Error");
+    if(iDuplicate!=0)
+        Message=Message+AnsiString(" (Again!)");
+    return ShowNoteAlarm(Code, Message, errPart, KCode, Ptr.FlushPanelName);
+}
+//---------------------------------------------------------------------------
+int ShowSystemError(int CodeType, int KCode)
+{
+    AnsiString Code=AnsiString().sprintf("SYS%04d", CodeType);
+    return ShowNoteAlarm(Code, "System Error", "", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+int ShowSystemError(AnsiString Name, int KCode, int iDuplicate, AnsiString Message)
+{
+    AnsiString AlarmMessage=Message;
+
+    if(AlarmMessage=="")
+        AlarmMessage=Name;
+    if(iDuplicate!=0)
+        AlarmMessage=AlarmMessage+AnsiString(" (Again!)");
+    return ShowNoteAlarm(Name, AlarmMessage, Message, KCode, Name);
+}
+//---------------------------------------------------------------------------
+int ShowShuttleError(int pos, int KCode)
+{
+    AnsiString PanelName;
+
+    if(pos==0)
+        PanelName="pn_InShuttle";
+    else
+        PanelName="pn_OutShuttle";
+    return ShowNoteAlarm(AnsiString().sprintf("SHT%04d", pos), "Shuttle Error", "", KCode, PanelName);
+}
+//---------------------------------------------------------------------------
+int ShowJamError(int iJamSensor, int KCode)
+{
+    return ShowNoteAlarm(AnsiString().sprintf("JAM%04d", iJamSensor), "Jam Error", "", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+int ShowMagazineError(int iMagazine, int CodeType, int KCode)
+{
+    return ShowNoteAlarm(AnsiString().sprintf("MAG%02d%02d", iMagazine, CodeType), "Magazine Error", "HT160S_BCB keeps this API for old-source compatibility.", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+int ShowSystemCommError(int CodeType, int KCode, AnsiString Note)
+{
+    return ShowNoteAlarm(AnsiString().sprintf("COM%04d", CodeType), "System Communication Error", Note, KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+int ShowCCDError(int CodeType, int KCode, AnsiString Note)
+{
+    return ShowNoteAlarm(AnsiString().sprintf("CCD%04d", CodeType), "CCD Error", Note, KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+int ShowMyError(AnsiString sMyError, int KCode)
+{
+    return ShowNoteAlarm(sMyError, sMyError, "", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+int ShowTNTError(int CodeType, int KCode)
+{
+    return ShowNoteAlarm(AnsiString().sprintf("TNT%04d", CodeType), "TNT Error", "", KCode, "pn_TempAndTest");
+}
+//---------------------------------------------------------------------------
+void ShowErrorMessage(AnsiString Code)
+{
+    ShowNoteAlarm(Code, Code, "", K_RETRY, "pn_System");
+}
+//---------------------------------------------------------------------------
+void RecordProcess(AnsiString S)
+{
+    static AnsiString LastRecord="";
+
+    if(S=="")
+        return;
+    if(S==LastRecord && S.Pos(" pressed")!=0)
+        return;
+
+    LastRecord=S;
+    AppendNoteLog(AnsiString("PROCESS,")+S);
+    if(fNote!=NULL && fNote->Memo1!=NULL)
+        fNote->Memo1->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+S);
+}
+//---------------------------------------------------------------------------
+void LevelRecordProcess()
+{
+}
+//---------------------------------------------------------------------------
+void SearchMessage(AnsiString Code)
+{
+    RecordProcess(AnsiString("SearchMessage:")+Code);
+}
+//---------------------------------------------------------------------------
+void RecordAlarmMessagePassTime(AnsiString AlarmCode, DWORD StartTime, AnsiString HappenTime, int Type)
+{
+    AppendNoteLog(AnsiString("PASS,")+AlarmCode+AnsiString(",")+HappenTime+AnsiString(",TYPE=")+IntToStr(Type));
+}
+//---------------------------------------------------------------------------
+bool CheckAlarmIsShow()
+{
+    return true;
+}
+//---------------------------------------------------------------------------
+void SetShowAlarmLocation(int iType, int iPosition)
+{
+}
+//---------------------------------------------------------------------------
+void SetShowSuckerLocation(AnsiString sSuckerName)
+{
+}
+//---------------------------------------------------------------------------
+void ShowImageTrayFuntion()
+{
+}
+//---------------------------------------------------------------------------
+AnsiString GetRefrenceCode(AnsiString S)
+{
+    return "No Code";
+}
+//---------------------------------------------------------------------------

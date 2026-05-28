@@ -1,0 +1,26 @@
+[DSP upload]
+Filename=BmpAnim.zip
+Replacements=BmpAnim.zip
+Version=0.2
+FileURL=www.student2.lu.se/~nma96pth/
+Description=A Bitmap animator that takes a bitmap with "frames" of   like-sized bitmaps and animates it in several styles. Create   animations as in MS Explorer Netscape Navigator etc
+Delphi 1.0=N
+Delphi 2.0=Y
+Delphi 3.0=Y
+C++Builder 1.0=N
+File Status=Freeware
+Full Source=Included
+Category=Visible Components
+Note=Freeware with source. Win32 only.
+Additional info=
+[DSP Support]
+DSP Support=Y
+[Versions available]
+Delphi 1.0=
+Delphi 2.0=
+Delphi 3.0=
+C++Builder 1.0=
+[Uploader]
+Author name=Peter Thörnqvist
+Author E-mail=NMA96PTH@STUDENT2.LU.SE
+Author URL=WWW.STUDENT2.LU.SE/~NMA96PTH/MYCOMPS.HTM

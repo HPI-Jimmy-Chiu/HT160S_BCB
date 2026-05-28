@@ -1,0 +1,86 @@
+[ALed], Freeware with source.
+
+Replaces:  TAutoLed V2.01 by Chang Ting SU (ctsu@ms12.hinet.net)
+Author:    Howard Harvey
+Date:      31/JULY/1997
+Version:   1.03
+
+HISTORY
+-------
+V1.03	31/7/97 Added ShowHint property
+V1.02	24/7/97 Fixed Timer identification
+V1.01	Initial Release
+
+DESCRIPTION
+-----------
+This component can show 6 different styles of LED:
+  Round Large (the original in TAutoLed)
+  Round Small
+  Square Large
+  Square Small
+  Rectangular Horizontal
+  Rectangular Vertical
+
+Dynamic resizing is possible, but the 6 predefined versions are best.
+Resizing upwards is acceptable, but resizing downwards results in loss of clarity.
+Resizing requires a definition of the form 
+  ALED1.width := NewWidth ;
+  ALED1.height := NewHeight ;
+to be executed when the form is first drawn or after each change in the style
+or colours.
+
+Dynamic selection of the LED style is also possible (try doing that in hardware!)
+
+Any defined system colour can be independently defined for the ON and OFF states.
+Blinking (when ON state selected) is provided, with user selectable blink rate.
+
+[Event]
+   OnClick,
+   *OnMouseEnter,
+   *OnMouseLeave,
+   *OnTimer(When Blink is true)
+[Properties]
+   Blink(True or False),
+   FalseColor(when Value is false)(You can select any defined color),
+   Hint,
+   Interval(Blink Interval),
+   LedStyle(LEDSmall,LEDLarge,LEDSqSmall,LEDSqLarge,LEDVertical,LEDHorizontal),
+   ShowHints(True or False),
+   TrueColor(when Value is true)(You can select any defined color),
+   Value(True or False);
+
+
+Focus Colour Control for LEDs
+
+The OnMouseEnter and OnMouseLeave events can be used to provide focus indication
+by changing the LED colour (eg changing from Lime/Green to Red/Maroon when the
+mouse enters the LED region and reverting to Lime/Green on exit)
+
+
+Suggested True (ON) and False (OFF) Colours for LEDs are:
+
+        TrueColor       FalseColor
+        ---------       ----------
+        Red             Maroon
+        Yellow          Olive
+        Lime            Green
+        Fuchsia         Purple
+        Aqua            Teal
+        Blue            Navy
+        White           Gray
+        Silver          Black
+
+
+Click Control
+
+Using the OnClick event allows clicking the LED to initiate any desired action,
+such as starting/stopping a timer or counter.
+
+
+This component has been successfully tested on Delphi2 and Delphi3.
+Test code is not included.  The component is simple and registers
+as ALed in the Extras component panel.
+
+Howard Harvey
+(hharvey@dove.net.au)
+(http://dove.net.au/~hharvey)
