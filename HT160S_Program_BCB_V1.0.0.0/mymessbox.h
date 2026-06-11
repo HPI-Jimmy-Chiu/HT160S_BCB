@@ -56,7 +56,7 @@ int  ShowMyMessageBox_YES_NO(char *str);
 AnsiString LoadLanguageString(char *str, int type);
 AnsiString LoadLanguageStringForCode(int Code, int type);
 AnsiString Changelanguagea(AnsiString S);
-void ShowSECSGEMMessage(AnsiString S);
 void CloseBuzzerOff();
+void ShowSECSGEMMessage(AnsiString S);
 //---------------------------------------------------------------------------
 #endif

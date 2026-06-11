@@ -22,7 +22,9 @@
 #include <DBGrids.hpp>
 #include "aled.hpp"
 #include "HTray.h"
+#include "cprod.h"
 #include "csystem.h"
 #include "mymessbox.h"
+#include "note.h"
 //---------------------------------------------------------------------------
 #endif

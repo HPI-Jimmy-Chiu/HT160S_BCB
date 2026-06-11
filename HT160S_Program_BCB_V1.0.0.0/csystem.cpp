@@ -4,12 +4,18 @@
 #pragma hdrstop
 
 #include "csystem.h"
-#include "ComPort.h"
 #include "cmydef.h"
 #include "iosetview.h"
 #include "main.h"
 #include "maintenance.h"
 #include "uruncontrol.h"
+#include "aAuto1To6.h"
+#include "aLoader.h"
+#include "aSortArm.h"
+#include "cprod.h"
+#include "uHome.h"
+#include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
+#include "note.h"                       //AI(HT160S-Maintainer) 20260603 : ShowSystemError for ProcessAlarm dispatch
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -40,14 +46,43 @@ static void UpdateRunControlFlag()
 	RunControlSystemStart=HSys.Sys.SystemStart;
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260603 : central alarm consumer. Modules raise alarms via
+//Alarm->Set(code) (non-blocking, returns immediately); MainProc drains the queue
+//here and shows each one through the alarm-code map. mapAlarmContext carries the
+//caller Func/Case string so the note remark field (Memo1) shows what triggered it.
+void ProcessAlarm()
+{
+	TComponent *Comp=NULL;
+	int iCode=0;
+	AnsiString sCtx;
+	std::map<int, AnsiString>::iterator it;
+
+	if(Alarm==NULL)
+		return;
+
+	while(PopUpAlarm(&Comp, iCode))
+	{
+		it=HSys.mapAlarmContext.find(iCode);
+		sCtx=(it!=HSys.mapAlarmContext.end())?it->second:AnsiString("");
+		ShowSystemError(AnsiString(iCode), K_RETRY, 0, sCtx);
+	}
+	ClearAllAlarm();
+	HSys.mapAlarmContext.clear();
+}
+//---------------------------------------------------------------------------
 void MainProc()
 {
 	static bool bProgramStart=false;
 
 	ProcessStartMode();
 	DoSystem();
-	SpinComPort();
 	ProcessRunStatus(bProgramStart);
+
+	if(fMain!=NULL)
+		fMain->SetSimulateScreenStatus();
+
+	if(fMain!=NULL)
+		fMain->ShowMotorInfo();
 
 	if(fiosetview!=NULL && fiosetview->Visible)
 	{
@@ -58,7 +93,21 @@ void MainProc()
 	if(bProgramStart==false)
 		bProgramStart=DoInitialProgramStart();
 	else
+	{
+		//AI(general) 20260601 : ProcessMotion must run every cycle so homing
+		//completion advances RunMode to Run_Normal; the old "else ProcessMotion()"
+		//branch was dead code (DataModule1 is never NULL after startup), which
+		//left RunMode stuck at Run_Home and the module dispatch never ran.
 		ProcessMotion();
+		//AI(HT160S-Maintainer) 20260602 : while a SortArm single Z-home is in
+		//progress, hold the module engine so it cannot fight the re-home.
+		if(DataModule1!=NULL && bSortArmNeedHome==false)
+			DataModule1->DoAllProcess();
+	}
+
+	//AI(HT160S-Maintainer) 20260603 : drain any alarms raised during this cycle's
+	//module processing and show them through the central dispatch.
+	ProcessAlarm();
 
 	UpdateRunControlFlag();
 }
@@ -397,6 +446,7 @@ void ProcessStartMode()
 	{
 		SoftStart=false;
 		SoftStop=false;
+		SetMotorSpeed();                                                        //AI(HT160S-Maintainer) 20260602 : apply working speed once per START, before SystemStart guard (HT172 0420 csystem.cpp port). Must precede SystemStart=true.
 		HSys.Sys.SystemStart=true;
 	}
 	else if(SoftStop)
@@ -424,6 +474,21 @@ void ProcessRunStatus(bool bProgramStart)
 			Status="HOMING";
 			Color=clGreen;
 		}
+        else if(HSys.Sys.RunMode==Run_CleanOut)
+        {
+            Status="Clean Out";
+			Color=clYellow;
+        }
+        else if(HSys.Sys.RunMode==Run_TrayFeed)
+        {
+            Status="Tray Feed";
+			Color=clYellow;
+        }
+        else if(HSys.Sys.RunMode==Run_OneCycle)
+        {
+            Status="One Cycle";
+			Color=clYellow;
+        }
 		else
 		{
 			Status="RUNNING";
@@ -466,6 +531,8 @@ void ProcessRunStatus(bool bProgramStart)
 //---------------------------------------------------------------------------
 void InitialAllTask()
 {
+	if(DataModule1!=NULL)
+		DataModule1->InitialAllTask();
 }
 //---------------------------------------------------------------------------
 void InitialAllModule()
@@ -480,25 +547,171 @@ bool DoInitialProgramStart()
 	{
 		case 1:
 			HSys.DecStopAllMotor();
+			InitialAllTask();
+			LoadMotorSpeedFromIni();                                            //AI(HT160S-Maintainer) 20260602 : load+apply per-motor speed baseline so iPersentSpeed never stays at the 1%% default (HT172 0420 Speed port)
 			Task=200;
 			break;
 		case 200:
+			if(DataModule1!=NULL && DataModule1->Timer1!=NULL)
+				DataModule1->Timer1->Enabled=true;
 			return true;
 	}
 	return false;
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260602 : SortArm single Z-home driver (HT172 0420
+//SortArm1ZHome equivalent, rewritten non-FSM). Re-homes the 4 SortArm suck-Z
+//axes non-blocking; returns true once every enabled axis reports homed. While
+//bSortArmNeedHome is set MainProc suspends DataModule1->DoAllProcess().
+static bool DoSortArmZHome()
+{
+	TTrayMotor *Z[4];
+	Z[0]=HSys.Mot.MSuckZ_1;
+	Z[1]=HSys.Mot.MSuckZ_2;
+	Z[2]=HSys.Mot.MSuckZ_3;
+	Z[3]=HSys.Mot.MSuckZ_4;
+
+	bool bAllHomed=true;
+	for(int i=0; i<4; i++)
+	{
+		if(Z[i]==NULL || Z[i]->GetEnable()==false)
+			continue;
+		AnsiString sErr="";
+		if(Z[i]->Home(sErr)==false)
+			bAllHomed=false;
+	}
+	return bAllHomed;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260602 : re-arm a fresh full-machine home. The Home
+//button leaves bHomeFlag set from the previous home, so without clearing them
+//CheckMotorHome() reports done and the engine never runs. Clearing every
+//motor's home flag forces ProcessMotion Layer 1 to drive ProcessMotorHome.
+void ArmMotorHome()
+{
+	if(HSys.MotPtr!=NULL)
+	{
+		for(int i=0; i<HSys.iTotalMotor; i++)
+			if(HSys.MotPtr[i]!=NULL)
+				HSys.MotPtr[i]->InitHomeTask();
+	}
+	fHome->iHomeStep=1;
+	fAllMotorHome=false;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260602 : ported HT172 0420 ProcessMotion lifecycle in
+//HT160S procedural style (no FSM). Layers: UPH pause accounting -> home not done
+//-> home-just-finished finalize -> SortArm single Z-home -> normal production
+//with lot-start init and RunMode finish dispatch.
 void ProcessMotion()
 {
-	if(HSys.Sys.SystemStart)
+	//Pause stopwatch: SystemStart falling edge starts timing so the paused
+	//interval is excluded from UPH. Covers operator SoftStop and any safety stop.
+	static bool bPrevSystemStart=false;
+	if(bPrevSystemStart && HSys.Sys.SystemStart==false)
 	{
-		if(CheckMotorHome()==false)
+		if(bCalculatePauseTime==false)
 		{
-			ChangeRunMode(Run_Home);
-			return;
+			tUPH_PauseStartTime=Now();
+			bCalculatePauseTime=true;
 		}
-		fAllMotorHome=true;
-		ChangeRunMode(Run_Normal);
+	}
+	bPrevSystemStart=HSys.Sys.SystemStart;
+
+	if(HSys.Sys.SystemStart==false)
+		return;
+
+	//Resume edge: accumulate the elapsed pause once, on the cycle we resume.
+	if(bCalculatePauseTime)
+	{
+		tUPH_PauseTime=tUPH_PauseTime+(Now()-tUPH_PauseStartTime);
+		bCalculatePauseTime=false;
+	}
+
+	//Layer 1 : full-machine home not finished -> drive the home engine. The
+	//engine raises the TrayArm Z + opens clamps, batch-homes the 4 sucker Z,
+	//then batch-homes every XY axis. When all enabled axes report homed,
+	//CheckMotorHome() turns true next cycle and Layer 2 finalizes.
+    CheckMotorHome();
+	//Layer 2 : home just completed this cycle -> finalize exactly once.
+	if(fAllMotorHome==false)
+	{
+        bSortArmNeedHome=false;
+		if(HSys.Sys.RunMode!=Run_Home)
+			ChangeRunMode(Run_Home);
+        if(fHome->ProcessMotorHome())
+        {
+            InitialAllTask();
+            fAllMotorHome=true;
+            ChangeRunMode(Run_Normal);                                          //20120102 Daver add
+            SetMotorSpeed(true);                                                //AI(HT160S-Maintainer) 20260602 : re-apply working speed after home (HT172 0420 csystem/uhome port)
+            if(bHomeByStart)
+                bHomeByStart=false;
+            else
+                SoftStop=true;
+        }
+		return;
+	}
+
+	//Layer 3 : SortArm single Z-home request. Writer in SortArm fault path is
+	//not yet wired; the flag stays dormant until a future module change sets it.
+	if(bSortArmNeedHome)
+	{
+		if(DoSortArmZHome())
+			bSortArmNeedHome=false;
+		return;
+	}
+
+	//Layer 4 : normal production. Lot-start one-shot init, then RunMode finish.
+	if(bFirstRun)
+	{
+		bFirstRun=false;
+		tRunData.StartTime=Now();
+		tUPH_PauseTime=StrToTime("00:00:00");
+		bCalculatePauseTime=false;
+	}
+
+	if(HSys.Sys.RunMode==Run_CleanOut)
+	{
+		if(CheckCleanOutFinish())
+		{
+			tRunData.LotEndTime=Now();
+			tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
+			InitialAllTask();
+			HSys.Sys.bCleanOut=false;   //AI(HT160S-Maintainer) 20260605 : CleanOut fully done, drop nested latch
+			ChangeRunMode(Run_Normal);
+			SoftStop=true;
+		}
+	}
+	else if(HSys.Sys.RunMode==Run_OneCycle)
+	{
+		if(CheckOneCycleFinish())
+		{
+			InitialAllTask();
+			//AI(HT160S-Maintainer) 20260605 : place-before-stop done. If OneCycle was
+			//launched mid-CleanOut, resume CleanOut and run it to completion (no stop :
+			//nested-continuation latch); otherwise return to Normal and stop the machine.
+			if(HSys.Sys.bCleanOut)
+            {
+                ChangeRunMode(Run_CleanOut);
+                SoftStop=true;
+            }
+			else
+			{
+				ChangeRunMode(Run_Normal);
+				SoftStop=true;
+			}
+		}
+	}
+	else if(HSys.Sys.RunMode==Run_TrayFeed)
+	{
+		if(CheckAllTrayFeedFinish())
+		{
+			InitialAllTask();
+			ChangeRunMode(Run_Normal);
+			bFirstRun=true;
+			SoftStop=true;
+		}
 	}
 }
 //---------------------------------------------------------------------------
@@ -512,11 +725,27 @@ void AddNoNeedHomeSensorList()
 //---------------------------------------------------------------------------
 bool CheckCleanOutFinish()
 {
+	//AI(HT160S-Maintainer) 20260602 : CleanOut done = Auto stations cleaned AND no
+	//IC left under the machine. Aggregates real module state so the RunMode revert
+	//never fires instantly at CleanOut start (was a stub returning true).
+	if(LoaderModule!=NULL && LoaderModule->IsAllCleanOutFinish()==false)
+		return false;
+	if(SortArmModule!=NULL && SortArmModule->IsCleanOutFinish()==false)
+		return false;
+	if(AutoModule!=NULL && AutoModule->IsAllCleanOutFinish()==false)
+		return false;
+	if(HasICUnderMachineForCleanOut())
+		return false;
 	return true;
 }
 //---------------------------------------------------------------------------
 bool CheckOneCycleFinish()
 {
+	//AI(HT160S-Maintainer) 20260605 : OneCycle done = SortArm has placed its held IC
+	//and is idle (place-before-stop). OneCycle deliberately does NOT drain trays, so
+	//IC may remain under the machine : do not gate on HasICUnderMachine here.
+	if(SortArmModule!=NULL && SortArmModule->IsOneCycleFinish()==false)
+		return false;
 	return true;
 }
 //---------------------------------------------------------------------------
@@ -558,7 +787,10 @@ bool CheckEmpty1TrayFeedFinish()
 //---------------------------------------------------------------------------
 bool CheckAllTrayFeedFinish(bool reset)
 {
-	return true;
+	//AI(HT160S-Maintainer) 20260602 : no per-module TrayFeed finish flag exists yet,
+	//so report not-finished to preserve current behavior. Wire real module finish
+	//state here when modules expose it.
+	return false;
 }
 //---------------------------------------------------------------------------
 void ChangeRunMode(RunModeEnum RunMode)
@@ -568,7 +800,12 @@ void ChangeRunMode(RunModeEnum RunMode)
 //---------------------------------------------------------------------------
 int GetCalculateUPH(TDateTime tEndTime)
 {
-	return 0;
+	//AI(HT160S-Maintainer) 20260602 : HT172 0420 UPH excludes accumulated pause time.
+	TDateTime tElapsed=tEndTime-tRunData.StartTime-tUPH_PauseTime;
+	double dSeconds=tElapsed.operator double()*86400.0;
+	if(dSeconds<=0.0)
+		return 0;
+	return (int)((double)tRunData.TotalIC*3600.0/dSeconds);
 }
 //---------------------------------------------------------------------------
 void RecordSafeDoorStates()

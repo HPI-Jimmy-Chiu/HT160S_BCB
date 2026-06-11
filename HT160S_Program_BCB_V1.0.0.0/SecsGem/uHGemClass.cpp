@@ -45,12 +45,94 @@ void HTGem::UpdateDataPath(AnsiString Path)
     DataPath = Path;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-secsgem) 20260610 : primary-message dispatch table (route B).
+// Called by THGem after a complete data message is decoded into SReceiveData.
+//---------------------------------------------------------------------------
+void HTGem::Dispatch(int S, int F)
+{
+    if(HGemPtr!=NULL)
+    {
+        AnsiString L;
+        L.sprintf("[SECS][RX] S%dF%d dispatch", S, F);
+        HGemPtr->StringOut(L);
+    }
+    //AI(ht160s-secsgem) 20260611 : even F = secondary (host reply to our primary,
+    //  e.g. S6F12 ack of S6F11). Log and drop; never answer with S9F3.
+    if((F & 1)==0)
+    {
+        if(HGemPtr!=NULL)
+        {
+            AnsiString R;
+            R.sprintf("[SECS][RX] S%dF%d reply ignored", S, F);
+            HGemPtr->StringOut(R);
+        }
+        return;
+    }
+    switch(S)
+    {
+    case 1:
+        switch(F)
+        {
+        case 1:  S1F2_OnLineData();                  return;
+        case 3:  S1F4_SelectedStatusReply();         return;
+        case 11: S1F12_StatusVariableNamelistReply();return;//AI(ht160s-secsgem) 20260611 : SV namelist
+        case 13: S1F14_ConnectRequestAcknowledge();  return;
+        }
+        break;
+    case 2:
+        switch(F)
+        {
+        case 17: S2F18_DateandTimeData();            return;
+        case 25: S2F26_DiagnosticLoopbackData();     return;
+        case 31: S2F32_DateAndTimeAcknowledge();     return;
+        case 41: S2F42_Host_Command_Acknowledge();   return;
+        case 13: S2F14_EquipmentConstanData();       return;
+        case 15: S2F16_NewEquipmentConstantSendAcknowledge(); return;//AI(ht160s-secsgem) 20260611 : EC write
+        }
+        break;
+    case 5:
+        switch(F)
+        {
+        case 3: S5F4_EnableDisableAlarmAcknowledge(); return;
+        case 5: S5F6_ListAlarmData();                 return;
+        }
+        break;
+    case 7:
+        switch(F)
+        {
+        case 1:  S7F2_ProcessProgramLoadGrant();           return;
+        case 3:  S7F4_ProcessProgramAcknowledge();         return;
+        case 5:  S7F6_ProcessProgramData();                return;
+        case 17: S7F18_DeleteProcessProgramAcknowledge();  return;
+        case 19: S7F20_CurrentEPPDData();                  return;
+        }
+        break;
+    case 10:
+        switch(F)
+        {
+        case 3: S10F4_TerminalDisplaySingleAcknowledge();   return;
+        case 5: S10F6_TerminalDisplayMultiBlockAcknowledge(); return;
+        }
+        break;
+    case 14:
+        if(F==1) { ProcessS14F1_GetAttrRequest(""); return; }
+        break;
+    }
+    // Unhandled primary message -> report unrecognized S/F.
+    AnsiString E;
+    E.sprintf("S%dF%d", S, F);
+    S9F3_Unrecognized_Stream_Function_Type(E);
+}
+//---------------------------------------------------------------------------
 void HTGem::SendUnsupported(AnsiString FunctionName)
 {
     if(HGemPtr!=NULL)
         HGemPtr->StringOut("[SECS] " + FunctionName + " unsupported in HT160S skeleton");
 }
 //---------------------------------------------------------------------------
+void HTGem::RefreshSVData(){ }
+//AI(ht160s-secsgem) 20260612 : base no-op; HT160Gem overrides to drive the main-screen SECS badge.
+void HTGem::RefreshSecsBadge(){ }
 void HTGem::AddSV(){ }
 void HTGem::AddEC(){ }
 void HTGem::AddAlarmList(){ }

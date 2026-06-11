@@ -69,7 +69,7 @@ void __fastcall THT160AutomationServer::LoadConfig()
 //---------------------------------------------------------------------------
 void __fastcall THT160AutomationServer::WriteLog(AnsiString Text)
 {
-    AnsiString LogDir = HSys.CurrentDir + AnsiString("\\logs\\automation");
+    AnsiString LogDir = HSys.LogRootDir + AnsiString("\\automation");
     ForceDirectories(LogDir);
     AnsiString LogPath = LogDir + AnsiString("\\automation_startup.log");
     FILE *LogFile = fopen(LogPath.c_str(), "a+");
@@ -435,13 +435,7 @@ AnsiString __fastcall THT160AutomationServer::BuildLotInfoReply()
     if(MainForm == NULL)
         return "ERR|MAIN_FORM_NOT_READY";
 
-    return AnsiString("OK|LOT_INFO|LOT_NO=") + EncodeValue(MainForm->edLotNo->Text) +
-           ";WAFER_LOT=" + EncodeValue(MainForm->edWaferLot->Text) +
-           ";CUS_DEVICE=" + EncodeValue(MainForm->edCusDevice->Text) +
-           ";INSERTION=" + EncodeValue(MainForm->edInsertion->Text) +
-           ";FLOW_ID=" + EncodeValue(MainForm->edFlowID->Text) +
-           ";OPERATOR=" + EncodeValue(MainForm->edOperator->Text) +
-           ";RUN_CARD=" + EncodeValue(MainForm->edtRunCard->Text);
+    return AnsiString("OK|LOT_INFO|LOT_NO=") + EncodeValue(MainForm->edLotNo->Text);
 }
 //---------------------------------------------------------------------------
 AnsiString __fastcall THT160AutomationServer::SetLotInfo(AnsiString Payload)
@@ -466,40 +460,6 @@ AnsiString __fastcall THT160AutomationServer::SetLotInfo(AnsiString Payload)
         Value = GetPayloadValue(Payload, "LOTNO");
     if(Value != "")
         MainForm->edLotNo->Text = Value;
-
-    Value = GetPayloadValue(Payload, "WAFER_LOT");
-    if(Value == "")
-        Value = GetPayloadValue(Payload, "WAFERLOT");
-    if(Value != "")
-        MainForm->edWaferLot->Text = Value;
-
-    Value = GetPayloadValue(Payload, "CUS_DEVICE");
-    if(Value == "")
-        Value = GetPayloadValue(Payload, "DEVICE");
-    if(Value != "")
-        MainForm->edCusDevice->Text = Value;
-
-    Value = GetPayloadValue(Payload, "INSERTION");
-    if(Value != "")
-        MainForm->edInsertion->Text = Value;
-
-    Value = GetPayloadValue(Payload, "FLOW_ID");
-    if(Value == "")
-        Value = GetPayloadValue(Payload, "FLOWID");
-    if(Value != "")
-        MainForm->edFlowID->Text = Value;
-
-    Value = GetPayloadValue(Payload, "OPERATOR");
-    if(Value == "")
-        Value = GetPayloadValue(Payload, "OPERATOR_ID");
-    if(Value != "")
-        MainForm->edOperator->Text = Value;
-
-    Value = GetPayloadValue(Payload, "RUN_CARD");
-    if(Value == "")
-        Value = GetPayloadValue(Payload, "RUNCARD");
-    if(Value != "")
-        MainForm->edtRunCard->Text = Value;
 
     return BuildLotInfoReply();
 }

@@ -23,19 +23,40 @@
 #include "butPa1.h"
 #include <DB.hpp>
 #include <jpeg.hpp>
+#include "ALed.hpp"
 //---------------------------------------------------------------------------
 class Tfiosetview : public TForm
 {
 __published:
+    TPanel *pn_IOSetViewMenu;
+    TSpeedButton *sbIOExit;
+    TRadioButton *rbGeneralIO;
+    TPageControl *PageIO;
+    TTabSheet *ts_IOLoader;
+    TGroupBox *GroupBox1;
+    TLabel *Label1;
+    TImage *img1;
+    TEdit *ed_OutPort_1;
+    TCheckBox *cbToolBit0;
+    TComboBox *ComboBox1;
+    TDBNavigator *DBNavigator1;
+    TDBGrid *DBGrid1;
+    TStringGrid *OutputInformationGrid;
+    TMemo *MemoIOMap;
+    TTable *ioTable;
+    TOpenDialog *OpenDialog1;
+    TSaveDialog *SaveDialog1;
+    TTimer *Timer1;
+    TDataSource *DataSource1;
+    TPopupMenu *PopupMenu1;
+    TMenuItem *SaveInputMap1;
+    TMyLed *MyLed1;
+    TBtnPanel *btnpnl1;
+    TALed *ALedTool0;
+    TMyLed *MyLed36;
+    TMyLed *MyLed37;
+    TBtnPanel *BtnPanel6;
     void __fastcall FormShow(TObject *Sender);
-    void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
-    void __fastcall tmrRefreshTimer(TObject *Sender);
-    void __fastcall btnRefreshClick(TObject *Sender);
-    void __fastcall btnOutputOnClick(TObject *Sender);
-    void __fastcall btnOutputOffClick(TObject *Sender);
-    void __fastcall btnSuckerDestroyClick(TObject *Sender);
-    void __fastcall chkManualOutputClick(TObject *Sender);
-    void __fastcall GridSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
     void __fastcall BtnPanelClick(TObject *Sender);
     void __fastcall ComboBox1Change(TObject *Sender);
     void __fastcall rbGeneralIOClick(TObject *Sender);
@@ -53,7 +74,14 @@ __published:
     void __fastcall spbTerminalProgramClick(TObject *Sender);
     void __fastcall Timer1Timer(TObject *Sender);
     void __fastcall tmr_IonFanTimer(TObject *Sender);
+    void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
 private:
+    // The members below are NOT present in iosetview.dfm; they belong to the
+    // code-built (dynamic) IO view UI created in BuildUI()/EnsureIOTableEditor().
+    // They MUST stay out of __published, otherwise the BCB6 IDE Form Designer
+    // reports "Incorrect method declaration in class Tfiosetview" when it
+    // reconciles __published against the DFM (the bcc32 command-line build is
+    // unaffected either way). //AI(general) 20260603
     TPanel *palHeader;
     TLabel *lblTitle;
     TLabel *lblSummary;
@@ -69,11 +97,6 @@ private:
     TTabSheet *tsSwitches;
     TTabSheet *tsSuckers;
     TTabSheet *tsIOTable;
-    TStringGrid *grdSensors;
-    TStringGrid *grdCylinders;
-    TStringGrid *grdSwitches;
-    TStringGrid *grdSuckers;
-    TStringGrid *grdIOTable;
     TPanel *pnIOTableEditorToolbar;
     TComboBox *cbbType;
     TComboBox *cbbLane;
@@ -85,7 +108,18 @@ private:
     TStringGrid *strngrdIoTable;
     TStringList *IOTableDeletedTags;
     TStringList *ManualOutputLog;
-    TTimer *tmrRefresh;
+    void __fastcall btnRefreshClick(TObject *Sender);
+    void __fastcall btnOutputOnClick(TObject *Sender);
+    void __fastcall btnOutputOffClick(TObject *Sender);
+    void __fastcall btnSuckerDestroyClick(TObject *Sender);
+    void __fastcall chkManualOutputClick(TObject *Sender);
+    void __fastcall GridSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
+
+    TStringGrid *grdSensors;
+    TStringGrid *grdCylinders;
+    TStringGrid *grdSwitches;
+    TStringGrid *grdSuckers;
+    TStringGrid *grdIOTable;
 
     int SelectedKind;
     int SelectedIndex;
@@ -158,6 +192,9 @@ private:
     bool ResolveLegacyButtonState(AnsiString AliasName, bool *State);
     void UpdateSelectedInfo();
     void UpdateManualButtons();
+    TPageControl *GetLegacyPageIO();
+    void SelectLegacyIOPageByButton(TSpeedButton *Button);
+    void UpdateLegacyPageTabsVisible();
     void ClearGridRows(TStringGrid *Grid);
     void SetGridRowCount(TStringGrid *Grid, int RowCount);
     int CountIOType(AnsiString TypeName);
@@ -181,8 +218,6 @@ private:
     bool IsLegacyGeneralIOMode();
     bool ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr);
     void SetRefreshTimerEnabled(bool Enabled);
-    void ApplyHT172Palette();
-    void ApplyHT172PaletteToComponent(TComponent *Component);
     void __fastcall btnAddIOClick(TObject *Sender);
     void __fastcall btnDeleteIOClick(TObject *Sender);
     void __fastcall btnModifyClick(TObject *Sender);
@@ -194,9 +229,16 @@ private:
 public:
     __fastcall Tfiosetview(TComponent* Owner);
     __fastcall ~Tfiosetview();
+    bool fShow;
 };
 //---------------------------------------------------------------------------
 extern PACKAGE Tfiosetview *fiosetview;
+// iosetview.dfm uses custom components (TMyLed/TBtnPanel/TALed) whose design
+// packages are NOT installed in this IDE (HT160S_BCB uses local compatibility
+// units, registered only at design time via RegisterComponents). Their classes
+// must therefore be registered at runtime before Tfiosetview is streamed, or
+// CreateForm throws "Class Txxx not found". Call this once before any
+// CreateForm(Tfiosetview). The function is idempotent (guarded by a static).
 void RegisterIOViewStreamClasses();
 //---------------------------------------------------------------------------
 #endif

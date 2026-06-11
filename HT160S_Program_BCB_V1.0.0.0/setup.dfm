@@ -13814,7 +13814,7 @@ object fSetup: TfSetup
           object lblBinPlaceholder: TLabel
             Left = 24
             Top = 14
-            Width = 324
+            Width = 223
             Height = 16
             Caption = 'Bin 0 means this area is not assigned.'
             Font.Charset = DEFAULT_CHARSET
@@ -13856,16 +13856,15 @@ object fSetup: TfSetup
             Width = 640
             Height = 330
             ColCount = 4
-            DefaultRowHeight = 24
+            FixedColor = clTeal
             FixedCols = 0
             RowCount = 8
-            FixedColor = clTeal
             Font.Charset = DEFAULT_CHARSET
             Font.Color = clWindowText
             Font.Height = -12
             Font.Name = 'Arial'
             Font.Style = []
-            Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goEditing, goTabs, goColSizing]
+            Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goColSizing, goEditing, goTabs]
             ParentFont = False
             TabOrder = 0
             OnExit = grdBinAreaMapExit
@@ -13877,13 +13876,11 @@ object fSetup: TfSetup
             Width = 280
             Height = 330
             BevelInner = bvLowered
-            Caption = ''
-            Color = clBtnFace
             TabOrder = 1
             object lblBinRecipeTitle: TLabel
               Left = 16
               Top = 16
-              Width = 48
+              Width = 51
               Height = 16
               Caption = 'Recipe'
               Font.Charset = DEFAULT_CHARSET
@@ -13909,7 +13906,7 @@ object fSetup: TfSetup
             object lblBinFileTitle: TLabel
               Left = 16
               Top = 42
-              Width = 60
+              Width = 61
               Height = 16
               Caption = 'Map File'
               Font.Charset = DEFAULT_CHARSET
@@ -13937,7 +13934,7 @@ object fSetup: TfSetup
             object lblBinMappedTitle: TLabel
               Left = 16
               Top = 86
-              Width = 57
+              Width = 58
               Height = 16
               Caption = 'Mapped'
               Font.Charset = DEFAULT_CHARSET
@@ -13963,7 +13960,7 @@ object fSetup: TfSetup
             object lblBinColorTitle: TLabel
               Left = 16
               Top = 112
-              Width = 42
+              Width = 38
               Height = 16
               Caption = 'Color'
               Font.Charset = DEFAULT_CHARSET
@@ -13989,7 +13986,7 @@ object fSetup: TfSetup
             object lblBinErrorTitle: TLabel
               Left = 16
               Top = 140
-              Width = 66
+              Width = 61
               Height = 16
               Caption = 'Error Bin'
               Font.Charset = DEFAULT_CHARSET

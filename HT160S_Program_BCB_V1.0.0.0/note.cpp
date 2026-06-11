@@ -1,8 +1,6 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
-
-#include "note.h"
 #include "database.h"
 #include "cmydef.h"
 #include "csystem.h"
@@ -31,12 +29,12 @@ static void EnsureNote()
 //---------------------------------------------------------------------------
 static AnsiString GetNoteLogFileName()
 {
-    AnsiString RootPath=HSys.CurrentDir;
+    AnsiString RootPath=HSys.LogRootDir;
 
     if(RootPath=="")
-        RootPath="..";
+        RootPath=HSys.LogRootDir;
 
-    return RootPath+AnsiString("\\logs\\note\\process_")+FormatDateTime("yyyymmdd", Now())+AnsiString(".log");
+    return RootPath+AnsiString("\\note\\process_")+FormatDateTime("yyyymmdd", Now())+AnsiString(".log");
 }
 //---------------------------------------------------------------------------
 static void AppendNoteLog(AnsiString S)
@@ -115,7 +113,6 @@ __fastcall TfNote::TfNote(TComponent* Owner)
     iBackOldMemo2Y=0;
     iBackMemo2Height=0;
     fMemoPos=false;
-    trayPtr=NullTray;
     sObjName="";
     FlushPanel=NULL;
     FlushPanelColor=MACHINE_NORMAL;
@@ -401,6 +398,10 @@ void __fastcall TfNote::Timer1Timer(TObject *Sender)
 void __fastcall TfNote::UpdateButtonStatus(TObject *Sender)
 {
     TPanel *RecoveryButtons[6]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut, BtnHome};
+    //AI(HT160S-Maintainer) 20260609 : caller compares Ret against K_* bitmask (K_SKIP..K_HOME),
+    //so ReturnCode must carry the matching bit value, not the sequential DFM Tag (Tag 3..6 != K 4..32).
+    //Same order as FormShow KeyComp. Index resolved by Sender pointer to drop the fragile Tag-1 coupling.
+    static const int KeyCodeByIndex[6]={K_SKIP, K_RETRY, K_TRAY_FEED, K_TRAY_END, K_CLEAN_OUT, K_HOME};
     TPanel *PanelPtr;
     int Index;
     int SelectIndex;
@@ -409,8 +410,13 @@ void __fastcall TfNote::UpdateButtonStatus(TObject *Sender)
     if(PanelPtr==NULL)
         return;
 
-    SelectIndex=PanelPtr->Tag-1;
-    if(SelectIndex<0 || SelectIndex>=6)
+    SelectIndex=-1;
+    for(Index=0; Index<6; Index++)
+    {
+        if(RecoveryButtons[Index]==PanelPtr)
+            SelectIndex=Index;
+    }
+    if(SelectIndex<0)
         return;
 
     for(Index=0; Index<6; Index++)
@@ -418,7 +424,7 @@ void __fastcall TfNote::UpdateButtonStatus(TObject *Sender)
         Select[Index]=(Index==SelectIndex);
         SetCommandButtonColor(RecoveryButtons[Index], Select[Index]);
     }
-    ReturnCode=PanelPtr->Tag;
+    ReturnCode=KeyCodeByIndex[SelectIndex];
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnSkipClick(TObject *Sender)
@@ -536,7 +542,6 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
     fNote->Memo1->Clear();
     if(Detail!="")
         fNote->Memo1->Lines->Add(Detail);
-    fNote->trayPtr=fNote->NullTray;
 
     if(FlushPanelName!="")
         fNote->GetFlushPanel(fNote->PanelMain6, FlushPanelName);
@@ -545,7 +550,6 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
 
     fNote->ProcessErrMessage(Code, Message, 1);
     fNote->ShowModal();
-    fNote->trayPtr=fNote->NullTray;
     return fNote->ReturnCode;
 }
 //---------------------------------------------------------------------------
@@ -602,13 +606,64 @@ int ShowSystemError(int CodeType, int KCode)
 //---------------------------------------------------------------------------
 int ShowSystemError(AnsiString Name, int KCode, int iDuplicate, AnsiString Message)
 {
-    AnsiString AlarmMessage=Message;
+    //AI(HT160S-Maintainer) 20260603 : alarm-code table lookup + language select + undefined-code branch,
+    //architecture aligned with HT172 ShowSystemError. Registered codes render bilingual
+    //message/description/panel; unregistered legacy names keep the original passthrough so
+    //existing string-based callers are not regressed. Part-name wording may differ from HT172.
+    AnsiString Code, Mess, Desc, PanelName;
 
-    if(AlarmMessage=="")
-        AlarmMessage=Name;
+    std::map<AnsiString, AnsiString>::iterator IterName=HSys.mapNameToAlarm.find(Name);
+    if(IterName==HSys.mapNameToAlarm.end())
+    {
+        Mess=(Message=="")?Name:Message;
+        if(iDuplicate!=0)
+            Mess=Mess+AnsiString(" (Again!)");
+        return ShowNoteAlarm(Name, Mess, Message, KCode, Name);
+    }
+
+    Code=IterName->second;
+    HSys.IterAlarmCodeList=HSys.mapAlarmCodeList.find(Code);
+    if(HSys.IterAlarmCodeList==HSys.mapAlarmCodeList.end())
+    {
+        int iAlarmType=Code.SubString(1, 1).ToIntDef((int)eOther);
+        PanelName="pn_System";
+        if(iAlarmType==eJamErr)             Mess="Jam Code Undefine Error";
+        else if(iAlarmType==eMessageErr)    Mess="Message Code Undefine Error";
+        else if(iAlarmType==eFunErr)        Mess="Function Code Undefine Error";
+        else if(iAlarmType==eSystemMess)    Mess="System Message Code Undefine Error";
+        else if(iAlarmType==eCynAlarm)      Mess="Cylinder Error Code Undefine Error";
+        else if(iAlarmType==eMotorAlarm)    Mess="Motor Error Code Undefine Error";
+        else if(iAlarmType==eSuckAlarm)     Mess="Suck Error Code Undefine Error";
+        else if(iAlarmType==eRecordProcess) Mess="Record Process Code Undefine Error";
+        else if(iAlarmType==eOther)         Mess="Other Code Undefine Error";
+        else                                Mess="System Error--System Code Unknown Error";
+        Desc=AnsiString().sprintf("Func: Name=%s KCode=%d", Name.c_str(), KCode);
+        Code="-"+Code;
+    }
+    else
+    {
+        PanelName=HSys.IterAlarmCodeList->second.FlushPanelName;
+        if(HSys.LastSet.iLanguageCountry==0)
+        {
+            Mess=HSys.IterAlarmCodeList->second.E_ErrMessage;
+            Desc=HSys.IterAlarmCodeList->second.E_Description;
+        }
+        else
+        {
+            Mess=HSys.IterAlarmCodeList->second.C_ErrMessage;
+            Desc=HSys.IterAlarmCodeList->second.C_Description;
+        }
+    }
+
+    if(PanelName=="")
+        PanelName="pn_System";
+    Desc=StringReplace(Desc, "\\r\\n", "\r\n", TReplaceFlags()<<rfReplaceAll);
+    if(Message!="")
+        Desc=Desc+AnsiString("\r\n")+Message;
     if(iDuplicate!=0)
-        AlarmMessage=AlarmMessage+AnsiString(" (Again!)");
-    return ShowNoteAlarm(Name, AlarmMessage, Message, KCode, Name);
+        Mess=Mess+AnsiString(" (Again!)");
+
+    return ShowNoteAlarm(Code, Mess, Desc, KCode, PanelName);
 }
 //---------------------------------------------------------------------------
 int ShowShuttleError(int pos, int KCode)

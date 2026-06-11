@@ -47,6 +47,8 @@ typedef struct
 
     int TrayXArmToEmptyXPosition;
     int TrayXArmToLoaderXPosition;
+    int TrayXArmToColorXPosition;       //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup at Color station
+    int ColorRead2DXPosition;           //AI(HT160S-Maintainer) 20260608 : Color 2D CCD reader X (on stepper, like Loader Top CCD)
     int TrayXArmToAuto1XPosition;
     int TrayXArmToAuto2XPosition;
     int TrayXArmToAuto3XPosition;
@@ -219,6 +221,7 @@ __published:
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
+    void __fastcall btnCloseClick(TObject *Sender);
 private:
     bool bUIBuilt;
     bool bTeachReady;
@@ -285,7 +288,6 @@ private:
     void __fastcall btnSaveClick(TObject *Sender);
     void __fastcall btnReloadClick(TObject *Sender);
     void __fastcall btnIOFormClick(TObject *Sender);
-    void __fastcall btnCloseClick(TObject *Sender);
     void __fastcall btnJogPMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
     void __fastcall btnJogNMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
     void __fastcall btnJogMouseUp(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);

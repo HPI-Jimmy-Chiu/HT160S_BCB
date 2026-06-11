@@ -13,16 +13,6 @@
 class TfComPort : public TForm
 {
 __published:
-    void __fastcall FormShow(TObject *Sender);
-    void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
-    void __fastcall sbExitClick(TObject *Sender);
-    void __fastcall sbUpdateClick(TObject *Sender);
-    void __fastcall spbResetComClick(TObject *Sender);
-    void __fastcall btnStopComClick(TObject *Sender);
-    void __fastcall btnClearMemoClick(TObject *Sender);
-    void __fastcall sbPanelSend_ComClick(TObject *Sender);
-    void __fastcall PadCommReceiveData(TObject *Sender, Pointer Buffer, WORD BufferLength);
-private:
     TPanel *pnlTop;
     TPanel *pnlSetting;
     TPanel *pnlManual;
@@ -39,8 +29,16 @@ private:
     TEdit *edPanelSend_Com;
     TMemo *memoPanelCom;
     TComm *PadComm;
-
-    void BuildUI();
+    void __fastcall FormShow(TObject *Sender);
+    void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
+    void __fastcall sbExitClick(TObject *Sender);
+    void __fastcall sbUpdateClick(TObject *Sender);
+    void __fastcall spbResetComClick(TObject *Sender);
+    void __fastcall btnStopComClick(TObject *Sender);
+    void __fastcall btnClearMemoClick(TObject *Sender);
+    void __fastcall sbPanelSend_ComClick(TObject *Sender);
+    void __fastcall PadCommReceiveData(TObject *Sender, Pointer Buffer, WORD BufferLength);
+private:
     void PopulateComList();
     AnsiString GetWorkFileName();
     void EnsurePadInterface();

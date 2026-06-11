@@ -1,10 +1,12 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
+#include <IniFiles.hpp>
 #pragma hdrstop
 
 #include "UsecegemMainFrom.h"
 #include "database.h"
 #include "uHGemClass.h"
+#include "CosFunction.h"   //AI(ht160s-secsgem) 20260611 : paid-feature gate (bUseSecsGem)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -26,13 +28,75 @@ void TFSECS::GemInitial(AnsiString HandlerType, AnsiString SoftwareVersion)
     if(HGem==NULL || HSys.MyGem==NULL)
         return;
 
+    //AI(ht160s-secsgem) 20260611 : hard paid-feature gate. If the customer has
+    //  not bought SECS/GEM, the whole stack stays off (no socket, no badge).
+    if(!CosFunction.bUseSecsGem)
+    {
+        USE_SECS_GEM = 0;
+        return;
+    }
+
+    //AI(ht160s-secsgem) 20260610 : read HSMS endpoint from system\General.ini [SECS].
+    //  Ship + hardware install tier (same pattern as [ColorCCD]/[TopCCD]).
+    //  Enable=0 disables the whole GEM stack; ActiveMode=1 dials out (host),
+    //  ActiveMode=0 (default) listens as equipment.
+    AnsiString sAddress = "127.0.0.1";
+    int        iPort     = 5098;
+    int        iDeviceID = 0;
+    int        iActive   = 0;
+    int        iEnable   = 1;
+    int        iReconnect = 5;   //AI(ht160s-secsgem) 20260611 : reconnect interval (s), 0=off
+    int        iLinktest  = 10;  //AI(ht160s-secsgem) 20260611 : Linktest heartbeat (s), 0=off
+    int        iT6        = 6;   //AI(ht160s-secsgem) 20260611 : T6 wait for Linktest.rsp (s)
+    int        iLogToFile = 1;   //AI(ht160s-secsgem) 20260611 : 1=persist SECS log to disk
+    {
+        AnsiString ConfigPath = HSys.CurrentDir + AnsiString("\\system\\General.ini");
+        TIniFile *IniFile = new TIniFile(ConfigPath);
+        try
+        {
+            iEnable   = IniFile->ReadInteger("SECS", "Enable",     iEnable);
+            sAddress  = IniFile->ReadString ("SECS", "Address",    sAddress);
+            iPort     = IniFile->ReadInteger("SECS", "Port",       iPort);
+            iDeviceID = IniFile->ReadInteger("SECS", "DeviceID",   iDeviceID);
+            iActive   = IniFile->ReadInteger("SECS", "ActiveMode", iActive);
+            iReconnect= IniFile->ReadInteger("SECS", "ReconnectInterval", iReconnect);
+            iLinktest = IniFile->ReadInteger("SECS", "LinktestInterval",  iLinktest);
+            iT6       = IniFile->ReadInteger("SECS", "T6Timeout",         iT6);
+            iLogToFile= IniFile->ReadInteger("SECS", "LogToFile",         iLogToFile);
+        }
+        __finally
+        {
+            delete IniFile;
+        }
+    }
+    if(iPort <= 0 || iPort > 65535)
+        iPort = 5098;
+    if(iReconnect < 0)
+        iReconnect = 0;
+    USE_SECS_GEM = (iEnable > 0) ? 1 : 0;
+
+    AnsiString sPort, sDeviceID;
+    sPort.sprintf("%d", iPort);
+    sDeviceID.sprintf("%d", iDeviceID);
+
     HGem->SetTimeFormat(1);
-    HGem->SetDefaultAddressAndPort("127.0.0.1", "5098", "0");
+    HGem->SetLogToFile(iLogToFile != 0);   //AI(ht160s-secsgem) 20260611 : disk log on/off
+    HGem->SetDefaultAddressAndPort(sAddress.c_str(), sPort.c_str(), sDeviceID.c_str());
     HGem->SetReceipeDirectoryAndGlobalName("..\\data\\", "*.*", 0);
     HGem->SetMachineTypeAndSoftwarseVer(HandlerType.c_str(), SoftwareVersion.c_str());
     SECS_SETData(HGem);
     HGem->SaveEventReportData();
     HGem->Timer1->Enabled = true;
+
+    //AI(ht160s-secsgem) 20260610 : open the HSMS socket (listen or connect).
+    if(USE_SECS_GEM > 0)
+    {
+        HGem->SetReconnectInterval(iReconnect);   //AI(ht160s-secsgem) 20260611
+        HGem->SetLinktestInterval(iLinktest);     //AI(ht160s-secsgem) 20260611
+        HGem->SetT6Timeout(iT6);                  //AI(ht160s-secsgem) 20260611
+        HGem->SetHsmsMode(iActive != 0);
+        HGem->StartCommunication();
+    }
     bInitialed = true;
 }
 //---------------------------------------------------------------------------

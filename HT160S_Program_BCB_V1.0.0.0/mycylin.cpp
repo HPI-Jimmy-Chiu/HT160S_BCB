@@ -1,3 +1,5 @@
+#include "IncludeAllHeader.h"       //Dell 將.h統一,可加速build
+//---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
@@ -8,12 +10,30 @@
 //---------------------------------------------------------------------------
 class TMyCylinder Cylinder[MaxCylinderItem];
 //---------------------------------------------------------------------------
-static void SetCylinderAlarm(int AlarmCode)
+static void SetCylinderAlarm(int AlarmCode, AnsiString sFrom="")
 {
+    //AI(HT160S-Maintainer) 20260603 : raise-hand to central dispatch (HAlarm). sFrom carries the
+    //caller Func/Case context, shown later in the note remark field via HSys.mapAlarmContext.
+    if(AlarmCode==0)
+        return;
+    if(Alarm==NULL)
+    {
+        //fallback: central object not created yet -> show directly (same behavior as before)
+        ShowSystemError(AnsiString(AlarmCode), K_RETRY, 0, sFrom);
+        return;
+    }
+    HSys.mapAlarmContext[AlarmCode]=sFrom;
+    Alarm->Set(AlarmCode);
 }
 //---------------------------------------------------------------------------
 static void ClearCylinderAlarm(int AlarmCode)
 {
+    //AI(HT160S-Maintainer) 20260603 : clear this code from the central queue and drop its context
+    if(AlarmCode==0)
+        return;
+    if(Alarm!=NULL)
+        Alarm->Clear(AlarmCode);
+    HSys.mapAlarmContext.erase(AlarmCode);
 }
 //---------------------------------------------------------------------------
 __fastcall TMyCylinder::TMyCylinder()
@@ -80,6 +100,9 @@ void TMyCylinder::Off()
 //---------------------------------------------------------------------------
 bool TMyCylinder::Push()
 {
+    #ifdef SOFT_SIMULATE
+    return true;
+    #else
     if(Enable==false && Task==1)
         Task=100;
 
@@ -128,7 +151,7 @@ bool TMyCylinder::Push()
             {
                 Task=1;
                 UpdateSimulateCompomentPosition(true);
-                SetCylinderAlarm(OnAlarmCode);
+                SetCylinderAlarm(OnAlarmCode, AnsiString().sprintf("Cylinder=%s Func=Push", CylinderName.c_str()));
                 return false;
             }
             return false;
@@ -167,10 +190,14 @@ bool TMyCylinder::Push()
     ClearCylinderAlarm(OnAlarmCode);
     UpdateSimulateCompomentPosition(true);
     return true;
+    #endif
 }
 //---------------------------------------------------------------------------
 bool TMyCylinder::Pop()
 {
+    #ifdef SOFT_SIMULATE
+    return true;
+    #else
     if(Enable==false && Task==1)
         Task=100;
 
@@ -218,7 +245,7 @@ bool TMyCylinder::Pop()
             if(Delay.Off())
             {
                 Task=1;
-                SetCylinderAlarm(OffAlarmCode);
+                SetCylinderAlarm(OffAlarmCode, AnsiString().sprintf("Cylinder=%s Func=Pop", CylinderName.c_str()));
                 UpdateSimulateCompomentPosition(false);
                 return false;
             }
@@ -258,6 +285,7 @@ bool TMyCylinder::Pop()
     ClearCylinderAlarm(OffAlarmCode);
     UpdateSimulateCompomentPosition(false);
     return true;
+    #endif
 }
 //---------------------------------------------------------------------------
 void TMyCylinder::UpdateSimulateCompomentPosition(bool bFlag)

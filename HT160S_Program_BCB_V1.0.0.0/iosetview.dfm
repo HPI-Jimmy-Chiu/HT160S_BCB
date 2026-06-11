@@ -1,10 +1,10 @@
 object fiosetview: Tfiosetview
-  Left = 207
-  Top = 37
+  Left = 402
+  Top = 65
   BorderIcons = [biSystemMenu]
   BorderStyle = bsSingle
   Caption = 'IO check and verify'
-  ClientHeight = 806
+  ClientHeight = 838
   ClientWidth = 1057
   Color = 12761254
   Font.Charset = DEFAULT_CHARSET
@@ -1690,7 +1690,7 @@ object fiosetview: Tfiosetview
   end
   object pn_IOOB: TPanel
     Left = 6
-    Top = 735
+    Top = 767
     Width = 839
     Height = 60
     BevelInner = bvRaised
@@ -1722,7 +1722,7 @@ object fiosetview: Tfiosetview
     Left = 0
     Top = 40
     Width = 849
-    Height = 691
+    Height = 729
     ActivePage = ts_IOTapeLoadUnload
     Style = tsButtons
     TabIndex = 1
@@ -1733,7 +1733,7 @@ object fiosetview: Tfiosetview
         Left = 0
         Top = 0
         Width = 841
-        Height = 660
+        Height = 698
         ActivePage = TabSheet1
         Align = alClient
         TabIndex = 0
@@ -2913,10 +2913,10 @@ object fiosetview: Tfiosetview
         Left = 0
         Top = 0
         Width = 841
-        Height = 660
-        ActivePage = TabSheet3
+        Height = 698
+        ActivePage = TabSheet2
         Align = alClient
-        TabIndex = 0
+        TabIndex = 1
         TabOrder = 0
         object TabSheet3: TTabSheet
           Caption = 'Auto 1~3'
@@ -5051,7 +5051,7 @@ object fiosetview: Tfiosetview
             Left = 9
             Top = 516
             Width = 820
-            Height = 123
+            Height = 141
             BevelInner = bvLowered
             BevelOuter = bvSpace
             Color = 12761254
@@ -5059,19 +5059,19 @@ object fiosetview: Tfiosetview
             Visible = False
             object MyLed174: TMyLed
               Left = 43
-              Top = 95
+              Top = 111
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'C_RingLoaderTrayClamp_On'
+              Alias = 'C_Color_FrontRiseTray_Off'
             end
             object MyLed176: TMyLed
               Left = 43
-              Top = 80
+              Top = 96
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'C_Color_FrontRiseTray_On'
             end
             object MyLed177: TMyLed
               Left = 175
@@ -5079,7 +5079,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'C_Color_PushTray_On'
             end
             object MyLed178: TMyLed
               Left = 175
@@ -5087,7 +5087,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'C_RingLoaderTrayClamp_On'
+              Alias = 'C_Color_PushTray_Off'
             end
             object MyLed179: TMyLed
               Left = 255
@@ -5095,7 +5095,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'C_Color_LeanOnTray_On'
             end
             object MyLed180: TMyLed
               Left = 255
@@ -5103,7 +5103,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'C_RingLoaderTrayClamp_On'
+              Alias = 'C_Color_LeanOnTray_Off'
             end
             object MyLed182: TMyLed
               Left = 666
@@ -5111,7 +5111,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'C_Color_RearRiseTray_On'
             end
             object MyLed183: TMyLed
               Left = 666
@@ -5119,7 +5119,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'C_RingLoaderTrayClamp_On'
+              Alias = 'C_Color_RearRiseTray_Off'
             end
             object MyLed184: TMyLed
               Left = 6
@@ -5127,7 +5127,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'SnColor_InputHasTray'
             end
             object MyLed185: TMyLed
               Left = 6
@@ -5135,15 +5135,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
-            end
-            object MyLed186: TMyLed
-              Left = 780
-              Top = 40
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'SnColor_InputFullTray'
             end
             object MyLed187: TMyLed
               Left = 780
@@ -5151,7 +5143,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnRingLoaderClampHasRing'
+              Alias = 'SnColor_OutputBottomHasTray'
             end
             object MyLed188: TMyLed
               Left = 271
@@ -5159,15 +5151,23 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnAuto6_TrayPos1'
+              Alias = 'SnColor_TrayPos1'
             end
-            object MyLed189: TMyLed
-              Left = 447
-              Top = 48
+            object MyLed36: TMyLed
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnAuto6_TrayPos2'
+              Alias = 'SnColor_InputEnd'
+            end
+            object MyLed37: TMyLed
+              Left = 43
+              Top = 77
+              Width = 22
+              Height = 14
+              LEDStyle = LEDHorizontal
+              Alias = 'C_Empty_FrontRiseTray_2_On'
             end
             object BtnPanel90: TBtnPanel
               Left = 277
@@ -5190,12 +5190,12 @@ object fiosetview: Tfiosetview
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
-              Alias = 'C_RingLoaderJawRotate'
+              Alias = 'C_Color_LeanOnTray'
               Style = tsButtons
             end
             object BtnPanel91: TBtnPanel
               Left = 65
-              Top = 80
+              Top = 96
               Width = 45
               Height = 30
               BevelInner = bvRaised
@@ -5214,7 +5214,7 @@ object fiosetview: Tfiosetview
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
-              Alias = 'C_RingLoaderTrayClamp'
+              Alias = 'C_Color_FrontRiseTray'
               Style = tsButtons
             end
             object BtnPanel92: TBtnPanel
@@ -5239,7 +5239,7 @@ object fiosetview: Tfiosetview
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
-              Alias = 'C_RingLoaderFrontBack'
+              Alias = 'C_Color_PushTray'
               Style = tsButtons
             end
             object Panel148: TPanel
@@ -5282,7 +5282,7 @@ object fiosetview: Tfiosetview
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
-              Alias = 'C_RingLoaderFrontBack'
+              Alias = 'C_Color_FrontSeparateTray_1'
               Style = tsButtons
             end
             object Panel150: TPanel
@@ -5338,7 +5338,7 @@ object fiosetview: Tfiosetview
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
-              Alias = 'C_RingLoaderJawRotate'
+              Alias = 'C_Color_RearRiseTray'
               Style = tsButtons
             end
             object Panel152: TPanel
@@ -5350,6 +5350,30 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 9
             end
+            object BtnPanel6: TBtnPanel
+              Left = 66
+              Top = 76
+              Width = 45
+              Height = 17
+              BevelInner = bvRaised
+              Caption = 'v    ^'
+              Color = 8404992
+              Font.Charset = ANSI_CHARSET
+              Font.Color = clWhite
+              Font.Height = -15
+              Font.Name = 'Times New Roman'
+              Font.Style = [fsBold]
+              ParentFont = False
+              ParentShowHint = False
+              ShowHint = True
+              TabOrder = 10
+              OnClick = BtnPanelClick
+              TrueColor = 16744448
+              FalseColor = 8404992
+              FalseFontColor = clWhite
+              Alias = 'C_Empty_FrontRiseTray_2'
+              Style = tsButtons
+            end
           end
         end
       end
@@ -5360,7 +5384,7 @@ object fiosetview: Tfiosetview
         Left = 0
         Top = 0
         Width = 841
-        Height = 660
+        Height = 698
         ActivePage = TabSheet5
         Align = alClient
         TabIndex = 0
@@ -5821,7 +5845,7 @@ object fiosetview: Tfiosetview
         Left = 0
         Top = 0
         Width = 841
-        Height = 660
+        Height = 698
         ActivePage = TabSheet7
         Align = alClient
         TabIndex = 0
@@ -11343,6 +11367,7 @@ object fiosetview: Tfiosetview
     Top = 51
   end
   object tmr_IonFan: TTimer
+    Enabled = False
     OnTimer = tmr_IonFanTimer
     Left = 808
     Top = 48

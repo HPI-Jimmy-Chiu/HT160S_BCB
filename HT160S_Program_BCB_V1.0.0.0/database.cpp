@@ -7,12 +7,136 @@
 
 #include "database.h"
 #include "cmydef.h"
+#include "ComPort.h"
+#include "MCUDisplay.h"
+#include "aLoader.h"
+#include "aEmpty.h"
+#include "aAuto1To6.h"
+#include "aTrayArm.h"
+#include "aSortArm.h"
+#include "aColor.h"
+#include "csystem.h"
 #include "myio_MN200.h"
 #include "CosFunction.h"
 #include "SecsGem\uHGemClass.h"
+#include "cStepTrace.h"
+#include "cStateRecordHT160.h"
 #pragma package(smart_init)
+#pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 SYSTEM_MODULAR HSys;
+TDataModule1 *DataModule1;
+//---------------------------------------------------------------------------
+__fastcall TDataModule1::TDataModule1(TComponent* Owner)
+    : TDataModule(Owner)
+{
+}
+//---------------------------------------------------------------------------
+void TDataModule1::InitialAllTask()
+{
+    if(UserMotion==NULL)
+        return;
+
+    for(int ActionIndex=0; ActionIndex<UserMotion->ActionCount; ActionIndex++)
+        UserMotion->Actions[ActionIndex]->Tag=1;
+
+    if(LoaderModule!=NULL)
+        LoaderModule->InitialFlag();
+    if(EmptyModule!=NULL)
+        EmptyModule->InitialFlag();
+    if(AutoModule!=NULL)
+        AutoModule->InitialFlag();
+    if(TrayArmModule!=NULL)
+        TrayArmModule->InitialFlag();
+    if(SortArmModule!=NULL)
+        SortArmModule->InitialFlag();
+    if(ColorModule!=NULL)
+        ColorModule->InitialFlag();
+}
+//---------------------------------------------------------------------------
+void TDataModule1::DoAllProcess()
+{
+    static bool bRunning=false;
+
+    if(bRunning)
+        return;
+
+    bRunning=true;
+    try
+    {
+        for(int ActionIndex=0; ActionIndex<UserMotion->ActionCount; ActionIndex++)
+        {
+            if(HSys.Sys.SystemStart==false)
+            {
+                HSys.DecStopAllMotor();
+                break;
+            }
+            UserMotion->Actions[ActionIndex]->Execute();
+        }
+    }
+    catch(...)
+    {
+        bRunning=false;
+        throw;
+    }
+    bRunning=false;
+
+    //AI(general) 20260601 : numeric step trace (no FSM). Records the 7 module
+    //Task values per cycle when D:\HT160S_Log\steptrace.on exists. No-op off.
+    StepTraceTick();
+
+    //AI(general) 20260608 : State Record task-history sampling (no FSM).
+    //Cheap: only records a module's Task when it changes. Used by the manual
+    //"Store Hangup" snapshot button to export TaskHistory.csv for analysis.
+    if(gStateRecord!=NULL)
+        gStateRecord->SampleTasks();
+}
+//---------------------------------------------------------------------------
+void __fastcall TDataModule1::InitialMotorNameExecute(TObject *Sender)
+{
+    HSys.InitialMotorName();
+}
+//---------------------------------------------------------------------------
+void __fastcall TDataModule1::InitialCylinderNameExecute(TObject *Sender)
+{
+    HSys.InitialCylinderName();
+}
+//---------------------------------------------------------------------------
+void __fastcall TDataModule1::InitialSensorNameExecute(TObject *Sender)
+{
+    HSys.InitialSensorName();
+}
+//---------------------------------------------------------------------------
+void __fastcall TDataModule1::InitialSwitchNameExecute(TObject *Sender)
+{
+    HSys.InitialSwitchName();
+}
+//---------------------------------------------------------------------------
+void __fastcall TDataModule1::InitialSuckerNameExecute(TObject *Sender)
+{
+    HSys.InitialSuckerName();
+}
+//---------------------------------------------------------------------------
+void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
+{
+    static bool bRun=false;
+
+    if(bRun)
+        return;
+
+    bRun=true;
+    try
+    {
+        SpinComPort();
+        SpinMCUDisplay();
+    }
+    catch(...)
+    {
+        bRun=false;
+        throw;
+    }
+    bRun=false;
+}
 //---------------------------------------------------------------------------
 static int FindMotColumn(TStringList *SL, const char *ColumnName)
 {
@@ -442,11 +566,30 @@ TMOTDATA::TMOTDATA(AnsiString Str)
     delete SL;
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260609 : Resolve the program root from the EXE's own
+//physical location (the parent of the EXE folder) so all runtime data lives
+//relative to the executable, matching the HT172 fixed-base layout. HSys is a
+//static global, so Application/ExeName is not yet available in this constructor;
+//use the Win32 GetModuleFileName API instead.
+static AnsiString GetProgramRootDir()
+{
+    char Buf[MAX_PATH];
+    Buf[0] = 0;
+    GetModuleFileName(NULL, Buf, MAX_PATH);
+    AnsiString ExeDir = ExtractFileDir(AnsiString(Buf)); // ...\EXE
+    AnsiString RootDir = ExtractFileDir(ExeDir);         // EXE's parent = program root
+    if(RootDir == AnsiString(""))
+        RootDir = "..";                                  // fallback to legacy behaviour
+    return RootDir;
+}
+//---------------------------------------------------------------------------
 SYSTEM_MODULAR::SYSTEM_MODULAR()
 {
-    CurrentDir = "..";
+    CurrentDir = GetProgramRootDir();   //AI(HT160S-Maintainer) 20260609 : was ".."; now derived from EXE location
+    LogRootDir = "D:\\HT160S_Log";
     MotTablePath = CurrentDir + "\\system\\Mot_Table.csv";
     IoTablePath = CurrentDir + "\\system\\IO_Table.csv";
+    AlarmTablePath = CurrentDir + "\\system\\AlarmList.csv";   //AI(HT160S-Maintainer) 20260609 : ported from HT172 0420 AlarmTablePath
     LastSet.iLanguageCountry = 0;
     LastSet.iStartMode = 0;
     #ifdef SOFT_SIMULATE
@@ -456,6 +599,7 @@ SYSTEM_MODULAR::SYSTEM_MODULAR()
     #endif
     Sys.SystemStart = false;
     Sys.RunMode = Run_Normal;
+    Sys.bCleanOut = false;
     MotPtr = NULL;
     VMotPtr = NULL;
     SenPtr = NULL;
@@ -585,6 +729,146 @@ void SYSTEM_MODULAR::Initial()
     LoadSuckerParameterFromDataBase();
     LoadMotorParameterFromDataBase();
     InitialVMotorParameter();
+    CreateSystemAlarmCode();
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260603 : build alarm-code text map, framework aligned with HT172
+//CreateCylinderAlarmCode. Uses HT172 "%d%03d%1d" scheme (eCynAlarm=4) and the full
+//6 error types per cylinder. Machine is pre-customer, so adopting the HT172 code scheme
+//has no field impact. Chinese fields are filled with the English text to keep the source ASCII.
+void SYSTEM_MODULAR::CreateSystemAlarmCode()
+{
+    AnsiString AlarmCode, SEng;
+    AnsiString SDesc="[1] check sensor \\r\\n[2] check wire \\r\\n[3] check air or air tube";
+
+    mapNameToAlarm.clear();
+    mapAlarmCodeList.clear();
+
+    for(int i=0; i<iTotalCylinder; i++)
+    {
+        if(CynPtr[i].CylinderName=="")
+            continue;
+
+        CynPtr[i].ErrorName[eOffNotOnErr ]=CynPtr[i].CylinderName+"_OffNotOnErr";
+        CynPtr[i].ErrorName[eOffNotOffErr]=CynPtr[i].CylinderName+"_OffNotOffErr";
+        CynPtr[i].ErrorName[eOffIsOnErr  ]=CynPtr[i].CylinderName+"_OffIsOnErr";
+        CynPtr[i].ErrorName[eOnNotOnErr  ]=CynPtr[i].CylinderName+"_OnNotOnErr";
+        CynPtr[i].ErrorName[eOnNotOffErr ]=CynPtr[i].CylinderName+"_OnNotOffErr";
+        CynPtr[i].ErrorName[eOnIsOnErr   ]=CynPtr[i].CylinderName+"_OnIsOnErr";
+
+        for(int j=0; j<eCynErrTotal; j++)
+        {
+            AlarmCode=AnsiString().sprintf("%d%03d%1d", (int)eCynAlarm, i, j);
+
+            if(j==eOffNotOnErr)
+                SEng=AnsiString().sprintf("The cylinder [%s] can not off error", CynPtr[i].OffSensorName.c_str());
+            else if(j==eOffNotOffErr)
+                SEng=AnsiString().sprintf("The cylinder [%s] can not on error", CynPtr[i].OffSensorName.c_str());
+            else if(j==eOffIsOnErr)
+                SEng=AnsiString().sprintf("The cylinder [%s] off sensor is on error", CynPtr[i].OffSensorName.c_str());
+            else if(j==eOnNotOnErr)
+                SEng=AnsiString().sprintf("The cylinder [%s] can not on error", CynPtr[i].OnSensorName.c_str());
+            else if(j==eOnNotOffErr)
+                SEng=AnsiString().sprintf("The cylinder [%s] can not off error", CynPtr[i].OnSensorName.c_str());
+            else
+                SEng=AnsiString().sprintf("The cylinder [%s] on sensor is on error", CynPtr[i].OnSensorName.c_str());
+
+            mapAlarmCodeList[AlarmCode]=MyAlarmCodeStruct(AlarmCode, (int)eCynAlarm, SEng, SEng, SDesc, SDesc, CynPtr[i].FlushPanelName);
+            mapNameToAlarm[AlarmCode]=AlarmCode;
+            mapNameToAlarm[CynPtr[i].ErrorName[j]]=AlarmCode;
+        }
+
+        //Push timeout = On sensor can not reach On (eOnNotOnErr); Pop timeout = Off sensor can not reach On (eOffNotOnErr)
+        CynPtr[i].OnAlarmCode =AnsiString().sprintf("%d%03d%1d", (int)eCynAlarm, i, (int)eOnNotOnErr ).ToIntDef(0);
+        CynPtr[i].OffAlarmCode=AnsiString().sprintf("%d%03d%1d", (int)eCynAlarm, i, (int)eOffNotOnErr).ToIntDef(0);
+    }
+
+    //----- Motor alarm code map (align HT172) -----
+    AnsiString MotorErrStr[eMotErrTotal];
+    MotorErrStr[eMotPwrErr      ]="--Motor Power Off Error";
+    MotorErrStr[eMotTorqueErr   ]="--Motor Out Of Torque Error";
+    MotorErrStr[eMotCWOnErr     ]="--Motor CW sensor ON Error";
+    MotorErrStr[eMotCCWOnErr    ]="--Motor CCW sensor ON Error";
+    MotorErrStr[eMotSoftPErr    ]="--Motor Soft P position Error";
+    MotorErrStr[eMotSoftNErr    ]="--Motor Soft N position Error";
+    MotorErrStr[eMotPosErr      ]="--Motor position Error,Home and restart";
+    MotorErrStr[eMotUnDefErr    ]="--Motor Undefine Error";
+    MotorErrStr[eMotOverLimitErr]="--Motor Target will Out Of Limit Position Error";
+    AnsiString SMotDesc="[1] check power \\r\\n[2] check wire \\r\\n[3] check machine";
+
+    for(int i=0; i<iTotalMotor; i++)
+    {
+        if(MotPtr[i]==NULL)
+            continue;
+
+        MotPtr[i]->AlarmName[eMotPwrErr       ]=MotPtr[i]->Alias+"_MotPwrErr";
+        MotPtr[i]->AlarmName[eMotTorqueErr    ]=MotPtr[i]->Alias+"_MotTorqueErr";
+        MotPtr[i]->AlarmName[eMotCWOnErr      ]=MotPtr[i]->Alias+"_MotCWOnErr";
+        MotPtr[i]->AlarmName[eMotCCWOnErr     ]=MotPtr[i]->Alias+"_MotCCWOnErr";
+        MotPtr[i]->AlarmName[eMotSoftPErr     ]=MotPtr[i]->Alias+"_MotSoftPErr";
+        MotPtr[i]->AlarmName[eMotSoftNErr     ]=MotPtr[i]->Alias+"_MotSoftNErr";
+        MotPtr[i]->AlarmName[eMotPosErr       ]=MotPtr[i]->Alias+"_MotPosErr";
+        MotPtr[i]->AlarmName[eMotUnDefErr     ]=MotPtr[i]->Alias+"_MotUnDefErr";
+        MotPtr[i]->AlarmName[eMotOverLimitErr ]=MotPtr[i]->Alias+"_MotOverLimitErr";
+
+        for(int j=0; j<eMotErrTotal; j++)
+        {
+            AlarmCode=AnsiString().sprintf("%d%03d%1d", (int)eMotorAlarm, i, j);
+            SEng=AnsiString().sprintf("[M%02d - %s] Motor %s", i+1, MotPtr[i]->Alias.c_str(), MotorErrStr[j].c_str());
+            mapAlarmCodeList[AlarmCode]=MyAlarmCodeStruct(AlarmCode, (int)eMotorAlarm, SEng, SEng, SMotDesc, SMotDesc, MotPtr[i]->FlushPanelName);
+            mapNameToAlarm[AlarmCode]=AlarmCode;
+            mapNameToAlarm[MotPtr[i]->AlarmName[j]]=AlarmCode;
+        }
+    }
+
+    //----- Sucker alarm code map (align HT172) -----
+    AnsiString SuckErrStr[eSuckErrTotal];
+    SuckErrStr[eSuckPickErr   ]="--Pick Up Error";
+    SuckErrStr[eSuckDestroyErr]="--Destory Error";
+    SuckErrStr[eSuckVacOffErr ]="--Vacuum Sensor Off Error";
+    SuckErrStr[eSuckDropErr   ]="--Device Be Droped Error";
+    SuckErrStr[eSuckIniOffErr ]="--Initial Sensor Off Error";
+    SuckErrStr[eSuckIniOnErr  ]="--Initial Sensor On Error";
+    AnsiString SSuckDesc="[1] check vacuum \\r\\n[2] check wire \\r\\n[3] check air or air tube";
+
+    for(int i=0; i<iTotalSucker; i++)
+    {
+        if(SuckPtr[i].Name=="")
+            continue;
+
+        SuckPtr[i].AlarmName[eSuckPickErr   ]=SuckPtr[i].Name+"_SuckPickErr";
+        SuckPtr[i].AlarmName[eSuckDestroyErr]=SuckPtr[i].Name+"_SuckDestroyErr";
+        SuckPtr[i].AlarmName[eSuckVacOffErr ]=SuckPtr[i].Name+"_SuckVacOffErr";
+        SuckPtr[i].AlarmName[eSuckDropErr   ]=SuckPtr[i].Name+"_SuckDropErr";
+        SuckPtr[i].AlarmName[eSuckIniOffErr ]=SuckPtr[i].Name+"_SuckIniOffErr";
+        SuckPtr[i].AlarmName[eSuckIniOnErr  ]=SuckPtr[i].Name+"_SuckIniOnErr";
+
+        for(int j=0; j<eSuckErrTotal; j++)
+        {
+            AlarmCode=AnsiString().sprintf("%d%03d%1d", (int)eSuckAlarm, i, j);
+            SEng=AnsiString().sprintf("%s%s", SuckPtr[i].Name.c_str(), SuckErrStr[j].c_str());
+            mapAlarmCodeList[AlarmCode]=MyAlarmCodeStruct(AlarmCode, (int)eSuckAlarm, SEng, SEng, SSuckDesc, SSuckDesc, SuckPtr[i].FlushPanelName);
+            mapNameToAlarm[AlarmCode]=AlarmCode;
+            mapNameToAlarm[SuckPtr[i].AlarmName[j]]=AlarmCode;
+        }
+    }
+
+    //AI(HT160S-Maintainer) 20260609 : ported from HT172 0420 CreateNewJamErrorTable.
+    //Dump the complete alarm-code map to system\AlarmList.csv at startup so the
+    //operator can see every alarm the machine can raise. Note: the PTI-only
+    //JamAlarmList.csv (HT172 systools.h sJamTableFile) is intentionally NOT ported.
+    try
+    {
+        TStringList *AlarmList=new TStringList();
+        AlarmList->Add("AlarmCode,AlarmType,E_ErrMessage,C_ErrMessage,E_Description,C_Description");
+        for(IterAlarmCodeList=mapAlarmCodeList.begin(); IterAlarmCodeList!=mapAlarmCodeList.end(); IterAlarmCodeList++)
+            AlarmList->Add(IterAlarmCodeList->second.CommaText());
+        AlarmList->SaveToFile(AlarmTablePath);
+        delete AlarmList;
+    }
+    catch(...)
+    {
+    }
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::InitialSensorName()
@@ -609,10 +893,61 @@ void SYSTEM_MODULAR::InitialSensorName()
     Sen.SnSafeSlideDoorRight.Name="SnSafeSlideDoorRight";
     Sen.SnSafeSlideDoorLeft.Name="SnSafeSlideDoorLeft";
     Sen.SnSafeAuto6.Name="SnSafeAuto6";
+    Sen.SnEmpty_InputHasTray.Name="SnEmpty_InputHasTray";
+    Sen.SnEmpty_InputFullTray.Name="SnEmpty_InputFullTray";
+    Sen.SnEmpty_TrayPos1.Name="SnEmpty_TrayPos1";
+    Sen.SnEmpty_TrayPos2.Name="SnEmpty_TrayPos2";
+    Sen.SnEmpty_OutputHasTray.Name="SnEmpty_OutputHasTray";
+    Sen.SnEmpty_OutputBottomHasTray.Name="SnEmpty_OutputBottomHasTray";
+    Sen.SnEmpty_InputEnd.Name="SnEmpty_InputEnd";
+    Sen.SnLoader_InputHasTray.Name="SnLoader_InputHasTray";
+    Sen.SnLoader_InputFullTray.Name="SnLoader_InputFullTray";
+    Sen.SnLoader_TrayPos1.Name="SnLoader_TrayPos1";
+    Sen.SnLoader_TrayPos2.Name="SnLoader_TrayPos2";
+    Sen.SnLoader_OutputHasTray.Name="SnLoader_OutputHasTray";
+    Sen.SnLoader_OutputBottomHasTray.Name="SnLoader_OutputBottomHasTray";
+    Sen.SnLoader_Inputend.Name="SnLoader_Inputend";
+    Sen.SnAuto1_InputHasTray.Name="SnAuto1_InputHasTray";
+    Sen.SnAuto1_InputFullTray.Name="SnAuto1_InputFullTray";
+    Sen.SnAuto1_OutputHasTray.Name="SnAuto1_OutputHasTray";
+    Sen.SnAuto1_OutputBottomHasTray.Name="SnAuto1_OutputBottomHasTray";
+    Sen.SnAuto1_TrayPos1.Name="SnAuto1_TrayPos1";
+    Sen.SnAuto1_TrayPos2.Name="SnAuto1_TrayPos2";
+    Sen.SnAuto2_InputHasTray.Name="SnAuto2_InputHasTray";
+    Sen.SnAuto2_InputFullTray.Name="SnAuto2_InputFullTray";
+    Sen.SnAuto2_OutputHasTray.Name="SnAuto2_OutputHasTray";
+    Sen.SnAuto2_OutputBottomHasTray.Name="SnAuto2_OutputBottomHasTray";
+    Sen.SnAuto2_TrayPos1.Name="SnAuto2_TrayPos1";
+    Sen.SnAuto2_TrayPos2.Name="SnAuto2_TrayPos2";
+    Sen.SnAuto3_InputHasTray.Name="SnAuto3_InputHasTray";
+    Sen.SnAuto3_InputFullTray.Name="SnAuto3_InputFullTray";
+    Sen.SnAuto3_OutputHasTray.Name="SnAuto3_OutputHasTray";
+    Sen.SnAuto3_OutputBottomHasTray.Name="SnAuto3_OutputBottomHasTray";
+    Sen.SnAuto3_TrayPos1.Name="SnAuto3_TrayPos1";
+    Sen.SnAuto3_TrayPos2.Name="SnAuto3_TrayPos2";
+    Sen.SnAuto4_InputHasTray.Name="SnAuto4_InputHasTray";
+    Sen.SnAuto4_InputFullTray.Name="SnAuto4_InputFullTray";
+    Sen.SnAuto4_OutputHasTray.Name="SnAuto4_OutputHasTray";
+    Sen.SnAuto4_OutputBottomHasTray.Name="SnAuto4_OutputBottomHasTray";
+    Sen.SnAuto4_TrayPos1.Name="SnAuto4_TrayPos1";
+    Sen.SnAuto4_TrayPos2.Name="SnAuto4_TrayPos2";
+    Sen.SnAuto5_InputHasTray.Name="SnAuto5_InputHasTray";
+    Sen.SnAuto5_InputFullTray.Name="SnAuto5_InputFullTray";
+    Sen.SnAuto5_OutputHasTray.Name="SnAuto5_OutputHasTray";
+    Sen.SnAuto5_OutputBottomHasTray.Name="SnAuto5_OutputBottomHasTray";
+    Sen.SnAuto5_TrayPos1.Name="SnAuto5_TrayPos1";
+    Sen.SnAuto5_TrayPos2.Name="SnAuto5_TrayPos2";
+    Sen.SnAuto6_InputHasTray.Name="SnAuto6_InputHasTray";
+    Sen.SnAuto6_InputFullTray.Name="SnAuto6_InputFullTray";
+    Sen.SnAuto6_OutputHasTray.Name="SnAuto6_OutputHasTray";
+    Sen.SnAuto6_OutputBottomHasTray.Name="SnAuto6_OutputBottomHasTray";
+    Sen.SnAuto6_TrayPos1.Name="SnAuto6_TrayPos1";
+    Sen.SnAuto6_TrayPos2.Name="SnAuto6_TrayPos2";
     Sen.SnColor_InputHasTray.Name="SnColor_InputHasTray";
     Sen.SnColor_InputFullTray.Name="SnColor_InputFullTray";
     Sen.SnColor_TrayPos1.Name="SnColor_TrayPos1";
     Sen.SnColor_OutputBottomHasTray.Name="SnColor_OutputBottomHasTray";
+    Sen.SnColor_InputEnd.Name="SnColor_InputEnd";
     Sen.SnFrontPadActive.Name="SnFrontPadActive";
     Sen.SnFKReset.Name="SnFKReset";
     Sen.SnFKPause.Name="SnFKPause";
@@ -682,6 +1017,8 @@ void SYSTEM_MODULAR::InitialMotorName()
     Mot.MSuckZ_3    ->Alias="MSuckZ_3";
     Mot.MSuckZ_4    ->Alias="MSuckZ_4";
     Mot.MPitchX     ->Alias="MPitchX";
+    Mot.MColorY        ->Alias="MColorY";
+    Mot.MTopCCDX_Color ->Alias="MTopCCDX_Color";
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::StopAllMotor()
@@ -795,7 +1132,8 @@ void SYSTEM_MODULAR::InitialCylinderName()
     Cyn.C_Auto6_RearRiseTray.CylinderName="C_Auto6_RearRiseTray";
     Cyn.C_Auto6_FrontSeparateTray_1.CylinderName="C_Auto6_FrontSeparateTray_1";
 
-    Cyn.C_Color_FrontRiseTray.CylinderName="C_Color_FrontRiseTray";
+    Cyn.C_Color_FrontRiseTray_1.CylinderName="C_Color_FrontRiseTray_1";
+    Cyn.C_Color_FrontRiseTray_2.CylinderName="C_Color_FrontRiseTray_2";
     Cyn.C_Color_PushTray.CylinderName="C_Color_PushTray";
     Cyn.C_Color_LeanOnTray.CylinderName="C_Color_LeanOnTray";
     Cyn.C_Color_RearRiseTray.CylinderName="C_Color_RearRiseTray";
@@ -1240,4 +1578,120 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
             MotPtr[i]->Stop();
     }
 }
-//--------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actEmptyExecute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(EmptyModule!=NULL)
+            EmptyModule->DoEmpty(P->Tag);
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }    
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actLoader1Execute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(LoaderModule!=NULL)
+                LoaderModule->DoLoader(1, P->Tag);
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }    
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actLoader2Execute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(LoaderModule!=NULL)
+                LoaderModule->DoLoader(2, P->Tag);
+//            LoaderModule->DoLoader(P->Tag);
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }    
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actAuto1to6Execute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(AutoModule!=NULL)
+            {
+                AutoModule->DoAuto(P->Tag);
+            }
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }    
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actTrayArmExecute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(TrayArmModule!=NULL)
+            TrayArmModule->DoTrayArm(P->Tag);
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }    
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actSortArmExecute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(SortArmModule!=NULL)
+                SortArmModule->DoSortArm(P->Tag);
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }    
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TDataModule1::actColorExecute(TObject *Sender)
+{
+    if(HSys.Sys.RunMode==Run_OneCycle || HSys.Sys.RunMode==Run_CleanOut || HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_TrayFeed)
+    {
+        TContainedAction *P;
+        P=dynamic_cast<TContainedAction *>(Sender);
+        if(P!=NULL)
+        {
+            if(ColorModule!=NULL)
+                ColorModule->DoColor(P->Tag);
+//            fMain->sr->LogTask((int)cStateRecord::eLNT_LoaderExecute, P->Tag);
+        }
+    }     
+}
+//---------------------------------------------------------------------------
+

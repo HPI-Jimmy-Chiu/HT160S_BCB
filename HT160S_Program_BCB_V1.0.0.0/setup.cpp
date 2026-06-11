@@ -4,7 +4,9 @@
 
 #include "setup.h"
 #include "CosFunction.h"
+#include "GeneralSetting.h"
 #include "database.h"
+#include "mymessbox.h"   //AI(general) 20260608 : ShowMyMessageBox_YES_NO instead of Application->MessageBox
 #include <Dialogs.hpp>
 #include <IniFiles.hpp>
 //---------------------------------------------------------------------------
@@ -339,8 +341,12 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
 
     FileName=RecipeManager.GetRecipeFileName(Name, "setup.ini");
     ForceDirectories(ExtractFilePath(FileName));
-    XDivision=GetTrayEditInt(edXDivision, 1, 1, 99);
-    YDivision=GetTrayEditInt(edYDivision, 1, 1, 99);
+    if(atoi(edXDivision->Text.c_str())>MAX_TRAY_X || atoi(edYDivision->Text.c_str())>MAX_TRAY_Y)
+    {
+        ShowMessage(AnsiString("Tray division exceeds machine limit (X max=")+IntToStr(MAX_TRAY_X)+", Y max="+IntToStr(MAX_TRAY_Y)+"). Value clamped.");
+    }
+    XDivision=GetTrayEditInt(edXDivision, 1, 1, MAX_TRAY_X);
+    YDivision=GetTrayEditInt(edYDivision, 1, 1, MAX_TRAY_Y);
     Ini=new TIniFile(FileName);
     Ini->WriteFloat(TRAY_FORM_INI_GROUP, "XStart", GetTrayEditDouble(edXStart, 0.0));
     Ini->WriteFloat(TRAY_FORM_INI_GROUP, "XPitch", GetTrayEditDouble(edXPitch, 1.0));
@@ -349,6 +355,11 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
     Ini->WriteInteger(TRAY_FORM_INI_GROUP, "XDivision", XDivision);
     Ini->WriteInteger(TRAY_FORM_INI_GROUP, "YDivision", YDivision);
     delete Ini;
+
+    //AI(HT160S-Maintainer) 20260608 : refresh the in-memory TrayForm structure
+    //from the just-saved INI so Loader/SortArm/Auto/Monitor pick up the new
+    //geometry immediately instead of reading stale Setup-form UI defaults.
+    TrayForm.Load(Name);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSetup::WriteDefaultTrayFormSettings(AnsiString RecipeName)
@@ -380,8 +391,8 @@ void __fastcall TfSetup::RefreshTrayFormPreview()
     if(TMyTray1==NULL)
         return;
 
-    XDivision=GetTrayEditInt(edXDivision, 1, 1, 99);
-    YDivision=GetTrayEditInt(edYDivision, 1, 1, 99);
+    XDivision=GetTrayEditInt(edXDivision, 1, 1, MAX_TRAY_X);
+    YDivision=GetTrayEditInt(edYDivision, 1, 1, MAX_TRAY_Y);
     TMyTray1->XItem=XDivision;
     TMyTray1->YItem=YDivision;
     CellNo=1;
@@ -628,7 +639,7 @@ void __fastcall TfSetup::RefreshBinSettingStatus()
     if(lblBinMappedValue!=NULL)
         lblBinMappedValue->Caption=CountText;
     if(lblBinColorValue!=NULL)
-        lblBinColorValue->Caption=CosFunction.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
+        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
     if(cbbBinErrorArea!=NULL)
         SelectBinErrorArea(GetSelectedBinErrorArea());
 }
@@ -640,7 +651,7 @@ void __fastcall TfSetup::RefreshBinErrorAreaOptions()
     bool OldLoading;
 
     if(lblBinColorValue!=NULL)
-        lblBinColorValue->Caption=CosFunction.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
+        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
     if(cbbBinErrorArea==NULL)
         return;
 
@@ -718,7 +729,7 @@ int __fastcall TfSetup::GetBinGridAreaCount()
 //---------------------------------------------------------------------------
 int __fastcall TfSetup::GetBinGridLastArea()
 {
-    if(CosFunction.bColorBinAreaInstalled)
+    if(GeneralSetting.bColorBinAreaInstalled)
         return eHT160BinAreaColor;
     return eHT160BinAreaAuto6;
 }
@@ -969,8 +980,9 @@ void __fastcall TfSetup::spbRecipeDeleteClick(TObject *Sender)
         return;
     }
 
-    Ret=Application->MessageBox((AnsiString("Delete recipe ")+Name+AnsiString("?")).c_str(), "Recipe", MB_YESNO | MB_ICONQUESTION);
-    if(Ret!=IDYES)
+    //AI(general) 20260608 : no Application->MessageBox - use the project message tool.
+    Ret=ShowMyMessageBox_YES_NO(AnsiString("Delete recipe ")+Name+AnsiString("?"));
+    if(Ret!=TMyMessageBox::msgrtnYES)
         return;
 
     if(!RecipeManager.DeleteRecipe(Name))

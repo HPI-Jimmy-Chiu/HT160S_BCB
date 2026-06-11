@@ -3,10 +3,69 @@
 #define databaseH
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
+#include <ActnList.hpp>
+#include <ExtCtrls.hpp>
 #include "MachineType.h"
 #include "MotorAndIO/MyMotor.h"
 #include "mycylin.h"
 #include "MyKitSuck.h"
+#include <map>
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260603 : alarm-code map framework, aligned with HT172 (mapNameToAlarm / mapAlarmCodeList)
+//Alarm type enum, value-aligned with HT172 IncludeAllHeader.h eAlarmType.
+enum eAlarmType{eJamErr        =0,
+                eMessageErr    =1,
+                eFunErr        =2,
+                eSystemMess    =3,
+                eCynAlarm      =4,
+                eMotorAlarm    =5,
+                eSuckAlarm     =6,
+                eRecordProcess =7,
+                eOther         =8,
+                eAlatmTypeTotal
+               };
+//---------------------------------------------------------------------------
+//Alarm code record, shape-aligned with HT172 MyAlarmCodeStruct (bilingual fields).
+//HT160 currently fills the Chinese fields with English text to keep the source ASCII;
+//part-name wording may differ from HT172, but the framework is the same.
+class MyAlarmCodeStruct
+{
+public:
+    AnsiString AlarmCode;
+    int        AlarmType;
+    AnsiString E_ErrMessage;
+    AnsiString C_ErrMessage;
+    AnsiString E_Description;
+    AnsiString C_Description;
+    AnsiString FlushPanelName;
+
+    MyAlarmCodeStruct()
+    {
+        AlarmType=0;
+    }
+    MyAlarmCodeStruct(AnsiString aCode, int aType, AnsiString aEMsg, AnsiString aCMsg, AnsiString aEDesc, AnsiString aCDesc, AnsiString aPanel)
+    {
+        AlarmCode=aCode;
+        AlarmType=aType;
+        E_ErrMessage=aEMsg;
+        C_ErrMessage=aCMsg;
+        E_Description=aEDesc;
+        C_Description=aCDesc;
+        FlushPanelName=aPanel;
+    }
+    //AI(HT160S-Maintainer) 20260609 : CSV row for AlarmList.csv (ported from HT172 0420
+    //MyAlarmCodeStruct::CommaText). Text fields are double-quoted so embedded commas
+    //(e.g. "...position Error,Home and restart") do not break column alignment.
+    AnsiString CommaText()
+    {
+        return AlarmCode + AnsiString(",") +
+               AnsiString(AlarmType) + AnsiString(",") +
+               AnsiString("\"") + E_ErrMessage  + AnsiString("\",") +
+               AnsiString("\"") + C_ErrMessage  + AnsiString("\",") +
+               AnsiString("\"") + E_Description + AnsiString("\",") +
+               AnsiString("\"") + C_Description + AnsiString("\"");
+    }
+};
 //---------------------------------------------------------------------------
 enum eIOType{eMotionNet=0,
              eISABase  =1,
@@ -156,6 +215,8 @@ typedef struct MOTOR_MODULAR_STRUCT
     TTrayMotor *MSuckZ_3;
     TTrayMotor *MSuckZ_4;
     TTrayMotor *MPitchX;
+    TTrayMotor *MColorY;
+    TTrayMotor *MTopCCDX_Color;
 }MOTOR_MODULAR;
 //---------------------------------------------------------------------------
 typedef struct VIRTUAL_MOTOR_MODULAR_STRUCT
@@ -186,15 +247,14 @@ enum RunModeEnum
     Run_Home        =1,
     Run_OneCycle    =2,
     Run_CleanOut    =3,
-    Run_TrayFeed    =4,
-    Run_Scan        =5,
-    Run_Check       =6
+    Run_TrayFeed    =4
 };
 //---------------------------------------------------------------------------
 typedef struct SYSTEM_STATUS_STRUCT
 {
     bool SystemStart;
     RunModeEnum RunMode;
+    bool bCleanOut;   //AI(HT160S-Maintainer) 20260605 : nested-continuation latch (resume CleanOut after a mid-drain OneCycle)
 }SYSTEM_STATUS;
 //---------------------------------------------------------------------------
 typedef struct SENSOR_MODULAR_STRUCT
@@ -219,10 +279,61 @@ typedef struct SENSOR_MODULAR_STRUCT
     TMySensor SnSafeSlideDoorRight;
     TMySensor SnSafeSlideDoorLeft;
     TMySensor SnSafeAuto6;
+    TMySensor SnEmpty_InputHasTray;
+    TMySensor SnEmpty_InputFullTray;
+    TMySensor SnEmpty_TrayPos1;
+    TMySensor SnEmpty_TrayPos2;
+    TMySensor SnEmpty_OutputHasTray;
+    TMySensor SnEmpty_OutputBottomHasTray;
+    TMySensor SnEmpty_InputEnd;
+    TMySensor SnLoader_InputHasTray;
+    TMySensor SnLoader_InputFullTray;
+    TMySensor SnLoader_TrayPos1;
+    TMySensor SnLoader_TrayPos2;
+    TMySensor SnLoader_OutputHasTray;
+    TMySensor SnLoader_OutputBottomHasTray;
+    TMySensor SnLoader_Inputend;
+    TMySensor SnAuto1_InputHasTray;
+    TMySensor SnAuto1_InputFullTray;
+    TMySensor SnAuto1_OutputHasTray;
+    TMySensor SnAuto1_OutputBottomHasTray;
+    TMySensor SnAuto1_TrayPos1;
+    TMySensor SnAuto1_TrayPos2;
+    TMySensor SnAuto2_InputHasTray;
+    TMySensor SnAuto2_InputFullTray;
+    TMySensor SnAuto2_OutputHasTray;
+    TMySensor SnAuto2_OutputBottomHasTray;
+    TMySensor SnAuto2_TrayPos1;
+    TMySensor SnAuto2_TrayPos2;
+    TMySensor SnAuto3_InputHasTray;
+    TMySensor SnAuto3_InputFullTray;
+    TMySensor SnAuto3_OutputHasTray;
+    TMySensor SnAuto3_OutputBottomHasTray;
+    TMySensor SnAuto3_TrayPos1;
+    TMySensor SnAuto3_TrayPos2;
+    TMySensor SnAuto4_InputHasTray;
+    TMySensor SnAuto4_InputFullTray;
+    TMySensor SnAuto4_OutputHasTray;
+    TMySensor SnAuto4_OutputBottomHasTray;
+    TMySensor SnAuto4_TrayPos1;
+    TMySensor SnAuto4_TrayPos2;
+    TMySensor SnAuto5_InputHasTray;
+    TMySensor SnAuto5_InputFullTray;
+    TMySensor SnAuto5_OutputHasTray;
+    TMySensor SnAuto5_OutputBottomHasTray;
+    TMySensor SnAuto5_TrayPos1;
+    TMySensor SnAuto5_TrayPos2;
+    TMySensor SnAuto6_InputHasTray;
+    TMySensor SnAuto6_InputFullTray;
+    TMySensor SnAuto6_OutputHasTray;
+    TMySensor SnAuto6_OutputBottomHasTray;
+    TMySensor SnAuto6_TrayPos1;
+    TMySensor SnAuto6_TrayPos2;
     TMySensor SnColor_InputHasTray;
     TMySensor SnColor_InputFullTray;
     TMySensor SnColor_TrayPos1;
     TMySensor SnColor_OutputBottomHasTray;
+    TMySensor SnColor_InputEnd;
     TMySensor SnFrontPadActive;
     TMySensor SnFKReset;
     TMySensor SnFKPause;
@@ -313,7 +424,8 @@ typedef struct CYLINDER_MODULAR_STRUCR
     TMyCylinder C_Auto6_RearRiseTray;
     TMyCylinder C_Auto6_FrontSeparateTray_1;
 
-    TMyCylinder C_Color_FrontRiseTray;
+    TMyCylinder C_Color_FrontRiseTray_1;
+    TMyCylinder C_Color_FrontRiseTray_2;
     TMyCylinder C_Color_PushTray;
     TMyCylinder C_Color_LeanOnTray;
     TMyCylinder C_Color_RearRiseTray;
@@ -371,6 +483,52 @@ typedef struct SUCKER_MODULAR_STRUCR
 //---------------------------------------------------------------------------
 class HTGem;
 //---------------------------------------------------------------------------
+class TDataModule1 : public TDataModule
+{
+__published:
+    TActionList *UserActionList;
+    TAction *InitialMotorName;
+    TAction *SpecificSetupForMotorParameter;
+    TAction *InitialCylinderName;
+    TAction *SpecificSetupForCylinderParameter;
+    TAction *InitialSensorName;
+    TAction *SpecificSetupForSensorParameter;
+    TAction *InitialSwitchName;
+    TAction *SpecificSetupForSwitchParameter;
+    TAction *InitialSuckerName;
+    TAction *SpecificSetupForSuckerParameter;
+    TAction *Initial_IO_Setup;
+    TActionList *UserMotion;
+    TTimer *Timer1;
+    TAction *actEmpty;
+    TAction *actLoader1;
+    TAction *actLoader2;
+    TAction *actAuto1to6;
+    TAction *actTrayArm;
+    TAction *actSortArm;
+    TAction *actColor;
+    void __fastcall InitialMotorNameExecute(TObject *Sender);
+    void __fastcall InitialCylinderNameExecute(TObject *Sender);
+    void __fastcall InitialSensorNameExecute(TObject *Sender);
+    void __fastcall InitialSwitchNameExecute(TObject *Sender);
+    void __fastcall InitialSuckerNameExecute(TObject *Sender);
+    void __fastcall Timer1Timer(TObject *Sender);
+    void __fastcall actEmptyExecute(TObject *Sender);
+    void __fastcall actLoader1Execute(TObject *Sender);
+    void __fastcall actLoader2Execute(TObject *Sender);
+    void __fastcall actAuto1to6Execute(TObject *Sender);
+    void __fastcall actTrayArmExecute(TObject *Sender);
+    void __fastcall actSortArmExecute(TObject *Sender);
+    void __fastcall actColorExecute(TObject *Sender);
+
+public:
+    __fastcall TDataModule1(TComponent* Owner);
+    void InitialAllTask();
+    void DoAllProcess();
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TDataModule1 *DataModule1;
+//---------------------------------------------------------------------------
 typedef struct
 {
     int  iLanguageCountry;
@@ -396,8 +554,10 @@ class SYSTEM_MODULAR
 {
 public:
     AnsiString CurrentDir;
+    AnsiString LogRootDir;
     AnsiString MotTablePath;
     AnsiString IoTablePath;
+    AnsiString AlarmTablePath;   //AI(HT160S-Maintainer) 20260609 : AlarmList.csv (all machine alarms, built at startup)
     TMOTNO MotNo;
     TIOTABLENO IoNo;
     LAST_GENERAL_SET LastSet;
@@ -425,6 +585,13 @@ public:
     int iTotalSucker;
     int iTotalSubSucker;
 
+    //AI(HT160S-Maintainer) 20260603 : alarm-code lookup maps, aligned with HT172
+    std::map<AnsiString, AnsiString>        mapNameToAlarm;
+    std::map<AnsiString, MyAlarmCodeStruct> mapAlarmCodeList;
+    std::map<AnsiString, MyAlarmCodeStruct>::iterator IterAlarmCodeList;
+    //AI(HT160S-Maintainer) 20260603 : alarm-code -> caller context (Func/Case), shown in note remark
+    std::map<int, AnsiString>               mapAlarmContext;
+
     SYSTEM_MODULAR();
     ~SYSTEM_MODULAR();
     void Initial();
@@ -449,6 +616,7 @@ public:
     void LoadMotorParameterFromDataBase(int Index=-1, bool bInitial=true);
     void StopAllMotor();
     void DecStopAllMotor();
+    void CreateSystemAlarmCode();
 };
 //---------------------------------------------------------------------------
 extern SYSTEM_MODULAR HSys;

@@ -18,7 +18,16 @@ extern bool SoftStop;
 extern const int REALLY;
 extern const int HAS_TRAY;
 extern const int DUMMY;
+extern const int EMPTY_IC;
+extern const int UNCHECK_IC;
+extern const int HAS_OK_IC;
 extern bool bHomeByStart;
+//AI(HT160S-Maintainer) 20260602 : HT172 0420 ProcessMotion lifecycle globals
+extern bool bFirstRun;
+extern bool bSortArmNeedHome;
+extern bool bCalculatePauseTime;
+extern TDateTime tUPH_PauseTime;
+extern TDateTime tUPH_PauseStartTime;
 //---------------------------------------------------------------------------
 enum eTrayName                  //使用的Harware Bin數量與名稱
 {

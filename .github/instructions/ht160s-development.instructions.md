@@ -39,6 +39,9 @@ Before implementing a migrated feature:
 ## Encoding And Compatibility
 
 - Preserve Big5/CP950 encoding for legacy `.cpp`, `.h`, `.dfm`, `.rc` files.
+- New or changed comments in BCB6 source files must be ASCII English. Do not add new Chinese comments to `.cpp`, `.h`, `.dfm`, or `.rc`; this avoids mojibake when tools read CP950 files as UTF-8.
+- Before and after editing BCB6 source files, run `scripts/ops/check-ht160s-source-encoding.ps1` or the normal `scripts/ops/build-ht160s.ps1 -Clean`. The check fails on `EF BF BD` replacement bytes and UTF-8 BOMs.
+- If a legacy source file appears garbled in VS Code/tool output but has no `EF BF BD`, treat it as CP950 display mismatch. Convert only touched comments to ASCII English; do not bulk-rewrite unrelated legacy comments.
 - Do not use C++11 or newer syntax.
 - Prefer existing HT160 naming, globals, forms, and task patterns.
 - Do not copy HT172 runtime data files into HT160.

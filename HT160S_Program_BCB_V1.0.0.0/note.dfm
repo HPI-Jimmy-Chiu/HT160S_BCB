@@ -270,12 +270,6 @@ object fNote: TfNote
         TabOrder = 8
         OnClick = BtnOffBuzzerClick
       end
-      object NullTray: TTMyTray
-        Left = 144
-        Top = 485
-        Width = 9
-        Height = 9
-      end
     end
     object PanelMain6: TPanel
       Left = 157

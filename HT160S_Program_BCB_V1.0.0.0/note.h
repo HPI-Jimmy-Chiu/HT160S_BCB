@@ -49,7 +49,6 @@ __published:
     TPanel *BtnPause;
     TPanel *BtnOffBuzzer;
     TPanel *PanelMain6;
-    TTMyTray *NullTray;
     TMemo *Memo1;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
@@ -76,7 +75,6 @@ public:
     int iBackOldMemo2Y;
     int iBackMemo2Height;
     bool fMemoPos;
-    TTMyTray *trayPtr;
     AnsiString sObjName;
     TPanel *FlushPanel;
     TColor FlushPanelColor;

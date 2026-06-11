@@ -1,7 +1,7 @@
 object fTeach: TfTeach
   Left = 134
   Top = 33
-  BorderIcons = []
+  BorderIcons = [biSystemMenu]
   BorderStyle = bsSingle
   Caption = 'Teach'
   ClientHeight = 880
@@ -624,8 +624,10 @@ object fTeach: TfTeach
         Top = 10
         Width = 86
         Height = 30
+        Cancel = True
         Caption = 'EXIT'
         TabOrder = 5
+        OnClick = btnCloseClick
       end
     end
     object PageTeach: TPageControl

@@ -39,11 +39,27 @@ typedef struct MyLockStruct
 //---------------------------------------------------------------------------
 class TTMyTray;
 
+//---------------------------------------------------------------------------
+// Tray data grid dimensions (single source of truth for TMyTray::Data).
+#define MAX_TRAY_Y 50
+#define MAX_TRAY_X 20
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260604 : Tray role within a stacking car (TMyCar).
+//   eTrayKindNormal   : normal work tray, may pick/place IC (default).
+//   eTrayKindIdentity : identity tray, carries the stack's 2D ID (TrayID), no IC.
+//   eTrayKindCover    : top cover tray, an empty tray that must NOT hold IC.
+enum eTrayKind{eTrayKindNormal   =0,
+               eTrayKindIdentity =1,
+               eTrayKindCover    =2
+              };
+//---------------------------------------------------------------------------
 class TMyTray
 {
 public:
-    int Data[20][50];
+    int Data[MAX_TRAY_X][MAX_TRAY_Y];   //AI(general) 20260601 : X-major Data[x][y], aligned to HT172
+    int iBin[MAX_TRAY_X][MAX_TRAY_Y];
     AnsiString TrayID;
+    eTrayKind Kind;   //AI(HT160S-Maintainer) 20260604 : tray role in stacking car
 
     TMyTray();
     void Clear();
@@ -52,6 +68,40 @@ public:
     bool FullIC();
     bool HasThisIC(int data);
     bool FullThisIC(int data);
+    //AI(HT160S-Maintainer) 20260601 : iBin sorting-bin grid helpers (mirror Data helpers)
+    void ClearBin();
+    void SetAllBin(int bin);
+    void SetBin(int x, int y, int bin);
+    int GetBin(int x, int y);
+    //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
+    void SetKind(eTrayKind kind);
+    eTrayKind GetKind();
+    bool CanHoldIC();   // true only for eTrayKindNormal
+};
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260604 : Stacking-car container (one level above TMyTray).
+//   A car holds an ordered stack of trays:
+//     Tray[0]   = identity tray (eTrayKindIdentity, carries CarID/2D),
+//     Tray[1]   = top cover     (eTrayKindCover, no IC),
+//     Tray[2..] = normal work trays (eTrayKindNormal).
+//   Mainly used by Auto1~6; packed for AMR upload when AMR retrieves the car
+//   (upload payload not designed yet).
+#define MAX_TRAY_PER_CAR 30
+//---------------------------------------------------------------------------
+class TMyCar
+{
+public:
+    AnsiString CarID;                  // stack identity (mirrors identity tray's TrayID)
+    int iTrayCount;                    // number of valid trays currently in the car
+    TMyTray Tray[MAX_TRAY_PER_CAR];
+
+    TMyCar();
+    void Clear();
+    int GetTrayCount();
+    TMyTray *GetTray(int index);       // NULL if out of range
+    TMyTray *GetIdentityTray();        // first eTrayKindIdentity tray, else NULL
+    bool IsFull();
+    void PackForAmrUpload();           //AI(HT160S-Maintainer) 20260604 : payload TBD, stub for now
 };
 //---------------------------------------------------------------------------
 class TMyMotor
@@ -80,6 +130,7 @@ public:
     bool bHomeFlag;
     bool bHomeFinish;
     int SimulateSpeed;
+    bool bShowSimulateCompoment;
     int Position;
     int EncoderPosition;
     bool bErrorMove;
@@ -223,6 +274,8 @@ public:
     void SetTrayInfo(int iRow, int iCol);
     void SetPTrayData(int x, int y, int iBin);
     void SetTraySingleData(int x, int y, int data);
+    void SetTrayBin(int x, int y, int bin);   //AI(HT160S-Maintainer) 20260601 : write sorting bin for a cell
+    int GetTrayBin(int x, int y);             //AI(HT160S-Maintainer) 20260601 : read sorting bin for a cell
     void Refresh();
     void InitNewTray(int data);
     void InitEmptyTray();
@@ -236,6 +289,7 @@ public:
     void ClearTray();
     void SetTrayID(AnsiString ID);
     void SetTrayVisible(bool bVisible);
+    void UpdateTrayVisibleByHasTray();
 };
 //---------------------------------------------------------------------------
 #endif

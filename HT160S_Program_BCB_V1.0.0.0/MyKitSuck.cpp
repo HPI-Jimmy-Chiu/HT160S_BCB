@@ -13,21 +13,6 @@ static const int SuckTestPass=1001;
 static const int SuckNullICTest=1002;
 static const int SuckHasNullICTest=1002;
 //---------------------------------------------------------------------------
-void TMySuckerDeviceInfo::Clear()
-{
-}
-//---------------------------------------------------------------------------
-void TMySuckerDeviceInfo::CopyFrom(TMySuckerDeviceInfo &Source)
-{
-    (void)Source;
-}
-//---------------------------------------------------------------------------
-void TMySuckerDeviceInfo::MoveFrom(TMySuckerDeviceInfo &Source)
-{
-    CopyFrom(Source);
-    Source.Clear();
-}
-//---------------------------------------------------------------------------
 __fastcall TMySucker::TMySucker()
 {
     Task=1;
@@ -288,6 +273,8 @@ __fastcall TMyKitSuck::TMyKitSuck()
 {
     Name="";
     FlushPanelName="";
+    for(int Index=0; Index<eSuckErrTotal; Index++)
+        AlarmName[Index]="";
     MaxItem=MAX_SUB_SUCKER_ITEM;
     MaxItemR=MAX_SUCKER_ROW;
     MaxItemC=MAX_SUCKER_COL;

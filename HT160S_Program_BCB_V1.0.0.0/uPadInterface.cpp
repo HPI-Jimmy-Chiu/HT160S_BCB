@@ -99,7 +99,7 @@ void PAD_PTR::SetItem(TMyLed *_mlEvent, TBtnPanelLane *_btnEvent, AnsiString _Pa
 }
 //---------------------------------------------------------------------------
 __fastcall TfPadInterface::TfPadInterface(TComponent* Owner)
-    : TForm(Owner)
+    : TForm(Owner, 0)
 {
     InitialVariable();
     BuildUI();
@@ -312,6 +312,10 @@ void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col
     BtnPtr->Caption=PadButtonDefs[Index].Caption;
     BtnPtr->Alias=PadButtonDefs[Index].PadName;
     BtnPtr->Tag=PadButtonDefs[Index].PanelTag;
+    BtnPtr->FalseColor=clBtnFace;
+    BtnPtr->FalseFontColor=clBlack;
+    BtnPtr->TrueColor=clLime;
+    BtnPtr->TrueFontColor=clBlack;
     BtnPtr->Down=false;
     BtnPtr->OnMouseDown=PadButtonMouseDown;
 
@@ -324,10 +328,13 @@ void __fastcall TfPadInterface::FormShow(TObject *Sender)
     Left=(1280-Width)/2;
     Top=(1024-Height)/2;
     bShow=true;
-    SendCommand("t050490000000");
-    SendCommand("t050491000000");
-    SendCommand("t051490000000");
-    SendCommand("t051491000000");
+    if(bRs232Ok)
+    {
+        SendCommand("t050490000000");
+        SendCommand("t050491000000");
+        SendCommand("t051490000000");
+        SendCommand("t051491000000");
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfPadInterface::FormClose(TObject *Sender, TCloseAction &Action)

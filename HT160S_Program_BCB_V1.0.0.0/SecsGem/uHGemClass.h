@@ -23,6 +23,19 @@ public:
 
     void UpdateDataPath(AnsiString Path);
 
+    //AI(ht160s-secsgem) 20260610 : route an incoming primary message (Stream S,
+    // Function F) decoded by THGem to the matching virtual handler.
+    virtual void Dispatch(int S, int F);
+
+    //AI(ht160s-secsgem) 20260611 : refresh SV snapshot values just before THGem
+    // serializes an S6F11 event report or an S1F4 status reply. Base is a no-op.
+    virtual void RefreshSVData();
+
+    //AI(ht160s-secsgem) 20260612 : called once per second from THGem::Timer1Timer
+    // so the machine-specific GEM logic can sync any HSMS-link UI (e.g. the main
+    // screen SECS status badge). Base is a no-op.
+    virtual void RefreshSecsBadge();
+
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();

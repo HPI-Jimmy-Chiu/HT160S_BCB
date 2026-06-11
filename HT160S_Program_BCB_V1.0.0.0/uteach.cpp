@@ -263,6 +263,7 @@ void TfTeach::BuildClientPanel()
     if(btnClose==NULL)
         btnClose=CreateButton(palFunction, 490, 10, 86, 30, "EXIT", btnCloseClick);
     btnClose->OnClick=btnCloseClick;
+    btnClose->Cancel=true;
 
     if(lblMessage==NULL)
         lblMessage=CreateLabel(palFunction, 592, 15, 220, 22, "");
@@ -566,6 +567,8 @@ void __fastcall TfTeach::InitialTeachParameter()
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "EmptyCarDischargeTrayYPosition", HSys.Mot.MEmptyY, &Teach.EmptyCarDischargeTrayYPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToEmptyXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToEmptyXPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToLoaderXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToLoaderXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToColorXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToColorXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DXPosition", HSys.Mot.MTopCCDX_Color, &Teach.ColorRead2DXPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto1XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto1XPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto2XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto2XPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto3XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto3XPosition);
@@ -1252,7 +1255,6 @@ void __fastcall TfTeach::btnReloadClick(TObject *Sender)
 void __fastcall TfTeach::btnIOFormClick(TObject *Sender)
 {
     (void)Sender;
-    RegisterIOViewStreamClasses();
     if(fiosetview==NULL)
         fiosetview=new Tfiosetview(this);
     fiosetview->Show();

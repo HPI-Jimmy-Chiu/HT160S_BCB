@@ -8,9 +8,32 @@
 #include "mySMCmotor.h"
 #include "myMN200motor.h"
 #include "myMC88X1motor.h"
+#include "HTray.h"
+#include "CosFunction.h"   //AI(general) 20260609 : recipe TrayForm geometry (real tray Col/Row)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #define DEFAULT_SIMULATE_SPEED 1000
+//---------------------------------------------------------------------------
+//AI(general) 20260609 : The real tray region comes from the active recipe
+//geometry (TrayForm.XDivision/YDivision), NOT the MAX_TRAY_* array bounds.
+//A 3x3 tray only fills Data[0..2][0..2]; scanning the full 20x50 array made
+//FullThisIC()/FullIC() never report true, so Auto full-tray discharge never
+//triggered. Clamp to the array bounds so an out-of-range recipe can't overflow.
+static int GetTrayRealXCount()
+{
+    int x=TrayForm.XDivision;
+    if(x<1) x=1;
+    if(x>MAX_TRAY_X) x=MAX_TRAY_X;
+    return x;
+}
+//---------------------------------------------------------------------------
+static int GetTrayRealYCount()
+{
+    int y=TrayForm.YDivision;
+    if(y<1) y=1;
+    if(y>MAX_TRAY_Y) y=MAX_TRAY_Y;
+    return y;
+}
 //---------------------------------------------------------------------------
 TMyTray::TMyTray()
 {
@@ -19,53 +42,154 @@ TMyTray::TMyTray()
 //---------------------------------------------------------------------------
 void TMyTray::Clear()
 {
-    for(int y=0; y<20; y++)
-        for(int x=0; x<50; x++)
-            Data[y][x]=0;
+    for(int y=0; y<MAX_TRAY_Y; y++)
+        for(int x=0; x<MAX_TRAY_X; x++)
+        {
+            Data[x][y]=0;
+            iBin[x][y]=0;   //AI(HT160S-Maintainer) 20260601 : 0 = bin not assigned yet
+        }
     TrayID="";
+    Kind=eTrayKindNormal;   //AI(HT160S-Maintainer) 20260604 : default role = normal work tray
 }
 //---------------------------------------------------------------------------
 void TMyTray::SetAll(int data)
 {
-    for(int y=0; y<20; y++)
-        for(int x=0; x<50; x++)
-            Data[y][x]=data;
+    for(int y=0; y<MAX_TRAY_Y; y++)
+        for(int x=0; x<MAX_TRAY_X; x++)
+            Data[x][y]=data;
 }
 //---------------------------------------------------------------------------
 bool TMyTray::HasIC()
 {
-    for(int y=0; y<20; y++)
-        for(int x=0; x<50; x++)
-            if(Data[y][x]!=0)
+    int xEnd=GetTrayRealXCount();
+    int yEnd=GetTrayRealYCount();
+    for(int y=0; y<yEnd; y++)
+        for(int x=0; x<xEnd; x++)
+            if(Data[x][y]!=0)
                 return true;
     return false;
 }
 //---------------------------------------------------------------------------
 bool TMyTray::FullIC()
 {
-    for(int y=0; y<20; y++)
-        for(int x=0; x<50; x++)
-            if(Data[y][x]==0)
+    int xEnd=GetTrayRealXCount();
+    int yEnd=GetTrayRealYCount();
+    for(int y=0; y<yEnd; y++)
+        for(int x=0; x<xEnd; x++)
+            if(Data[x][y]==0)
                 return false;
     return true;
 }
 //---------------------------------------------------------------------------
 bool TMyTray::HasThisIC(int data)
 {
-    for(int y=0; y<20; y++)
-        for(int x=0; x<50; x++)
-            if(Data[y][x]==data)
+    int xEnd=GetTrayRealXCount();
+    int yEnd=GetTrayRealYCount();
+    for(int y=0; y<yEnd; y++)
+        for(int x=0; x<xEnd; x++)
+            if(Data[x][y]==data)
                 return true;
     return false;
 }
 //---------------------------------------------------------------------------
 bool TMyTray::FullThisIC(int data)
 {
-    for(int y=0; y<20; y++)
-        for(int x=0; x<50; x++)
-            if(Data[y][x]!=data)
+    int xEnd=GetTrayRealXCount();
+    int yEnd=GetTrayRealYCount();
+    for(int y=0; y<yEnd; y++)
+        for(int x=0; x<xEnd; x++)
+            if(Data[x][y]!=data)
                 return false;
     return true;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260601 : iBin sorting-bin grid helpers (mirror Data helpers)
+void TMyTray::ClearBin()
+{
+    for(int y=0; y<MAX_TRAY_Y; y++)
+        for(int x=0; x<MAX_TRAY_X; x++)
+            iBin[x][y]=0;
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetAllBin(int bin)
+{
+    for(int y=0; y<MAX_TRAY_Y; y++)
+        for(int x=0; x<MAX_TRAY_X; x++)
+            iBin[x][y]=bin;
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetBin(int x, int y, int bin)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    iBin[x][y]=bin;
+}
+//---------------------------------------------------------------------------
+int TMyTray::GetBin(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return 0;
+    return iBin[x][y];
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260604 : tray-kind helpers
+void TMyTray::SetKind(eTrayKind kind)
+{
+    Kind=kind;
+}
+//---------------------------------------------------------------------------
+eTrayKind TMyTray::GetKind()
+{
+    return Kind;
+}
+//---------------------------------------------------------------------------
+bool TMyTray::CanHoldIC()
+{
+    return (Kind==eTrayKindNormal);   // identity / cover trays must not hold IC
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260604 : TMyCar stacking-car container
+TMyCar::TMyCar()
+{
+    Clear();
+}
+//---------------------------------------------------------------------------
+void TMyCar::Clear()
+{
+    CarID="";
+    iTrayCount=0;
+    for(int i=0; i<MAX_TRAY_PER_CAR; i++)
+        Tray[i].Clear();
+}
+//---------------------------------------------------------------------------
+int TMyCar::GetTrayCount()
+{
+    return iTrayCount;
+}
+//---------------------------------------------------------------------------
+TMyTray *TMyCar::GetTray(int index)
+{
+    if(index<0 || index>=MAX_TRAY_PER_CAR)
+        return NULL;
+    return &Tray[index];
+}
+//---------------------------------------------------------------------------
+TMyTray *TMyCar::GetIdentityTray()
+{
+    for(int i=0; i<MAX_TRAY_PER_CAR; i++)
+        if(Tray[i].GetKind()==eTrayKindIdentity)
+            return &Tray[i];
+    return NULL;
+}
+//---------------------------------------------------------------------------
+bool TMyCar::IsFull()
+{
+    return (iTrayCount>=MAX_TRAY_PER_CAR);
+}
+//---------------------------------------------------------------------------
+void TMyCar::PackForAmrUpload()
+{
+    //AI(HT160S-Maintainer) 20260604 : AMR upload payload not designed yet; stub.
 }
 //---------------------------------------------------------------------------
 __fastcall TMyMotor::TMyMotor()
@@ -79,6 +203,7 @@ __fastcall TMyMotor::TMyMotor()
     bHomeFlag=false;
     bHomeFinish=false;
     SimulateSpeed=DEFAULT_SIMULATE_SPEED;
+    bShowSimulateCompoment=false;
     Position=0;
     EncoderPosition=0;
     bErrorMove=false;
@@ -151,12 +276,34 @@ bool TMyMotor::ReadServoAlarmOn() { return Motor->ReadServoAlarmOn(); }
 //---------------------------------------------------------------------------
 void TMyMotor::SetPersentSpeed(int persent, bool bSave)
 {
-    (void)bSave;
-    if(persent<1)
-        persent=1;
+    //AI(HT160S-Maintainer) 20260602 : HT172 0420 SetPersentSpeed port. Was a
+    //  dead stub that only stored iPersentSpeed; the percentage never reached
+    //  the motor. Now convert percent of JogHighSpeed into a raw speed and push
+    //  it to the motor register (same model as HT172 mymotor.cpp SetPersentSpeed).
+    //  bSave=false applies a temporary speed (e.g. transient slow-down) without
+    //  overwriting the saved working percentage.
     if(persent>100)
         persent=100;
-    iPersentSpeed=persent;
+    else if(persent<1)
+        persent=1;
+
+    if(bSave)
+        iPersentSpeed=persent;
+
+    if(Motor->Enable)
+    {
+        int s=Motor->JogHighSpeed*persent/100;
+        if(s<1)
+            s=1;
+        SetSpeed(s);
+    }
+    else
+    {
+        int s=SimulateSpeed*persent/100;
+        if(s<1)
+            s=1;
+        speed=s;
+    }
 }
 //---------------------------------------------------------------------------
 void TMyMotor::SetInitSpeed(unsigned int x) { Motor->SetInitSpeed(x); }
@@ -248,9 +395,13 @@ bool TMyMotor::MotorMoveSub(int p, bool bCheckLed)
     }
     if(MoveCheckCallBack!=NULL && MoveCheckCallBack()==false)
         return false;
+    bool bRet;
     if(Motor->Enable)
-        return MotorMovePosition(Position, GetSpeed(), p);
-    return SimulateMotorMovePosition(Position, SimulateSpeed, p);
+        bRet=MotorMovePosition(Position, GetSpeed(), p);
+    else
+        bRet=SimulateMotorMovePosition(Position, SimulateSpeed, p);
+    UpdateSimulateCompomentPosition();
+    return bRet;
 }
 //---------------------------------------------------------------------------
 bool TMyMotor::MotorMove(int p)
@@ -311,6 +462,7 @@ int TMyMotor::ReadPos()
 {
     if(Motor->Enable)
         Position=Motor->ReadPos();
+    UpdateSimulateCompomentPosition();
     return Position;
 }
 //---------------------------------------------------------------------------
@@ -419,16 +571,80 @@ void TMyMotor::ClearPosition(int cmd) { ResetPos(cmd); }
 void TMyMotor::EnableTrigger(int iFlag, int iMode, long lValue) { Motor->EnableTrigger(iFlag, iMode, lValue); }
 void TMyMotor::ManualTestTrigger(bool bOn) { Motor->ManualTestTrigger(bOn); }
 bool TMyMotor::ReadStatus(DWORD offset, WORD *ReadData) { return Motor->ReadStatus(offset, ReadData); }
-void TMyMotor::UpdateSimulateCompomentPosition() {}
-void TMyMotor::SetShowSimulateCompomentFlag(bool flag) { (void)flag; }
+//---------------------------------------------------------------------------
+// Motion View motor-position visualization (ported from HT172 / HT160S V300A).
+// GetScale equivalent: scale = (refStart-refEnd) / (factStart-factEnd).
+static double CalcSimulateScale(int refStart, int refEnd, int factStart, int factEnd)
+{
+    double denom = (double)(factStart - factEnd);
+    if(denom == 0.0)
+        return 1.0;
+    return (double)(refStart - refEnd) / denom;
+}
+//---------------------------------------------------------------------------
+void TMyMotor::UpdateSimulateCompomentPosition()
+{
+    int i, ScreenPos;
+    if(bShowSimulateCompoment==false)
+        return;
+    MyMotorSimulateList *P;
+    for(i=0; i<SimuCtrlList->Count; i++)
+    {
+        P=(MyMotorSimulateList *)SimuCtrlList->Items[i];
+        if(P->PWinCtrl==NULL)
+            continue;
+        ScreenPos=(int)(P->Scale*(Position-P->FactStart))+P->RefStart;
+        if(P->bUpDownMove)
+            P->PWinCtrl->Top=ScreenPos;
+        else
+            P->PWinCtrl->Left=ScreenPos;
+    }
+}
+//---------------------------------------------------------------------------
+void TMyMotor::SetShowSimulateCompomentFlag(bool flag)
+{
+    bShowSimulateCompoment=flag;
+}
+//---------------------------------------------------------------------------
+// Bind a VCL control to this motor for position visualization.
+// Alignment akLeft/akRight => vertical (Top) move; otherwise horizontal (Left) move.
 void TMyMotor::SetSimulateCompoment(TObject *PCtrl, TAnchorKind Alignment, int StartPos, int EndPos, int simuStartPos, int simuEndPos)
 {
-    (void)PCtrl;
-    (void)Alignment;
-    (void)StartPos;
-    (void)EndPos;
-    (void)simuStartPos;
-    (void)simuEndPos;
+    int i;
+    MyMotorSimulateList *TempP, *P;
+    bool bUpDown = (Alignment==akLeft || Alignment==akRight);
+
+    TWinControl *PTempWinCtrl = dynamic_cast<TWinControl *>(PCtrl);
+    if(PTempWinCtrl!=NULL)
+        PTempWinCtrl->DoubleBuffered=true;
+
+    TControl *PWinCtrl = dynamic_cast<TControl *>(PCtrl);
+    if(PWinCtrl==NULL)
+        return;
+
+    for(i=0; i<SimuCtrlList->Count; i++)
+    {
+        TempP=(MyMotorSimulateList *)SimuCtrlList->Items[i];
+        if(TempP->PWinCtrl==PWinCtrl)
+        {
+            TempP->FactStart=StartPos;
+            TempP->FactEnd=EndPos;
+            TempP->RefStart=simuStartPos;
+            TempP->RefEnd=simuEndPos;
+            TempP->bUpDownMove=bUpDown;
+            TempP->Scale=CalcSimulateScale(TempP->RefStart, TempP->RefEnd, TempP->FactStart, TempP->FactEnd);
+            return;
+        }
+    }
+    P=new MyMotorSimulateList;
+    P->PWinCtrl=PWinCtrl;
+    P->FactStart=StartPos;
+    P->FactEnd=EndPos;
+    P->RefStart=simuStartPos;
+    P->RefEnd=simuEndPos;
+    P->bUpDownMove=bUpDown;
+    P->Scale=CalcSimulateScale(P->RefStart, P->RefEnd, P->FactStart, P->FactEnd);
+    SimuCtrlList->Add((void *)P);
 }
 //---------------------------------------------------------------------------
 bool TMyMotor::LinearAxisMoveTo(TMyMotor* LineMotPtr[8], long lPos[8])
@@ -484,38 +700,119 @@ bool TTrayMotor::FullThisIC(int data) { return Tray.FullThisIC(data); }
 bool TTrayMotor::HasThisIC(int data) { return Tray.HasThisIC(data); }
 void TTrayMotor::SetTrayInfo(int iRow, int iCol) { (void)iRow; (void)iCol; }
 void TTrayMotor::SetPTrayData(int x, int y, int iBin) { SetTraySingleData(x, y, iBin); }
-void TTrayMotor::Refresh() {}
-void TTrayMotor::SetIDPanel(TPanel *ptr) { pPalTrayID=ptr; }
-void TTrayMotor::SetTrayPanel(TPanel *ptr) { pPanel=ptr; }
-void TTrayMotor::SetHTrayPanel(TTMyTray *ptr) { pHTray=ptr; }
-void TTrayMotor::SetSubHTrayPanel(TTMyTray *ptr) { pSubHTray=ptr; }
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) : init a default index->color map for a bound tray panel.
+static void InitTrayColorMap(TTMyTray *p)
+{
+    if(p==NULL) return;
+    p->SetColorMap(0,  clWhite);    //EMPTY_IC   : empty pocket
+    p->SetColorMap(1,  clSkyBlue);  //UNCHECK_IC : IC present, not yet checked
+    p->SetColorMap(2,  clLime);     //HAS_OK_IC  : good / passed
+    p->SetColorMap(3,  clRed);
+    p->SetColorMap(4,  clYellow);
+    p->SetColorMap(5,  clAqua);
+    p->SetColorMap(6,  clFuchsia);
+    p->SetColorMap(7,  clBlue);
+    p->SetColorMap(8,  clGreen);
+    p->SetColorMap(9,  clOlive);
+    p->SetColorMap(10, clTeal);
+    p->SetColorMap(11, clPurple);
+    p->SetColorMap(12, clMaroon);
+    p->SetColorMap(13, clNavy);
+    p->SetColorMap(14, clGray);
+    p->SetColorMap(15, clSilver);
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) : repaint all bound cells from Tray.Data. Grid dims come
+//from the bound panel (HT160 TMyTray has no XItem/YItem), clamped to MAX_TRAY_*.
+void TTrayMotor::Refresh()
+{
+    UpdateTrayVisibleByHasTray();
+    if(fHTary && pHTray!=NULL)
+    {
+        int nx=pHTray->XItem, ny=pHTray->YItem;
+        if(nx>MAX_TRAY_X) nx=MAX_TRAY_X;
+        if(ny>MAX_TRAY_Y) ny=MAX_TRAY_Y;
+        for(int x=0; x<nx; x++)
+            for(int y=0; y<ny; y++)
+                pHTray->SetCellColorIndex(x, y, Tray.Data[x][y]);
+    }
+    if(fSubHTary && pSubHTray!=NULL)
+    {
+        int nx=pSubHTray->XItem, ny=pSubHTray->YItem;
+        if(nx>MAX_TRAY_X) nx=MAX_TRAY_X;
+        if(ny>MAX_TRAY_Y) ny=MAX_TRAY_Y;
+        for(int x=0; x<nx; x++)
+            for(int y=0; y<ny; y++)
+                pSubHTray->SetCellColorIndex(x, y, Tray.Data[x][y]);
+    }
+}
+void TTrayMotor::SetIDPanel(TPanel *ptr) { fPanelID=(ptr!=NULL); pPalTrayID=ptr; }
+void TTrayMotor::SetTrayPanel(TPanel *ptr) { fPanel=(ptr!=NULL); pPanel=ptr; }
+void TTrayMotor::SetHTrayPanel(TTMyTray *ptr) { fHTary=(ptr!=NULL); pHTray=ptr; InitTrayColorMap(ptr); UpdateTrayVisibleByHasTray(); }
+void TTrayMotor::SetSubHTrayPanel(TTMyTray *ptr) { fSubHTary=(ptr!=NULL); pSubHTray=ptr; InitTrayColorMap(ptr); UpdateTrayVisibleByHasTray(); }
 void TTrayMotor::CopyTrayFrom(int Index) { (void)Index; }
 void TTrayMotor::MoveTrayFrom(int Index) { (void)Index; }
-void TTrayMotor::SetTrayVisible(bool bVisible) { (void)bVisible; }
+void TTrayMotor::SetTrayVisible(bool bVisible)
+{
+    if(fHTary    && pHTray    !=NULL) pHTray->Visible=bVisible;
+    if(fSubHTary && pSubHTray !=NULL) pSubHTray->Visible=bVisible;
+    if(fPanel    && pPanel    !=NULL) pPanel->Visible=bVisible;
+    if(fPanelID  && pPalTrayID!=NULL) pPalTrayID->Visible=bVisible;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) : sync the tray CONTENT grid visibility with fHasTray.
+//A freshly fed/empty car has no tray -> hide the cell grid; once a tray is
+//received (fHasTray==true) show it. Position carrier panel is NOT touched here
+//(it stays visible to show the Y position). Display only - no machine risk.
+//The != guard avoids redundant repaints each frame.
+void TTrayMotor::UpdateTrayVisibleByHasTray()
+{
+    if(fHTary    && pHTray    !=NULL && pHTray->Visible   !=fHasTray) pHTray->Visible=fHasTray;
+    if(fSubHTary && pSubHTray !=NULL && pSubHTray->Visible!=fHasTray) pSubHTray->Visible=fHasTray;
+}
 //---------------------------------------------------------------------------
 void TTrayMotor::SetTraySingleData(int x, int y, int data)
 {
-    if(y>=0 && y<20 && x>=0 && x<50)
-        Tray.Data[y][x]=data;
+    if(y>=0 && y<MAX_TRAY_Y && x>=0 && x<MAX_TRAY_X)
+        Tray.Data[x][y]=data;
+    if(fHTary    && pHTray    !=NULL) pHTray->SetCellColorIndex(x, y, data);
+    if(fSubHTary && pSubHTray !=NULL) pSubHTray->SetCellColorIndex(x, y, data);
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260601 : sorting-bin accessors (no display side effect)
+void TTrayMotor::SetTrayBin(int x, int y, int bin)
+{
+    Tray.SetBin(x, y, bin);
+}
+//---------------------------------------------------------------------------
+int TTrayMotor::GetTrayBin(int x, int y)
+{
+    return Tray.GetBin(x, y);
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::InitNewTray(int data)
 {
     Tray.SetAll(data);
+    Tray.ClearBin();   //AI(HT160S-Maintainer) 20260601 : new tray starts with no bin assignment
     fHasTray=true;
+    Refresh();
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::InitEmptyTray()
 {
     Tray.Clear();
     fHasTray=true;
+    Refresh();
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::SetTray(int data, bool bWithCover)
 {
     Tray.SetAll(data);
+    Tray.ClearBin();   //AI(HT160S-Maintainer) 20260601 : reset bin assignment with tray content
     fHasTray=true;
     bHasCover=bWithCover;
+    Refresh();
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::ClearTray()
@@ -523,6 +820,7 @@ void TTrayMotor::ClearTray()
     Tray.Clear();
     fHasTray=false;
     bHasCover=false;
+    Refresh();
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::SetTrayID(AnsiString ID)

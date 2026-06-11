@@ -801,6 +801,46 @@ object fMaintenance: TfMaintenance
       end
       object tsMaintFunctionDef: TTabSheet
         Caption = 'Function Define'
+        object pnlFunctionDefHeader: TPanel
+          Left = 0
+          Top = 0
+          Width = 839
+          Height = 31
+          Align = alTop
+          BevelInner = bvLowered
+          Caption = 'Function define setup'
+          Color = clTeal
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWhite
+          Font.Height = -16
+          Font.Name = 'MS Sans Serif'
+          Font.Style = []
+          ParentFont = False
+          TabOrder = 0
+        end
+        object pnlFunctionDefBody: TPanel
+          Left = 0
+          Top = 31
+          Width = 839
+          Height = 767
+          Align = alClient
+          BevelInner = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object pgcFunctionDef: TPageControl
+            Left = 2
+            Top = 2
+            Width = 835
+            Height = 763
+            ActivePage = tsFunctionGeneral
+            Align = alClient
+            TabIndex = 0
+            TabOrder = 0
+            object tsFunctionGeneral: TTabSheet
+              Caption = 'General'
+            end
+          end
+        end
       end
       object tsMaintHardware: TTabSheet
         Caption = 'Hardware Setup'
@@ -845,14 +885,14 @@ object fMaintenance: TfMaintenance
                 Left = 0
                 Top = 0
                 Width = 827
-                Height = 65
+                Height = 40
                 Align = alTop
                 BevelInner = bvLowered
                 TabOrder = 0
                 object lblHardwareColorHint: TLabel
-                  Left = 82
-                  Top = 36
-                  Width = 610
+                  Left = 220
+                  Top = 12
+                  Width = 479
                   Height = 16
                   AutoSize = False
                   Caption = 
@@ -868,7 +908,7 @@ object fMaintenance: TfMaintenance
                 object chkHardwareColorBinArea: TCheckBox
                   Left = 16
                   Top = 10
-                  Width = 260
+                  Width = 193
                   Height = 20
                   Caption = 'Color bin area installed'
                   Font.Charset = DEFAULT_CHARSET
@@ -879,6 +919,30 @@ object fMaintenance: TfMaintenance
                   ParentFont = False
                   TabOrder = 0
                   OnClick = chkHardwareColorBinAreaClick
+                end
+              end
+              object Panel3: TPanel
+                Left = 0
+                Top = 40
+                Width = 827
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object chkUseAMR: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 260
+                  Height = 20
+                  Caption = 'Use AMR'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkUseAMRClick
                 end
               end
             end

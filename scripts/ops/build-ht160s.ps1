@@ -13,6 +13,7 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $projectRoot = Join-Path $repoRoot "HT160S_Program_BCB_V1.0.0.0"
 $projectFile = Join-Path $projectRoot "ht160s.bpr"
 $makeFile = Join-Path $projectRoot "ht160s.mak"
+$encodingCheck = Join-Path $PSScriptRoot "check-ht160s-source-encoding.ps1"
 $bpr2mak = Join-Path $BCBRoot "Bin\bpr2mak.exe"
 $make = Join-Path $BCBRoot "Bin\make.exe"
 $brcc32 = Join-Path $BCBRoot "Bin\brcc32.exe"
@@ -31,6 +32,10 @@ if (-not (Test-Path -LiteralPath $make)) {
 
 if (-not (Test-Path -LiteralPath $brcc32)) {
     throw "brcc32.exe not found: $brcc32"
+}
+
+if (-not (Test-Path -LiteralPath $encodingCheck)) {
+    throw "Encoding check script not found: $encodingCheck"
 }
 
 $projectText = Get-Content -LiteralPath $projectFile -Raw
@@ -80,6 +85,8 @@ function Assert-StaleOutputsNotRunning {
 
 Push-Location $projectRoot
 try {
+    & $encodingCheck -ProjectRoot $projectRoot
+
     $objRoot = Join-Path $repoRoot "Obj"
     if (-not (Test-Path -LiteralPath $objRoot)) {
         New-Item -ItemType Directory -Path $objRoot | Out-Null
@@ -91,7 +98,7 @@ try {
         $cleanFiles = @(
             "ht160s.obj", "main.obj", "database.obj", "uruncontrol.obj",
             "HTray.obj", "HTray.d", "HTMotor.obj", "MyMotor.obj", "mySMCmotor.obj", "myMN200motor.obj",
-            "myMC88X1motor.obj", "AutomationServer.obj", $projectExeName,
+            "myMC88X1motor.obj", "AutomationServer.obj", "MCUDisplayProtocol.obj", "MCUDisplay.obj", $projectExeName,
             ([System.IO.Path]::ChangeExtension($projectExeName, ".tds")),
             "..\Obj\ht160s.csm"
         )

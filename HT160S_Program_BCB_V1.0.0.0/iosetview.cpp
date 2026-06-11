@@ -1,3 +1,4 @@
+#include "IncludeAllHeader.h"       //Dell 將.h統一,可加速build
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #include <TypInfo.hpp>
@@ -10,6 +11,9 @@
 #include "uPadInterface.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
+#pragma link "ALed"
+#pragma link "MyLed"
+#pragma link "butPa1"
 #pragma resource "*.dfm"
 Tfiosetview *fiosetview;
 //---------------------------------------------------------------------------
@@ -92,6 +96,11 @@ struct TIOMapItem
     AnsiString Alias;
 };
 //---------------------------------------------------------------------------
+// iosetview.dfm references custom components (TMyLed/TBtnPanel/TALed) plus the
+// usual VCL classes. Their design packages are not installed in this IDE, so
+// VCL's streaming class registry does not contain them at runtime. Register
+// every class the DFM uses here, once, before Tfiosetview is streamed; without
+// this, CreateForm(Tfiosetview) throws "Class Txxx not found".
 void RegisterIOViewStreamClasses()
 {
     static bool bRegistered=false;
@@ -125,6 +134,7 @@ void RegisterIOViewStreamClasses()
     RegisterClass(__classid(TImage));
     RegisterClass(__classid(TMyLed));
     RegisterClass(__classid(TBtnPanel));
+    RegisterClass(__classid(TALed));
 
     bRegistered=true;
 }
@@ -163,7 +173,6 @@ __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     strngrdIoTable=NULL;
     IOTableDeletedTags=new TStringList();
     ManualOutputLog=new TStringList();
-    tmrRefresh=NULL;
     SelectedKind=eIOViewNone;
     SelectedIndex=-1;
     SelectedRow=-1;
@@ -171,7 +180,7 @@ __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     iSelectRow=0;
     iSelectCol=0;
     Color=IO_COLOR_FORM;
-    ApplyHT172Palette();
+    fShow=false;
 }
 //---------------------------------------------------------------------------
 __fastcall Tfiosetview::~Tfiosetview()
@@ -182,70 +191,6 @@ __fastcall Tfiosetview::~Tfiosetview()
     ManualOutputLog=NULL;
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::ApplyHT172Palette()
-{
-    int i;
-
-    Color=IO_COLOR_FORM;
-    for(i=0; i<ComponentCount; i++)
-        ApplyHT172PaletteToComponent(Components[i]);
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::ApplyHT172PaletteToComponent(TComponent *Component)
-{
-    AnsiString ClassName;
-    AnsiString ComponentName;
-    TPanel *Panel;
-    TGroupBox *GroupBox;
-
-    if(Component==NULL)
-        return;
-
-    ClassName=Component->ClassName();
-    ComponentName=Component->Name;
-
-    if(ClassName=="TBtnPanel" || ClassName=="TBtnPanelLane")
-    {
-        SetOrdProperty(Component, "Color", (int)IO_COLOR_BUTTON_OFF);
-        SetOrdProperty(Component, "TrueColor", (int)IO_COLOR_BUTTON_ON);
-        SetOrdProperty(Component, "FalseColor", (int)IO_COLOR_BUTTON_OFF);
-        SetOrdProperty(Component, "TrueFontColor", (int)clBlack);
-        SetOrdProperty(Component, "FalseFontColor", (int)clWhite);
-        if(Component->InheritsFrom(__classid(TPanel)))
-            ((TPanel*)Component)->Font->Color=clWhite;
-        return;
-    }
-
-    if(ClassName=="TMyLed" || ClassName=="TMyLedLane" || ClassName=="TALed")
-    {
-        SetOrdProperty(Component, "TrueColor", (int)clLime);
-        SetOrdProperty(Component, "FalseColor", (int)clSilver);
-        return;
-    }
-
-    if(Component->InheritsFrom(__classid(TGroupBox)))
-    {
-        GroupBox=(TGroupBox*)Component;
-        GroupBox->Color=IO_COLOR_FORM;
-        GroupBox->ParentColor=false;
-        return;
-    }
-
-    if(Component->InheritsFrom(__classid(TPanel)))
-    {
-        Panel=(TPanel*)Component;
-        if(ComponentName=="pn_IOSetViewMenu")
-            Panel->Color=IO_COLOR_FORM;
-        else if(ComponentName.Pos("palBackGround")>0)
-            Panel->Color=IO_COLOR_SUCKER_BG;
-        else if(Panel->Color==clGreen || Panel->Color==clOlive || Panel->Color==clTeal ||
-                Panel->Height<=16 || Panel->Width<=16)
-            Panel->Color=IO_COLOR_HEADER;
-        else if(Panel->Color==(TColor)13487501 || Panel->Color==clBtnFace)
-            Panel->Color=IO_COLOR_FORM;
-    }
-}
-//---------------------------------------------------------------------------
 void Tfiosetview::BuildUI()
 {
     Color=IO_COLOR_FORM;
@@ -253,11 +198,6 @@ void Tfiosetview::BuildUI()
     Font->Size=10;
     BuildHeader();
     BuildPages();
-
-    tmrRefresh=new TTimer(this);
-    tmrRefresh->Enabled=false;
-    tmrRefresh->Interval=500;
-    tmrRefresh->OnTimer=tmrRefreshTimer;
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::BuildHeader()
@@ -2356,42 +2296,77 @@ void Tfiosetview::UpdateManualButtons()
     btnSuckerDestroy->Font->Color=btnSuckerDestroy->Enabled?clBlack:clGray;
 }
 //---------------------------------------------------------------------------
+TPageControl *Tfiosetview::GetLegacyPageIO()
+{
+    return dynamic_cast<TPageControl *>(FindComponent("PageIO"));
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelectLegacyIOPageByButton(TSpeedButton *Button)
+{
+    TPageControl *LegacyPage;
+    TPanel *TitlePanel;
+    int PageIndex;
+
+    if(Button==NULL)
+        return;
+
+    LegacyPage=GetLegacyPageIO();
+    if(LegacyPage==NULL)
+        return;
+
+    PageIndex=Button->Tag-1;
+    if(PageIndex<0 || PageIndex>=LegacyPage->PageCount)
+        return;
+
+    LegacyPage->ActivePageIndex=PageIndex;
+    TitlePanel=dynamic_cast<TPanel *>(FindComponent("plIOForm"));
+    if(TitlePanel!=NULL)
+        TitlePanel->Caption=Button->Caption;
+    UpdateLegacyPageTabsVisible();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::UpdateLegacyPageTabsVisible()
+{
+    TPageControl *LegacyPage;
+    bool bVisible;
+    int PageIndex;
+
+    LegacyPage=GetLegacyPageIO();
+    if(LegacyPage==NULL)
+        return;
+
+    bVisible=!HSys.Sys.SystemStart;
+    for(PageIndex=0; PageIndex<LegacyPage->PageCount; PageIndex++)
+    {
+        if(LegacyPage->Pages[PageIndex]!=NULL && LegacyPage->Pages[PageIndex]->TabVisible!=bVisible)
+            LegacyPage->Pages[PageIndex]->TabVisible=bVisible;
+    }
+}
+//---------------------------------------------------------------------------
 void Tfiosetview::SetRefreshTimerEnabled(bool Enabled)
 {
-    TTimer *LegacyTimer;
-
-    if(tmrRefresh!=NULL)
-    {
-        tmrRefresh->Enabled=Enabled;
-        return;
-    }
-
-    LegacyTimer=FindNamedTimer(this, "Timer1");
-    if(LegacyTimer!=NULL)
-        LegacyTimer->Enabled=Enabled;
+//    TTimer *LegacyTimer;
+//
+//    if(tmrRefresh!=NULL)
+//    {
+//        tmrRefresh->Enabled=Enabled;
+//        return;
+//    }
+//
+//    LegacyTimer=FindNamedTimer(this, "Timer1");
+//    if(LegacyTimer!=NULL)
+//        LegacyTimer->Enabled=Enabled;
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormShow(TObject *Sender)
 {
     (void)Sender;
-    ApplyHT172Palette();
     EnsureIOTableEditor();
     RefreshCurrentView();
     RefreshLegacyIOMaps();
+    UpdateLegacyPageTabsVisible();
     SetRefreshTimerEnabled(true);
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::FormClose(TObject *Sender, TCloseAction &Action)
-{
-    (void)Sender;
-    Action=caHide;
-    SetRefreshTimerEnabled(false);
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::tmrRefreshTimer(TObject *Sender)
-{
-    (void)Sender;
-    RefreshCurrentView();
+    fShow=true;
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::btnRefreshClick(TObject *Sender)
@@ -2637,8 +2612,7 @@ void __fastcall Tfiosetview::sbInputClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::sbIOExitClick(TObject *Sender)
 {
-    (void)Sender;
-    Hide();
+    Close();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::sbIORefreshClick(TObject *Sender)
@@ -2660,7 +2634,10 @@ void __fastcall Tfiosetview::sbIORefreshClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::sbIORingLoadClick(TObject *Sender)
 {
-    (void)Sender;
+    TSpeedButton *Button;
+
+    Button=dynamic_cast<TSpeedButton *>(Sender);
+    SelectLegacyIOPageByButton(Button);
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::sbOutputClick(TObject *Sender)
@@ -2794,6 +2771,7 @@ void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)
 {
     (void)Sender;
     RefreshCurrentView();
+    UpdateLegacyPageTabsVisible();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::tmr_IonFanTimer(TObject *Sender)
@@ -2801,3 +2779,10 @@ void __fastcall Tfiosetview::tmr_IonFanTimer(TObject *Sender)
     (void)Sender;
 }
 //---------------------------------------------------------------------------
+void __fastcall Tfiosetview::FormClose(TObject *Sender,
+      TCloseAction &Action)
+{
+    fShow=false;      
+}
+//---------------------------------------------------------------------------
+

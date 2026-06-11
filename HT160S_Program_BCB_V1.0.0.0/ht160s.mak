@@ -13,23 +13,27 @@ BCB = $(MAKEDIR)\..
 
 VERSION = BCB.06.00
 # ---------------------------------------------------------------------------
-PROJECT = ht160s.exe
-OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uQwertyKey.obj \
-    language.obj setup.obj data.obj maintenance.obj uOffset.obj uspeed.obj \
-    systools.obj mymessbox.obj note.obj cmydef.obj CosFunction.obj \
-    UserRoleManager.obj database.obj csystem.obj uruncontrol.obj HTimer.obj \
-    myio.obj myio_MN200.obj mysensor.obj myswitch.obj mycylin.obj \
-    MyKitSuck.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj \
+PROJECT = ..\EXE\ht160s.exe
+OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uHome.obj \
+    uQwertyKey.obj language.obj setup.obj data.obj maintenance.obj uOffset.obj \
+    uspeed.obj systools.obj mymessbox.obj note.obj cmydef.obj cprod.obj \
+    CosFunction.obj Include\cJSON.obj GeneralSetting.obj Config.obj \
+    UserRoleManager.obj cEventLog.obj cSelfCheck.obj cStepTrace.obj \
+    cStateRecordHT160.obj database.obj aLoader.obj aEmpty.obj aAuto1To6.obj \
+    aTrayArm.obj aSortArm.obj aColor.obj csystem.obj uruncontrol.obj \
+    HTimer.obj myio.obj myio_MN200.obj mysensor.obj myswitch.obj mycylin.obj \
+    MyKitSuck.obj deviceinfo.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj \
     MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj \
     MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj \
-    AutomationServer.obj ComPort.obj uPadInterface.obj \
+    AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj ComPort.obj \
+    MCUDisplayProtocol.obj MCUDisplay.obj uPadInterface.obj \
     SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj \
-    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj
+    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj
 RESFILES = ht160s.res
 MAINSOURCE = ht160s.cpp
-RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm \
+RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm \
     uQwertyKey.dfm language.dfm setup.dfm data.dfm maintenance.dfm uOffset.dfm \
-    uspeed.dfm systools.dfm mymessbox.dfm note.dfm
+    uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm
 LIBFILES = 
 IDLFILES = 
 IDLGENFILES = 
@@ -41,7 +45,7 @@ PACKAGES = vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx
     inet.bpi inetdbbde.bpi inetdbxpress.bpi inetdb.bpi nmfast.bpi webdsnap.bpi \
     bcbie.bpi websnap.bpi soaprtl.bpi dclocx.bpi dbexpress.bpi dbxcds.bpi \
     indy.bpi dclusr60.bpi
-SPARELIBS = vcl.lib rtl.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib
+SPARELIBS = vcl.lib rtl.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib bdertl.lib
 DEFFILE = 
 OTHERFILES = 
 # ---------------------------------------------------------------------------
@@ -49,10 +53,10 @@ DEBUGLIBPATH = $(BCB)\lib\debug
 RELEASELIBPATH = $(BCB)\lib\release
 USERDEFINES = _DEBUG
 SYSDEFINES = _RTLDLL;NO_STRICT;USEPACKAGES
-INCLUDEPATH = SecsGem;MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\Component;$(BCB)\include;$(BCB)\include\vcl;D:\HT160S_BCB\elec\myvcl
-LIBPATH = MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\myvcl;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib;D:\HT160S_BCB\elec\Component
+INCLUDEPATH = Include;SecsGem;MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\Component;$(BCB)\include;$(BCB)\include\vcl;D:\HT160S_BCB\elec\myvcl
+LIBPATH = Include;SecsGem;MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\myvcl;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib;D:\HT160S_BCB\elec\Component
 WARNINGS= -w-par
-PATHCPP = .;MotorAndIO;SecsGem
+PATHCPP = .;Include;MotorAndIO;SecsGem
 PATHASM = .;
 PATHPAS = .;
 PATHRC = .;

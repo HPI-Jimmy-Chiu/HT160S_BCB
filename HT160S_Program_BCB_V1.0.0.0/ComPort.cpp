@@ -9,6 +9,7 @@
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "SPComm"
+#pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 TfComPort *fComPort = NULL;
 //---------------------------------------------------------------------------
@@ -36,8 +37,7 @@ __fastcall TfComPort::TfComPort(TComponent* Owner)
     : TForm(Owner)
 {
     bShow=false;
-    PadComm=NULL;
-    BuildUI();
+    PopulateComList();
     OpenWorkFile();
 }
 //---------------------------------------------------------------------------
@@ -46,134 +46,13 @@ __fastcall TfComPort::~TfComPort()
     StopAllCom();
 }
 //---------------------------------------------------------------------------
-void TfComPort::BuildUI()
-{
-    Caption="COM Port";
-    Width=700;
-    Height=430;
-    Position=poScreenCenter;
-    OnShow=FormShow;
-    OnClose=FormClose;
-
-    pnlTop=new TPanel(this);
-    pnlTop->Parent=this;
-    pnlTop->Align=alTop;
-    pnlTop->Height=42;
-    pnlTop->Caption="Pad COM Port";
-    pnlTop->Font->Style=TFontStyles()<<fsBold;
-
-    sbExit=new TButton(this);
-    sbExit->Parent=pnlTop;
-    sbExit->Caption="Exit";
-    sbExit->Width=80;
-    sbExit->Height=26;
-    sbExit->Left=pnlTop->Width-90;
-    sbExit->Top=8;
-    sbExit->Anchors=TAnchors()<<akTop<<akRight;
-    sbExit->OnClick=sbExitClick;
-
-    pnlSetting=new TPanel(this);
-    pnlSetting->Parent=this;
-    pnlSetting->Align=alTop;
-    pnlSetting->Height=64;
-    pnlSetting->BevelOuter=bvNone;
-
-    labPadCom=new TLabel(this);
-    labPadCom->Parent=pnlSetting;
-    labPadCom->Caption="Pad COM";
-    labPadCom->Left=12;
-    labPadCom->Top=22;
-
-    cbPadComm=new TComboBox(this);
-    cbPadComm->Parent=pnlSetting;
-    cbPadComm->Left=78;
-    cbPadComm->Top=18;
-    cbPadComm->Width=100;
-    cbPadComm->Style=csDropDown;
-    PopulateComList();
-
-    spbResetCom=new TButton(this);
-    spbResetCom->Parent=pnlSetting;
-    spbResetCom->Caption="Open / Reset";
-    spbResetCom->Left=190;
-    spbResetCom->Top=16;
-    spbResetCom->Width=95;
-    spbResetCom->OnClick=spbResetComClick;
-
-    btnStopCom=new TButton(this);
-    btnStopCom->Parent=pnlSetting;
-    btnStopCom->Caption="Close";
-    btnStopCom->Left=294;
-    btnStopCom->Top=16;
-    btnStopCom->Width=70;
-    btnStopCom->OnClick=btnStopComClick;
-
-    sbUpdate=new TButton(this);
-    sbUpdate->Parent=pnlSetting;
-    sbUpdate->Caption="Save";
-    sbUpdate->Left=372;
-    sbUpdate->Top=16;
-    sbUpdate->Width=70;
-    sbUpdate->OnClick=sbUpdateClick;
-
-    btnClearMemo=new TButton(this);
-    btnClearMemo->Parent=pnlSetting;
-    btnClearMemo->Caption="Clear Log";
-    btnClearMemo->Left=450;
-    btnClearMemo->Top=16;
-    btnClearMemo->Width=82;
-    btnClearMemo->OnClick=btnClearMemoClick;
-
-    pnlManual=new TPanel(this);
-    pnlManual->Parent=this;
-    pnlManual->Align=alTop;
-    pnlManual->Height=54;
-    pnlManual->BevelOuter=bvNone;
-
-    labManualSend=new TLabel(this);
-    labManualSend->Parent=pnlManual;
-    labManualSend->Caption="Manual Send";
-    labManualSend->Left=12;
-    labManualSend->Top=18;
-
-    edPanelSend_Com=new TEdit(this);
-    edPanelSend_Com->Parent=pnlManual;
-    edPanelSend_Com->Left=100;
-    edPanelSend_Com->Top=14;
-    edPanelSend_Com->Width=250;
-    edPanelSend_Com->Text="t051120";
-
-    sbPanelSend_Com=new TButton(this);
-    sbPanelSend_Com->Parent=pnlManual;
-    sbPanelSend_Com->Caption="Send";
-    sbPanelSend_Com->Left=360;
-    sbPanelSend_Com->Top=13;
-    sbPanelSend_Com->Width=70;
-    sbPanelSend_Com->OnClick=sbPanelSend_ComClick;
-
-    pnlLog=new TPanel(this);
-    pnlLog->Parent=this;
-    pnlLog->Align=alClient;
-    pnlLog->BevelOuter=bvNone;
-
-    memoPanelCom=new TMemo(this);
-    memoPanelCom->Parent=pnlLog;
-    memoPanelCom->Align=alClient;
-    memoPanelCom->ScrollBars=ssVertical;
-
-    PadComm=new TComm(this);
-    PadComm->OnReceiveData=PadCommReceiveData;
-}
-//---------------------------------------------------------------------------
 void TfComPort::PopulateComList()
 {
-    int i;
-
     if(cbPadComm==NULL)
         return;
 
     cbPadComm->Items->Clear();
-    for(i=1; i<=32; i++)
+    for(int i=1; i<=32; i++)
         cbPadComm->Items->Add(AnsiString("COM")+IntToStr(i));
     cbPadComm->Text=PAD_DEFAULT_COM;
 }

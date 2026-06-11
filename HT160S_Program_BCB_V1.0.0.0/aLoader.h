@@ -1,0 +1,107 @@
+//---------------------------------------------------------------------------
+#ifndef aLoaderH
+#define aLoaderH
+//---------------------------------------------------------------------------
+#include <Classes.hpp>
+#include "HTimer.h"
+//---------------------------------------------------------------------------
+// Loader per-side handshake status for the shared Loader-Y axis. SortArm uses
+// this to know when a side has finished CCD scanning and the Y axis may be
+// handed over for picking. See AcquireSortOwner/ReleaseSortOwner/IsSortOwnerHeld.
+enum eLoaderStatus
+{
+    LS_IDLE=0,            // No tray / nothing to do
+    LS_FEEDING=1,         // Feeding a tray, Loader owns the Y axis
+    LS_CCD_SCAN=2,        // Top CCD scanning, Loader owns the Y axis
+    LS_READY_SORT=3,      // CCD done, Y parked, available for SortArm to take
+    LS_SORTING=4,         // Y axis ownership granted to SortArm
+    LS_ToRear=5,          // Y axis will go to rear
+};
+//---------------------------------------------------------------------------
+struct TLoaderSideState
+{
+    int FeedTask;
+    int CcdTask;
+    int DischargeTask;
+    bool bTrayEmpty;
+    bool bCcdLeftToRight;
+    int CcdX;
+    int CcdY;
+    int Status;
+    bool bCleanOutFinish;   //AI(HT160S-Maintainer) 20260605 : this side drained in CleanOut
+    HTimer FeedDelay;
+    HTimer CcdDelay;
+};
+//---------------------------------------------------------------------------
+class TLoaderModule
+{
+private:
+    TLoaderSideState Side[2];
+    bool bRearHasTray;
+    int iFrontOwner;
+    int iTopCcdCount;
+    int iYOwner[2];
+    int SimuCcdCycleIndex;   // round-robin cursor over LotRegistry codes (simulation only)
+    AnsiString CurrentLotNumber;
+
+    TLoaderSideState *GetSide(int LoaderNo);
+    TLoaderSideState *GetOtherSide(int LoaderNo);
+    int GetSideIndex(int LoaderNo);
+    bool IsValidLoaderNo(int LoaderNo);
+
+    void ResetSide(TLoaderSideState *State);
+    void PrepareTrayMap(int LoaderNo);
+    void ChangeActiveTrayData(int LoaderNo, int SourceData, int TargetData);
+    bool HasActiveTrayData(int LoaderNo, int Data);
+    bool ActiveTrayAllData(int LoaderNo, int Data);
+    bool FindNextCcdCell(int LoaderNo, int &CellX, int &CellY);
+
+    int GetTrayXCount();
+    int GetTrayYCount();
+    double GetTrayXPitch();
+    double GetTrayYPitch();
+    int GetLoaderFeedY(int LoaderNo);
+    int GetLoaderDischargeY(int LoaderNo);
+    int GetLoaderFirstCcdY(int LoaderNo);
+    int GetTopCcdFirstX();
+    int RoundPosition(double Value);
+
+    bool MoveLoaderY(int LoaderNo, int Position);
+    bool MoveTopCcdX(int Position);
+    bool MoveToCcdCell(int LoaderNo, int CellX, int CellY);
+    bool IsLoaderYMoveSafe(int LoaderNo, int Position);   //AI(HT160S-Maintainer) 20260610 : cross-side safe-distance interlock
+    bool IsOutputBottomOccupied();
+    bool IsRearOccupied();
+    void RefreshRearState();
+    bool AcquireFrontOwner(int LoaderNo);
+    void ReleaseFrontOwner(int LoaderNo);
+    bool IsSoftSimulate();
+    bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
+    int ReadTopCcdBin(int LoaderNo, int CellX, int CellY, bool &bOk);
+    AnsiString ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, bool &bOk);
+
+    bool DoFeedTray(int LoaderNo, int Flag);
+    bool DoCcdCheck(int LoaderNo, int Flag);
+    bool DoDischargeTray(int LoaderNo, int Flag);
+
+public:
+    TLoaderModule();
+    void InitialFlag();
+    void DoLoader(int LoaderNo, int &Task);
+    bool IsRearHasTray();
+    void SetCurrentLotNumber(AnsiString Lot);
+    bool IsLoaderReadyForSort(int LoaderNo);
+    int GetSortingLoaderNo();
+    int GetLoaderStatus(int LoaderNo);
+    bool AcquireSortOwner(int LoaderNo);
+    void ReleaseSortOwner(int LoaderNo);
+    bool IsSortOwnerHeld(int LoaderNo);
+    void NotifyTrayArmPickRearTray();
+    bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
+};
+//---------------------------------------------------------------------------
+extern TLoaderModule *LoaderModule;
+void InitializeLoaderModule();
+void ShutdownLoaderModule();
+//---------------------------------------------------------------------------
+#endif

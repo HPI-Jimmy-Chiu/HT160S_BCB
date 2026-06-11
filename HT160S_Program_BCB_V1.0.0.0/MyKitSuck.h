@@ -12,14 +12,25 @@
 #define MAX_SUB_SUCKER_ITEM (MAX_SUCKER_ROW*MAX_SUCKER_COL)
 #define MAXSUCK MAX_SUB_SUCKER_ITEM
 //---------------------------------------------------------------------------
+enum eSuckError{eSuckPickErr     =0,
+                eSuckDestroyErr  =1,
+                eSuckVacOffErr   =2,
+                eSuckDropErr     =3,
+                eSuckIniOffErr   =4,
+                eSuckIniOnErr    =5,
+                eSuckErrTotal
+               };
+//---------------------------------------------------------------------------
 class TMyLed;
 //---------------------------------------------------------------------------
+// Lightweight per-sucker IC carrier stub. Production trace logging is handled
+// centrally by TDeviceInfo (g_DeviceInfo) in deviceinfo.h.
 class TMySuckerDeviceInfo
 {
 public:
-    void Clear();
-    void CopyFrom(TMySuckerDeviceInfo &Source);
-    void MoveFrom(TMySuckerDeviceInfo &Source);
+    void Clear() {}
+    void CopyFrom(TMySuckerDeviceInfo &Source) {}
+    void MoveFrom(TMySuckerDeviceInfo &Source) {}
 };
 //---------------------------------------------------------------------------
 class TMySucker
@@ -93,6 +104,7 @@ public:
     TMySucker Suck[MAX_SUCKER_ROW][MAX_SUCKER_COL];
     AnsiString Name;
     AnsiString FlushPanelName;
+    AnsiString AlarmName[eSuckErrTotal];
     int MaxItem;
     int MaxItemR;
     int MaxItemC;

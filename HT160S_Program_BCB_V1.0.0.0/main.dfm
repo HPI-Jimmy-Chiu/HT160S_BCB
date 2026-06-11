@@ -1,8 +1,8 @@
 object fMain: TfMain
-  Left = 301
-  Top = 110
-  Width = 1730
-  Height = 1138
+  Left = 273
+  Top = 103
+  Width = 1760
+  Height = 1142
   Caption = 'HT160S'
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -11,13 +11,15 @@ object fMain: TfMain
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
+  OnClose = FormClose
+  OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
   object pgcMain: TPageControl
     Left = 0
     Top = 0
-    Width = 1714
-    Height = 1099
+    Width = 1744
+    Height = 1103
     ActivePage = tsMain
     Align = alClient
     TabIndex = 0
@@ -27,14 +29,14 @@ object fMain: TfMain
       object pnlMain: TPanel
         Left = 0
         Top = 0
-        Width = 1706
-        Height = 1071
+        Width = 1736
+        Height = 1075
         Align = alClient
         TabOrder = 0
         object pnlMainMenu: TPanel
           Left = 1
           Top = 1
-          Width = 1704
+          Width = 1734
           Height = 53
           Align = alTop
           BevelOuter = bvLowered
@@ -1257,10 +1259,10 @@ object fMain: TfMain
           end
         end
         object pnlBinCntInfo: TPanel
-          Left = 920
+          Left = 950
           Top = 54
           Width = 785
-          Height = 1016
+          Height = 1020
           Align = alRight
           BevelOuter = bvNone
           TabOrder = 2
@@ -1407,14 +1409,14 @@ object fMain: TfMain
             Left = 0
             Top = 36
             Width = 785
-            Height = 980
+            Height = 984
             Align = alClient
             TabOrder = 1
             object Panel9: TPanel
               Left = 23
               Top = 1
               Width = 761
-              Height = 978
+              Height = 982
               Align = alRight
               BevelOuter = bvNone
               BorderWidth = 4
@@ -2406,7 +2408,7 @@ object fMain: TfMain
               end
               object pal1: TPanel
                 Left = 4
-                Top = 778
+                Top = 782
                 Width = 753
                 Height = 196
                 Align = alBottom
@@ -2571,21 +2573,130 @@ object fMain: TfMain
                     105)
                 end
               end
+              object PageControl2: TPageControl
+                Left = 4
+                Top = 174
+                Width = 753
+                Height = 571
+                ActivePage = tsLotInfo
+                Align = alTop
+                TabIndex = 0
+                TabOrder = 2
+                object tsLotInfo: TTabSheet
+                  Caption = 'Lot'
+                  object lblLotNo: TLabel
+                    Left = 3
+                    Top = 13
+                    Width = 71
+                    Height = 20
+                    AutoSize = False
+                    Caption = 'Lot No.'
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clNavy
+                    Font.Height = -16
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                  end
+                  object grpLotManualEdit: TGroupBox
+                    Left = 560
+                    Top = 0
+                    Width = 185
+                    Height = 543
+                    Align = alRight
+                    Caption = 'Lot Manual Edit'
+                    TabOrder = 0
+                    object edLotNo: TEdit
+                      Left = 8
+                      Top = 21
+                      Width = 161
+                      Height = 21
+                      TabOrder = 0
+                    end
+                    object btnAddLot: TButton
+                      Left = 8
+                      Top = 56
+                      Width = 89
+                      Height = 25
+                      Caption = 'Add Lot'
+                      TabOrder = 1
+                      OnClick = btnAddLotClick
+                    end
+                    object btnEditLot: TButton
+                      Left = 8
+                      Top = 88
+                      Width = 89
+                      Height = 25
+                      Caption = 'Edit Lot'
+                      TabOrder = 2
+                      OnClick = btnEditLotClick
+                    end
+                    object btnRemoveLot: TButton
+                      Left = 8
+                      Top = 120
+                      Width = 89
+                      Height = 25
+                      Caption = 'Remove Lot'
+                      TabOrder = 3
+                      OnClick = btnRemoveLotClick
+                    end
+                  end
+                  object sgLotList: TStringGrid
+                    Left = 4
+                    Top = 32
+                    Width = 533
+                    Height = 489
+                    TabStop = False
+                    Align = alCustom
+                    ColCount = 1
+                    DefaultColWidth = 360
+                    DefaultRowHeight = 20
+                    FixedCols = 0
+                    RowCount = 14
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clWindowText
+                    Font.Height = -11
+                    Font.Name = 'MS Sans Serif'
+                    Font.Style = []
+                    ParentFont = False
+                    TabOrder = 1
+                    OnClick = sgLotListClick
+                  end
+                  object btnLotStart: TButton
+                    Left = 83
+                    Top = 6
+                    Width = 105
+                    Height = 25
+                    Caption = 'Lot Start'
+                    TabOrder = 2
+                    OnClick = btnLotStartClick
+                  end
+                  object btnLotEnd: TButton
+                    Left = 279
+                    Top = 6
+                    Width = 105
+                    Height = 25
+                    Caption = 'Lot End'
+                    TabOrder = 3
+                    OnClick = btnLotEndClick
+                  end
+                end
+              end
             end
           end
         end
         object pnlMain1: TPanel
           Left = 1
           Top = 54
-          Width = 919
-          Height = 1016
+          Width = 949
+          Height = 1020
           Align = alClient
           BevelOuter = bvNone
           TabOrder = 1
           object pnlMain2: TPanel
             Left = 0
             Top = 0
-            Width = 919
+            Width = 949
             Height = 379
             Align = alTop
             Font.Charset = DEFAULT_CHARSET
@@ -3183,6 +3294,8 @@ object fMain: TfMain
               ItemHeight = 16
               ParentFont = False
               TabOrder = 2
+              OnChange = cb_WorkFileChange
+              OnDropDown = cb_WorkFileDropDown
             end
             object cbbUserSelect: TComboBox
               Left = 116
@@ -3198,17 +3311,18 @@ object fMain: TfMain
               ItemHeight = 16
               ParentFont = False
               TabOrder = 3
+              OnChange = cbbUserSelectChange
               Items.Strings = (
-                'Operator'
-                'Engineer'
+                'Operation'
                 'Supervisor'
-                'HonPrec')
+                'Engineer'
+                'Honprec')
             end
           end
           object pnlLogMenu: TPanel
             Left = 0
             Top = 379
-            Width = 919
+            Width = 949
             Height = 39
             Align = alTop
             BevelOuter = bvLowered
@@ -3790,11 +3904,11 @@ object fMain: TfMain
           object pgcLog: TPageControl
             Left = 0
             Top = 418
-            Width = 919
-            Height = 598
-            ActivePage = tsTrayStatus
+            Width = 949
+            Height = 602
+            ActivePage = tsMapTray
             Align = alClient
-            TabIndex = 0
+            TabIndex = 3
             TabOrder = 2
             TabWidth = 128
             object tsTrayStatus: TTabSheet
@@ -4791,7 +4905,7 @@ object fMain: TfMain
               object lstLog: TListBox
                 Left = 0
                 Top = 0
-                Width = 911
+                Width = 941
                 Height = 201
                 Align = alTop
                 ItemHeight = 13
@@ -4832,10 +4946,10 @@ object fMain: TfMain
               Caption = 'Map of Tray'
               ImageIndex = 3
               object Memo1: TMemo
-                Left = 612
+                Left = 642
                 Top = 0
                 Width = 299
-                Height = 570
+                Height = 574
                 Align = alRight
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWindowText
@@ -4849,8 +4963,8 @@ object fMain: TfMain
               object PageControl1: TPageControl
                 Left = 0
                 Top = 0
-                Width = 612
-                Height = 570
+                Width = 642
+                Height = 574
                 ActivePage = tsSimulation
                 Align = alClient
                 TabIndex = 0
@@ -4860,7 +4974,7 @@ object fMain: TfMain
                   object gbSimuSetting: TGroupBox
                     Left = 0
                     Top = 0
-                    Width = 604
+                    Width = 634
                     Height = 185
                     Align = alTop
                     Caption = 'Setting'
@@ -4872,41 +4986,16 @@ object fMain: TfMain
                       Height = 17
                       Caption = 'Enable Simulation'
                       TabOrder = 0
-                    end
-                    object rgSimuItems: TRadioGroup
-                      Left = 16
-                      Top = 48
-                      Width = 121
-                      Height = 129
-                      Caption = 'Types'
-                      Items.Strings = (
-                        'None'
-                        'Single Auto'
-                        'Only All Auto'
-                        'Single Mag'
-                        'Only All Mag'
-                        'All Auto and Mag')
-                      TabOrder = 1
-                      Visible = False
-                    end
-                    object chbSimuSingleArea: TComboBox
-                      Left = 152
-                      Top = 56
-                      Width = 145
-                      Height = 21
-                      Color = clMenu
-                      ItemHeight = 0
-                      TabOrder = 2
-                      Visible = False
+                      OnClick = cbEnableSimulationClick
                     end
                     object btnLoadSimuData: TButton
-                      Left = 152
-                      Top = 104
+                      Left = 8
+                      Top = 64
                       Width = 145
                       Height = 25
                       Caption = 'Load Data'
-                      TabOrder = 3
-                      Visible = False
+                      TabOrder = 1
+                      OnClick = btnLoadSimuDataClick
                     end
                   end
                 end
@@ -5098,14 +5187,14 @@ object fMain: TfMain
       object pnlMonitorView: TPanel
         Left = 0
         Top = 0
-        Width = 1706
-        Height = 1071
+        Width = 1736
+        Height = 1075
         Align = alClient
         TabOrder = 0
         object pnlMonitorMenu: TPanel
           Left = 1
           Top = 1
-          Width = 1704
+          Width = 1734
           Height = 80
           Align = alTop
           BevelOuter = bvLowered
@@ -6117,10 +6206,10 @@ object fMain: TfMain
           end
         end
         object pnlControlBtn: TPanel
-          Left = 1559
+          Left = 1589
           Top = 81
           Width = 146
-          Height = 989
+          Height = 993
           Align = alRight
           BevelInner = bvLowered
           Color = 12761254
@@ -6688,8 +6777,8 @@ object fMain: TfMain
         object pgcMonitor: TPageControl
           Left = 1
           Top = 81
-          Width = 1558
-          Height = 989
+          Width = 1588
+          Height = 993
           ActivePage = TabSheet10
           Align = alClient
           Style = tsButtons
@@ -6702,8 +6791,8 @@ object fMain: TfMain
             object PanelMain6: TPanel
               Left = 0
               Top = 0
-              Width = 1550
-              Height = 958
+              Width = 1580
+              Height = 962
               Align = alClient
               Color = 12761254
               TabOrder = 0
@@ -6750,56 +6839,8 @@ object fMain: TfMain
                   TabOrder = 0
                 end
               end
-              object pnlAuto1PathR: TPanel
-                Left = 342
-                Top = 52
-                Width = 9
-                Height = 700
-                Color = clOlive
-                Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWhite
-                Font.Height = -11
-                Font.Name = 'Arial'
-                Font.Style = []
-                ParentFont = False
-                TabOrder = 2
-              end
-              object palWorkEmpty1: TPanel
-                Left = 256
-                Top = 432
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 11
-                Visible = False
-                object mtWorkEmpty1: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object palEmpty1Car: TPanel
-                Left = 256
-                Top = 595
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 13
-                Visible = False
-                object mtEmptyCar: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object pnlAuto1PathL: TPanel
-                Left = 248
+              object plLoaderChLeft: TPanel
+                Left = 275
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6812,8 +6853,22 @@ object fMain: TfMain
                 ParentFont = False
                 TabOrder = 1
               end
-              object Panel1: TPanel
-                Left = 684
+              object plLoaderRChRight: TPanel
+                Left = 515
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clOlive
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 43
+              end
+              object plAuto3ChRight: TPanel
+                Left = 953
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6824,27 +6879,10 @@ object fMain: TfMain
                 Font.Name = 'Arial'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 6
+                TabOrder = 4
               end
-              object palWorkLoader: TPanel
-                Left = 598
-                Top = 73
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 8
-                Visible = False
-                object mtWorkLoader: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel5: TPanel
-                Left = 590
+              object plAuto3ChLeft: TPanel
+                Left = 859
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6855,17 +6893,16 @@ object fMain: TfMain
                 Font.Name = 'Arial'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 5
+                TabOrder = 3
               end
-              object palNowSortTray: TPanel
-                Left = 598
+              object plAuto3TrayWork: TPanel
+                Left = 867
                 Top = 243
                 Width = 87
                 Height = 153
                 Color = 9534289
-                TabOrder = 9
-                Visible = False
-                object mtNowSortTray: TTMyTray
+                TabOrder = 6
+                object mtAuto3TrayWork: TTMyTray
                   Left = 4
                   Top = 4
                   Width = 79
@@ -6874,15 +6911,14 @@ object fMain: TfMain
                   YItem = 5
                 end
               end
-              object palWorkEmpty3: TPanel
-                Left = 256
-                Top = 244
+              object plLoaderLTrayWork: TPanel
+                Left = 283
+                Top = 243
                 Width = 87
                 Height = 153
                 Color = 9534289
-                TabOrder = 7
-                Visible = False
-                object mtWorkEmpty3: TTMyTray
+                TabOrder = 5
+                object mtLoaderLTrayWork: TTMyTray
                   Left = 4
                   Top = 4
                   Width = 79
@@ -6891,15 +6927,14 @@ object fMain: TfMain
                   YItem = 5
                 end
               end
-              object palWorkEmpty4: TPanel
-                Left = 256
-                Top = 73
+              object plLoaderRTrayWork: TPanel
+                Left = 429
+                Top = 243
                 Width = 87
                 Height = 153
                 Color = 9534289
-                TabOrder = 3
-                Visible = False
-                object mtWorkEmpty4: TTMyTray
+                TabOrder = 42
+                object mtLoaderRTrayWork: TTMyTray
                   Left = 4
                   Top = 4
                   Width = 79
@@ -6908,40 +6943,110 @@ object fMain: TfMain
                   YItem = 5
                 end
               end
-              object palLoadCar: TPanel
-                Left = 598
-                Top = 595
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 14
-                Visible = False
-                object mtLoaderCar: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel8: TPanel
-                Left = 248
-                Top = 403
-                Width = 96
-                Height = 25
-                Caption = 'CCD'
-                Color = 12428409
+              object plAuto4ChRight: TPanel
+                Left = 1099
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
                 Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWindowText
-                Font.Height = -19
-                Font.Name = 'MS Sans Serif'
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 8
+              end
+              object plAuto4ChLeft: TPanel
+                Left = 1005
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 9
+              end
+              object plAuto4TrayWork: TPanel
+                Left = 1013
+                Top = 243
+                Width = 87
+                Height = 153
+                Color = 9534289
+                TabOrder = 10
+                object mtAuto4TrayWork: TTMyTray
+                  Left = 4
+                  Top = 4
+                  Width = 79
+                  Height = 145
+                  XItem = 4
+                  YItem = 5
+                end
+              end
+              object plAuto5ChRight: TPanel
+                Left = 1245
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 11
+              end
+              object plAuto5ChLeft: TPanel
+                Left = 1151
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
                 Font.Style = []
                 ParentFont = False
                 TabOrder = 12
               end
-              object Panel3: TPanel
-                Left = 799
+              object plAuto5TrayWork: TPanel
+                Left = 1159
+                Top = 243
+                Width = 87
+                Height = 153
+                Color = 9534289
+                TabOrder = 13
+                object mtAuto5TrayWork: TTMyTray
+                  Left = 4
+                  Top = 4
+                  Width = 79
+                  Height = 145
+                  XItem = 4
+                  YItem = 5
+                end
+              end
+              object plEmptyChRight: TPanel
+                Left = 223
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 14
+              end
+              object plEmptyChLeft: TPanel
+                Left = 129
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6954,15 +7059,14 @@ object fMain: TfMain
                 ParentFont = False
                 TabOrder = 15
               end
-              object Panel4: TPanel
-                Left = 713
-                Top = 73
+              object plEmptyTrayWork: TPanel
+                Left = 137
+                Top = 243
                 Width = 87
                 Height = 153
                 Color = 9534289
                 TabOrder = 16
-                Visible = False
-                object TMyTray9: TTMyTray
+                object mtEmptyTrayWork: TTMyTray
                   Left = 4
                   Top = 4
                   Width = 79
@@ -6971,8 +7075,8 @@ object fMain: TfMain
                   YItem = 5
                 end
               end
-              object Panel6: TPanel
-                Left = 705
+              object plAuto1ChRight: TPanel
+                Left = 661
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6985,32 +7089,28 @@ object fMain: TfMain
                 ParentFont = False
                 TabOrder = 17
               end
-              object Panel11: TPanel
-                Left = 713
+              object plAuto1ChLeft: TPanel
+                Left = 567
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 18
+              end
+              object plAuto1TrayWork: TPanel
+                Left = 575
                 Top = 243
                 Width = 87
                 Height = 153
                 Color = 9534289
-                TabOrder = 18
-                Visible = False
-                object TMyTray10: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel14: TPanel
-                Left = 713
-                Top = 595
-                Width = 87
-                Height = 153
-                Color = 9534289
                 TabOrder = 19
-                Visible = False
-                object TMyTray11: TTMyTray
+                object mtAuto1TrayWork: TTMyTray
                   Left = 4
                   Top = 4
                   Width = 79
@@ -7019,8 +7119,8 @@ object fMain: TfMain
                   YItem = 5
                 end
               end
-              object Panel15: TPanel
-                Left = 911
+              object plAuto2ChRight: TPanel
+                Left = 807
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7033,25 +7133,8 @@ object fMain: TfMain
                 ParentFont = False
                 TabOrder = 20
               end
-              object Panel16: TPanel
-                Left = 825
-                Top = 73
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 21
-                Visible = False
-                object TMyTray12: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel17: TPanel
-                Left = 817
+              object plAuto2ChLeft: TPanel
+                Left = 713
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7062,17 +7145,16 @@ object fMain: TfMain
                 Font.Name = 'Arial'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 22
+                TabOrder = 21
               end
-              object Panel18: TPanel
-                Left = 825
+              object plAuto2TrayWork: TPanel
+                Left = 721
                 Top = 243
                 Width = 87
                 Height = 153
                 Color = 9534289
-                TabOrder = 23
-                Visible = False
-                object TMyTray13: TTMyTray
+                TabOrder = 22
+                object mtAuto2TrayWork: TTMyTray
                   Left = 4
                   Top = 4
                   Width = 79
@@ -7081,183 +7163,128 @@ object fMain: TfMain
                   YItem = 5
                 end
               end
-              object Panel19: TPanel
-                Left = 825
-                Top = 595
-                Width = 87
-                Height = 153
+              object plCCDMotorLoader: TPanel
+                Left = 456
+                Top = 419
+                Width = 57
+                Height = 30
+                Caption = 'CCD'
                 Color = 9534289
-                TabOrder = 24
-                Visible = False
-                object TMyTray14: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel20: TPanel
-                Left = 223
-                Top = 52
-                Width = 9
-                Height = 700
-                Color = clGreen
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWhite
-                Font.Height = -11
-                Font.Name = 'Arial'
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
                 TabOrder = 25
               end
-              object Panel21: TPanel
+              object plEmptyLabel: TPanel
                 Left = 137
-                Top = 73
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 26
-                Visible = False
-                object TMyTray15: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel22: TPanel
-                Left = 129
-                Top = 52
-                Width = 9
-                Height = 700
-                Color = clGreen
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Empty'
+                Color = clSkyBlue
                 Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWhite
-                Font.Height = -11
-                Font.Name = 'Arial'
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 26
+              end
+              object plLoaderLLabel: TPanel
+                Left = 283
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Load L'
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
                 TabOrder = 27
               end
-              object Panel23: TPanel
-                Left = 137
-                Top = 243
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 28
-                Visible = False
-                object TMyTray16: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel24: TPanel
-                Left = 137
-                Top = 595
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 29
-                Visible = False
-                object TMyTray17: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel25: TPanel
-                Left = 458
-                Top = 52
-                Width = 9
-                Height = 700
-                Color = clGreen
+              object plAuto1Label: TPanel
+                Left = 575
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Auto1'
+                Color = clSkyBlue
                 Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWhite
-                Font.Height = -11
-                Font.Name = 'Arial'
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 28
+              end
+              object plAuto2Label: TPanel
+                Left = 721
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Auto2'
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 29
+              end
+              object plAuto3Label: TPanel
+                Left = 867
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Auto3'
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
                 TabOrder = 30
               end
-              object Panel26: TPanel
-                Left = 372
-                Top = 73
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 31
-                Visible = False
-                object TMyTray18: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel27: TPanel
-                Left = 364
-                Top = 52
-                Width = 9
-                Height = 700
-                Color = clGreen
+              object plAuto4Label: TPanel
+                Left = 1013
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Auto4'
+                Color = clSkyBlue
                 Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWhite
-                Font.Height = -11
-                Font.Name = 'Arial'
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 31
+              end
+              object plAuto5Label: TPanel
+                Left = 1159
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Auto5'
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
                 TabOrder = 32
               end
-              object Panel28: TPanel
-                Left = 372
-                Top = 243
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 33
-                Visible = False
-                object TMyTray19: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel29: TPanel
-                Left = 372
-                Top = 595
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 34
-                Visible = False
-                object TMyTray20: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel30: TPanel
-                Left = 570
+              object plAuto6ChLeft: TPanel
+                Left = 1297
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7268,27 +7295,53 @@ object fMain: TfMain
                 Font.Name = 'Arial'
                 Font.Style = []
                 ParentFont = False
+                TabOrder = 33
+              end
+              object plAuto6ChRight: TPanel
+                Left = 1391
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 34
+              end
+              object plAuto6Label: TPanel
+                Left = 1305
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Auto6'
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
                 TabOrder = 35
               end
-              object Panel32: TPanel
-                Left = 484
-                Top = 73
-                Width = 87
-                Height = 153
-                Color = 9534289
+              object plColorChLeft: TPanel
+                Left = 1443
+                Top = 52
+                Width = 9
+                Height = 700
+                Color = clGreen
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -11
+                Font.Name = 'Arial'
+                Font.Style = []
+                ParentFont = False
                 TabOrder = 36
-                Visible = False
-                object TMyTray21: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
               end
-              object Panel33: TPanel
-                Left = 476
+              object plColorChRight: TPanel
+                Left = 1537
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7301,46 +7354,12 @@ object fMain: TfMain
                 ParentFont = False
                 TabOrder = 37
               end
-              object Panel34: TPanel
-                Left = 484
-                Top = 243
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 38
-                Visible = False
-                object TMyTray22: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel35: TPanel
-                Left = 484
-                Top = 595
-                Width = 87
-                Height = 153
-                Color = 9534289
-                TabOrder = 39
-                Visible = False
-                object TMyTray23: TTMyTray
-                  Left = 4
-                  Top = 4
-                  Width = 79
-                  Height = 145
-                  XItem = 4
-                  YItem = 5
-                end
-              end
-              object Panel153: TPanel
-                Left = 114
-                Top = 351
-                Width = 831
-                Height = 17
-                Caption = 'Sort Arm '
+              object plColorLabel: TPanel
+                Left = 1451
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Color'
                 Color = clSkyBlue
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWindowText
@@ -7348,12 +7367,45 @@ object fMain: TfMain
                 Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 4
+                TabOrder = 38
               end
-              object Panel36: TPanel
+              object plAuto6TrayWork: TPanel
+                Left = 1305
+                Top = 243
+                Width = 87
+                Height = 153
+                Color = 9534289
+                TabOrder = 39
+                object mtAuto6TrayWork: TTMyTray
+                  Left = 4
+                  Top = 4
+                  Width = 79
+                  Height = 145
+                  XItem = 4
+                  YItem = 5
+                end
+              end
+              object plColorTrayWork: TPanel
+                Left = 1449
+                Top = 243
+                Width = 87
+                Height = 153
+                Color = 9534289
+                TabOrder = 40
+                Visible = False
+                object mtColorTrayWork: TTMyTray
+                  Left = 4
+                  Top = 4
+                  Width = 79
+                  Height = 145
+                  XItem = 4
+                  YItem = 5
+                end
+              end
+              object plTrayArmName: TPanel
                 Left = 114
                 Top = 63
-                Width = 831
+                Width = 1432
                 Height = 17
                 Caption = 'Tray Arm '
                 Color = clSkyBlue
@@ -7363,11 +7415,51 @@ object fMain: TfMain
                 Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 40
+                TabOrder = 23
+              end
+              object plTrayArm: TPanel
+                Left = 256
+                Top = 43
+                Width = 97
+                Height = 30
+                Alignment = taRightJustify
+                Caption = 'Tray Arm   '
+                Color = 9534289
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWhite
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 24
+                object ledTrayArm: TMyLed
+                  Left = 5
+                  Top = 7
+                  Width = 22
+                  Height = 14
+                  Hint = 'WorkArm1InSuck02'
+                  LEDStyle = LEDHorizontal
+                  ShowHint = True
+                end
+              end
+              object plLoaderRLabel: TPanel
+                Left = 429
+                Top = 775
+                Width = 95
+                Height = 42
+                Caption = 'Load R'
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 41
               end
               object palSortArm1: TPanel
-                Left = 244
-                Top = 328
+                Left = 268
+                Top = 344
                 Width = 109
                 Height = 41
                 Color = 9534289
@@ -7377,7 +7469,7 @@ object fMain: TfMain
                 Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 10
+                TabOrder = 7
                 object ledSortArm1ZA: TMyLed
                   Left = 5
                   Top = 7
@@ -7415,13 +7507,27 @@ object fMain: TfMain
                   ShowHint = True
                 end
               end
-              object Panel31: TPanel
-                Left = 256
-                Top = 59
-                Width = 97
+              object plSortArmName: TPanel
+                Left = 122
+                Top = 399
+                Width = 1432
+                Height = 17
+                Caption = 'Sort Arm '
+                Color = clSkyBlue
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -16
+                Font.Name = 'MS Sans Serif'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 2
+              end
+              object plCCDMotorColor: TPanel
+                Left = 1464
+                Top = 419
+                Width = 57
                 Height = 30
-                Alignment = taRightJustify
-                Caption = 'Tray Arm   '
+                Caption = 'CCD'
                 Color = 9534289
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWhite
@@ -7429,16 +7535,17 @@ object fMain: TfMain
                 Font.Name = 'MS Sans Serif'
                 Font.Style = []
                 ParentFont = False
-                TabOrder = 41
-                object MyLed1: TMyLed
-                  Left = 5
-                  Top = 7
-                  Width = 22
-                  Height = 14
-                  Hint = 'WorkArm1InSuck02'
-                  LEDStyle = LEDHorizontal
-                  ShowHint = True
-                end
+                TabOrder = 44
+              end
+              object chkLoadTray: TCheckBox
+                Left = 284
+                Top = 824
+                Width = 97
+                Height = 17
+                Caption = 'Load New Tray'
+                Checked = True
+                State = cbChecked
+                TabOrder = 45
               end
             end
           end
@@ -7475,8 +7582,8 @@ object fMain: TfMain
             object Panel12: TPanel
               Left = 0
               Top = 0
-              Width = 1550
-              Height = 958
+              Width = 1580
+              Height = 962
               Align = alClient
               BevelInner = bvLowered
               Color = 12761254
@@ -7484,8 +7591,8 @@ object fMain: TfMain
               object PageControlTaskView: TPageControl
                 Left = 2
                 Top = 2
-                Width = 1546
-                Height = 954
+                Width = 1576
+                Height = 958
                 ActivePage = tsTaskRecord
                 Align = alClient
                 TabIndex = 0
@@ -7496,8 +7603,8 @@ object fMain: TfMain
                   object lbTaskRecord: TListBox
                     Left = 0
                     Top = 0
-                    Width = 1538
-                    Height = 926
+                    Width = 1568
+                    Height = 930
                     Align = alClient
                     Color = 14670284
                     ItemHeight = 13
@@ -7513,8 +7620,8 @@ object fMain: TfMain
             object Panel13: TPanel
               Left = 0
               Top = 0
-              Width = 1550
-              Height = 958
+              Width = 1580
+              Height = 962
               Align = alClient
               BevelInner = bvLowered
               Color = 12761254
@@ -7522,8 +7629,8 @@ object fMain: TfMain
               object PageControl3: TPageControl
                 Left = 2
                 Top = 2
-                Width = 1546
-                Height = 954
+                Width = 1576
+                Height = 958
                 ActivePage = TabSheet2
                 Align = alClient
                 TabIndex = 0
@@ -7617,8 +7724,8 @@ object fMain: TfMain
             object PageControl4: TPageControl
               Left = 0
               Top = 0
-              Width = 1550
-              Height = 958
+              Width = 1580
+              Height = 962
               ActivePage = TabSheet4
               Align = alClient
               TabIndex = 0
@@ -7628,8 +7735,8 @@ object fMain: TfMain
                 object ScrollBox1: TScrollBox
                   Left = 0
                   Top = 0
-                  Width = 1542
-                  Height = 930
+                  Width = 1572
+                  Height = 934
                   Align = alClient
                   TabOrder = 0
                   object TMyTray1: TTMyTray
@@ -7662,8 +7769,8 @@ object fMain: TfMain
                 object ScrollBox2: TScrollBox
                   Left = 0
                   Top = 0
-                  Width = 1542
-                  Height = 930
+                  Width = 1572
+                  Height = 934
                   Align = alClient
                   TabOrder = 0
                   object TMyTray2: TTMyTray
@@ -7691,8 +7798,8 @@ object fMain: TfMain
                 object ScrollBox3: TScrollBox
                   Left = 0
                   Top = 0
-                  Width = 1542
-                  Height = 930
+                  Width = 1572
+                  Height = 934
                   Align = alClient
                   TabOrder = 0
                   object TMyTray3: TTMyTray
@@ -7720,8 +7827,8 @@ object fMain: TfMain
                 object ScrollBox4: TScrollBox
                   Left = 0
                   Top = 0
-                  Width = 1542
-                  Height = 930
+                  Width = 1572
+                  Height = 934
                   Align = alClient
                   TabOrder = 0
                   object TMyTray4: TTMyTray
