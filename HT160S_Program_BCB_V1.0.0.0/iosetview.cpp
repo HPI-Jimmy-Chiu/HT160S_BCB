@@ -45,17 +45,6 @@ enum eIOTableEditorColumn
     eIOTableColTotal
 };
 
-static void SetOrdProperty(TObject *ObjectPtr, const char *PropName, int Value)
-{
-    PPropInfo PropInfo;
-
-    if(ObjectPtr==NULL || PropName==NULL)
-        return;
-
-    PropInfo=GetPropInfo(ObjectPtr, AnsiString(PropName));
-    if(PropInfo!=NULL)
-        SetOrdProp(ObjectPtr, PropInfo, Value);
-}
 
 static bool TextEndsWith(AnsiString Value, AnsiString Suffix)
 {
@@ -67,24 +56,7 @@ static bool TextEndsWith(AnsiString Value, AnsiString Suffix)
     return Value.SubString(ValueLength-SuffixLength+1, SuffixLength)==Suffix;
 }
 
-static TTimer *FindNamedTimer(TComponent *Owner, const char *TimerName)
-{
-    TComponent *ComponentPtr;
 
-    if(Owner==NULL || TimerName==NULL)
-        return NULL;
-
-    ComponentPtr=Owner->FindComponent(AnsiString(TimerName));
-    return dynamic_cast<TTimer *>(ComponentPtr);
-}
-
-enum eIOViewSelectKind
-{
-    eIOViewNone     =0,
-    eIOViewSwitch   =1,
-    eIOViewCylinder =2,
-    eIOViewSucker   =3
-};
 
 struct TIOMapItem
 {
@@ -142,26 +114,6 @@ void RegisterIOViewStreamClasses()
 __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     : TForm(Owner)
 {
-    palHeader=NULL;
-    lblTitle=NULL;
-    lblSummary=NULL;
-    lblSelected=NULL;
-    chkManualOutput=NULL;
-    btnRefresh=NULL;
-    btnOutputOn=NULL;
-    btnOutputOff=NULL;
-    btnSuckerDestroy=NULL;
-    PageControl=NULL;
-    tsSensors=NULL;
-    tsCylinders=NULL;
-    tsSwitches=NULL;
-    tsSuckers=NULL;
-    tsIOTable=NULL;
-    grdSensors=NULL;
-    grdCylinders=NULL;
-    grdSwitches=NULL;
-    grdSuckers=NULL;
-    grdIOTable=NULL;
     pnIOTableEditorToolbar=NULL;
     cbbType=NULL;
     cbbLane=NULL;
@@ -173,10 +125,6 @@ __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     strngrdIoTable=NULL;
     IOTableDeletedTags=new TStringList();
     ManualOutputLog=new TStringList();
-    SelectedKind=eIOViewNone;
-    SelectedIndex=-1;
-    SelectedRow=-1;
-    SelectedCol=-1;
     iSelectRow=0;
     iSelectCol=0;
     Color=IO_COLOR_FORM;
@@ -189,168 +137,6 @@ __fastcall Tfiosetview::~Tfiosetview()
     IOTableDeletedTags=NULL;
     delete ManualOutputLog;
     ManualOutputLog=NULL;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::BuildUI()
-{
-    Color=IO_COLOR_FORM;
-    Font->Name="Arial";
-    Font->Size=10;
-    BuildHeader();
-    BuildPages();
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::BuildHeader()
-{
-    palHeader=new TPanel(this);
-    palHeader->Parent=this;
-    palHeader->Align=alTop;
-    palHeader->Height=86;
-    palHeader->BevelOuter=bvNone;
-    palHeader->Color=IO_COLOR_HEADER;
-
-    lblTitle=new TLabel(palHeader);
-    lblTitle->Parent=palHeader;
-    lblTitle->Left=16;
-    lblTitle->Top=10;
-    lblTitle->Caption="HT160S IO View";
-    lblTitle->Font->Color=clWhite;
-    lblTitle->Font->Size=16;
-    lblTitle->Font->Style=TFontStyles() << fsBold;
-
-    lblSummary=new TLabel(palHeader);
-    lblSummary->Parent=palHeader;
-    lblSummary->Left=18;
-    lblSummary->Top=48;
-    lblSummary->Width=900;
-    lblSummary->Caption="";
-    lblSummary->Font->Color=clWhite;
-
-    btnRefresh=new TButton(palHeader);
-    btnRefresh->Parent=palHeader;
-    btnRefresh->Left=940;
-    btnRefresh->Top=14;
-    btnRefresh->Width=90;
-    btnRefresh->Height=28;
-    btnRefresh->Caption="Refresh";
-    btnRefresh->OnClick=btnRefreshClick;
-
-    chkManualOutput=new TCheckBox(palHeader);
-    chkManualOutput->Parent=palHeader;
-    chkManualOutput->Left=1045;
-    chkManualOutput->Top=18;
-    chkManualOutput->Width=145;
-    chkManualOutput->Caption="Manual output";
-    chkManualOutput->Font->Color=clWhite;
-    chkManualOutput->OnClick=chkManualOutputClick;
-
-    btnOutputOn=new TButton(palHeader);
-    btnOutputOn->Parent=palHeader;
-    btnOutputOn->Left=1205;
-    btnOutputOn->Top=14;
-    btnOutputOn->Width=80;
-    btnOutputOn->Height=28;
-    btnOutputOn->Caption="ON";
-    btnOutputOn->OnClick=btnOutputOnClick;
-
-    btnOutputOff=new TButton(palHeader);
-    btnOutputOff->Parent=palHeader;
-    btnOutputOff->Left=1295;
-    btnOutputOff->Top=14;
-    btnOutputOff->Width=80;
-    btnOutputOff->Height=28;
-    btnOutputOff->Caption="OFF";
-    btnOutputOff->OnClick=btnOutputOffClick;
-
-    btnSuckerDestroy=new TButton(palHeader);
-    btnSuckerDestroy->Parent=palHeader;
-    btnSuckerDestroy->Left=1385;
-    btnSuckerDestroy->Top=14;
-    btnSuckerDestroy->Width=110;
-    btnSuckerDestroy->Height=28;
-    btnSuckerDestroy->Caption="Destroy";
-    btnSuckerDestroy->OnClick=btnSuckerDestroyClick;
-
-    lblSelected=new TLabel(palHeader);
-    lblSelected->Parent=palHeader;
-    lblSelected->Left=940;
-    lblSelected->Top=52;
-    lblSelected->Width=520;
-    lblSelected->Caption="Selected: none";
-    lblSelected->Font->Color=clWhite;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::BuildPages()
-{
-    const char *SensorHeaders[]   = {"No", "Alias", "Status", "Lane", "IP", "Port", "Bit", "Type", "Enable", "IOPos", "Driver"};
-    const int SensorWidths[]      = {40, 220, 70, 55, 55, 55, 45, 55, 60, 120, 110};
-    const char *CylinderHeaders[] = {"No", "Cylinder", "Out", "On Sen", "Off Sen", "Enable", "Addr", "OnAddr", "OffAddr"};
-    const int CylinderWidths[]    = {40, 220, 65, 80, 80, 70, 120, 120, 120};
-    const char *SwitchHeaders[]   = {"No", "Switch", "Out", "Enable", "Addr", "IOPos", "Driver"};
-    const int SwitchWidths[]      = {40, 220, 65, 70, 120, 160, 110};
-    const char *SuckerHeaders[]   = {"No", "Sucker", "Row", "Col", "Vacuum", "Suck Out", "Destroy Out", "Enable", "SensorAddr", "OnAddr", "OffAddr"};
-    const int SuckerWidths[]      = {40, 120, 45, 45, 70, 80, 90, 70, 120, 120, 120};
-    const char *IOTableHeaders[]  = {"No", "Type", "Alias", "Lane", "ModuleType", "IP", "Port", "Bit", "InType", "ISA Base", "Enable", "OnAlarmTime", "OffAlarmTime", "OnDelayTime", "OffDelayTime", "Note"};
-    const int IOTableWidths[]     = {50, 90, 210, 50, 70, 55, 65, 45, 55, 65, 60, 85, 85, 85, 85, 260};
-
-    PageControl=new TPageControl(this);
-    PageControl->Parent=this;
-    PageControl->Align=alClient;
-    PageControl->TabPosition=tpTop;
-
-    tsSensors=new TTabSheet(PageControl);
-    tsSensors->PageControl=PageControl;
-    tsSensors->Caption="Sensors";
-    grdSensors=CreateGrid(tsSensors, 11, SensorHeaders, SensorWidths);
-
-    tsCylinders=new TTabSheet(PageControl);
-    tsCylinders->PageControl=PageControl;
-    tsCylinders->Caption="Cylinders";
-    grdCylinders=CreateGrid(tsCylinders, 9, CylinderHeaders, CylinderWidths);
-
-    tsSwitches=new TTabSheet(PageControl);
-    tsSwitches->PageControl=PageControl;
-    tsSwitches->Caption="Switches";
-    grdSwitches=CreateGrid(tsSwitches, 7, SwitchHeaders, SwitchWidths);
-
-    tsSuckers=new TTabSheet(PageControl);
-    tsSuckers->PageControl=PageControl;
-    tsSuckers->Caption="Suckers";
-    grdSuckers=CreateGrid(tsSuckers, 11, SuckerHeaders, SuckerWidths);
-
-    tsIOTable=new TTabSheet(PageControl);
-    tsIOTable->PageControl=PageControl;
-    tsIOTable->Caption="IO Table";
-    grdIOTable=CreateGrid(tsIOTable, eIOTableColTotal, IOTableHeaders, IOTableWidths);
-}
-//---------------------------------------------------------------------------
-TStringGrid *Tfiosetview::CreateGrid(TWinControl *Parent, int ColCount, const char **Headers, const int *Widths)
-{
-    TStringGrid *Grid=new TStringGrid(Parent);
-    Grid->Parent=Parent;
-    Grid->Align=alClient;
-    SetupGrid(Grid, ColCount, Headers, Widths);
-    return Grid;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::SetupGrid(TStringGrid *Grid, int ColCount, const char **Headers, const int *Widths)
-{
-    Grid->ColCount=ColCount;
-    Grid->RowCount=2;
-    Grid->FixedRows=1;
-    Grid->FixedCols=0;
-    Grid->DefaultRowHeight=22;
-    Grid->FixedColor=IO_COLOR_GRID_FIXED;
-    Grid->Color=clWhite;
-    Grid->Font->Name="Arial";
-    Grid->Font->Size=9;
-    Grid->Options=Grid->Options << goRowSelect << goColSizing;
-    Grid->OnSelectCell=GridSelectCell;
-    for(int Col=0; Col<ColCount; Col++)
-    {
-        Grid->Cells[Col][0]=Headers[Col];
-        Grid->ColWidths[Col]=Widths[Col];
-    }
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::SetGridRowCount(TStringGrid *Grid, int RowCount)
@@ -369,294 +155,65 @@ void Tfiosetview::ClearGridRows(TStringGrid *Grid)
     }
 }
 //---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatEnable(bool Flag)
+//AI(general) 20260613 : MN200 connection status page. Shows card open state, ring
+//count, and per-ring start/device/error captured by OpenMN200Card(), plus the
+//count of enabled MotionNet IO points in IO_Table. Under SOFT_SIMULATE the card is
+//never opened, so the page reports simulation mode instead of live ring data.
+void Tfiosetview::RefreshMN200()
 {
-    if(Flag)
-        return "YES";
-    return "NO";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatEnableInt(int Flag)
-{
-    if(Flag!=0)
-        return "YES";
-    return "NO";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatOnOff(bool Flag)
-{
-    if(Flag)
-        return "ON";
-    return "OFF";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatAddress(int Lane, int IP, int Port, int Bit)
-{
-    AnsiString Str;
-    Str.sprintf("L%d IP%d P%d B%d", Lane, IP, Port, Bit);
-    return Str;
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatIODataAddress(TIODATA *Data)
-{
-    if(Data==NULL)
-        return "";
-    return FormatAddress(Data->iLane, Data->iIP, Data->iPort, Data->iBit);
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatIODriver(TIODATA *Data)
-{
-    if(Data==NULL)
-        return "";
-    if(IsPadCommunicationData(Data))
-        return "Pad COM";
-    if(Data->iEnable!=0 && Data->iISABase==eMotionNet)
-        return "TMyMN200_IO";
-    return "TMyIo";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatIODriver(TMyIo *IOPtr)
-{
-    if(IOPtr==NULL)
-        return "";
-    return IOPtr->GetDriverName();
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatSensor(TMySensor *Sensor)
-{
-    if(Sensor==NULL || Sensor->Enable==false)
-        return "DISABLED";
-    if(Sensor->IsOn())
-        return "ON";
-    return "OFF";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatSwitch(TMySwitch *SwitchPtr)
-{
-    if(SwitchPtr==NULL)
-        return "";
-    return FormatAddress(SwitchPtr->Card/100, SwitchPtr->Card%100, SwitchPtr->Port, SwitchPtr->Bit);
-}
-//---------------------------------------------------------------------------
-int Tfiosetview::CountIOType(AnsiString TypeName)
-{
-    int Count=0;
-    AnsiString Target=TypeName.UpperCase();
-    if(HSys.IOTable==NULL)
-        return 0;
-    for(int Index=0; Index<HSys.IOTable->Count; Index++)
-    {
-        TIODATA *Data=(TIODATA *)HSys.IOTable->Items[Index];
-        if(Data!=NULL && Data->Type.UpperCase()==Target)
-            Count++;
-    }
-    return Count;
-}
-//---------------------------------------------------------------------------
-TIODATA *Tfiosetview::GetIODataByFilteredRow(AnsiString TypeName, int RowIndex)
-{
-    int Count=0;
-    AnsiString Target=TypeName.UpperCase();
-    if(HSys.IOTable==NULL || RowIndex<1)
-        return NULL;
-    for(int Index=0; Index<HSys.IOTable->Count; Index++)
-    {
-        TIODATA *Data=(TIODATA *)HSys.IOTable->Items[Index];
-        if(Data!=NULL && Data->Type.UpperCase()==Target)
-        {
-            Count++;
-            if(Count==RowIndex)
-                return Data;
-        }
-    }
-    return NULL;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSummary()
-{
-    AnsiString Str;
+    if(grdMN200==NULL)
+        return;
+
+    //AI(general) 20260613 : header/column setup formerly done by the removed
+    //code-built BuildPages(); set here so the DFM StringGrid shows MN200 columns.
+    grdMN200->ColCount=4;
+    grdMN200->FixedRows=1;
+    grdMN200->Cells[0][0]="Ring";
+    grdMN200->Cells[1][0]="Started";
+    grdMN200->Cells[2][0]="Devices";
+    grdMN200->Cells[3][0]="ErrorCode";
+
+    TMN200Connection *Conn=GetMN200Connection();
+
+    int MotionNetPoints=0;
     int IOCount=(HSys.IOTable==NULL)?0:HSys.IOTable->Count;
-    Str.sprintf("IO=%d  Sensor=%d  Cylinder=%d  Switch=%d  SuckerGroup=%d  Path=%s",
-                IOCount,
-                CountIOType("Sensor"),
-                HSys.iTotalCylinder,
-                HSys.iTotalSwitch,
-                HSys.iTotalSucker,
-                HSys.IoTablePath.c_str());
-    lblSummary->Caption=Str;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSensors()
-{
-    int Count=CountIOType("Sensor");
-    SetGridRowCount(grdSensors, Count+1);
-    ClearGridRows(grdSensors);
-    for(int Row=1; Row<=Count; Row++)
-    {
-        TIODATA *Data=GetIODataByFilteredRow("Sensor", Row);
-        if(Data==NULL)
-            continue;
-
-        if(IsPadCommunicationData(Data))
-        {
-            bool PadState=false;
-            ResolvePadCommunicationInputState(Data->Alias, &PadState);
-            grdSensors->Cells[0][Row]=IntToStr(Row);
-            grdSensors->Cells[1][Row]=Data->Alias;
-            grdSensors->Cells[2][Row]=FormatOnOff(PadState);
-            grdSensors->Cells[3][Row]="";
-            grdSensors->Cells[4][Row]="";
-            grdSensors->Cells[5][Row]="";
-            grdSensors->Cells[6][Row]="";
-            grdSensors->Cells[7][Row]="COMM";
-            grdSensors->Cells[8][Row]="COMM";
-            grdSensors->Cells[9][Row]="Pad COM";
-            grdSensors->Cells[10][Row]="Pad COM";
-            continue;
-        }
-
-        TMyIo TempIO;
-        TMyMN200_IO TempMN200IO;
-        TMyIo *TempIOPtr=&TempIO;
-        if(Data->iEnable!=0 && Data->iISABase==eMotionNet)
-            TempIOPtr=&TempMN200IO;
-        TempIOPtr->iCard=Data->iLane*100+Data->iIP;
-        TempIOPtr->iLane=Data->iLane;
-        TempIOPtr->iIP=Data->iIP;
-        TempIOPtr->iPort=Data->iPort;
-        TempIOPtr->iBit=Data->iBit;
-        TempIOPtr->ISABase=Data->iISABase;
-        TempIOPtr->iModuleType=Data->iModuleType;
-        bool RawOn=TempIOPtr->IsOn();
-        bool IsOn=(Data->iInType==1)?RawOn:!RawOn;
-
-        grdSensors->Cells[0][Row]=IntToStr(Row);
-        grdSensors->Cells[1][Row]=Data->Alias;
-        if(Data->iEnable!=0)
-            grdSensors->Cells[2][Row]=FormatOnOff(IsOn);
-        else
-            grdSensors->Cells[2][Row]="DISABLED";
-        grdSensors->Cells[3][Row]=IntToStr(Data->iLane);
-        grdSensors->Cells[4][Row]=IntToStr(Data->iIP);
-        grdSensors->Cells[5][Row]=IntToStr(Data->iPort);
-        grdSensors->Cells[6][Row]=IntToStr(Data->iBit);
-        grdSensors->Cells[7][Row]=IntToStr(Data->iInType);
-        grdSensors->Cells[8][Row]=FormatEnableInt(Data->iEnable);
-        grdSensors->Cells[9][Row]=Data->IOPos;
-        grdSensors->Cells[10][Row]=FormatIODriver(Data);
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshCylinders()
-{
-    SetGridRowCount(grdCylinders, HSys.iTotalCylinder+1);
-    ClearGridRows(grdCylinders);
-    for(int Index=0; Index<HSys.iTotalCylinder; Index++)
-    {
-        TMyCylinder *Cyn=&HSys.CynPtr[Index];
-        grdCylinders->Cells[0][Index+1]=IntToStr(Index);
-        grdCylinders->Cells[1][Index+1]=Cyn->CylinderName;
-        grdCylinders->Cells[2][Index+1]=FormatOnOff(Cyn->GetOutBit());
-        grdCylinders->Cells[3][Index+1]=FormatSensor(&Cyn->OnSensor);
-        grdCylinders->Cells[4][Index+1]=FormatSensor(&Cyn->OffSensor);
-        grdCylinders->Cells[5][Index+1]=FormatEnable(Cyn->Enable);
-        grdCylinders->Cells[6][Index+1]=FormatSwitch(&Cyn->Switch);
-        grdCylinders->Cells[7][Index+1]=FormatAddress(Cyn->OnSensor.Card/100, Cyn->OnSensor.Card%100, Cyn->OnSensor.Port, Cyn->OnSensor.Bit);
-        grdCylinders->Cells[8][Index+1]=FormatAddress(Cyn->OffSensor.Card/100, Cyn->OffSensor.Card%100, Cyn->OffSensor.Port, Cyn->OffSensor.Bit);
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSwitches()
-{
-    SetGridRowCount(grdSwitches, HSys.iTotalSwitch+1);
-    ClearGridRows(grdSwitches);
-    for(int Index=0; Index<HSys.iTotalSwitch; Index++)
-    {
-        TMySwitch *SwitchPtr=&HSys.SwPtr[Index];
-        bool PadState=false;
-        grdSwitches->Cells[0][Index+1]=IntToStr(Index);
-        grdSwitches->Cells[1][Index+1]=SwitchPtr->Name;
-        if(IsPadCommunicationOutput(SwitchPtr->Name))
-        {
-            ResolvePadCommunicationOutputState(SwitchPtr->Name, &PadState);
-            grdSwitches->Cells[2][Index+1]=FormatOnOff(PadState);
-            grdSwitches->Cells[3][Index+1]="COMM";
-            grdSwitches->Cells[4][Index+1]="Pad COM";
-            grdSwitches->Cells[5][Index+1]="Pad COM";
-            grdSwitches->Cells[6][Index+1]="Pad COM";
-        }
-        else
-        {
-            grdSwitches->Cells[2][Index+1]=FormatOnOff(SwitchPtr->Status());
-            grdSwitches->Cells[3][Index+1]=FormatEnable(SwitchPtr->Enable);
-            grdSwitches->Cells[4][Index+1]=FormatSwitch(SwitchPtr);
-            grdSwitches->Cells[5][Index+1]=SwitchPtr->IOPos;
-            grdSwitches->Cells[6][Index+1]=FormatIODriver(SwitchPtr->Output);
-        }
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSuckers()
-{
-    int TotalRows=0;
-    for(int SuckerIndex=0; SuckerIndex<HSys.iTotalSucker; SuckerIndex++)
-        TotalRows+=HSys.SuckPtr[SuckerIndex].MaxItemR*HSys.SuckPtr[SuckerIndex].MaxItemC;
-
-    SetGridRowCount(grdSuckers, TotalRows+1);
-    ClearGridRows(grdSuckers);
-
-    int Row=1;
-    for(int SuckerIndex=0; SuckerIndex<HSys.iTotalSucker; SuckerIndex++)
-    {
-        TMyKitSuck *Kit=&HSys.SuckPtr[SuckerIndex];
-        for(int RowIndex=0; RowIndex<Kit->MaxItemR; RowIndex++)
-        {
-            for(int ColIndex=0; ColIndex<Kit->MaxItemC; ColIndex++)
-            {
-                TMySucker *Sucker=&Kit->Suck[RowIndex][ColIndex];
-                grdSuckers->Cells[0][Row]=IntToStr(Row-1);
-                grdSuckers->Cells[1][Row]=Sucker->SuckerName;
-                grdSuckers->Cells[2][Row]=IntToStr(RowIndex);
-                grdSuckers->Cells[3][Row]=IntToStr(ColIndex);
-                grdSuckers->Cells[4][Row]=FormatSensor(&Sucker->Sensor);
-                grdSuckers->Cells[5][Row]=FormatOnOff(Sucker->GetOnBit());
-                grdSuckers->Cells[6][Row]=FormatOnOff(Sucker->GetOffBit());
-                grdSuckers->Cells[7][Row]=FormatEnable(Sucker->Enable);
-                grdSuckers->Cells[8][Row]=FormatAddress(Sucker->Sensor.Card/100, Sucker->Sensor.Card%100, Sucker->Sensor.Port, Sucker->Sensor.Bit);
-                grdSuckers->Cells[9][Row]=FormatSwitch(&Sucker->OnSw);
-                grdSuckers->Cells[10][Row]=FormatSwitch(&Sucker->OffSw);
-                Row++;
-            }
-        }
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshIOTable()
-{
-    int Count=(HSys.IOTable==NULL)?0:HSys.IOTable->Count;
-    SetGridRowCount(grdIOTable, Count+1);
-    ClearGridRows(grdIOTable);
-    for(int Index=0; Index<Count; Index++)
+    for(int Index=0; Index<IOCount; Index++)
     {
         TIODATA *Data=(TIODATA *)HSys.IOTable->Items[Index];
-        if(Data==NULL)
-            continue;
-        grdIOTable->Cells[eIOTableColTag][Index+1]=IntToStr(Data->Tag);
-        grdIOTable->Cells[eIOTableColType][Index+1]=Data->Type;
-        grdIOTable->Cells[eIOTableColAlias][Index+1]=Data->Alias;
-        grdIOTable->Cells[eIOTableColLane][Index+1]=IOTableCellFromInt(Data->iLane);
-        grdIOTable->Cells[eIOTableColModuleType][Index+1]=IOTableCellFromInt(Data->iModuleType);
-        grdIOTable->Cells[eIOTableColIP][Index+1]=IOTableIPToCell(Data);
-        grdIOTable->Cells[eIOTableColPort][Index+1]=IOTablePortToCell(Data);
-        grdIOTable->Cells[eIOTableColBit][Index+1]=IOTableCellFromInt(Data->iBit);
-        grdIOTable->Cells[eIOTableColInType][Index+1]=IOTableCellFromInt(Data->iInType);
-        grdIOTable->Cells[eIOTableColISABase][Index+1]=IOTableCellFromInt(Data->iISABase);
-        grdIOTable->Cells[eIOTableColEnable][Index+1]=IOTableCellFromInt(Data->iEnable);
-        grdIOTable->Cells[eIOTableColOnAlarmTime][Index+1]=IOTableCellFromInt(Data->iOnAlarmTime);
-        grdIOTable->Cells[eIOTableColOffAlarmTime][Index+1]=IOTableCellFromInt(Data->iOffAlarmTime);
-        grdIOTable->Cells[eIOTableColOnDelayTime][Index+1]=IOTableCellFromInt(Data->iOnDelayTime);
-        grdIOTable->Cells[eIOTableColOffDelayTime][Index+1]=IOTableCellFromInt(Data->iOffDelayTime);
-        grdIOTable->Cells[eIOTableColNote][Index+1]=GetIOTableNote(Data);
+        if(Data!=NULL && Data->iEnable!=0 && Data->iISABase==eMotionNet)
+            MotionNetPoints++;
+    }
+
+    AnsiString Summary;
+#ifdef SOFT_SIMULATE
+    Summary.sprintf("SOFT_SIMULATE active - MN200 card NOT opened (IO is simulated).  MotionNet IO points in table=%d",
+                    MotionNetPoints);
+#else
+    if(Conn!=NULL && Conn->bOpened)
+        Summary.sprintf("MN200 opened.  Rings=%d  MotionNet IO points=%d  LastMsg=%s",
+                        Conn->iNumLine, MotionNetPoints, Conn->sLastMessage.c_str());
+    else
+        Summary.sprintf("MN200 NOT opened (LastError=%d %s).  MotionNet IO points=%d",
+                        (Conn==NULL)?0:Conn->iLastError,
+                        (Conn==NULL)?"":Conn->sLastMessage.c_str(),
+                        MotionNetPoints);
+#endif
+    if(lblMN200Summary!=NULL)
+        lblMN200Summary->Caption=Summary;
+
+    int Rings=(Conn==NULL)?0:Conn->iNumLine;
+    if(Rings<0)
+        Rings=0;
+    if(Rings>MN200_MAX_RING)
+        Rings=MN200_MAX_RING;
+    SetGridRowCount(grdMN200, Rings+1);
+    ClearGridRows(grdMN200);
+    for(int i=0; i<Rings; i++)
+    {
+        grdMN200->Cells[0][i+1]=IntToStr(i);
+        grdMN200->Cells[1][i+1]=(Conn->bRingStarted[i])?AnsiString("YES"):AnsiString("NO");
+        grdMN200->Cells[2][i+1]=IntToStr(Conn->iNumDev[i]);
+        grdMN200->Cells[3][i+1]=IntToStr(Conn->iRingError[i]);
     }
 }
 //---------------------------------------------------------------------------
@@ -1175,9 +732,45 @@ bool Tfiosetview::BackupIOTableFile(AnsiString *BackupFile)
     if(!CopyFile(HSys.IoTablePath.c_str(), BackupName.c_str(), false))
         return false;
 
+    PruneIOTableBackups(BackupDir, 10);
+
     if(BackupFile!=NULL)
         *BackupFile=BackupName;
     return true;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260613 : keep at most MaxKeep IO_Table backup files in BackupDir
+//and delete the oldest first, so the system backup folder does not grow without
+//bound. Backup names are IO_Table_yyyymmdd_hhnnss.csv, so an ascending name sort
+//is also chronological; the first (Count-MaxKeep) entries are therefore the oldest.
+void Tfiosetview::PruneIOTableBackups(AnsiString BackupDir, int MaxKeep)
+{
+    TSearchRec SearchRec;
+    TStringList *Names;
+    AnsiString Mask;
+    int FindResult;
+    int DeleteCount;
+
+    if(BackupDir==AnsiString("") || MaxKeep<0)
+        return;
+
+    Names=new TStringList();
+    Mask=BackupDir+AnsiString("\\IO_Table_*.csv");
+    FindResult=FindFirst(Mask, faAnyFile, SearchRec);
+    while(FindResult==0)
+    {
+        if((SearchRec.Attr & faDirectory)==0)
+            Names->Add(SearchRec.Name);
+        FindResult=FindNext(SearchRec);
+    }
+    FindClose(SearchRec);
+
+    Names->Sort();
+    DeleteCount=Names->Count-MaxKeep;
+    for(int Index=0; Index<DeleteCount; Index++)
+        DeleteFile(BackupDir+AnsiString("\\")+Names->Strings[Index]);
+
+    delete Names;
 }
 //---------------------------------------------------------------------------
 int Tfiosetview::FindIOTableGridRowByTag(int Tag)
@@ -1308,28 +901,11 @@ void Tfiosetview::SaveIoTableFromGrid()
     delete Lines;
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::RefreshAll()
-{
-    RefreshSummary();
-    RefreshSensors();
-    RefreshCylinders();
-    RefreshSwitches();
-    RefreshSuckers();
-    RefreshIOTable();
-    RefreshLegacyIOControls();
-    UpdateSelectedInfo();
-    UpdateManualButtons();
-}
-//---------------------------------------------------------------------------
 void Tfiosetview::RefreshCurrentView()
 {
-    if(lblSummary!=NULL && grdSensors!=NULL && grdCylinders!=NULL &&
-       grdSwitches!=NULL && grdSuckers!=NULL && grdIOTable!=NULL)
-    {
-        RefreshAll();
-        return;
-    }
-
+    //AI(general) 20260613 : the code-built generic-grid view was removed; the
+    //live IO view is the DFM legacy LED/panel layout that RefreshLegacyIOControls
+    //repaints from current IO state.
     RefreshLegacyIOControls();
 }
 //---------------------------------------------------------------------------
@@ -2066,113 +1642,6 @@ bool Tfiosetview::ResolveLegacyButtonState(AnsiString AliasName, bool *State)
     return false;
 }
 //---------------------------------------------------------------------------
-bool Tfiosetview::IsManualOutputEnabled()
-{
-    return (chkManualOutput!=NULL && chkManualOutput->Checked==true);
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::CanManualOutput(AnsiString *Reason)
-{
-    if(Reason!=NULL)
-        *Reason=AnsiString("");
-
-    if(HSys.Sys.SystemStart)
-    {
-        if(Reason!=NULL)
-            *Reason="Manual output is blocked while machine is running.";
-        return false;
-    }
-
-    if(IsSafeDoorOpen()>0)
-    {
-        if(Reason!=NULL)
-            *Reason="Manual output is blocked while safe door is open.";
-        return false;
-    }
-
-    if(!IsManualOutputEnabled())
-    {
-        if(Reason!=NULL)
-            *Reason="Manual output is locked.";
-        return false;
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::CanLegacyManualOutput(AnsiString *Reason)
-{
-    if(!CanManualOutput(Reason))
-        return false;
-
-    if(!IsLegacyGeneralIOMode())
-    {
-        if(Reason!=NULL)
-            *Reason="General IO mode is required for manual output.";
-        return false;
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::ShowManualOutputBlocked(AnsiString Reason)
-{
-    if(Reason==AnsiString(""))
-        Reason="Manual output is blocked.";
-    LogManualOutputAction("ManualOutput", "BLOCK", Reason);
-    ShowMessage(Reason);
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::GetSelectedSwitch(TMySwitch **SwitchPtr)
-{
-    if(SwitchPtr!=NULL)
-        *SwitchPtr=NULL;
-    if(SelectedKind!=eIOViewSwitch || SelectedIndex<0 || SelectedIndex>=HSys.iTotalSwitch)
-        return false;
-    if(SwitchPtr!=NULL)
-        *SwitchPtr=&HSys.SwPtr[SelectedIndex];
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::GetSelectedCylinder(TMyCylinder **CylinderPtr)
-{
-    if(CylinderPtr!=NULL)
-        *CylinderPtr=NULL;
-    if(SelectedKind!=eIOViewCylinder || SelectedIndex<0 || SelectedIndex>=HSys.iTotalCylinder)
-        return false;
-    if(CylinderPtr!=NULL)
-        *CylinderPtr=&HSys.CynPtr[SelectedIndex];
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::GetSelectedSucker(TMySucker **SuckerPtr)
-{
-    if(SuckerPtr!=NULL)
-        *SuckerPtr=NULL;
-    if(SelectedKind!=eIOViewSucker || SelectedIndex<0 || HSys.iTotalSucker<=0)
-        return false;
-    TMyKitSuck *Kit=&HSys.SuckPtr[0];
-    int Total=Kit->MaxItemR*Kit->MaxItemC;
-    if(SelectedIndex>=Total || Kit->MaxItemC<=0)
-        return false;
-    int RowIndex=SelectedIndex/Kit->MaxItemC;
-    int ColIndex=SelectedIndex%Kit->MaxItemC;
-    if(SuckerPtr!=NULL)
-        *SuckerPtr=&Kit->Suck[RowIndex][ColIndex];
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::IsLegacyGeneralIOMode()
-{
-    TRadioButton *GeneralRadio;
-
-    GeneralRadio=dynamic_cast<TRadioButton *>(FindComponent("rbGeneralIO"));
-    if(GeneralRadio!=NULL)
-        return GeneralRadio->Checked;
-
-    return IsManualOutputEnabled();
-}
-//---------------------------------------------------------------------------
 bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
 {
     AnsiString AliasName;
@@ -2265,37 +1734,6 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
     return false;
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::UpdateSelectedInfo()
-{
-    AnsiString Str="Selected: none";
-    TMySwitch *SwitchPtr=NULL;
-    TMyCylinder *CylinderPtr=NULL;
-    TMySucker *SuckerPtr=NULL;
-
-    if(GetSelectedSwitch(&SwitchPtr) && SwitchPtr!=NULL)
-        Str="Selected switch: "+SwitchPtr->Name;
-    else if(GetSelectedCylinder(&CylinderPtr) && CylinderPtr!=NULL)
-        Str="Selected cylinder: "+CylinderPtr->CylinderName;
-    else if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-        Str="Selected sucker: "+SuckerPtr->SuckerName;
-
-    lblSelected->Caption=Str;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::UpdateManualButtons()
-{
-    bool HasSwitch=(SelectedKind==eIOViewSwitch);
-    bool HasCylinder=(SelectedKind==eIOViewCylinder);
-    bool HasSucker=(SelectedKind==eIOViewSucker);
-    bool Manual=CanManualOutput(NULL);
-    btnOutputOn->Enabled=Manual && (HasSwitch || HasCylinder || HasSucker);
-    btnOutputOff->Enabled=Manual && (HasSwitch || HasCylinder || HasSucker);
-    btnSuckerDestroy->Enabled=Manual && HasSucker;
-    btnOutputOn->Font->Color=btnOutputOn->Enabled?clBlack:clGray;
-    btnOutputOff->Font->Color=btnOutputOff->Enabled?clBlack:clGray;
-    btnSuckerDestroy->Font->Color=btnSuckerDestroy->Enabled?clBlack:clGray;
-}
-//---------------------------------------------------------------------------
 TPageControl *Tfiosetview::GetLegacyPageIO()
 {
     return dynamic_cast<TPageControl *>(FindComponent("PageIO"));
@@ -2345,17 +1783,12 @@ void Tfiosetview::UpdateLegacyPageTabsVisible()
 //---------------------------------------------------------------------------
 void Tfiosetview::SetRefreshTimerEnabled(bool Enabled)
 {
-//    TTimer *LegacyTimer;
-//
-//    if(tmrRefresh!=NULL)
-//    {
-//        tmrRefresh->Enabled=Enabled;
-//        return;
-//    }
-//
-//    LegacyTimer=FindNamedTimer(this, "Timer1");
-//    if(LegacyTimer!=NULL)
-//        LegacyTimer->Enabled=Enabled;
+    //AI(general) 20260613 : Timer1 is a DFM component (OnTimer=Timer1Timer) shipped
+    //with Enabled=False. FormShow calls this with true so the live legacy IO view
+    //(RefreshLegacyIOControls) is re-scanned periodically; without it a sensor that
+    //changes after the window opens never updates on screen.
+    if(Timer1!=NULL)
+        Timer1->Enabled=Enabled;
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormShow(TObject *Sender)
@@ -2369,173 +1802,16 @@ void __fastcall Tfiosetview::FormShow(TObject *Sender)
     fShow=true;
 }
 //---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnRefreshClick(TObject *Sender)
-{
-    (void)Sender;
-    RefreshCurrentView();
-    RefreshLegacyIOMaps();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::chkManualOutputClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(IsManualOutputEnabled() && !CanManualOutput(&Reason))
-    {
-        chkManualOutput->Checked=false;
-        ShowManualOutputBlocked(Reason);
-    }
-    UpdateManualButtons();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::GridSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect)
-{
-    (void)ACol;
-    CanSelect=true;
-    SelectedKind=eIOViewNone;
-    SelectedIndex=-1;
-    SelectedRow=ARow;
-    SelectedCol=ACol;
-
-    if(ARow>0)
-    {
-        if(Sender==grdSwitches)
-        {
-            SelectedKind=eIOViewSwitch;
-            SelectedIndex=ARow-1;
-        }
-        else if(Sender==grdCylinders)
-        {
-            SelectedKind=eIOViewCylinder;
-            SelectedIndex=ARow-1;
-        }
-        else if(Sender==grdSuckers)
-        {
-            SelectedKind=eIOViewSucker;
-            SelectedIndex=ARow-1;
-        }
-    }
-    UpdateSelectedInfo();
-    UpdateManualButtons();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnOutputOnClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(!CanManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        return;
-    }
-
-    TMySwitch *SwitchPtr=NULL;
-    TMyCylinder *CylinderPtr=NULL;
-    TMySucker *SuckerPtr=NULL;
-    if(GetSelectedSwitch(&SwitchPtr) && SwitchPtr!=NULL)
-    {
-        SwitchPtr->On();
-        SyncPadSwitchStatus(SwitchPtr->Name, SwitchPtr->Status());
-        LogManualOutputAction(SwitchPtr->Name, "ON", "OK");
-    }
-    else if(GetSelectedCylinder(&CylinderPtr) && CylinderPtr!=NULL)
-    {
-        CylinderPtr->On();
-        LogManualOutputAction(CylinderPtr->CylinderName, "ON", "OK");
-    }
-    else if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-    {
-        SuckerPtr->On();
-        LogManualOutputAction(SuckerPtr->SuckerName, "ON", "OK");
-    }
-    else
-    {
-        LogManualOutputAction("ManualOutput", "ON", "NO_SELECTION");
-        ShowMessage("No output selected.");
-    }
-    RefreshCurrentView();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnOutputOffClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(!CanManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        return;
-    }
-
-    TMySwitch *SwitchPtr=NULL;
-    TMyCylinder *CylinderPtr=NULL;
-    TMySucker *SuckerPtr=NULL;
-    if(GetSelectedSwitch(&SwitchPtr) && SwitchPtr!=NULL)
-    {
-        SwitchPtr->Off();
-        SyncPadSwitchStatus(SwitchPtr->Name, SwitchPtr->Status());
-        LogManualOutputAction(SwitchPtr->Name, "OFF", "OK");
-    }
-    else if(GetSelectedCylinder(&CylinderPtr) && CylinderPtr!=NULL)
-    {
-        CylinderPtr->Off();
-        LogManualOutputAction(CylinderPtr->CylinderName, "OFF", "OK");
-    }
-    else if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-    {
-        SuckerPtr->Normal();
-        LogManualOutputAction(SuckerPtr->SuckerName, "OFF", "OK");
-    }
-    else
-    {
-        LogManualOutputAction("ManualOutput", "OFF", "NO_SELECTION");
-        ShowMessage("No output selected.");
-    }
-    RefreshCurrentView();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnSuckerDestroyClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(!CanManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        return;
-    }
-
-    TMySucker *SuckerPtr=NULL;
-    if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-    {
-        SuckerPtr->Off();
-        LogManualOutputAction(SuckerPtr->SuckerName, "DESTROY", "OK");
-    }
-    else
-    {
-        LogManualOutputAction("ManualOutput", "DESTROY", "NO_SELECTION");
-        ShowMessage("No sucker selected.");
-    }
-    RefreshCurrentView();
-}
-//---------------------------------------------------------------------------
 void __fastcall Tfiosetview::BtnPanelClick(TObject *Sender)
 {
     TBtnPanel *ButtonPtr;
-    AnsiString Reason;
 
+    //AI(general) 20260613 : direct manual toggle, matching HT172 IOSetViewOutput.
+    //The previous IsManualOutputEnabled()/CanLegacyManualOutput() gate is removed;
+    //ToggleLegacyButtonOutput already refuses unbound or disabled outputs.
     ButtonPtr=dynamic_cast<TBtnPanel *>(Sender);
     if(ButtonPtr==NULL)
         return;
-
-    if(!CanLegacyManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        RefreshCurrentView();
-        return;
-    }
 
     if(!ToggleLegacyButtonOutput(ButtonPtr))
     {
@@ -2770,7 +2046,10 @@ void __fastcall Tfiosetview::spbTerminalProgramClick(TObject *Sender)
 void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)
 {
     (void)Sender;
+    if(!fShow)
+        return;
     RefreshCurrentView();
+    RefreshMN200();
     UpdateLegacyPageTabsVisible();
 }
 //---------------------------------------------------------------------------

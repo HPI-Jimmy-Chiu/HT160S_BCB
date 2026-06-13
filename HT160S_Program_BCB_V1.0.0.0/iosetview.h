@@ -56,6 +56,9 @@ __published:
     TMyLed *MyLed36;
     TMyLed *MyLed37;
     TBtnPanel *BtnPanel6;
+    TTabSheet *tsMN200;
+    TLabel *lblMN200Summary;
+    TStringGrid *grdMN200;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall BtnPanelClick(TObject *Sender);
     void __fastcall ComboBox1Change(TObject *Sender);
@@ -77,26 +80,11 @@ __published:
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
 private:
     // The members below are NOT present in iosetview.dfm; they belong to the
-    // code-built (dynamic) IO view UI created in BuildUI()/EnsureIOTableEditor().
+    // IO Table editor controls created dynamically in EnsureIOTableEditor().
     // They MUST stay out of __published, otherwise the BCB6 IDE Form Designer
     // reports "Incorrect method declaration in class Tfiosetview" when it
     // reconciles __published against the DFM (the bcc32 command-line build is
     // unaffected either way). //AI(general) 20260603
-    TPanel *palHeader;
-    TLabel *lblTitle;
-    TLabel *lblSummary;
-    TLabel *lblSelected;
-    TCheckBox *chkManualOutput;
-    TButton *btnRefresh;
-    TButton *btnOutputOn;
-    TButton *btnOutputOff;
-    TButton *btnSuckerDestroy;
-    TPageControl *PageControl;
-    TTabSheet *tsSensors;
-    TTabSheet *tsCylinders;
-    TTabSheet *tsSwitches;
-    TTabSheet *tsSuckers;
-    TTabSheet *tsIOTable;
     TPanel *pnIOTableEditorToolbar;
     TComboBox *cbbType;
     TComboBox *cbbLane;
@@ -108,39 +96,13 @@ private:
     TStringGrid *strngrdIoTable;
     TStringList *IOTableDeletedTags;
     TStringList *ManualOutputLog;
-    void __fastcall btnRefreshClick(TObject *Sender);
-    void __fastcall btnOutputOnClick(TObject *Sender);
-    void __fastcall btnOutputOffClick(TObject *Sender);
-    void __fastcall btnSuckerDestroyClick(TObject *Sender);
-    void __fastcall chkManualOutputClick(TObject *Sender);
-    void __fastcall GridSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
 
-    TStringGrid *grdSensors;
-    TStringGrid *grdCylinders;
-    TStringGrid *grdSwitches;
-    TStringGrid *grdSuckers;
-    TStringGrid *grdIOTable;
 
-    int SelectedKind;
-    int SelectedIndex;
-    int SelectedRow;
-    int SelectedCol;
     int iSelectRow;
     int iSelectCol;
 
-    void BuildUI();
-    void BuildHeader();
-    void BuildPages();
-    void SetupGrid(TStringGrid *Grid, int ColCount, const char **Headers, const int *Widths);
-    TStringGrid *CreateGrid(TWinControl *Parent, int ColCount, const char **Headers, const int *Widths);
-    void RefreshAll();
     void RefreshCurrentView();
-    void RefreshSummary();
-    void RefreshSensors();
-    void RefreshCylinders();
-    void RefreshSwitches();
-    void RefreshSuckers();
-    void RefreshIOTable();
+    void RefreshMN200();
     void RefreshLegacyIOControls();
     void RefreshLegacyIOMaps();
     void SetLegacyComponentHints();
@@ -156,6 +118,7 @@ private:
     bool ValidateIOTableGrid(TStringList *Errors);
     bool ValidateIOTableRow(int Row, TStringList *Errors);
     bool BackupIOTableFile(AnsiString *BackupFile);
+    void PruneIOTableBackups(AnsiString BackupDir, int MaxKeep);
     bool IsIOTableGridRowBlank(int Row);
     bool RowMatchesIOTableFilter(TIODATA *Data, int TypeFilter, int LaneFilter, AnsiString SearchText);
     int FindIOTableGridRowByTag(int Tag);
@@ -190,32 +153,11 @@ private:
     void SaveIOMap(bool InputSide);
     bool ResolveLegacyLedState(AnsiString AliasName, bool *State);
     bool ResolveLegacyButtonState(AnsiString AliasName, bool *State);
-    void UpdateSelectedInfo();
-    void UpdateManualButtons();
     TPageControl *GetLegacyPageIO();
     void SelectLegacyIOPageByButton(TSpeedButton *Button);
     void UpdateLegacyPageTabsVisible();
     void ClearGridRows(TStringGrid *Grid);
     void SetGridRowCount(TStringGrid *Grid, int RowCount);
-    int CountIOType(AnsiString TypeName);
-    TIODATA *GetIODataByFilteredRow(AnsiString TypeName, int RowIndex);
-    AnsiString FormatAddress(int Lane, int IP, int Port, int Bit);
-    AnsiString FormatIODataAddress(TIODATA *Data);
-    AnsiString FormatIODriver(TIODATA *Data);
-    AnsiString FormatIODriver(TMyIo *IOPtr);
-    AnsiString FormatSensor(TMySensor *Sensor);
-    AnsiString FormatSwitch(TMySwitch *SwitchPtr);
-    AnsiString FormatEnable(bool Flag);
-    AnsiString FormatEnableInt(int Flag);
-    AnsiString FormatOnOff(bool Flag);
-    bool IsManualOutputEnabled();
-    bool CanManualOutput(AnsiString *Reason);
-    bool CanLegacyManualOutput(AnsiString *Reason);
-    void ShowManualOutputBlocked(AnsiString Reason);
-    bool GetSelectedSwitch(TMySwitch **SwitchPtr);
-    bool GetSelectedCylinder(TMyCylinder **CylinderPtr);
-    bool GetSelectedSucker(TMySucker **SuckerPtr);
-    bool IsLegacyGeneralIOMode();
     bool ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr);
     void SetRefreshTimerEnabled(bool Enabled);
     void __fastcall btnAddIOClick(TObject *Sender);

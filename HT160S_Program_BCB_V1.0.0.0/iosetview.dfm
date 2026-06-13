@@ -5063,7 +5063,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'C_Color_FrontRiseTray_Off'
+              Alias = 'C_Color_FrontRiseTray_1_Off'
             end
             object MyLed176: TMyLed
               Left = 43
@@ -5071,7 +5071,7 @@ object fiosetview: Tfiosetview
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'C_Color_FrontRiseTray_On'
+              Alias = 'C_Color_FrontRiseTray_1_On'
             end
             object MyLed177: TMyLed
               Left = 175
@@ -5104,22 +5104,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_LeanOnTray_Off'
-            end
-            object MyLed182: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Color_RearRiseTray_On'
-            end
-            object MyLed183: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Color_RearRiseTray_Off'
             end
             object MyLed184: TMyLed
               Left = 6
@@ -5214,7 +5198,7 @@ object fiosetview: Tfiosetview
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
-              Alias = 'C_Color_FrontRiseTray'
+              Alias = 'C_Color_FrontRiseTray_1'
               Style = tsButtons
             end
             object BtnPanel92: TBtnPanel
@@ -5317,30 +5301,6 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 7
             end
-            object BtnPanel94: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 8
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Color_RearRiseTray'
-              Style = tsButtons
-            end
             object Panel152: TPanel
               Left = 768
               Top = 16
@@ -5348,7 +5308,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
             object BtnPanel6: TBtnPanel
               Left = 66
@@ -5366,7 +5326,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 10
+              TabOrder = 9
               OnClick = BtnPanelClick
               TrueColor = 16744448
               FalseColor = 8404992
@@ -11303,6 +11263,28 @@ object fiosetview: Tfiosetview
         Style = tsButtons
       end
     end
+    object tsMN200: TTabSheet
+      Caption = 'MN200'
+      object lblMN200Summary: TLabel
+        Left = 8
+        Top = 8
+        Width = 820
+        Height = 16
+        AutoSize = False
+        Caption = 'MN200: (refresh pending)'
+        WordWrap = True
+      end
+      object grdMN200: TStringGrid
+        Left = 8
+        Top = 32
+        Width = 820
+        Height = 360
+        DefaultRowHeight = 22
+        FixedCols = 0
+        RowCount = 2
+        TabOrder = 0
+      end
+    end
   end
   object plIOForm: TPanel
     Left = 0
@@ -11338,7 +11320,7 @@ object fiosetview: Tfiosetview
   end
   object Timer1: TTimer
     Enabled = False
-    Interval = 50
+    Interval = 200
     OnTimer = Timer1Timer
     Left = 700
     Top = 65534
