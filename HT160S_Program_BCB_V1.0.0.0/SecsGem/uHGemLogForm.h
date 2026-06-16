@@ -28,7 +28,6 @@ __published:
     TTabSheet    *tsEC;
     TTabSheet    *tsConn;
 
-    // -- Log tab --
     TPanel    *PanelTop;
     TMemo     *MemoLog;
     TButton   *BtnClear;
@@ -37,10 +36,8 @@ __published:
     TCheckBox *ChkPause;
     TLabel    *LblState;
 
-    // -- SV tab --
     TStringGrid *GridSV;
 
-    // -- EC tab --
     TStringGrid *GridEC;
     TPanel      *PanelECEdit;
     TLabel      *LblECSel;
@@ -48,7 +45,6 @@ __published:
     TButton     *BtnECWrite;
     TLabel      *LblECStatus;
 
-    // -- Connection tab --
     TLabel *LblConnAddr;
     TLabel *LblConnPort;
     TLabel *LblConnDev;
@@ -56,7 +52,6 @@ __published:
     TLabel *LblConnState;
     TLabel *LblConnNote;
 
-    // -- Settings tab (edit General.ini [SECS]) --
     TTabSheet *tsSet;
     TLabel    *LblSetEnable;
     TLabel    *LblSetMode;

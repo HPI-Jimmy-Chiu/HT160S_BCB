@@ -11,7 +11,7 @@
 #include <SyncObjs.hpp>
 //---------------------------------------------------------------------------
 
-#define PROD_LOG_FIELD_COUNT    17
+#define PROD_LOG_FIELD_COUNT    19
 
 enum eICRecordField
 {
@@ -19,7 +19,10 @@ enum eICRecordField
     eWhichArm, eSuckX, eSuckY, eWhichAuto,
     eBin, eOutTrayID, eUnloadX, eUnloadY, eUnloadTime, eErrorCode,
     // Trace code columns (backward-compat append)
-    eTraceCode, eErrorType
+    eTraceCode, eErrorType,
+    //AI(ht160s-lotbin) 20260615 : per-IC Lot + 2D code (By Lot+Bin traceability;
+    //appended so existing column positions are unchanged)
+    eLotID, e2DCode
 };
 
 //---------------------------------------------------------------------------
@@ -70,6 +73,11 @@ public:
     // Called at pick: fill input info per nozzle
     void AddInputInfo(int iNozzle, int iRow, int iCol,
                       const AnsiString& sTrayID);
+
+    //AI(ht160s-lotbin) 20260615 : record this IC's owning Lot + 2D code on the
+    //per-nozzle line (called at pick, alongside AddInputInfo).
+    void AddIcIdentity(int iNozzle, const AnsiString& sLotID,
+                       const AnsiString& sCode2D);
 
     // Called at classify: fill bin assignment per nozzle
     void AddBinInfo(int iNozzle, int iBinIndex, int iGradeCode);

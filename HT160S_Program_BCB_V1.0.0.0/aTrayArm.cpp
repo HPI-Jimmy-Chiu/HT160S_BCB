@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-#include <vcl.h>
+#include "IncludeAllHeader.h"
 #pragma hdrstop
 
 #include "aTrayArm.h"
@@ -30,22 +30,33 @@ TTrayArmModule::TTrayArmModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-void TTrayArmModule::InitialFlag()
+void TTrayArmModule::InitialFlag(bool bKeepMaterial)
 {
     bHasTray=false;
     if(HSys.VMot.MMTrayArmX!=NULL)
         bHasTray=HSys.VMot.MMTrayArmX->fHasTray;
-    Status=TAS_IDLE;
-    Job=TAJOB_NONE;
     PickTask=1;
     PlaceTask=1;
+    bCleanOutFinish=true;
+    bTrayFeedFinish=true;
+    ArmDelay.Clear();
+    //AI(HT160S-Maintainer) 20260612 : recoverable home while a tray is in hand. Keep the
+    //delivery job + destination (Auto target, AMR kind, 2D TrayID, place dest) so the arm
+    //resumes placing the SAME tray after home instead of losing where it must go. The
+    //clamps are kept closed during the home (see uHome ProcessMotorHome) so the tray rides
+    //up with the head and is never dropped. Only the transient pick/place sub-tasks above
+    //are restarted.
+    if(bKeepMaterial && bHasTray)
+    {
+        Status=TAS_CARRYING;
+        return;
+    }
+    Status=TAS_IDLE;
+    Job=TAJOB_NONE;
     iAutoTarget=-1;
     iDeliverKind=eTrayKindNormal;
     iDeliverTrayID="";
     PlaceDest=TAPLACE_AUTO;
-    bCleanOutFinish=true;
-    bTrayFeedFinish=true;
-    ArmDelay.Clear();
 }
 //---------------------------------------------------------------------------
 bool TTrayArmModule::HasTray()
@@ -521,6 +532,17 @@ void TTrayArmModule::DoTrayArm(int &Task)
             //a teach/recovery flow exists. Only start a new job when arm is empty.
             if(bHasTray)
             {
+                //AI(HT160S-Maintainer) 20260612 : EXCEPTION - if the tray was in hand for
+                //a still-valid delivery job that survived a recoverable home (Job!=NONE,
+                //destination already chosen), this is not unknown residue : resume placing
+                //that same tray so production continues without losing/dropping it.
+                if(Job!=TAJOB_NONE)
+                {
+                    Status=TAS_CARRYING;
+                    DoPlace(0);
+                    Task=2000;
+                    break;
+                }
                 Status=TAS_IDLE;
                 break;
             }

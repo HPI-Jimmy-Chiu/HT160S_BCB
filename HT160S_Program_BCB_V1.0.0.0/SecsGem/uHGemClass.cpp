@@ -133,6 +133,8 @@ void HTGem::SendUnsupported(AnsiString FunctionName)
 void HTGem::RefreshSVData(){ }
 //AI(ht160s-secsgem) 20260612 : base no-op; HT160Gem overrides to drive the main-screen SECS badge.
 void HTGem::RefreshSecsBadge(){ }
+//AI(ht160s-agv) 20260615 : base no-op; HT160Gem overrides to drive the AGV coordinator.
+void HTGem::ServiceAgv(){ }
 void HTGem::AddSV(){ }
 void HTGem::AddEC(){ }
 void HTGem::AddAlarmList(){ }

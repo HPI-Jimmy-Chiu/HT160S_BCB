@@ -8,7 +8,7 @@
       uQwertyKey.obj language.obj setup.obj data.obj maintenance.obj uOffset.obj 
       uspeed.obj systools.obj mymessbox.obj note.obj cmydef.obj cprod.obj 
       CosFunction.obj Include\cJSON.obj GeneralSetting.obj Config.obj 
-      UserRoleManager.obj cEventLog.obj cSelfCheck.obj cStepTrace.obj 
+      UserRoleManager.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj cSelfCheck.obj cStepTrace.obj
       cStateRecordHT160.obj 
       database.obj aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj 
       aSortArm.obj aColor.obj csystem.obj uruncontrol.obj HTimer.obj myio.obj 
@@ -16,9 +16,10 @@
       deviceinfo.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj 
       MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj 
       MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj 
-      AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj ComPort.obj MCUDisplayProtocol.obj 
-      MCUDisplay.obj uPadInterface.obj SecsGem\uHGemEquipment.obj 
-      SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj"/>
+      AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj
+      MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj
+      SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj
+      SecsGem\uAgvStation.obj"/>
     <RESFILES value="ht160s.res"/>
     <IDLFILES value=""/>
     <IDLGENFILES value=""/>
@@ -97,7 +98,9 @@
       <FILE FILENAME="GeneralSetting.cpp" FORMNAME="" UNITNAME="GeneralSetting" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="Config.cpp" FORMNAME="" UNITNAME="Config" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="UserRoleManager.cpp" FORMNAME="" UNITNAME="UserRoleManager" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="cCsvDailyLog.cpp" FORMNAME="" UNITNAME="cCsvDailyLog" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cEventLog.cpp" FORMNAME="" UNITNAME="cEventLog" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="cCommLog.cpp" FORMNAME="" UNITNAME="cCommLog" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cSelfCheck.cpp" FORMNAME="" UNITNAME="cSelfCheck" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cStepTrace.cpp" FORMNAME="" UNITNAME="cStepTrace" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cStateRecordHT160.cpp" FORMNAME="" UNITNAME="cStateRecordHT160" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
@@ -127,14 +130,15 @@
       <FILE FILENAME="AutomationServer.cpp" FORMNAME="" UNITNAME="AutomationServer" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="TopCcdSocket.cpp" FORMNAME="" UNITNAME="TopCcdSocket" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="ColorCcdSocket.cpp" FORMNAME="" UNITNAME="ColorCcdSocket" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="LotWebApiClient.cpp" FORMNAME="" UNITNAME="LotWebApiClient" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="ComPort.cpp" FORMNAME="fComPort" UNITNAME="ComPort" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
-      <FILE FILENAME="MCUDisplayProtocol.cpp" FORMNAME="" UNITNAME="MCUDisplayProtocol" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
-      <FILE FILENAME="MCUDisplay.cpp" FORMNAME="" UNITNAME="MCUDisplay" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MyBinDisp.cpp" FORMNAME="" UNITNAME="MyBinDisp" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="uPadInterface.cpp" FORMNAME="" UNITNAME="uPadInterface" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="SecsGem\uHGemEquipment.cpp" FORMNAME="" UNITNAME="uHGemEquipment" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="SecsGem\UsecegemMainFrom.cpp" FORMNAME="" UNITNAME="UsecegemMainFrom" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="SecsGem\uHGemClass.cpp" FORMNAME="" UNITNAME="uHGemClass" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="SecsGem\uHGemHT160.cpp" FORMNAME="" UNITNAME="uHGemHT160" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="SecsGem\uAgvStation.cpp" FORMNAME="" UNITNAME="uAgvStation" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="SecsGem\uHGemLogForm.cpp" FORMNAME="fSecsGemLog" UNITNAME="uHGemLogForm" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
   </FILELIST>
   <BUILDTOOLS>

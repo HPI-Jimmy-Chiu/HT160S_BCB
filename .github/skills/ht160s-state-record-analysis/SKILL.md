@@ -29,7 +29,14 @@ Folder: `D:\HT160S_StateRecord\<yyyy-mm-dd hh_mm_ss>\` (written by
 | `CurrentTasks.txt` | Module index table + current Task + last-change time |
 | `TaskHistory.csv` | Per module, last 30 `(Time_k,Task_k)` pairs. **Time_0 is NEWEST.** A sample is recorded **only when Task changes** (`SampleTasks`). |
 | `Snapshot.ini` | `TriggerReason` (Manual = operator pressed the button), `Time`, `Version` |
+| `SortArmDecision.txt` | **Place/discharge deadlock evidence.** SortArm held-IC routing (`DescribeHolding`: per-slot bin -> mapped Auto) + each Auto's live flags and **working-tray cell map** (`.`=EMPTY_IC `O`=HAS_OK_IC `?`=UNCHECK_IC `#`=other) with empty/ok counts. Read the two together to see WHICH cell blocks the held pattern, and why an Auto cannot discharge (needs every cell HAS_OK_IC). |
+| `MotionDetail.ini` | motor cmd/enc/tgt, SortArm Pick/PlaceTask, SuckZ, sucker vacuum bits |
 | `MachineConfig/` | Copied `system\` + active `recipe\` for reproduction |
+
+`CurrentTasks.txt` and `MachineState.ini [StuckMs]` also carry **StuckMs** = ms since
+each module's last Task change. NB: with `SystemStart=0` StuckMs is inflated by the
+operator notice->stop->snapshot delay (same caveat as the timestamps); it is exact
+only when a watchdog auto-triggers while the line still runs.
 
 Module order (index 0..6): **Empty, Loader1, Loader2, Auto1, TrayArm, SortArm,
 Color** (the 7 entries in `UserMotion` action list).
@@ -153,6 +160,9 @@ in the tool and §4 here.
 3. List FROZEN-on-handshake modules + CHURN-idle modules.
 4. Pick the **most upstream blocked actor** (here SortArm place) and read its
    wait function in source **before** asserting a cause. Confirm `.h` + `.cpp`.
+   For a SortArm-frozen-at-200 snapshot, open `SortArmDecision.txt` first: it shows
+   the held-IC routing + each target Auto's cell map, so "no contiguous EMPTY_IC run
+   fits the held pattern" becomes a direct read instead of an inference.
 5. Walk the cascade (place -> discharge -> request -> deliver) to confirm the
    circular wait. Label FACT (read) vs INFER (derived).
 6. Propose fixes; do NOT edit motion handshake code without user sign-off.

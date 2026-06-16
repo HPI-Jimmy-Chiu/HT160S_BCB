@@ -14,8 +14,8 @@
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
-static const char *DEFAULT_COLORCCD_ADDRESS = "172.16.8.90";
-static const int   DEFAULT_COLORCCD_PORT    = 5001;
+static const char *DEFAULT_COLORCCD_ADDRESS = "172.16.8.100";
+static const int   DEFAULT_COLORCCD_PORT    = 5000;
 
 THT160ColorCcdSocket *ColorCcdSocket = NULL;
 //---------------------------------------------------------------------------
@@ -40,6 +40,8 @@ __fastcall THT160ColorCcdSocket::THT160ColorCcdSocket()
     sLastError       = "";
     sCcdAddress      = DEFAULT_COLORCCD_ADDRESS;
     iCcdPort         = DEFAULT_COLORCCD_PORT;
+    bWantConnected   = false;
+    iLastReconnectTick = 0;
 }
 //---------------------------------------------------------------------------
 __fastcall THT160ColorCcdSocket::~THT160ColorCcdSocket()
@@ -118,6 +120,9 @@ void __fastcall THT160ColorCcdSocket::CloseSocket()
 //---------------------------------------------------------------------------
 bool __fastcall THT160ColorCcdSocket::ColorCcdConnect()
 {
+    //AI(HT160S-Maintainer) 20260612 : align HT172 (GAP E) - remember that a
+    //connection is wanted so ColorCcdPoll can auto-reconnect if the link drops.
+    bWantConnected = true;
     if(iState == COLORCCD_CONNECTED || iState == COLORCCD_CONNECTING)
         return true;
 
@@ -163,6 +168,7 @@ bool __fastcall THT160ColorCcdSocket::ColorCcdConnect()
 //---------------------------------------------------------------------------
 void __fastcall THT160ColorCcdSocket::ColorCcdDisconnect()
 {
+    bWantConnected = false;   //AI(HT160S-Maintainer) 20260612 : stop auto-reconnect
     CloseSocket();
 }
 //---------------------------------------------------------------------------
@@ -213,14 +219,27 @@ void __fastcall THT160ColorCcdSocket::PollReceive()
         Buffer[ReceiveLength] = '\0';
         sRecvBuffer += AnsiString(Buffer);
 
-        AnsiString sTrimmed = sRecvBuffer.Trim();
-        if(sTrimmed != "")
+        //AI(HT160S-Maintainer) 20260612 : align HT172 (GAP D) - only treat the
+        //reply as a complete 2D code once a line terminator (CR or LF) arrives,
+        //so a TCP-fragmented reply is not mistaken for a truncated code. Strip
+        //CR/LF like HT172 Barcode.cpp; keep any bytes after the terminator.
+        int iPos = sRecvBuffer.Pos("\n");
+        if(iPos == 0)
+            iPos = sRecvBuffer.Pos("\r");
+        if(iPos > 0)
         {
-            sColorCcd2D       = sTrimmed;
-            bColorCcdReadDone = true;
-            SaveColorCcd2DLog(sColorCcd2D);
+            AnsiString sLine = sRecvBuffer.SubString(1, iPos);
+            sLine = StringReplace(sLine, "\r", "", TReplaceFlags() << rfReplaceAll);
+            sLine = StringReplace(sLine, "\n", "", TReplaceFlags() << rfReplaceAll);
+            sLine = sLine.Trim();
+            sRecvBuffer = sRecvBuffer.SubString(iPos + 1, sRecvBuffer.Length());
+            if(sLine != "")
+            {
+                sColorCcd2D       = sLine;
+                bColorCcdReadDone = true;
+                SaveColorCcd2DLog(sColorCcd2D);
+            }
         }
-        sRecvBuffer = "";
         return;
     }
 
@@ -244,6 +263,18 @@ void __fastcall THT160ColorCcdSocket::ColorCcdPoll()
         PollConnecting();
     if(iState == COLORCCD_CONNECTED)
         PollReceive();
+
+    //AI(HT160S-Maintainer) 20260612 : align HT172 TimerCCDConnect (GAP E) - if a
+    //connection is desired but the link is down, re-attempt at most every 2 s.
+    if(bWantConnected && iState == COLORCCD_IDLE)
+    {
+        unsigned long Tick = GetTickCount();
+        if(Tick - iLastReconnectTick > 2000)
+        {
+            iLastReconnectTick = Tick;
+            ColorCcdConnect();
+        }
+    }
 }
 //---------------------------------------------------------------------------
 bool __fastcall THT160ColorCcdSocket::IsColorCcdConnected()
@@ -279,19 +310,36 @@ void __fastcall THT160ColorCcdSocket::SendColorCcdCmd(AnsiString sData)
     }
 }
 //---------------------------------------------------------------------------
+void __fastcall THT160ColorCcdSocket::DrainSocketInput()
+{
+    //AI(HT160S-Maintainer) 20260612 : align HT172 FSM_PhotoInit (GAP D) - discard
+    //any stale bytes left in the OS socket buffer before a new shot, so the next
+    //read cannot return a code from the previous scan.
+    if(sckColorCcd == INVALID_SOCKET)
+        return;
+    char Buffer[1025];
+    for(;;)
+    {
+        int ReceiveLength = recv(sckColorCcd, Buffer, 1024, 0);
+        if(ReceiveLength <= 0)
+            break;
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall THT160ColorCcdSocket::ColorCcdTriggerShot()
 {
     bColorCcdReadDone = false;
     sColorCcd2D       = "";
     sRecvBuffer       = "";
-    SendColorCcdCmd("LON");
+    DrainSocketInput();
+    SendColorCcdCmd("LON\r\n");   //AI(HT160S-Maintainer) 20260612 : align HT172 - CRLF terminator (GAP B)
 }
 //---------------------------------------------------------------------------
 void __fastcall THT160ColorCcdSocket::ColorCcdEndShot()
 {
     // End the current shot (lamp off / stop imaging). Safe to call even if the
     // reply already arrived; the read flag/result are left intact for the caller.
-    SendColorCcdCmd("LOFF");
+    SendColorCcdCmd("LOFF\r\n");   //AI(HT160S-Maintainer) 20260612 : align HT172 - CRLF terminator (GAP B)
 }
 //---------------------------------------------------------------------------
 bool __fastcall THT160ColorCcdSocket::ColorCcdGetResult(AnsiString &sCode)

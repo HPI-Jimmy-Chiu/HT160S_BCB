@@ -131,6 +131,14 @@ typedef struct
 	bool bUseBinAreaMap;
 	// Use the 2D-code -> Bin lookup map (THT160Bin2DMap) at Top CCD stage.
 	bool bUse2DBinMap;
+	// Color-station 2D reader enable (mirrors bUse2DBinMap for the Top CCD).
+	// Loaded from system\General.ini [ColorCCD] Enable; gates the Color CCD
+	// connect/shot trigger in aColor and is toggled by the maintenance page.
+	bool bUseColorCcd;
+	// Which customer bin field drives sorting when the lot table comes from the
+	// customer 2DIDHistory format : 0=SBin (default), 1=HBin. HBin/SBin both
+	// stored as backup regardless. See HT160_SORT_BIN_SOURCE_*.
+	int iSortBinSource;
 	// Paid customer-bound feature : SECS/GEM factory communication. Gates both
 	// the engine boot (GemInitial) and the main-form SECS status badge/log view.
 	bool bUseSecsGem;
@@ -176,6 +184,8 @@ public:
 #define HT160_MAX_LOT 64                 // max Lots coexisting on the machine
 #define HT160_LOT_SOURCE_OFFLINE 0       // operator built the lot data by hand
 #define HT160_LOT_SOURCE_SECS    1       // remote host (SECS) pushed the lot data
+#define HT160_SORT_BIN_SOURCE_SBIN 0     // route by customer SBin field (default)
+#define HT160_SORT_BIN_SOURCE_HBIN 1     // route by customer HBin field
 //---------------------------------------------------------------------------
 // Layer 1 : one production Lot instance currently held on the machine.
 typedef struct
@@ -191,8 +201,28 @@ typedef struct
 	TDateTime  dtLastSeen;         // last IC of this Lot scanned
 	bool       bActive;            // still being sorted on the machine
 
+	// Backup meta from the customer 2DIDHistory format (not used for routing,
+	// kept for traceability / UI / SECS report). Cleared by Clear().
+	AnsiString sSubstage;          // 2DIDHistory[].Substage
+	AnsiString sProductCode;       // 2DIDHistory[].ProductCode
+
 	void Clear();
 } TLotRunInfo;
+//---------------------------------------------------------------------------
+// Per-IC backup record (customer 2DIDHistory ICIInfo[] item). The hot sorting
+// path only needs (LotIndex, Bin) packed in the reverse index; this struct
+// stores ALL extra customer fields for traceability / UI / SECS, keyed by the
+// IC's unique 2D code. Allocated on the heap and freed wholesale on Clear().
+typedef struct
+{
+	AnsiString sCode2D;       // QRCodeID (unique key)
+	AnsiString sLotID;        // owning Lot
+	int        iBin;          // routing bin actually used (per iSortBinSource)
+	int        iHBin;         // customer HBin (backup)
+	int        iSBin;         // customer SBin (backup)
+	AnsiString sRetestCode;   // customer RetestCode (backup)
+	AnsiString sDiePass;      // customer DiePass (backup)
+} TLotIcInfo;
 //---------------------------------------------------------------------------
 // Layer 2 : the Lot registry + the global 2D-code reverse index.
 // Reverse index key = Code2D alone (unique); value packs (LotIndex, Bin).
@@ -202,10 +232,12 @@ private:
 	TLotRunInfo  m_Lots[HT160_MAX_LOT];
 	int          m_LotCount;
 	TStringList *m_Code2DIndex;    // Sorted; name=Code2D; Objects=(LotIndex*1000000+Bin)
+	TStringList *m_Code2DInfo;     // Sorted; name=Code2D; Objects=TLotIcInfo* (backup)
 	AnsiString   m_LastDupCode;    // last duplicate 2D code seen on load
 
 	int  PackRef(int LotIndex, int Bin);
 	void UnpackRef(int Packed, int &LotIndex, int &Bin);
+	void FreeAllIcInfo();          // delete every heap TLotIcInfo + clear list
 
 public:
 	__fastcall THT160LotRegistry();
@@ -213,6 +245,7 @@ public:
 
 	void Clear();
 	int  GetLotCount();
+	int  GetLotSlotCount();                 // raw slot span (incl. freed gaps)
 	int  GetItemCount();
 	AnsiString GetLastDuplicateCode();
 
@@ -233,6 +266,22 @@ public:
 	// (duplicate); DupExistingLot is set to the Lot that already owns the code.
 	bool AddItem(AnsiString LotID, AnsiString Code2D, int Bin, AnsiString &DupExistingLot);
 
+	// Extended add : same as AddItem but also stores the customer backup fields
+	// (HBin/SBin/RetestCode/DiePass). Bin is the routing bin actually used.
+	bool AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
+		int HBin, int SBin, AnsiString RetestCode, AnsiString DiePass,
+		AnsiString &DupExistingLot);
+
+	// Backup lookup : fetch the full per-IC record by 2D code. Returns false if
+	// the code is unknown. Not on the hot sorting path.
+	bool FindIcInfo(AnsiString Code2D, TLotIcInfo &Info);
+
+	//AI(ht160s-lot-webapi) 20260612 : UI / traceability : enumerate every 2D IC
+	// record that belongs to one Lot. Out is filled with one tab-separated line
+	// per IC : Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass.
+	// Returns the record count (0 = this Lot has no 2D data loaded yet).
+	int  GetLotIcList(AnsiString LotID, TStrings *Out);
+
 	// The heart of HT160 sorting : reverse lookup by the IC's unique 2D code.
 	bool FindByCode2D(AnsiString Code2D, AnsiString &LotID, int &Bin, int &LotIndex);
 
@@ -241,7 +290,59 @@ public:
 
 	// Bulk load (remote/file).  bHasDuplicate / FirstDupCode report 2D collisions.
 	bool LoadFromJsonFile(AnsiString FileName, bool &bHasDuplicate, AnsiString &FirstDupCode);
+	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : load directly from a JSON string
+	// (e.g. a WebAPI HTTP response body), not a file.  LoadFromJsonFile delegates here.
+	bool LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode);
 	bool LoadLatest(bool &bHasDuplicate, AnsiString &FirstDupCode);
+};
+//---------------------------------------------------------------------------
+// Dynamic (Lot,Bin) -> Auto binding table for the "By Lot+Bin" sort mode
+// (customer special request). In this mode the Auto<->Bin mapping is NOT a
+// static recipe table (THT160BinAreaMap); instead each distinct (LotID,Bin)
+// pair is bound to an Auto on a first-come-first-served basis as ICs are
+// scanned at the Top CCD. The first scanned (Lot,Bin) takes the first free
+// non-Error Auto, the next distinct pair takes the next, and so on. Once every
+// non-Error Auto is bound, any further distinct pair routes to the Error Auto.
+//
+// Persistence is keyed by LotID (stable across restart), not LotIndex, so a
+// mid-lot software restart can restore the table and keep each Auto tied to the
+// same (Lot,Bin) -> no cross-lot mixing in one Auto. Stored in
+//   <CurrentDir>\system\LotBinBinding.ini .
+// The Error Auto comes from BinAreaMap.GetErrorBinArea() (set on the Bin page,
+// only editable at Lot End), so the Error Auto is fixed during a lot.
+class THT160LotBinBinding
+{
+private:
+	TStringList *m_List;        // name = LotID \x01 Bin ; Objects[i] = (TObject*)(AutoIndex+1)
+
+	AnsiString MakeKey(AnsiString LotID, int Bin);
+	AnsiString GetIniFileName();
+	int  GetAutoStationCount();     // number of Auto stations (Auto1..Auto6)
+	int  GetErrorAutoIndex();       // 0-based Auto index of the Error Auto
+
+public:
+	__fastcall THT160LotBinBinding();
+	__fastcall ~THT160LotBinBinding();
+
+	void Clear();
+	// Read-only lookup of an already-bound pair. Returns 0-based Auto index, or
+	// -1 if (LotID,Bin) is not bound yet.
+	int  FindAutoByLotID(AnsiString LotID, int Bin);
+	int  FindAuto(int LotIndex, int Bin);   // resolve LotID via LotRegistry first
+	// Is this Auto already taken by some non-Error (Lot,Bin) binding?
+	bool IsAutoBound(int AutoIndex);
+	// First-come-first-served allocation. Binds (LotID,Bin) to the first free
+	// non-Error Auto (skips the Error Auto), persists, and returns its index.
+	// When every non-Error Auto is bound, binds to the Error Auto. Idempotent :
+	// an already-bound pair returns its existing Auto. LotIndex<0 (no lot) is
+	// not bound here; the caller routes such ICs straight to the Error Auto.
+	int  ResolveAuto(int LotIndex, int Bin);
+
+	int  GetBindingCount();
+	bool GetBindingByIndex(int Index, AnsiString &LotID, int &Bin, int &AutoIndex);
+
+	void SaveToIni();
+	void LoadFromIni();
 };
 //---------------------------------------------------------------------------
 extern HT160S_CUSTOMER_FUNCTION CosFunction;
@@ -249,6 +350,7 @@ extern THT160RecipeManager RecipeManager;
 extern THT160BinAreaMap BinAreaMap;
 extern THT160Bin2DMap Bin2DMap;
 extern THT160LotRegistry LotRegistry;
+extern THT160LotBinBinding LotBinBinding;
 extern THT160TrayForm TrayForm;
 extern void InitialCosFunction();
 //---------------------------------------------------------------------------

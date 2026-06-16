@@ -65,7 +65,7 @@ private:
 
 public:
     TTrayArmModule();
-    void InitialFlag();
+    void InitialFlag(bool bKeepMaterial=false);
     void DoTrayArm(int &Task);
     bool HasTray();
     int GetStatus();

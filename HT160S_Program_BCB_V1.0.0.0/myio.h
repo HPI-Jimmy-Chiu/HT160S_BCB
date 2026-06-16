@@ -52,4 +52,21 @@ protected:
     byte MN200BitMask(int Bit);
 };
 //---------------------------------------------------------------------------
+//AI(general) 20260613 : MN200 MotionNet card connection info (option A open-card).
+//Filled by OpenMN200Card() at boot. Lets the IO ring start so every mn_get/set
+//returns SUCCESS instead of <0 (root cause of "all MN200 points dead").
+#define MN200_MAX_RING 8
+struct TMN200Connection
+{
+    bool        bOpened;
+    int         iNumLine;
+    int         iNumDev[MN200_MAX_RING];
+    bool        bRingStarted[MN200_MAX_RING];
+    int         iRingError[MN200_MAX_RING];
+    int         iLastError;
+    AnsiString  sLastMessage;
+};
+TMN200Connection *GetMN200Connection();
+bool OpenMN200Card();
+//---------------------------------------------------------------------------
 #endif

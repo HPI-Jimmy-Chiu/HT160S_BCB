@@ -72,7 +72,7 @@ AnsiString TDeviceInfo::GetTitleLine()
     return "Start Time,Load_X,Load_Y,Load_Time,Tray_ID,"
            "Which Arm,Suck_X,Suck_Y,Which Auto,"
            "Bin,Output tray,Unload_X,Unload_Y,Unload_Time,Error log,"
-           "TraceCode,ErrorType";
+           "TraceCode,ErrorType,Lot,Code2D";
 }
 
 //---------------------------------------------------------------------------
@@ -151,6 +151,18 @@ void TDeviceInfo::AddInputInfo(int iNozzle, int iRow, int iCol,
     m_records[iNozzle].sField[eWhichArm]   = "1";
     m_records[iNozzle].sField[eSuckX]      = IntToStr(iNozzle);
     m_records[iNozzle].sField[eSuckY]      = "0";
+}
+
+//---------------------------------------------------------------------------
+void TDeviceInfo::AddIcIdentity(int iNozzle, const AnsiString& sLotID,
+                                const AnsiString& sCode2D)
+{
+    if (iNozzle < 0 || iNozzle >= 4)
+        return;
+    if (!m_records[iNozzle].bActive)
+        return;
+    m_records[iNozzle].sField[eLotID]  = sLotID;
+    m_records[iNozzle].sField[e2DCode] = sCode2D;
 }
 
 //---------------------------------------------------------------------------

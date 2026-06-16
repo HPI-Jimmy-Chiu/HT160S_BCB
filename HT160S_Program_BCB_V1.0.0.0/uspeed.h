@@ -45,6 +45,9 @@ public:
     void __fastcall edtMotorSpeedExit(TObject *Sender);
 };
 //---------------------------------------------------------------------------
+// AI : GroupSpeedAddSub(int flag) flag values: 0=sub, 1=add, 2=full. Note kept out
+// of the class body (a comment in a VCL form class makes the BCB6 designer raise
+// "Incorrect method declaration in class TfSpeed" when you click an event).
 class TfSpeed : public TForm
 {
 __published:    // DFM-wired controls and event handlers
@@ -66,7 +69,7 @@ private:
     std::vector<TMySpeedPanel *> MySpeedPanel;
 
     void BuildPanels();
-    void GroupSpeedAddSub(int flag);    // 0=sub, 1=add, 2=full
+    void GroupSpeedAddSub(int flag);
 public:
     __fastcall TfSpeed(TComponent* Owner);
     void RefreshAll();

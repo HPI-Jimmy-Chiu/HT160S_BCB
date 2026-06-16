@@ -18,17 +18,18 @@ OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uHome.obj
     uQwertyKey.obj language.obj setup.obj data.obj maintenance.obj uOffset.obj \
     uspeed.obj systools.obj mymessbox.obj note.obj cmydef.obj cprod.obj \
     CosFunction.obj Include\cJSON.obj GeneralSetting.obj Config.obj \
-    UserRoleManager.obj cEventLog.obj cSelfCheck.obj cStepTrace.obj \
-    cStateRecordHT160.obj database.obj aLoader.obj aEmpty.obj aAuto1To6.obj \
-    aTrayArm.obj aSortArm.obj aColor.obj csystem.obj uruncontrol.obj \
-    HTimer.obj myio.obj myio_MN200.obj mysensor.obj myswitch.obj mycylin.obj \
-    MyKitSuck.obj deviceinfo.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj \
-    MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj \
-    MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj \
-    AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj ComPort.obj \
-    MCUDisplayProtocol.obj MCUDisplay.obj uPadInterface.obj \
-    SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj \
-    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj
+    UserRoleManager.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj \
+    cSelfCheck.obj cStepTrace.obj cStateRecordHT160.obj database.obj \
+    aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj aSortArm.obj aColor.obj \
+    csystem.obj uruncontrol.obj HTimer.obj myio.obj myio_MN200.obj \
+    mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj deviceinfo.obj \
+    MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj \
+    MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj \
+    MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj \
+    ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj MyBinDisp.obj \
+    uPadInterface.obj SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj \
+    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj \
+    SecsGem\uAgvStation.obj
 RESFILES = ht160s.res
 MAINSOURCE = ht160s.cpp
 RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm \

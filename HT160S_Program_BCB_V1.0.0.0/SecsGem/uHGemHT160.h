@@ -74,6 +74,7 @@ public:
 
     virtual void RefreshSVData();
     virtual void RefreshSecsBadge();   //AI(ht160s-secsgem) 20260612 : 1s tick -> sync main-screen SECS badge to HSMS state
+    virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();

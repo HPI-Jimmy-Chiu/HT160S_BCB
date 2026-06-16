@@ -170,6 +170,7 @@ public:
     AnsiString __fastcall GetSetUpFileName();
     void __fastcall OpenWorkFile();
     void __fastcall SaveWorkFile(AnsiString S);
+    void __fastcall UpdateRunStateLock();
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfSetup *fSetup;

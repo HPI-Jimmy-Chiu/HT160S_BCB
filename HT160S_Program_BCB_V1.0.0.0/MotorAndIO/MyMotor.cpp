@@ -47,6 +47,8 @@ void TMyTray::Clear()
         {
             Data[x][y]=0;
             iBin[x][y]=0;   //AI(HT160S-Maintainer) 20260601 : 0 = bin not assigned yet
+            iLot[x][y]=-1;  //AI(ht160s-lotbin) 20260615 : -1 = no owning lot yet
+            sCode2D[x][y]="";
         }
     TrayID="";
     Kind=eTrayKindNormal;   //AI(HT160S-Maintainer) 20260604 : default role = normal work tray
@@ -130,6 +132,45 @@ int TMyTray::GetBin(int x, int y)
     if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
         return 0;
     return iBin[x][y];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotbin) 20260615 : LotIndex + 2D-code grid helpers (mirror iBin helpers)
+void TMyTray::ClearLotCode()
+{
+    for(int y=0; y<MAX_TRAY_Y; y++)
+        for(int x=0; x<MAX_TRAY_X; x++)
+        {
+            iLot[x][y]=-1;
+            sCode2D[x][y]="";
+        }
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetLot(int x, int y, int lot)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    iLot[x][y]=lot;
+}
+//---------------------------------------------------------------------------
+int TMyTray::GetLot(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return -1;
+    return iLot[x][y];
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetCode2D(int x, int y, AnsiString code)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    sCode2D[x][y]=code;
+}
+//---------------------------------------------------------------------------
+AnsiString TMyTray::GetCode2D(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return "";
+    return sCode2D[x][y];
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
@@ -564,7 +605,17 @@ void TMyMotor::MotOutputOn(int iOutPort) { Motor->MotOutputOn(iOutPort); }
 void TMyMotor::MotOutputOff(int iOutPort) { Motor->MotOutputOff(iOutPort); }
 void TMyMotor::MotInputStatus(bool *bInputPort) { Motor->MotInputStatus(bInputPort); }
 void TMyMotor::SetEncoderType(int a) { Motor->EncoderType=a; }
-void TMyMotor::InitHomeTask_forSingleAxis() { InitHomeTask(); }
+void TMyMotor::InitHomeTask_forSingleAxis()
+{
+    // Single-axis (Teach / MotorTest) re-arm. Beyond clearing the wrapper home
+    // flags, reset the inner motion-card home state machine (iHomeObjectTask)
+    // back to step 1. Without this, a previously interrupted home (e.g. STOP
+    // pressed mid-sequence) leaves the inner Task stuck at a polling step, so the
+    // next HOME press issues no new home command and the axis appears dead.
+    InitHomeTask();
+    if(Motor!=NULL)
+        Motor->HomeReset();
+}
 void TMyMotor::ServoOnOff(bool IsOn) { Motor->SetServoOn(IsOn); }
 void TMyMotor::ServoOnResetPos() { ResetPos(Position); }
 void TMyMotor::ClearPosition(int cmd) { ResetPos(cmd); }
@@ -791,10 +842,32 @@ int TTrayMotor::GetTrayBin(int x, int y)
     return Tray.GetBin(x, y);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-lotbin) 20260615 : LotIndex + 2D-code cell accessors (By Lot+Bin mode)
+void TTrayMotor::SetTrayLot(int x, int y, int lot)
+{
+    Tray.SetLot(x, y, lot);
+}
+//---------------------------------------------------------------------------
+int TTrayMotor::GetTrayLot(int x, int y)
+{
+    return Tray.GetLot(x, y);
+}
+//---------------------------------------------------------------------------
+void TTrayMotor::SetTrayCode2D(int x, int y, AnsiString code)
+{
+    Tray.SetCode2D(x, y, code);
+}
+//---------------------------------------------------------------------------
+AnsiString TTrayMotor::GetTrayCode2D(int x, int y)
+{
+    return Tray.GetCode2D(x, y);
+}
+//---------------------------------------------------------------------------
 void TTrayMotor::InitNewTray(int data)
 {
     Tray.SetAll(data);
     Tray.ClearBin();   //AI(HT160S-Maintainer) 20260601 : new tray starts with no bin assignment
+    Tray.ClearLotCode();   //AI(ht160s-lotbin) 20260615 : new tray starts with no lot/2D
     fHasTray=true;
     Refresh();
 }

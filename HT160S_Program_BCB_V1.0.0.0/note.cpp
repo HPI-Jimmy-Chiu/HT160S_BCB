@@ -2,6 +2,7 @@
 #include "IncludeAllHeader.h"
 #pragma hdrstop
 #include "database.h"
+#include "cEventLog.h"
 #include "cmydef.h"
 #include "csystem.h"
 #include "main.h"
@@ -27,39 +28,11 @@ static void EnsureNote()
         fNote=new TfNote(Application);
 }
 //---------------------------------------------------------------------------
-static AnsiString GetNoteLogFileName()
-{
-    AnsiString RootPath=HSys.LogRootDir;
-
-    if(RootPath=="")
-        RootPath=HSys.LogRootDir;
-
-    return RootPath+AnsiString("\\note\\process_")+FormatDateTime("yyyymmdd", Now())+AnsiString(".log");
-}
-//---------------------------------------------------------------------------
-static void AppendNoteLog(AnsiString S)
-{
-    TStringList *List;
-    AnsiString FileName;
-    AnsiString Line;
-
-    FileName=GetNoteLogFileName();
-    ForceDirectories(ExtractFilePath(FileName));
-    Line=FormatDateTime("yyyy/mm/dd hh:nn:ss", Now())+AnsiString(" ")+S;
-
-    List=new TStringList;
-    try
-    {
-        if(FileExists(FileName))
-            List->LoadFromFile(FileName);
-        List->Add(Line);
-        List->SaveToFile(FileName);
-    }
-    __finally
-    {
-        delete List;
-    }
-}
+//AI(HT160S-Maintainer) 20260615 : the legacy note process_*.log writer
+//(GetNoteLogFileName + AppendNoteLog, full-file rewrite, no lock) is removed.
+//Alarm / process / pass-time records now go through g_EventLog (cEventLog),
+//matching the HT172 RecordAlarmMessage -> EventLog CSV path. See note callers
+//ProcessErrMessage / RecordProcess / RecordAlarmMessagePassTime below.
 //---------------------------------------------------------------------------
 static void SetCommandButtonColor(TPanel *Panel, bool Selected)
 {
@@ -483,7 +456,8 @@ void __fastcall TfNote::ProcessErrMessage(AnsiString EC, AnsiString Str, int Typ
     if(EC=="" && Str=="")
         return;
     RecordHappenTime=GetTickCount();
-    AppendNoteLog(AnsiString("ALARM,")+EC+AnsiString(",")+Str+AnsiString(",TYPE=")+IntToStr(Type));
+    // EventLog columns: AlarmCode=EC, Message=Str, ErrorPart="TYPE=n".
+    g_EventLog.Log(EC, Str, AnsiString("TYPE=")+IntToStr(Type));
 }
 //---------------------------------------------------------------------------
 void TfNote::GetFlushPanel(TWinControl *PCtrl, AnsiString PanelName)
@@ -722,7 +696,8 @@ void RecordProcess(AnsiString S)
         return;
 
     LastRecord=S;
-    AppendNoteLog(AnsiString("PROCESS,")+S);
+    // Operator / process action: AlarmCode="PROCESS", Message=S.
+    g_EventLog.Log("PROCESS", S, "");
     if(fNote!=NULL && fNote->Memo1!=NULL)
         fNote->Memo1->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+S);
 }
@@ -738,7 +713,8 @@ void SearchMessage(AnsiString Code)
 //---------------------------------------------------------------------------
 void RecordAlarmMessagePassTime(AnsiString AlarmCode, DWORD StartTime, AnsiString HappenTime, int Type)
 {
-    AppendNoteLog(AnsiString("PASS,")+AlarmCode+AnsiString(",")+HappenTime+AnsiString(",TYPE=")+IntToStr(Type));
+    // Alarm pass / elapsed-time record routed to EventLog.
+    g_EventLog.Log(AlarmCode, AnsiString("PASS ")+HappenTime, AnsiString("TYPE=")+IntToStr(Type));
 }
 //---------------------------------------------------------------------------
 bool CheckAlarmIsShow()

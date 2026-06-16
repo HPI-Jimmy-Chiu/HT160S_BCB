@@ -17,18 +17,15 @@
 TfTeach *fTeach;
 TEACH Teach;
 //---------------------------------------------------------------------------
-static const TColor TEACH_COLOR_BG=(TColor)12761254;
-static const TColor TEACH_COLOR_TITLE=(TColor)10263630;
-static const TColor TEACH_COLOR_DARK=(TColor)8421440;
-static const TColor TEACH_COLOR_GRID=(TColor)14670284;
+// Static layout/colors/captions for the Teach form now live in uteach.dfm. Only
+// the runtime LED color convention stays here (UpdateStatusLed switches between
+// these per motor state).
 static const TColor TEACH_COLOR_LED_OFF=(TColor)12632256;
 static const TColor TEACH_COLOR_LED_ON=(TColor)65280;
-static const TColor TEACH_COLOR_LED_ALARM=(TColor)255;
-
-static const char *TEACH_LED_NAME[iMotLedTotalCnt]={
-    "CW", "HOME", "CCW", "EMG", "ALARM", "Soft CW", "Soft CCW",
-    "Servo Alarm", "In Pos", "Z Phase", "Servo On"
-};
+// AI(general) 20260616 : LED color convention (per RD): a signal that is in use
+// shows green when triggered and gray when idle; red is reserved for "not in
+// use" (the active motor is disabled). Applies to all status LEDs uniformly.
+static const TColor TEACH_COLOR_LED_DISABLED=(TColor)255;
 //---------------------------------------------------------------------------
 __fastcall TfTeach::TfTeach(TComponent* Owner)
     : TForm(Owner)
@@ -42,52 +39,9 @@ __fastcall TfTeach::TfTeach(TComponent* Owner)
     SelectedTeachIndex=-1;
     TECH_MAX_ITEM=0;
 
-    palClient=NULL;
-    palTitle=NULL;
-    palFunction=NULL;
-    palMotorControl=NULL;
-    palMotorName=NULL;
-    PageTeach=NULL;
-    tsEmptyTray=NULL;
-    tsLoaderSort=NULL;
-    tsAuto=NULL;
-    tsSortZ=NULL;
-    tsOthers=NULL;
-    grdEmptyTray=NULL;
-    grdLoaderSort=NULL;
-    grdAuto=NULL;
-    grdSortZ=NULL;
-    grdOthers=NULL;
-    lblActiveMot=NULL;
-    lblSpeed=NULL;
-    lblStep=NULL;
-    lblTarget=NULL;
-    lblNowPos=NULL;
-    lblEncoder=NULL;
-    lblMotorList=NULL;
-    lblMessage=NULL;
-    edSpeed=NULL;
-    edStep=NULL;
-    edTarget=NULL;
-    edNowPos=NULL;
-    edEncoder=NULL;
-    lstMotors=NULL;
-    btnSetTeach=NULL;
-    btnGoTeach=NULL;
-    btnSave=NULL;
-    btnReload=NULL;
-    btnIOForm=NULL;
-    btnClose=NULL;
-    btnJogP=NULL;
-    btnJogN=NULL;
-    btnStepP=NULL;
-    btnStepN=NULL;
-    btnMove=NULL;
-    btnHome=NULL;
-    btnStop=NULL;
-    btnRefresh=NULL;
-    tmrUpdate=NULL;
-
+    // UI is fully defined in uteach.dfm; VCL auto-binds the __published members on
+    // form streaming. Only the lblStatus[]/ledStatus[] arrays are non-published and
+    // are mapped from the named DFM LEDs in BindDfmComponents (TfMotorTest pattern).
     for(int i=0; i<iMotLedTotalCnt; i++)
     {
         lblStatus[i]=NULL;
@@ -133,332 +87,53 @@ void TfTeach::BuildUI()
     if(bUIBuilt)
         return;
 
+    // All controls live in uteach.dfm (auto-bound). Only map the named status LEDs
+    // into the arrays and apply the runtime grid setup (headers/widths cannot be
+    // stored in the DFM for a TStringGrid).
     BindDfmComponents();
 
-    Width=1200;
-    Height=880;
-    Caption="Teach";
-    Color=TEACH_COLOR_BG;
-    Position=poDefault;
-    BorderStyle=bsSingle;
-    BorderIcons=TBorderIcons();
-    Font->Name="MS Sans Serif";
-    Font->Height=-11;
-
-    BuildMotorPanel();
-    BuildClientPanel();
-
-    if(tmrUpdate==NULL)
-        tmrUpdate=new TTimer(this);
-    tmrUpdate->Enabled=false;
-    tmrUpdate->Interval=200;
-    tmrUpdate->OnTimer=tmrUpdateTimer;
+    ConfigureTeachGrid(grdEmptyTray);
+    ConfigureTeachGrid(grdLoaderSort);
+    ConfigureTeachGrid(grdAuto);
+    ConfigureTeachGrid(grdSortZ);
+    ConfigureTeachGrid(grdOthers);
 
     bUIBuilt=true;
 }
 //---------------------------------------------------------------------------
 void TfTeach::BindDfmComponents()
 {
-    int i;
-    AnsiString Name;
+    lblStatus[0]=lblStatus0;
+    lblStatus[1]=lblStatus1;
+    lblStatus[2]=lblStatus2;
+    lblStatus[3]=lblStatus3;
+    lblStatus[4]=lblStatus4;
+    lblStatus[5]=lblStatus5;
+    lblStatus[6]=lblStatus6;
+    lblStatus[7]=lblStatus7;
+    lblStatus[8]=lblStatus8;
+    lblStatus[9]=lblStatus9;
+    lblStatus[10]=lblStatus10;
 
-    palClient=dynamic_cast<TPanel *>(FindComponent("palClient"));
-    palTitle=dynamic_cast<TPanel *>(FindComponent("palTitle"));
-    palFunction=dynamic_cast<TPanel *>(FindComponent("palFunction"));
-    palMotorControl=dynamic_cast<TPanel *>(FindComponent("palMotorControl"));
-    palMotorName=dynamic_cast<TPanel *>(FindComponent("palMotorName"));
-    PageTeach=dynamic_cast<TPageControl *>(FindComponent("PageTeach"));
-    tsEmptyTray=dynamic_cast<TTabSheet *>(FindComponent("tsEmptyTray"));
-    tsLoaderSort=dynamic_cast<TTabSheet *>(FindComponent("tsLoaderSort"));
-    tsAuto=dynamic_cast<TTabSheet *>(FindComponent("tsAuto"));
-    tsSortZ=dynamic_cast<TTabSheet *>(FindComponent("tsSortZ"));
-    tsOthers=dynamic_cast<TTabSheet *>(FindComponent("tsOthers"));
-    grdEmptyTray=dynamic_cast<TStringGrid *>(FindComponent("grdEmptyTray"));
-    grdLoaderSort=dynamic_cast<TStringGrid *>(FindComponent("grdLoaderSort"));
-    grdAuto=dynamic_cast<TStringGrid *>(FindComponent("grdAuto"));
-    grdSortZ=dynamic_cast<TStringGrid *>(FindComponent("grdSortZ"));
-    grdOthers=dynamic_cast<TStringGrid *>(FindComponent("grdOthers"));
-    lblActiveMot=dynamic_cast<TLabel *>(FindComponent("lblActiveMot"));
-    lblSpeed=dynamic_cast<TLabel *>(FindComponent("lblSpeed"));
-    lblStep=dynamic_cast<TLabel *>(FindComponent("lblStep"));
-    lblTarget=dynamic_cast<TLabel *>(FindComponent("lblTarget"));
-    lblNowPos=dynamic_cast<TLabel *>(FindComponent("lblNowPos"));
-    lblEncoder=dynamic_cast<TLabel *>(FindComponent("lblEncoder"));
-    lblMotorList=dynamic_cast<TLabel *>(FindComponent("lblMotorList"));
-    lblMessage=dynamic_cast<TLabel *>(FindComponent("lblMessage"));
-    edSpeed=dynamic_cast<TEdit *>(FindComponent("edSpeed"));
-    edStep=dynamic_cast<TEdit *>(FindComponent("edStep"));
-    edTarget=dynamic_cast<TEdit *>(FindComponent("edTarget"));
-    edNowPos=dynamic_cast<TEdit *>(FindComponent("edNowPos"));
-    edEncoder=dynamic_cast<TEdit *>(FindComponent("edEncoder"));
-    lstMotors=dynamic_cast<TListBox *>(FindComponent("lstMotors"));
-    btnSetTeach=dynamic_cast<TButton *>(FindComponent("btnSetTeach"));
-    btnGoTeach=dynamic_cast<TButton *>(FindComponent("btnGoTeach"));
-    btnSave=dynamic_cast<TButton *>(FindComponent("btnSave"));
-    btnReload=dynamic_cast<TButton *>(FindComponent("btnReload"));
-    btnIOForm=dynamic_cast<TButton *>(FindComponent("btnIOForm"));
-    btnClose=dynamic_cast<TButton *>(FindComponent("btnClose"));
-    btnJogP=dynamic_cast<TButton *>(FindComponent("btnJogP"));
-    btnJogN=dynamic_cast<TButton *>(FindComponent("btnJogN"));
-    btnStepP=dynamic_cast<TButton *>(FindComponent("btnStepP"));
-    btnStepN=dynamic_cast<TButton *>(FindComponent("btnStepN"));
-    btnMove=dynamic_cast<TButton *>(FindComponent("btnMove"));
-    btnHome=dynamic_cast<TButton *>(FindComponent("btnHome"));
-    btnStop=dynamic_cast<TButton *>(FindComponent("btnStop"));
-    btnRefresh=dynamic_cast<TButton *>(FindComponent("btnRefresh"));
-    tmrUpdate=dynamic_cast<TTimer *>(FindComponent("tmrUpdate"));
-
-    for(i=0; i<iMotLedTotalCnt; i++)
-    {
-        Name=AnsiString("lblStatus")+IntToStr(i);
-        lblStatus[i]=dynamic_cast<TLabel *>(FindComponent(Name));
-        Name=AnsiString("ledStatus")+IntToStr(i);
-        ledStatus[i]=dynamic_cast<TALed *>(FindComponent(Name));
-    }
-}
-//---------------------------------------------------------------------------
-void TfTeach::BuildClientPanel()
-{
-    if(palClient==NULL)
-        palClient=new TPanel(this);
-    palClient->Parent=this;
-    palClient->Align=alClient;
-    palClient->BevelOuter=bvNone;
-    palClient->Color=TEACH_COLOR_BG;
-
-    if(palTitle==NULL)
-        palTitle=new TPanel(this);
-    palTitle->Parent=palClient;
-    palTitle->Align=alTop;
-    palTitle->Height=58;
-    palTitle->Caption="Teach";
-    palTitle->Color=TEACH_COLOR_TITLE;
-    palTitle->Font->Color=clYellow;
-    palTitle->Font->Height=-32;
-    palTitle->Font->Style=TFontStyles() << fsBold;
-
-    if(palFunction==NULL)
-        palFunction=new TPanel(this);
-    palFunction->Parent=palClient;
-    palFunction->Align=alTop;
-    palFunction->Height=52;
-    palFunction->BevelOuter=bvLowered;
-    palFunction->Color=TEACH_COLOR_BG;
-
-    if(btnSetTeach==NULL)
-        btnSetTeach=CreateButton(palFunction, 10, 10, 96, 30, "SET NOW", btnSetTeachClick);
-    btnSetTeach->OnClick=btnSetTeachClick;
-    if(btnGoTeach==NULL)
-        btnGoTeach=CreateButton(palFunction, 114, 10, 86, 30, "GO", btnGoTeachClick);
-    btnGoTeach->OnClick=btnGoTeachClick;
-    if(btnSave==NULL)
-        btnSave=CreateButton(palFunction, 208, 10, 86, 30, "SAVE", btnSaveClick);
-    btnSave->OnClick=btnSaveClick;
-    if(btnReload==NULL)
-        btnReload=CreateButton(palFunction, 302, 10, 86, 30, "RELOAD", btnReloadClick);
-    btnReload->OnClick=btnReloadClick;
-    if(btnIOForm==NULL)
-        btnIOForm=CreateButton(palFunction, 396, 10, 86, 30, "IO TOOL", btnIOFormClick);
-    btnIOForm->OnClick=btnIOFormClick;
-    if(btnClose==NULL)
-        btnClose=CreateButton(palFunction, 490, 10, 86, 30, "EXIT", btnCloseClick);
-    btnClose->OnClick=btnCloseClick;
-    btnClose->Cancel=true;
-
-    if(lblMessage==NULL)
-        lblMessage=CreateLabel(palFunction, 592, 15, 220, 22, "");
-    lblMessage->Font->Color=clNavy;
-
-    if(PageTeach==NULL)
-        PageTeach=new TPageControl(this);
-    PageTeach->Parent=palClient;
-    PageTeach->Align=alClient;
-    PageTeach->Font->Height=-13;
-
-    if(tsEmptyTray==NULL)
-        tsEmptyTray=CreateTeachTab("Empty / Tray X");
-    if(grdEmptyTray==NULL)
-        grdEmptyTray=CreateTeachGrid(tsEmptyTray);
-    else
-        ConfigureTeachGrid(grdEmptyTray);
-    if(tsLoaderSort==NULL)
-        tsLoaderSort=CreateTeachTab("Loader / Sort X");
-    if(grdLoaderSort==NULL)
-        grdLoaderSort=CreateTeachGrid(tsLoaderSort);
-    else
-        ConfigureTeachGrid(grdLoaderSort);
-    if(tsAuto==NULL)
-        tsAuto=CreateTeachTab("Auto 1-6");
-    if(grdAuto==NULL)
-        grdAuto=CreateTeachGrid(tsAuto);
-    else
-        ConfigureTeachGrid(grdAuto);
-    if(tsSortZ==NULL)
-        tsSortZ=CreateTeachTab("Sort Z");
-    if(grdSortZ==NULL)
-        grdSortZ=CreateTeachGrid(tsSortZ);
-    else
-        ConfigureTeachGrid(grdSortZ);
-    if(tsOthers==NULL)
-        tsOthers=CreateTeachTab("Others");
-    if(grdOthers==NULL)
-        grdOthers=CreateTeachGrid(tsOthers);
-    else
-        ConfigureTeachGrid(grdOthers);
-}
-//---------------------------------------------------------------------------
-void TfTeach::BuildMotorPanel()
-{
-    int i;
-    int X;
-    int Y;
-    TButton *Button;
-
-    if(palMotorControl==NULL)
-        palMotorControl=new TPanel(this);
-    palMotorControl->Parent=this;
-    palMotorControl->Align=alRight;
-    palMotorControl->Width=361;
-    palMotorControl->BevelInner=bvLowered;
-    palMotorControl->Color=TEACH_COLOR_BG;
-
-    if(lblActiveMot==NULL)
-        lblActiveMot=CreateLabel(palMotorControl, 2, 2, 357, 34, "Activel Motor");
-    lblActiveMot->Alignment=taCenter;
-    lblActiveMot->Font->Color=clBlue;
-    lblActiveMot->Font->Height=-24;
-    lblActiveMot->Font->Style=TFontStyles() << fsBold;
-
-    if(palMotorName==NULL)
-        palMotorName=new TPanel(this);
-    palMotorName->Parent=palMotorControl;
-    palMotorName->SetBounds(12, 44, 337, 44);
-    palMotorName->BevelOuter=bvLowered;
-    palMotorName->Color=TEACH_COLOR_DARK;
-    palMotorName->Font->Color=clWhite;
-    palMotorName->Font->Height=-15;
-    palMotorName->Caption="";
-
-    if(lblNowPos==NULL)
-        lblNowPos=CreateLabel(palMotorControl, 12, 102, 96, 20, "Now Position");
-    if(lblEncoder==NULL)
-        lblEncoder=CreateLabel(palMotorControl, 12, 136, 96, 20, "Encoder");
-    if(lblSpeed==NULL)
-        lblSpeed=CreateLabel(palMotorControl, 12, 170, 96, 20, "Speed");
-    if(lblStep==NULL)
-        lblStep=CreateLabel(palMotorControl, 12, 204, 96, 20, "Step");
-    if(lblTarget==NULL)
-        lblTarget=CreateLabel(palMotorControl, 12, 238, 96, 20, "Move To");
-    lblNowPos->Font->Color=clNavy;
-    lblEncoder->Font->Color=clNavy;
-    lblSpeed->Font->Color=clNavy;
-    lblStep->Font->Color=clNavy;
-    lblTarget->Font->Color=clNavy;
-
-    if(edNowPos==NULL)
-        edNowPos=CreateEdit(palMotorControl, 116, 98, 126, 24, "", true);
-    edNowPos->ReadOnly=true;
-    if(edEncoder==NULL)
-        edEncoder=CreateEdit(palMotorControl, 116, 132, 126, 24, "", true);
-    edEncoder->ReadOnly=true;
-    if(edSpeed==NULL)
-        edSpeed=CreateEdit(palMotorControl, 116, 166, 126, 24, "10", false);
-    if(edStep==NULL)
-        edStep=CreateEdit(palMotorControl, 116, 200, 126, 24, "1.00", false);
-    if(edTarget==NULL)
-        edTarget=CreateEdit(palMotorControl, 116, 234, 126, 24, "0.00", false);
-
-    Button=dynamic_cast<TButton *>(FindComponent("btnMotorSet"));
-    if(Button==NULL)
-        Button=CreateButton(palMotorControl, 252, 98, 96, 28, "SET", btnSetTeachClick);
-    Button->OnClick=btnSetTeachClick;
-    if(btnMove==NULL)
-        btnMove=CreateButton(palMotorControl, 252, 232, 96, 30, "MOVE", btnMoveClick);
-    btnMove->OnClick=btnMoveClick;
-
-    if(btnJogP==NULL)
-        btnJogP=CreateButton(palMotorControl, 20, 282, 90, 34, "JOG +", NULL);
-    if(btnJogN==NULL)
-        btnJogN=CreateButton(palMotorControl, 126, 282, 90, 34, "JOG -", NULL);
-    if(btnStepP==NULL)
-        btnStepP=CreateButton(palMotorControl, 232, 282, 54, 34, "+", btnStepPClick);
-    btnStepP->OnClick=btnStepPClick;
-    if(btnStepN==NULL)
-        btnStepN=CreateButton(palMotorControl, 294, 282, 54, 34, "-", btnStepNClick);
-    btnStepN->OnClick=btnStepNClick;
-    btnJogP->OnMouseDown=btnJogPMouseDown;
-    btnJogP->OnMouseUp=btnJogMouseUp;
-    btnJogN->OnMouseDown=btnJogNMouseDown;
-    btnJogN->OnMouseUp=btnJogMouseUp;
-
-    if(btnHome==NULL)
-        btnHome=CreateButton(palMotorControl, 20, 326, 96, 36, "HOME", btnHomeClick);
-    btnHome->OnClick=btnHomeClick;
-    if(btnStop==NULL)
-        btnStop=CreateButton(palMotorControl, 132, 326, 96, 36, "STOP", btnStopClick);
-    btnStop->OnClick=btnStopClick;
-    if(btnRefresh==NULL)
-        btnRefresh=CreateButton(palMotorControl, 244, 326, 96, 36, "REFRESH", btnRefreshClick);
-    btnRefresh->OnClick=btnRefreshClick;
-
-    for(i=0; i<iMotLedTotalCnt; i++)
-    {
-        X=(i<6)?20:188;
-        Y=382+(i%6)*24;
-        if(lblStatus[i]==NULL)
-            lblStatus[i]=CreateLabel(palMotorControl, X, Y, 92, 18, TEACH_LED_NAME[i]);
-        lblStatus[i]->Color=TEACH_COLOR_DARK;
-        lblStatus[i]->Font->Color=clWhite;
-        if(ledStatus[i]==NULL)
-            ledStatus[i]=new TALed(this);
-        ledStatus[i]->Parent=palMotorControl;
-        ledStatus[i]->SetBounds(X+98, Y, 22, 22);
-        ledStatus[i]->LEDStyle=Aled::LEDSqLarge;
-        ledStatus[i]->FalseColor=TEACH_COLOR_LED_OFF;
-        if(i==iAlarmLed || i==iEmgLed || i==iServoalarmLed)
-            ledStatus[i]->TrueColor=TEACH_COLOR_LED_ALARM;
-        else
-            ledStatus[i]->TrueColor=TEACH_COLOR_LED_ON;
-        ledStatus[i]->Value=false;
-    }
-
-    if(lblMotorList==NULL)
-        lblMotorList=CreateLabel(palMotorControl, 20, 540, 110, 20, "Motor List");
-    lblMotorList->Font->Color=clNavy;
-    if(lstMotors==NULL)
-        lstMotors=new TListBox(this);
-    lstMotors->Parent=palMotorControl;
-    lstMotors->SetBounds(20, 562, 328, 260);
-    lstMotors->ItemHeight=13;
-    lstMotors->OnClick=lstMotorsClick;
-}
-//---------------------------------------------------------------------------
-TTabSheet *TfTeach::CreateTeachTab(AnsiString Caption)
-{
-    TTabSheet *Tab=new TTabSheet(this);
-    Tab->PageControl=PageTeach;
-    Tab->Caption=Caption;
-    return Tab;
-}
-//---------------------------------------------------------------------------
-TStringGrid *TfTeach::CreateTeachGrid(TWinControl *Parent)
-{
-    TStringGrid *Grid=new TStringGrid(this);
-    Grid->Parent=Parent;
-    ConfigureTeachGrid(Grid);
-    return Grid;
+    ledStatus[0]=ledStatus0;
+    ledStatus[1]=ledStatus1;
+    ledStatus[2]=ledStatus2;
+    ledStatus[3]=ledStatus3;
+    ledStatus[4]=ledStatus4;
+    ledStatus[5]=ledStatus5;
+    ledStatus[6]=ledStatus6;
+    ledStatus[7]=ledStatus7;
+    ledStatus[8]=ledStatus8;
+    ledStatus[9]=ledStatus9;
+    ledStatus[10]=ledStatus10;
 }
 //---------------------------------------------------------------------------
 void TfTeach::ConfigureTeachGrid(TStringGrid *Grid)
 {
     if(Grid==NULL)
         return;
-    Grid->Align=alClient;
-    Grid->ColCount=5;
-    Grid->RowCount=2;
-    Grid->FixedRows=1;
-    Grid->DefaultRowHeight=24;
-    Grid->Color=TEACH_COLOR_GRID;
+    // Layout/colors/events are set in the DFM; only the header row text and column
+    // widths must be applied in code (a TStringGrid does not stream cell content).
     Grid->Options=Grid->Options << goRowSelect << goColSizing;
     Grid->Cells[0][0]="Teach Position";
     Grid->Cells[1][0]="Motor";
@@ -470,44 +145,6 @@ void TfTeach::ConfigureTeachGrid(TStringGrid *Grid)
     Grid->ColWidths[2]=90;
     Grid->ColWidths[3]=90;
     Grid->ColWidths[4]=150;
-    Grid->OnSelectCell=grdTeachSelectCell;
-    Grid->OnDblClick=grdTeachDblClick;
-}
-//---------------------------------------------------------------------------
-TLabel *TfTeach::CreateLabel(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Caption)
-{
-    TLabel *Label=new TLabel(this);
-    Label->Parent=Parent;
-    Label->SetBounds(Left, Top, Width, Height);
-    Label->AutoSize=false;
-    Label->Caption=Caption;
-    Label->ParentColor=false;
-    Label->Color=TEACH_COLOR_BG;
-    Label->Font->Name="MS Sans Serif";
-    Label->Font->Height=-13;
-    return Label;
-}
-//---------------------------------------------------------------------------
-TEdit *TfTeach::CreateEdit(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Text, bool ReadOnly)
-{
-    TEdit *Edit=new TEdit(this);
-    Edit->Parent=Parent;
-    Edit->SetBounds(Left, Top, Width, Height);
-    Edit->Text=Text;
-    Edit->ReadOnly=ReadOnly;
-    return Edit;
-}
-//---------------------------------------------------------------------------
-TButton *TfTeach::CreateButton(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Caption, TNotifyEvent OnClick)
-{
-    TButton *Button=new TButton(this);
-    Button->Parent=Parent;
-    Button->SetBounds(Left, Top, Width, Height);
-    Button->Caption=Caption;
-    Button->Font->Height=-13;
-    if(OnClick!=NULL)
-        Button->OnClick=OnClick;
-    return Button;
 }
 //---------------------------------------------------------------------------
 void TfTeach::ResetTeachGrid(TStringGrid *Grid)
@@ -922,7 +559,70 @@ void TfTeach::SetActiveMotor(int Index)
     ActiveMotorIndex=Index;
     if(lstMotors!=NULL && Index>=0 && Index<lstMotors->Items->Count)
         lstMotors->ItemIndex=Index;
+    SetupSpeedControl();
     UpdateMotorMonitor();
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetupSpeedControl()
+{
+    TTrayMotor *Motor=GetActiveMotor();
+    int Low;
+    int High;
+    int Speed;
+
+    if(scbTeachSpeed==NULL || edSpeed==NULL || Motor==NULL)
+        return;
+    Low=Motor->GetJogLowSpeed();
+    High=Motor->GetJogHighSpeed();
+    if(Low<1)
+        Low=1;
+    if(High<Low)
+        High=Low;
+    scbTeachSpeed->Min=Low;
+    scbTeachSpeed->Max=High;
+    Speed=GetEditInt(edSpeed, Low);
+    if(Speed<Low)
+        Speed=Low;
+    if(Speed>High)
+        Speed=High;
+    // edSpeed->OnChange (edSpeedChange) keeps the bar in sync; just seed the text.
+    edSpeed->Text=IntToStr(Speed);
+    scbTeachSpeed->Position=Speed;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::scbTeachSpeedScroll(TObject *Sender, TScrollCode ScrollCode, int &ScrollPos)
+{
+    TTrayMotor *Motor=GetActiveMotor();
+    (void)Sender;
+    (void)ScrollCode;
+
+    // User dragged the bar: push value to the edit (which re-applies SetSpeed via
+    // edSpeedChange) and apply directly too so the speed tracks live.
+    if(edSpeed!=NULL)
+        edSpeed->Text=IntToStr(ScrollPos);
+    if(Motor!=NULL)
+        Motor->SetSpeed(ScrollPos);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::edSpeedChange(TObject *Sender)
+{
+    TTrayMotor *Motor=GetActiveMotor();
+    int Speed;
+    (void)Sender;
+
+    if(scbTeachSpeed==NULL || edSpeed==NULL)
+        return;
+    if(edSpeed->Text==AnsiString(""))
+        return;
+    Speed=atoi(edSpeed->Text.c_str());
+    if(Speed<scbTeachSpeed->Min)
+        Speed=scbTeachSpeed->Min;
+    if(Speed>scbTeachSpeed->Max)
+        Speed=scbTeachSpeed->Max;
+    // Position= fires OnChange (not OnScroll), so this does not re-enter here.
+    scbTeachSpeed->Position=Speed;
+    if(Motor!=NULL)
+        Motor->SetSpeed(Speed);
 }
 //---------------------------------------------------------------------------
 TTrayMotor *TfTeach::GetMotor(int Index)
@@ -964,6 +664,8 @@ void TfTeach::UpdateMotorMonitor()
     TTrayMotor *Motor=GetActiveMotor();
     int NowPos;
     int EncoderPos;
+    bool bSysEmg;
+    bool bEnabled;
 
     if(Motor==NULL)
     {
@@ -973,6 +675,9 @@ void TfTeach::UpdateMotorMonitor()
             edNowPos->Text="";
         if(edEncoder!=NULL)
             edEncoder->Text="";
+        // No active motor: reset all LEDs to idle gray (in-use, untriggered).
+        for(int i=0; i<iMotLedTotalCnt; i++)
+            UpdateStatusLed(i, true, false);
         return;
     }
 
@@ -986,18 +691,40 @@ void TfTeach::UpdateMotorMonitor()
     if(edSpeed->Text==AnsiString(""))
         edSpeed->Text=IntToStr(Motor->GetJogLowSpeed());
 
+    //AI(general) 20260616 : the per-axis EMG led bit (!(bMotorStatus & 0x02))
+    //never reacts on this machine because EMG is wired to a system DI read by
+    //IsEMGPressed(), not to each motor card's EMG input pin. Reflect the real
+    //system EMG on the panel led so it matches the move/lock behaviour.
+    bSysEmg=(IsEMGPressed()>0);
+    bEnabled=Motor->GetEnable();
     for(int i=0; i<iMotLedTotalCnt; i++)
-        UpdateStatusLed(i, Motor->Led[i]);
+    {
+        if(i==iEmgLed)
+            UpdateStatusLed(i, bEnabled, Motor->Led[i] || bSysEmg);
+        else
+            UpdateStatusLed(i, bEnabled, Motor->Led[i]);
+    }
 
     if(SelectedTeachIndex>=0)
         RefreshTeachRow(SelectedTeachIndex);
 }
 //---------------------------------------------------------------------------
-void TfTeach::UpdateStatusLed(int LedIndex, bool Value)
+void TfTeach::UpdateStatusLed(int LedIndex, bool Enabled, bool Value)
 {
     if(LedIndex<0 || LedIndex>=iMotLedTotalCnt || ledStatus[LedIndex]==NULL)
         return;
 
+    if(Enabled==false)
+    {
+        // Motor not in use -> solid red regardless of the scanned bit.
+        ledStatus[LedIndex]->TrueColor=TEACH_COLOR_LED_DISABLED;
+        ledStatus[LedIndex]->FalseColor=TEACH_COLOR_LED_DISABLED;
+        ledStatus[LedIndex]->Value=true;
+        return;
+    }
+    // In use -> green when triggered, gray when idle.
+    ledStatus[LedIndex]->TrueColor=TEACH_COLOR_LED_ON;
+    ledStatus[LedIndex]->FalseColor=TEACH_COLOR_LED_OFF;
     ledStatus[LedIndex]->Value=Value;
 }
 //---------------------------------------------------------------------------
@@ -1078,7 +805,10 @@ void TfTeach::StartJog(bool bPositive)
     int Speed;
     if(Motor==NULL)
         return;
-    if(CheckCanTeachMove(Motor, true, false, 0)==false)
+    // Jog is a manual move and must work BEFORE homing (e.g. to reach the home
+    // sensor), so it does NOT require bHomeFlag. Alarm/EMG/disable/soft-limit
+    // checks inside CheckCanTeachMove still apply. Move/Step keep bRequireHome=true.
+    if(CheckCanTeachMove(Motor, false, false, 0)==false)
         return;
     Speed=GetEditInt(edSpeed, Motor->GetJogLowSpeed());
     Motor->SetSpeed(Speed);
@@ -1176,7 +906,25 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
 {
     TTrayMotor *Motor;
     AnsiString Err;
+    static bool bEmgActive=false;
     (void)Sender;
+
+    //AI(general) 20260616 : EMG only blocked the START of a move before; a move,
+    //jog or home already in progress kept running. Poll EMG here and stop the
+    //active axis (StopActiveMotor also aborts the home task). bEmgActive latches
+    //so we stop once per press and do not advance home/jog while EMG is held.
+    if(IsEMGPressed()>0)
+    {
+        if(!bEmgActive)
+        {
+            bEmgActive=true;
+            StopActiveMotor();
+            SetMessage("Move abort: EMG");
+        }
+        UpdateMotorMonitor();
+        return;
+    }
+    bEmgActive=false;
 
     if(bHomeRunning && iHomeMotorIndex>=0 && iHomeMotorIndex<HSys.iTotalMotor)
     {
@@ -1261,12 +1009,6 @@ void __fastcall TfTeach::btnIOFormClick(TObject *Sender)
     fiosetview->BringToFront();
 }
 //---------------------------------------------------------------------------
-void __fastcall TfTeach::btnCloseClick(TObject *Sender)
-{
-    (void)Sender;
-    Close();
-}
-//---------------------------------------------------------------------------
 void __fastcall TfTeach::btnJogPMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y)
 {
     (void)Sender;
@@ -1323,7 +1065,7 @@ void __fastcall TfTeach::btnHomeClick(TObject *Sender)
         return;
     if(CheckCanTeachMove(Motor, false, false, 0)==false)
         return;
-    Motor->InitHomeTask();
+    Motor->InitHomeTask_forSingleAxis();
     bHomeRunning=true;
     iHomeMotorIndex=ActiveMotorIndex;
     SetMessage("Home start");

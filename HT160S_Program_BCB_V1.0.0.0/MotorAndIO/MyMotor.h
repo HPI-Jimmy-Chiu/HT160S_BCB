@@ -58,6 +58,11 @@ class TMyTray
 public:
     int Data[MAX_TRAY_X][MAX_TRAY_Y];   //AI(general) 20260601 : X-major Data[x][y], aligned to HT172
     int iBin[MAX_TRAY_X][MAX_TRAY_Y];
+    //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode carries the owning LotIndex and
+    //the IC 2D code per cell (mirror iBin), so the (Lot,Bin) routing key and the
+    //Production_Log Lot/2D columns survive the CCD->pick->place hand-off.
+    int iLot[MAX_TRAY_X][MAX_TRAY_Y];
+    AnsiString sCode2D[MAX_TRAY_X][MAX_TRAY_Y];
     AnsiString TrayID;
     eTrayKind Kind;   //AI(HT160S-Maintainer) 20260604 : tray role in stacking car
 
@@ -73,6 +78,12 @@ public:
     void SetAllBin(int bin);
     void SetBin(int x, int y, int bin);
     int GetBin(int x, int y);
+    //AI(ht160s-lotbin) 20260615 : LotIndex + 2D-code grid helpers (mirror iBin helpers)
+    void ClearLotCode();
+    void SetLot(int x, int y, int lot);
+    int  GetLot(int x, int y);
+    void SetCode2D(int x, int y, AnsiString code);
+    AnsiString GetCode2D(int x, int y);
     //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
     void SetKind(eTrayKind kind);
     eTrayKind GetKind();
@@ -86,7 +97,7 @@ public:
 //     Tray[2..] = normal work trays (eTrayKindNormal).
 //   Mainly used by Auto1~6; packed for AMR upload when AMR retrieves the car
 //   (upload payload not designed yet).
-#define MAX_TRAY_PER_CAR 30
+#define MAX_TRAY_PER_CAR 100
 //---------------------------------------------------------------------------
 class TMyCar
 {
@@ -276,6 +287,10 @@ public:
     void SetTraySingleData(int x, int y, int data);
     void SetTrayBin(int x, int y, int bin);   //AI(HT160S-Maintainer) 20260601 : write sorting bin for a cell
     int GetTrayBin(int x, int y);             //AI(HT160S-Maintainer) 20260601 : read sorting bin for a cell
+    void SetTrayLot(int x, int y, int lot);   //AI(ht160s-lotbin) 20260615 : write owning LotIndex for a cell
+    int  GetTrayLot(int x, int y);            //AI(ht160s-lotbin) 20260615 : read owning LotIndex for a cell
+    void SetTrayCode2D(int x, int y, AnsiString code);  //AI(ht160s-lotbin) 20260615 : write IC 2D code for a cell
+    AnsiString GetTrayCode2D(int x, int y);             //AI(ht160s-lotbin) 20260615 : read IC 2D code for a cell
     void Refresh();
     void InitNewTray(int data);
     void InitEmptyTray();

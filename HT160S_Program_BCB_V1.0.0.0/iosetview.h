@@ -25,12 +25,19 @@
 #include <jpeg.hpp>
 #include "ALed.hpp"
 //---------------------------------------------------------------------------
+// AI(general) 20260613 : The IO Table editor controls and their event handlers
+// were formerly created at runtime in EnsureIOTableEditor(); they now stream from
+// iosetview.dfm (inside pn_IODatabase) so they live in __published below (controls
+// + handlers must be __published for TReader::MethodAddress to resolve them).
+// bIOTableEditorReady (private) guards the one-time grid setup + initial load.
+// IMPORTANT: keep the __published section free of comments - the BCB6 form designer
+// parses this header on event clicks and raises "Incorrect method declaration in
+// class Tfiosetview" if it meets a comment among the members. Put notes out here.
 class Tfiosetview : public TForm
 {
 __published:
     TPanel *pn_IOSetViewMenu;
     TSpeedButton *sbIOExit;
-    TRadioButton *rbGeneralIO;
     TPageControl *PageIO;
     TTabSheet *ts_IOLoader;
     TGroupBox *GroupBox1;
@@ -39,8 +46,6 @@ __published:
     TEdit *ed_OutPort_1;
     TCheckBox *cbToolBit0;
     TComboBox *ComboBox1;
-    TDBNavigator *DBNavigator1;
-    TDBGrid *DBGrid1;
     TStringGrid *OutputInformationGrid;
     TMemo *MemoIOMap;
     TTable *ioTable;
@@ -59,6 +64,19 @@ __published:
     TTabSheet *tsMN200;
     TLabel *lblMN200Summary;
     TStringGrid *grdMN200;
+    TPanel *pnIOTableEditorToolbar;
+    TLabel *lblIOType;
+    TLabel *lblIOLane;
+    TLabel *lblIOSearch;
+    TComboBox *cbbType;
+    TComboBox *cbbLane;
+    TEdit *edtSearchIO;
+    TSpeedButton *btnAddIO;
+    TSpeedButton *btnDeleteIO;
+    TSpeedButton *btnModify;
+    TSpeedButton *sbUpdate;
+    TSpeedButton *sbIOEditorRefresh;
+    TStringGrid *strngrdIoTable;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall BtnPanelClick(TObject *Sender);
     void __fastcall ComboBox1Change(TObject *Sender);
@@ -78,25 +96,18 @@ __published:
     void __fastcall Timer1Timer(TObject *Sender);
     void __fastcall tmr_IonFanTimer(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
+    void __fastcall btnAddIOClick(TObject *Sender);
+    void __fastcall btnDeleteIOClick(TObject *Sender);
+    void __fastcall btnModifyClick(TObject *Sender);
+    void __fastcall sbUpdateClick(TObject *Sender);
+    void __fastcall cbbTypeChange(TObject *Sender);
+    void __fastcall edtSearchIOChange(TObject *Sender);
+    void __fastcall strngrdIoTableDblClick(TObject *Sender);
+    void __fastcall strngrdIoTableSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
 private:
-    // The members below are NOT present in iosetview.dfm; they belong to the
-    // IO Table editor controls created dynamically in EnsureIOTableEditor().
-    // They MUST stay out of __published, otherwise the BCB6 IDE Form Designer
-    // reports "Incorrect method declaration in class Tfiosetview" when it
-    // reconciles __published against the DFM (the bcc32 command-line build is
-    // unaffected either way). //AI(general) 20260603
-    TPanel *pnIOTableEditorToolbar;
-    TComboBox *cbbType;
-    TComboBox *cbbLane;
-    TEdit *edtSearchIO;
-    TSpeedButton *btnAddIO;
-    TSpeedButton *btnDeleteIO;
-    TSpeedButton *btnModify;
-    TSpeedButton *sbUpdate;
-    TStringGrid *strngrdIoTable;
     TStringList *IOTableDeletedTags;
     TStringList *ManualOutputLog;
-
+    bool bIOTableEditorReady;
 
     int iSelectRow;
     int iSelectCol;
@@ -108,7 +119,6 @@ private:
     void SetLegacyComponentHints();
     void SetLegacyComponentHints(TWinControl *PCtrl);
     void EnsureIOTableEditor();
-    void HideLegacyIOTableEditor();
     void SetupIOTableEditorGrid();
     void LoadIoTable(int iType, int iLane, int iIP);
     void SaveIoTableFromGrid();
@@ -160,14 +170,6 @@ private:
     void SetGridRowCount(TStringGrid *Grid, int RowCount);
     bool ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr);
     void SetRefreshTimerEnabled(bool Enabled);
-    void __fastcall btnAddIOClick(TObject *Sender);
-    void __fastcall btnDeleteIOClick(TObject *Sender);
-    void __fastcall btnModifyClick(TObject *Sender);
-    void __fastcall sbUpdateClick(TObject *Sender);
-    void __fastcall cbbTypeChange(TObject *Sender);
-    void __fastcall edtSearchIOChange(TObject *Sender);
-    void __fastcall strngrdIoTableDblClick(TObject *Sender);
-    void __fastcall strngrdIoTableSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
 public:
     __fastcall Tfiosetview(TComponent* Owner);
     __fastcall ~Tfiosetview();

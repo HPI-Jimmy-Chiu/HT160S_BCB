@@ -8,6 +8,7 @@
 #include "iosetview.h"
 #include "main.h"
 #include "maintenance.h"
+#include "setup.h"                       //AI(poka-yoke) 20260616 : fSetup->UpdateRunStateLock from UpdateRunControlFlag
 #include "uruncontrol.h"
 #include "aAuto1To6.h"
 #include "aLoader.h"
@@ -44,6 +45,14 @@ static void SetMainStatus(AnsiString StatusText, TColor Color)
 static void UpdateRunControlFlag()
 {
 	RunControlSystemStart=HSys.Sys.SystemStart;
+	//AI(poka-yoke) 20260616 : disable run-locked screens while the machine runs
+	//  so the operator cannot open them. No stop-the-machine popup is used; the
+	//  forms self-heal (re-enable) once the machine stops. Guarded by Visible so
+	//  we only touch a form that is actually on screen.
+	if(fMaintenance!=NULL && fMaintenance->Visible)
+		fMaintenance->UpdateRunStateLock();
+	if(fSetup!=NULL && fSetup->Visible)
+		fSetup->UpdateRunStateLock();
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260603 : central alarm consumer. Modules raise alarms via
@@ -83,6 +92,12 @@ void MainProc()
 
 	if(fMain!=NULL)
 		fMain->ShowMotorInfo();
+
+	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive any in-flight Lot WebAPI pull.
+	// MainProc runs on the VCL main thread (TRunControl::Synchronize), so this is a
+	// safe place to consume the async response and reproject the Lot list. No-op when idle.
+	if(fMain!=NULL)
+		fMain->PollLotDataWebApi();
 
 	if(fiosetview!=NULL && fiosetview->Visible)
 	{
@@ -275,7 +290,12 @@ void ScanAllMotorStatus()
 		if(HSys.MotPtr[i]==NULL)
 			continue;
 		HSys.MotPtr[i]->ScanMotorStatus();
-		if(HSys.MotPtr[i]->Led[iAlarmLed] && HSys.MotPtr[i]->GetEnable() &&
+		//AI(HT160S-Maintainer) 20260616 : during a HOME power-cycle recovery the
+		//servo is intentionally de-energized (reads alarm); do not force a
+		//re-home / SystemStart=false off that expected transient. The cycle
+		//clears the latched alarm and re-homes the axis itself.
+		if(bHomePowerCycling==false &&
+		   HSys.MotPtr[i]->Led[iAlarmLed] && HSys.MotPtr[i]->GetEnable() &&
 		   HSys.MotPtr[i]->ReadServoAlarmOn())
 		{
 			HSys.MotPtr[i]->bHomeFlag=false;
@@ -292,6 +312,11 @@ void CheckMotorPowerShutDown()
 	MotorPowerOnDelay=0;
 	return;
 #else
+	//AI(HT160S-Maintainer) 20260616 : a HOME power-cycle recovery owns the motor
+	//relay until it completes; do not let the power-button logic fight it.
+	if(bHomePowerCycling)
+		return;
+
 	bool bOn=false;
 	bool bOff=false;
 
@@ -529,10 +554,10 @@ void ProcessRunStatus(bool bProgramStart)
 	SetMainStatus(Status, Color);
 }
 //---------------------------------------------------------------------------
-void InitialAllTask()
+void InitialAllTask(bool bKeepMaterial)
 {
 	if(DataModule1!=NULL)
-		DataModule1->InitialAllTask();
+		DataModule1->InitialAllTask(bKeepMaterial);
 }
 //---------------------------------------------------------------------------
 void InitialAllModule()
@@ -641,7 +666,13 @@ void ProcessMotion()
 			ChangeRunMode(Run_Home);
         if(fHome->ProcessMotorHome())
         {
-            InitialAllTask();
+            //AI(HT160S-Maintainer) 20260612 : a full-machine home triggered mid-production
+            //(operator HOME or motor-anomaly recovery) must NOT forget the material the
+            //machine physically still holds. Pass bKeepMaterial=true so SortArm keeps its
+            //sucked IC (vacuum re-asserted), TrayArm keeps its gripped tray + delivery job,
+            //and Auto keeps its car/stack identity. Production then resumes (or pauses then
+            //resumes on next Start) without dropping or misrouting material.
+            InitialAllTask(true);
             fAllMotorHome=true;
             ChangeRunMode(Run_Normal);                                          //20120102 Daver add
             SetMotorSpeed(true);                                                //AI(HT160S-Maintainer) 20260602 : re-apply working speed after home (HT172 0420 csystem/uhome port)
@@ -679,8 +710,23 @@ void ProcessMotion()
 			tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
 			InitialAllTask();
 			HSys.Sys.bCleanOut=false;   //AI(HT160S-Maintainer) 20260605 : CleanOut fully done, drop nested latch
-			ChangeRunMode(Run_Normal);
-			SoftStop=true;
+			//AI(HT160S-Maintainer) 20260612 : pop a "CleanOut finish" note (ref HT172
+			//  ShowSystemError(SnFKCleanOut, K_SKIP|K_TRAY_FEED)). Operator picks SKIP
+			//  (end : back to Normal + stop) or TRAY_FEED (drain remaining trays).
+			//  NOTE: CheckAllTrayFeedFinish() is still a stub returning false, so the
+			//  TRAY_FEED branch will not auto-complete until that is wired : SKIP is
+			//  the only fully-working choice today.
+			int retCleanOut=ShowSystemError(HSys.Sen.SnFKCleanOut.Name, K_SKIP, 0);
+			// if(retCleanOut==K_TRAY_FEED)
+			// {
+			// 	CheckAllTrayFeedFinish(true);   // reset per-module TrayFeed finish flags
+			// 	ChangeRunMode(Run_TrayFeed);
+			// }
+			// else
+			{
+				ChangeRunMode(Run_Normal);
+				SoftStop=true;
+			}
 		}
 	}
 	else if(HSys.Sys.RunMode==Run_OneCycle)

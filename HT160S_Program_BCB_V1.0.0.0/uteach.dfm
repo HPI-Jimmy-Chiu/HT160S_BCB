@@ -13,7 +13,7 @@ object fTeach: TfTeach
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poDefault
+  Position = poScreenCenter
   OnClose = FormClose
   OnCreate = FormCreate
   OnShow = FormShow
@@ -355,6 +355,19 @@ object fTeach: TfTeach
       Height = 24
       TabOrder = 3
       Text = '10'
+      OnChange = edSpeedChange
+    end
+    object scbTeachSpeed: TScrollBar
+      Left = 252
+      Top = 168
+      Width = 96
+      Height = 20
+      Min = 1
+      Max = 100
+      PageSize = 0
+      Position = 1
+      TabOrder = 16
+      OnScroll = scbTeachSpeedScroll
     end
     object edStep: TEdit
       Left = 116
@@ -379,6 +392,7 @@ object fTeach: TfTeach
       Height = 28
       Caption = 'SET'
       TabOrder = 6
+      OnClick = btnSetTeachClick
     end
     object btnMove: TButton
       Left = 252
@@ -387,6 +401,7 @@ object fTeach: TfTeach
       Height = 30
       Caption = 'MOVE'
       TabOrder = 7
+      OnClick = btnMoveClick
     end
     object btnJogP: TButton
       Left = 20
@@ -395,6 +410,8 @@ object fTeach: TfTeach
       Height = 34
       Caption = 'JOG +'
       TabOrder = 8
+      OnMouseDown = btnJogPMouseDown
+      OnMouseUp = btnJogMouseUp
     end
     object btnJogN: TButton
       Left = 126
@@ -403,6 +420,8 @@ object fTeach: TfTeach
       Height = 34
       Caption = 'JOG -'
       TabOrder = 9
+      OnMouseDown = btnJogNMouseDown
+      OnMouseUp = btnJogMouseUp
     end
     object btnStepP: TButton
       Left = 232
@@ -411,6 +430,7 @@ object fTeach: TfTeach
       Height = 34
       Caption = '+'
       TabOrder = 10
+      OnClick = btnStepPClick
     end
     object btnStepN: TButton
       Left = 294
@@ -419,6 +439,7 @@ object fTeach: TfTeach
       Height = 34
       Caption = '-'
       TabOrder = 11
+      OnClick = btnStepNClick
     end
     object btnHome: TButton
       Left = 20
@@ -427,6 +448,7 @@ object fTeach: TfTeach
       Height = 36
       Caption = 'HOME'
       TabOrder = 12
+      OnClick = btnHomeClick
     end
     object btnStop: TButton
       Left = 132
@@ -435,6 +457,7 @@ object fTeach: TfTeach
       Height = 36
       Caption = 'STOP'
       TabOrder = 13
+      OnClick = btnStopClick
     end
     object btnRefresh: TButton
       Left = 244
@@ -443,12 +466,15 @@ object fTeach: TfTeach
       Height = 36
       Caption = 'REFRESH'
       TabOrder = 14
+      OnClick = btnRefreshClick
     end
     object ledStatus0: TALed
       Left = 118
       Top = 382
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus1: TALed
@@ -456,6 +482,8 @@ object fTeach: TfTeach
       Top = 406
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus2: TALed
@@ -463,6 +491,8 @@ object fTeach: TfTeach
       Top = 430
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus3: TALed
@@ -470,6 +500,8 @@ object fTeach: TfTeach
       Top = 454
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus4: TALed
@@ -477,6 +509,8 @@ object fTeach: TfTeach
       Top = 478
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus5: TALed
@@ -484,6 +518,8 @@ object fTeach: TfTeach
       Top = 502
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus6: TALed
@@ -491,6 +527,8 @@ object fTeach: TfTeach
       Top = 382
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus7: TALed
@@ -498,6 +536,8 @@ object fTeach: TfTeach
       Top = 406
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus8: TALed
@@ -505,6 +545,8 @@ object fTeach: TfTeach
       Top = 430
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus9: TALed
@@ -512,6 +554,8 @@ object fTeach: TfTeach
       Top = 454
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object ledStatus10: TALed
@@ -519,6 +563,8 @@ object fTeach: TfTeach
       Top = 478
       Width = 22
       Height = 22
+      FalseColor = 12632256
+      TrueColor = 65280
       LEDStyle = LEDSqLarge
     end
     object lstMotors: TListBox
@@ -528,6 +574,7 @@ object fTeach: TfTeach
       Height = 260
       ItemHeight = 13
       TabOrder = 15
+      OnClick = lstMotorsClick
     end
   end
   object palClient: TPanel
@@ -586,6 +633,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'SET NOW'
         TabOrder = 0
+        OnClick = btnSetTeachClick
       end
       object btnGoTeach: TButton
         Left = 114
@@ -594,6 +642,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'GO'
         TabOrder = 1
+        OnClick = btnGoTeachClick
       end
       object btnSave: TButton
         Left = 208
@@ -602,6 +651,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'SAVE'
         TabOrder = 2
+        OnClick = btnSaveClick
       end
       object btnReload: TButton
         Left = 302
@@ -610,6 +660,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'RELOAD'
         TabOrder = 3
+        OnClick = btnReloadClick
       end
       object btnIOForm: TButton
         Left = 396
@@ -618,16 +669,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'IO TOOL'
         TabOrder = 4
-      end
-      object btnClose: TButton
-        Left = 490
-        Top = 10
-        Width = 86
-        Height = 30
-        Cancel = True
-        Caption = 'EXIT'
-        TabOrder = 5
-        OnClick = btnCloseClick
+        OnClick = btnIOFormClick
       end
     end
     object PageTeach: TPageControl
@@ -652,11 +694,14 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
+          Color = 14670284
           ColCount = 5
           DefaultRowHeight = 24
           FixedRows = 1
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsLoaderSort: TTabSheet
@@ -668,11 +713,14 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
+          Color = 14670284
           ColCount = 5
           DefaultRowHeight = 24
           FixedRows = 1
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsAuto: TTabSheet
@@ -684,11 +732,14 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
+          Color = 14670284
           ColCount = 5
           DefaultRowHeight = 24
           FixedRows = 1
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsSortZ: TTabSheet
@@ -700,11 +751,14 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
+          Color = 14670284
           ColCount = 5
           DefaultRowHeight = 24
           FixedRows = 1
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsOthers: TTabSheet
@@ -716,11 +770,14 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
+          Color = 14670284
           ColCount = 5
           DefaultRowHeight = 24
           FixedRows = 1
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
     end
@@ -728,6 +785,7 @@ object fTeach: TfTeach
   object tmrUpdate: TTimer
     Enabled = False
     Interval = 200
+    OnTimer = tmrUpdateTimer
     Left = 664
     Top = 16
   end

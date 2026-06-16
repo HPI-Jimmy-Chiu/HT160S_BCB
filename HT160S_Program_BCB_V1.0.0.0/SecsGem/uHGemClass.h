@@ -36,6 +36,11 @@ public:
     // screen SECS status badge). Base is a no-op.
     virtual void RefreshSecsBadge();
 
+    //AI(ht160s-agv) 20260615 : called once per second from THGem::Timer1Timer so
+    // the machine-specific GEM logic can drive the E87/AGV coordinator (poll car
+    // full -> CEID272, service handshake). Base is a no-op.
+    virtual void ServiceAgv();
+
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();

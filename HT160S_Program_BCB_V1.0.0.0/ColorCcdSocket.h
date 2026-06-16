@@ -44,12 +44,15 @@ private:
     AnsiString sLastError;
     AnsiString sCcdAddress;       // camera IP
     int iCcdPort;                 // camera port
+    bool bWantConnected;          // true while a connection is desired (drives auto-reconnect)
+    unsigned long iLastReconnectTick; // throttle auto-reconnect attempts (GetTickCount)
 
     bool __fastcall StartWinsock();
     void __fastcall CloseSocket();
     void __fastcall PollConnecting();
     void __fastcall PollReceive();
     void __fastcall SendColorCcdCmd(AnsiString sData);
+    void __fastcall DrainSocketInput();   // discard stale bytes before a shot
     void __fastcall SaveColorCcd2DLog(AnsiString sMessage);
 
 public:

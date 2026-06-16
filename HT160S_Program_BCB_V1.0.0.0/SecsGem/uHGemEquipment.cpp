@@ -72,6 +72,7 @@ __fastcall THGem::THGem(TComponent *Owner)
     iLinktestInterval  = 10;                 // seconds; 0 = heartbeat off
     iLinktestCountdown = 0;
     iT6Timeout         = 6;                   // seconds to wait for Linktest.rsp
+    bLogLinktest       = false;               //AI(ht160s-secsgem) 20260612 : quiet heartbeat by default
     iT6Countdown       = 0;
     bAwaitLinktestRsp  = false;
     uControlSystemByte = 1;
@@ -164,6 +165,14 @@ void __fastcall THGem::Timer1Timer(TObject *Sender)
     //  drops to OFF while the link is down / reconnecting.
     if(GemLogic != NULL)
         GemLogic->RefreshSecsBadge();
+
+    //AI(ht160s-agv) 20260615 : drive the E87/AGV coordinator each tick (Phase B
+    //  car-full -> CEID272; Phase D handshake). Routed through GemLogic so the lean
+    //  transport stays decoupled from the AGV/machine modules. Done before the
+    //  bWantComm guard so polling/snapshot continues; EventReport itself no-ops
+    //  unless the link is SELECTED.
+    if(GemLogic != NULL)
+        GemLogic->ServiceAgv();
 
     //AI(ht160s-secsgem) 20260611 : batch-flush pending SECS log lines to disk
     //  every tick.  Done first (before the bWantComm guard) so logs are written
@@ -1133,6 +1142,13 @@ void THGem::SetT6Timeout(int Seconds)
 {
     iT6Timeout = (Seconds <= 0) ? 6 : Seconds;   // never 0: must allow time for a reply
 }
+//AI(ht160s-secsgem) 20260612 : toggle routine Linktest req/rsp logging. Off by
+//  default so the heartbeat does not flood the operator/disk log; anomalies
+//  (T6 timeout, DropConnection) are always logged regardless of this flag.
+void THGem::SetLogLinktest(bool On)
+{
+    bLogLinktest = On;
+}
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : SECS communication file logging. Layout aligned
 //  with HT172 (per-day folder), but rooted at HSys.LogRootDir = D:\HT160S_Log.
@@ -1239,7 +1255,10 @@ void THGem::SendLinktestReq()
     bAwaitLinktestRsp = true;
     iT6Countdown      = iT6Timeout;
     iLinktestCountdown= iLinktestInterval;
-    StringOut("[SECS] Linktest.req sent (heartbeat)");
+    //AI(ht160s-secsgem) 20260612 : routine heartbeat is logged only when LogLinktest=1
+    //  so the operator/disk log is not flooded (industry: quiet keepalive, loud failures).
+    if(bLogLinktest)
+        StringOut("[SECS] Linktest.req sent (heartbeat)");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : force-drop a dead/errored connection so the
@@ -1362,7 +1381,8 @@ void THGem::HandleControlMessage(unsigned char *Ptr, int Len)
         break;
     case HSMS_STYPE_LINKTEST_REQ:
         SendControlReply(Ptr, HSMS_STYPE_LINKTEST_RSP);
-        StringOut("[SECS] Linktest.req -> Linktest.rsp");
+        if(bLogLinktest)
+            StringOut("[SECS] Linktest.req -> Linktest.rsp");
         break;
     case HSMS_STYPE_SEPARATE_REQ:
         StringOut("[SECS] Separate.req -> closing connection");
@@ -1378,7 +1398,8 @@ void THGem::HandleControlMessage(unsigned char *Ptr, int Len)
         break;
     case HSMS_STYPE_LINKTEST_RSP:
         bAwaitLinktestRsp = false;          //AI(ht160s-secsgem) 20260611 : heartbeat ack
-        StringOut("[SECS] Linktest.rsp received");
+        if(bLogLinktest)
+            StringOut("[SECS] Linktest.rsp received");
         break;
     default:
         {

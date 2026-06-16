@@ -15,6 +15,8 @@ struct TSortArmSlotState
     int PlaceY;
     int TrayData;
     int BinValue;
+    int LotIndex;        //AI(ht160s-lotbin) 20260615 : owning LotIndex (By Lot+Bin routing key)
+    AnsiString Code2D;   //AI(ht160s-lotbin) 20260615 : IC 2D code (Production_Log trace)
 };
 //---------------------------------------------------------------------------
 class TTrayMotor;
@@ -76,7 +78,7 @@ private:
     bool SelectPlaceAuto();
     bool FindPlaceCells(int AutoIndex);
     int GetSlotRoutingBin(int SlotIndex);
-    int GetMappedAutoIndex(int BinData, bool &bFixedArea);
+    int GetMappedAutoIndex(int BinData, int LotIndex, bool &bFixedArea);
     bool CanPlaceSlotToAuto(int SlotIndex, int AutoIndex);
 
     bool SuckSelectedSlots();
@@ -89,11 +91,14 @@ private:
 
 public:
     TSortArmModule();
-    void InitialFlag();
+    void InitialFlag(bool bKeepMaterial=false);
     void DoSortArm(int &Task);
     bool HasHoldingIC();
     bool IsCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm CleanOut finish
     bool IsOneCycleFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm OneCycle finish
+    int  GetPickTask();        //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
+    int  GetPlaceTask();       //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
+    AnsiString DescribeHolding();   //AI(ht160s-state-record-analysis) 20260616 : read-only held-IC + routing dump for SortArmDecision.txt
 };
 //---------------------------------------------------------------------------
 extern TSortArmModule *SortArmModule;

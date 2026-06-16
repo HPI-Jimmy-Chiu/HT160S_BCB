@@ -23,6 +23,7 @@ bool bHomeByStart=false;
 //AI(HT160S-Maintainer) 20260602 : HT172 0420 ProcessMotion lifecycle globals
 bool bFirstRun=true;
 bool bSortArmNeedHome=false;
+bool bHomePowerCycling=false;
 bool bCalculatePauseTime=false;
 TDateTime tUPH_PauseTime;
 TDateTime tUPH_PauseStartTime;

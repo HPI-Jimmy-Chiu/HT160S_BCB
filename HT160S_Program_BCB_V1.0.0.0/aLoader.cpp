@@ -1001,16 +1001,25 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                 //AI(HT160S-Maintainer) 20260604 : P3 active. Trigger Top CCD shot, then
                 //poll for the 2D code in state 5500. Only when the flag is on AND the Top
                 //CCD socket is connected; otherwise behaviour is unchanged (go idle).
-                if(TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected())
+                //AI(HT160S-Maintainer) 20260612 : GAP A fix - the connect condition was
+                //reversed (it reported "not ready" while actually connected, blocking the
+                //2D scan on real hardware). Only run the 2D path when the bin-map feature
+                //is on and the IC is good; require a connected Top CCD for real hardware,
+                //while still letting the NULL-socket simulation path advance to state 5500.
+                if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)
                 {
-                    ShowMyError("Top CCD Connect not ready", K_RETRY);
-                    break;
-                }
-                else if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)
-                {
-                    //AI(HT160S-Maintainer) 20260608 : guard NULL socket so the
-                    //simulation path (no Top CCD hardware) can still advance to the
-                    //2D-code poll state. Real hardware triggers a shot as before.
+                    if(TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected()==false)
+                    {
+                        Ret=ShowMyError("Top CCD Connect not ready", K_RETRY|K_SKIP);
+                        if(Ret==K_SKIP)
+                        {
+                            TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_2D_SCAN_FAIL);
+                            State->CcdTask=1;
+                        }
+                        break;
+                    }
+                    //Guard NULL socket so the simulation path (no Top CCD hardware) can
+                    //still advance to the 2D-code poll state. Real hardware triggers a shot.
                     if(TopCcdSocket!=NULL)
                         TopCcdSocket->TopCcdTriggerShot();
                     State->CcdDelay.SetMS(3000);
@@ -1059,8 +1068,18 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     if(LotRegistry.FindByCode2D(sCode, HitLot, Bin, HitLotIndex))
                     {
                         TrayMotor->SetTrayBin(State->CcdX, State->CcdY, Bin);
+                        //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode. Carry owning lot
+                        //and 2D code on the cell. ICs are scanned in physical order, so
+                        //ResolveAuto here binds each new (Lot,Bin) to the next free Auto
+                        //first-come-first-served; placement later just reads the binding.
+                        TrayMotor->SetTrayLot(State->CcdX, State->CcdY, HitLotIndex);
+                        TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
+                        if(GeneralSetting.bUseLotBinSortMode)
+                            LotBinBinding.ResolveAuto(HitLotIndex, Bin);
                         LotRegistry.OnSorted(HitLotIndex, Bin);
                         MachineRun.iTotalSorted++;
+                        if(TopCcdSocket!=NULL)
+                            TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                         State->CcdTask=1;
                     }
                     else
@@ -1077,6 +1096,11 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         {
                             MachineRun.iUnknown2D++;
                             TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+                            //AI(ht160s-lotbin) 20260615 : no owning lot -> route to Error Auto.
+                            TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+                            TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
+                            if(TopCcdSocket!=NULL)
+                                TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                             State->CcdTask=1;
                         }
                     }
@@ -1094,6 +1118,11 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     else
                     {
                         TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+                        //AI(ht160s-lotbin) 20260615 : 2D no-response -> no owning lot -> Error Auto.
+                        TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+                        TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, "");
+                        if(TopCcdSocket!=NULL)
+                            TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                         State->CcdTask=1;
                     }
                 }

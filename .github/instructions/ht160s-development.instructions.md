@@ -46,6 +46,27 @@ Before implementing a migrated feature:
 - Prefer existing HT160 naming, globals, forms, and task patterns.
 - Do not copy HT172 runtime data files into HT160.
 
+## VCL Form Headers (No Comments In `__published`)
+
+- Do NOT put comments inside the `__published` section of a VCL form/frame/data-module
+  class (`class TfXxx : public TForm`). This includes standalone `//` lines among the
+  members and trailing `// ...` comments on a member declaration line.
+- Reason: the code still compiles and the form still streams at runtime (streaming uses
+  compiled RTTI, not source), but when you click a component's event in the Object
+  Inspector the BCB6 form designer parses the `.h` source to resolve the handler. Its
+  simplified parser chokes on a comment in `__published` and raises a modal
+  `Error in module <unit>: Incorrect method declaration in class <TForm>`. It is a
+  whole-class parse failure, so it breaks EVERY event handler on that form, not just the
+  one clicked. A clean command-line build does NOT catch this; only design-time clicking
+  reproduces it.
+- Comments in `private:`/`public:` user-declaration sections are tolerated by the designer
+  (e.g. `main.h` carries many and works), but prefer keeping notes out of the class body
+  entirely. The IDE-written trailing comments on the section keywords themselves
+  (`__published:\t// IDE-managed Components`) are fine.
+- Put explanatory notes ABOVE the `class` line or BELOW the closing `};`. When you move a
+  control from a runtime `Build*Page()` builder into the DFM, document the move there, not
+  among the `__published` members.
+
 ## Compile Gate
 
 - Every C++/DFM/project-file change requires BCB6 verification before completion.

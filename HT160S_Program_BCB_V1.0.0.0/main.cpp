@@ -9,6 +9,7 @@
 #include "cStateRecordHT160.h"
 #include "cmydef.h"
 #include "CosFunction.h"
+#include "GeneralSetting.h"   //AI(ht160s-agv) 20260615 : GeneralSetting.bUseAMR for the AMR status badge
 #include "cprod.h"
 #include "UserRoleManager.h"
 #include "uruncontrol.h"
@@ -25,6 +26,7 @@
 #include "systools.h"
 #include "deviceinfo.h"
 #include "aLoader.h"
+#include "LotWebApiClient.h"   //AI(ht160s-lot-webapi) 20260612 : Stage 4 : machine-flow Lot data pull
 #include "SecsGem/UsecegemMainFrom.h"
 #include "SecsGem/uHGemHT160.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : SECS/GEM log monitor window
@@ -121,6 +123,7 @@ static AnsiString GetFeatureStatusName(int BadgeIndex)
     {
         case eMainFeatureSECS:     return "SECS";
         case eMainFeatureSafeDoor: return "SAFE";
+        case eMainFeatureAMR:      return "AMR";
     }
 
     return "";
@@ -132,6 +135,7 @@ static AnsiString GetFeatureStatusDefaultValue(int BadgeIndex)
     {
         case eMainFeatureSECS:     return "OFF";
         case eMainFeatureSafeDoor: return "NORMAL";
+        case eMainFeatureAMR:      return "OFF";
     }
 
     return "";
@@ -143,6 +147,7 @@ static TColor GetFeatureStatusDefaultColor(int BadgeIndex)
     {
         case eMainFeatureSECS:     return clTeal;
         case eMainFeatureSafeDoor: return clGreen;
+        case eMainFeatureAMR:      return clGray;
     }
 
     return clGray;
@@ -167,6 +172,11 @@ __fastcall TfMain::TfMain(TComponent* Owner)
 
     bUpdatingMainSelections = false;
     iLastSecsBadgeState = -1;   //AI(ht160s-secsgem) 20260612 : force the first periodic tick to paint the real HSMS state
+    bLotApiPullActive = false;  //AI(ht160s-lot-webapi) 20260612 : Stage 4 : no pull in flight at startup
+    sLotApiPullLot = "";
+    bLotApiPullAll = false;     //AI(ht160s-lot-webapi) 20260612 : no "pull all lots" sweep at startup
+    iLotApiPullCursor = 0;
+    iLotApiRetryCount = 0;
 
     if(ComponentState.Contains(csDesigning))
         return;
@@ -198,13 +208,15 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     {
         for(int PageIndex = 0; PageIndex < pgcMonitor->PageCount; PageIndex++)
             pgcMonitor->Pages[PageIndex]->TabVisible = false;
-        pgcMonitor->ActivePage = TabSheet10;
+        pgcMonitor->ActivePage = tsMotionView;
     }
 
     if(sbMotionView != NULL)
         sbMotionView->Down = true;
 
     SetupLotListGrid();                                                         //AI(HT160S-Maintainer) 20260604 : init multi-lot manual list grid
+    if(sgLotList != NULL)
+        sgLotList->OnDblClick = sgLotListDblClick;                              //AI(ht160s-lot-webapi) 20260612 : double-click a Lot row -> 2D detail viewer
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::UpdateWorkFileComboBox()
@@ -330,7 +342,7 @@ void __fastcall TfMain::BuildFeatureStatusBadges()
         BadgePanel->BevelOuter = bvRaised;
         BadgePanel->Color = clBtnFace;
         BadgePanel->ParentColor = false;
-        BadgePanel->Visible = (StatusIndex <= eMainFeatureSafeDoor);
+        BadgePanel->Visible = (StatusIndex <= eMainFeatureAMR);   //AI(ht160s-agv) 20260615 : show SECS/SAFE/AMR badges
         FeatureStatusPanels[StatusIndex] = BadgePanel;
 
         NameLabel = new TLabel(this);
@@ -396,7 +408,23 @@ void __fastcall TfMain::BuildFeatureStatusBadges()
                 BadgePanel->Visible = false;   // feature not purchased -> no badge
             }
         }
+
+        //AI(ht160s-agv) 20260615 : seed the AMR badge from the live AMR mode flag so the
+        //  operator can read AMR ON/OFF at a glance (GetFeatureStatusDefaultValue only
+        //  carries a static "OFF" placeholder).
+        if(StatusIndex == eMainFeatureAMR)
+            UpdateAmrFeatureBadge();
     }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260615 : sync the main-screen AMR badge to GeneralSetting.bUseAMR.
+//  Shown as a green "ON" when AMR/AGV mode is enabled, grey "OFF" otherwise. Safe to
+//  call any time (e.g. after a maintenance change) - it is a cheap label repaint.
+void __fastcall TfMain::UpdateAmrFeatureBadge()
+{
+    AnsiString ValueText = GeneralSetting.bUseAMR ? "ON" : "OFF";
+    TColor     ValueColor = GeneralSetting.bUseAMR ? clGreen : clGray;
+    SetFeatureStatusBadge(eMainFeatureAMR, ValueText, ValueColor);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::SetFeatureStatusBadge(int BadgeIndex, AnsiString ValueText, TColor ValueColor)
@@ -548,14 +576,14 @@ void __fastcall TfMain::sbRecordClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbMotorViewClick(TObject *Sender)
 {
-    if(pgcMonitor != NULL && TabSheet7 != NULL)
-        pgcMonitor->ActivePage = TabSheet7;
+    if(pgcMonitor != NULL && tsMotorView != NULL)
+        pgcMonitor->ActivePage = tsMotorView;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbMotionViewClick(TObject *Sender)
 {
-    if(pgcMonitor != NULL && TabSheet10 != NULL)
-        pgcMonitor->ActivePage = TabSheet10;
+    if(pgcMonitor != NULL && tsMotionView != NULL)
+        pgcMonitor->ActivePage = tsMotionView;
 }
 //---------------------------------------------------------------------------
 // Motion View motor-position monitor gate. Only refresh motor->panel positions
@@ -576,7 +604,7 @@ void __fastcall TfMain::SetSimulateScreenStatus()
     }
 
     bool bStatus = (pgcMain != NULL && pgcMain->ActivePage == tsMonitorView &&
-                    pgcMonitor != NULL && pgcMonitor->ActivePage == TabSheet10);
+                    pgcMonitor != NULL && pgcMonitor->ActivePage == tsMotionView);
 
     if(bStatus != bLastStatus)
     {
@@ -621,7 +649,7 @@ void __fastcall TfMain::SetSimulateScreenStatus()
     }
 }
 //---------------------------------------------------------------------------
-// Motor View page (TabSheet7) live status grid. Ported from HT172 0420
+// Motor View page (tsMotorView) live status grid. Ported from HT172 0420
 // TfMain::ShowMotorInfo(). One-time header build, then per-frame fill of
 // Target/Position/Encoder plus a colored LED block per motor status bit.
 // Only refreshes while the Motor View page is actually visible (perf guard).
@@ -633,7 +661,7 @@ void __fastcall TfMain::ShowMotorInfo()
 
     if(sgMotorStatus==NULL || pgcMonitor==NULL)
         return;
-    if(pgcMonitor->ActivePage!=TabSheet7)                                       // only update when Motor View is shown //
+    if(pgcMonitor->ActivePage!=tsMotorView)                                       // only update when Motor View is shown //
         return;
 
     if(flag==false)
@@ -661,7 +689,7 @@ void __fastcall TfMain::ShowMotorInfo()
         {
             if(HSys.MotPtr[i]==NULL)
                 continue;
-            sgMotorStatus->Cells[0][i+2]=HSys.MotPtr[i]->NumberAlias;
+            sgMotorStatus->Cells[0][i+1]=HSys.MotPtr[i]->NumberAlias;
         }
     }
 
@@ -670,18 +698,18 @@ void __fastcall TfMain::ShowMotorInfo()
 
     for(int i=0; i<HSys.iTotalMotor; i++)
     {
-        if(HSys.MotPtr[i]==NULL || HSys.MotPtr[i]->GetEnable()==false)
-            continue;
+//        if(HSys.MotPtr[i]==NULL || HSys.MotPtr[i]->GetEnable()==false)
+//            continue;
 
         if(HSys.Sys.SystemStart==false)
             HSys.MotPtr[i]->ReadPos();
-        sgMotorStatus->Cells[1][i+2]=HSys.MotPtr[i]->TargetPosition;
-        sgMotorStatus->Cells[2][i+2]=HSys.MotPtr[i]->Position;
-        sgMotorStatus->Cells[3][i+2]=HSys.MotPtr[i]->EncoderPosition;
+        sgMotorStatus->Cells[1][i+1]=HSys.MotPtr[i]->TargetPosition;
+        sgMotorStatus->Cells[2][i+1]=HSys.MotPtr[i]->Position;
+        sgMotorStatus->Cells[3][i+1]=HSys.MotPtr[i]->EncoderPosition;
         HSys.MotPtr[i]->ScanMotorStatus();
         for(int j=0; j<iMotLedTotalCnt; j++)
         {
-            R=sgMotorStatus->CellRect(4+j, i+2);
+            R=sgMotorStatus->CellRect(4+j, i+1);
             R.Top++;
             R.Bottom-=1;
             R.Left++;
@@ -797,16 +825,16 @@ void __fastcall TfMain::InitSimulateScreenBinding()
     // Pixel Top 7 (up) .. 14 (down) within the 41px arm panel - display only.
     if(HSys.Mot.MSuckZ_1 != NULL && ledSortArm1ZA != NULL)
         HSys.Mot.MSuckZ_1->SetSimulateCompoment(ledSortArm1ZA, akLeft,
-            HSys.Mot.MSuckZ_1->GetSoftLimitN(), HSys.Mot.MSuckZ_1->GetSoftLimitP(), 7, 14);
+            HSys.Mot.MSuckZ_1->GetSoftLimitN(), HSys.Mot.MSuckZ_1->GetSoftLimitP(), 14, 7);
     if(HSys.Mot.MSuckZ_2 != NULL && ledSortArm1ZB != NULL)
         HSys.Mot.MSuckZ_2->SetSimulateCompoment(ledSortArm1ZB, akLeft,
-            HSys.Mot.MSuckZ_2->GetSoftLimitN(), HSys.Mot.MSuckZ_2->GetSoftLimitP(), 7, 14);
+            HSys.Mot.MSuckZ_2->GetSoftLimitN(), HSys.Mot.MSuckZ_2->GetSoftLimitP(), 14, 7);
     if(HSys.Mot.MSuckZ_3 != NULL && ledSortArm1ZE != NULL)
         HSys.Mot.MSuckZ_3->SetSimulateCompoment(ledSortArm1ZE, akLeft,
-            HSys.Mot.MSuckZ_3->GetSoftLimitN(), HSys.Mot.MSuckZ_3->GetSoftLimitP(), 7, 14);
+            HSys.Mot.MSuckZ_3->GetSoftLimitN(), HSys.Mot.MSuckZ_3->GetSoftLimitP(), 14, 7);
     if(HSys.Mot.MSuckZ_4 != NULL && ledSortArm1ZF != NULL)
         HSys.Mot.MSuckZ_4->SetSimulateCompoment(ledSortArm1ZF, akLeft,
-            HSys.Mot.MSuckZ_4->GetSoftLimitN(), HSys.Mot.MSuckZ_4->GetSoftLimitP(), 7, 14);
+            HSys.Mot.MSuckZ_4->GetSoftLimitN(), HSys.Mot.MSuckZ_4->GetSoftLimitP(), 14, 7);
 
     //AI(ht172-to-ht160-porting) 20260609 : also wire the four Sort Arm Z LEDs
     //to the sucker group so each lights when its slot holds an IC (HT172
@@ -1251,12 +1279,23 @@ void __fastcall TfMain::sbHome1Click(TObject *Sender)
 
 void __fastcall TfMain::sbOneCycle1Click(TObject *Sender)
 {
-    if(HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_CleanOut)
+    //AI(poka-yoke) 20260616 : was a silent no-op when mode/data was wrong. One
+    //  Cycle runs at idle, so ShowMyMessage here is safe (does not stop a running
+    //  machine). Tell the operator why, and require the same lot/2D data as Start.
+    if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
     {
-        RecordProcess("ONE CYCLE pressed");
-        EventReport(SECS_EVENT.PressOneCycle);
-        ChangeRunMode(Run_OneCycle);
-    }    
+        ShowMyMessage("One Cycle is only allowed in Normal / Clean Out mode.");
+        return;
+    }
+    AnsiString Reason;
+    if(CheckLotDataReady(Reason)==false)
+    {
+        ShowMyMessage(Reason);
+        return;
+    }
+    RecordProcess("ONE CYCLE pressed");
+    EventReport(SECS_EVENT.PressOneCycle);
+    ChangeRunMode(Run_OneCycle);
 }
 //---------------------------------------------------------------------------
 
@@ -1319,13 +1358,50 @@ void __fastcall TfMain::sbStoreHangupClick(TObject *Sender)
         ShowMyMessage("State Record snapshot failed (check 7-Zip / disk).");
 }
 //---------------------------------------------------------------------------
+//AI(poka-yoke) 20260616 : shared start-precondition guard. Returns true when
+//  lot/2D data is ready; otherwise fills Reason and the caller warns + aborts.
+//  Centralizes what Start() checked inline so OneCycle uses the SAME rules. Only
+//  ever called at idle (SystemStart==false), so the caller's ShowMyMessage does
+//  not interrupt a running machine.
+bool TfMain::CheckLotDataReady(AnsiString &Reason)
+{
+    if(edLotNo->Text=="")                                                       //Steven 20240625 : block start without lot ID
+    {
+        Reason="Please Enter LotID !";
+        return false;
+    }
+    //AI(ht160s-lot-webapi) 20260612 : Start safety gate. Refuse to start the
+    // machine unless (a) at least one Lot is registered AND (b) at least one
+    // 2D/Bin record is loaded. A lot name alone (e.g. SECS SET_LOT_INFO that
+    // only registers names) is NOT enough to sort by, so block and warn.
+    if(LotRegistry.GetLotCount()<=0)
+    {
+        Reason="No Lot data : add at least one Lot before Start !";
+        return false;
+    }
+    if(LotRegistry.GetItemCount()<=0)
+    {
+        Reason="No 2D data : load lot 2D/Bin data before Start !";
+        return false;
+    }
+    //AI(poka-yoke) 20260616 : By Lot+Bin mode needs at least one (Lot,Bin)->Auto
+    // binding, otherwise nothing can be routed. Block start until bindings exist.
+    if(GeneralSetting.bUseLotBinSortMode && LotBinBinding.GetBindingCount()<=0)
+    {
+        Reason="By Lot+Bin mode is ON but no binding is set. Set bindings first !";
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
 void TfMain::Start()
 {
     if(HSys.Sys.SystemStart==false)
     {
-        if(edLotNo->Text=="")                                                   //Steven 20240625 : block start without lot ID
+        AnsiString Reason;
+        if(CheckLotDataReady(Reason)==false)
         {
-            ShowMyMessage("Please Enter LotID !");
+            ShowMyMessage(Reason);
             return;
         }
 //        CheckContinusStartIsReady();                                            //Sam 20240710 : StartMode exception handling
@@ -1409,15 +1485,202 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
             FirstLot=LotText;
     }
 
+    //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode. A fresh Lot Start clears all
+    //dynamic (Lot,Bin)->Auto bindings so Autos are re-bound first-come-first-served
+    //for this work order. (Mid-lot RESTART resumes via the machine START button,
+    //which does NOT clear - bindings are restored in RestoreLastWorkOrder. The
+    //future "inherit last record?" prompt will gate this clear for that path.)
+    LotBinBinding.Clear();
+    LotBinBinding.SaveToIni();
+
     MachineRun.bRunning=true;
     MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
 
     edLotNo->Text=FirstLot;
+    //AI(ht160s-lot-webapi) 20260612 : Stage 4 : at lot start, pull EVERY lot's
+    // 2D/Bin data from the customer WebAPI (async, no modal). Shared helper so the
+    // SECS S2F42 LOTSTART handler pulls every lot too (not just the first).
+    StartLotWebApiPullAll();
     //AI(HT160S-Maintainer) 20260608 : need1 : persist the started work order so
     //the next power-on can restore it (see RestoreLastWorkOrder / FormShow).
     SaveLastLotList();
     RecordProcess("LOT START pressed");
-    Start();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : total attempts allowed per lot during a pull-all
+// sweep (1 initial try + (LOT_API_MAX_RETRY-1) retries). Guards against transient
+// network blips / a momentarily slow customer WebAPI server dropping a lot.
+static const int LOT_API_MAX_RETRY = 3;
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : advance the "pull all lots" sweep. Walk the raw
+// registry slots from iLotApiPullCursor, skipping freed (blank) slots, and kick off
+// a pull for the lot at the cursor. The cursor only moves past a real lot once that
+// lot succeeds or its retries are used up (see PollLotDataWebApi), so a slow/failed
+// lot is retried instead of being silently dropped, and the sweep never stalls.
+void __fastcall TfMain::StartNextLotApiPull()
+{
+    TLotRunInfo *Lot;
+    int SlotCount;
+
+    if(bLotApiPullAll==false)
+        return;
+
+    SlotCount=LotRegistry.GetLotSlotCount();
+    while(iLotApiPullCursor<SlotCount)
+    {
+        Lot=LotRegistry.GetLot(iLotApiPullCursor);
+        if(Lot==NULL || Lot->sLotID.Trim()=="")
+        {
+            iLotApiPullCursor++;                   // skip freed/blank slots
+            continue;
+        }
+        //real lot at the cursor : pull it. Do NOT advance the cursor here -
+        //PollLotDataWebApi advances it on success, or re-calls us (same cursor)
+        //to retry on failure, or advances it once the retries are used up.
+        RequestLotDataFromWebApi(Lot->sLotID);
+        return;                                    // one in flight ; Poll will call us again
+    }
+
+    //no more lots to pull : end the sweep
+    bLotApiPullAll=false;
+    iLotApiRetryCount=0;
+    RecordProcess("Lot WebAPI pull-all sweep complete");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : arm a "pull all lots" sweep over the WHOLE
+// registry, one lot at a time (the WebAPI client is single-request). Shared by the
+// manual LotStart button and the SECS S2F42 LOTSTART handler so both fetch every
+// lot's 2D/Bin data, not just the first lot. Non-blocking, no modal (the SECS path
+// runs on the HSMS/VCL receive thread). Gated by the Lot WebAPI "UsePull" toggle.
+void __fastcall TfMain::StartLotWebApiPullAll()
+{
+    EnsureLotWebApiClientCreated();
+    if(LotWebApiClient!=NULL && LotWebApiClient->GetUsePull())
+    {
+        bLotApiPullAll=true;
+        iLotApiPullCursor=0;
+        iLotApiRetryCount=0;
+        StartNextLotApiPull();
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : Stage 4 : start a non-blocking Lot WebAPI pull.
+// Used by both the manual LotStart path and the SECS S2F42 LOTSTART handler, so it
+// must NEVER show a modal dialog (the SECS path runs on the HSMS/VCL receive thread
+// and a popup would stall factory communication). On any problem we just log.
+void __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
+{
+    AnsiString Lot;
+
+    Lot=LotID.Trim();
+    if(Lot=="")
+        return;
+
+    EnsureLotWebApiClientCreated();
+    if(LotWebApiClient==NULL)
+        return;
+
+    if(LotWebApiClient->IsBusy())
+    {
+        //a pull is already running : do not stack requests (non-blocking, no modal)
+        RecordProcess("Lot WebAPI pull skipped (client busy): "+Lot);
+        return;
+    }
+
+    if(LotWebApiClient->StartLotRequest(Lot))
+    {
+        bLotApiPullActive=true;
+        sLotApiPullLot=Lot;
+        RecordProcess("Lot WebAPI pull started: "+Lot);
+    }
+    else
+    {
+        //start failed (bad URL etc) : log only, never block the caller
+        RecordProcess("Lot WebAPI pull start failed: "+LotWebApiClient->GetLastError());
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive the in-flight pull. Called every
+// MainProc cycle (VCL main thread via Synchronize). Cheap no-op when idle. When the
+// response arrives it is parsed straight into LotRegistry and the on-screen Lot list
+// is reprojected. NO modal dialog here either.
+void __fastcall TfMain::PollLotDataWebApi()
+{
+    AnsiString Body;
+    bool bOk;
+    int HttpStatus;
+    bool bDuplicate;
+    AnsiString DupCode;
+
+    if(bLotApiPullActive==false)
+        return;
+    if(LotWebApiClient==NULL)
+    {
+        bLotApiPullActive=false;
+        return;
+    }
+
+    LotWebApiClient->Poll();
+    if(!LotWebApiClient->GetResult(Body, bOk, HttpStatus))
+        return;     // still running
+
+    bLotApiPullActive=false;        // one-shot consume
+    bool bAttemptOk=false;          //AI(ht160s-lot-webapi) 20260612 : did THIS attempt succeed?
+    if(bOk==true && Body.Trim()!="")
+    {
+        bDuplicate=false;
+        DupCode="";
+        if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode))
+        {
+            RefreshLotListFromRegistry();
+            RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot);
+            if(bDuplicate==true)
+                RecordProcess("Lot WebAPI duplicate 2D ignored: "+DupCode);
+            bAttemptOk=true;
+        }
+        else
+        {
+            RecordProcess("Lot WebAPI JSON parse failed: "+sLotApiPullLot);
+        }
+    }
+    else
+    {
+        RecordProcess("Lot WebAPI pull failed (HTTP "+IntToStr(HttpStatus)+"): "+sLotApiPullLot);
+    }
+    sLotApiPullLot="";
+
+    //AI(ht160s-lot-webapi) 20260612 : drive the "pull all lots" sweep. On success
+    // advance to the next lot. On failure retry the SAME lot up to LOT_API_MAX_RETRY
+    // times (network blips / slow server) before giving up and moving on, so one
+    // flaky lot never stalls the sweep and never silently drops a lot on the first
+    // hiccup.
+    if(bLotApiPullAll==true)
+    {
+        if(bAttemptOk==true)
+        {
+            iLotApiPullCursor++;        // this lot done : move to the next slot
+            iLotApiRetryCount=0;
+            StartNextLotApiPull();
+        }
+        else
+        {
+            iLotApiRetryCount++;
+            if(iLotApiRetryCount<LOT_API_MAX_RETRY)
+            {
+                RecordProcess("Lot WebAPI retry "+IntToStr(iLotApiRetryCount)+"/"+
+                              IntToStr(LOT_API_MAX_RETRY-1)+" for slot "+IntToStr(iLotApiPullCursor));
+                StartNextLotApiPull();  // same cursor : re-pull this lot
+            }
+            else
+            {
+                RecordProcess("Lot WebAPI giving up slot "+IntToStr(iLotApiPullCursor)+
+                              " after "+IntToStr(LOT_API_MAX_RETRY-1)+" retries");
+                iLotApiPullCursor++;    // skip this lot and continue the sweep
+                iLotApiRetryCount=0;
+                StartNextLotApiPull();
+            }
+        }
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnLotEndClick(TObject *Sender)
@@ -1431,6 +1694,29 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     }
     SoftStop=true;
     MachineRun.bRunning=false;
+
+    //AI(ht160s-lot-webapi) 20260612 : stop any in-flight "pull all lots" sweep so
+    // it does not walk the registry we are about to clear.
+    bLotApiPullAll=false;
+    iLotApiPullCursor=0;
+    iLotApiRetryCount=0;
+
+    //AI(ht160s-lot-webapi) 20260612 : Lot End clears the whole work order so the
+    // next lot starts clean. Clear() drops every Lot slot, the 2D-code index and
+    // all per-IC 2D/Bin records. Then blank the active Lot No, repaint the grid
+    // (RefreshLotListFromRegistry blanks every row when the registry is empty),
+    // and overwrite system\LastLotList.ini with the now-empty list so a restart
+    // does NOT restore the finished lots.
+    LotRegistry.Clear();
+    //AI(ht160s-lotbin) 20260615 : drop all (Lot,Bin)->Auto bindings on Lot End so the
+    //next work order starts with a clean dynamic table (also persisted empty).
+    LotBinBinding.Clear();
+    LotBinBinding.SaveToIni();
+    if(edLotNo!=NULL)
+        edLotNo->Text="";
+    RefreshLotListFromRegistry();
+    SaveLastLotList();
+    RecordProcess("Lot data cleared (Lot End)");
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : Lot Manual Edit list helpers (multi-lot queue, UI layer)
@@ -1439,15 +1725,30 @@ void __fastcall TfMain::SetupLotListGrid()
     if(sgLotList==NULL)
         return;
 
-    sgLotList->ColCount=1;
+    //AI(ht160s-lot-webapi) 20260612 : multi-column so each Lot's loaded data is
+    // confirmable at a glance : LotID | source | 2D-code count | sorted count.
+    // Column 0 stays the LotID (every other helper still reads Cells[0][row]).
+    sgLotList->ColCount=4;
     sgLotList->FixedCols=0;
     sgLotList->FixedRows=1;
     if(sgLotList->RowCount<2)
         sgLotList->RowCount=2;
+    sgLotList->ColWidths[0]=300;
+    sgLotList->ColWidths[1]=70;
+    sgLotList->ColWidths[2]=70;
+    sgLotList->ColWidths[3]=80;
     sgLotList->Cells[0][0]="Lot No.";
+    sgLotList->Cells[1][0]="Src";
+    sgLotList->Cells[2][0]="2D";
+    sgLotList->Cells[3][0]="Sorted";
 
     for(int RowIndex=1; RowIndex<sgLotList->RowCount; RowIndex++)
+    {
         sgLotList->Cells[0][RowIndex]="";
+        sgLotList->Cells[1][RowIndex]="";
+        sgLotList->Cells[2][RowIndex]="";
+        sgLotList->Cells[3][RowIndex]="";
+    }
 }
 //---------------------------------------------------------------------------
 int __fastcall TfMain::GetLotListCount()
@@ -1572,39 +1873,98 @@ void __fastcall TfMain::RefreshLotListFromRegistry()
     if(LotCount<=0)
         return;
 
+    //AI(ht160s-lot-webapi) 20260612 : RemoveLot leaves a freed (blank) slot in
+    // place to keep packed 2D-ref indices valid, so we must walk the RAW slot
+    // span and skip blanks. Emitting only non-blank lots into consecutive rows
+    // shifts the list up after a middle delete (no gap, no dropped last lot).
     sgLotList->RowCount=1+LotCount;
-    for(int Index=0; Index<LotCount; Index++)
+    int OutRow=0;
+    AnsiString FirstLotID="";
+    int SlotCount=LotRegistry.GetLotSlotCount();
+    for(int Index=0; Index<SlotCount; Index++)
     {
         Lot=LotRegistry.GetLot(Index);
-        if(Lot!=NULL)
-            sgLotList->Cells[0][1+Index]=Lot->sLotID;
+        if(Lot==NULL || Lot->sLotID.Trim()==AnsiString(""))
+            continue;
+        //AI(ht160s-lot-webapi) 20260612 : col0=LotID, col1=source, col2=2D-code
+        // count (iPlanQty grows as the work-order JSON loads), col3=sorted qty.
+        sgLotList->Cells[0][1+OutRow]=Lot->sLotID;
+        sgLotList->Cells[1][1+OutRow]=(Lot->iSource==HT160_LOT_SOURCE_SECS)?AnsiString("SECS"):AnsiString("OFF");
+        sgLotList->Cells[2][1+OutRow]=IntToStr(Lot->iPlanQty);
+        sgLotList->Cells[3][1+OutRow]=IntToStr(Lot->iSortedQty);
+        if(FirstLotID==AnsiString(""))
+            FirstLotID=Lot->sLotID;
+        OutRow++;
     }
     if(sgLotList->RowCount<2)
         sgLotList->RowCount=2;
-    if(edLotNo!=NULL && LotRegistry.GetLot(0)!=NULL)
-        edLotNo->Text=LotRegistry.GetLot(0)->sLotID;
+    if(edLotNo!=NULL && FirstLotID!=AnsiString(""))
+        edLotNo->Text=FirstLotID;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::RestoreLastWorkOrder()
 {
     bool bDuplicate;
     AnsiString DupCode;
+    bool bLoaded;
+    int LotCnt;
+    int BindCnt;
+    AnsiString Msg;
 
-    //A) restore production run-data counters (ref HT172 ReadLastDataIni).
+    //A) restore production run-data counters (ref HT172 ReadLastDataIni). These are
+    //   cumulative production stats and are KEPT even on a fresh start (user choice).
     ReadLastDataIni();
 
     //B) auto-load today's newest delivered work order (2D->Bin JSON). When a
     //   fresh lot table exists, drive the Lot list display from the registry.
     bDuplicate=false;
     DupCode="";
+    bLoaded=false;
     if(LotRegistry.LoadLatest(bDuplicate, DupCode))
     {
         RefreshLotListFromRegistry();
-        return;
+        //AI(ht160s-lotbin) 20260615 : restore the dynamic (Lot,Bin)->Auto table after
+        //the registry is populated, so a mid-lot restart keeps each Auto's binding
+        //(table is keyed by LotID, stable across restart).
+        LotBinBinding.LoadFromIni();
+        bLoaded=true;
+    }
+    else
+    {
+        //C) no JSON work order : restore the last manually-used Lot list.
+        LoadLastLotList();
+        LotBinBinding.LoadFromIni();   //AI(ht160s-lotbin) 20260615 : restore dynamic bindings (see above)
+        bLoaded=(LotRegistry.GetLotCount()>0 || LotBinBinding.GetBindingCount()>0);
     }
 
-    //C) no JSON work order : restore the last manually-used Lot list.
-    LoadLastLotList();
+    //AI(ht160s-lotbin) 20260615 : "inherit last record?" gate. When a previous work
+    //order was restored above, ask the operator whether to resume it or start fresh.
+    //NO clears the WHOLE work order (registry + LastLotList.ini + (Lot,Bin)->Auto
+    //bindings, persisted empty), matching Lot End semantics; the cumulative production
+    //counters from ReadLastDataIni are kept regardless. This is the gate that decides
+    //resume-keeps-bindings vs fresh-start-clears-them (mid-lot restart -> Yes resumes).
+    if(bLoaded)
+    {
+        LotCnt=LotRegistry.GetLotCount();
+        BindCnt=LotBinBinding.GetBindingCount();
+        Msg="Inherit last work order ? ("+IntToStr(LotCnt)+" lots, "+IntToStr(BindCnt)+
+            " bindings)   Yes = resume,  No = start fresh";
+        if(ShowMyMessageBox_YES_NO(Msg)!=TMyMessageBox::msgrtnYES)
+        {
+            LotRegistry.Clear();
+            LotBinBinding.Clear();
+            LotBinBinding.SaveToIni();
+            if(edLotNo!=NULL)
+                edLotNo->Text="";
+            RefreshLotListFromRegistry();
+            SaveLastLotList();
+            RecordProcess("Startup: operator chose fresh start, last work order cleared");
+        }
+        else
+        {
+            RecordProcess("Startup: operator chose to inherit last work order");
+        }
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnAddLotClick(TObject *Sender)
@@ -1700,6 +2060,111 @@ void __fastcall TfMain::sgLotListClick(TObject *Sender)
 
     if(sgLotList->Cells[0][SelectedRow].Trim()!="")
         edLotNo->Text=sgLotList->Cells[0][SelectedRow];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : double-click a Lot row to view its 2D / Bin
+// data. This is the operator's confirmation that the work-order JSON (WebAPI /
+// file / SECS) actually downloaded : an empty list means no 2D data is loaded
+// for that Lot yet. User-initiated, so a modal popup is fine here.
+void __fastcall TfMain::sgLotListDblClick(TObject *Sender)
+{
+    int SelectedRow;
+    AnsiString LotText;
+
+    (void)Sender;
+    if(sgLotList==NULL)
+        return;
+    SelectedRow=sgLotList->Row;
+    if(SelectedRow<1 || SelectedRow>=sgLotList->RowCount)
+        return;
+    LotText=sgLotList->Cells[0][SelectedRow].Trim();
+    if(LotText=="")
+        return;
+    ShowLotDetail(LotText);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : pop a read-only grid of every 2D code mapped
+// to LotID (Code2D / Bin / HBin / SBin / RetestCode / DiePass). Empty -> tell the
+// operator no work-order JSON has been loaded for this Lot.
+void __fastcall TfMain::ShowLotDetail(AnsiString LotID)
+{
+    TStringList *Lines;
+    TForm *Dlg;
+    TStringGrid *Grid;
+    int Count;
+    int i;
+    int c;
+
+    Lines=new TStringList;
+    try
+    {
+        Count=LotRegistry.GetLotIcList(LotID, Lines);
+        if(Count<=0)
+        {
+            ShowMyMessage("Lot \""+LotID+"\" has no 2D data loaded yet.\n"
+                          "(Work-order JSON not downloaded for this Lot.)");
+            return;
+        }
+
+        Dlg=new TForm((TComponent*)this);
+        try
+        {
+            Dlg->Caption="Lot 2D Detail : "+LotID+"   ("+IntToStr(Count)+" codes)";
+            Dlg->Width=660;
+            Dlg->Height=480;
+            Dlg->Position=poScreenCenter;
+
+            Grid=new TStringGrid(Dlg);
+            Grid->Parent=Dlg;
+            Grid->Align=alClient;
+            Grid->ColCount=6;
+            Grid->FixedCols=0;
+            Grid->FixedRows=1;
+            Grid->RowCount=1+Count;
+            Grid->ColWidths[0]=240;
+            Grid->ColWidths[1]=50;
+            Grid->ColWidths[2]=55;
+            Grid->ColWidths[3]=55;
+            Grid->ColWidths[4]=120;
+            Grid->ColWidths[5]=100;
+            Grid->Cells[0][0]="2D Code";
+            Grid->Cells[1][0]="Bin";
+            Grid->Cells[2][0]="HBin";
+            Grid->Cells[3][0]="SBin";
+            Grid->Cells[4][0]="RetestCode";
+            Grid->Cells[5][0]="DiePass";
+
+            for(i=0; i<Count; i++)
+            {
+                AnsiString Rest=Lines->Strings[i];
+                for(c=0; c<6; c++)
+                {
+                    AnsiString Field;
+                    int Tab=Rest.Pos("\t");
+                    if(Tab>0)
+                    {
+                        Field=Rest.SubString(1, Tab-1);
+                        Rest=Rest.SubString(Tab+1, Rest.Length());
+                    }
+                    else
+                    {
+                        Field=Rest;
+                        Rest="";
+                    }
+                    Grid->Cells[c][1+i]=Field;
+                }
+            }
+            Dlg->ShowModal();
+        }
+        __finally
+        {
+            delete Dlg;
+        }
+    }
+    __finally
+    {
+        delete Lines;
+    }
 }
 //---------------------------------------------------------------------------
 

@@ -425,6 +425,15 @@ bool TColorModule::DoReadColor2D(int Flag)
                 sTrayID2D=AnsiString("COLOR2D_")+Now().FormatString("hhnnsszzz");
                 return true;
             }
+            //AI(HT160S-Maintainer) 20260612 : gate the Color CCD connect/shot
+            //trigger on CosFunction.bUseColorCcd ([ColorCCD] Enable), mirroring how
+            //aLoader gates the Top CCD on CosFunction.bUse2DBinMap. When disabled,
+            //skip the camera and report no 2D code so the supply flow continues.
+            if(CosFunction.bUseColorCcd==false)
+            {
+                sTrayID2D="";
+                return true;
+            }
             EnsureColorCcdSocketCreated();
             if(ColorCcdSocket!=NULL)
                 ColorCcdSocket->ColorCcdConnect();

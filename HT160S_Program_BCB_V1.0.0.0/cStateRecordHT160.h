@@ -60,9 +60,23 @@ private:
     void       WriteTaskHistoryCsv(AnsiString Path);
     void       WriteCurrentTasksTxt(AnsiString Path);
     void       WriteMachineStateIni(AnsiString Path, AnsiString Reason, AnsiString Stamp);
+    //AI(ht160s-lot-webapi) 20260612 : full Lot work order as JSON (lot names +
+    //  every 2D code with Bin/HBin/SBin/RetestCode/DiePass), so a snapshot carries
+    //  the actual sort data, not just the [LotList] counts in MachineState.ini.
+    void       WriteLotDataJson(AnsiString Path, AnsiString Reason, AnsiString Stamp);
+    //AI(ht160s-state-record-analysis) 20260612 : motor positions + SortArm sub-task +
+    //  sucker vacuum, so "sucker not raised during move" is diagnosable from a snapshot.
+    void       WriteMotionDetailIni(AnsiString Path);
+    //AI(ht160s-state-record-analysis) 20260616 : SortArm held-IC routing + per-Auto
+    //  working-tray cell map, so the place/discharge threshold-mismatch deadlock is
+    //  diagnosable offline (which cell blocks the held pattern) without re-running config.
+    void       WriteSortArmDecisionTxt(AnsiString Path);
     void       CaptureConfig(AnsiString DstRootWithSlash);
     //AI(ht160s-secsgem) 20260611 : package today's SECS/GEM log (gated by CosFunction.bUseSecsGem)
     void       CaptureSecsLog(AnsiString DstRootWithSlash);
+    //AI(ht160s-lot-webapi) 20260612 : package today's Lot WebAPI log if one exists
+    //  (the log only exists when a pull actually ran, i.e. the feature was in use).
+    void       CaptureWebApiLog(AnsiString DstRootWithSlash);
 
 public:
     cStateRecordHT160();

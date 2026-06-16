@@ -4,9 +4,15 @@
 
 #include "myMC88X1motor.h"
 #include "MC88X1P_DLL.h"
+#include "..\MachineType.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
-#define MC88X1_DEFAULT_HOME_TYPE       90
+//AI(general) 20260616 : default home type 7 (card-native MC88X1MotHome) like
+//legacy HT160. The port hardcoded 90 and dropped the per-motor HomeType config
+//load, which forced every axis through the manual HomeType90() seek/leave/touch
+//routine; the suck-nozzle Z axes stalled in its phase-B leave-sensor loop and
+//never homed in the Teach screen.
+#define MC88X1_DEFAULT_HOME_TYPE       7
 #define MC88X1_DEFAULT_HOME_STEP       5
 #define MC88X1_DEFAULT_HOME_STEP_RANGE 100
 #define MAX_MC88X1_CARD                16
@@ -114,8 +120,18 @@ int TMyMC88X1Motor::InitMotor(int IoAddress)
     bAxisID=(unsigned char)(1<<iPortID);
     bLineAxisID=bAxisID;
 
+    //AI(general) 20260612 : open the axis card at boot even when the motor is
+    //disabled in Mot_Table, so a motor enabled later from the motor-test screen
+    //(reload uses bInitial=false and never calls InitMotor again) still finds an
+    //opened card. Same root cause as the MN200 open-at-boot fix. Legacy HT160
+    //opened the card unconditionally in the constructor. Skipped in simulation.
     if(!Enable)
+    {
+#ifndef SOFT_SIMULATE
+        Open_MC88X1Card();
+#endif
         return 0;
+    }
     if(Open_MC88X1Card()==false)
     {
         Enable=false;
@@ -331,6 +347,7 @@ bool TMyMC88X1Motor::MoveTo(int Tar)
 {
     long Distance[8]={0,0,0,0,0,0,0,0};
     long TargetPulse;
+    long NowPulse;
     if(MotorIdleSafeDoorCheck!=NULL && MotorIdleSafeDoorCheck()==true)
         return false;
     if(!Enable)
@@ -350,8 +367,18 @@ bool TMyMC88X1Motor::MoveTo(int Tar)
     MC88X1PMotPtp((BYTE)iBoardID, bAxisID, bAxisID,
                   Distance[0], Distance[1], Distance[2], Distance[3],
                   Distance[4], Distance[5], Distance[6], Distance[7]);
-    if(MotionDone() && TargetPulse==ReadMC88X1RealPos()/GearRatio)
-        return true;
+    //AI(general) 20260612 : compare raw card pulses like legacy HT160. The unit
+    //domain compare (ReadPos()/GearRatio) truncates and never matches for the
+    //fractional gear ratios in Mot_Table (0.9, 0.5, 0.1, 0.04), so the move task
+    //would never report done.
+    NowPulse=0;
+    if(MotionDone() && ERROR_SUCCESS==MC88X1PGetTheorecticalRegister((BYTE)iBoardID, bAxisID, &NowPulse))
+    {
+        if(Direction)
+            NowPulse=-NowPulse;
+        if(NowPulse==TargetPulse)
+            return true;
+    }
     return false;
 }
 //---------------------------------------------------------------------------
@@ -978,10 +1005,10 @@ void TMyMC88X1Motor::EnableSetInPosition(bool SetEnable)
 //---------------------------------------------------------------------------
 void TMyMC88X1Motor::SetPos(int pos)
 {
-    if(Direction==1)
-        SetCommand(-pos);
-    else
-        SetCommand(pos);
+    //AI(general) 20260612 : SetCommand of this class already negates by Direction
+    //internally (legacy SetCommand did not), so the legacy pre-negation here would
+    //double-negate the command register and ReadPos would return -pos.
+    SetCommand(pos);
     SetPosition(pos);
 }
 //---------------------------------------------------------------------------

@@ -4,6 +4,7 @@
 //---------------------------------------------------------------------------
 #include "uPadInterface.h"
 #include "database.h"
+#include "cCommLog.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "SPComm"
@@ -719,5 +720,9 @@ void TfPadInterface::RecordCommunication(AnsiString aTitle, AnsiString Command)
     Memo_PadInterface->Lines->Add(LineText);
     if(Memo_PadInterface->Lines->Count>1000)
         Memo_PadInterface->Lines->Delete(0);
+
+    //AI(ht160s-maintainer) 20260615 : persist Pad send/connect events to the
+    //daily PadLog CSV (RX is logged from ComPort::PadCommReceiveData).
+    g_PadCommLog.Log(aTitle, Command);
 }
 //---------------------------------------------------------------------------

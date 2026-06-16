@@ -11,6 +11,7 @@
 #include "uteach.h"
 #include "SecsGem\uHGemEquipment.h"
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
+#include "CosFunction.h"      //AI(ht160s-state-record-analysis) 20260616 : TrayForm recipe geometry for DescribeStation cell map
 #include "aSortArm.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -18,6 +19,9 @@
 TAutoModule *AutoModule=NULL;
 //---------------------------------------------------------------------------
 static const int AUTO_STATION_COUNT=6;
+//AI(ht160s-agv) 20260615 : simulation output-car-full threshold (trays) for the AGV
+//  AGVSupplement trigger. Real machine uses the SnAutoX_InputFullTray sensor instead.
+static const int AMR_FULL_TRAY_SIM=10;
 //---------------------------------------------------------------------------
 static bool IsSensorOnReady(TMySensor *Sensor)
 {
@@ -61,7 +65,7 @@ TAutoModule::TAutoModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-void TAutoModule::InitialFlag()
+void TAutoModule::InitialFlag(bool bKeepMaterial)
 {
     TTrayMotor *TrayMotor=NULL;
 
@@ -78,12 +82,18 @@ void TAutoModule::InitialFlag()
     {
         TrayMotor=GetAutoVMotor(Index);
         State[Index].bCarHasTray=(TrayMotor!=NULL && TrayMotor->fHasTray);
+        State[Index].bCleanOutFinish=false;
+        bCleanOutCheck[Index]=false;
+        bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
+        //AI(HT160S-Maintainer) 20260612 : on a recoverable home keep the car stack + its
+        //tray roles/2D identity so the Auto does not forget what it is holding. Only the
+        //sensor-backed presence above and the cleanout transient flags are refreshed.
+        if(bKeepMaterial)
+            continue;
         State[Index].bRearHasTray=false;
         State[Index].bRearCanUse=false;
         State[Index].bFrontHasTray=false;
         State[Index].bFullIC=false;
-        State[Index].bCleanOutFinish=false;
-        bCleanOutCheck[Index]=false;
         bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 latch reset
         RearKind[Index]=eTrayKindNormal;     //AI(HT160S-Maintainer) 20260605 : AMR reset
         WorkingKind[Index]=eTrayKindNormal;  //AI(HT160S-Maintainer) 20260605 : AMR reset
@@ -851,6 +861,10 @@ int TAutoModule::GetTrayRequest(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return eTrayReqNone;
+    //AI(ht160s-agv) 20260615 : while a full car is being handed to the AGV, refuse new
+    //trays so TrayArm stops feeding this Auto until the handoff finishes (ClearAmrCar).
+    if(bAmrLocked[Index])
+        return eTrayReqNone;
     RefreshAutoState();
     if(State[Index].bCarHasTray)
         return eTrayReqNone;                 // car still busy with a working tray
@@ -906,6 +920,207 @@ bool TAutoModule::IsReadyForSortArmPlace(int Index)
     return (WorkingKind[Index]==eTrayKindNormal);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260615 : output-car-full test used by the SECS AGV coordinator to
+//  raise AGVSupplement (CEID272). Simulation has no sensor, so it uses a logical tray
+//  threshold; the real machine reads the per-Auto InputFullTray sensor (same source
+//  ServiceCarFull treats as the physical last line of defense).
+bool TAutoModule::IsOutputCarFullForAmr(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    if(IsSoftSimulate())
+        return (Car[Index].iTrayCount >= AMR_FULL_TRAY_SIM);
+    TMySensor *FullSensor=GetInputFullTray(Index);
+    return (FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
+}
+//---------------------------------------------------------------------------
+void TAutoModule::SetAmrLock(int Index, bool bLock)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return;
+    bAmrLocked[Index]=bLock;
+}
+//---------------------------------------------------------------------------
+bool TAutoModule::IsAmrLocked(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    return bAmrLocked[Index];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260615 : Ready (CEID273) condition. The Auto has stacked every tray
+//  into the car - no working tray, no rear tray (none in transit), nothing left to
+//  discharge. With the AMR lock on, TrayArm cannot feed it, so this state is stable.
+bool TAutoModule::IsDrainedForAmr(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    RefreshAutoState();
+    return (!State[Index].bCarHasTray
+            && !State[Index].bRearHasTray
+            && !bRearDeliveredPending[Index]
+            && !State[Index].bFullIC);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260615 : Finish (CEID274) condition. The AGV has removed the full car.
+//  Simulation reports taken so the handshake is testable end-to-end; the real machine
+//  needs a per-Auto "car taken" IO point (TBD) wired here - until then it returns false
+//  and the handshake holds at Ready (production stays parked on that Auto).
+bool TAutoModule::IsAmrTaken(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    if(IsSoftSimulate())
+        return true;
+    return false;   // TODO: read the SnAutoX car-taken sensor once the IO point exists
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260615 : AGV finish - empty the output car, re-seed the stack roles,
+//  and release the lock so production resumes (mirrors ServiceCarFull's clear, without
+//  the operator modal).
+void TAutoModule::ClearAmrCar(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return;
+    Car[Index].Clear();
+    InitAutoCarStack(Index);
+    bAmrLocked[Index]=false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260616 : read-only state + working-tray cell
+//map for the Store Hangup SortArmDecision.txt. Lets an offline snapshot show WHY
+//an Auto neither accepts a SortArm place (no contiguous EMPTY_IC run) nor discharges
+//(discharge needs FullThisIC(HAS_OK_IC) = EVERY cell a good IC). Iterates only the
+//recipe tray region clamped to the Data[] array bounds (mirrors MyMotor's
+//GetTrayRealXCount/YCount), so an out-of-range recipe cannot overflow.
+int TAutoModule::GetStationCount()
+{
+    return AUTO_STATION_COUNT;
+}
+//---------------------------------------------------------------------------
+AnsiString TAutoModule::DescribeStation(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return "";
+
+    RefreshAutoState();
+
+    AnsiString s;
+    s  = "[Auto" + IntToStr(Index+1) + "]\r\n";
+    s += "  CarHasTray="  + IntToStr(State[Index].bCarHasTray ? 1 : 0)
+       + "  RearHasTray=" + IntToStr(State[Index].bRearHasTray ? 1 : 0)
+       + "  FullIC="      + IntToStr(State[Index].bFullIC ? 1 : 0)
+       + "  RearPending=" + IntToStr(bRearDeliveredPending[Index] ? 1 : 0)
+       + "  AmrLocked="   + IntToStr(bAmrLocked[Index] ? 1 : 0)
+       + "  WorkingKind=" + IntToStr(WorkingKind[Index]) + "\r\n";
+
+    TTrayMotor *V=GetAutoVMotor(Index);
+    if(V==NULL)
+    {
+        s += "  (no working V motor)\r\n";
+        return s;
+    }
+    if(V->fHasTray==false)
+    {
+        s += "  (working car empty - no tray)\r\n";
+        return s;
+    }
+
+    int xEnd=TrayForm.XDivision;
+    if(xEnd<1) xEnd=1;
+    if(xEnd>MAX_TRAY_X) xEnd=MAX_TRAY_X;
+    int yEnd=TrayForm.YDivision;
+    if(yEnd<1) yEnd=1;
+    if(yEnd>MAX_TRAY_Y) yEnd=MAX_TRAY_Y;
+
+    int nEmpty=0, nOk=0, nUnchk=0, nOther=0;
+    s += "  Cells (row=Y, col=X ; .=empty O=OK ?=uncheck #=other):\r\n";
+    for(int y=0; y<yEnd; y++)
+    {
+        AnsiString Row="    ";
+        for(int x=0; x<xEnd; x++)
+        {
+            int d=V->Tray.Data[x][y];
+            if(d==EMPTY_IC)        { Row+="."; nEmpty++; }
+            else if(d==HAS_OK_IC)  { Row+="O"; nOk++;    }
+            else if(d==UNCHECK_IC) { Row+="?"; nUnchk++; }
+            else                   { Row+="#"; nOther++; }
+        }
+        s += Row + "\r\n";
+    }
+    s += "  Counts: empty=" + IntToStr(nEmpty)
+       + " ok="      + IntToStr(nOk)
+       + " uncheck=" + IntToStr(nUnchk)
+       + " other="   + IntToStr(nOther) + "\r\n";
+    return s;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260612 : AMR output-car full handling. The car book-keeping
+//(Car[].iTrayCount) only grows on DoFeedTray and is never reset by discharge/cleanout,
+//so once it reaches MAX_TRAY_PER_CAR GetNextTrayKindForAuto()/GetTrayRequest() return -1
+//forever and TrayArm stops feeding that Auto. This services a full car each idle scan :
+//  - Simulation (IsSoftSimulate): no physical car/AMR, so logically recycle the full
+//    car (stands in for the AMR car-swap) and keep running.
+//  - Real machine : pop an alarm so the operator changes the car, and only clear the
+//    data after the operator confirms.
+//  - Last line of defense : the physical InputFullTray sensor. While it reads ON keep
+//    alarming until the operator physically clears the stack (sensor OFF).
+//Scoped to AMR + Run_Normal so Normal/CleanOut behavior is unchanged.
+void TAutoModule::ServiceCarFull()
+{
+    if(GeneralSetting.bUseAMR==false)
+        return;
+    if(HSys.Sys.RunMode!=Run_Normal)
+        return;
+
+    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+    {
+        //AI(ht160s-agv) 20260615 : when the SECS link is up, hand a full car to the AGV
+        //(the CEID272/273/274 handshake clears it via ClearAmrCar) instead of popping the
+        //operator full-car modal. While the host is disconnected this falls through to the
+        //original modal + manual car change, so offline behavior is unchanged.
+        if(HGem!=NULL && HGem->IsSelected())
+            continue;
+
+        bool bLogicalFull=(Car[Index].iTrayCount>=MAX_TRAY_PER_CAR);
+
+        if(IsSoftSimulate())
+        {
+            if(bLogicalFull)
+            {
+                Car[Index].Clear();
+                InitAutoCarStack(Index);
+            }
+            continue;
+        }
+
+        TMySensor *FullSensor=GetInputFullTray(Index);
+        bool bSensorFull=(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
+
+        if(bSensorFull)
+        {
+            AnsiString ErrorText;
+            ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
+            do
+            {
+                ShowMyError(ErrorText, K_RETRY);
+                FullSensor=GetInputFullTray(Index);
+            }
+            while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
+            Car[Index].Clear();
+            InitAutoCarStack(Index);
+        }
+        else if(bLogicalFull)
+        {
+            AnsiString ErrorText;
+            ErrorText.sprintf("Auto%d output car full (%d trays) - change car then confirm", Index+1, MAX_TRAY_PER_CAR);
+            ShowMyError(ErrorText, K_RETRY);
+            Car[Index].Clear();
+            InitAutoCarStack(Index);
+        }
+    }
+}
+//---------------------------------------------------------------------------
 void TAutoModule::DoAuto(int &Task)
 {
     if(HSys.Sys.RunMode==Run_CleanOut && IsAllCleanOutFinish())
@@ -926,6 +1141,7 @@ void TAutoModule::DoAuto(int &Task)
                 break;
             }
             CheckAutoTray();
+            ServiceCarFull();   //AI(HT160S-Maintainer) 20260612 : AMR car-full sim-clear / alarm / Full-sensor last line
             Task=1000;
             break;
 

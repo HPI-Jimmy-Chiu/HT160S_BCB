@@ -45,7 +45,7 @@ TSortArmModule::TSortArmModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-void TSortArmModule::InitialFlag()
+void TSortArmModule::InitialFlag(bool bKeepMaterial)
 {
     PickTask=1;
     PlaceTask=1;
@@ -56,7 +56,31 @@ void TSortArmModule::InitialFlag()
     bCleanOutFinish=false;
     bOneCycleFinish=false;
     for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
-        ClearSlot(SlotIndex);
+    {
+        //AI(HT160S-Maintainer) 20260612 : recoverable home with a sucked IC still on this
+        //slot : keep the IC (TrayData/BinValue) and RE-ASSERT the vacuum so it cannot fall
+        //during the re-home, dropping only the transient pick/place selection. The held IC
+        //is placed to its Auto on resume (DoSortArm case 1 -> HasHoldingIC -> place).
+        if(bKeepMaterial && Slot[SlotIndex].bHasIC)
+        {
+            TMySucker *Sucker=GetSucker(SlotIndex);
+            Slot[SlotIndex].bCanPick=false;
+            Slot[SlotIndex].bPlaceSelected=false;
+            Slot[SlotIndex].PickX=0;
+            Slot[SlotIndex].PickY=0;
+            Slot[SlotIndex].PlaceX=0;
+            Slot[SlotIndex].PlaceY=0;
+            if(Sucker!=NULL && IsSoftSimulate()==false)
+            {
+                Sucker->Reset();   //clear sub-task only : does NOT touch the vacuum output
+                Sucker->On();      //re-assert suck so the held IC cannot drop during home
+            }
+        }
+        else
+        {
+            ClearSlot(SlotIndex);
+        }
+    }
     UpdateKitSuckState();
 }
 //---------------------------------------------------------------------------
@@ -75,6 +99,8 @@ void TSortArmModule::ClearSlot(int SlotIndex)
     Slot[SlotIndex].PlaceY=0;
     Slot[SlotIndex].TrayData=EMPTY_IC;
     Slot[SlotIndex].BinValue=0;
+    Slot[SlotIndex].LotIndex=-1;       //AI(ht160s-lotbin) 20260615 : clear carried lot
+    Slot[SlotIndex].Code2D="";         //AI(ht160s-lotbin) 20260615 : clear carried 2D code
     if(Sucker!=NULL)
     {
         Sucker->Item=EMPTY_IC;
@@ -536,20 +562,44 @@ bool TSortArmModule::FindPickCells(int LoaderNo)
     TTrayMotor *TrayMotor=GetLoaderVMotor(LoaderNo);
     int XCount=GetTrayXCount();
     int YCount=GetTrayYCount();
+    int FirstEnabled;
 
     ClearPickSelection();
     if(TrayMotor==NULL || TrayMotor->fHasTray==false)
         return false;
 
+    //AI(ht160s-maintainer) 20260616 : per-nozzle enable. Find the first ENABLED sucker
+    //and anchor it (not slot 0) to the anchor cell, so a disabled leading slot does not
+    //deadlock (the anchor cell would otherwise always map to a slot that never picks).
+    //The X geometry in MoveToLoaderPick uses BaseX=PickX-FirstSlot, so any starting slot
+    //is handled. If every nozzle is disabled there is nothing to pick.
+    FirstEnabled=-1;
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(GeneralSetting.bSuckerEnabled[s])
+        {
+            FirstEnabled=s;
+            break;
+        }
+    }
+    if(FirstEnabled<0)
+        return false;
+
+    //AI(ht160s-maintainer) 20260616 : the anchor cell column must be >= FirstEnabled.
+    //With the leftmost nozzle(s) disabled the suckers physically cannot reach tray
+    //columns 0..FirstEnabled-1 (BaseX would be negative and MoveToLoaderPick would
+    //retry forever), so those edge cells are LEFT in the tray instead of stalling.
     for(int YIndex=0; YIndex<YCount; YIndex++)
     {
-        for(int XIndex=0; XIndex<XCount; XIndex++)
+        for(int XIndex=FirstEnabled; XIndex<XCount; XIndex++)
         {
             if(IsPickableData(TrayMotor->Tray.Data[XIndex][YIndex]))
             {
-                for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
+                for(int SlotIndex=FirstEnabled; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
                 {
-                    int TrayX=XIndex+SlotIndex;
+                    int TrayX=XIndex+(SlotIndex-FirstEnabled);
+                    if(GeneralSetting.bSuckerEnabled[SlotIndex]==false)
+                        continue;
                     if(TrayX<XCount && IsPickableData(TrayMotor->Tray.Data[TrayX][YIndex]))
                     {
                         Slot[SlotIndex].bCanPick=true;
@@ -558,6 +608,10 @@ bool TSortArmModule::FindPickCells(int LoaderNo)
                         Slot[SlotIndex].TrayData=TrayMotor->Tray.Data[TrayX][YIndex];
                         //AI(HT160S-Maintainer) 20260604 : P4 capture 2D-looked-up bin for routing.
                         Slot[SlotIndex].BinValue=TrayMotor->GetTrayBin(TrayX, YIndex);
+                        //AI(ht160s-lotbin) 20260615 : carry owning lot + 2D code for By Lot+Bin
+                        //routing and Production_Log; harmless in Normal mode (unused).
+                        Slot[SlotIndex].LotIndex=TrayMotor->GetTrayLot(TrayX, YIndex);
+                        Slot[SlotIndex].Code2D=TrayMotor->GetTrayCode2D(TrayX, YIndex);
                     }
                 }
                 return true;
@@ -579,11 +633,31 @@ int TSortArmModule::GetSlotRoutingBin(int SlotIndex)
     return Slot[SlotIndex].TrayData;
 }
 //---------------------------------------------------------------------------
-int TSortArmModule::GetMappedAutoIndex(int BinData, bool &bFixedArea)
+int TSortArmModule::GetMappedAutoIndex(int BinData, int LotIndex, bool &bFixedArea)
 {
     int Area;
 
     bFixedArea=false;
+    //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode. The (Lot,Bin) pair was bound to
+    //an Auto at CCD scan time (LotBinBinding.ResolveAuto), so here we only READ the
+    //binding - no allocation side-effect during the per-slot/per-Auto place scan.
+    //Error bins (2D fail / no bin setting) and ICs with no owning lot route to the
+    //Error Auto. Color is not used for sorting in this mode (AMR identity tray only).
+    if(GeneralSetting.bUseLotBinSortMode)
+    {
+        int AutoIndex;
+        bFixedArea=true;
+        if(LotIndex>=0 && BinAreaMap.IsErrorBin(BinData)==false)
+        {
+            AutoIndex=LotBinBinding.FindAuto(LotIndex, BinData);
+            if(AutoIndex>=0)
+                return AutoIndex;
+        }
+        Area=BinAreaMap.GetErrorBinArea();
+        if(Area>=eHT160BinAreaAuto1 && Area<=eHT160BinAreaAuto6)
+            return Area-eHT160BinAreaAuto1;
+        return -1;
+    }
     if(CosFunction.bUseBinAreaMap)
     {
         Area=BinAreaMap.GetAreaByBin(BinData);
@@ -623,7 +697,7 @@ bool TSortArmModule::CanPlaceSlotToAuto(int SlotIndex, int AutoIndex)
     if(SlotIndex<0 || SlotIndex>=SORT_ARM_SUCKER_COUNT || Slot[SlotIndex].bHasIC==false)
         return false;
 
-    MappedAutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), bFixedArea);
+    MappedAutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, bFixedArea);
     if(MappedAutoIndex>=0)
         return (MappedAutoIndex==AutoIndex);
     return (bFixedArea==false);
@@ -718,7 +792,7 @@ bool TSortArmModule::SelectPlaceAuto()
         if(Slot[SlotIndex].bHasIC)
         {
             bool bFixedArea=false;
-            int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), bFixedArea);
+            int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, bFixedArea);
             if(AutoIndex>=0 && FindPlaceCells(AutoIndex))
             {
                 iActiveAutoIndex=AutoIndex;
@@ -813,6 +887,16 @@ void TSortArmModule::TransferPickDataFromLoader()
             TMySucker *Sucker=GetSucker(SlotIndex);
             TrayMotor->SetTraySingleData(Slot[SlotIndex].PickX, Slot[SlotIndex].PickY, EMPTY_IC);
             g_DeviceInfo.AddInputInfo(SlotIndex, Slot[SlotIndex].PickY, Slot[SlotIndex].PickX, "");
+            //AI(ht160s-lotbin) 20260615 : record this IC's owning Lot + 2D code on the
+            //production trace line. Empty for ICs picked without a 2D lookup (Normal mode
+            //or pre-feature data) - the columns simply stay blank.
+            {
+                AnsiString sLotID="";
+                TLotRunInfo *Lot=LotRegistry.GetLot(Slot[SlotIndex].LotIndex);
+                if(Lot!=NULL)
+                    sLotID=Lot->sLotID;
+                g_DeviceInfo.AddIcIdentity(SlotIndex, sLotID, Slot[SlotIndex].Code2D);
+            }
             Slot[SlotIndex].bHasIC=true;
             Slot[SlotIndex].bCanPick=false;
             if(Sucker!=NULL)
@@ -1047,6 +1131,60 @@ bool TSortArmModule::IsOneCycleFinish()
     return bOneCycleFinish;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260612 : expose pick/place sub-task so the
+//Store Hangup snapshot can record WHICH step the arm is in (e.g. 30 = moving XY,
+//40 = Z-down). Top-level DoSortArm Task only shows 1/100/200.
+int TSortArmModule::GetPickTask()
+{
+    return PickTask;
+}
+//---------------------------------------------------------------------------
+int TSortArmModule::GetPlaceTask()
+{
+    return PlaceTask;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260616 : read-only dump of what the arm is
+//holding and where each held IC routes, for the Store Hangup SortArmDecision.txt.
+//Pairs with TAutoModule::DescribeStation so "SortArm frozen at place" can be traced
+//to "slot held bin=X -> Auto Y, but Y has no contiguous EMPTY_IC run that fits".
+//GetSlotRoutingBin / GetMappedAutoIndex are pure lookups (no allocation side-effect),
+//so calling them here does NOT disturb the live place decision.
+AnsiString TSortArmModule::DescribeHolding()
+{
+    AnsiString s;
+    s  = "[SortArm]\r\n";
+    s += "PickTask=" + IntToStr(PickTask) + "  PlaceTask=" + IntToStr(PlaceTask) + "\r\n";
+    s += "ActiveLoaderNo=" + IntToStr(iActiveLoaderNo)
+       + "  ActiveAutoIndex=" + IntToStr(iActiveAutoIndex) + "\r\n";
+
+    int HoldCount=0;
+    for(int i=0; i<SORT_ARM_SUCKER_COUNT; i++)
+        if(Slot[i].bHasIC)
+            HoldCount++;
+    s += "HoldingIC=" + IntToStr(HoldCount) + " / " + IntToStr(SORT_ARM_SUCKER_COUNT) + "\r\n";
+
+    for(int i=0; i<SORT_ARM_SUCKER_COUNT; i++)
+    {
+        s += "  Slot" + IntToStr(i) + ": hasIC=" + IntToStr(Slot[i].bHasIC ? 1 : 0);
+        if(Slot[i].bHasIC)
+        {
+            int  RouteBin = GetSlotRoutingBin(i);
+            bool bFixed   = false;
+            int  Mapped   = GetMappedAutoIndex(RouteBin, Slot[i].LotIndex, bFixed);
+            AnsiString Dest = (Mapped>=0) ? ("Auto"+IntToStr(Mapped+1)) : AnsiString("none(Color/Err)");
+            s += "  TrayData=" + IntToStr(Slot[i].TrayData)
+               + "  Bin="      + IntToStr(Slot[i].BinValue)
+               + "  RouteBin=" + IntToStr(RouteBin)
+               + "  LotIdx="   + IntToStr(Slot[i].LotIndex)
+               + "  Code2D="   + Slot[i].Code2D
+               + "  ->" + Dest;
+        }
+        s += "\r\n";
+    }
+    return s;
+}
+//---------------------------------------------------------------------------
 void TSortArmModule::DoSortArm(int &Task)
 {
     if(LoaderModule==NULL)
@@ -1095,13 +1233,15 @@ void TSortArmModule::DoSortArm(int &Task)
             break;
 
         case 200:
-            if(HasHoldingIC()==false)
+            if(HasHoldingIC()==false && PlaceTask<=1)   // no holding IC and place is idle : nothing to place, leave case 200
             {
                 Task=1;
                 break;
             }
             if(DoPlaceToAuto(1))
+            {
                 Task=HasHoldingIC()?200:1;
+            }
             break;
 
         default:

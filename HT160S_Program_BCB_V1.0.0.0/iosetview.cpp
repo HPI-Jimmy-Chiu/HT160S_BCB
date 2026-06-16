@@ -99,8 +99,9 @@ void RegisterIOViewStreamClasses()
     RegisterClass(__classid(TPopupMenu));
     RegisterClass(__classid(TMenuItem));
     RegisterClass(__classid(TDataSource));
-    RegisterClass(__classid(TDBNavigator));
-    RegisterClass(__classid(TDBGrid));
+    //AI(general) 20260613 : TDBNavigator/TDBGrid registrations removed - the
+    //DBNavigator1/DBGrid1 controls were deleted from iosetview.dfm. TTable and
+    //TDataSource stay registered because ioTable/DataSource1 remain in the DFM.
     RegisterClass(__classid(TTable));
     RegisterClass(__classid(TMemo));
     RegisterClass(__classid(TImage));
@@ -114,15 +115,13 @@ void RegisterIOViewStreamClasses()
 __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     : TForm(Owner)
 {
-    pnIOTableEditorToolbar=NULL;
-    cbbType=NULL;
-    cbbLane=NULL;
-    edtSearchIO=NULL;
-    btnAddIO=NULL;
-    btnDeleteIO=NULL;
-    btnModify=NULL;
-    sbUpdate=NULL;
-    strngrdIoTable=NULL;
+    //AI(general) 20260613 : the IO Table editor controls (pnIOTableEditorToolbar,
+    //cbbType, cbbLane, edtSearchIO, btnAddIO/btnDeleteIO/btnModify/sbUpdate,
+    //sbIOEditorRefresh, strngrdIoTable) are now streamed from iosetview.dfm. They
+    //must NOT be set to NULL here: DFM streaming runs inside the base TForm(Owner)
+    //constructor before this body, so a NULL assignment would clobber the wired
+    //pointers. EnsureIOTableEditor() now runs grid setup once via the flag below.
+    bIOTableEditorReady=false;
     IOTableDeletedTags=new TStringList();
     ManualOutputLog=new TStringList();
     iSelectRow=0;
@@ -217,148 +216,21 @@ void Tfiosetview::RefreshMN200()
     }
 }
 //---------------------------------------------------------------------------
+//AI(general) 20260613 : the IO Table editor controls (toolbar, filter combos,
+//search edit, action buttons, grid) and their combo Items now live in
+//iosetview.dfm, parented to pn_IODatabase. This routine no longer builds them;
+//it only performs the one-time grid header/format setup and the initial load,
+//guarded by bIOTableEditorReady so repeated FormShow/button calls do not redo it.
 void Tfiosetview::EnsureIOTableEditor()
 {
-    TPanel *Host;
-    TLabel *LabelPtr;
-    TSpeedButton *RefreshButton;
-    int LaneIndex;
-
-    if(strngrdIoTable!=NULL)
+    if(bIOTableEditorReady)
+        return;
+    if(strngrdIoTable==NULL)
         return;
 
-    Host=dynamic_cast<TPanel *>(FindComponent("pn_IODatabase"));
-    if(Host==NULL)
-        return;
-
-    HideLegacyIOTableEditor();
-
-    pnIOTableEditorToolbar=new TPanel(Host);
-    pnIOTableEditorToolbar->Parent=Host;
-    pnIOTableEditorToolbar->Align=alTop;
-    pnIOTableEditorToolbar->Height=48;
-    pnIOTableEditorToolbar->BevelOuter=bvNone;
-    pnIOTableEditorToolbar->Color=IO_COLOR_FORM;
-
-    LabelPtr=new TLabel(pnIOTableEditorToolbar);
-    LabelPtr->Parent=pnIOTableEditorToolbar;
-    LabelPtr->Left=10;
-    LabelPtr->Top=7;
-    LabelPtr->Caption="Type";
-
-    cbbType=new TComboBox(pnIOTableEditorToolbar);
-    cbbType->Parent=pnIOTableEditorToolbar;
-    cbbType->Left=10;
-    cbbType->Top=22;
-    cbbType->Width=105;
-    cbbType->Style=csDropDownList;
-    cbbType->Items->Add("All");
-    cbbType->Items->Add("Sensor");
-    cbbType->Items->Add("Sucker");
-    cbbType->Items->Add("Switch");
-    cbbType->Items->Add("Cylinder");
-    cbbType->ItemIndex=0;
-    cbbType->OnChange=cbbTypeChange;
-
-    LabelPtr=new TLabel(pnIOTableEditorToolbar);
-    LabelPtr->Parent=pnIOTableEditorToolbar;
-    LabelPtr->Left=125;
-    LabelPtr->Top=7;
-    LabelPtr->Caption="Lane";
-
-    cbbLane=new TComboBox(pnIOTableEditorToolbar);
-    cbbLane->Parent=pnIOTableEditorToolbar;
-    cbbLane->Left=125;
-    cbbLane->Top=22;
-    cbbLane->Width=75;
-    cbbLane->Style=csDropDownList;
-    cbbLane->Items->Add("All");
-    for(LaneIndex=0; LaneIndex<10; LaneIndex++)
-        cbbLane->Items->Add(IntToStr(LaneIndex));
-    cbbLane->ItemIndex=0;
-    cbbLane->OnChange=cbbTypeChange;
-
-    LabelPtr=new TLabel(pnIOTableEditorToolbar);
-    LabelPtr->Parent=pnIOTableEditorToolbar;
-    LabelPtr->Left=212;
-    LabelPtr->Top=7;
-    LabelPtr->Caption="Search Alias";
-
-    edtSearchIO=new TEdit(pnIOTableEditorToolbar);
-    edtSearchIO->Parent=pnIOTableEditorToolbar;
-    edtSearchIO->Left=212;
-    edtSearchIO->Top=22;
-    edtSearchIO->Width=180;
-    edtSearchIO->OnChange=edtSearchIOChange;
-
-    btnAddIO=new TSpeedButton(pnIOTableEditorToolbar);
-    btnAddIO->Parent=pnIOTableEditorToolbar;
-    btnAddIO->Left=410;
-    btnAddIO->Top=12;
-    btnAddIO->Width=70;
-    btnAddIO->Height=28;
-    btnAddIO->Caption="Add";
-    btnAddIO->OnClick=btnAddIOClick;
-
-    btnDeleteIO=new TSpeedButton(pnIOTableEditorToolbar);
-    btnDeleteIO->Parent=pnIOTableEditorToolbar;
-    btnDeleteIO->Left=488;
-    btnDeleteIO->Top=12;
-    btnDeleteIO->Width=70;
-    btnDeleteIO->Height=28;
-    btnDeleteIO->Caption="Delete";
-    btnDeleteIO->OnClick=btnDeleteIOClick;
-
-    btnModify=new TSpeedButton(pnIOTableEditorToolbar);
-    btnModify->Parent=pnIOTableEditorToolbar;
-    btnModify->Left=566;
-    btnModify->Top=12;
-    btnModify->Width=70;
-    btnModify->Height=28;
-    btnModify->Caption="Modify";
-    btnModify->OnClick=btnModifyClick;
-
-    sbUpdate=new TSpeedButton(pnIOTableEditorToolbar);
-    sbUpdate->Parent=pnIOTableEditorToolbar;
-    sbUpdate->Left=644;
-    sbUpdate->Top=12;
-    sbUpdate->Width=70;
-    sbUpdate->Height=28;
-    sbUpdate->Caption="Save";
-    sbUpdate->OnClick=sbUpdateClick;
-
-    RefreshButton=new TSpeedButton(pnIOTableEditorToolbar);
-    RefreshButton->Parent=pnIOTableEditorToolbar;
-    RefreshButton->Left=722;
-    RefreshButton->Top=12;
-    RefreshButton->Width=80;
-    RefreshButton->Height=28;
-    RefreshButton->Caption="Refresh";
-    RefreshButton->OnClick=sbIORefreshClick;
-
-    strngrdIoTable=new TStringGrid(Host);
-    strngrdIoTable->Parent=Host;
-    strngrdIoTable->Align=alClient;
-    strngrdIoTable->OnSelectCell=strngrdIoTableSelectCell;
-    strngrdIoTable->OnDblClick=strngrdIoTableDblClick;
-
+    bIOTableEditorReady=true;
     SetupIOTableEditorGrid();
     LoadIoTable(0, 0, 0);
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::HideLegacyIOTableEditor()
-{
-    const char *Names[]={"DBNavigator1", "DBGrid1", "pn_IODatabaseOB0"};
-    TComponent *ComponentPtr;
-    TControl *ControlPtr;
-
-    for(int Index=0; Index<3; Index++)
-    {
-        ComponentPtr=FindComponent(Names[Index]);
-        ControlPtr=dynamic_cast<TControl *>(ComponentPtr);
-        if(ControlPtr!=NULL)
-            ControlPtr->Visible=false;
-    }
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::SetupIOTableEditorGrid()
@@ -882,6 +754,15 @@ void Tfiosetview::SaveIoTableFromGrid()
 
         Lines->SaveToFile(HSys.IoTablePath);
         HSys.LoadIoData();
+        //AI(general) 20260616 : LoadIoData only rebuilds the raw IOTable list.
+        //Cylinder/Switch/Sucker/Sensor runtime objects (CynPtr/SwPtr/SuckPtr/SenPtr)
+        //copy their IP/Port/Bit from IOTable at startup and are NOT refreshed by
+        //LoadIoData, so edited addresses for those types stayed stale until restart.
+        //Re-run the bind step here so sbUpdate takes effect live.
+        HSys.LoadSensorParameterFromDataBase();
+        HSys.LoadCylinderParameterFromDataBase();
+        HSys.LoadSwitchParameterFromDataBase();
+        HSys.LoadSuckerParameterFromDataBase();
         if(IOTableDeletedTags!=NULL)
             IOTableDeletedTags->Clear();
         LoadIoTable((cbbType==NULL)?0:cbbType->ItemIndex, (cbbLane==NULL)?0:cbbLane->ItemIndex, 0);
@@ -2064,4 +1945,5 @@ void __fastcall Tfiosetview::FormClose(TObject *Sender,
     fShow=false;      
 }
 //---------------------------------------------------------------------------
+
 

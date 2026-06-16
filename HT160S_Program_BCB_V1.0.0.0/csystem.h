@@ -41,7 +41,7 @@ bool CheckAllTrayFeedFinish(bool reset=false);
 void ChangeRunMode(RunModeEnum RunMode);
 int GetCalculateUPH(TDateTime tEndTime);
 bool HasAutoICInMachine();
-void InitialAllTask();
+void InitialAllTask(bool bKeepMaterial=false);
 void ScanAllMotorStatus();
 void RecordSafeDoorStates();
 //---------------------------------------------------------------------------

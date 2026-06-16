@@ -198,6 +198,7 @@ private:
     int  iT6Timeout;                  // seconds to wait for Linktest.rsp
     int  iT6Countdown;                // seconds left while awaiting Linktest.rsp
     bool bAwaitLinktestRsp;           // a Linktest.req is outstanding
+    bool bLogLinktest;                // log routine Linktest req/rsp (default off : avoid log flooding)
     unsigned uControlSystemByte;      // SystemBytes generator for our control msgs
     void SendLinktestReq();           // actively send Linktest.req (heartbeat)
     void DropConnection(AnsiString Reason);  // close socket + OnPeerDisconnected
@@ -317,6 +318,7 @@ public:
     //AI(ht160s-secsgem) 20260611 : Linktest heartbeat / T6 timeout config.
     void SetLinktestInterval(int Seconds);     // <=0 disables heartbeat
     void SetT6Timeout(int Seconds);            // <=0 falls back to a safe minimum
+    void SetLogLinktest(bool On);              //AI(ht160s-secsgem) 20260612 : show routine Linktest in log (default off)
 
     //AI(ht160s-secsgem) 20260611 : SECS communication on-disk logging control.
     void SetLogToFile(bool On);                // enable/disable disk logging

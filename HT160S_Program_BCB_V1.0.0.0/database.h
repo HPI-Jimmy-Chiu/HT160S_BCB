@@ -523,7 +523,7 @@ __published:
 
 public:
     __fastcall TDataModule1(TComponent* Owner);
-    void InitialAllTask();
+    void InitialAllTask(bool bKeepMaterial=false);
     void DoAllProcess();
 };
 //---------------------------------------------------------------------------
@@ -549,6 +549,8 @@ typedef struct
     bool bSwStatus[100];
     int iMaxContactCount;
 } LAST_GENERAL_SET;
+//-------------------------------------------------------------------------
+class TMyBinDispCtrl;   //AI(ht160s-maintainer) 20260615 : Bin display controller (MyBinDisp.h)
 //-------------------------------------------------------------------------
 class SYSTEM_MODULAR
 {
@@ -577,6 +579,7 @@ public:
     TList *MotTable;
     TList *IOTable;
     HTGem *MyGem;
+    TMyBinDispCtrl *BinDisCtrl;   //AI(ht160s-maintainer) 20260615 : LED bin display (HSys-owned, created in database.cpp)
     int iTotalMotor;
     int iTotalVMotor;
     int iTotalSensor;

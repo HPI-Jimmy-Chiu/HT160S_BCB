@@ -18,6 +18,7 @@ THT160RecipeManager RecipeManager;
 THT160BinAreaMap BinAreaMap;
 THT160Bin2DMap Bin2DMap;
 THT160LotRegistry LotRegistry;
+THT160LotBinBinding LotBinBinding;
 THT160TrayForm TrayForm;
 //---------------------------------------------------------------------------
 __fastcall THT160RecipeManager::THT160RecipeManager()
@@ -821,6 +822,8 @@ void TLotRunInfo::Clear()
 	dtFirstSeen=0;
 	dtLastSeen=0;
 	bActive=false;
+	sSubstage="";
+	sProductCode="";
 }
 //---------------------------------------------------------------------------
 __fastcall THT160LotRegistry::THT160LotRegistry()
@@ -829,6 +832,10 @@ __fastcall THT160LotRegistry::THT160LotRegistry()
 	m_Code2DIndex->Sorted=true;
 	m_Code2DIndex->Duplicates=dupIgnore;
 	m_Code2DIndex->CaseSensitive=true;
+	m_Code2DInfo=new TStringList;
+	m_Code2DInfo->Sorted=true;
+	m_Code2DInfo->Duplicates=dupIgnore;
+	m_Code2DInfo->CaseSensitive=true;
 	m_LotCount=0;
 	m_LastDupCode="";
 	for(int i=0;i<HT160_MAX_LOT;i++)
@@ -837,7 +844,21 @@ __fastcall THT160LotRegistry::THT160LotRegistry()
 //---------------------------------------------------------------------------
 __fastcall THT160LotRegistry::~THT160LotRegistry()
 {
+	FreeAllIcInfo();
+	delete m_Code2DInfo;
 	delete m_Code2DIndex;
+}
+//---------------------------------------------------------------------------
+void THT160LotRegistry::FreeAllIcInfo()
+{
+	// Delete every heap TLotIcInfo record, then empty the parallel list.
+	for(int i=0;i<m_Code2DInfo->Count;i++)
+	{
+		TLotIcInfo *Info=(TLotIcInfo*)m_Code2DInfo->Objects[i];
+		if(Info!=NULL)
+			delete Info;
+	}
+	m_Code2DInfo->Clear();
 }
 //---------------------------------------------------------------------------
 int THT160LotRegistry::PackRef(int LotIndex, int Bin)
@@ -854,6 +875,7 @@ void THT160LotRegistry::UnpackRef(int Packed, int &LotIndex, int &Bin)
 void THT160LotRegistry::Clear()
 {
 	m_Code2DIndex->Clear();
+	FreeAllIcInfo();
 	m_LotCount=0;
 	m_LastDupCode="";
 	for(int i=0;i<HT160_MAX_LOT;i++)
@@ -867,6 +889,14 @@ int THT160LotRegistry::GetLotCount()
 		if(m_Lots[i].sLotID.Trim()!=AnsiString(""))
 			Count++;
 	return Count;
+}
+//---------------------------------------------------------------------------
+// Raw slot span : RemoveLot keeps freed slots in place (so packed 2D-ref
+// indices stay valid), so callers that walk slot-by-slot must use this, not
+// GetLotCount(), and skip slots whose sLotID is blank.
+int THT160LotRegistry::GetLotSlotCount()
+{
+	return m_LotCount;
 }
 //---------------------------------------------------------------------------
 int THT160LotRegistry::GetItemCount()
@@ -914,7 +944,13 @@ int THT160LotRegistry::AddLot(AnsiString LotID, int Source, AnsiString SourceMac
 	int Index=FindLotIndex(Key);
 	if(Index>=0)
 	{
-		m_Lots[Index].iSource=Source;
+		//AI(ht160s-lot-webapi) 20260612 : a lot that a SECS host originated must
+		// keep its SECS source even when its 2D data later arrives via the WebAPI
+		// /JSON loader, which always parses lots as OFFLINE. Without this guard a
+		// SECS LOTSTART lot wrongly flipped to "OFF" after its data was pulled.
+		// Only adopt the new source when the existing one is NOT already SECS.
+		if(m_Lots[Index].iSource!=HT160_LOT_SOURCE_SECS)
+			m_Lots[Index].iSource=Source;
 		if(SourceMachine.Trim()!=AnsiString(""))
 			m_Lots[Index].sSourceMachine=SourceMachine;
 		if(DeviceName.Trim()!=AnsiString(""))
@@ -967,6 +1003,18 @@ bool THT160LotRegistry::RemoveLot(AnsiString LotID)
 			m_Code2DIndex->Delete(i);
 	}
 
+	// Drop + free every per-IC backup record owned by this Lot.
+	AnsiString LotKey=m_Lots[Index].sLotID.Trim();
+	for(int i=m_Code2DInfo->Count-1;i>=0;i--)
+	{
+		TLotIcInfo *Info=(TLotIcInfo*)m_Code2DInfo->Objects[i];
+		if(Info!=NULL && Info->sLotID.Trim()==LotKey)
+		{
+			delete Info;
+			m_Code2DInfo->Delete(i);
+		}
+	}
+
 	// Free the slot (kept in place so other packed indices stay valid).
 	m_Lots[Index].Clear();
 	return true;
@@ -987,6 +1035,15 @@ bool THT160LotRegistry::RenameLot(AnsiString OldLotID, AnsiString NewLotID)
 }
 //---------------------------------------------------------------------------
 bool THT160LotRegistry::AddItem(AnsiString LotID, AnsiString Code2D, int Bin, AnsiString &DupExistingLot)
+{
+	// Legacy / offline / "Maps" path : no customer backup fields, so mirror Bin
+	// into HBin/SBin and leave RetestCode/DiePass empty.
+	return AddItemEx(LotID, Code2D, Bin, Bin, Bin, "", "", DupExistingLot);
+}
+//---------------------------------------------------------------------------
+bool THT160LotRegistry::AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
+	int HBin, int SBin, AnsiString RetestCode, AnsiString DiePass,
+	AnsiString &DupExistingLot)
 {
 	DupExistingLot="";
 	AnsiString Code=Code2D.Trim();
@@ -1009,9 +1066,72 @@ bool THT160LotRegistry::AddItem(AnsiString LotID, AnsiString Code2D, int Bin, An
 		return false;
 	}
 
+	// Hot-path reverse index : packed (LotIndex, routing Bin).
 	m_Code2DIndex->AddObject(Code, (TObject*)PackRef(LotIndex, Bin));
 	m_Lots[LotIndex].iPlanQty++;
+
+	// Parallel backup record (all customer fields kept for traceability).
+	TLotIcInfo *Info=new TLotIcInfo;
+	Info->sCode2D=Code;
+	Info->sLotID=m_Lots[LotIndex].sLotID;
+	Info->iBin=Bin;
+	Info->iHBin=HBin;
+	Info->iSBin=SBin;
+	Info->sRetestCode=RetestCode;
+	Info->sDiePass=DiePass;
+	m_Code2DInfo->AddObject(Code, (TObject*)Info);
 	return true;
+}
+//---------------------------------------------------------------------------
+bool THT160LotRegistry::FindIcInfo(AnsiString Code2D, TLotIcInfo &Info)
+{
+	Info.sCode2D="";
+	Info.sLotID="";
+	Info.iBin=0;
+	Info.iHBin=0;
+	Info.iSBin=0;
+	Info.sRetestCode="";
+	Info.sDiePass="";
+	AnsiString Code=Code2D.Trim();
+	if(Code==AnsiString(""))
+		return false;
+	int Index=m_Code2DInfo->IndexOf(Code);
+	if(Index<0)
+		return false;
+	TLotIcInfo *Rec=(TLotIcInfo*)m_Code2DInfo->Objects[Index];
+	if(Rec==NULL)
+		return false;
+	Info=*Rec;
+	return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260612 : enumerate all 2D IC records of one Lot (UI /
+// traceability). One tab-separated line per IC. Returns the count (0 = no data).
+int THT160LotRegistry::GetLotIcList(AnsiString LotID, TStrings *Out)
+{
+	int Count=0;
+	if(Out==NULL)
+		return 0;
+	Out->Clear();
+	if(m_Code2DInfo==NULL)
+		return 0;
+	AnsiString Key=LotID.Trim();
+	if(Key==AnsiString(""))
+		return 0;
+	for(int i=0; i<m_Code2DInfo->Count; i++)
+	{
+		TLotIcInfo *Rec=(TLotIcInfo*)m_Code2DInfo->Objects[i];
+		if(Rec==NULL)
+			continue;
+		if(Rec->sLotID.Trim()!=Key)
+			continue;
+		AnsiString Line=Rec->sCode2D+"\t"+IntToStr(Rec->iBin)+"\t"+
+			IntToStr(Rec->iHBin)+"\t"+IntToStr(Rec->iSBin)+"\t"+
+			Rec->sRetestCode+"\t"+Rec->sDiePass;
+		Out->Add(Line);
+		Count++;
+	}
+	return Count;
 }
 //---------------------------------------------------------------------------
 bool THT160LotRegistry::FindByCode2D(AnsiString Code2D, AnsiString &LotID, int &Bin, int &LotIndex)
@@ -1073,7 +1193,20 @@ bool THT160LotRegistry::LoadFromJsonFile(AnsiString FileName, bool &bHasDuplicat
 	}
 	delete Raw;
 
-	cJSON *Root=cJSON_Parse(Text.c_str());
+	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : parsing is shared with the
+	// WebAPI pull path (response body is a JSON string, not a file), so the
+	// cJSON parse lives in LoadFromJsonString and this file loader just feeds it.
+	return LoadFromJsonString(Text, bHasDuplicate, FirstDupCode);
+}
+//---------------------------------------------------------------------------
+bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode)
+{
+	// Appends to the registry (multi-Lot).  Accepts both the legacy "Maps"
+	// shape and the customer "2DIDHistory" shape.  Caller decides when to Clear().
+	bHasDuplicate=false;
+	FirstDupCode="";
+
+	cJSON *Root=cJSON_Parse(Json.c_str());
 	if(Root==NULL)
 		return false;
 
@@ -1119,6 +1252,91 @@ bool THT160LotRegistry::LoadFromJsonFile(AnsiString FileName, bool &bHasDuplicat
 				}
 			}
 			MapNode=MapNode->next;
+		}
+	}
+
+	// Customer 2DIDHistory format (new) : root "2DIDHistory"[] -> Lot
+	// { LOTID, Substage, ProductCode, ICIInfo[] } -> IC
+	// { QRCodeID, RetestCode, HBin(str), SBin(str), DiePass }. HBin/SBin are
+	// strings; the routing Bin is SBin or HBin per CosFunction.iSortBinSource.
+	cJSON *Hist=cJSON_GetObjectItem(Root, "2DIDHistory");
+	if(Hist!=NULL && cJSON_IsArray(Hist))
+	{
+		cJSON *LotNode=Hist->child;
+		while(LotNode!=NULL)
+		{
+			cJSON *IdNode=cJSON_GetObjectItem(LotNode, "LOTID");
+			AnsiString LotNumber="";
+			if(IdNode!=NULL && cJSON_IsString(IdNode) && IdNode->valuestring!=NULL)
+				LotNumber=AnsiString(IdNode->valuestring);
+
+			cJSON *SubNode=cJSON_GetObjectItem(LotNode, "Substage");
+			AnsiString Substage="";
+			if(SubNode!=NULL && cJSON_IsString(SubNode) && SubNode->valuestring!=NULL)
+				Substage=AnsiString(SubNode->valuestring);
+
+			cJSON *ProdNode=cJSON_GetObjectItem(LotNode, "ProductCode");
+			AnsiString ProductCode="";
+			if(ProdNode!=NULL && cJSON_IsString(ProdNode) && ProdNode->valuestring!=NULL)
+				ProductCode=AnsiString(ProdNode->valuestring);
+
+			int LotIndex=AddLot(LotNumber, HT160_LOT_SOURCE_OFFLINE, "", ProductCode);
+			if(LotIndex>=0)
+			{
+				TLotRunInfo *Lot=GetLot(LotIndex);
+				if(Lot!=NULL)
+				{
+					Lot->sSubstage=Substage;
+					Lot->sProductCode=ProductCode;
+				}
+			}
+
+			cJSON *ICIInfo=cJSON_GetObjectItem(LotNode, "ICIInfo");
+			if(LotIndex>=0 && ICIInfo!=NULL && cJSON_IsArray(ICIInfo))
+			{
+				cJSON *IcNode=ICIInfo->child;
+				while(IcNode!=NULL)
+				{
+					cJSON *QrNode=cJSON_GetObjectItem(IcNode, "QRCodeID");
+					if(QrNode!=NULL && cJSON_IsString(QrNode) && QrNode->valuestring!=NULL)
+					{
+						AnsiString Qr=AnsiString(QrNode->valuestring);
+
+						cJSON *HBinNode=cJSON_GetObjectItem(IcNode, "HBin");
+						cJSON *SBinNode=cJSON_GetObjectItem(IcNode, "SBin");
+						cJSON *RetNode=cJSON_GetObjectItem(IcNode, "RetestCode");
+						cJSON *DieNode=cJSON_GetObjectItem(IcNode, "DiePass");
+
+						AnsiString HBinStr="";
+						if(HBinNode!=NULL && cJSON_IsString(HBinNode) && HBinNode->valuestring!=NULL)
+							HBinStr=AnsiString(HBinNode->valuestring);
+						AnsiString SBinStr="";
+						if(SBinNode!=NULL && cJSON_IsString(SBinNode) && SBinNode->valuestring!=NULL)
+							SBinStr=AnsiString(SBinNode->valuestring);
+						AnsiString RetestCode="";
+						if(RetNode!=NULL && cJSON_IsString(RetNode) && RetNode->valuestring!=NULL)
+							RetestCode=AnsiString(RetNode->valuestring);
+						AnsiString DiePass="";
+						if(DieNode!=NULL && cJSON_IsString(DieNode) && DieNode->valuestring!=NULL)
+							DiePass=AnsiString(DieNode->valuestring);
+
+						int HBin=StrToIntDef(HBinStr.Trim(), 0);
+						int SBin=StrToIntDef(SBinStr.Trim(), 0);
+						int RouteBin=(CosFunction.iSortBinSource==HT160_SORT_BIN_SOURCE_HBIN) ? HBin : SBin;
+
+						AnsiString DupLot;
+						if(!AddItemEx(LotNumber, Qr, RouteBin, HBin, SBin,
+							RetestCode, DiePass, DupLot))
+						{
+							if(!bHasDuplicate)
+								FirstDupCode=Qr;
+							bHasDuplicate=true;
+						}
+					}
+					IcNode=IcNode->next;
+				}
+			}
+			LotNode=LotNode->next;
 		}
 	}
 
@@ -1212,15 +1430,251 @@ void THT160TrayForm::Save(AnsiString RecipeName)
 	}
 }
 //---------------------------------------------------------------------------
+// THT160LotBinBinding : dynamic (Lot,Bin) -> Auto table for the By Lot+Bin mode.
+//---------------------------------------------------------------------------
+__fastcall THT160LotBinBinding::THT160LotBinBinding()
+{
+	m_List=new TStringList();
+	m_List->Sorted=true;
+	m_List->Duplicates=dupIgnore;
+	m_List->CaseSensitive=true;
+}
+//---------------------------------------------------------------------------
+__fastcall THT160LotBinBinding::~THT160LotBinBinding()
+{
+	delete m_List;
+	m_List=NULL;
+}
+//---------------------------------------------------------------------------
+AnsiString THT160LotBinBinding::MakeKey(AnsiString LotID, int Bin)
+{
+	return LotID+AnsiString("\x01")+IntToStr(Bin);
+}
+//---------------------------------------------------------------------------
+AnsiString THT160LotBinBinding::GetIniFileName()
+{
+	AnsiString RootPath=HSys.CurrentDir;
+	if(RootPath==AnsiString(""))
+		RootPath="..";
+	return RootPath+AnsiString("\\system\\LotBinBinding.ini");
+}
+//---------------------------------------------------------------------------
+int THT160LotBinBinding::GetAutoStationCount()
+{
+	// Auto1..Auto6 are contiguous in EHT160BinArea.
+	return eHT160BinAreaAuto6-eHT160BinAreaAuto1+1;
+}
+//---------------------------------------------------------------------------
+int THT160LotBinBinding::GetErrorAutoIndex()
+{
+	int Area=BinAreaMap.GetErrorBinArea();
+	if(Area>=eHT160BinAreaAuto1 && Area<=eHT160BinAreaAuto6)
+		return Area-eHT160BinAreaAuto1;
+	// Error area is not an Auto (e.g. Color) : fall back to the last Auto.
+	return GetAutoStationCount()-1;
+}
+//---------------------------------------------------------------------------
+void THT160LotBinBinding::Clear()
+{
+	m_List->Clear();
+}
+//---------------------------------------------------------------------------
+int THT160LotBinBinding::FindAutoByLotID(AnsiString LotID, int Bin)
+{
+	int Pos=m_List->IndexOf(MakeKey(LotID, Bin));
+	if(Pos<0)
+		return -1;
+	return ((int)m_List->Objects[Pos])-1;
+}
+//---------------------------------------------------------------------------
+int THT160LotBinBinding::FindAuto(int LotIndex, int Bin)
+{
+	TLotRunInfo *Lot=LotRegistry.GetLot(LotIndex);
+	if(Lot==NULL)
+		return -1;
+	return FindAutoByLotID(Lot->sLotID, Bin);
+}
+//---------------------------------------------------------------------------
+bool THT160LotBinBinding::IsAutoBound(int AutoIndex)
+{
+	int i;
+	for(i=0; i<m_List->Count; i++)
+	{
+		if(((int)m_List->Objects[i])-1==AutoIndex)
+			return true;
+	}
+	return false;
+}
+//---------------------------------------------------------------------------
+int THT160LotBinBinding::ResolveAuto(int LotIndex, int Bin)
+{
+	TLotRunInfo *Lot=LotRegistry.GetLot(LotIndex);
+	AnsiString LotID;
+	int Existing;
+	int ErrorAuto=GetErrorAutoIndex();
+	int Count=GetAutoStationCount();
+	int AutoIndex;
+	int Chosen;
+
+	if(Lot==NULL)
+		return ErrorAuto;
+	LotID=Lot->sLotID;
+
+	Existing=FindAutoByLotID(LotID, Bin);
+	if(Existing>=0)
+		return Existing;
+
+	// First-come-first-served : lowest-index non-Error Auto not yet bound.
+	// Autos turned off on tsMaintHardware (GeneralSetting.bAutoEnabled) are skipped
+	// here so no new (LotID,Bin) pair binds to them. The Error Auto stays usable as
+	// the overflow target even if its own enable flag is off.
+	Chosen=-1;
+	for(AutoIndex=0; AutoIndex<Count; AutoIndex++)
+	{
+		if(AutoIndex==ErrorAuto)
+			continue;
+		if(AutoIndex>=0 && AutoIndex<6 && GeneralSetting.bAutoEnabled[AutoIndex]==false)
+			continue;
+		if(IsAutoBound(AutoIndex)==false)
+		{
+			Chosen=AutoIndex;
+			break;
+		}
+	}
+	if(Chosen<0)
+		Chosen=ErrorAuto;   // all non-Error Autos taken -> overflow to Error Auto
+
+	m_List->AddObject(MakeKey(LotID, Bin), (TObject*)(Chosen+1));
+	SaveToIni();
+	return Chosen;
+}
+//---------------------------------------------------------------------------
+int THT160LotBinBinding::GetBindingCount()
+{
+	return m_List->Count;
+}
+//---------------------------------------------------------------------------
+bool THT160LotBinBinding::GetBindingByIndex(int Index, AnsiString &LotID, int &Bin, int &AutoIndex)
+{
+	AnsiString Key;
+	int SepPos;
+
+	LotID="";
+	Bin=0;
+	AutoIndex=-1;
+	if(Index<0 || Index>=m_List->Count)
+		return false;
+	Key=m_List->Strings[Index];
+	SepPos=Key.Pos("\x01");
+	if(SepPos<=0)
+		return false;
+	LotID=Key.SubString(1, SepPos-1);
+	Bin=atoi(Key.SubString(SepPos+1, Key.Length()-SepPos).c_str());
+	AutoIndex=((int)m_List->Objects[Index])-1;
+	return true;
+}
+//---------------------------------------------------------------------------
+void THT160LotBinBinding::SaveToIni()
+{
+	AnsiString FileName=GetIniFileName();
+	TIniFile *Ini;
+	AnsiString LotID;
+	int Bin;
+	int AutoIndex;
+	int i;
+
+	ForceDirectories(ExtractFilePath(FileName));
+	Ini=new TIniFile(FileName);
+	try
+	{
+		Ini->EraseSection("LotBinBinding");
+		Ini->WriteInteger("LotBinBinding", "Count", m_List->Count);
+		for(i=0; i<m_List->Count; i++)
+		{
+			if(GetBindingByIndex(i, LotID, Bin, AutoIndex)==false)
+				continue;
+			Ini->WriteString("LotBinBinding", "Item"+IntToStr(i),
+				LotID+AnsiString("\x01")+IntToStr(Bin)+AnsiString("\x01")+IntToStr(AutoIndex));
+		}
+	}
+	__finally
+	{
+		delete Ini;
+	}
+}
+//---------------------------------------------------------------------------
+void THT160LotBinBinding::LoadFromIni()
+{
+	AnsiString FileName=GetIniFileName();
+	TIniFile *Ini;
+	AnsiString Line;
+	AnsiString LotID;
+	int Count;
+	int Bin;
+	int AutoIndex;
+	int i;
+	int Sep1;
+	int Sep2;
+
+	Clear();
+	if(!FileExists(FileName))
+		return;
+
+	Ini=new TIniFile(FileName);
+	try
+	{
+		Count=Ini->ReadInteger("LotBinBinding", "Count", 0);
+		for(i=0; i<Count; i++)
+		{
+			Line=Ini->ReadString("LotBinBinding", "Item"+IntToStr(i), "");
+			if(Line==AnsiString(""))
+				continue;
+			Sep1=Line.Pos("\x01");
+			if(Sep1<=0)
+				continue;
+			LotID=Line.SubString(1, Sep1-1);
+			AnsiString Rest=Line.SubString(Sep1+1, Line.Length()-Sep1);
+			Sep2=Rest.Pos("\x01");
+			if(Sep2<=0)
+				continue;
+			Bin=atoi(Rest.SubString(1, Sep2-1).c_str());
+			AutoIndex=atoi(Rest.SubString(Sep2+1, Rest.Length()-Sep2).c_str());
+			if(AutoIndex<0)
+				continue;
+			m_List->AddObject(MakeKey(LotID, Bin), (TObject*)(AutoIndex+1));
+		}
+	}
+	__finally
+	{
+		delete Ini;
+	}
+}
+//---------------------------------------------------------------------------
 void InitialCosFunction()
 {
 	// CosFunction tier (paid features) : defaults first, then customer switch.
 	CosFunction.bUseBinAreaMap=true;
 	CosFunction.bUse2DBinMap=true;
+	CosFunction.bUseColorCcd=true;   // default on; overridden by [ColorCCD] Enable below
+	CosFunction.iSortBinSource=HT160_SORT_BIN_SOURCE_SBIN;   // route by SBin by default
 	CosFunction.bUseSecsGem=false;   // paid SECS/GEM off unless a CUSTOMER_CODE enables it
 	DoCustomerFunction();
 	// General tier (ship + hardware install) : system\General.ini.
 	GeneralSetting.Load();
+	// AI(HT160S-Maintainer) 20260612 : load Color CCD enable from
+	// system\General.ini [ColorCCD] Enable (default on) so the maintenance page
+	// checkbox persists and aColor can gate the camera connect/shot trigger.
+	{
+		TIniFile *IniColorCcd=new TIniFile(HSys.CurrentDir+AnsiString("\\system\\General.ini"));
+		try
+		{
+			CosFunction.bUseColorCcd=IniColorCcd->ReadBool("ColorCCD", "Enable", true);
+		}
+		__finally
+		{
+			delete IniColorCcd;
+		}
+	}
 	// Config tier (customer self-toggle) : config\config.ini.
 	Config.Load();
 	// Recipe tier : data\<recipe>\.

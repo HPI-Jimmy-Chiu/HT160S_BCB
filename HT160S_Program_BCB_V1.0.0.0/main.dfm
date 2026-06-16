@@ -1,6 +1,8 @@
 object fMain: TfMain
   Left = 273
   Top = 103
+  BorderIcons = [biSystemMenu]
+  BorderStyle = bsNone
   Width = 1760
   Height = 1142
   Caption = 'HT160S'
@@ -11,6 +13,7 @@ object fMain: TfMain
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
+  WindowState = wsMaximized
   OnClose = FormClose
   OnShow = FormShow
   PixelsPerInch = 96
@@ -2679,6 +2682,20 @@ object fMain: TfMain
                     Caption = 'Lot End'
                     TabOrder = 3
                     OnClick = btnLotEndClick
+                  end
+                  object lblLotListHint: TLabel
+                    Left = 4
+                    Top = 523
+                    Width = 533
+                    Height = 16
+                    AutoSize = False
+                    Caption = 'Tip: double-click a lot row to view its 2D detail.'
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clGrayText
+                    Font.Height = -12
+                    Font.Name = 'Arial'
+                    Font.Style = []
+                    ParentFont = False
                   end
                 end
               end
@@ -6779,13 +6796,13 @@ object fMain: TfMain
           Top = 81
           Width = 1588
           Height = 993
-          ActivePage = TabSheet10
+          ActivePage = tsMotorView
           Align = alClient
           Style = tsButtons
-          TabIndex = 0
+          TabIndex = 1
           TabOrder = 2
           TabWidth = 104
-          object TabSheet10: TTabSheet
+          object tsMotionView: TTabSheet
             Caption = 'Motion View'
             ImageIndex = 5
             object PanelMain6: TPanel
@@ -7549,14 +7566,14 @@ object fMain: TfMain
               end
             end
           end
-          object TabSheet7: TTabSheet
+          object tsMotorView: TTabSheet
             Caption = 'Motor View'
             ImageIndex = 2
             object sgMotorStatus: TStringGrid
               Left = 0
               Top = 0
-              Width = 1357
-              Height = 848
+              Width = 1580
+              Height = 962
               Align = alClient
               Color = 14670284
               ColCount = 14

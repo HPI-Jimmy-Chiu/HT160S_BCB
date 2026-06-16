@@ -2710,6 +2710,7 @@ void TfMotorTest::UpdateMotorMonitor()
     TTrayMotor *Motor;
     int NowPos;
     int EncoderPos;
+    bool bSysEmg;
 
     Motor=GetActiveMotor();
     if(Motor==NULL)
@@ -2734,8 +2735,17 @@ void TfMotorTest::UpdateMotorMonitor()
     if(edEncoder!=NULL)
         edEncoder->Text=FormatPositionText(EncoderPos);
 
+    //AI(general) 20260616 : the per-axis EMG led bit never reacts on this machine
+    //because EMG is wired to a system DI read by IsEMGPressed(), not to each motor
+    //card's EMG input pin. Reflect the real system EMG on the panel led.
+    bSysEmg=(IsEMGPressed()>0);
     for(int LedIndex=0; LedIndex<iMotLedTotalCnt; LedIndex++)
-        UpdateStatusLed(LedIndex, Motor->Led[LedIndex]);
+    {
+        if(LedIndex==iEmgLed)
+            UpdateStatusLed(LedIndex, Motor->Led[LedIndex] || bSysEmg);
+        else
+            UpdateStatusLed(LedIndex, Motor->Led[LedIndex]);
+    }
 }
 //---------------------------------------------------------------------------
 void TfMotorTest::UpdateStatusLed(int LedIndex, bool Value)
@@ -2913,7 +2923,10 @@ void TfMotorTest::StartJog(bool bPositive)
     Motor=GetActiveMotor();
     if(Motor==NULL)
         return;
-    if(CheckCanMotorMove(Motor, true, false, 0)==false)
+    // Jog is a manual move and must work BEFORE homing, so it does NOT require
+    // bHomeFlag. Alarm/EMG/disable/soft-limit checks still apply. Move/Step keep
+    // bRequireHome=true.
+    if(CheckCanMotorMove(Motor, false, false, 0)==false)
         return;
     ApplySpeedPercent(Motor);
     if(bPositive)
@@ -3371,7 +3384,25 @@ void __fastcall TfMotorTest::tmrUpdateTimer(TObject *Sender)
 {
     TTrayMotor *Motor;
     AnsiString Err;
+    static bool bEmgActive=false;
     (void)Sender;
+
+    //AI(general) 20260616 : EMG only blocked the START of a move before; a move,
+    //jog, home or loop already in progress kept running. Poll EMG here and stop
+    //it (StopActiveMotor stops the active axis and aborts home and loop moves).
+    //bEmgActive latches so we stop once per press and do not advance while held.
+    if(IsEMGPressed()>0)
+    {
+        if(!bEmgActive)
+        {
+            bEmgActive=true;
+            StopActiveMotor();
+            SetMessage("Move abort: EMG");
+        }
+        UpdateMotorMonitor();
+        return;
+    }
+    bEmgActive=false;
 
     if(bHomeRunning && iHomeMotorIndex>=0 && iHomeMotorIndex<GetMotorCount())
     {
@@ -3570,7 +3601,7 @@ void __fastcall TfMotorTest::btnHomeClick(TObject *Sender)
         return;
     if(CheckCanMotorMove(Motor, false, false, 0)==false)
         return;
-    Motor->InitHomeTask();
+    Motor->InitHomeTask_forSingleAxis();
     bHomeRunning=true;
     iHomeMotorIndex=ActiveMotorIndex;
     SetMessage("Home start");

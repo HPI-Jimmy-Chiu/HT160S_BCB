@@ -12,6 +12,7 @@
 #include "cprod.h"         // tRunData (TotalIC/UPH), MachineRun (iTotalSorted)
 #include "note.h"          // fNote (alarm dialog : fShow / Code)
 #include "cmydef.h"        // SoftStop (S2F42 PAUSE host command)
+#include "uAgvStation.h"   // AI(ht160s-agv) 20260615 : E87/AGV station table + AgvCoord
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -84,33 +85,63 @@ void HT160Gem::AddSV()
     if(HGemPtr==NULL)
         return;
 
-    //AI(ht160s-secsgem) 20260611 : SVID numbering follows HT9045 AddSV for the
+    //AI(ht160s-secsgem) 20260612 : SVID numbering follows HT9045 AddSV for the
     // common identity/time/throughput band (1001 Machine Model, 1003 Software
     // Version, 1021 UPH, 1027 System Time) so a shared host SVID table works across
-    // machines. HT160-specific run/alarm/output/lot SVs are relocated to a 1100+
-    // band to avoid colliding with the 9045 1010-1036 region.
+    // machines. HT160-specific run/alarm/output/lot SVs are relocated to a high
+    // 66000+ band (9045 max SVID 65095 + 1000, rounded) so they can never collide
+    // with 9045's 1010-1190 count region or any future 9045 SVID growth.
     // -- 9045-aligned common band --
     HGemPtr->SetSVDataPointer(1001, HType.ASCII_TYPE, "Machine Model", "", &HandlerPath, "machine model name (9045 SVID 1001)");
     HGemPtr->SetSVDataPointer(1003, HType.ASCII_TYPE, "Software Version", "", &svSoftwareVersion, "application software version (9045 SVID 1003)");
     HGemPtr->SetSVDataPointer(1021, HType.INT_4_TYPE, "UPH", "pcs/hr", &svUPH, "units per hour (9045 SVID 1021)");
     HGemPtr->SetSVDataPointer(1027, HType.ASCII_TYPE, "System Time", "", &sSystemTime, "current system time (9045 SVID 1027)");
 
-    //AI(ht160s-secsgem) 20260611 : HT160 custom band 1100+. Values are snapshotted
-    // into the sv* members by RefreshSVData() right before each serialize, so the
-    // bound address stays valid while the reported value tracks live data.
-    // -- Machine state --
-    HGemPtr->SetSVDataPointer(1100, HType.INT_4_TYPE, "Run Mode", "", &svRunMode, "0=Normal 1=Home 2=OneCycle 3=CleanOut 4=TrayFeed");
-    HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "System Running", "", &svSystemRunning, "1=machine started/running, 0=stopped");
-    HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Control State", "", &iControlState, "GEM control state mirror (4=Local 5=Remote)");
-    // -- Alarm state --
-    HGemPtr->SetSVDataPointer(1110, HType.INT_4_TYPE, "Alarm Active", "", &svAlarmActive, "1=alarm dialog showing, 0=no alarm");
-    HGemPtr->SetSVDataPointer(1111, HType.INT_4_TYPE, "Alarm Code", "", &svAlarmCode, "current active alarm code (0=none)");
-    // -- Output / production --
-    HGemPtr->SetSVDataPointer(1120, HType.INT_4_TYPE, "Total IC", "pcs", &svTotalIC, "total IC processed this lot/run");
-    HGemPtr->SetSVDataPointer(1121, HType.INT_4_TYPE, "Total Sorted", "pcs", &svTotalSorted, "total IC sorted into a bin");
-    // -- Current Lot --
-    HGemPtr->SetSVDataPointer(1130, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
-    HGemPtr->SetSVDataPointer(1131, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
+    //AI(ht160s-secsgem) 20260612 : HT160 custom high band (66000+). Values are
+    // snapshotted into the sv* members by RefreshSVData() right before each
+    // serialize, so the bound address stays valid while the reported value tracks
+    // live data. Sub-grouped with gaps (66000 state / 66010 alarm / 66020 output /
+    // 66030 lot) so each group can grow without renumbering. These are HT160-only
+    // semantics; 9045 has no equivalent SVID here.
+    // -- Machine state (66000-66009) --
+    HGemPtr->SetSVDataPointer(66000, HType.INT_4_TYPE, "Run Mode", "", &svRunMode, "0=Normal 1=Home 2=OneCycle 3=CleanOut 4=TrayFeed");
+    HGemPtr->SetSVDataPointer(66001, HType.INT_4_TYPE, "System Running", "", &svSystemRunning, "1=machine started/running, 0=stopped");
+    HGemPtr->SetSVDataPointer(66002, HType.INT_4_TYPE, "Control State", "", &iControlState, "GEM control state mirror (4=Local 5=Remote)");
+    // -- Alarm state (66010-66019) --
+    HGemPtr->SetSVDataPointer(66010, HType.INT_4_TYPE, "Alarm Active", "", &svAlarmActive, "1=alarm dialog showing, 0=no alarm");
+    HGemPtr->SetSVDataPointer(66011, HType.INT_4_TYPE, "Alarm Code", "", &svAlarmCode, "current active alarm code (0=none)");
+    // -- Output / production (66020-66029) --
+    HGemPtr->SetSVDataPointer(66020, HType.INT_4_TYPE, "Total IC", "pcs", &svTotalIC, "total IC processed this lot/run");
+    HGemPtr->SetSVDataPointer(66021, HType.INT_4_TYPE, "Total Sorted", "pcs", &svTotalSorted, "total IC sorted into a bin");
+    // -- Current Lot (66030-66039) --
+    HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
+    HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
+
+    //AI(ht160s-agv) 20260615 : E87/AGV SVIDs (draft 38202-38245), bound to the
+    // AgvCoord snapshot block (stable addresses). Bitmaps 38219-38221 are written
+    // by the coordinator right before each AGV S6F11; carrier id / counts are
+    // refreshed by the coordinator before the relevant events. SVIDs are not all
+    // contiguous past Auto3, so they come from the station table, not a base+offset.
+    HGemPtr->SetSVDataPointer(38219, HType.ASCII_TYPE, "Supplement Bin",     "", &AgvCoord.SupplementBitmap, "AGVSupplement P1-P9 bitmap");
+    HGemPtr->SetSVDataPointer(38220, HType.ASCII_TYPE, "LD UnLD Check AGV",  "", &AgvCoord.StatusBitmap,     "AGVLDUnLDStatus P1-P9 bitmap");
+    HGemPtr->SetSVDataPointer(38221, HType.ASCII_TYPE, "LD UnLD Finish AGV", "", &AgvCoord.FinishBitmap,     "AGVLDUnLDFinish P1-P9 bitmap");
+    for(int ai = 0; ai < AGV_STATION_COUNT; ai++)
+    {
+        const TAgvStationDesc *d = &AgvStation[ai];
+        AnsiString cName, tName, vName;
+        cName.sprintf("%s Carrier ID", d->Name);
+        tName.sprintf("AMR %s Tray Count", d->Name);
+        vName.sprintf("AMR %s Device Count", d->Name);
+        HGemPtr->SetSVDataPointer(d->SvidCarrierID, HType.ASCII_TYPE, cName, "",      &AgvCoord.CarrierID[ai],   "AGV carrier id");
+        HGemPtr->SetSVDataPointer(d->SvidTrayCount, HType.INT_4_TYPE,  tName, "trays", &AgvCoord.TrayCount[ai],   "AGV tray count");
+        HGemPtr->SetSVDataPointer(d->SvidDeviceCnt, HType.INT_4_TYPE,  vName, "pcs",   &AgvCoord.DeviceCount[ai], "AGV device count");
+        if(d->SvidBinSet != 0 && d->AutoIndex >= 0)
+        {
+            AnsiString bName;
+            bName.sprintf("AMR %s Bin Setting", d->Name);
+            HGemPtr->SetSVDataPointer(d->SvidBinSet, HType.ASCII_TYPE, bName, "", &AgvCoord.BinSetting[d->AutoIndex], "AGV bin setting");
+        }
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : snapshot live machine data into SV members.
@@ -150,6 +181,16 @@ void HT160Gem::RefreshSecsBadge()
         fMain->UpdateSecsFeatureBadge();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260615 : 1s tick from THGem::Timer1Timer. Drive the E87/AGV
+// coordinator : Phase B poll (Auto car full -> CEID272 AGVSupplement) + Phase D
+// handshake service. AgvCoord fires S6F11 through HGemPtr only while SELECTED, so
+// this is safe to call every tick regardless of link state.
+void HT160Gem::ServiceAgv()
+{
+    AgvCoord.PollAndCall(HGemPtr);
+    AgvCoord.ServiceHandshake(HGemPtr);
+}
+//---------------------------------------------------------------------------
 void HT160Gem::AddEC()
 {
     if(HGemPtr==NULL)
@@ -167,13 +208,25 @@ void HT160Gem::AddEC()
     //    ecRecipeName snapshot refreshed in S2F14_EquipmentConstanData().
     // -- Recipe selection --
     HGemPtr->SetECDataPointer(1501, HType.ASCII_TYPE, "Recipe Name",     "",   &ecRecipeName,      "", "", "Default", "current recipe (Setup File) name");
-    // -- Tray Form geometry (data\<recipe>\setup.ini [TrayForm]) --
-    HGemPtr->SetECDataPointer(2011, HType.FT_8_TYPE,  "Tray X Start",    "mm", &TrayForm.XStart,   "", "", "0", "tray form X start position");
-    HGemPtr->SetECDataPointer(2012, HType.FT_8_TYPE,  "Tray X Pitch",    "mm", &TrayForm.XPitch,   "", "", "0", "tray form X pitch");
-    HGemPtr->SetECDataPointer(2013, HType.FT_8_TYPE,  "Tray Y Start",    "mm", &TrayForm.YStart,   "", "", "0", "tray form Y start position");
-    HGemPtr->SetECDataPointer(2014, HType.FT_8_TYPE,  "Tray Y Pitch",    "mm", &TrayForm.YPitch,   "", "", "0", "tray form Y pitch");
-    HGemPtr->SetECDataPointer(2015, HType.INT_4_TYPE, "Tray X Division", "",   &TrayForm.XDivision,"", "", "0", "tray form columns (X count)");
-    HGemPtr->SetECDataPointer(2016, HType.INT_4_TYPE, "Tray Y Division", "",   &TrayForm.YDivision,"", "", "0", "tray form rows (Y count)");
+    //AI(ht160s-secsgem) 20260612 : Tray Form geometry aligned to HT9045 "Type 1
+    //  Tray" band (9045 ECID 2758-2763) instead of the old 2011-2016 (which collided
+    //  with 9045's 2011 X-Dimension / 2012 Y-Dimension / 2013 Kit Diameter contact-
+    //  force band). HT160 currently exposes a single tray geometry, bound directly to
+    //  the live THT160TrayForm struct (persistent + type-matched).
+    //  data\<recipe>\setup.ini [TrayForm]
+    HGemPtr->SetECDataPointer(2760, HType.FT_8_TYPE,  "Tray X Start",    "mm", &TrayForm.XStart,   "", "", "0", "tray X start pos (9045 ECID 2760 Type1 Start Position X)");
+    HGemPtr->SetECDataPointer(2758, HType.FT_8_TYPE,  "Tray X Pitch",    "mm", &TrayForm.XPitch,   "", "", "0", "tray X pitch (9045 ECID 2758 Type1 Pitch X)");
+    HGemPtr->SetECDataPointer(2761, HType.FT_8_TYPE,  "Tray Y Start",    "mm", &TrayForm.YStart,   "", "", "0", "tray Y start pos (9045 ECID 2761 Type1 Start Position Y)");
+    HGemPtr->SetECDataPointer(2759, HType.FT_8_TYPE,  "Tray Y Pitch",    "mm", &TrayForm.YPitch,   "", "", "0", "tray Y pitch (9045 ECID 2759 Type1 Pitch Y)");
+    HGemPtr->SetECDataPointer(2762, HType.INT_4_TYPE, "Tray X Division", "",   &TrayForm.XDivision,"", "", "0", "tray columns / X count (9045 ECID 2762 Type1 Division X)");
+    HGemPtr->SetECDataPointer(2763, HType.INT_4_TYPE, "Tray Y Division", "",   &TrayForm.YDivision,"", "", "0", "tray rows / Y count (9045 ECID 2763 Type1 Division Y)");
+    //AI(ht160s-secsgem) 20260612 : RESERVED tray-type slots aligned to HT9045 for
+    //  future HT160 multi-tray support. NOT registered yet (HT160 has no Type2/3
+    //  data source / values today). When HT160 gains Type 2/3 tray geometries,
+    //  register them on these reserved IDs and widen the S2F16 / GuiWriteTrayEC
+    //  settable range accordingly:
+    //    Type 2 -> 2771 Pitch X / 2772 Pitch Y / 2773 Start X / 2774 Start Y / 2775 Div X / 2776 Div Y
+    //    Type 3 -> 2784 Pitch X / 2785 Pitch Y / 2786 Start X / 2787 Start Y / 2788 Div X / 2789 Div Y
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddAlarmList()
@@ -193,14 +246,27 @@ void HT160Gem::AddCEID()
     {
         HGemPtr->SetCEIDContent(i, EventDescription[i], 1, ReportID, EquDefault);
     }
+
+    //AI(ht160s-agv) 20260615 : E87/AGV events mapped to DEDICATED reports (2/3/4/5)
+    // NOT report 1, so the host receives the P-bitmap / carrier id, not the 13
+    // machine-status SVs that every other CEID carries. Report content is defined
+    // in AddReprot() (runs after AddCEID; EventReport resolves report->SV at send).
+    unsigned rptSup[1]; rptSup[0] = 2;
+    unsigned rptSta[1]; rptSta[0] = 3;
+    unsigned rptFin[1]; rptFin[0] = 4;
+    unsigned rptCid[1]; rptCid[0] = 5;
+    HGemPtr->SetCEIDContent(272, "AGVSupplement",   1, rptSup, EquDefault);
+    HGemPtr->SetCEIDContent(273, "AGVLDUnLDStatus", 1, rptSta, EquDefault);
+    HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 1, rptFin, EquDefault);
+    HGemPtr->SetCEIDContent(275, "AGVLdID",         1, rptCid, EquDefault);
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddReprot()
 {
     int EquDefault = 1;
-    //AI(ht160s-secsgem) 20260611 : report 1 carries the real machine-data SVs on
+    //AI(ht160s-secsgem) 20260612 : report 1 carries the real machine-data SVs on
     // every event, using the 9045-aligned numbering (1001/1003/1021/1027) plus the
-    // HT160 custom 1100+ band.
+    // HT160 custom high band (66000+).
     unsigned ReportIDContent[16];
 
     if(HGemPtr==NULL)
@@ -210,16 +276,27 @@ void HT160Gem::AddReprot()
     ReportIDContent[ 1] = 1003;  // Software Version  (9045-aligned)
     ReportIDContent[ 2] = 1021;  // UPH               (9045-aligned)
     ReportIDContent[ 3] = 1027;  // System Time       (9045-aligned)
-    ReportIDContent[ 4] = 1100;  // Run Mode          (HT160 custom)
-    ReportIDContent[ 5] = 1101;  // System Running
-    ReportIDContent[ 6] = 1102;  // Control State
-    ReportIDContent[ 7] = 1110;  // Alarm Active
-    ReportIDContent[ 8] = 1111;  // Alarm Code
-    ReportIDContent[ 9] = 1120;  // Total IC
-    ReportIDContent[10] = 1121;  // Total Sorted
-    ReportIDContent[11] = 1130;  // Active Lot Count
-    ReportIDContent[12] = 1131;  // Current Lot ID
+    ReportIDContent[ 4] = 66000; // Run Mode          (HT160 custom band)
+    ReportIDContent[ 5] = 66001; // System Running
+    ReportIDContent[ 6] = 66002; // Control State
+    ReportIDContent[ 7] = 66010; // Alarm Active
+    ReportIDContent[ 8] = 66011; // Alarm Code
+    ReportIDContent[ 9] = 66020; // Total IC
+    ReportIDContent[10] = 66021; // Total Sorted
+    ReportIDContent[11] = 66030; // Active Lot Count
+    ReportIDContent[12] = 66031; // Current Lot ID
     HGemPtr->SetReportIDContent(1, 13, ReportIDContent, EquDefault);
+
+    //AI(ht160s-agv) 20260615 : dedicated AGV reports. 2/3/4 each carry a single
+    // P1-P9 bitmap SV (supplement/status/finish); 5 carries all nine carrier IDs.
+    unsigned rSup[1]; rSup[0] = 38219; HGemPtr->SetReportIDContent(2, 1, rSup, EquDefault);
+    unsigned rSta[1]; rSta[0] = 38220; HGemPtr->SetReportIDContent(3, 1, rSta, EquDefault);
+    unsigned rFin[1]; rFin[0] = 38221; HGemPtr->SetReportIDContent(4, 1, rFin, EquDefault);
+    unsigned rCid[AGV_STATION_COUNT];
+    for(int ci = 0; ci < AGV_STATION_COUNT; ci++)
+        rCid[ci] = AgvStation[ci].SvidCarrierID;
+    HGemPtr->SetReportIDContent(5, AGV_STATION_COUNT, rCid, EquDefault);
+
     HGemPtr->SaveEventReportData();
 }
 //---------------------------------------------------------------------------
@@ -480,7 +557,7 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
             EAC = 2;                 // busy -> reject, write nothing
             continue;
         }
-        if(ECID>=2011 && ECID<=2016)
+        if(ECID>=2758 && ECID<=2763)  //AI(ht160s-secsgem) 20260612 : 9045 Type1 tray band
         {
             if(HGemPtr->WriteECValueByString(ECID, sVal)==0)
                 bWroteTrayForm = true;
@@ -506,10 +583,10 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
     HGemPtr->StringOut(sLog);
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-secsgem) 20260611 : local GUI EC editor write path. Enforces the
+//AI(ht160s-secsgem) 20260612 : local GUI EC editor write path. Enforces the
 //  exact same policy as the host S2F16: only the tray-form geometry ECs
-//  (2011-2016) are settable, only while the machine is idle, and a successful
-//  write is persisted to the active recipe's setup.ini. Returns 0=ok,
+//  (9045 Type1 band 2758-2763) are settable, only while the machine is idle, and
+//  a successful write is persisted to the active recipe's setup.ini. Returns 0=ok,
 //  1=not settable / unknown, 2=busy, 3=convert/range error.
 int HT160Gem::GuiWriteTrayEC(unsigned ECID, AnsiString sValue)
 {
@@ -520,7 +597,7 @@ int HT160Gem::GuiWriteTrayEC(unsigned ECID, AnsiString sValue)
     if(bBusy)
         return 2;
 
-    if(ECID<2011 || ECID>2016)
+    if(ECID<2758 || ECID>2763)
         return 1;        // not a host/GUI-settable constant
 
     if(HGemPtr->WriteECValueByString(ECID, sValue)!=0)
@@ -656,6 +733,113 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
             iControlState = 4;
             HCACK = 0;
+        }
+        else if(S.AnsiPos("LOTSTART")==1)
+        {
+            //AI(ht160s-lot-webapi) 20260612 : Stage 4 : LOTSTART host command (ref
+            // HT9045 899 S2F42 LOTSTART). Inner L[n] of ASCII Lot id(s) (usually 1).
+            // We register the lot(s) (additive : no Clear, unlike SET_LOT_INFO) and
+            // kick off a NON-blocking Lot WebAPI pull for the first lot's 2D/Bin data.
+            // We do NOT auto-start machine motion : starting motion stays operator-
+            // gated (safety-critical). No modal dialog : this runs on the HSMS/VCL
+            // receive path and a popup would stall SECS communication.
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
+            {
+                if(n<=0)
+                {
+                    HCACK = 2;                                   // empty list -> param error
+                }
+                else if(HSys.Sys.SystemStart==true || HasICUnderMachine()==true)
+                {
+                    HCACK = 4;                                   // producing / IC inside -> busy
+                }
+                else
+                {
+                    AnsiString FirstLot = "";
+                    HCACK = 0;
+                    for(i=0; i<n; i++)
+                    {
+                        HGemPtr->GetDataItemLenAndType(len, Type);
+                        if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
+                        {
+                            if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)==1)
+                            {
+                                AnsiString lot = str;
+                                LotRegistry.AddLot(lot, HT160_LOT_SOURCE_SECS, "", "");
+                                if(FirstLot=="")
+                                    FirstLot = lot;
+                            }
+                            else
+                            {
+                                HCACK = 2;                       // read failure -> param error
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            HCACK = 2;                           // type mismatch -> param error
+                            break;
+                        }
+                    }
+                    if(HCACK==0 && FirstLot!="" && fMain!=NULL)
+                    {
+                        fMain->edLotNo->Text = FirstLot;         // active lot backfill
+                        fMain->RefreshLotListFromRegistry();
+                        //AI(ht160s-lot-webapi) 20260612 : pull EVERY registered lot's
+                        // 2D/Bin data (matches the manual LotStart path). Previously
+                        // only the first lot was pulled, so SET_LOT_INFO/LOTSTART lots
+                        // 2..n arrived with no 2D items.
+                        fMain->StartLotWebApiPullAll();            // async, no modal
+                    }
+                }
+            }
+            else
+            {
+                HCACK = 1;                                       // bad list format
+            }
+        }
+        else if(S.AnsiPos("START_AGV")==1)
+        {
+            //AI(ht160s-agv) 20260615 : Phase C START_AGV. Inner L[n] of
+            // L[2]{ A cpName, <cpValue> } pairs (spec 4.1). Station names
+            // (Loader/Empty/Color/AUTO1..6) record a per-station AGV-handoff prep
+            // intent via AgvCoord.BeginPrep; LoaderTrayCount sets the expected loader
+            // tray count (SVID 38222). Records intent + ACKs ONLY : no motion is
+            // driven and no Ready (CEID273) is faked - that is Phase D + in-place sensor.
+            int innerLen;
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
+            {
+                if(n<=0)
+                {
+                    HCACK = 2;                                   // empty list -> param error
+                }
+                else
+                {
+                    HCACK = 0;
+                    for(i=0; i<n; i++)
+                    {
+                        if(HGemPtr->GetDataItemLenAndTypeAndDelete(innerLen, HType.LIST_TYPE)!=1)
+                        {
+                            HCACK = 1;                           // pair not a list -> format error
+                            break;
+                        }
+                        AnsiString cpName="", cpVal="";
+                        if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                            HGemPtr->DataItemIn(len, Type, cpName);
+                        if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                            HGemPtr->DataItemIn(len, Type, cpVal);
+
+                        if(cpName.Trim().UpperCase()=="LOADERTRAYCOUNT")
+                            AgvCoord.TrayCount[0] = StrToIntDef(cpVal, 0);  // P1 Loader expected trays
+                        else if(AgvCoord.BeginPrep(cpName)==false)
+                            HCACK = 2;                           // unknown CP name -> param error
+                    }
+                }
+            }
+            else
+            {
+                HCACK = 1;                                       // bad list format
+            }
         }
         else
         {

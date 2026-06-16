@@ -8,7 +8,7 @@
 #include "database.h"
 #include "cmydef.h"
 #include "ComPort.h"
-#include "MCUDisplay.h"
+#include "MyBinDisp.h"
 #include "aLoader.h"
 #include "aEmpty.h"
 #include "aAuto1To6.h"
@@ -32,7 +32,7 @@ __fastcall TDataModule1::TDataModule1(TComponent* Owner)
 {
 }
 //---------------------------------------------------------------------------
-void TDataModule1::InitialAllTask()
+void TDataModule1::InitialAllTask(bool bKeepMaterial)
 {
     if(UserMotion==NULL)
         return;
@@ -44,12 +44,16 @@ void TDataModule1::InitialAllTask()
         LoaderModule->InitialFlag();
     if(EmptyModule!=NULL)
         EmptyModule->InitialFlag();
+    //AI(HT160S-Maintainer) 20260612 : on a recoverable full-machine home (bKeepMaterial)
+    //the arms that physically still hold material keep their material memory so production
+    //can resume without dropping/misrouting. Loader/Empty/Color hold no in-hand IC/tray
+    //identity that would be lost, so they always do a full reset.
     if(AutoModule!=NULL)
-        AutoModule->InitialFlag();
+        AutoModule->InitialFlag(bKeepMaterial);
     if(TrayArmModule!=NULL)
-        TrayArmModule->InitialFlag();
+        TrayArmModule->InitialFlag(bKeepMaterial);
     if(SortArmModule!=NULL)
-        SortArmModule->InitialFlag();
+        SortArmModule->InitialFlag(bKeepMaterial);
     if(ColorModule!=NULL)
         ColorModule->InitialFlag();
 }
@@ -128,7 +132,6 @@ void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
     try
     {
         SpinComPort();
-        SpinMCUDisplay();
     }
     catch(...)
     {
@@ -607,6 +610,7 @@ SYSTEM_MODULAR::SYSTEM_MODULAR()
     SwPtr = NULL;
     SuckPtr = NULL;
     MyGem = NULL;
+    BinDisCtrl = new TMyBinDispHT9046;   //AI(ht160s-maintainer) 20260615 : LED bin display controller
     MotTable = new TList;
     IOTable = new TList;
     iTotalMotor = 0;
@@ -627,6 +631,11 @@ SYSTEM_MODULAR::~SYSTEM_MODULAR()
     {
         delete MyGem;
         MyGem=NULL;
+    }
+    if(BinDisCtrl!=NULL)
+    {
+        delete BinDisCtrl;
+        BinDisCtrl=NULL;
     }
     if(MotPtr!=NULL)
     {
@@ -723,6 +732,9 @@ void SYSTEM_MODULAR::Initial()
     InitialSwitchName();
     InitialSuckerName();
     LoadIoData();
+    //AI(general) 20260613 : OPTION A - open MN200 card + start MotionNet rings once
+    //IO addresses are known. No-op under SOFT_SIMULATE / when MN200DLL.dll is absent.
+    OpenMN200Card();
     LoadSensorParameterFromDataBase();
     LoadCylinderParameterFromDataBase();
     LoadSwitchParameterFromDataBase();

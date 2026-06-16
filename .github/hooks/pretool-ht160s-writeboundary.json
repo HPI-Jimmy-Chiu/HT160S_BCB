@@ -1,0 +1,17 @@
+{
+  "_comment": "Reference template. The ACTIVE registration lives in .claude/settings.json (Claude Code only loads hooks from settings files, not from .github/hooks/*.json). Supersedes pretool-ht172-readonly.json: a whitelist that allows writes only under D:\\HT160S_BCB (plus the Claude state dir and temp) and denies every other tree, including HT172.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ops/check-ht160s-writeboundary.ps1",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

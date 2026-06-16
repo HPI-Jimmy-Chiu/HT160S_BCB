@@ -5,6 +5,9 @@
 #include "ComPort.h"
 #include "database.h"
 #include "uPadInterface.h"
+#include "MyBinDisp.h"
+#include "GeneralSetting.h"
+#include "cCommLog.h"
 #include <IniFiles.hpp>
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -37,8 +40,10 @@ __fastcall TfComPort::TfComPort(TComponent* Owner)
     : TForm(Owner)
 {
     bShow=false;
+    BinComm=NULL;
     PopulateComList();
     OpenWorkFile();
+    ConfigureBinDisplay();
 }
 //---------------------------------------------------------------------------
 __fastcall TfComPort::~TfComPort()
@@ -84,6 +89,69 @@ void TfComPort::ConfigurePadComm()
     PadComm->ParityCheck=false;
     PadComm->StopBits=_1;
     PadComm->OnReceiveData=PadCommReceiveData;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260615 : wire HSys.BinDisCtrl to a runtime COM and the
+//General.ini endpoint. The controller opens/closes the port itself inside Spin()
+//(StartComport); here we only prepare the TComm line settings and the run gate.
+void TfComPort::ConfigureBinDisplay()
+{
+    if(HSys.BinDisCtrl==NULL)
+        return;
+    if(BinComm==NULL)
+        BinComm=new TComm(this);
+
+    BinComm->ReadIntervalTimeout=1;
+    BinComm->Parity=None;
+    BinComm->BaudRate=9600;
+    BinComm->ByteSize=_8;
+    BinComm->ParityCheck=false;
+    BinComm->StopBits=_1;
+
+    HSys.BinDisCtrl->CommBin=BinComm;
+    HSys.BinDisCtrl->SetComParity(None);
+    HSys.BinDisCtrl->SetComPort(GeneralSetting.sBinDispComPort);
+    HSys.BinDisCtrl->SetDelayTime(GeneralSetting.iBinDispDelaySec);
+    HSys.BinDisCtrl->SetUsedBinNumber(BIN_DISP_UNIT_COUNT);
+    for(int i=0; i<BIN_DISP_UNIT_COUNT; i++)
+        HSys.BinDisCtrl->InstalledUnit(i);
+    HSys.BinDisCtrl->InitialOK=true;
+
+    ApplyBinDisplayConfig();
+
+    // Only kick the state machine when the hardware is present. Leaving it
+    // un-started keeps bFirstInit true so a later enable still runs task 1
+    // (which opens the COM port) rather than jumping straight to GetStatus.
+    if(GeneralSetting.bBinDisplayInstalled)
+        HSys.BinDisCtrl->ProcessStopStart(true);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260615 : convert one display-label string to the
+//WriteTargetBin value encoding: -1 blank(X), 0..99 digits, 100..125 A..Z.
+static int BinTextToValue(AnsiString s)
+{
+    s=s.Trim();
+    if(s=="")
+        return -1;
+    char c=s[1];
+    if(c>='0' && c<='9')
+        return atoi(s.c_str());
+    if(c>='A' && c<='Z')
+        return 100+(c-'A');
+    if(c>='a' && c<='z')
+        return 100+(c-'a');
+    return -1;
+}
+//---------------------------------------------------------------------------
+void TfComPort::ApplyBinDisplayConfig()
+{
+    if(HSys.BinDisCtrl==NULL)
+        return;
+    for(int i=0; i<BIN_DISP_UNIT_COUNT; i++)
+    {
+        int Value=BinTextToValue(GeneralSetting.sBinDispText[i]);
+        HSys.BinDisCtrl->SetUnitLabel(i, Value, GeneralSetting.iBinDispColor[i]);
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfComPort::FormShow(TObject *Sender)
@@ -213,6 +281,17 @@ void TfComPort::StopAllCom()
     {
     }
 
+    if(HSys.BinDisCtrl!=NULL)
+        HSys.BinDisCtrl->ProcessStopStart(false);
+    try
+    {
+        if(BinComm!=NULL)
+            BinComm->StopComm();
+    }
+    catch(...)
+    {
+    }
+
     if(fPadInterface!=NULL)
         fPadInterface->bRs232Ok=false;
 
@@ -223,6 +302,8 @@ void TfComPort::Spin()
 {
     if(fPadInterface!=NULL)
         fPadInterface->Main232();
+    if(HSys.BinDisCtrl!=NULL)
+        HSys.BinDisCtrl->Spin();
 }
 //---------------------------------------------------------------------------
 void TfComPort::MemoAddString(TMemo *Memo, AnsiString Title, AnsiString Text)
@@ -236,6 +317,10 @@ void TfComPort::MemoAddString(TMemo *Memo, AnsiString Title, AnsiString Text)
     Memo->Lines->Add(LineText);
     if(Memo->Lines->Count>1000)
         Memo->Lines->Delete(0);
+
+    //AI(ht160s-maintainer) 20260615 : persist the Pad COM memo to the daily
+    //PadLog CSV so connect/disconnect/recv can be traced after a restart.
+    g_PadCommLog.Log(Title, Text);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfComPort::PadCommReceiveData(TObject *Sender, Pointer Buffer, WORD BufferLength)

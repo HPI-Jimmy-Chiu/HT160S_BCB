@@ -35,6 +35,11 @@ private:
     int iFeedAuto;
     int iDischargeAuto;
     bool bCleanOutCheck[6];
+    //AI(ht160s-agv) 20260615 : per-Auto AMR/AGV handoff lock. While set, GetTrayRequest
+    //refuses new trays (TrayArm stops feeding this Auto) and ServiceCarFull defers the
+    //operator full-car modal to the AGV handshake. Set when a full car is handed to the
+    //AGV; cleared on AGV finish (ClearAmrCar) or a home/init.
+    bool bAmrLocked[6];
     //AI(general) 20260608 : Stage0 fix for TrayArm back-and-forth. Latches a
     //TrayArm-delivered rear tray so RefreshAutoState() cannot erase the logical
     //handshake when the physical rear sensor reads OFF (offline / sim-data run).
@@ -70,10 +75,14 @@ private:
     bool DoFeedTray(int Flag);
     bool DoDischargeTray(int Flag);
     bool DoAllAutoCleanOut(int Flag);
+    //AI(HT160S-Maintainer) 20260612 : AMR output-car full service. Sim auto-clears
+    //the full car; real machine alarms + operator confirm then clears; physical
+    //InputFullTray sensor is the last line of defense (alarm until it reads OFF).
+    void ServiceCarFull();
 
 public:
     TAutoModule();
-    void InitialFlag();
+    void InitialFlag(bool bKeepMaterial=false);
     void DoAuto(int &Task);
     int FindEmptyRearForTrayArm();
     bool IsRearHasTray(int Index);
@@ -82,6 +91,11 @@ public:
     //AI(HT160S-Maintainer) 20260604 : stacking-car data containers for Auto1~6 (AMR pack source).
     TMyCar Car[6];
     TMyCar *GetAutoCar(int Index);          // NULL if out of range
+    //AI(ht160s-agv) 20260615 : AMR/AGV output-car-full test for the SECS AGVSupplement
+    //  trigger. Real machine = the SnAutoX_InputFullTray sensor (IsOn); simulation =
+    //  a logical tray threshold (AMR_FULL_TRAY_SIM). Distinct from TMyCar::IsFull()
+    //  (MAX_TRAY_PER_CAR book-keeping cap) on purpose.
+    bool IsOutputCarFullForAmr(int Index);
     void InitAutoCarStack(int Index);       // set tray[0]=identity, tray[1]=cover, rest=normal
     //AI(HT160S-Maintainer) 20260605 : AMR stack-order support.
     int GetNextTrayKindForAuto(int Index);          // eTrayKind needed next, -1 if car full
@@ -93,6 +107,16 @@ public:
     //requesting Auto and sets OutKind, or -1 when no Auto currently wants a tray.
     int GetTrayRequest(int Index);
     int FindTrayRequestAuto(int &OutKind);
+    //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
+    void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer
+    bool IsAmrLocked(int Index);
+    bool IsDrainedForAmr(int Index);           // Ready : no working/rear/full tray left (all GoUp to car)
+    bool IsAmrTaken(int Index);                // Finish : AGV removed the car (sim=true; real sensor TBD)
+    void ClearAmrCar(int Index);               // AGV finish : empty the car + re-seed stack + unlock
+    //AI(ht160s-state-record-analysis) 20260616 : read-only state + working-tray cell map
+    //for the Store Hangup SortArmDecision.txt (why SortArm cannot place / Auto cannot discharge).
+    int        GetStationCount();
+    AnsiString DescribeStation(int Index);
 };
 //---------------------------------------------------------------------------
 extern TAutoModule *AutoModule;

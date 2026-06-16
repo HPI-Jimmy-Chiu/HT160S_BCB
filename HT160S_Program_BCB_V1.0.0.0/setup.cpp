@@ -796,6 +796,14 @@ void __fastcall TfSetup::grdBinAreaMapExit(TObject *Sender)
 void __fastcall TfSetup::grdBinAreaMapSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect)
 {
     (void)Sender;
+    //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode binds Auto<->Bin dynamically at run
+    //time, so the static Auto->Bin assignment must NOT be edited here (only the Error
+    //Bin selection stays usable). Block the Bin column from being focused/edited.
+    if(GeneralSetting.bUseLotBinSortMode)
+    {
+        CanSelect=false;
+        return;
+    }
     CanSelect=(ARow==0 || ACol==BIN_GRID_COL_BIN);
 }
 //---------------------------------------------------------------------------
@@ -841,6 +849,23 @@ void __fastcall TfSetup::cbbBinErrorAreaChange(TObject *Sender)
 bool __fastcall TfSetup::IsSystemRunning()
 {
     return HSys.Sys.SystemStart;
+}
+//---------------------------------------------------------------------------
+//AI(poka-yoke) 20260616 : run-state lock for recipe operations. While running,
+//  disable Use/Delete recipe so the operator cannot change the live recipe
+//  mid-run. Pure visual interlock; the existing ShowMessage guards inside the
+//  click handlers stay as a harmless backstop (VCL ShowMessage does not stop the
+//  machine). Called every cycle from UpdateRunControlFlag, so it self-heals when
+//  the machine stops.
+void __fastcall TfSetup::UpdateRunStateLock()
+{
+    bool bRunning;
+
+    bRunning=HSys.Sys.SystemStart;
+    if(spbRecipeUse!=NULL)
+        spbRecipeUse->Enabled=(bRunning==false);
+    if(spbRecipeDelete!=NULL)
+        spbRecipeDelete->Enabled=(bRunning==false);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSetup::spbSetupMenuClick(TObject *Sender)

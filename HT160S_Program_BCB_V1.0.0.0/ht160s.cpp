@@ -50,8 +50,6 @@ USEUNIT("MotorAndIO\\MC88X1PLazyLoad.cpp");
 USEUNIT("MotorAndIO\\myMC88X1motor.cpp");
 USEUNIT("AutomationServer.cpp");
 USEFORM("ComPort.cpp", fComPort);
-USEUNIT("MCUDisplayProtocol.cpp");
-USEUNIT("MCUDisplay.cpp");
 USEUNIT("uPadInterface.cpp");
 USEUNIT("SecsGem\uHGemEquipment.cpp");
 USEUNIT("SecsGem\UsecegemMainFrom.cpp");
@@ -59,7 +57,6 @@ USEUNIT("SecsGem\uHGemClass.cpp");
 USEUNIT("SecsGem\uHGemHT160.cpp");
 USEFORM("iosetview.cpp", fiosetview);
 #include "AutomationServer.h"
-#include "MCUDisplay.h"
 #include "aLoader.h"
 #include "aEmpty.h"
 #include "aAuto1To6.h"
@@ -69,6 +66,7 @@ USEFORM("iosetview.cpp", fiosetview);
 #include "database.h"
 #include "uruncontrol.h"
 #include "cEventLog.h"
+#include "cCommLog.h"
 #include "deviceinfo.h"
 #include "cSelfCheck.h"
 #include "SecsGem\uHGemEquipment.h"
@@ -133,6 +131,10 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          Application->CreateForm(__classid(TfComPort), &fComPort);
          Application->CreateForm(__classid(TfPadInterface), &fPadInterface);
          g_EventLog.Init();
+         //AI(ht160s-maintainer) 20260615 : per-channel serial comm CSV logs,
+         //same folder layout as EventLog. Pad + LED bin display, for tracing.
+         g_PadCommLog.Init("PadLog");
+         g_BinDispCommLog.Init("BindisplayLog");
          g_DeviceInfo.Init();
          InitializeLoaderModule();
          InitializeEmptyModule();
@@ -191,7 +193,6 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          ShutdownAutoModule();
          ShutdownEmptyModule();
          ShutdownLoaderModule();
-         ShutdownHT160MCUDisplay();
          ShutdownHT160Automation();
     }
     catch (Exception &exception)

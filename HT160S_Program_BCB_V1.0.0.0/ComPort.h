@@ -10,6 +10,13 @@
 #include <ExtCtrls.hpp>
 #include "SPComm.hpp"
 //---------------------------------------------------------------------------
+// AI(ht160s-maintainer) 20260615 : Bin-display LED COM support (no DFM control; the
+// port is created at runtime and wired to HSys.BinDisCtrl->CommBin). Notes kept out
+// of the class body so the BCB6 form designer never meets a comment in it:
+//   BinComm                 - the runtime-created TComm for the LED bin display.
+//   ConfigureBinDisplay()   - (re)configure that COM + its run gate.
+//   ApplyBinDisplayConfig() - push GeneralSetting per-unit text+color to the LED bin
+//                             display (old-160 startup/apply behavior; re-callable).
 class TfComPort : public TForm
 {
 __published:
@@ -43,6 +50,7 @@ private:
     AnsiString GetWorkFileName();
     void EnsurePadInterface();
     void ConfigurePadComm();
+    TComm *BinComm;
 public:
     __fastcall TfComPort(TComponent* Owner);
     __fastcall ~TfComPort();
@@ -52,6 +60,8 @@ public:
     bool __fastcall RS232Init();
     void StopAllCom();
     void Spin();
+    void ConfigureBinDisplay();
+    void ApplyBinDisplayConfig();
     void MemoAddString(TMemo *Memo, AnsiString Title, AnsiString Text);
     bool bShow;
 };

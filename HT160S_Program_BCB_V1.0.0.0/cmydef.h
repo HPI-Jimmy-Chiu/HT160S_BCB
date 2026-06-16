@@ -25,6 +25,11 @@ extern bool bHomeByStart;
 //AI(HT160S-Maintainer) 20260602 : HT172 0420 ProcessMotion lifecycle globals
 extern bool bFirstRun;
 extern bool bSortArmNeedHome;
+//AI(HT160S-Maintainer) 20260616 : true while uHome ProcessMotorHome runs a
+//motor-power Off->On recovery (clears latched servo-amp alarms). Suppresses
+//CheckMotorPowerShutDown relay control + ScanAllMotorStatus alarm-forcing +
+//Home-monitor auto-close so the power-cycle owns SwMotorRelay until done.
+extern bool bHomePowerCycling;
 extern bool bCalculatePauseTime;
 extern TDateTime tUPH_PauseTime;
 extern TDateTime tUPH_PauseStartTime;

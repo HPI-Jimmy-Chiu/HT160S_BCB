@@ -26,5 +26,6 @@
 #include "csystem.h"
 #include "mymessbox.h"
 #include "note.h"
+#include "cmydef.h"
 //---------------------------------------------------------------------------
 #endif

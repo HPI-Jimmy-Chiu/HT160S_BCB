@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ops/check-ht160s-writeboundary.ps1 -AllowedRoots 'D:\\AI_Area\\Tool\\HT160S_SECS_Simulator'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

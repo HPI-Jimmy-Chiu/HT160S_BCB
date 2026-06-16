@@ -200,13 +200,13 @@ __published:
     TEdit *edTarget;
     TEdit *edNowPos;
     TEdit *edEncoder;
+    TScrollBar *scbTeachSpeed;
     TListBox *lstMotors;
     TButton *btnSetTeach;
     TButton *btnGoTeach;
     TButton *btnSave;
     TButton *btnReload;
     TButton *btnIOForm;
-    TButton *btnClose;
     TButton *btnMotorSet;
     TButton *btnJogP;
     TButton *btnJogN;
@@ -221,7 +221,26 @@ __published:
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
-    void __fastcall btnCloseClick(TObject *Sender);
+    void __fastcall tmrUpdateTimer(TObject *Sender);
+    void __fastcall grdTeachSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
+    void __fastcall grdTeachDblClick(TObject *Sender);
+    void __fastcall lstMotorsClick(TObject *Sender);
+    void __fastcall scbTeachSpeedScroll(TObject *Sender, TScrollCode ScrollCode, int &ScrollPos);
+    void __fastcall edSpeedChange(TObject *Sender);
+    void __fastcall btnSetTeachClick(TObject *Sender);
+    void __fastcall btnGoTeachClick(TObject *Sender);
+    void __fastcall btnSaveClick(TObject *Sender);
+    void __fastcall btnReloadClick(TObject *Sender);
+    void __fastcall btnIOFormClick(TObject *Sender);
+    void __fastcall btnJogPMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
+    void __fastcall btnJogNMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
+    void __fastcall btnJogMouseUp(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
+    void __fastcall btnStepPClick(TObject *Sender);
+    void __fastcall btnStepNClick(TObject *Sender);
+    void __fastcall btnMoveClick(TObject *Sender);
+    void __fastcall btnHomeClick(TObject *Sender);
+    void __fastcall btnStopClick(TObject *Sender);
+    void __fastcall btnRefreshClick(TObject *Sender);
 private:
     bool bUIBuilt;
     bool bTeachReady;
@@ -239,14 +258,7 @@ private:
 
     void BuildUI();
     void BindDfmComponents();
-    void BuildClientPanel();
-    void BuildMotorPanel();
-    TTabSheet *CreateTeachTab(AnsiString Caption);
-    TStringGrid *CreateTeachGrid(TWinControl *Parent);
     void ConfigureTeachGrid(TStringGrid *Grid);
-    TLabel *CreateLabel(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Caption);
-    TEdit *CreateEdit(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Text, bool ReadOnly);
-    TButton *CreateButton(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Caption, TNotifyEvent OnClick);
     void ResetTeachGrid(TStringGrid *Grid);
     void AddTeachItem(TStringGrid *Grid, AnsiString GroupName, AnsiString Caption, TTrayMotor *Motor, int *iPara);
     int FindTeachItem(TStringGrid *Grid, int Row);
@@ -255,6 +267,7 @@ private:
     void RefreshTeachGrid(TStringGrid *Grid);
     void RefreshTeachRow(int Index);
     void FillMotorList();
+    void SetupSpeedControl();
     void SetActiveMotor(int Index);
     TTrayMotor *GetMotor(int Index);
     TTrayMotor *GetActiveMotor();
@@ -268,7 +281,7 @@ private:
     AnsiString GetMotorCaption(int Index);
     AnsiString GetSoftLimitCaption(TTrayMotor *Motor);
     void UpdateMotorMonitor();
-    void UpdateStatusLed(int LedIndex, bool Value);
+    void UpdateStatusLed(int LedIndex, bool Enabled, bool Value);
     void StartJog(bool bPositive);
     void StepMove(bool bPositive);
     void MoveActiveMotorToTarget();
@@ -278,25 +291,6 @@ private:
     void SetMessage(AnsiString Text);
     bool CheckSortArmZHome();
     bool CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target);
-
-    void __fastcall tmrUpdateTimer(TObject *Sender);
-    void __fastcall grdTeachSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
-    void __fastcall grdTeachDblClick(TObject *Sender);
-    void __fastcall lstMotorsClick(TObject *Sender);
-    void __fastcall btnSetTeachClick(TObject *Sender);
-    void __fastcall btnGoTeachClick(TObject *Sender);
-    void __fastcall btnSaveClick(TObject *Sender);
-    void __fastcall btnReloadClick(TObject *Sender);
-    void __fastcall btnIOFormClick(TObject *Sender);
-    void __fastcall btnJogPMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
-    void __fastcall btnJogNMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
-    void __fastcall btnJogMouseUp(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
-    void __fastcall btnStepPClick(TObject *Sender);
-    void __fastcall btnStepNClick(TObject *Sender);
-    void __fastcall btnMoveClick(TObject *Sender);
-    void __fastcall btnHomeClick(TObject *Sender);
-    void __fastcall btnStopClick(TObject *Sender);
-    void __fastcall btnRefreshClick(TObject *Sender);
 public:
     __fastcall TfTeach(TComponent* Owner);
     void __fastcall InitialTeachParameter();

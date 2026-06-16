@@ -26,7 +26,7 @@ enum TMainFeatureStatusIndex
 {
     eMainFeatureSECS = 0,
     eMainFeatureSafeDoor,
-    eMainFeatureReserve1,
+    eMainFeatureAMR,            //AI(ht160s-agv) 20260615 : AMR/AGV ON-OFF status badge
     eMainFeatureReserve2,
     eMainFeatureReserve3,
     eMainFeatureReserve4,
@@ -34,6 +34,45 @@ enum TMainFeatureStatusIndex
     eMainFeatureReserve6
 };
 //---------------------------------------------------------------------------
+// AI : design notes for members/methods declared below. Kept out of the class
+// body so the BCB6 form designer never meets a comment inside it (a comment in a
+// VCL form class - the __published section above all - makes the designer raise
+// "Incorrect method declaration in class TfMain" when you click an event).
+//   iLastSecsBadgeState     - last SECS badge state shown (-1=unset); edge-trigger
+//                             guard so VCL is touched only on change. (secsgem 20260612)
+//   Lot WebAPI pull state (lot-webapi 20260612, Stage 4, machine flow):
+//     bLotApiPullActive     - a non-blocking pull is in flight.
+//     sLotApiPullLot        - lot being pulled (for logging).
+//     bLotApiPullAll        - arms the "pull all lots" sweep: manual Lot Start pulls
+//                             EVERY lot in the registry, one at a time (the WebAPI
+//                             client is single-request).
+//     iLotApiPullCursor     - raw registry slot being pulled NOW (advances only after
+//                             a lot succeeds or its retries are used up).
+//     iLotApiRetryCount     - failed attempts on the current lot.
+//   FeatureBadgeSecsClick() - SECS badge -> open GEM log. (secsgem 20260611)
+//   sgLotListDblClick()     - double-click a Lot row to inspect the 2D/Bin data
+//                             downloaded for that Lot (operator confirms the work-order
+//                             JSON arrived). Wired to sgLotList->OnDblClick in ctor.
+//   RefreshLotListFromRegistry() - public so the SECS S2F42 SET_LOT_INFO handler can
+//                             reproject LotRegistry onto the on-screen Lot list (single
+//                             source of truth). (general 20260610)
+//   RequestLotDataFromWebApi()/PollLotDataWebApi() - Stage 4 non-blocking pull: Request
+//                             kicks off an async GET (no modal; also used by the SECS
+//                             LOTSTART handler on the HSMS thread); Poll runs every
+//                             MainProc cycle and loads the response into LotRegistry.
+//   StartNextLotApiPull()   - advance the sweep: find the next registry lot from
+//                             iLotApiPullCursor and start its pull; ends/clears the
+//                             sweep when none remain or bLotApiPullAll is off.
+//   StartLotWebApiPullAll() - arm a sweep over the whole registry; shared by manual
+//                             LotStart AND the SECS LOTSTART handler so BOTH pull every
+//                             lot's 2D/Bin data, not just the first.
+//   SaveLastLotList()/LoadLastLotList()/RestoreLastWorkOrder() - restore last used work
+//                             order on power-on (ref HT172 FormShow ReadLastDataIni):
+//                             persist/restore manual Lot list + active Lot No across
+//                             restarts; also auto-load today's JSON lot. (need1 20260608)
+//   UpdateSecsFeatureBadge() - sync the SECS feature badge to the live HSMS link state;
+//                             driven once/sec by the SECS engine timer (HGem->Timer1 ->
+//                             HT160Gem::RefreshSecsBadge); edge-triggered.
 class TfMain : public TForm
 {
 __published:	// IDE-managed Components
@@ -87,7 +126,7 @@ __published:	// IDE-managed Components
     TSpeedButton *sbCleanOut1;
     TSpeedButton *sbStoreHangup;
     TPageControl *pgcMonitor;
-    TTabSheet *TabSheet10;
+    TTabSheet *tsMotionView;
     TPanel *PanelMain6;
     TPanel *pnlLed;
     TALed *ledRed1;
@@ -132,7 +171,7 @@ __published:	// IDE-managed Components
     TMyLed *ledSortArm1ZE;
     TMyLed *ledSortArm1ZF;
     TPanel *plTrayArm;
-    TTabSheet *TabSheet7;
+    TTabSheet *tsMotorView;
     TStringGrid *sgMotorStatus;
     TTabSheet *TabRecord;
     TPanel *Panel12;
@@ -339,6 +378,7 @@ __published:	// IDE-managed Components
     TButton *btnRemoveLot;
     TButton *btnLotStart;
     TButton *btnLotEnd;
+    TLabel *lblLotListHint;
     TPanel *plCCDMotorColor;
     TCheckBox *chkLoadTray;
     void __fastcall sbLaguageClick(TObject *Sender);
@@ -382,30 +422,34 @@ private:	// User declarations
     TLabel *FeatureStatusNameLabels[MAIN_FEATURE_STATUS_COUNT];
     TLabel *FeatureStatusValueLabels[MAIN_FEATURE_STATUS_COUNT];
     bool bUpdatingMainSelections;
-    int  iLastSecsBadgeState;   //AI(ht160s-secsgem) 20260612 : last SECS badge state shown (-1=unset); edge-trigger guard so VCL is touched only on change
+    int  iLastSecsBadgeState;
+    bool bLotApiPullActive;
+    AnsiString sLotApiPullLot;
+    bool bLotApiPullAll;
+    int  iLotApiPullCursor;
+    int  iLotApiRetryCount;
     void __fastcall BuildFeatureStatusBadges();
-    void __fastcall FeatureBadgeSecsClick(TObject *Sender);   //AI(ht160s-secsgem) 20260611 : SECS badge -> open GEM log
+    void __fastcall FeatureBadgeSecsClick(TObject *Sender);
     void __fastcall UpdateWorkFileComboBox();
     void __fastcall RefreshMainUserSelect();
     void __fastcall InitSimulateScreenBinding();
     void __fastcall SyncMonitorTrayDivision();
     void __fastcall SetupLotListGrid();
     int  __fastcall GetLotListCount();
-    //AI(HT160S-Maintainer) 20260608 : need1 : restore last used work order on
-    //power-on (ref HT172 FormShow ReadLastDataIni). Persist/restore the manual
-    //Lot list + active Lot No across restarts; also auto-load today's JSON lot.
+    void __fastcall sgLotListDblClick(TObject *Sender);
+    void __fastcall ShowLotDetail(AnsiString LotID);
     void __fastcall SaveLastLotList();
     void __fastcall LoadLastLotList();
     void __fastcall RestoreLastWorkOrder();
 public:		// User declarations
     __fastcall TfMain(TComponent* Owner);
-    //AI(general) 20260610 : public so the SECS S2F42 SET_LOT_INFO handler can
-    // reproject LotRegistry onto the on-screen Lot list (single source of truth).
     void __fastcall RefreshLotListFromRegistry();
-    //AI(ht160s-secsgem) 20260612 : sync the SECS feature badge to the live HSMS
-    // link state. Driven once per second by the SECS engine timer (HGem->Timer1
-    // -> HT160Gem::RefreshSecsBadge). Edge-triggered: only repaints on change.
+    void __fastcall RequestLotDataFromWebApi(AnsiString LotID);
+    void __fastcall PollLotDataWebApi();
+    void __fastcall StartNextLotApiPull();
+    void __fastcall StartLotWebApiPullAll();
     void __fastcall UpdateSecsFeatureBadge();
+    void __fastcall UpdateAmrFeatureBadge();   //AI(ht160s-agv) 20260615 : sync AMR badge to GeneralSetting.bUseAMR
     void __fastcall SetFeatureStatusBadge(int BadgeIndex, AnsiString ValueText, TColor ValueColor);
     void __fastcall SetSimulateScreenStatus();
     void __fastcall ShowMotorInfo();
@@ -413,6 +457,7 @@ public:		// User declarations
     void LoadRunModePicture();
     void LoadStartModePicture();
     void Start();
+    bool CheckLotDataReady(AnsiString &Reason);
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfMain *fMain;

@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"name": "HT160S_BCB (Dev - WRITABLE)",
+			"path": "."
+		},
+		{
+			"name": "HT172 (Reference - READ ONLY)",
+			"path": "../HT172"
+		}
+	],
+	"settings": {
+		"files.readonlyFromPermissions": false,
+		"files.readonlyInclude": {
+			"../HT172/**": true
+		},
+		"search.exclude": {
+			"**/Obj/**": true,
+			"**/*.exe": true,
+			"**/*.dll": true,
+			"**/*.obj": true,
+			"**/*.tds": true,
+			"**/*.DB": true,
+			"**/system/*.bak": true
+		},
+		"files.encoding": "cp950",
+		"[markdown]": {
+			"files.encoding": "utf8"
+		}
+	}
+}
