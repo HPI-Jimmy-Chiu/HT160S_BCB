@@ -19,7 +19,8 @@ static const TColor MOTOR_TEST_COLOR_GRID=(TColor)14670284;
 
 enum
 {
-    eOperateColNo = 0,
+    eOperateColLoop = 0,
+    eOperateColNo,
     eOperateColMotor,
     eOperateColCommand,
     eOperateColEncoder,
@@ -259,11 +260,6 @@ void __fastcall TfMotorTest::FormClose(TObject *Sender, TCloseAction &Action)
         Action=caNone;
         return;
     }
-    if(ConfirmDiscardMotorTableEdit()==false)
-    {
-        Action=caNone;
-        return;
-    }
     if(tmrUpdate!=NULL)
         tmrUpdate->Enabled=false;
     StopActiveMotor();
@@ -318,7 +314,6 @@ void TfMotorTest::BuildPageArea()
     ArrangeOperatePage();
     ConfigureOperateGrid();
     ConfigureMotorParameterGrid();
-    ConfigureMotorTableGrid();
     ConfigureInformationGrid();
     ConfigureDriverRegisterGrid();
     ConfigureServoGuardGrid();
@@ -345,6 +340,92 @@ void TfMotorTest::ArrangeOperatePage()
     }
 }
 //---------------------------------------------------------------------------
+// grdOperate is both the status list and the motor picker. The active motor row
+// is drawn with the system highlight (blue bar) keyed off ActiveMotorIndex, not
+// the grid's own selection, so it stays correct regardless of focus. The first
+// column ("Loop") is a checkbox marking multi-loop membership (bMultiLoopMotor).
+void __fastcall TfMotorTest::grdOperateDrawCell(TObject *Sender, int ACol,
+    int ARow, const TRect &Rect, TGridDrawState State)
+{
+    TStringGrid *Grid=(TStringGrid*)Sender;
+    TCanvas *Cv=Grid->Canvas;
+    bool bFixed=(ARow<Grid->FixedRows)||(ACol<Grid->FixedCols);
+    bool bActive=(ARow>=Grid->FixedRows)&&(ARow-1==ActiveMotorIndex);
+    (void)State;
+    if(bFixed)
+    {
+        Cv->Brush->Color=(TColor)Grid->FixedColor;
+        Cv->Font->Color=clWindowText;
+    }
+    else if(bActive)
+    {
+        Cv->Brush->Color=clHighlight;
+        Cv->Font->Color=clHighlightText;
+    }
+    else
+    {
+        Cv->Brush->Color=(TColor)Grid->Color;
+        Cv->Font->Color=clWindowText;
+    }
+    Cv->FillRect(Rect);
+
+    if(!bFixed && ACol==eOperateColLoop)
+    {
+        int MotorIndex=ARow-1;
+        bool bChecked=(MotorIndex>=0 && MotorIndex<MAX_MOTOR_TEST_MOTOR_COUNT && bMultiLoopMotor[MotorIndex]);
+        int BoxLeft=Rect.Left+(Rect.right-Rect.Left-14)/2;
+        int BoxTop=Rect.Top+(Rect.Bottom-Rect.Top-14)/2;
+        Cv->Brush->Color=clWindow;
+        Cv->Pen->Color=clBlack;
+        Cv->Pen->Width=1;
+        Cv->Rectangle(BoxLeft, BoxTop, BoxLeft+14, BoxTop+14);
+        if(bChecked)
+        {
+            Cv->Pen->Color=clGreen;
+            Cv->Pen->Width=2;
+            Cv->MoveTo(BoxLeft+3, BoxTop+7);
+            Cv->LineTo(BoxLeft+6, BoxTop+10);
+            Cv->LineTo(BoxLeft+11, BoxTop+3);
+            Cv->Pen->Width=1;
+        }
+        return;
+    }
+
+    AnsiString Text=Grid->Cells[ACol][ARow];
+    if(!Text.IsEmpty())
+        Cv->TextRect(Rect, Rect.Left+4, Rect.Top+4, Text);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMotorTest::grdOperateMouseDown(TObject *Sender,
+    TMouseButton Button, TShiftState Shift, int X, int Y)
+{
+    int ACol;
+    int ARow;
+    int MotorIndex;
+    (void)Sender;
+    (void)Button;
+    (void)Shift;
+
+    if(grdOperate==NULL)
+        return;
+    grdOperate->MouseToCell(X, Y, ACol, ARow);
+    if(ARow<1)
+        return;
+    MotorIndex=ARow-1;
+    if(MotorIndex<0 || MotorIndex>=GetMotorCount())
+        return;
+    if(ACol==eOperateColLoop)
+    {
+        if(MotorIndex<MAX_MOTOR_TEST_MOTOR_COUNT)
+        {
+            bMultiLoopMotor[MotorIndex]=!bMultiLoopMotor[MotorIndex];
+            grdOperate->Invalidate();
+        }
+        return;
+    }
+    SetActiveMotor(MotorIndex);
+}
+//---------------------------------------------------------------------------
 void TfMotorTest::ConfigureOperateGrid()
 {
     if(grdOperate==NULL)
@@ -354,7 +435,10 @@ void TfMotorTest::ConfigureOperateGrid()
     grdOperate->FixedCols=0;
     grdOperate->DefaultRowHeight=24;
     grdOperate->Color=MOTOR_TEST_COLOR_GRID;
-    grdOperate->Options=grdOperate->Options << goRowSelect << goColSizing;
+    grdOperate->Options=grdOperate->Options << goColSizing;
+    grdOperate->OnDrawCell=grdOperateDrawCell;
+    grdOperate->OnMouseDown=grdOperateMouseDown;
+    grdOperate->Cells[eOperateColLoop][0]="Loop";
     grdOperate->Cells[eOperateColNo][0]="No";
     grdOperate->Cells[eOperateColMotor][0]="Motor";
     grdOperate->Cells[eOperateColCommand][0]="Command";
@@ -367,6 +451,7 @@ void TfMotorTest::ConfigureOperateGrid()
     grdOperate->Cells[eOperateColAlarm][0]="Alarm";
     grdOperate->Cells[eOperateColInPos][0]="InPos";
     grdOperate->Cells[eOperateColSoftLimit][0]="Soft Limit";
+    grdOperate->ColWidths[eOperateColLoop]=42;
     grdOperate->ColWidths[eOperateColNo]=45;
     grdOperate->ColWidths[eOperateColMotor]=145;
     grdOperate->ColWidths[eOperateColCommand]=75;
@@ -413,21 +498,6 @@ void TfMotorTest::ConfigureMotorParameterGrid()
     grdMotorParameter->ColWidths[eMotorParamColAlias]=150;
     grdMotorParameter->ColWidths[eMotorParamColCard]=80;
     grdMotorParameter->ColWidths[eMotorParamColAddress]=70;
-}
-//---------------------------------------------------------------------------
-void TfMotorTest::ConfigureMotorTableGrid()
-{
-    if(grdMotorTable==NULL)
-        return;
-    grdMotorTable->ColCount=1;
-    grdMotorTable->RowCount=2;
-    grdMotorTable->FixedRows=1;
-    grdMotorTable->FixedCols=0;
-    grdMotorTable->DefaultRowHeight=24;
-    grdMotorTable->Color=MOTOR_TEST_COLOR_GRID;
-    grdMotorTable->Options=TGridOptions() << goFixedVertLine << goFixedHorzLine << goVertLine << goHorzLine << goRowSelect << goColSizing;
-    grdMotorTable->OnDblClick=grdMotorTableDblClick;
-    grdMotorTable->Cells[0][0]="Mot_Table";
 }
 //---------------------------------------------------------------------------
 void TfMotorTest::ConfigureInformationGrid()
@@ -533,30 +603,17 @@ int TfMotorTest::GetMotorCount()
 void TfMotorTest::FillMotorList()
 {
     int OldIndex;
-    int MotorIndex;
     int MotorCount;
 
-    if(lstMotors==NULL)
-        return;
-
-    OldIndex=ActiveMotorIndex;
+    // Motor selection moved to the grdOperate row (blue bar). This keeps the
+    // active index valid and re-syncs the right-hand active-motor panel.
     MotorCount=GetMotorCount();
-    lstMotors->Items->BeginUpdate();
-    lstMotors->Items->Clear();
-    for(MotorIndex=0; MotorIndex<MotorCount; MotorIndex++)
-    {
-        if(HSys.MotPtr!=NULL && HSys.MotPtr[MotorIndex]!=NULL)
-            lstMotors->Items->Add(HSys.MotPtr[MotorIndex]->NumberAlias);
-    }
-    lstMotors->Items->EndUpdate();
-
-    if(lstMotors->Items->Count>0)
-    {
-        if(OldIndex<0 || OldIndex>=lstMotors->Items->Count)
-            OldIndex=0;
-        lstMotors->ItemIndex=OldIndex;
-        SetActiveMotor(OldIndex);
-    }
+    if(MotorCount<=0)
+        return;
+    OldIndex=ActiveMotorIndex;
+    if(OldIndex<0 || OldIndex>=MotorCount)
+        OldIndex=0;
+    SetActiveMotor(OldIndex);
 }
 //---------------------------------------------------------------------------
 void TfMotorTest::SetActiveMotor(int Index)
@@ -568,18 +625,22 @@ void TfMotorTest::SetActiveMotor(int Index)
         return;
 
     ActiveMotorIndex=Index;
-    if(lstMotors!=NULL && Index>=0 && Index<lstMotors->Items->Count)
-        lstMotors->ItemIndex=Index;
     if(palMotorName!=NULL)
         palMotorName->Caption=Motor->NumberAlias;
     if(grdMotorParameter!=NULL && Index+1<grdMotorParameter->RowCount)
         grdMotorParameter->Row=Index+1;
+    if(grdOperate!=NULL)
+        grdOperate->Invalidate();
     if(edSpeedPercent!=NULL)
     {
-        int Percent=Motor->GetPersentSpeed()>0?Motor->GetPersentSpeed():20;
+        // Always default to a safe 30% speed on every motor selection (operator
+        // request), regardless of the motor's stored percent, so a high speed left
+        // from a previously selected axis cannot cause a dangerous first move.
+        int Percent=30;
         edSpeedPercent->Text=IntToStr(Percent);
         if(scrSpeedPercent!=NULL)
             scrSpeedPercent->Position=Percent;
+        Motor->SetPersentSpeed(Percent, false);
     }
     UpdateActivePositionEdits();
     UpdateMotorMonitor();
@@ -665,24 +726,6 @@ bool TfMotorTest::ConfirmDiscardMotorParameterEdit()
     return false;
 }
 //---------------------------------------------------------------------------
-bool TfMotorTest::ConfirmDiscardMotorTableEdit()
-{
-    int Ret;
-
-    if(bMotorTableDirty==false)
-        return true;
-
-    Ret=MessageDlg("Discard unsaved Mot_Table changes?", mtConfirmation, TMsgDlgButtons() << mbYes << mbNo, 0);
-    if(Ret==mrYes)
-    {
-        bMotorTableDirty=false;
-        LoadMotorTableGrid();
-        SetMessage("Mot_Table edit discarded");
-        return true;
-    }
-    return false;
-}
-//---------------------------------------------------------------------------
 bool TfMotorTest::CheckNoUnsavedMotorParameter(AnsiString ActionText)
 {
     if(bMotorParameterDirty==false)
@@ -720,7 +763,13 @@ bool TfMotorTest::CheckMotorDataEditIdle()
 //---------------------------------------------------------------------------
 bool TfMotorTest::IsMotorParameterEditableColumn(int ColIndex)
 {
-    return (ColIndex==eMotorParamColSoftN     || ColIndex==eMotorParamColSoftP  ||
+    // Every configurable column is editable here; access to this screen is gated at
+    // the screen level (permission), so individual fields are not locked. Only the
+    // No column (row identity) and the Home column (live home status, not a setting)
+    // stay read-only.
+    return (ColIndex==eMotorParamColAlias     || ColIndex==eMotorParamColCard   ||
+            ColIndex==eMotorParamColAddress   || ColIndex==eMotorParamColEnable ||
+            ColIndex==eMotorParamColSoftN     || ColIndex==eMotorParamColSoftP  ||
             ColIndex==eMotorParamColInit      || ColIndex==eMotorParamColJogLow ||
             ColIndex==eMotorParamColJogHigh   || ColIndex==eMotorParamColHomeLow||
             ColIndex==eMotorParamColHomeHigh  || ColIndex==eMotorParamColAcc    ||
@@ -731,6 +780,11 @@ AnsiString TfMotorTest::GetMotorParameterCsvName(int ColIndex)
 {
     switch(ColIndex)
     {
+        case eMotorParamColAlias:    return "Alias";
+        case eMotorParamColCard:     return "CardModel";
+        case eMotorParamColEnable:   return "Enable";
+        // eMotorParamColAddress maps to two CSV columns (BoardID + Port) and is
+        // handled specially in SaveMotorParameterToFile, not via this 1:1 lookup.
         case eMotorParamColSoftN:    return "SoftLimitN";
         case eMotorParamColSoftP:    return "SoftLimitP";
         case eMotorParamColInit:     return "InitSpeed";
@@ -758,6 +812,74 @@ bool TfMotorTest::ValidateMotorParameterValue(int ColIndex, AnsiString InputText
     {
         ErrorText="This parameter is read only.";
         return false;
+    }
+
+    if(ColIndex==eMotorParamColAlias)
+    {
+        DisplayText=MotorTestTrim(InputText);
+        if(DisplayText==AnsiString(""))
+        {
+            ErrorText="Alias must not be empty.";
+            return false;
+        }
+        CsvText=DisplayText;
+        return true;
+    }
+
+    if(ColIndex==eMotorParamColCard)
+    {
+        DisplayText=MotorTestTrim(InputText).UpperCase();
+        // Match the card models the system actually instantiates (database.cpp /
+        // MyMotor InitialMotorObject). Anything else would build a no-op HTMotor.
+        if(DisplayText!=AnsiString("MC88X1") && DisplayText!=AnsiString("MC88X1P") &&
+           DisplayText!=AnsiString("SMC")    && DisplayText!=AnsiString("MN200")   &&
+           DisplayText!=AnsiString("SYNTEK"))
+        {
+            ErrorText="Card must be MC88X1, MC88X1P, SMC, MN200 or SYNTEK.";
+            return false;
+        }
+        CsvText=DisplayText;
+        return true;
+    }
+
+    if(ColIndex==eMotorParamColEnable)
+    {
+        AnsiString Flag=MotorTestTrim(InputText).UpperCase();
+        if(Flag==AnsiString("ON") || Flag==AnsiString("1") || Flag==AnsiString("TRUE") || Flag==AnsiString("Y"))
+        {
+            DisplayText="ON";
+            CsvText="1";
+            return true;
+        }
+        if(Flag==AnsiString("OFF") || Flag==AnsiString("0") || Flag==AnsiString("FALSE") || Flag==AnsiString("N"))
+        {
+            DisplayText="OFF";
+            CsvText="0";
+            return true;
+        }
+        ErrorText="Enable must be ON or OFF.";
+        return false;
+    }
+
+    if(ColIndex==eMotorParamColAddress)
+    {
+        // Address is shown as the card-specific composite (BoardID*10+Port for
+        // MC88X1/SMC, BoardID*100+Port for MN200). Validate the integer here; the
+        // BoardID/Port split is done in SaveMotorParameterToFile using the row's
+        // Card value so it stays correct when both columns are edited together.
+        if(MotorTestTryParseInt(InputText, IntValue)==false)
+        {
+            ErrorText="Address must be integer.";
+            return false;
+        }
+        if(IntValue<0)
+        {
+            ErrorText="Address must not be negative.";
+            return false;
+        }
+        CsvText=IntToStr(IntValue);
+        DisplayText=CsvText;
+        return true;
     }
 
     if(ColIndex==eMotorParamColSoftN || ColIndex==eMotorParamColSoftP)
@@ -1115,428 +1237,6 @@ bool TfMotorTest::ValidateMotorTableCsv(AnsiString &SummaryText, AnsiString &Err
     return ErrorText==AnsiString("");
 }
 //---------------------------------------------------------------------------
-void TfMotorTest::LoadMotorTableGrid()
-{
-    TStringList *LineList;
-    TStringList *Fields;
-    int MaxColCount;
-
-    if(grdMotorTable==NULL)
-        return;
-
-    grdMotorTable->RowCount=2;
-    grdMotorTable->ColCount=1;
-    grdMotorTable->Cells[0][0]="Mot_Table";
-    grdMotorTable->Cells[0][1]="";
-
-    if(HSys.MotTablePath==AnsiString("") || FileExists(HSys.MotTablePath)==false)
-    {
-        SetMessage("Mot_Table.csv not found");
-        return;
-    }
-
-    LineList=new TStringList;
-    Fields=new TStringList;
-    try
-    {
-        LineList->LoadFromFile(HSys.MotTablePath);
-        if(LineList->Count<=0)
-            throw Exception("Mot_Table.csv is empty.");
-
-        MaxColCount=1;
-        for(int RowIndex=0; RowIndex<LineList->Count; RowIndex++)
-        {
-            Fields->CommaText=LineList->Strings[RowIndex];
-            if(Fields->Count>MaxColCount)
-                MaxColCount=Fields->Count;
-        }
-
-        grdMotorTable->ColCount=MaxColCount;
-        grdMotorTable->RowCount=(LineList->Count>1)?LineList->Count:2;
-        for(int RowIndex=0; RowIndex<grdMotorTable->RowCount; RowIndex++)
-            for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-                grdMotorTable->Cells[ColIndex][RowIndex]="";
-
-        for(int RowIndex=0; RowIndex<LineList->Count; RowIndex++)
-        {
-            Fields->CommaText=LineList->Strings[RowIndex];
-            for(int ColIndex=0; ColIndex<Fields->Count && ColIndex<grdMotorTable->ColCount; ColIndex++)
-                grdMotorTable->Cells[ColIndex][RowIndex]=Fields->Strings[ColIndex];
-        }
-
-        for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-        {
-            AnsiString Header=grdMotorTable->Cells[ColIndex][0].UpperCase();
-            if(Header=="MOTORNAME" || Header=="ALIAS" || Header=="CARDMODEL" || Header=="FLUSHPANEL" || Header=="HOMEORDER")
-                grdMotorTable->ColWidths[ColIndex]=120;
-            else
-                grdMotorTable->ColWidths[ColIndex]=78;
-        }
-
-        bMotorTableDirty=false;
-        SetMessage(AnsiString("Mot_Table loaded. Rows=")+IntToStr((LineList->Count>0)?LineList->Count-1:0));
-    }
-    catch(Exception &E)
-    {
-        SetMessage(AnsiString("Mot_Table load failed: ")+E.Message);
-    }
-    catch(...)
-    {
-        SetMessage("Mot_Table load failed");
-    }
-
-    delete Fields;
-    delete LineList;
-}
-//---------------------------------------------------------------------------
-bool TfMotorTest::IsMotorTableEditableColumn(int ColIndex)
-{
-    AnsiString Header;
-
-    if(grdMotorTable==NULL || ColIndex<0 || ColIndex>=grdMotorTable->ColCount)
-        return false;
-    Header=grdMotorTable->Cells[ColIndex][0].UpperCase();
-    return (Header=="SOFTLIMITN"     || Header=="SOFTLIMITP"  ||
-            Header=="INITSPEED"      || Header=="JOGLOWSPEED" ||
-            Header=="JOGHIGHSPEED"   || Header=="HOMELOWSPEED"||
-            Header=="HOMEHIGHSPEED"  || Header=="ACC"         ||
-            Header=="DEC"            || Header=="RANGE");
-}
-//---------------------------------------------------------------------------
-bool TfMotorTest::ValidateMotorTableEditValue(int ColIndex, AnsiString InputText, AnsiString &DisplayText, AnsiString &ErrorText)
-{
-    AnsiString Header;
-    int IntValue;
-    double DoubleValue;
-
-    DisplayText="";
-    ErrorText="";
-    if(grdMotorTable==NULL || IsMotorTableEditableColumn(ColIndex)==false)
-    {
-        ErrorText="This Mot_Table column is read only.";
-        return false;
-    }
-
-    Header=grdMotorTable->Cells[ColIndex][0].UpperCase();
-    if(Header=="ACC" || Header=="DEC")
-    {
-        if(MotorTestTryParseDouble(InputText, DoubleValue)==false)
-        {
-            ErrorText=Header+AnsiString(" must be numeric.");
-            return false;
-        }
-        if(DoubleValue<=0.0 || DoubleValue>100000.0)
-        {
-            ErrorText=Header+AnsiString(" must be greater than 0.");
-            return false;
-        }
-        DisplayText=MotorTestFormatDouble(DoubleValue);
-        return true;
-    }
-
-    if(MotorTestTryParseInt(InputText, IntValue)==false)
-    {
-        ErrorText=Header+AnsiString(" must be integer.");
-        return false;
-    }
-
-    if(Header=="SOFTLIMITN" || Header=="SOFTLIMITP")
-    {
-        if(IntValue<-999999999 || IntValue>999999999)
-        {
-            ErrorText=Header+AnsiString(" is out of range.");
-            return false;
-        }
-        DisplayText=IntToStr(IntValue);
-        return true;
-    }
-
-    if(IntValue<=0)
-    {
-        ErrorText=Header+AnsiString(" must be greater than 0.");
-        return false;
-    }
-    DisplayText=IntToStr(IntValue);
-    return true;
-}
-//---------------------------------------------------------------------------
-bool TfMotorTest::ValidateMotorTableGrid(AnsiString &SummaryText, AnsiString &ErrorText)
-{
-    TStringList *HeaderList;
-    TStringList *RowFields;
-    TStringList *MotorNameList;
-    TStringList *AliasList;
-    TMOTNO TableNo;
-    int MissingIndex;
-    int ValidRows;
-
-    SummaryText="";
-    ErrorText="";
-    if(grdMotorTable==NULL || grdMotorTable->RowCount<=1 || grdMotorTable->ColCount<=1)
-    {
-        ErrorText="Mot_Table view is empty.";
-        return false;
-    }
-
-    HeaderList=new TStringList;
-    RowFields=new TStringList;
-    MotorNameList=new TStringList;
-    AliasList=new TStringList;
-    ValidRows=0;
-    try
-    {
-        for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-            HeaderList->Add(grdMotorTable->Cells[ColIndex][0]);
-
-        MissingIndex=TableNo.SetMOTTableNo(HeaderList->CommaText);
-        if(MissingIndex!=TableNo.emotTotal)
-            throw Exception(AnsiString("Missing Mot_Table column: ")+GetMotorTableColumnName(MissingIndex));
-
-        for(int RowIndex=1; RowIndex<grdMotorTable->RowCount; RowIndex++)
-        {
-            AnsiString MotorName;
-            AnsiString Alias;
-            AnsiString CardModel;
-            AnsiString Key;
-            int RowNo=RowIndex+1;
-            int Direction;
-            int HomeDirection;
-            int HomeHigh;
-            int HomeLow;
-            int InitSpeed;
-            int JogHigh;
-            int JogLow;
-            int Rate;
-            int SoftN;
-            int SoftP;
-            int Enable;
-            int ServoAlarmOn;
-            int Range;
-            int OnePTwoP;
-            int SensorType;
-            int SimulateSpeed;
-            int BoardID;
-            int Port;
-            int MotorKind;
-            int LimitLogic;
-            int In1Logic;
-            double GearRatio;
-            double Acc;
-            double Dec;
-
-            RowFields->Clear();
-            for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-                RowFields->Add(grdMotorTable->Cells[ColIndex][RowIndex]);
-            if(MotorTestTrim(RowFields->CommaText)==AnsiString(""))
-                continue;
-
-            MotorName=MotorTestTrim(MotorTestCsvField(RowFields, TableNo.emotNo));
-            Alias=MotorTestTrim(MotorTestCsvField(RowFields, TableNo.emotAlias));
-            CardModel=MotorTestTrim(MotorTestCsvField(RowFields, TableNo.emotCardModel));
-            if(MotorName==AnsiString("")) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" missing Motorname."));
-            if(Alias==AnsiString("")) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" missing Alias."));
-            if(CardModel==AnsiString("")) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" missing CardModel."));
-
-            Key=MotorName.UpperCase();
-            if(MotorNameList->IndexOf(Key)>=0) throw Exception(AnsiString("Duplicate Motorname: ")+MotorName);
-            MotorNameList->Add(Key);
-            Key=Alias.UpperCase();
-            if(AliasList->IndexOf(Key)>=0) throw Exception(AnsiString("Duplicate Alias: ")+Alias);
-            AliasList->Add(Key);
-
-            if(MotorTestReadIntField(RowFields, TableNo.emotDirection, "Direction", RowNo, Direction, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadDoubleField(RowFields, TableNo.emotGearRatio, "GearRatio", RowNo, GearRatio, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotHomeDirectior, "HomeDirectior", RowNo, HomeDirection, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotHomeHighSpeed, "HomeHighSpeed", RowNo, HomeHigh, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotHomeLowSpeed, "HomeLowSpeed", RowNo, HomeLow, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotInitSpeed, "InitSpeed", RowNo, InitSpeed, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotJogHighSpeed, "JogHighSpeed", RowNo, JogHigh, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotJogLowSpeed, "JogLowSpeed", RowNo, JogLow, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotRate, "Rate", RowNo, Rate, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotSoftLimitN, "SoftLimitN", RowNo, SoftN, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotSoftLimitP, "SoftLimitP", RowNo, SoftP, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotEnable, "Enable", RowNo, Enable, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotServoAlarmOn, "ServoAlarmOn", RowNo, ServoAlarmOn, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotRange, "Range", RowNo, Range, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emot1P2P, "1P2P", RowNo, OnePTwoP, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotSensorType, "SensorType", RowNo, SensorType, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotSimulateSpeed, "SimulateSpeed", RowNo, SimulateSpeed, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotBoardID, "BoardID", RowNo, BoardID, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotPort, "Port", RowNo, Port, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadDoubleField(RowFields, TableNo.emotAcc, "Acc", RowNo, Acc, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadDoubleField(RowFields, TableNo.emotDec, "Dec", RowNo, Dec, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotMotorKind, "MotorKind", RowNo, MotorKind, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotLimitLogic, "LimitLogic", RowNo, LimitLogic, ErrorText)==false) throw Exception(ErrorText);
-            if(MotorTestReadIntField(RowFields, TableNo.emotIn1Logic, "In1Logic", RowNo, In1Logic, ErrorText)==false) throw Exception(ErrorText);
-
-            if(GearRatio<=0.0) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" GearRatio must be greater than 0."));
-            if(HomeLow>HomeHigh) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" HomeLowSpeed must not exceed HomeHighSpeed."));
-            if(JogLow>JogHigh) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" JogLowSpeed must not exceed JogHighSpeed."));
-            if(SoftN>=SoftP) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" SoftLimitN must be less than SoftLimitP."));
-            if(InitSpeed<=0 || JogHigh<=0 || JogLow<=0 || HomeHigh<=0 || HomeLow<=0 || Rate<=0 || Range<=0 || SimulateSpeed<=0)
-                throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" speed/rate/range values must be greater than 0."));
-            if(Acc<=0.0 || Dec<=0.0) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" Acc/Dec must be greater than 0."));
-            if(BoardID<0 || Port<0) throw Exception(AnsiString("Row ")+IntToStr(RowNo)+AnsiString(" BoardID/Port must not be negative."));
-
-            ValidRows++;
-        }
-
-        if(ValidRows<=0)
-            throw Exception("Mot_Table grid has no valid motor rows.");
-        SummaryText=AnsiString("Mot_Table grid validate OK. Rows=")+IntToStr(ValidRows)+AnsiString(", Columns=")+IntToStr(HeaderList->Count);
-    }
-    catch(Exception &E)
-    {
-        ErrorText=E.Message;
-    }
-    catch(...)
-    {
-        ErrorText="Unknown Mot_Table grid validation error.";
-    }
-
-    delete AliasList;
-    delete MotorNameList;
-    delete RowFields;
-    delete HeaderList;
-
-    return ErrorText==AnsiString("");
-}
-//---------------------------------------------------------------------------
-bool TfMotorTest::BuildMotorTableLinesFromGrid(TStringList *LineList, AnsiString &ErrorText)
-{
-    TStringList *RowFields;
-
-    ErrorText="";
-    if(LineList==NULL || grdMotorTable==NULL)
-    {
-        ErrorText="Mot_Table view is empty.";
-        return false;
-    }
-
-    RowFields=new TStringList;
-    try
-    {
-        LineList->Clear();
-        for(int RowIndex=0; RowIndex<grdMotorTable->RowCount; RowIndex++)
-        {
-            RowFields->Clear();
-            for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-                RowFields->Add(grdMotorTable->Cells[ColIndex][RowIndex]);
-            if(RowIndex>0 && MotorTestTrim(RowFields->CommaText)==AnsiString(""))
-                continue;
-            LineList->Add(RowFields->CommaText);
-        }
-    }
-    __finally
-    {
-        delete RowFields;
-    }
-    return true;
-}
-//---------------------------------------------------------------------------
-bool TfMotorTest::BuildMotorTableChangeList(TStringList *ChangeList, AnsiString &PreviewText, int &ChangeCount, AnsiString &ErrorText)
-{
-    TStringList *OriginalLines;
-    TStringList *OriginalFields;
-    TStringList *OriginalHeader;
-    TStringList *GridHeader;
-    AnsiString RowLabel;
-    AnsiString Header;
-    AnsiString OldText;
-    AnsiString NewText;
-    int MotorNameCol;
-    int AliasCol;
-    int PreviewLimit;
-
-    PreviewText="";
-    ErrorText="";
-    ChangeCount=0;
-    if(ChangeList==NULL || grdMotorTable==NULL)
-    {
-        ErrorText="Mot_Table view is empty.";
-        return false;
-    }
-    ChangeList->Clear();
-    if(HSys.MotTablePath==AnsiString("") || FileExists(HSys.MotTablePath)==false)
-    {
-        ErrorText="Mot_Table.csv not found.";
-        return false;
-    }
-
-    OriginalLines=new TStringList;
-    OriginalFields=new TStringList;
-    OriginalHeader=new TStringList;
-    GridHeader=new TStringList;
-    try
-    {
-        OriginalLines->LoadFromFile(HSys.MotTablePath);
-        if(OriginalLines->Count!=grdMotorTable->RowCount)
-            throw Exception("Mot_Table row count changed on disk. Reload before saving.");
-
-        OriginalHeader->CommaText=OriginalLines->Strings[0];
-        for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-            GridHeader->Add(grdMotorTable->Cells[ColIndex][0]);
-        if(OriginalHeader->Count!=GridHeader->Count)
-            throw Exception("Mot_Table header count changed on disk. Reload before saving.");
-        for(int ColIndex=0; ColIndex<GridHeader->Count; ColIndex++)
-        {
-            if(MotorTestTrim(OriginalHeader->Strings[ColIndex]).UpperCase()!=MotorTestTrim(GridHeader->Strings[ColIndex]).UpperCase())
-                throw Exception("Mot_Table header changed on disk. Reload before saving.");
-        }
-
-        MotorNameCol=FindCsvColumn(GridHeader, "Motorname");
-        AliasCol=FindCsvColumn(GridHeader, "Alias");
-        for(int RowIndex=1; RowIndex<grdMotorTable->RowCount; RowIndex++)
-        {
-            OriginalFields->Clear();
-            OriginalFields->CommaText=OriginalLines->Strings[RowIndex];
-            RowLabel=AnsiString("Row ")+IntToStr(RowIndex+1);
-            if(AliasCol>=0 && AliasCol<grdMotorTable->ColCount && grdMotorTable->Cells[AliasCol][RowIndex]!=AnsiString(""))
-                RowLabel=RowLabel+AnsiString(" ")+grdMotorTable->Cells[AliasCol][RowIndex];
-            else if(MotorNameCol>=0 && MotorNameCol<grdMotorTable->ColCount && grdMotorTable->Cells[MotorNameCol][RowIndex]!=AnsiString(""))
-                RowLabel=RowLabel+AnsiString(" ")+grdMotorTable->Cells[MotorNameCol][RowIndex];
-
-            for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-            {
-                if(IsMotorTableEditableColumn(ColIndex)==false)
-                    continue;
-                Header=grdMotorTable->Cells[ColIndex][0];
-                OldText=(ColIndex<OriginalFields->Count)?OriginalFields->Strings[ColIndex]:AnsiString("");
-                NewText=grdMotorTable->Cells[ColIndex][RowIndex];
-                if(OldText!=NewText)
-                    ChangeList->Add(RowLabel+AnsiString(" | ")+Header+AnsiString(": ")+OldText+AnsiString(" -> ")+NewText);
-            }
-        }
-
-        ChangeCount=ChangeList->Count;
-        if(ChangeCount<=0)
-            PreviewText="No effective Mot_Table changes.";
-        else
-        {
-            PreviewText=AnsiString("Mot_Table changes: ")+IntToStr(ChangeCount);
-            PreviewLimit=(ChangeCount<12)?ChangeCount:12;
-            for(int Index=0; Index<PreviewLimit; Index++)
-                PreviewText=PreviewText+AnsiString("\r\n")+ChangeList->Strings[Index];
-            if(ChangeCount>PreviewLimit)
-                PreviewText=PreviewText+AnsiString("\r\n...")+IntToStr(ChangeCount-PreviewLimit)+AnsiString(" more change(s)");
-        }
-    }
-    catch(Exception &E)
-    {
-        ErrorText=E.Message;
-    }
-    catch(...)
-    {
-        ErrorText="Unknown Mot_Table change preview error.";
-    }
-
-    delete GridHeader;
-    delete OriginalHeader;
-    delete OriginalFields;
-    delete OriginalLines;
-    return ErrorText==AnsiString("");
-}
-//---------------------------------------------------------------------------
 AnsiString TfMotorTest::GetMotorTableLogFileName()
 {
     AnsiString RootPath=HSys.CurrentDir;
@@ -1587,286 +1287,15 @@ bool TfMotorTest::AppendMotorTableSaveLog(AnsiString BackupPath, TStringList *Ch
     return ErrorText==AnsiString("");
 }
 //---------------------------------------------------------------------------
-void TfMotorTest::SelectMotorTableCell(int ColIndex, int RowIndex)
-{
-    if(grdMotorTable==NULL)
-        return;
-    if(RowIndex<0 || RowIndex>=grdMotorTable->RowCount || ColIndex<0 || ColIndex>=grdMotorTable->ColCount)
-        return;
-    if(PageMotorTest!=NULL && tsMotorTable!=NULL)
-        PageMotorTest->ActivePage=tsMotorTable;
-    grdMotorTable->Row=RowIndex;
-    grdMotorTable->Col=ColIndex;
-}
-//---------------------------------------------------------------------------
-bool TfMotorTest::FindMotorTableText(AnsiString Text, bool bStartAfterCurrent)
-{
-    AnsiString Key;
-    int StartIndex;
-    int TotalCells;
-
-    if(grdMotorTable==NULL)
-        return false;
-    Key=MotorTestTrim(Text).UpperCase();
-    if(Key==AnsiString(""))
-    {
-        SetMessage("Input Mot_Table search text");
-        return false;
-    }
-    if(grdMotorTable->RowCount<=0 || grdMotorTable->ColCount<=0)
-    {
-        SetMessage("Mot_Table view is empty");
-        return false;
-    }
-
-    TotalCells=grdMotorTable->RowCount*grdMotorTable->ColCount;
-    StartIndex=grdMotorTable->Row*grdMotorTable->ColCount+grdMotorTable->Col;
-    if(bStartAfterCurrent)
-        StartIndex++;
-
-    for(int Offset=0; Offset<TotalCells; Offset++)
-    {
-        int CellIndex=(StartIndex+Offset)%TotalCells;
-        int RowIndex=CellIndex/grdMotorTable->ColCount;
-        int ColIndex=CellIndex%grdMotorTable->ColCount;
-        AnsiString CellText=grdMotorTable->Cells[ColIndex][RowIndex].UpperCase();
-
-        if(RowIndex<grdMotorTable->FixedRows)
-            continue;
-
-        if(CellText.Pos(Key)>0)
-        {
-            SelectMotorTableCell(ColIndex, RowIndex);
-            SetMessage(AnsiString("Found Mot_Table text at row ")+IntToStr(RowIndex+1)+AnsiString(", col ")+IntToStr(ColIndex+1));
-            return true;
-        }
-    }
-
-    SetMessage("Mot_Table text not found");
-    return false;
-}
-//---------------------------------------------------------------------------
-void TfMotorTest::LocateActiveMotorInTable()
-{
-    TTrayMotor *Motor;
-    int MotorNameCol;
-    int AliasCol;
-
-    if(grdMotorTable==NULL)
-        return;
-    Motor=GetActiveMotor();
-    if(Motor==NULL)
-    {
-        SetMessage("No active motor selected");
-        return;
-    }
-
-    MotorNameCol=-1;
-    AliasCol=-1;
-    for(int ColIndex=0; ColIndex<grdMotorTable->ColCount; ColIndex++)
-    {
-        AnsiString Header=grdMotorTable->Cells[ColIndex][0].UpperCase();
-        if(Header=="MOTORNAME")
-            MotorNameCol=ColIndex;
-        if(Header=="ALIAS")
-            AliasCol=ColIndex;
-    }
-
-    for(int RowIndex=1; RowIndex<grdMotorTable->RowCount; RowIndex++)
-    {
-        if(MotorNameCol>=0 && grdMotorTable->Cells[MotorNameCol][RowIndex].UpperCase()==Motor->Number.UpperCase())
-        {
-            SelectMotorTableCell(MotorNameCol, RowIndex);
-            SetMessage(AnsiString("Located ")+Motor->NumberAlias+AnsiString(" in Mot_Table"));
-            return;
-        }
-        if(AliasCol>=0 && grdMotorTable->Cells[AliasCol][RowIndex].UpperCase()==Motor->Alias.UpperCase())
-        {
-            SelectMotorTableCell(AliasCol, RowIndex);
-            SetMessage(AnsiString("Located ")+Motor->NumberAlias+AnsiString(" in Mot_Table"));
-            return;
-        }
-    }
-
-    SetMessage(AnsiString("Active motor not found in Mot_Table: ")+Motor->NumberAlias);
-}
-//---------------------------------------------------------------------------
-void TfMotorTest::EditMotorTableCell()
-{
-    AnsiString OldText;
-    AnsiString NewText;
-    AnsiString DisplayText;
-    AnsiString ErrorText;
-    AnsiString SummaryText;
-    AnsiString Prompt;
-    int RowIndex;
-    int ColIndex;
-
-    if(grdMotorTable==NULL)
-        return;
-    RowIndex=grdMotorTable->Row;
-    ColIndex=grdMotorTable->Col;
-    if(RowIndex<grdMotorTable->FixedRows)
-    {
-        SetMessage("Select a Mot_Table data cell");
-        return;
-    }
-    if(IsMotorTableEditableColumn(ColIndex)==false)
-    {
-        SetMessage("Read only Mot_Table column");
-        return;
-    }
-    if(CheckNoUnsavedMotorParameter("editing Mot_Table")==false)
-        return;
-    if(CheckMotorDataEditIdle()==false)
-        return;
-
-    OldText=grdMotorTable->Cells[ColIndex][RowIndex];
-    NewText=OldText;
-    Prompt=grdMotorTable->Cells[ColIndex][0]+AnsiString(" : row ")+IntToStr(RowIndex+1);
-
-    TEdit *Edit=new TEdit(this);
-    try
-    {
-        Edit->Parent=this;
-        Edit->Visible=false;
-        Edit->Text=OldText;
-        if(grdMotorTable->Cells[ColIndex][0].UpperCase()=="ACC" || grdMotorTable->Cells[ColIndex][0].UpperCase()=="DEC")
-        {
-            if(ShowMotorTestKeyboard(Edit, N_DOUBLE, 2, false, 0.0, 0.0, Prompt)==false)
-                return;
-        }
-        else
-        {
-            if(ShowMotorTestKeyboard(Edit, N_INTEGER, 1, false, 0.0, 0.0, Prompt)==false)
-                return;
-        }
-        NewText=Edit->Text;
-    }
-    __finally
-    {
-        delete Edit;
-    }
-
-    if(ValidateMotorTableEditValue(ColIndex, NewText, DisplayText, ErrorText)==false)
-    {
-        MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        return;
-    }
-
-    grdMotorTable->Cells[ColIndex][RowIndex]=DisplayText;
-    if(ValidateMotorTableGrid(SummaryText, ErrorText)==false)
-    {
-        grdMotorTable->Cells[ColIndex][RowIndex]=OldText;
-        MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        SetMessage("Mot_Table edit rejected");
-        return;
-    }
-
-    bMotorTableDirty=true;
-    SetMessage("Mot_Table cell modified, save required");
-}
-//---------------------------------------------------------------------------
-void TfMotorTest::SaveMotorTableGridToFile()
-{
-    TStringList *LineList;
-    TStringList *ChangeList;
-    AnsiString ErrorText;
-    AnsiString SummaryText;
-    AnsiString PreviewText;
-    AnsiString BackupPath;
-    AnsiString LogError;
-    int ChangeCount;
-    bool bSuccess;
-    bool bLogOK;
-
-    if(bMotorTableDirty==false)
-    {
-        SetMessage("No Mot_Table changes");
-        return;
-    }
-    if(CheckNoUnsavedMotorParameter("saving Mot_Table")==false)
-        return;
-    if(CheckMotorDataEditIdle()==false)
-        return;
-    if(ValidateMotorTableGrid(SummaryText, ErrorText)==false)
-    {
-        MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        SetMessage("Mot_Table validation failed");
-        return;
-    }
-    ChangeList=new TStringList;
-    if(BuildMotorTableChangeList(ChangeList, PreviewText, ChangeCount, ErrorText)==false)
-    {
-        delete ChangeList;
-        MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        SetMessage("Mot_Table preview failed");
-        return;
-    }
-    if(ChangeCount<=0)
-    {
-        delete ChangeList;
-        bMotorTableDirty=false;
-        SetMessage("No effective Mot_Table changes");
-        return;
-    }
-    if(MessageDlg(PreviewText+AnsiString("\r\n\r\nSave controlled Mot_Table changes?"), mtConfirmation, TMsgDlgButtons() << mbYes << mbNo, 0)!=mrYes)
-    {
-        delete ChangeList;
-        return;
-    }
-
-    LineList=new TStringList;
-    bSuccess=false;
-    try
-    {
-        if(BuildMotorTableLinesFromGrid(LineList, ErrorText)==false)
-            throw Exception(ErrorText);
-        if(BackupMotorTable(BackupPath, ErrorText)==false)
-            throw Exception(AnsiString("Backup failed: ")+ErrorText);
-        LineList->SaveToFile(HSys.MotTablePath);
-        bSuccess=true;
-    }
-    catch(Exception &E)
-    {
-        ErrorText=E.Message;
-    }
-    catch(...)
-    {
-        ErrorText="Unknown Mot_Table save error.";
-    }
-    delete LineList;
-
-    if(bSuccess==false)
-    {
-        delete ChangeList;
-        MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        SetMessage("Mot_Table save failed");
-        return;
-    }
-
-    bLogOK=AppendMotorTableSaveLog(BackupPath, ChangeList, LogError);
-    delete ChangeList;
-
-    HSys.LoadSingleMotorParameterFromDataBase(-1, false);
-    bMotorTableDirty=false;
-    FillMotorList();
-    LoadMotorTableGrid();
-    RefreshMotorParameterGrid();
-    RefreshInformationGrid();
-    UpdateMotorMonitor();
-    if(bLogOK==false)
-    {
-        MessageDlg(AnsiString("Mot_Table saved, but log failed: ")+LogError, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        SetMessage(AnsiString("Mot_Table saved. Log failed. Backup: ")+ExtractFileName(BackupPath));
-    }
-    else
-        SetMessage(AnsiString("Mot_Table saved. Backup: ")+ExtractFileName(BackupPath));
-}
-//---------------------------------------------------------------------------
 bool TfMotorTest::BackupMotorTable(AnsiString &BackupPath, AnsiString &ErrorText)
 {
     AnsiString BackupDir;
+    AnsiString Mask;
+    TSearchRec SearchRec;
+    TStringList *Names;
+    int FindResult;
+    int DeleteCount;
+    const int MaxKeep=10;
 
     BackupPath="";
     ErrorText="";
@@ -1876,13 +1305,40 @@ bool TfMotorTest::BackupMotorTable(AnsiString &BackupPath, AnsiString &ErrorText
         return false;
     }
 
-    BackupDir=ExtractFilePath(HSys.MotTablePath);
-    BackupPath=BackupDir+AnsiString("Mot_Table_backup_")+FormatDateTime("yyyymmdd_hhnnss", Now())+AnsiString("_")+IntToStr((int)(GetTickCount() & 0xFFFF))+AnsiString(".csv");
+    // Mirror the IO_Table backup model (iosetview BackupIOTableFile): keep Mot_Table
+    // backups in a dedicated backupMotor subfolder instead of loose next to
+    // Mot_Table.csv, and cap the count by deleting the oldest first so the folder
+    // does not grow without bound. The Mot_Table_yyyymmdd_hhnnss name sorts
+    // chronologically, so the first (Count-MaxKeep) entries are the oldest.
+    BackupDir=ExtractFilePath(HSys.MotTablePath)+AnsiString("backupMotor");
+    if(!DirectoryExists(BackupDir) && !ForceDirectories(BackupDir))
+    {
+        ErrorText="Cannot create backupMotor folder.";
+        return false;
+    }
+    BackupPath=BackupDir+AnsiString("\\Mot_Table_")+FormatDateTime("yyyymmdd_hhnnss", Now())+AnsiString("_")+IntToStr((int)(GetTickCount() & 0xFFFF))+AnsiString(".csv");
     if(CopyFile(HSys.MotTablePath.c_str(), BackupPath.c_str(), false)==0)
     {
         ErrorText=SysErrorMessage(GetLastError());
         return false;
     }
+
+    Names=new TStringList();
+    Mask=BackupDir+AnsiString("\\Mot_Table_*.csv");
+    FindResult=FindFirst(Mask, faAnyFile, SearchRec);
+    while(FindResult==0)
+    {
+        if((SearchRec.Attr & faDirectory)==0)
+            Names->Add(SearchRec.Name);
+        FindResult=FindNext(SearchRec);
+    }
+    FindClose(SearchRec);
+    Names->Sort();
+    DeleteCount=Names->Count-MaxKeep;
+    for(int Index=0; Index<DeleteCount; Index++)
+        DeleteFile(BackupDir+AnsiString("\\")+Names->Strings[Index]);
+    delete Names;
+
     return true;
 }
 //---------------------------------------------------------------------------
@@ -1910,6 +1366,29 @@ void TfMotorTest::EditMotorParameterCell(int RowIndex, int ColIndex)
     if(CheckMotorDataEditIdle()==false)
         return;
 
+    if(ColIndex==eMotorParamColEnable)
+    {
+        // Enable is a simple ON/OFF flag; toggle it directly instead of opening the
+        // keyboard so the operator just taps the cell.
+        AnsiString CurFlag=MotorTestTrim(grdMotorParameter->Cells[ColIndex][RowIndex]).UpperCase();
+        ValueText=(CurFlag==AnsiString("ON"))?AnsiString("OFF"):AnsiString("ON");
+        if(ValidateMotorParameterValue(ColIndex, ValueText, DisplayText, CsvText, ErrorText)==false)
+        {
+            MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
+            return;
+        }
+        grdMotorParameter->Cells[ColIndex][RowIndex]=DisplayText;
+        if(ValidateMotorParameterRow(RowIndex, ErrorText)==false)
+        {
+            MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
+            RefreshMotorParameterGrid();
+            return;
+        }
+        bMotorParameterDirty=true;
+        SetMessage("Motor parameter modified, save required");
+        return;
+    }
+
     ValueText=grdMotorParameter->Cells[ColIndex][RowIndex];
     Prompt=grdMotorParameter->Cells[ColIndex][0]+AnsiString(" : ")+grdMotorParameter->Cells[eMotorParamColAlias][RowIndex];
     TEdit *Edit=new TEdit(this);
@@ -1918,8 +1397,20 @@ void TfMotorTest::EditMotorParameterCell(int RowIndex, int ColIndex)
         Edit->Parent=this;
         Edit->Visible=false;
         Edit->Text=ValueText;
-        if(ColIndex==eMotorParamColSoftN || ColIndex==eMotorParamColSoftP ||
-           ColIndex==eMotorParamColAcc   || ColIndex==eMotorParamColDec)
+        if(ColIndex==eMotorParamColAlias)
+        {
+            // String column -> QWERTY text keyboard (no spaces in motor aliases).
+            if(ShowMotorTestKeyboard(Edit, N_NO_SPACE, 0, false, 0.0, 0.0, Prompt)==false)
+                return;
+        }
+        else if(ColIndex==eMotorParamColCard)
+        {
+            // Card model is an uppercase token -> uppercase QWERTY keyboard.
+            if(ShowMotorTestKeyboard(Edit, N_UPPERCASE|N_NO_SPACE, 0, false, 0.0, 0.0, Prompt)==false)
+                return;
+        }
+        else if(ColIndex==eMotorParamColSoftN || ColIndex==eMotorParamColSoftP ||
+                ColIndex==eMotorParamColAcc   || ColIndex==eMotorParamColDec)
         {
             if(ShowMotorTestKeyboard(Edit, N_DOUBLE, 2, false, 0.0, 0.0, Prompt)==false)
                 return;
@@ -1968,6 +1459,8 @@ void TfMotorTest::SaveMotorParameterToFile()
     AnsiString PreviewText;
     AnsiString LogError;
     AnsiString RowLabel;
+    int MotorIndex;
+    int MotorCount;
     int RowIndex;
     int TableRow;
     int ChangeCount;
@@ -1985,12 +1478,18 @@ void TfMotorTest::SaveMotorParameterToFile()
     if(CheckMotorDataEditIdle()==false)
         return;
 
-    Motor=GetActiveMotor();
-    RowIndex=ActiveMotorIndex+1;
-    if(Motor==NULL || ValidateMotorParameterRow(RowIndex, ErrorText)==false)
+    // 172-style batch save: validate every motor row first, then write all
+    // changed rows to Mot_Table.csv in one pass (no per-motor save lock).
+    MotorCount=GetMotorCount();
+    for(MotorIndex=0; MotorIndex<MotorCount; MotorIndex++)
     {
-        MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
-        return;
+        if(GetMotor(MotorIndex)==NULL)
+            continue;
+        if(ValidateMotorParameterRow(MotorIndex+1, ErrorText)==false)
+        {
+            MessageDlg(ErrorText, mtWarning, TMsgDlgButtons() << mbOK, 0);
+            return;
+        }
     }
 
     LineList=new TStringList;
@@ -2005,34 +1504,96 @@ void TfMotorTest::SaveMotorParameterToFile()
             throw Exception("Mot_Table.csv has no motor data.");
 
         HeaderList->CommaText=LineList->Strings[0];
-        TableRow=FindMotorTableRow(LineList, Motor, HeaderList);
-        if(TableRow<=0)
-            throw Exception("Selected motor row not found in Mot_Table.csv.");
 
-        RowFields->CommaText=LineList->Strings[TableRow];
-        while(RowFields->Count<HeaderList->Count)
-            RowFields->Add("");
-        RowLabel=AnsiString("SAVE_PARAM Row ")+IntToStr(TableRow+1)+AnsiString(" ")+Motor->Alias;
-
-        for(int ColIndex=0; ColIndex<grdMotorParameter->ColCount; ColIndex++)
+        for(MotorIndex=0; MotorIndex<MotorCount; MotorIndex++)
         {
-            int CsvCol;
-            AnsiString OldText;
-            AnsiString Header;
-            if(IsMotorParameterEditableColumn(ColIndex)==false)
+            Motor=GetMotor(MotorIndex);
+            if(Motor==NULL)
                 continue;
-            Header=GetMotorParameterCsvName(ColIndex);
-            CsvCol=FindCsvColumn(HeaderList, Header);
-            if(CsvCol<0)
-                throw Exception(AnsiString("Missing Mot_Table column: ")+Header);
-            if(ValidateMotorParameterValue(ColIndex, grdMotorParameter->Cells[ColIndex][RowIndex], DisplayText, CsvText, ErrorText)==false)
-                throw Exception(ErrorText);
-            while(RowFields->Count<=CsvCol)
+            RowIndex=MotorIndex+1;
+            TableRow=FindMotorTableRow(LineList, Motor, HeaderList);
+            if(TableRow<=0)
+                throw Exception(AnsiString("Motor row not found in Mot_Table.csv: ")+Motor->Alias);
+
+            RowFields->CommaText=LineList->Strings[TableRow];
+            while(RowFields->Count<HeaderList->Count)
                 RowFields->Add("");
-            OldText=RowFields->Strings[CsvCol];
-            if(OldText!=CsvText)
-                ChangeList->Add(RowLabel+AnsiString(" | ")+Header+AnsiString(": ")+OldText+AnsiString(" -> ")+CsvText);
-            RowFields->Strings[CsvCol]=CsvText;
+            RowLabel=AnsiString("SAVE_PARAM Row ")+IntToStr(TableRow+1)+AnsiString(" ")+Motor->Alias;
+
+            for(int ColIndex=0; ColIndex<grdMotorParameter->ColCount; ColIndex++)
+            {
+                int CsvCol;
+                AnsiString OldText;
+                AnsiString Header;
+                if(IsMotorParameterEditableColumn(ColIndex)==false)
+                    continue;
+                if(ColIndex==eMotorParamColAddress)
+                {
+                    // Address has no single CSV column: split the composite back into
+                    // BoardID + Port using THIS row's (possibly just-edited) Card so
+                    // the divisor matches database.cpp InitialMotorObject.
+                    AnsiString CardText;
+                    AnsiString OldBoard;
+                    AnsiString OldPort;
+                    AnsiString NewBoard;
+                    AnsiString NewPort;
+                    int AddrValue;
+                    int BoardValue;
+                    int PortValue;
+                    int BoardCol;
+                    int PortCol;
+                    if(ValidateMotorParameterValue(ColIndex, grdMotorParameter->Cells[ColIndex][RowIndex], DisplayText, CsvText, ErrorText)==false)
+                        throw Exception(ErrorText);
+                    AddrValue=StrToIntDef(CsvText, -1);
+                    CardText=MotorTestTrim(grdMotorParameter->Cells[eMotorParamColCard][RowIndex]).UpperCase();
+                    if(CardText==AnsiString("MN200") || CardText==AnsiString("SYNTEK"))
+                    {
+                        BoardValue=AddrValue/100;
+                        PortValue=AddrValue%100;
+                    }
+                    else
+                    {
+                        BoardValue=AddrValue/10;
+                        PortValue=AddrValue%10;
+                        if(PortValue>7)
+                            throw Exception(AnsiString("Address Port (last digit) must be 0-7 for ")+CardText+AnsiString("."));
+                    }
+                    BoardCol=FindCsvColumn(HeaderList, "BoardID");
+                    PortCol=FindCsvColumn(HeaderList, "Port");
+                    if(BoardCol<0)
+                        throw Exception("Missing Mot_Table column: BoardID");
+                    if(PortCol<0)
+                        throw Exception("Missing Mot_Table column: Port");
+                    while(RowFields->Count<=BoardCol)
+                        RowFields->Add("");
+                    while(RowFields->Count<=PortCol)
+                        RowFields->Add("");
+                    NewBoard=IntToStr(BoardValue);
+                    NewPort=IntToStr(PortValue);
+                    OldBoard=RowFields->Strings[BoardCol];
+                    OldPort=RowFields->Strings[PortCol];
+                    if(OldBoard!=NewBoard)
+                        ChangeList->Add(RowLabel+AnsiString(" | BoardID: ")+OldBoard+AnsiString(" -> ")+NewBoard);
+                    if(OldPort!=NewPort)
+                        ChangeList->Add(RowLabel+AnsiString(" | Port: ")+OldPort+AnsiString(" -> ")+NewPort);
+                    RowFields->Strings[BoardCol]=NewBoard;
+                    RowFields->Strings[PortCol]=NewPort;
+                    continue;
+                }
+                Header=GetMotorParameterCsvName(ColIndex);
+                CsvCol=FindCsvColumn(HeaderList, Header);
+                if(CsvCol<0)
+                    throw Exception(AnsiString("Missing Mot_Table column: ")+Header);
+                if(ValidateMotorParameterValue(ColIndex, grdMotorParameter->Cells[ColIndex][RowIndex], DisplayText, CsvText, ErrorText)==false)
+                    throw Exception(ErrorText);
+                while(RowFields->Count<=CsvCol)
+                    RowFields->Add("");
+                OldText=RowFields->Strings[CsvCol];
+                if(OldText!=CsvText)
+                    ChangeList->Add(RowLabel+AnsiString(" | ")+Header+AnsiString(": ")+OldText+AnsiString(" -> ")+CsvText);
+                RowFields->Strings[CsvCol]=CsvText;
+            }
+            LineList->Strings[TableRow]=RowFields->CommaText;
         }
 
         ChangeCount=ChangeList->Count;
@@ -2049,13 +1610,12 @@ void TfMotorTest::SaveMotorParameterToFile()
                 PreviewText=PreviewText+AnsiString("\r\n")+ChangeList->Strings[Index];
             if(ChangeCount>PreviewLimit)
                 PreviewText=PreviewText+AnsiString("\r\n...")+IntToStr(ChangeCount-PreviewLimit)+AnsiString(" more change(s)");
-            if(MessageDlg(PreviewText+AnsiString("\r\n\r\nSave selected motor parameter changes?"), mtConfirmation, TMsgDlgButtons() << mbYes << mbNo, 0)!=mrYes)
+            if(MessageDlg(PreviewText+AnsiString("\r\n\r\nSave motor parameter changes?"), mtConfirmation, TMsgDlgButtons() << mbYes << mbNo, 0)!=mrYes)
                 throw Exception("User cancelled motor parameter save.");
 
             if(BackupMotorTable(BackupPath, ErrorText)==false)
                 throw Exception(AnsiString("Backup failed: ")+ErrorText);
 
-            LineList->Strings[TableRow]=RowFields->CommaText;
             LineList->SaveToFile(HSys.MotTablePath);
             bSuccess=true;
         }
@@ -2096,7 +1656,9 @@ void TfMotorTest::SaveMotorParameterToFile()
     bLogOK=AppendMotorTableSaveLog(BackupPath, ChangeList, LogError);
     delete ChangeList;
 
-    HSys.LoadSingleMotorParameterFromDataBase(ActiveMotorIndex, false);
+    for(MotorIndex=0; MotorIndex<MotorCount; MotorIndex++)
+        if(GetMotor(MotorIndex)!=NULL)
+            HSys.LoadSingleMotorParameterFromDataBase(MotorIndex, false);
     bMotorParameterDirty=false;
     FillMotorList();
     RefreshAllGrids();
@@ -2556,7 +2118,12 @@ bool TfMotorTest::ExecuteServoPowerGuard(bool bServoOn, bool bApplyMode)
             ServoCount++;
             if(Motor->GetEnable())
                 EnabledServoCount++;
-            if(Motor->Led[iAlarmLed] || Motor->Led[iServoalarmLed] || Motor->Led[iEmgLed])
+            // A triggered over-travel limit forces iAlarmLed true (see MC88X1
+            // ScanMotorStatus) but is NOT a servo-drive alarm, so it must not block
+            // Servo On. Count a servo alarm only when ALARM is on for a reason OTHER
+            // than a CW/CCW limit, or on a real servo-alarm / EMG signal.
+            if((Motor->Led[iAlarmLed] && !(Motor->Led[iCwLed] || Motor->Led[iCcwLed]))
+               || Motor->Led[iServoalarmLed] || Motor->Led[iEmgLed])
                 ServoAlarmCount++;
         }
     }
@@ -2700,8 +2267,6 @@ void TfMotorTest::RefreshAllGrids()
 {
     RefreshOperateGrid();
     RefreshMotorParameterGrid();
-    if(bMotorTableDirty==false)
-        LoadMotorTableGrid();
     RefreshInformationGrid();
 }
 //---------------------------------------------------------------------------
@@ -2808,14 +2373,25 @@ void TfMotorTest::SetMessage(AnsiString Text)
 //---------------------------------------------------------------------------
 bool TfMotorTest::CheckSortArmZHome()
 {
-    if(HSys.Mot.MSuckZ_1!=NULL && HSys.Mot.MSuckZ_1->bHomeFlag==false)
-        return false;
-    if(HSys.Mot.MSuckZ_2!=NULL && HSys.Mot.MSuckZ_2->bHomeFlag==false)
-        return false;
-    if(HSys.Mot.MSuckZ_3!=NULL && HSys.Mot.MSuckZ_3->bHomeFlag==false)
-        return false;
-    if(HSys.Mot.MSuckZ_4!=NULL && HSys.Mot.MSuckZ_4->bHomeFlag==false)
-        return false;
+    // SortArm X/Y may move only when every suck-nozzle Z is physically sitting on
+    // its Home sensor (sensor LED lit RIGHT NOW), not merely "has homed before"
+    // (bHomeFlag). Read the live Home sensor each call. Disabled nozzles are skipped
+    // (no meaningful sensor), matching the old bHomeFlag behaviour for !Enable.
+    TTrayMotor *SuckZ[4];
+    int Index;
+
+    SuckZ[0]=HSys.Mot.MSuckZ_1;
+    SuckZ[1]=HSys.Mot.MSuckZ_2;
+    SuckZ[2]=HSys.Mot.MSuckZ_3;
+    SuckZ[3]=HSys.Mot.MSuckZ_4;
+    for(Index=0; Index<4; Index++)
+    {
+        if(SuckZ[Index]==NULL || SuckZ[Index]->GetEnable()==false)
+            continue;
+        SuckZ[Index]->ScanMotorStatus();
+        if(SuckZ[Index]->Led[iHomeLed]==false)
+            return false;
+    }
     return true;
 }
 //---------------------------------------------------------------------------
@@ -2844,6 +2420,16 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
     {
         MessageDlg("Machine is running.", mtWarning, TMsgDlgButtons() << mbOK, 0);
         SetMessage("Move abort: system start");
+        return false;
+    }
+    // Home or loop already running: block any new move/jog/step/loop/home start
+    // until it finishes (matches HT172, where spbHome->Down latches and gates the
+    // other operate buttons). bHomeRunning/bLoopRunning are set AFTER the start
+    // gate calls this, so the first home/loop start is not self-blocked.
+    if(bHomeRunning || bLoopRunning)
+    {
+        MessageDlg("Motor Test is busy (home or loop running).", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        SetMessage("Move abort: home/loop busy");
         return false;
     }
     Emg=IsEMGPressed();
@@ -2923,11 +2509,38 @@ void TfMotorTest::StartJog(bool bPositive)
     Motor=GetActiveMotor();
     if(Motor==NULL)
         return;
-    // Jog is a manual move and must work BEFORE homing, so it does NOT require
-    // bHomeFlag. Alarm/EMG/disable/soft-limit checks still apply. Move/Step keep
-    // bRequireHome=true.
-    if(CheckCanMotorMove(Motor, false, false, 0)==false)
+    // Jog: home/loop busy and EMG always block. For the over-travel limits, allow
+    // jogging AWAY but block jogging FURTHER into a triggered limit -- a lit CW (+)
+    // limit blocks Jog+ (only Jog- allowed), a lit CCW (-) limit blocks Jog- (only
+    // Jog+ allowed). The limit-derived ALARM LED itself does NOT block jog, and the
+    // MC88X1 card also auto-stops at the limit. Servo-drive alarm / disable / soft
+    // limit are not pre-checked (JogP/JogN no-op safely when disabled and still run
+    // the MC88X1 safe-door callback). Move/Step keep the full CheckCanMotorMove gate.
+    if(bHomeRunning || bLoopRunning)
+    {
+        MessageDlg("Motor Test is busy (home or loop running).", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        SetMessage("Jog abort: home/loop busy");
         return;
+    }
+    if(IsEMGPressed()>0)
+    {
+        MessageDlg("EMG is pressed.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        SetMessage("Jog abort: EMG");
+        return;
+    }
+    Motor->ScanMotorStatus();
+    if(bPositive && Motor->Led[iCwLed])
+    {
+        MessageDlg("CW (+) limit is triggered. Jog + is blocked; use Jog - to move away.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        SetMessage("Jog+ abort: CW limit");
+        return;
+    }
+    if(!bPositive && Motor->Led[iCcwLed])
+    {
+        MessageDlg("CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        SetMessage("Jog- abort: CCW limit");
+        return;
+    }
     ApplySpeedPercent(Motor);
     if(bPositive)
     {
@@ -3004,6 +2617,17 @@ void TfMotorTest::StopActiveMotor()
     Motor=GetActiveMotor();
     if(Motor!=NULL)
         Motor->Stop();
+    // If a single-axis home was in progress, MC88X1PMotStop leaves the motion-card
+    // home state machine in AxisHomeBusy, so MotionDone() stays false and Jog/Move
+    // silently no-op afterwards. Re-arm the home task (InitHomeTask_forSingleAxis ->
+    // HomeReset) on the homing axis so manual jog works right after Stop without
+    // needing a fresh HOME press.
+    if(bHomeRunning && iHomeMotorIndex>=0 && iHomeMotorIndex<GetMotorCount())
+    {
+        TTrayMotor *HomeMotor=GetMotor(iHomeMotorIndex);
+        if(HomeMotor!=NULL)
+            HomeMotor->InitHomeTask_forSingleAxis();
+    }
     bHomeRunning=false;
     iHomeMotorIndex=-1;
     StopLoopMove(true);
@@ -3098,21 +2722,19 @@ void TfMotorTest::StartMultiLoopMove()
     edLoopCount->Text=IntToStr(iLoopRemainCount);
 
     for(MotorIndex=0; MotorIndex<MAX_MOTOR_TEST_MOTOR_COUNT; MotorIndex++)
-    {
-        bMultiLoopMotor[MotorIndex]=false;
         MultiLoopTarget[MotorIndex]=0;
-    }
 
+    // Multi-loop members are the Loop-column checkboxes (bMultiLoopMotor), kept
+    // live as the operator toggles them in grdOperate.
     for(MotorIndex=0; MotorIndex<GetMotorCount(); MotorIndex++)
     {
-        if(lstMotors==NULL || lstMotors->Selected[MotorIndex]==false)
+        if(MotorIndex>=MAX_MOTOR_TEST_MOTOR_COUNT || bMultiLoopMotor[MotorIndex]==false)
             continue;
         Motor=GetMotor(MotorIndex);
         if(CheckCanMotorMove(Motor, true, true, Pos1[MotorIndex])==false)
             return;
         if(CheckCanMotorMove(Motor, true, true, Pos2[MotorIndex])==false)
             return;
-        bMultiLoopMotor[MotorIndex]=true;
     }
 
     bLoopRunning=true;
@@ -3357,10 +2979,8 @@ int TfMotorTest::GetSelectedMultiLoopCount()
 {
     int Count=0;
 
-    if(lstMotors==NULL)
-        return 0;
     for(int MotorIndex=0; MotorIndex<GetMotorCount(); MotorIndex++)
-        if(lstMotors->Selected[MotorIndex])
+        if(MotorIndex<MAX_MOTOR_TEST_MOTOR_COUNT && bMultiLoopMotor[MotorIndex])
             Count++;
     return Count;
 }
@@ -3403,6 +3023,25 @@ void __fastcall TfMotorTest::tmrUpdateTimer(TObject *Sender)
         return;
     }
     bEmgActive=false;
+
+    // Reflect home-in-progress on the Home button itself (caption + red text) so
+    // the operator sees it is busy, like HT172's latched spbHome. Sync only on
+    // state change to avoid per-tick repaint flicker; covers finish and abort.
+    static bool bHomeBtnShown=false;
+    if(btnHome!=NULL && bHomeRunning!=bHomeBtnShown)
+    {
+        bHomeBtnShown=bHomeRunning;
+        if(bHomeRunning)
+        {
+            btnHome->Caption="HOMING..";
+            btnHome->Font->Color=clRed;
+        }
+        else
+        {
+            btnHome->Caption="HOME";
+            btnHome->Font->Color=clWindowText;
+        }
+    }
 
     if(bHomeRunning && iHomeMotorIndex>=0 && iHomeMotorIndex<GetMotorCount())
     {
@@ -3461,23 +3100,6 @@ void __fastcall TfMotorTest::tmrUpdateTimer(TObject *Sender)
     UpdateMotorMonitor();
 }
 //---------------------------------------------------------------------------
-void __fastcall TfMotorTest::lstMotorsClick(TObject *Sender)
-{
-    (void)Sender;
-    if(lstMotors!=NULL)
-    {
-        if(bMotorParameterDirty && lstMotors->ItemIndex!=ActiveMotorIndex)
-        {
-            if(ConfirmDiscardMotorParameterEdit()==false)
-            {
-                lstMotors->ItemIndex=ActiveMotorIndex;
-                return;
-            }
-        }
-        SetActiveMotor(lstMotors->ItemIndex);
-    }
-}
-//---------------------------------------------------------------------------
 void __fastcall TfMotorTest::grdMotorParameterSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect)
 {
     (void)Sender;
@@ -3487,11 +3109,8 @@ void __fastcall TfMotorTest::grdMotorParameterSelectCell(TObject *Sender, int AC
         return;
     if(ARow-1==ActiveMotorIndex)
         return;
-    if(bMotorParameterDirty && ConfirmDiscardMotorParameterEdit()==false)
-    {
-        CanSelect=false;
-        return;
-    }
+    // Batch-edit model (172-style): switching motors keeps pending edits in the
+    // grid; one SAVE PARAM writes all changed rows. No save-before-switch lock.
     SetActiveMotor(ARow-1);
 }
 //---------------------------------------------------------------------------
@@ -3501,12 +3120,6 @@ void __fastcall TfMotorTest::grdMotorParameterDblClick(TObject *Sender)
     if(grdMotorParameter==NULL)
         return;
     EditMotorParameterCell(grdMotorParameter->Row, grdMotorParameter->Col);
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMotorTest::grdMotorTableDblClick(TObject *Sender)
-{
-    (void)Sender;
-    EditMotorTableCell();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMotorTest::edMotorInputClick(TObject *Sender)
@@ -3618,8 +3231,6 @@ void __fastcall TfMotorTest::btnRefreshClick(TObject *Sender)
 {
     (void)Sender;
     if(ConfirmDiscardMotorParameterEdit()==false)
-        return;
-    if(ConfirmDiscardMotorTableEdit()==false)
         return;
     FillMotorList();
     RefreshAllGrids();
@@ -3740,40 +3351,6 @@ void __fastcall TfMotorTest::btnParamValidateClick(TObject *Sender)
     }
 }
 //---------------------------------------------------------------------------
-void __fastcall TfMotorTest::btnMotorTableReloadClick(TObject *Sender)
-{
-    (void)Sender;
-    if(ConfirmDiscardMotorTableEdit()==false)
-        return;
-    LoadMotorTableGrid();
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMotorTest::btnMotorTableFindClick(TObject *Sender)
-{
-    (void)Sender;
-    if(edMotorTableSearch==NULL)
-        return;
-    FindMotorTableText(edMotorTableSearch->Text, true);
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMotorTest::btnMotorTableLocateActiveClick(TObject *Sender)
-{
-    (void)Sender;
-    LocateActiveMotorInTable();
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMotorTest::btnMotorTableEditClick(TObject *Sender)
-{
-    (void)Sender;
-    EditMotorTableCell();
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMotorTest::btnMotorTableSaveClick(TObject *Sender)
-{
-    (void)Sender;
-    SaveMotorTableGridToFile();
-}
-//---------------------------------------------------------------------------
 void __fastcall TfMotorTest::btnRegisterReadClick(TObject *Sender)
 {
     (void)Sender;
@@ -3805,6 +3382,21 @@ void __fastcall TfMotorTest::btnServoApplyOnClick(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMotorTest::btnServoApplyOffClick(TObject *Sender)
+{
+    (void)Sender;
+    ApplyServoPower(false);
+}
+//---------------------------------------------------------------------------
+// Operate-panel Servo On/Off (mirrors HT172, which keeps servo power on the
+// main motor-test screen). Routes through the same guarded apply path as the
+// Servo Guard tab so the motor-relay sequencing/safety checks still run.
+void __fastcall TfMotorTest::btnServoOnClick(TObject *Sender)
+{
+    (void)Sender;
+    ApplyServoPower(true);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMotorTest::btnServoOffClick(TObject *Sender)
 {
     (void)Sender;
     ApplyServoPower(false);

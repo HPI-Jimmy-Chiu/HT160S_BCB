@@ -376,7 +376,14 @@ void __fastcall TfQwertyKey::FormShow(TObject *Sender)
     (void)Sender;
     bShow=true;
     if(edContent!=NULL)
+    {
         edContent->SetFocus();
+        // Pre-select the whole value (HT172 behaviour) so the operator can just type
+        // the new value to replace it, instead of manually selecting all first. The
+        // first key press deletes the selection via InsertContent (SelLength aware).
+        edContent->SelStart=0;
+        edContent->SelLength=edContent->Text.Length();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfQwertyKey::FormClose(TObject *Sender, TCloseAction &Action)

@@ -684,13 +684,24 @@ bool TMyMC88X1Motor::MC88X1MotHome()
             break;
         case 30:
             SetPosition(0);
+            iWaitCount=0;
             Task=31;
             break;
         case 31:
-            if(ReadMC88X1EnCoderRealPos()==0)
+            // Best-effort encoder-zero confirmation after the card home completed.
+            // The encoder often settles a few counts off zero, so do NOT spin here
+            // forever (the legacy "else Task=30" looped endlessly and left the HOME
+            // button stuck on "HOMING.."). Retry a bounded number of times, then
+            // proceed so HomeObject() reliably reports done.
+            if(ReadMC88X1EnCoderRealPos()==0 || iWaitCount>=10)
+            {
                 Task=32;
+            }
             else
-                Task=30;
+            {
+                iWaitCount++;
+                SetPosition(0);
+            }
             break;
         case 32:
             LastHomePos=ReadMC88X1RealPos();

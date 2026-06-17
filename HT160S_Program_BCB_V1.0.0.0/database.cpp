@@ -449,6 +449,11 @@ TMOTNO::TMOTNO()
     emotHomeOrder        =26;
     emotLimitLogic       =27;
     emotIn1Logic         =28;
+    // HomeType is an OPTIONAL trailing column (per-motor MC88X1 home mode: 7 =
+    // card-native, 90 = manual seek/reverse/slow). Default index sits past a legacy
+    // 29-column table so a missing column reads "" and falls back to 7; emotTotal
+    // stays 29 so existing Mot_Table.csv files still validate.
+    emotHomeType         =29;
     emotTotal            =29;
 }
 //---------------------------------------------------------------------------
@@ -516,6 +521,9 @@ int TMOTNO::SetMOTTableNo(AnsiString Str)
     if(emotLimitLogic<0 && Result==emotTotal) Result=27;
     emotIn1Logic=FindMotColumn(SL, "In1Logic");
     if(emotIn1Logic<0 && Result==emotTotal) Result=28;
+    // Optional column: do NOT flag Result when absent (legacy tables lack it); a
+    // missing HomeType simply defaults to 7 (card-native) at load time.
+    emotHomeType=FindMotColumn(SL, "HomeType");
 
     delete SL;
     return Result;
@@ -557,6 +565,7 @@ TMOTDATA::TMOTDATA(AnsiString Str)
     iLimitLogic     =GetMotInt(SL, HSys.MotNo.emotLimitLogic, 0);
     iIn1Logic       =GetMotInt(SL, HSys.MotNo.emotIn1Logic, 0);
     iSimulateSpeed  =GetMotInt(SL, HSys.MotNo.emotSimulateSpeed, 10000);
+    iHomeType       =GetMotInt(SL, HSys.MotNo.emotHomeType, 7);
 
     if(No==AnsiString("") || Alias==AnsiString("") || CardModel==AnsiString("") ||
        iBoardID<0 || iPort<0)
@@ -1576,6 +1585,7 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
         MotPtr[i]->bIsServoMotor=(Data->iServoAlarmOn==1)?true:false;
         MotPtr[i]->SetLimitLogic((Data->iLimitLogic==1)?true:false);
         MotPtr[i]->SetIn1Logic((Data->iIn1Logic==1)?true:false);
+        MotPtr[i]->SetHomeType(Data->iHomeType);
         MotPtr[i]->bHomeFlag=false;
         if(bInitial)
             MotPtr[i]->InitMotor(iAdder);

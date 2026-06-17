@@ -367,6 +367,10 @@ void TMyMotor::SetSensorType(bool Value) { Motor->bSensorType=Value; }
 void TMyMotor::SetEnable(bool Value) { Motor->Enable=Value; }
 void TMyMotor::SetLimitLogic(bool logic) { Motor->bLimitLogic=logic; }
 void TMyMotor::SetIn1Logic(bool logic) { Motor->bIn1Logic=logic; }
+// Per-motor MC88X1 home mode from Mot_Table (7=card-native, 90=manual 3-phase
+// seek/reverse/slow). Applied before InitMotor so the HomeType register/manual
+// path is selected for this axis. Inner motors that ignore iHomeType are unaffected.
+void TMyMotor::SetHomeType(int Type) { if(Motor!=NULL) Motor->iHomeType=Type; }
 void TMyMotor::SetMotorKind(eMotorKind Kind) { Motor->SetMotorKind(Kind); }
 eMotorKind TMyMotor::GetMotorKind() { return Motor->GetMotorKind(); }
 void TMyMotor::SetMotionCardType(eMotionCardType Type) { Motor->SetMotionCardType(Type); }

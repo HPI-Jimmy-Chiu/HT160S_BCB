@@ -217,6 +217,7 @@ public:
     void SetEnable(bool Value);
     void SetLimitLogic(bool logic);
     void SetIn1Logic(bool logic);
+    void SetHomeType(int Type);
     void SetMotorKind(eMotorKind Kind);
     eMotorKind GetMotorKind();
     void SetMotionCardType(eMotionCardType Type);

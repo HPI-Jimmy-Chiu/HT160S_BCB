@@ -154,6 +154,7 @@ typedef struct TMOTDATA
     int iLimitLogic;
     int iIn1Logic;
     int iSimulateSpeed;
+    int iHomeType;
 
     TMOTDATA(AnsiString Str=AnsiString(""));
 }TMOTDATA;
@@ -189,6 +190,7 @@ typedef struct TMOTNO
     int emotHomeOrder;
     int emotLimitLogic;
     int emotIn1Logic;
+    int emotHomeType;
     int emotTotal;
 
     TMOTNO();
