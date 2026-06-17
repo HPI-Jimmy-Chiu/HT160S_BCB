@@ -505,15 +505,28 @@ bool TMyMotor::Home(AnsiString &sErr)
 //---------------------------------------------------------------------------
 int TMyMotor::ReadPos()
 {
+    // Match HT172: read command AND encoder together when enabled; when the axis is
+    // disabled, mirror the command onto the encoder so a powered-off motor shows a
+    // consistent Now Position / Encoder pair instead of a stale feedback value.
+    // (For an ENABLED servo the two legitimately differ by the following error --
+    // HT172 shows the same gap; this does not force them equal while powered.)
     if(Motor->Enable)
+    {
         Position=Motor->ReadPos();
+        EncoderPosition=Motor->ReadEncoderPos();
+    }
+    else
+        EncoderPosition=Position;
     UpdateSimulateCompomentPosition();
     return Position;
 }
 //---------------------------------------------------------------------------
 int TMyMotor::ReadEncoderPos()
 {
-    EncoderPosition=Motor->ReadEncoderPos();
+    if(Motor->Enable)
+        EncoderPosition=Motor->ReadEncoderPos();
+    else
+        EncoderPosition=Position;
     return EncoderPosition;
 }
 //---------------------------------------------------------------------------
