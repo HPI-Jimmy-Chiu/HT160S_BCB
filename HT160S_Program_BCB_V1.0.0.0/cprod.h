@@ -74,10 +74,6 @@ extern TLatchCycleTime lctLoader;
 struct TFunction
 {
     bool UseCCD;
-    bool RejectCCDfail;
-    bool UseHitCylinder;
-    int  HitRetry;
-    bool UsePreAlignment;
 };
 extern TFunction tFunction;
 //---------------------------------------------------------------------------

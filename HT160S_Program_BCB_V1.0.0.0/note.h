@@ -134,7 +134,6 @@ public:
     void __fastcall FlushLabel();
     void __fastcall ScanKey();
     void __fastcall ProcessErrMessage(AnsiString EC, AnsiString Str, int Type);
-    bool __fastcall CheckCodeIsExist(AnsiString Str);
     void __fastcall Start();
     void __fastcall UpdateButtonStatus(TObject *Sender);
     void __fastcall LevelProcessErrMessage();
@@ -161,14 +160,8 @@ int  ShowMyError(AnsiString sMyError, int KCode);
 int  ShowTNTError(int CodeType, int KCode);
 void ShowErrorMessage(AnsiString Code);
 void RecordProcess(AnsiString S);
-void LevelRecordProcess();
 void SearchMessage(AnsiString Code);
 void RecordAlarmMessagePassTime(AnsiString AlarmCode, DWORD StartTime, AnsiString HappenTime, int Type);
-bool CheckAlarmIsShow();
-void SetShowAlarmLocation(int iType=0, int iPosition=0);
-void SetShowSuckerLocation(AnsiString sSuckerName);
-void ShowImageTrayFuntion();
-AnsiString GetRefrenceCode(AnsiString S);
 extern DWORD RecordHappenTime;
 //---------------------------------------------------------------------------
 #endif

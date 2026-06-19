@@ -331,6 +331,18 @@ void __fastcall TfPadInterface::FormShow(TObject *Sender)
     Left=(1280-Width)/2;
     Top=(1024-Height)/2;
     bShow=true;
+    //AI(ht160s-maintainer) 20260620 : align to HT172 - clear stale button-down /
+    //LED visual state on (re)show so the panel starts from a clean display.
+    {
+        int i;
+        for(i=0; i<CheckPadItem; i++)
+        {
+            if(PadItem[i].btnEvent!=NULL)
+                PadItem[i].btnEvent->Down=false;
+            if(PadItem[i].mlEvent!=NULL)
+                PadItem[i].mlEvent->Value=false;
+        }
+    }
     if(bRs232Ok)
     {
         SendCommand("t050490000000");
@@ -462,6 +474,10 @@ bool TfPadInterface::GetPadSwitchStatus(AnsiString aName, bool *State)
 //---------------------------------------------------------------------------
 bool TfPadInterface::OpenCommPort()
 {
+    //AI(ht160s-maintainer) 20260620 : align to HT172 - idempotency guard so an
+    //already-open port is not re-StartComm'd.
+    if(bRs232Ok)
+        return true;
     if(PadComm==NULL)
     {
         RecordCommunication("[Connect]", "PadComm is not assigned");
@@ -579,7 +595,12 @@ void TfPadInterface::SendCommand(AnsiString sData)
 
     RecordCommunication("[Send]", sData);
     if(bRs232Ok==false || PadComm==NULL)
+    {
+        //AI(ht160s-maintainer) 20260620 : align to HT172 - record that the send was
+        //dropped because the Pad link is not ready, instead of a silent return.
+        RecordCommunication("[Connect Error]", "send dropped, Pad link not ready");
         return;
+    }
 
     SendText=sData+AnsiString('\r');
     iSize=SendText.Length();
@@ -669,31 +690,40 @@ void __fastcall TfPadInterface::ProcessReceiceData()
                 Frame=Entry;
             Frame=Frame.Trim();
 
-            //AI(ht160s-maintainer) 20260619 : an input/status frame is 13 chars
-            //(t05 + addr + type + func[6,2] + 6-hex key[8,13]). The trailing '\r'
-            //is already stripped above, so the minimum length is 13. HT172 used
-            //>=14 only because its buffer still held the '\r'; keeping >=14 here
-            //silently dropped every 13-char key('00')/switch('90') report and
-            //killed all Pad input. >= covers 13- and 14+ char frames safely.
-            if(Frame.Length()>=13)
+            //AI(ht160s-maintainer) 20260619 : aligned to HT172 ProcessReceiceData -
+            //gate each frame type INDEPENDENTLY by its own minimum length. The
+            //trailing '\r' is already stripped above, so input/switch reports need
+            //>=13 (HT172 used >=14 on the buffer that still held the '\r') and the
+            //version reply needs >=8. S is computed first; SubString(6,2) on a short
+            //frame yields "", which matches no type. (HT172's bSendSwitchStatusing
+            //reset on '90' is omitted: that flag has no consumer in HT160.)
+            S=Frame.SubString(6, 2);
+            if(S=="00" && Frame.Length()>=13)
             {
+                //panel key / LED-scan report
                 sAddress=Frame.SubString(4, 1);
                 iAddress=atoi(sAddress.c_str());
                 aPadKey=Frame.SubString(8, 6);
                 iPadKey=StrToIntDef("0x"+aPadKey, 0);
-                //AI(HT160S-Maintainer) 20260616 : a valid status frame proves the
-                //Pad panel is talking; from here the panel Power On/Off sensors
-                //are live and CheckMotorPowerShutDown may act on them.
+                //a valid status frame proves the Pad panel is talking; the panel
+                //Power On/Off sensors are now live for CheckMotorPowerShutDown.
                 bPadEverCommunicated=true;
-                S=Frame.SubString(6, 2);
-                if(S=="00")
-                    DoScanPanelLed(iAddress, iPadKey);
-                else if(S=="90")
-                    DoUpdataPadStatus(iAddress, iPadKey);
+                DoScanPanelLed(iAddress, iPadKey);
             }
-            else if(Frame.Length()>=8 && Frame.SubString(6, 2)=="20")
+            else if(S=="20" && Frame.Length()>=8)
             {
+                //version reply
                 bRequestVer=true;
+            }
+            else if(S=="90" && Frame.Length()>=13)
+            {
+                //switch-status report
+                sAddress=Frame.SubString(4, 1);
+                iAddress=atoi(sAddress.c_str());
+                aPadKey=Frame.SubString(8, 6);
+                iPadKey=StrToIntDef("0x"+aPadKey, 0);
+                bPadEverCommunicated=true;
+                DoUpdataPadStatus(iAddress, iPadKey);
             }
 
             if(iPos>0)

@@ -561,11 +561,6 @@ void __fastcall TfNote::LevelProcessErrMessage()
 {
 }
 //---------------------------------------------------------------------------
-bool __fastcall TfNote::CheckCodeIsExist(AnsiString Str)
-{
-    return false;
-}
-//---------------------------------------------------------------------------
 void __fastcall TfNote::ProcessErrMessage(AnsiString EC, AnsiString Str, int Type)
 {
     if(EC=="" && Str=="")
@@ -817,10 +812,6 @@ void RecordProcess(AnsiString S)
         fNote->Memo1->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+S);
 }
 //---------------------------------------------------------------------------
-void LevelRecordProcess()
-{
-}
-//---------------------------------------------------------------------------
 void SearchMessage(AnsiString Code)
 {
     RecordProcess(AnsiString("SearchMessage:")+Code);
@@ -830,27 +821,5 @@ void RecordAlarmMessagePassTime(AnsiString AlarmCode, DWORD StartTime, AnsiStrin
 {
     // Alarm pass / elapsed-time record routed to EventLog.
     g_EventLog.Log(AlarmCode, AnsiString("PASS ")+HappenTime, AnsiString("TYPE=")+IntToStr(Type));
-}
-//---------------------------------------------------------------------------
-bool CheckAlarmIsShow()
-{
-    return true;
-}
-//---------------------------------------------------------------------------
-void SetShowAlarmLocation(int iType, int iPosition)
-{
-}
-//---------------------------------------------------------------------------
-void SetShowSuckerLocation(AnsiString sSuckerName)
-{
-}
-//---------------------------------------------------------------------------
-void ShowImageTrayFuntion()
-{
-}
-//---------------------------------------------------------------------------
-AnsiString GetRefrenceCode(AnsiString S)
-{
-    return "No Code";
 }
 //---------------------------------------------------------------------------

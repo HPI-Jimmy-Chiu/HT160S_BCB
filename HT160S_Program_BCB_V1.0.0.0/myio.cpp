@@ -443,11 +443,6 @@ byte TMyIo::IOInputByte(int port)
     return 0;
 }
 //---------------------------------------------------------------------------
-int TMyIo::IOInputLongByte(int port)
-{
-    return 0;
-}
-//---------------------------------------------------------------------------
 void TMyIo::IOByteOut(int port, byte Byte)
 {
     int TargetPort=port;

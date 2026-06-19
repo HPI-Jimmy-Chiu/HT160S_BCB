@@ -33,7 +33,6 @@ public:
     virtual AnsiString GetDriverName(){return "TMyIo";};
 
     byte IOInputByte(int port);
-    int IOInputLongByte(int port);
     void IOByteOut(int port, byte Byte);
     void InitialMyOutIOData();
     int IOSetOutport(int port);

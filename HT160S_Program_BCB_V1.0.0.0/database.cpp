@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #pragma hdrstop
+#include "mymessbox.h"
 
 #include "database.h"
 #include "cmydef.h"
@@ -449,11 +450,9 @@ TMOTNO::TMOTNO()
     emotHomeOrder        =26;
     emotLimitLogic       =27;
     emotIn1Logic         =28;
-    // HomeType is an OPTIONAL trailing column (per-motor MC88X1 home mode: 7 =
-    // card-native, 90 = manual seek/reverse/slow). Default index sits past a legacy
-    // 29-column table so a missing column reads "" and falls back to 7; emotTotal
-    // stays 29 so existing Mot_Table.csv files still validate.
-    emotHomeType         =29;
+    // HomeType is no longer a Mot_Table column. The MC88X1 home mode is fixed in code
+    // (TMyMC88X1Motor MC88X1_DEFAULT_HOME_TYPE = 90); the mechanism design is fixed so a
+    // settable column only added operator risk.
     emotTotal            =29;
 }
 //---------------------------------------------------------------------------
@@ -521,9 +520,6 @@ int TMOTNO::SetMOTTableNo(AnsiString Str)
     if(emotLimitLogic<0 && Result==emotTotal) Result=27;
     emotIn1Logic=FindMotColumn(SL, "In1Logic");
     if(emotIn1Logic<0 && Result==emotTotal) Result=28;
-    // Optional column: do NOT flag Result when absent (legacy tables lack it); a
-    // missing HomeType simply defaults to 7 (card-native) at load time.
-    emotHomeType=FindMotColumn(SL, "HomeType");
 
     delete SL;
     return Result;
@@ -565,7 +561,6 @@ TMOTDATA::TMOTDATA(AnsiString Str)
     iLimitLogic     =GetMotInt(SL, HSys.MotNo.emotLimitLogic, 0);
     iIn1Logic       =GetMotInt(SL, HSys.MotNo.emotIn1Logic, 0);
     iSimulateSpeed  =GetMotInt(SL, HSys.MotNo.emotSimulateSpeed, 10000);
-    iHomeType       =GetMotInt(SL, HSys.MotNo.emotHomeType, 7);
 
     if(No==AnsiString("") || Alias==AnsiString("") || CardModel==AnsiString("") ||
        iBoardID<0 || iPort<0)
@@ -1381,7 +1376,7 @@ void SYSTEM_MODULAR::LoadMotData()
     if(!FileExists(MotTablePath))
     {
         Msg.sprintf("File %s is not exist!", MotTablePath);
-        ShowMessage(Msg);
+        ShowMyOKMessageNoStop(Msg);
         return;
     }
 
@@ -1392,7 +1387,7 @@ void SYSTEM_MODULAR::LoadMotData()
         if(StrList->Count<=1)
         {
             Msg.sprintf("File %s data is lose!", MotTablePath);
-            ShowMessage(Msg);
+            ShowMyOKMessageNoStop(Msg);
         }
         else
         {
@@ -1407,7 +1402,7 @@ void SYSTEM_MODULAR::LoadMotData()
                     if(Data->Alias!=AnsiString("") && FindMotData(Data->Alias)!=NULL)
                     {
                         Msg.sprintf("Motor %s alias is duplicated!", Data->Alias);
-                        ShowMessage(Msg);
+                        ShowMyOKMessageNoStop(Msg);
                     }
                     MotTable->Add(Data);
                 }
@@ -1415,14 +1410,14 @@ void SYSTEM_MODULAR::LoadMotData()
             else
             {
                 Msg.sprintf("File %s data is mistake! (%d)", MotTablePath, Result);
-                ShowMessage(Msg);
+                ShowMyOKMessageNoStop(Msg);
             }
         }
     }
     catch(...)
     {
         Msg.sprintf("File %s is opened by other software!", MotTablePath);
-        ShowMessage(Msg);
+        ShowMyOKMessageNoStop(Msg);
     }
     delete StrList;
 }
@@ -1434,7 +1429,7 @@ void SYSTEM_MODULAR::LoadIoData()
     if(!FileExists(IoTablePath))
     {
         Msg.sprintf("File %s is not exist!", IoTablePath);
-        ShowMessage(Msg);
+        ShowMyOKMessageNoStop(Msg);
         return;
     }
 
@@ -1445,7 +1440,7 @@ void SYSTEM_MODULAR::LoadIoData()
         if(StrList->Count<=1)
         {
             Msg.sprintf("File %s data is lose!", IoTablePath);
-            ShowMessage(Msg);
+            ShowMyOKMessageNoStop(Msg);
         }
         else
         {
@@ -1461,7 +1456,7 @@ void SYSTEM_MODULAR::LoadIoData()
                     if(Data->Alias!=AnsiString("") && FindIOData(Data->Alias)!=NULL)
                     {
                         Msg.sprintf("IO %s alias is duplicated!", Data->Alias);
-                        ShowMessage(Msg);
+                        ShowMyOKMessageNoStop(Msg);
                     }
                     IOTable->Add(Data);
                 }
@@ -1469,14 +1464,14 @@ void SYSTEM_MODULAR::LoadIoData()
             else
             {
                 Msg.sprintf("File %s data is mistake! (%d)", IoTablePath, Result);
-                ShowMessage(Msg);
+                ShowMyOKMessageNoStop(Msg);
             }
         }
     }
     catch(...)
     {
         Msg.sprintf("File %s is opened by other software!", IoTablePath);
-        ShowMessage(Msg);
+        ShowMyOKMessageNoStop(Msg);
     }
     delete StrList;
 }
@@ -1541,11 +1536,15 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
             MotPtr[i]->SetMotNo(i);
         }
 
-        #ifdef SOFT_SIMULATE
-            MotPtr[i]->SetEnable(false);
-        #else
-            MotPtr[i]->SetEnable(Data->iEnable);
-        #endif
+        //AI(HT160S-Maintainer) 20260619 : SIMULATION now mirrors the real machine's
+        //per-axis enable (Mot_Table Enable column) instead of force-disabling EVERY axis.
+        //The old all-disabled sim made the whole machine a no-op : MoveTo/HomeFlag/MotionDone
+        //short-circuit on !Enable, so a simulated HOME homed nothing and per-axis execution
+        //could not be verified. With the deepened driver sim (InitMotor keeps an enabled axis
+        //enabled with no card; HomeObject reports done; MotionDone/MoveTo complete instantly;
+        //card reads default to OK) an enabled axis now executes and LOGS a full HOME exactly
+        //like the real machine -- identical case flow, only the leaf card ops are simulated.
+        MotPtr[i]->SetEnable(Data->iEnable);
 
         if(CardModel=="MC88X1" || CardModel=="MC88X1P")
             MotPtr[i]->SetMotionCardType(eMC88x1);
@@ -1579,13 +1578,19 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
         else
             MotPtr[i]->SetMotorKind(eMotor);
         MotPtr[i]->FlushPanelName=Data->FlushPanel;
-        MotPtr[i]->OriginRange=Data->iRange;
-        MotPtr[i]->OriginRate=Data->iRate;
         MotPtr[i]->SimulateSpeed=Data->iSimulateSpeed;
         MotPtr[i]->bIsServoMotor=(Data->iServoAlarmOn==1)?true:false;
         MotPtr[i]->SetLimitLogic((Data->iLimitLogic==1)?true:false);
         MotPtr[i]->SetIn1Logic((Data->iIn1Logic==1)?true:false);
-        MotPtr[i]->SetHomeType(Data->iHomeType);
+        // HomeType is FIXED in code (no operator-settable Mot_Table column). ALL axes now
+        // use card-native type 7 (find Home -> leave -> re-enter -> stop): the sensor->stop
+        // timing is hardware-gated on IN3, so home repeatability is immune to PC/main-loop
+        // latency -- critical as the software grows and several axes home together. The
+        // software HomeType90() seek is retired (kept dormant in myMC88X1motor.cpp as a
+        // fallback; flip an axis back here if its mechanism ever needs the manual approach).
+        // Authority for the home model: docs/MC88X1_Driver/MC88X1_technical-note.
+        // Must run before InitMotor so the HomeType register is written for the axis.
+        MotPtr[i]->SetHomeType(7);
         MotPtr[i]->bHomeFlag=false;
         if(bInitial)
             MotPtr[i]->InitMotor(iAdder);

@@ -140,13 +140,12 @@ public:
     bool Led[iMotLedTotalCnt];
     bool bHomeFlag;
     bool bHomeFinish;
+    DWORD dwHomeSensorWaitStart;   // GetTickCount stamp for the home-sensor confirm wait
     int SimulateSpeed;
     bool bShowSimulateCompoment;
     int Position;
     int EncoderPosition;
     bool bErrorMove;
-    int OriginRate;
-    int OriginRange;
     bool bIsServoMotor;
     bool (*MoveCheckCallBack)();
     int Tag;
@@ -169,6 +168,8 @@ public:
     int MotorMove(int p, int PreDonePos, bool bJogP);
     bool MotorMoveSKLED(int p);
     bool Home(AnsiString &sErr);
+    DWORD GetLastParaError(void);
+    DWORD VerifyHomeParaRange(void);
     void InitHomeTask();
     int ReadPos();
     int ReadEncoderPos();

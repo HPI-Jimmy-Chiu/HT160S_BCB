@@ -10,9 +10,13 @@
 #include "myMC88X1motor.h"
 #include "HTray.h"
 #include "CosFunction.h"   //AI(general) 20260609 : recipe TrayForm geometry (real tray Col/Row)
+#include "cStepTrace.h"    //AI(general) 20260617 : MotorTaskLog home/limit diagnosis trace
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #define DEFAULT_SIMULATE_SPEED 1000
+// Bounded wait (ms) for the home sensor (HomeFlag) to confirm after the card
+// reports home complete; on timeout HOME commits best-effort so it cannot stick.
+#define HOME_SENSOR_CONFIRM_MS 5000
 //---------------------------------------------------------------------------
 //AI(general) 20260609 : The real tray region comes from the active recipe
 //geometry (TrayForm.XDivision/YDivision), NOT the MAX_TRAY_* array bounds.
@@ -248,8 +252,6 @@ __fastcall TMyMotor::TMyMotor()
     Position=0;
     EncoderPosition=0;
     bErrorMove=false;
-    OriginRate=0;
-    OriginRange=0;
     bIsServoMotor=false;
     MoveCheckCallBack=NULL;
     Tag=-1;
@@ -367,9 +369,9 @@ void TMyMotor::SetSensorType(bool Value) { Motor->bSensorType=Value; }
 void TMyMotor::SetEnable(bool Value) { Motor->Enable=Value; }
 void TMyMotor::SetLimitLogic(bool logic) { Motor->bLimitLogic=logic; }
 void TMyMotor::SetIn1Logic(bool logic) { Motor->bIn1Logic=logic; }
-// Per-motor MC88X1 home mode from Mot_Table (7=card-native, 90=manual 3-phase
-// seek/reverse/slow). Applied before InitMotor so the HomeType register/manual
-// path is selected for this axis. Inner motors that ignore iHomeType are unaffected.
+// MC88X1 home mode is fixed in code (TMyMC88X1Motor MC88X1_DEFAULT_HOME_TYPE = 90);
+// the former per-motor Mot_Table HomeType column was removed. This setter is retained
+// for completeness but is no longer called from the table-load path.
 void TMyMotor::SetHomeType(int Type) { if(Motor!=NULL) Motor->iHomeType=Type; }
 void TMyMotor::SetMotorKind(eMotorKind Kind) { Motor->SetMotorKind(Kind); }
 eMotorKind TMyMotor::GetMotorKind() { return Motor->GetMotorKind(); }
@@ -470,9 +472,30 @@ bool TMyMotor::MoveTo(int Tar) { return Motor->MoveTo(Tar); }
 bool TMyMotor::MoveToPosShortDistance(int Tar) { return Motor->MoveToPosShortDistance(Tar); }
 bool TMyMotor::HomeObject(void) { return Motor->HomeObject(); }
 bool TMyMotor::GetAlarm(void) { return Motor->GetAlarm(); }
-bool TMyMotor::JogP() { return Motor->JogP(); }
-bool TMyMotor::JogN() { return Motor->JogN(); }
+bool TMyMotor::JogP()
+{
+    MotorTaskLog("Motor", Alias, "JOG+",
+        AnsiString("alarm=")+(Led[iAlarmLed]?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")+AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0"));
+    return Motor->JogP();
+}
+bool TMyMotor::JogN()
+{
+    MotorTaskLog("Motor", Alias, "JOG-",
+        AnsiString("alarm=")+(Led[iAlarmLed]?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")+AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0"));
+    return Motor->JogN();
+}
 void TMyMotor::Stop() { Motor->Stop(); }
+//---------------------------------------------------------------------------
+// AI(general) 20260617 : delegate MC88X1 speed/accel range diagnostics to the inner
+// card object (private member), so the Motor Test screen can report the card's verdict.
+DWORD TMyMotor::GetLastParaError(void)
+{
+    return (Motor!=NULL)?Motor->GetLastParaError():0;
+}
+DWORD TMyMotor::VerifyHomeParaRange(void)
+{
+    return (Motor!=NULL)?Motor->VerifyHomeParaRange():0;
+}
 void TMyMotor::DecStop() { Motor->DecStop(); }
 //---------------------------------------------------------------------------
 void TMyMotor::InitHomeTask()
@@ -484,21 +507,92 @@ void TMyMotor::InitHomeTask()
 //---------------------------------------------------------------------------
 bool TMyMotor::Home(AnsiString &sErr)
 {
+    // 172-style 3-state latched home. The old single-line form
+    //   if(Motor->HomeObject() && Motor->HomeFlag()) ...
+    // required BOTH true in the SAME tick. The inner card HomeObject() returns
+    // true exactly once on completion and then re-arms its own task to step 1,
+    // so if the home sensor (HomeFlag) was not on at that instant the completion
+    // was lost and the next tick re-ran the whole home -> "HOME never stops /
+    // keeps repeating". Here we LATCH the card completion (case 100), then confirm
+    // the sensor separately with a bounded wait (case 200), matching HT172.
     sErr="";
-    if(Motor->Enable==false)
+    int &Task=iHomeTask;
+    switch(Task)
     {
-        ResetPos(0);
-        bHomeFlag=true;
-        bHomeFinish=true;
-        return true;
-    }
-    if(Motor->HomeObject() && Motor->HomeFlag())
-    {
-        bHomeFlag=true;
-        bHomeFinish=true;
-        Position=Motor->ReadPos();
-        EncoderPosition=Motor->ReadEncoderPos();
-        return true;
+        case 1:
+            if(Motor->Enable==false)
+            {
+                ResetPos(0);
+                bHomeFlag=true;
+                bHomeFinish=true;
+                MotorTaskLog("Motor", Alias, "HOME_DONE", "disabled axis -> pos reset 0");
+                return true;
+            }
+            // AI(general) 20260617 : log the REAL servo-alarm bit (GetAlarm, MotDI 0x80) plus
+            // limit/encoder at HOME start. Note Led[iAlarmLed] is force-set true on a limit by
+            // ScanMotorStatus, so it is NOT a reliable alarm indicator here -- GetAlarm() is.
+            // A latched servo alarm (set when an OT trips the amp) cannot be cleared in software
+            // (MC88X1 SetServoOn is a no-op) -> Cmove is accepted but the axis does NOT move
+            // (encoder stays put). Recovery needs a SwMotorRelay Off->On power-cycle.
+            Motor->ScanMotorStatus(Led);
+            MotorTaskLog("Motor", Alias, "HOME_START",
+                AnsiString("alarm=")+(Motor->GetAlarm()?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")
+                +AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0")+AnsiString(" enc=")+IntToStr(Motor->ReadEncoderPos())
+                +AnsiString(" -> drive card home"));
+            Task=100;
+            break;
+        case 100:
+            // Poll the inner card home state machine to completion. Do NOT also test
+            // HomeFlag here, and do NOT keep calling HomeObject() after it reports
+            // done (it would restart the sequence). Latch by advancing to case 200.
+            if(Motor->HomeObject())
+            {
+                dwHomeSensorWaitStart=GetTickCount();
+                MotorTaskLog("Motor", Alias, "HOME_CARD_DONE",
+                    AnsiString("HomeFlag=")+(Motor->HomeFlag()?"1":"0")+AnsiString(" -> confirm sensor"));
+                Task=200;
+            }
+            else if(Motor->bHomePhaseTimeout)
+            {
+                // HomeType90 phase-B could not change the home-sensor state within the
+                // per-leg timeout; the inner routine reset itself and will re-seek. Log
+                // once per timeout so a misdirected/faulty home sensor is visible instead
+                // of a silent retry loop.
+                Motor->bHomePhaseTimeout=false;
+                MotorTaskLog("Motor", Alias, "HOME_PHASEB_TIMEOUT",
+                    "home sensor did not change within phase-B timeout; re-seeking");
+            }
+            break;
+        case 200:
+            // Confirm the home sensor like HT172, but bounded: a sensor that never
+            // reports on must not leave HOME stuck. On timeout commit best-effort
+            // (the card already confirmed home in case 100) and log the warning.
+            if(Motor->HomeFlag())
+            {
+                bHomeFlag=true;
+                bHomeFinish=true;
+                Position=Motor->ReadPos();
+                EncoderPosition=Motor->ReadEncoderPos();
+                MotorTaskLog("Motor", Alias, "HOME_DONE",
+                    AnsiString("pos=")+IntToStr(Position)+AnsiString(" enc=")+IntToStr(EncoderPosition));
+                Task=1;
+                return true;
+            }
+            else if((int)(GetTickCount()-dwHomeSensorWaitStart)>=HOME_SENSOR_CONFIRM_MS)
+            {
+                bHomeFlag=true;
+                bHomeFinish=true;
+                Position=Motor->ReadPos();
+                EncoderPosition=Motor->ReadEncoderPos();
+                MotorTaskLog("Motor", Alias, "HOME_DONE_TIMEOUT",
+                    AnsiString("HomeFlag not on within timeout; committed pos=")+IntToStr(Position));
+                Task=1;
+                return true;
+            }
+            break;
+        default:
+            Task=1;
+            break;
     }
     return false;
 }
@@ -523,8 +617,14 @@ int TMyMotor::ReadPos()
 //---------------------------------------------------------------------------
 int TMyMotor::ReadEncoderPos()
 {
+    // Align to HT172: refresh command AND encoder together from one driver transaction,
+    // so a paired (Position,EncoderPosition) snapshot is consistent no matter which
+    // accessor the caller used last.
     if(Motor->Enable)
+    {
+        Position=Motor->ReadPos();
         EncoderPosition=Motor->ReadEncoderPos();
+    }
     else
         EncoderPosition=Position;
     return EncoderPosition;
