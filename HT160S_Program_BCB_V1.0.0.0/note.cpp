@@ -7,6 +7,8 @@
 #include "csystem.h"
 #include "main.h"
 #include "mymessbox.h"
+#include "SecsGem/UsecegemMainFrom.h"
+#include "SecsGem/uHGemHT160.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "HTray"
@@ -337,6 +339,15 @@ void __fastcall TfNote::FormShow(TObject *Sender)
             RecoveryButtons[Index]->Visible=((KeyCode & KeyComp[Index])!=0);
     }
 
+    //AI(ht160s-maintainer) 20260617 : light the front-panel recovery-button LEDs
+    //this prompt is offering, so the operator sees which keys are live (HT172
+    //note.cpp bLamp* port; DoPanelLamp pushes these onto SwFK*).
+    bLampSkip    =((KeyCode & K_SKIP)!=0);
+    bLampRetry   =((KeyCode & K_RETRY)!=0);
+    bLampTrayFeed=((KeyCode & K_TRAY_FEED)!=0);
+    bLampTrayEnd =((KeyCode & K_TRAY_END)!=0);
+    bLampCleanOut=((KeyCode & K_CLEAN_OUT)!=0);
+
     if(FlushPanel!=NULL)
         FlushPanelColor=FlushPanel->Color;
 }
@@ -346,6 +357,12 @@ void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
     CloseBuzzerOff();
     bOffBuzzer=false;
     fShow=false;
+    //AI(ht160s-maintainer) 20260617 : prompt dismissed -> clear recovery LEDs.
+    bLampSkip=false;
+    bLampRetry=false;
+    bLampTrayFeed=false;
+    bLampTrayEnd=false;
+    bLampCleanOut=false;
     if(FlushPanel!=NULL)
         FlushPanel->Color=FlushPanelColor;
 }
@@ -356,6 +373,14 @@ void __fastcall TfNote::Timer1Timer(TObject *Sender)
 
     if(fShow==false)
         return;
+
+    //AI(HT160S-Maintainer) 20260619 : physical operator-panel keys on the alarm
+    //screen (HT172 note ScanKey port). May Close() the form on Start/Pause, so
+    //re-check fShow before the blink work below.
+    ScanKey();
+    if(fShow==false)
+        return;
+
     if(bOffBuzzer)
         CloseBuzzerOff();
     if(FlushPanel==NULL)
@@ -435,6 +460,96 @@ void __fastcall TfNote::FlushLabel()
 //---------------------------------------------------------------------------
 void __fastcall TfNote::ScanKey()
 {
+    //AI(HT160S-Maintainer) 20260619 : HT172 note.cpp TfNote::ScanKey port. The
+    //alarm/recovery screen now responds to the physical operator panel. HT160
+    //sensors carry no Tag (unlike HT172 ScanPannelKey/.Tag), so each key is read
+    //directly and rising-edge latched so a held button fires once.
+    //AI 20260619 : read FRONT keys too (SnFK*||SnRK*). This machine is front-panel
+    //only, so the original rear-only (SnRK*) read made the alarm/recovery screen
+    //ignore every physical button. Aligned with the main run screen (ScanPanelKeys)
+    //and TfHome::ScanKey, which already read SnFK*||SnRK*.
+    //recovery keys (Skip/Retry/TrayFeed/TrayEnd/CleanOut/Home) just select the
+    //matching on-screen button (UpdateButtonStatus, same as a touch); Start and
+    //Pause run the existing click handlers. SECS events mirror HT172; HT160 has
+    //no PressReset/PressTrayEnd/HasICUnderMachine, so the nearest event is used.
+    static bool bWasStart=false;
+    static bool bWasPause=false;
+    static bool bWasSkip=false;
+    static bool bWasRetry=false;
+    static bool bWasTrayFeed=false;
+    static bool bWasTrayEnd=false;
+    static bool bWasCleanOut=false;
+    static bool bWasReset=false;
+
+    TPanel *Ptr[6]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut, BtnHome};
+    bool bKey[6];
+    bKey[0]=HSys.Sen.SnFKSkip.IsOn()     || HSys.Sen.SnRKSkip.IsOn();
+    bKey[1]=HSys.Sen.SnFKRetry.IsOn()    || HSys.Sen.SnRKRetry.IsOn();
+    bKey[2]=HSys.Sen.SnFKTrayFeed.IsOn() || HSys.Sen.SnRKTrayFeed.IsOn();
+    bKey[3]=HSys.Sen.SnFKTrayEnd.IsOn()  || HSys.Sen.SnRKTrayEnd.IsOn();
+    bKey[4]=HSys.Sen.SnFKCleanOut.IsOn() || HSys.Sen.SnRKCleanOut.IsOn();
+    bKey[5]=HSys.Sen.SnFKHome.IsOn()     || HSys.Sen.SnRKHome.IsOn();
+
+    for(int i=0; i<6; i++)
+    {
+        if(Ptr[i]->Visible && bKey[i])
+            UpdateButtonStatus(Ptr[i]);
+    }
+
+    bool bStart=HSys.Sen.SnFKStart.IsOn()      || HSys.Sen.SnRKStart.IsOn();
+    bool bPause=HSys.Sen.SnFKPause.IsOn()      || HSys.Sen.SnRKPause.IsOn();
+    bool bReset=HSys.Sen.SnFKAlarmReset.IsOn() || HSys.Sen.SnRKAlarmReset.IsOn();
+
+    if(bStart && bWasStart==false)
+    {
+        EventReport(SECS_EVENT.PressStartWithoutIC);
+        BtnStartClick(this);
+    }
+    else if(bPause && bWasPause==false)
+    {
+        EventReport(SECS_EVENT.PressPause);
+        BtnPauseClick(this);
+    }
+    else if(bKey[0] && bWasSkip==false)
+    {
+        RecordProcess("SKIP pressed");
+        EventReport(SECS_EVENT.PressSkip);
+    }
+    else if(bKey[1] && bWasRetry==false)
+    {
+        RecordProcess("RETRY pressed");
+        EventReport(SECS_EVENT.PressRetry);
+    }
+    else if(bKey[2] && bWasTrayFeed==false)
+    {
+        RecordProcess("TRAY FEED pressed");
+        EventReport(SECS_EVENT.PressTrayFeed);
+    }
+    else if(bKey[3] && bWasTrayEnd==false)
+    {
+        RecordProcess("TRAY END pressed");
+        EventReport(SECS_EVENT.PressTrayFeed);
+    }
+    else if(bKey[4] && bWasCleanOut==false)
+    {
+        RecordProcess("CLEAN OUT pressed");
+        EventReport(SECS_EVENT.PressCleanOut);
+    }
+    else if(bReset && bWasReset==false)
+    {
+        RecordProcess("ALARM RESET pressed");
+        EventReport(SECS_EVENT.PressAlarmReset);
+        CloseBuzzerOff();
+    }
+
+    bWasStart=bStart;
+    bWasPause=bPause;
+    bWasSkip=bKey[0];
+    bWasRetry=bKey[1];
+    bWasTrayFeed=bKey[2];
+    bWasTrayEnd=bKey[3];
+    bWasCleanOut=bKey[4];
+    bWasReset=bReset;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::Start()

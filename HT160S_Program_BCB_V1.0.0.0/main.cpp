@@ -11,6 +11,7 @@
 #include "CosFunction.h"
 #include "GeneralSetting.h"   //AI(ht160s-agv) 20260615 : GeneralSetting.bUseAMR for the AMR status badge
 #include "cprod.h"
+#include "aAuto1To6.h"   //AI(ht160s-motion-view) 20260618 : AutoModule->GetWorkingTrayID for Unload Auto info
 #include "UserRoleManager.h"
 #include "uruncontrol.h"
 #include "iosetview.h"
@@ -117,18 +118,8 @@ static AnsiString GetRunModeLogText()
     return "Change Dummy Mode";
 }
 //---------------------------------------------------------------------------
-static AnsiString GetFeatureStatusName(int BadgeIndex)
-{
-    switch(BadgeIndex)
-    {
-        case eMainFeatureSECS:     return "SECS";
-        case eMainFeatureSafeDoor: return "SAFE";
-        case eMainFeatureAMR:      return "AMR";
-    }
-
-    return "";
-}
-//---------------------------------------------------------------------------
+//AI(ht160s-secsgem) 20260616 : badge name captions (SECS/SAFE/AMR) now live in
+//  main.dfm, so the former GetFeatureStatusName() helper was removed as dead code.
 static AnsiString GetFeatureStatusDefaultValue(int BadgeIndex)
 {
     switch(BadgeIndex)
@@ -171,6 +162,7 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     }
 
     bUpdatingMainSelections = false;
+    bFeatureBadgeOverflowWarned = false;   //AI(ht160s-mainui) 20260617 : badge-grid overflow warning not shown yet
     iLastSecsBadgeState = -1;   //AI(ht160s-secsgem) 20260612 : force the first periodic tick to paint the real HSMS state
     bLotApiPullActive = false;  //AI(ht160s-lot-webapi) 20260612 : Stage 4 : no pull in flight at startup
     sLotApiPullLot = "";
@@ -211,12 +203,51 @@ __fastcall TfMain::TfMain(TComponent* Owner)
         pgcMonitor->ActivePage = tsMotionView;
     }
 
+    //AI 20260619 : hide the pgcLog tab row (Tray Status/Logs/Time Data/Map Tray) and
+    //drive page switching from the four header buttons (spbTrayStatus/sbTimeData/
+    //apbLogs/btnTrayMap OnClick -> pgcLog->ActivePage), matching HT172
+    //SetInitialWindowFrame. Without this the redundant tab row showed and the four
+    //buttons did nothing (their OnClick was never wired).
+    if(pgcLog != NULL)
+    {
+        for(int PageIndex = 0; PageIndex < pgcLog->PageCount; PageIndex++)
+            pgcLog->Pages[PageIndex]->TabVisible = false;
+        pgcLog->ActivePage = tsTrayStatus;
+    }
+
     if(sbMotionView != NULL)
         sbMotionView->Down = true;
 
     SetupLotListGrid();                                                         //AI(HT160S-Maintainer) 20260604 : init multi-lot manual list grid
     if(sgLotList != NULL)
         sgLotList->OnDblClick = sgLotListDblClick;                              //AI(ht160s-lot-webapi) 20260612 : double-click a Lot row -> 2D detail viewer
+}
+//---------------------------------------------------------------------------
+//AI 20260619 : four header buttons that switch the pgcLog page (HT172 port). The
+//pgcLog tab row is hidden (SetInitialWindowFrame), so these buttons are the only
+//way to switch Tray Status / Time Data / Logs / Map Tray.
+void __fastcall TfMain::spbTrayStatusClick(TObject *Sender)
+{
+    if(pgcLog != NULL)
+        pgcLog->ActivePage = tsTrayStatus;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::sbTimeDataClick(TObject *Sender)
+{
+    if(pgcLog != NULL)
+        pgcLog->ActivePage = tsTimeData;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::apbLogsClick(TObject *Sender)
+{
+    if(pgcLog != NULL)
+        pgcLog->ActivePage = tsLogs;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btnTrayMapClick(TObject *Sender)
+{
+    if(pgcLog != NULL)
+        pgcLog->ActivePage = tsMapTray;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::UpdateWorkFileComboBox()
@@ -303,117 +334,120 @@ void __fastcall TfMain::RefreshMainUserSelect()
     cbbUserSelect->Text = UserRoleManager.GetLevelName();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-secsgem) 20260616 : the SECS/SAFE/AMR badges now live in main.dfm as
+//  static layout (panel geometry, fonts, name caption, default value color). This
+//  routine no longer creates VCL objects - it only binds the array slots to the
+//  designer components, seeds the live value text/color, and applies the dynamic
+//  gating (SECS visibility + click-to-open-log, AMR ON/OFF). The arrays are already
+//  NULL-initialised in the constructor, and the unused Reserve2..6 slots stay NULL.
 void __fastcall TfMain::BuildFeatureStatusBadges()
 {
-    const int BadgeWidth = 132;
-    const int BadgeHeight = 30;
-    const int GapX = 6;
-    const int GapY = 6;
-    int StatusIndex;
-    int ColumnIndex;
-    int RowIndex;
-    TPanel *BadgePanel;
-    TLabel *NameLabel;
-    TLabel *ValueLabel;
+    if(pnlFeatureStatus == NULL)
+        return;
+
+    FeatureStatusPanels[eMainFeatureSECS]      = pnlFeatureBadge1;
+    FeatureStatusNameLabels[eMainFeatureSECS]  = lblFeatureName1;
+    FeatureStatusValueLabels[eMainFeatureSECS] = lblFeatureValue1;
+
+    FeatureStatusPanels[eMainFeatureSafeDoor]      = pnlFeatureBadge2;
+    FeatureStatusNameLabels[eMainFeatureSafeDoor]  = lblFeatureName2;
+    FeatureStatusValueLabels[eMainFeatureSafeDoor] = lblFeatureValue2;
+
+    FeatureStatusPanels[eMainFeatureAMR]      = pnlFeatureBadge3;
+    FeatureStatusNameLabels[eMainFeatureAMR]  = lblFeatureName3;
+    FeatureStatusValueLabels[eMainFeatureAMR] = lblFeatureValue3;
+
+    //AI(ht160s-secsgem) 20260616 : seed the static-default value text/color for the
+    //  two badges that carry one (SECS, SAFE); AMR is seeded from its live flag below.
+    SetFeatureStatusBadge(eMainFeatureSECS, GetFeatureStatusDefaultValue(eMainFeatureSECS), GetFeatureStatusDefaultColor(eMainFeatureSECS));
+    SetFeatureStatusBadge(eMainFeatureSafeDoor, GetFeatureStatusDefaultValue(eMainFeatureSafeDoor), GetFeatureStatusDefaultColor(eMainFeatureSafeDoor));
+
+    //AI(ht160s-secsgem) 20260611 : make the SECS status badge open the GEM log.
+    //  Only wire/show it when the SECS/GEM paid feature is enabled; otherwise hide
+    //  the badge entirely (the engine is also not booted in that case).
+    if(pnlFeatureBadge1 != NULL)
+    {
+        if(CosFunction.bUseSecsGem)
+        {
+            pnlFeatureBadge1->OnClick  = FeatureBadgeSecsClick;
+            lblFeatureName1->OnClick   = FeatureBadgeSecsClick;
+            lblFeatureValue1->OnClick  = FeatureBadgeSecsClick;
+            pnlFeatureBadge1->Cursor   = crHandPoint;
+            lblFeatureName1->Cursor    = crHandPoint;
+            lblFeatureValue1->Cursor   = crHandPoint;
+            pnlFeatureBadge1->ShowHint = true;
+            pnlFeatureBadge1->Hint     = "Open SECS/GEM Log";
+        }
+        else
+        {
+            pnlFeatureBadge1->Visible = false;   // feature not purchased -> no badge
+        }
+    }
+
+    //AI(ht160s-agv) 20260615 : seed the AMR badge from the live AMR mode flag so the
+    //  operator can read AMR ON/OFF at a glance (GetFeatureStatusDefaultValue only
+    //  carries a static "OFF" placeholder).
+    UpdateAmrFeatureBadge();
+
+    //AI(ht160s-mainui) 20260617 : arrange the badges into the COLS x ROWS grid now
+    //  that every badge's final Visible state is known (SECS may be hidden above).
+    LayoutFeatureBadges();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-mainui) 20260617 : auto-arrange the visible status badges into a grid of
+//  at most MAIN_FEATURE_BADGE_COLS columns x MAIN_FEATURE_BADGE_ROWS rows inside
+//  pnlFeatureStatus. The home screen is cramped on the machine, so badges wrap to a
+//  second row instead of running off the panel. A hidden badge (e.g. SECS when the
+//  feature is off) does not consume a grid cell - the rest pack up to fill the gap.
+//  Defensive reminder (req: "future when adding more, remind"): if the visible badge
+//  count exceeds the grid capacity, the extras are hidden and a one-time warning
+//  dialog tells the developer to bump COLS/ROWS (and widen the panel).
+void __fastcall TfMain::LayoutFeatureBadges()
+{
+    const int GapX = 6;   // horizontal gap between badge cells
+    const int GapY = 6;   // vertical gap between badge rows
+    int  VisibleIndex;
+    int  Col;
+    int  Row;
+    bool bOverflow;
+    TPanel *Badge;
 
     if(pnlFeatureStatus == NULL)
         return;
 
-    pnlFeatureStatus->Left = 12;
-    pnlFeatureStatus->Top = 206;
-    pnlFeatureStatus->Width = 556;
-    pnlFeatureStatus->Height = 72;
-    pnlFeatureStatus->Color = clWhite;
+    VisibleIndex = 0;
+    bOverflow = false;
 
-    for(StatusIndex = 0; StatusIndex < MAIN_FEATURE_STATUS_COUNT; StatusIndex++)
+    for(int BadgeIndex = 0; BadgeIndex < MAIN_FEATURE_STATUS_COUNT; BadgeIndex++)
     {
-        ColumnIndex = StatusIndex % MAIN_FEATURE_STATUS_COLUMNS;
-        RowIndex = StatusIndex / MAIN_FEATURE_STATUS_COLUMNS;
+        Badge = FeatureStatusPanels[BadgeIndex];
+        if(Badge == NULL)
+            continue;             // unused slot - no DFM panel bound
+        if(!Badge->Visible)
+            continue;             // hidden badge takes no grid cell
 
-        BadgePanel = new TPanel(this);
-        BadgePanel->Name = AnsiString("pnlFeatureBadge") + IntToStr(StatusIndex + 1);
-        BadgePanel->Parent = pnlFeatureStatus;
-        BadgePanel->Left = ColumnIndex * (BadgeWidth + GapX);
-        BadgePanel->Top = RowIndex * (BadgeHeight + GapY);
-        BadgePanel->Width = BadgeWidth;
-        BadgePanel->Height = BadgeHeight;
-        BadgePanel->Caption = "";
-        BadgePanel->BevelInner = bvLowered;
-        BadgePanel->BevelOuter = bvRaised;
-        BadgePanel->Color = clBtnFace;
-        BadgePanel->ParentColor = false;
-        BadgePanel->Visible = (StatusIndex <= eMainFeatureAMR);   //AI(ht160s-agv) 20260615 : show SECS/SAFE/AMR badges
-        FeatureStatusPanels[StatusIndex] = BadgePanel;
-
-        NameLabel = new TLabel(this);
-        NameLabel->Name = AnsiString("lblFeatureName") + IntToStr(StatusIndex + 1);
-        NameLabel->Parent = BadgePanel;
-        NameLabel->Left = 4;
-        NameLabel->Top = 2;
-        NameLabel->Width = 38;
-        NameLabel->Height = 24;
-        NameLabel->Alignment = taCenter;
-        NameLabel->AutoSize = false;
-        NameLabel->Caption = GetFeatureStatusName(StatusIndex);
-        NameLabel->Color = clBtnFace;
-        NameLabel->Font->Charset = ANSI_CHARSET;
-        NameLabel->Font->Color = clNavy;
-        NameLabel->Font->Height = -11;
-        NameLabel->Font->Name = "Arial";
-        NameLabel->Font->Style = TFontStyles() << fsBold;
-        NameLabel->ParentColor = false;
-        NameLabel->ParentFont = false;
-        FeatureStatusNameLabels[StatusIndex] = NameLabel;
-
-        ValueLabel = new TLabel(this);
-        ValueLabel->Name = AnsiString("lblFeatureValue") + IntToStr(StatusIndex + 1);
-        ValueLabel->Parent = BadgePanel;
-        ValueLabel->Left = 43;
-        ValueLabel->Top = 4;
-        ValueLabel->Width = 84;
-        ValueLabel->Height = 20;
-        ValueLabel->Alignment = taCenter;
-        ValueLabel->AutoSize = false;
-        ValueLabel->Color = clBtnFace;
-        ValueLabel->Font->Charset = ANSI_CHARSET;
-        ValueLabel->Font->Color = GetFeatureStatusDefaultColor(StatusIndex);
-        ValueLabel->Font->Height = -12;
-        ValueLabel->Font->Name = "Arial";
-        ValueLabel->Font->Style = TFontStyles() << fsBold;
-        ValueLabel->ParentColor = false;
-        ValueLabel->ParentFont = false;
-        FeatureStatusValueLabels[StatusIndex] = ValueLabel;
-
-        if(StatusIndex <= eMainFeatureSafeDoor)
-            SetFeatureStatusBadge(StatusIndex, GetFeatureStatusDefaultValue(StatusIndex), GetFeatureStatusDefaultColor(StatusIndex));
-
-        //AI(ht160s-secsgem) 20260611 : make the SECS status badge open the GEM log.
-        //  Only wire/show it when the SECS/GEM paid feature is enabled; otherwise
-        //  hide the badge entirely (the engine is also not booted in that case).
-        if(StatusIndex == eMainFeatureSECS)
+        if(VisibleIndex >= MAIN_FEATURE_BADGE_CAPACITY)
         {
-            if(CosFunction.bUseSecsGem)
-            {
-                BadgePanel->OnClick = FeatureBadgeSecsClick;
-                NameLabel->OnClick  = FeatureBadgeSecsClick;
-                ValueLabel->OnClick = FeatureBadgeSecsClick;
-                BadgePanel->Cursor  = crHandPoint;
-                NameLabel->Cursor   = crHandPoint;
-                ValueLabel->Cursor  = crHandPoint;
-                BadgePanel->ShowHint = true;
-                BadgePanel->Hint     = "Open SECS/GEM Log";
-            }
-            else
-            {
-                BadgePanel->Visible = false;   // feature not purchased -> no badge
-            }
+            Badge->Visible = false;   // grid full - drop the extra and flag a reminder
+            bOverflow = true;
+            continue;
         }
 
-        //AI(ht160s-agv) 20260615 : seed the AMR badge from the live AMR mode flag so the
-        //  operator can read AMR ON/OFF at a glance (GetFeatureStatusDefaultValue only
-        //  carries a static "OFF" placeholder).
-        if(StatusIndex == eMainFeatureAMR)
-            UpdateAmrFeatureBadge();
+        Col = VisibleIndex % MAIN_FEATURE_BADGE_COLS;
+        Row = VisibleIndex / MAIN_FEATURE_BADGE_COLS;
+        Badge->Left = Col * (Badge->Width  + GapX);
+        Badge->Top  = Row * (Badge->Height + GapY);
+        VisibleIndex++;
+    }
+
+    if(bOverflow && !bFeatureBadgeOverflowWarned)
+    {
+        bFeatureBadgeOverflowWarned = true;
+        ShowMyOKMessageNoStop(
+            "Main status badges exceed the grid (max "
+            "3 cols x 2 rows = 6). The extra badges are hidden.\n"
+            "Increase MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS in "
+            "main.h and widen pnlFeatureStatus to make room.");
     }
 }
 //---------------------------------------------------------------------------
@@ -646,6 +680,60 @@ void __fastcall TfMain::SetSimulateScreenStatus()
                     HSys.VMotPtr[i]->UpdateTrayVisibleByHasTray();
             }
         }
+    }
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-motion-view) 20260618 : fill the Unload-area Auto1~6 info panels.
+// Bin/Lot from the routing core : Normal mode = BinAreaMap static Bin<-Auto reverse;
+// By Lot+Bin mode = LotBinBinding dynamic (Lot,Bin)<-Auto reverse. ID = 2D TrayID at
+// the Auto working position. Cnt = per-Auto sorted IC count (tRunData.TrayICCnt).
+void __fastcall TfMain::ShowUnloadAutoInfo()
+{
+    TPanel *BinPanel[6]={palAuto01Bin, palAuto02Bin, palAuto03Bin, palAuto04Bin, palAuto05Bin, palAuto06Bin};
+    TPanel *IDPanel[6] ={palAuto01ID,  palAuto02ID,  palAuto03ID,  palAuto04ID,  palAuto05ID,  palAuto06ID};
+    TPanel *CntPanel[6]={palAuto01Cnt, palAuto02Cnt, palAuto03Cnt, palAuto04Cnt, palAuto05Cnt, palAuto06Cnt};
+    TPanel *LotPanel[6]={plLotNumberAuto1, plLotNumberAuto2, plLotNumberAuto3, plLotNumberAuto4, plLotNumberAuto5, plLotNumberAuto6};
+
+    bool bLotBinMode=GeneralSetting.bUseLotBinSortMode;
+
+    for(int i=0; i<6; i++)
+    {
+        AnsiString sBin="0";
+        AnsiString sLot="";
+
+        if(bLotBinMode)
+        {
+            int BindCount=LotBinBinding.GetBindingCount();
+            for(int j=0; j<BindCount; j++)
+            {
+                AnsiString BindLotID;
+                int BindBin=0, BindAuto=-1;
+                if(LotBinBinding.GetBindingByIndex(j, BindLotID, BindBin, BindAuto) && BindAuto==i)
+                {
+                    sBin=IntToStr(BindBin);
+                    sLot=BindLotID;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            int Bin=BinAreaMap.GetBinByArea(eHT160BinAreaAuto1+i);
+            if(Bin>0)
+                sBin=IntToStr(Bin);
+        }
+
+        AnsiString sID="";
+        if(AutoModule!=NULL)
+            sID=AutoModule->GetWorkingTrayID(i);
+
+        AnsiString sCnt=IntToStr(tRunData.TrayICCnt[eAuto1+i]);
+
+        if(BinPanel[i]!=NULL && BinPanel[i]->Caption!=sBin) BinPanel[i]->Caption=sBin;
+        if(LotPanel[i]!=NULL && LotPanel[i]->Caption!=sLot) LotPanel[i]->Caption=sLot;
+        if(IDPanel[i] !=NULL && IDPanel[i]->Caption !=sID ) IDPanel[i]->Caption =sID;
+        if(CntPanel[i]!=NULL && CntPanel[i]->Caption!=sCnt) CntPanel[i]->Caption=sCnt;
     }
 }
 //---------------------------------------------------------------------------
@@ -1434,6 +1522,69 @@ void TfMain::Start()
         }
 //        flagOneCycleTrayEnd=false;
     }
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch. Ported
+//from HT172 ScanPannelKey()+TfMain::ScanKey() in procedural form (HT160 sensors
+//carry no Tag, so no Tag table). The Pad hooks added 20260616 fill the scan
+//buffer (uPadInterface::DoScanPanelLed), but nothing consumed it, so the physical
+//Start/Home/Pause/One Cycle/Clean Out keys did nothing. Front and Rear keys share
+//one action. Each key is rising-edge latched so a held button fires once. The
+//existing screen handlers already log + EventReport + show prompts (e.g. Home's
+//"Confirm home?"), so we just call them - pressing physical Home now prompts too.
+void TfMain::ScanPanelKeys()
+{
+    static bool bWasStart=false;
+    static bool bWasHome=false;
+    static bool bWasPause=false;
+    static bool bWasOneCycle=false;
+    static bool bWasCleanOut=false;
+
+    //suspend while a teach/IO-test/home/dialog window owns the panel (HT172 ScanKey
+    //guard set), and while the machine is safety-interlocked.
+    if(fNote!=NULL && fNote->fShow)
+        return;
+    if(fiosetview!=NULL && fiosetview->fShow)
+        return;
+    if(fHome!=NULL && fHome->Visible)
+        return;
+    if(MyMessageBox!=NULL && MyMessageBox->fShow)
+        return;
+    if(IsSafeLock())
+        return;
+
+    bool bStart    = HSys.Sen.SnFKStart.IsOn()    || HSys.Sen.SnRKStart.IsOn();
+    bool bHome     = HSys.Sen.SnFKHome.IsOn()     || HSys.Sen.SnRKHome.IsOn();
+    bool bPause    = HSys.Sen.SnFKPause.IsOn()    || HSys.Sen.SnRKPause.IsOn();
+    bool bOneCycle = HSys.Sen.SnFKOneCycle.IsOn() || HSys.Sen.SnRKOneCycle.IsOn();
+    bool bCleanOut = HSys.Sen.SnFKCleanOut.IsOn() || HSys.Sen.SnRKCleanOut.IsOn();
+
+    //Pause first (operator stop has priority); each handler self-guards on state.
+    if(bPause && bWasPause==false)
+        sbPause1Click(this);
+    else if(bStart && bWasStart==false)
+        Start();
+    else if(bHome && bWasHome==false)
+        sbHome1Click(this);
+    else if(bOneCycle && bWasOneCycle==false)
+        sbOneCycle1Click(this);
+    else if(bCleanOut && bWasCleanOut==false)
+    {
+        //AI(HT160S-Maintainer) 20260619 : HT172 ScanKey wraps the physical
+        //CLEAN OUT key in a YES/NO confirm before acting. The touchscreen
+        //handler stays prompt-free; only the panel key asks. SOFT_SIMULATE
+        //skips the prompt (matches HT172).
+        #ifndef SOFT_SIMULATE
+        if(ShowMyMessageBox_YES_NO("Confirm Clean Out?")==TMyMessageBox::msgrtnYES)
+        #endif
+            sbCleanOut1Click(this);
+    }
+
+    bWasStart=bStart;
+    bWasHome=bHome;
+    bWasPause=bPause;
+    bWasOneCycle=bOneCycle;
+    bWasCleanOut=bCleanOut;
 }
 //---------------------------------------------------------------------------
 

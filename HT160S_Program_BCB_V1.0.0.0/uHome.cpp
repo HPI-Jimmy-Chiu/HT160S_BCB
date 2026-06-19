@@ -16,6 +16,7 @@
 #include "cmydef.h"
 #include "csystem.h"
 #include "aTrayArm.h"   //AI(HT160S-Maintainer) 20260612 : TrayArmModule->HasTray() guard for held-tray home
+#include "aLoader.h"    //AI(HT160S-Maintainer) 20260617 : LoaderModule + held-tray safe-home clamp release
 #pragma package(smart_init)
 #pragma link "ALed"
 #pragma resource "*.dfm"
@@ -160,32 +161,73 @@ void __fastcall TfHome::SpeedButton1Click(TObject *Sender)
     Close();
 }
 //---------------------------------------------------------------------------
+void __fastcall TfHome::ScanKey()
+{
+    //AI(HT160S-Maintainer) 20260619 : HT172 uhome.cpp TfHome::ScanKey port. HT160
+    //sensors carry no Tag, so read SnFKPause/SnRKPause directly and rising-edge
+    //latch so a held key fires once. Physical PAUSE aborts the HOME monitor via
+    //the existing Abort-Home handler (StopAllMotor + Close).
+    static bool bWasPause=false;
+    bool bPause=HSys.Sen.SnFKPause.IsOn() || HSys.Sen.SnRKPause.IsOn();
+    if(bPause && bWasPause==false)
+        SpeedButton1Click(this);
+    bWasPause=bPause;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfHome::Timer1Timer(TObject *Sender)
 {
     int i;
     if(fShow==false)
         return;
 
+    //AI(HT160S-Maintainer) 20260619 : physical PAUSE (front or rear) aborts the
+    //HOME monitor (HT172 TfHome::ScanKey port). May Close() the form, so re-check
+    //fShow before touching the LED/position widgets below.
+    ScanKey();
+    if(fShow==false)
+        return;
+
     for(i=0;i<HSys.iTotalMotor && i<HOME_MOTOR_MAX;i++)
         ShowMotorHomePos(i);
 
+    //AI(HT160S-Maintainer) 20260619 : display-only now (HT172 TfHome::Timer1Timer
+    //parity). The window close/abort DECISION moved to the kernel home-lifecycle
+    //owner (csystem ProcessHomeLifecycle), which runs every tick even when
+    //SystemStart==false; this timer only refreshes LEDs/positions and latches
+    //fSeenStart for that owner to read.
     if(HSys.Sys.SystemStart)
         fSeenStart=true;
-
-    if(fAllMotorHome)                                  // home finished -> stop
-    {
-        lstHomeMsg->Items->Insert(0, "Home finished.");
-        Close();
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260619 : View teardown hooks called by the kernel home-
+//lifecycle owner (csystem ProcessHomeLifecycle). The DECISION of WHEN to close
+//(normal completion / SystemStart-drop abort) lives in the kernel so Timer1Timer
+//is display-only (HT172 parity); the View still physically owns the window Close()
+//and the completion message. IsShown()/SeenStart() expose the private fShow/
+//fSeenStart latches to that kernel owner (read-only).
+bool TfHome::IsShown() const
+{
+    return fShow;
+}
+//---------------------------------------------------------------------------
+bool TfHome::SeenStart() const
+{
+    return fSeenStart;
+}
+//---------------------------------------------------------------------------
+void TfHome::RequestClose()
+{
+    if(fShow==false)
         return;
-    }
-    //AI(HT160S-Maintainer) 20260616 : a power-cycle recovery deliberately drops
-    //SystemStart (motor power off); keep the monitor open through it so the
-    //re-home that follows is not aborted.
-    if(fSeenStart && HSys.Sys.SystemStart==false && bHomePowerCycling==false)
-    {
-        Close();
+    Close();
+}
+//---------------------------------------------------------------------------
+void TfHome::RequestCloseFinished()
+{
+    if(fShow==false)
         return;
-    }
+    lstHomeMsg->Items->Insert(0, "Home finished.");
+    Close();
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260612 : true when a motor can be treated as already homed
@@ -204,6 +246,31 @@ static bool IsHomedServoSkippable(TTrayMotor *m)
 		return false;
 	return (m->bIsServoMotor && m->bHomeFlag && (m->Led[iAlarmLed]==false));
 }
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260618 : SIMULATION-ONLY home trace. Writes a fresh
+//HomeTrace.log (EXE folder) each home round so the full-machine HOME sequence
+//can be reviewed offline. Compiled ONLY under SOFT_SIMULATE -> ZERO footprint on
+//a production build. Each line is flushed to disk immediately so a hang mid-round
+//still leaves a partial trace. bReset=true truncates (called once at round start,
+//case 1) so the file never grows across rounds.
+#ifdef SOFT_SIMULATE
+static void SimHomeTrace(AnsiString line, bool bReset)
+{
+	static TStringList *pTrace=NULL;
+	if(pTrace==NULL)
+		pTrace=new TStringList();
+	if(bReset)
+		pTrace->Clear();
+	pTrace->Add(FormatDateTime("hh:nn:ss:zzz", Now())+"  "+line);
+	try
+	{
+		pTrace->SaveToFile(ExtractFilePath(Application->ExeName)+"HomeTrace.log");
+	}
+	catch(...)
+	{
+	}
+}
+#endif
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260602 : full-machine motor home engine (HT172 0420
 //ProcessMotorHome equivalent, rewritten non-FSM / no FSMRunner). Drives every
@@ -225,10 +292,22 @@ bool TfHome::ProcessMotorHome()
 	AnsiString sErr="";
     int &iMotorHomeTask=iHomeStep;
 	static HTimer HomePowerTimer;
+#ifdef SOFT_SIMULATE
+	//Trace gate: log only on the FIRST entry of each case so a case that polls
+	//(returns false for many cycles) is written ONCE, not every tick. The clean
+	//per-round sequence becomes 1 -> 2 -> 50 -> 60 -> 100 -> 200 -> DONE.
+	static int iSimLastStep=-999;
+	bool bSimNewStep=(iMotorHomeTask!=iSimLastStep);
+	iSimLastStep=iMotorHomeTask;
+#endif
 	switch(iMotorHomeTask)
 	{
 		case 1:
 		{
+#ifdef SOFT_SIMULATE
+			if(bSimNewStep)
+				SimHomeTrace("==== HOME ROUND START ====  case1: power-cycle gate (SIM forces skip) -> case2", true);
+#endif
 			//AI(HT160S-Maintainer) 20260616 : power-cycle gate (compromise port
 			//of the old-160 home Off->On). A latched servo-amp alarm cannot be
 			//cleared in software (MC88X1 SetServoOn is a no-op), so the ONLY way
@@ -275,6 +354,10 @@ bool TfHome::ProcessMotorHome()
 			return false;
 		}
 		case 10:
+#ifdef SOFT_SIMULATE
+			if(bSimNewStep)
+				SimHomeTrace("case10: servo discharge wait -> re-energize motor power, servo-on -> case20", false);
+#endif
 			//Servo discharge complete -> re-energize motor power and re-assert
 			//servo-on for every alarm-monitored axis, then settle.
 			if(HomePowerTimer.Off())
@@ -295,16 +378,67 @@ bool TfHome::ProcessMotorHome()
 			}
 			return false;
 		case 20:
+#ifdef SOFT_SIMULATE
+			if(bSimNewStep)
+				SimHomeTrace("case20: servo-on settle -> release brakes, end power-cycle -> case2", false);
+#endif
 			//Servo-on settle complete -> release brakes, end the power-cycle and
 			//fall into the normal home (the previously-alarmed axis re-homes
 			//because ScanAllMotorStatus cleared its bHomeFlag).
-			if(HomePowerTimer.Off())
+			//AI(HT160S-Maintainer) 20260619 : ALSO wait for MotorPowerOnDelay==0 before
+			//clearing bHomePowerCycling. The relay Off->On set MotorPowerOnDelay (~10s,
+			//via ScanSystemSenser IsSystemPowerOff) which forces SystemStart=false every
+			//cycle until it counts down; clearing bHomePowerCycling while that delay is
+			//still running would let the HOME lifecycle abort guard (ProcessHomeLifecycle)
+			//tear the monitor down before case 2 can re-home. HTimer::Off() keeps
+			//returning true after expiry, so gating on both is safe (no missed edge).
+			if(HomePowerTimer.Off() && MotorPowerOnDelay==0)
 			{
 				AllBreakFree();
 				bMotorHomePowerOn=true;
 				bHomePowerCycling=false;
 				if(lstHomeMsg!=NULL)
 					lstHomeMsg->Items->Insert(0, "Motor power restored.");
+				//AI 20260619 : the motor relay cuts MAIN motor power only, NOT the A6 drive
+				//CONTROL power (L1C/L2C), so a latched drive alarm can survive this power-cycle
+				//(confirmed in the field: only a MAIN-breaker cycle clears it). If an enabled
+				//servo STILL reads its ALM line (and is not merely sitting on a CW/CCW limit),
+				//do NOT loop the recovery silently -- case 1 would just power-cycle again every
+				//round. Tell the operator exactly what to do and abort: SystemStart=false stops
+				//ProcessMotion stepping the engine (no re-loop) and ProcessHomeLifecycle then
+				//closes the monitor. Compiled out under SOFT_SIMULATE (ShowModal would hang the
+				//--selftest-home; sim drivers never raise an alarm anyway).
+#ifndef SOFT_SIMULATE
+				{
+					AnsiString sStuck="";
+					if(HSys.MotPtr!=NULL)
+					{
+						for(int i=0; i<HSys.iTotalMotor; i++)
+						{
+							TTrayMotor *m=HSys.MotPtr[i];
+							if(m==NULL || m->GetEnable()==false || m->bIsServoMotor==false)
+								continue;
+							m->ScanMotorStatus();
+							if(m->ReadServoAlarmOn() && m->Led[iAlarmLed] &&
+							   m->Led[iCwLed]==false && m->Led[iCcwLed]==false)
+								sStuck+=m->NumberAlias+" ";
+						}
+					}
+					if(sStuck!="")
+					{
+						RecordProcess(AnsiString("Home: servo alarm NOT cleared by motor power-cycle : ")+sStuck);
+						if(lstHomeMsg!=NULL)
+							lstHomeMsg->Items->Insert(0, AnsiString("Servo alarm NOT cleared : ")+sStuck+"- cycle MAIN power (breaker).");
+						ShowMyMessage(AnsiString("Servo alarm not cleared by motor power-cycle : ")+sStuck+
+						              ". The motor relay does not cut the drive control power, so HOME cannot clear it. "
+						              "Please cycle the machine MAIN power (breaker) to reset the drive, or remove the drive fault, then HOME again.");
+						fAllMotorHome=false;
+						HSys.Sys.SystemStart=false;
+						iMotorHomeTask=1;
+						return false;
+					}
+				}
+#endif
 				iMotorHomeTask=2;
 			}
 			return false;
@@ -337,7 +471,69 @@ bool TfHome::ProcessMotorHome()
 				HSys.Cyn.C_TrayArm_FrontClamp.Off();
 				HSys.Cyn.C_TrayArm_RearClamp.Off();
 			}
-			iMotorHomeTask=100;
+#ifdef SOFT_SIMULATE
+			if(bSimNewStep)
+			{
+				AnsiString sRun="", sSkipServo="", sDisabled="";
+				if(HSys.MotPtr!=NULL)
+				{
+					for(int i=0; i<HSys.iTotalMotor; i++)
+					{
+						TTrayMotor *m=HSys.MotPtr[i];
+						if(m==NULL)
+							continue;
+						//Match the home batch gate (case100/200): disabled axes are
+						//skipped (never run), already-homed servos are skipped (keep
+						//position), everything else physically re-homes this round.
+						if(m->GetEnable()==false)
+							sDisabled+=m->NumberAlias+" ";
+						else if(IsHomedServoSkippable(m))
+							sSkipServo+=m->NumberAlias+" ";
+						else
+							sRun+=m->NumberAlias+" ";
+					}
+				}
+				bool bHeldTray=(TrayArmModule!=NULL && TrayArmModule->HasTray());
+				SimHomeTrace(AnsiString("case2: arm home. TrayArmZ UP, TrayArm clamps ")+
+					(bHeldTray?"KEPT CLOSED (holding tray)":"OPENED")+" -> case50", false);
+				SimHomeTrace("       WILL HOME (enabled): "+sRun, false);
+				SimHomeTrace("       skipped(already-homed servo): "+sSkipServo, false);
+				SimHomeTrace("       NOT run (disabled): "+sDisabled, false);
+			}
+#endif
+			iMotorHomeTask=50;
+			return false;
+		case 50:
+			//AI(HT160S-Maintainer) 20260617 : Loader held-tray SAFE HOME. The two Loader
+			//cars (L=Loader1, R=Loader2) share one Loader-Y rail; homing while a car still
+			//clamps a tray would drag that tray into the other car (cars colliding/jamming).
+			//So release BOTH cars' tray clamps BEFORE any Loader-Y motion (case 200 homes
+			//MLoaderY_1/_2). Release ORDER per machine spec : rear hook (LeanOnTray) FIRST,
+			//then front stopper (PushTray). Pop() opens the clamp and returns true once the
+			//Off sensor confirms (returns true immediately under SOFT_SIMULATE).
+			{
+#ifdef SOFT_SIMULATE
+				if(bSimNewStep)
+					SimHomeTrace("case50: release Loader rear hooks (Loader1/2 LeanOnTray) -> case60 when both off", false);
+#endif
+				bool bRearL=HSys.Cyn.C_Loader1_LeanOnTray.Pop();
+				bool bRearR=HSys.Cyn.C_Loader2_LeanOnTray.Pop();
+				if(bRearL && bRearR)
+					iMotorHomeTask=60;
+			}
+			return false;
+		case 60:
+			//Front stopper (PushTray) released only after the rear hook is fully open.
+			{
+#ifdef SOFT_SIMULATE
+				if(bSimNewStep)
+					SimHomeTrace("case60: release Loader front stoppers (Loader1/2 PushTray) -> case100 when both off", false);
+#endif
+				bool bFrontL=HSys.Cyn.C_Loader1_PushTray.Pop();
+				bool bFrontR=HSys.Cyn.C_Loader2_PushTray.Pop();
+				if(bFrontL && bFrontR)
+					iMotorHomeTask=100;
+			}
 			return false;
 		case 100:
 		{
@@ -347,6 +543,19 @@ bool TfHome::ProcessMotorHome()
 			TTrayMotor *Z[4];
 			Z[0]=HSys.Mot.MSuckZ_1; Z[1]=HSys.Mot.MSuckZ_2;
 			Z[2]=HSys.Mot.MSuckZ_3; Z[3]=HSys.Mot.MSuckZ_4;
+#ifdef SOFT_SIMULATE
+			if(bSimNewStep)
+			{
+				AnsiString s="";
+				for(int i=0;i<4;i++)
+				{
+					if(Z[i]==NULL)
+						continue;
+					s+=Z[i]->NumberAlias+(Z[i]->GetEnable()?"":"(disabled)")+" ";
+				}
+				SimHomeTrace("case100: batch-home 4 sucker Z [ "+s+"] -> case200 when all done", false);
+			}
+#endif
 			bool bZHomed=true;
 			for(int i=0; i<4; i++)
 			{
@@ -355,6 +564,17 @@ bool TfHome::ProcessMotorHome()
 				//AI(HT160S-Maintainer) 20260612 : sucker Z are steppers (never skipped),
 				//but apply the same servo-skip guard generically for config safety.
 				if(IsHomedServoSkippable(Z[i]))
+					continue;
+				//AI(HT160S-Maintainer) 20260619 : HT172 batch-home gate (uhome.cpp
+				//PushStoreArmHome case100). TMyMotor::Home() returns true only on the
+				//tick it completes, then resets its inner task to 1, so calling it again
+				//after completion physically RE-HOMES the axis. Servos are protected by
+				//IsHomedServoSkippable, but STEPPERS (these sucker Z) are not -> in a
+				//multi-axis batch the axes that finish first get re-homed every tick
+				//while waiting for the slowest, oscillating near home (0<->1) and the
+				//batch never converges. Latch on bHomeFinish (set by Home(), cleared by
+				//InitHomeTask in case 2) so each axis homes exactly once per round.
+				if(Z[i]->bHomeFinish)
 					continue;
 				if(Z[i]->Home(sErr)==false)
 					bZHomed=false;
@@ -375,6 +595,10 @@ bool TfHome::ProcessMotorHome()
 			XY[10]=HSys.Mot.MAutoY_6;    XY[11]=HSys.Mot.MTopCCDX;
 			XY[12]=HSys.Mot.MBottomCCDY; XY[13]=HSys.Mot.MPitchX;
             XY[14]=HSys.Mot.MColorY;     XY[15]=HSys.Mot.MTopCCDX_Color;
+#ifdef SOFT_SIMULATE
+			if(bSimNewStep)
+				SimHomeTrace("case200: batch-home all XY axes (TrayArm X incl) -> DONE when all homed", false);
+#endif
 			bool bAllHomed=true;
             for(int i=0; i<16; i++)
 			{
@@ -385,11 +609,57 @@ bool TfHome::ProcessMotorHome()
 				//still physically re-home here.
 				if(IsHomedServoSkippable(XY[i]))
 					continue;
+				//AI(HT160S-Maintainer) 20260619 : same HT172 batch-home gate as case100 --
+				//a stepper XY axis would otherwise re-home every tick while waiting for
+				//the rest of the batch (Home() resets its task after returning true).
+				//Latch on bHomeFinish so each axis homes exactly once per round.
+				if(XY[i]->bHomeFinish)
+					continue;
 				if(XY[i]->Home(sErr)==false)
 					bAllHomed=false;
 			}
 			if(bAllHomed)
 			{
+				//AI(HT160S-Maintainer) 20260617 : Loader held-tray exception. The clamps were
+				//opened during this home (case 50/60), so any tray a Loader car still logically
+				//holds is now loose/unreferenced on the car. Require the operator to physically
+				//remove ALL Loader trays, then clear both cars' tray identity + map (ClearTray
+				//also drops fHasTray). The loader feed Task is re-initialized to "request a new
+				//tray from scratch" by the InitialAllTask(true) the home caller runs right after
+				//this returns true (see ProcessMotion Layer 2 in csystem.cpp).
+				bool bLoaderL=(HSys.VMot.MMLoaderY_1!=NULL && HSys.VMot.MMLoaderY_1->fHasTray);
+				bool bLoaderR=(HSys.VMot.MMLoaderY_2!=NULL && HSys.VMot.MMLoaderY_2->fHasTray);
+				if(bLoaderL || bLoaderR)
+				{
+					RecordProcess("Home: Loader held tray -> prompt operator to remove all Loader trays, clear tray data");
+					ShowMyMessage("Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK.");
+					if(HSys.VMot.MMLoaderY_1!=NULL)
+						HSys.VMot.MMLoaderY_1->ClearTray();
+					if(HSys.VMot.MMLoaderY_2!=NULL)
+						HSys.VMot.MMLoaderY_2->ClearTray();
+				}
+#ifdef SOFT_SIMULATE
+				//Final per-round summary: enumerate EVERY motor's home status so the
+				//offline reviewer can confirm a complete round physically homed all axes.
+				SimHomeTrace("---- ALL MOTOR HOME STATUS (round done) ----", false);
+				if(HSys.MotPtr!=NULL)
+				{
+					for(int i=0; i<HSys.iTotalMotor; i++)
+					{
+						TTrayMotor *m=HSys.MotPtr[i];
+						if(m==NULL)
+							continue;
+						AnsiString s=m->NumberAlias;
+						s+=m->GetEnable()?" EN":" --";
+						s+=m->bHomeFlag?" HOMED":" NOThomed";
+						s+=m->bIsServoMotor?" servo":" stepper";
+						if(m->Led[iAlarmLed])
+							s+=" ALARM";
+						SimHomeTrace("   "+s, false);
+					}
+				}
+				SimHomeTrace("==== HOME ROUND DONE (case200 -> return true) ====", false);
+#endif
 				iMotorHomeTask=1;
 				return true;
 			}

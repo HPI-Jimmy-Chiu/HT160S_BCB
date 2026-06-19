@@ -18,8 +18,22 @@
 //---------------------------------------------------------------------------
 enum
 {
-    MAIN_FEATURE_STATUS_COUNT = 8,
-    MAIN_FEATURE_STATUS_COLUMNS = 4
+    MAIN_FEATURE_STATUS_COUNT = 8
+};
+
+//AI(ht160s-mainui) 20260617 : main status-badge grid limits. The SECS/SAFE/AMR
+//  badges are auto-arranged by LayoutFeatureBadges() into a COLS x ROWS grid on
+//  pnlFeatureStatus (the home screen is cramped on the machine, so the badges must
+//  wrap instead of running off one row). To add more badges later: drop a new
+//  pnlFeatureBadgeN panel in main.dfm, bind it in BuildFeatureStatusBadges(), and
+//  the layout follows automatically. If the visible badge count exceeds the grid
+//  capacity the extras are hidden and a one-time runtime warning fires - bump
+//  MAIN_FEATURE_BADGE_COLS / _ROWS (and widen pnlFeatureStatus) to make room.
+enum
+{
+    MAIN_FEATURE_BADGE_COLS     = 3,
+    MAIN_FEATURE_BADGE_ROWS     = 2,
+    MAIN_FEATURE_BADGE_CAPACITY = MAIN_FEATURE_BADGE_COLS * MAIN_FEATURE_BADGE_ROWS
 };
 
 enum TMainFeatureStatusIndex
@@ -73,6 +87,10 @@ enum TMainFeatureStatusIndex
 //   UpdateSecsFeatureBadge() - sync the SECS feature badge to the live HSMS link state;
 //                             driven once/sec by the SECS engine timer (HGem->Timer1 ->
 //                             HT160Gem::RefreshSecsBadge); edge-triggered.
+//   pgcMonitor subtree (pgcMonitor .. MemoEventLog) - decls recovered 2026-06-18 after an
+//                             IDE save dropped them. They are component fields, so they sit
+//                             with the other __published fields; ALL fields must precede the
+//                             event-handler methods or the form designer rejects event edits.
 class TfMain : public TForm
 {
 __published:	// IDE-managed Components
@@ -95,6 +113,15 @@ __published:	// IDE-managed Components
     TPanel *pnlSetting;
     TPanel *palMainStatus;
     TPanel *pnlFeatureStatus;
+    TPanel *pnlFeatureBadge1;
+    TLabel *lblFeatureName1;
+    TLabel *lblFeatureValue1;
+    TPanel *pnlFeatureBadge2;
+    TLabel *lblFeatureName2;
+    TLabel *lblFeatureValue2;
+    TPanel *pnlFeatureBadge3;
+    TLabel *lblFeatureName3;
+    TLabel *lblFeatureValue3;
     TPanel *palMainStatus_En;
     TPanel *pnlLight;
     TALed *ledYellow;
@@ -125,6 +152,102 @@ __published:	// IDE-managed Components
     TSpeedButton *sbOneCycle1;
     TSpeedButton *sbCleanOut1;
     TSpeedButton *sbStoreHangup;
+    TLabel *lbl_WorkFile;
+    TComboBox *cb_WorkFile;
+    TLabel *lblUserSelect;
+    TComboBox *cbbUserSelect;
+    TPanel *Panel7;
+    TLabel *Label1;
+    TSpeedButton *btnClearCount;
+    TLabel *lblUnloadingCount;
+    TLabel *lblloseCnt;
+    TSpeedButton *sbPaperSummary;
+    TPanel *palloadingCount;
+    TPanel *palUnloadingCount;
+    TPanel *palloseCnt;
+    TPanel *Panel2;
+    TPanel *Panel9;
+    TGroupBox *grpTrack1;
+    TPanel *palAutoInfo01;
+    TLabel *lblAuto01Cnt;
+    TPanel *palAuto01Bin;
+    TPanel *palAuto01ID;
+    TPanel *palAuto01Cnt;
+    TPanel *palAutoInfo02;
+    TLabel *lblAuto02Cnt;
+    TPanel *palAuto02Bin;
+    TPanel *palAuto02ID;
+    TPanel *palAuto02Cnt;
+    TPanel *palAutoInfo03;
+    TLabel *lblAuto03Cnt;
+    TPanel *palAuto03Bin;
+    TPanel *palAuto03ID;
+    TPanel *palAuto03Cnt;
+    TPanel *pal1;
+    TStringGrid *UPH_StringGrid;
+    TPanel *pnlLogMenu;
+    TSpeedButton *spbTrayStatus;
+    TSpeedButton *sbTimeData;
+    TSpeedButton *apbLogs;
+    TSpeedButton *btnTrayMap;
+    TPageControl *pgcLog;
+    TTabSheet *tsTrayStatus;
+    TGroupBox *grpLoaderR;
+    TTMyTray *mtSortRecv;
+    TPanel *lblLoaderCarID;
+    TGroupBox *grpLoaderL;
+    TLabel *lblLoadCurrBin_1;
+    TTMyTray *mtWorkArea;
+    TPanel *lblLoadCurrID_1;
+    TTabSheet *tsLogs;
+    TListBox *lstLog;
+    TTabSheet *tsTimeData;
+    TStringGrid *sgTimeData;
+    TPanel *btSaveTimeData;
+    TTabSheet *tsMapTray;
+    TMemo *Memo1;
+    TPageControl *PageControl1;
+    TTabSheet *tsSimulation;
+    TGroupBox *gbSimuSetting;
+    TCheckBox *cbEnableSimulation;
+    TButton *btnLoadSimuData;
+    TTabSheet *tsOtherTool;
+    TPageControl *PageControl2;
+    TTabSheet *tsLotInfo;
+    TLabel *lblLotNo;
+    TGroupBox *grpLotManualEdit;
+    TEdit *edLotNo;
+    TStringGrid *sgLotList;
+    TButton *btnAddLot;
+    TButton *btnEditLot;
+    TButton *btnRemoveLot;
+    TButton *btnLotStart;
+    TButton *btnLotEnd;
+    TLabel *lblLotListHint;
+    TPanel *plLotNumberAuto1;
+    TPanel *plLotNumberAuto2;
+    TPanel *plLotNumberAuto3;
+    TGroupBox *GroupBox1;
+    TPanel *palAutoInfo04;
+    TLabel *lblAuto04Cnt;
+    TPanel *palAuto04Bin;
+    TPanel *palAuto04ID;
+    TPanel *palAuto04Cnt;
+    TPanel *plLotNumberAuto4;
+    TPanel *palAutoInfo05;
+    TLabel *lblAuto05Cnt;
+    TPanel *palAuto05Bin;
+    TPanel *palAuto05ID;
+    TPanel *palAuto05Cnt;
+    TPanel *plLotNumberAuto5;
+    TPanel *palAutoInfo06;
+    TLabel *lblAuto06Cnt;
+    TPanel *palAuto06Bin;
+    TPanel *palAuto06ID;
+    TPanel *palAuto06Cnt;
+    TPanel *plLotNumberAuto6;
+    TPanel *Panel1;
+    TStringGrid *sgProductInfo;
     TPageControl *pgcMonitor;
     TTabSheet *tsMotionView;
     TPanel *PanelMain6;
@@ -134,6 +257,7 @@ __published:	// IDE-managed Components
     TALed *ledGreen1;
     TPanel *pnlPillar;
     TPanel *plLoaderChLeft;
+    TPanel *plLoaderRChRight;
     TPanel *plAuto3ChRight;
     TPanel *plAuto3ChLeft;
     TPanel *plAuto3TrayWork;
@@ -142,7 +266,6 @@ __published:	// IDE-managed Components
     TTMyTray *mtLoaderLTrayWork;
     TPanel *plLoaderRTrayWork;
     TTMyTray *mtLoaderRTrayWork;
-    TPanel *plLoaderRChRight;
     TPanel *plAuto4ChRight;
     TPanel *plAuto4ChLeft;
     TPanel *plAuto4TrayWork;
@@ -163,14 +286,36 @@ __published:	// IDE-managed Components
     TPanel *plAuto2ChLeft;
     TPanel *plAuto2TrayWork;
     TTMyTray *mtAuto2TrayWork;
-    TPanel *plSortArmName;
+    TPanel *plCCDMotorLoader;
+    TPanel *plEmptyLabel;
+    TPanel *plLoaderLLabel;
+    TPanel *plAuto1Label;
+    TPanel *plAuto2Label;
+    TPanel *plAuto3Label;
+    TPanel *plAuto4Label;
+    TPanel *plAuto5Label;
+    TPanel *plAuto6ChLeft;
+    TPanel *plAuto6ChRight;
+    TPanel *plAuto6Label;
+    TPanel *plColorChLeft;
+    TPanel *plColorChRight;
+    TPanel *plColorLabel;
+    TPanel *plAuto6TrayWork;
+    TTMyTray *mtAuto6TrayWork;
+    TPanel *plColorTrayWork;
+    TTMyTray *mtColorTrayWork;
     TPanel *plTrayArmName;
+    TPanel *plTrayArm;
+    TMyLed *ledTrayArm;
+    TPanel *plLoaderRLabel;
     TPanel *palSortArm1;
     TMyLed *ledSortArm1ZA;
     TMyLed *ledSortArm1ZB;
     TMyLed *ledSortArm1ZE;
     TMyLed *ledSortArm1ZF;
-    TPanel *plTrayArm;
+    TPanel *plSortArmName;
+    TPanel *plCCDMotorColor;
+    TCheckBox *chkLoadTray;
     TTabSheet *tsMotorView;
     TStringGrid *sgMotorStatus;
     TTabSheet *TabRecord;
@@ -218,169 +363,6 @@ __published:	// IDE-managed Components
     TMemo *MemoAudioCCD;
     TTabSheet *TabSheet9;
     TMemo *MemoEventLog;
-    TLabel *lbl_WorkFile;
-    TComboBox *cb_WorkFile;
-    TLabel *lblUserSelect;
-    TComboBox *cbbUserSelect;
-    TPanel *Panel7;
-    TLabel *Label1;
-    TSpeedButton *btnClearCount;
-    TLabel *lblUnloadingCount;
-    TLabel *lblloseCnt;
-    TSpeedButton *sbPaperSummary;
-    TLabel *lblLotInfo;
-    TPanel *palloadingCount;
-    TPanel *palUnloadingCount;
-    TPanel *palloseCnt;
-    TPanel *Panel2;
-    TPanel *Panel9;
-    TGroupBox *grpTrack1;
-    TLabel *lblAuto06Cnt;
-    TPanel *palAutoInfo01;
-    TLabel *lblAuto01Cnt;
-    TPanel *palAuto01Bin;
-    TButton *btnSetFullTray_Auto1;
-    TPanel *palAuto01ID;
-    TPanel *palAuto01Cnt;
-    TPanel *palAuto01LotCnt;
-    TPanel *pnlAuto01ICCnt;
-    TPanel *pnlAuto01EmptyCnt;
-    TPanel *palAuto01In;
-    TPanel *palAutoInfo02;
-    TLabel *lblAuto02Cnt;
-    TPanel *palAuto02Bin;
-    TButton *btnSetFullTray_Auto2;
-    TPanel *palAuto02ID;
-    TPanel *palAuto02Cnt;
-    TPanel *palAuto02LotCnt;
-    TPanel *pnlAuto02EmptyCnt;
-    TPanel *pnlAuto02ICCnt;
-    TPanel *palAuto02In;
-    TPanel *palAutoInfo03;
-    TLabel *lblAuto03Cnt;
-    TPanel *palAuto03Bin;
-    TButton *btnSetFullTray_Auto3;
-    TPanel *palAuto03ID;
-    TPanel *palAuto03Cnt;
-    TPanel *palAuto03LotCnt;
-    TPanel *pnlAuto03EmptyCnt;
-    TPanel *pnlAuto03ICCnt;
-    TPanel *palAuto03In;
-    TPanel *palAutoInfo04;
-    TLabel *lblAuto04Cnt;
-    TPanel *palAuto04Bin;
-    TButton *btnSetFullTray_Auto4;
-    TPanel *palAuto04ID;
-    TPanel *palAuto04Cnt;
-    TPanel *palAuto04LotCnt;
-    TPanel *pnlAuto04ICCnt;
-    TPanel *pnlAuto04EmptyCnt;
-    TPanel *palAuto04In;
-    TPanel *palAutoInfo05;
-    TLabel *lblAuto05Cnt;
-    TPanel *palAuto05Bin;
-    TButton *btnSetFullTray_Auto5;
-    TPanel *palAuto05ID;
-    TPanel *palAuto05Cnt;
-    TPanel *palAuto05LotCnt;
-    TPanel *pnlAuto05ICCnt;
-    TPanel *pnlAuto05EmptyCnt;
-    TPanel *palAuto05In;
-    TPanel *palAuto06Bin;
-    TButton *btnSetFullTray_Auto6;
-    TPanel *palAuto06ID;
-    TPanel *palAuto06Cnt;
-    TPanel *palAuto06LotCnt;
-    TPanel *pnlAuto06EmptyCnt;
-    TPanel *pnlAuto06ICCnt;
-    TPanel *palAuto06In;
-    TPanel *pal1;
-    TSpeedButton *btnTranspose;
-    TStringGrid *UPH_StringGrid;
-    TStringGrid *sgProductInfo;
-    TPanel *pnlLogMenu;
-    TSpeedButton *spbTrayStatus;
-    TSpeedButton *sbTimeData;
-    TSpeedButton *apbLogs;
-    TSpeedButton *btnTrayMap;
-    TPageControl *pgcLog;
-    TTabSheet *tsTrayStatus;
-    TMemo *MemoBinCount;
-    TGroupBox *grpLoaderR;
-    TTMyTray *mtSortRecv;
-    TPanel *lblLoaderCarID;
-    TGroupBox *grpLoaderL;
-    TLabel *lblLoadCurrBin_1;
-    TTMyTray *mtWorkArea;
-    TPanel *lblLoadCurrID_1;
-    TTabSheet *tsLogs;
-    TSpeedButton *sbHome;
-    TSpeedButton *sbStart;
-    TSpeedButton *sbPause;
-    TSpeedButton *sbRetry;
-    TSpeedButton *sbSkip;
-    TSpeedButton *sbTrayEnd;
-    TSpeedButton *sbTrayFeed;
-    TSpeedButton *sbOneCycle;
-    TSpeedButton *sbCleanOut;
-    TSpeedButton *sbReset;
-    TListBox *lstLog;
-    TTabSheet *tsTimeData;
-    TStringGrid *sgTimeData;
-    TPanel *btSaveTimeData;
-    TTabSheet *tsMapTray;
-    TMemo *Memo1;
-    TPageControl *PageControl1;
-    TTabSheet *tsSimulation;
-    TGroupBox *gbSimuSetting;
-    TCheckBox *cbEnableSimulation;
-    TButton *btnLoadSimuData;
-    TTabSheet *tsOtherTool;
-    TGroupBox *grpNotUse;
-    TLabel *lblNotUse;
-    TPanel *palNotUseCnt;
-    TPanel *palNotUseBin;
-    TPanel *palNotUseID;
-    TPanel *palNotUse;
-    TTMyTray *myNotUse;
-    TPanel *palNoUseIn;
-    TPanel *palNoUseICCnt;
-    TPanel *palNoUseEmptyCnt;
-    TPanel *palNotUseLotCnt;
-    TPanel *plCCDMotorLoader;
-    TPanel *plEmptyLabel;
-    TPanel *plLoaderLLabel;
-    TPanel *plAuto1Label;
-    TPanel *plAuto2Label;
-    TPanel *plAuto3Label;
-    TPanel *plAuto4Label;
-    TPanel *plAuto5Label;
-    TPanel *plAuto6ChLeft;
-    TPanel *plAuto6ChRight;
-    TPanel *plAuto6Label;
-    TPanel *plColorChLeft;
-    TPanel *plColorChRight;
-    TPanel *plColorLabel;
-    TPanel *plAuto6TrayWork;
-    TTMyTray *mtAuto6TrayWork;
-    TPanel *plColorTrayWork;
-    TTMyTray *mtColorTrayWork;
-    TPanel *plLoaderRLabel;
-    TMyLed *ledTrayArm;
-    TPageControl *PageControl2;
-    TTabSheet *tsLotInfo;
-    TLabel *lblLotNo;
-    TGroupBox *grpLotManualEdit;
-    TEdit *edLotNo;
-    TStringGrid *sgLotList;
-    TButton *btnAddLot;
-    TButton *btnEditLot;
-    TButton *btnRemoveLot;
-    TButton *btnLotStart;
-    TButton *btnLotEnd;
-    TLabel *lblLotListHint;
-    TPanel *plCCDMotorColor;
-    TCheckBox *chkLoadTray;
     void __fastcall sbLaguageClick(TObject *Sender);
     void __fastcall sbProductClick(TObject *Sender);
     void __fastcall sbMaintanceClick(TObject *Sender);
@@ -396,6 +378,10 @@ __published:	// IDE-managed Components
     void __fastcall sbMotionViewClick(TObject *Sender);
     void __fastcall sbOtherClick(TObject *Sender);
     void __fastcall spbStripPosClick(TObject *Sender);
+    void __fastcall spbTrayStatusClick(TObject *Sender);
+    void __fastcall sbTimeDataClick(TObject *Sender);
+    void __fastcall apbLogsClick(TObject *Sender);
+    void __fastcall btnTrayMapClick(TObject *Sender);
     void __fastcall pnStartModeClick(TObject *Sender);
     void __fastcall pnRealDummyClick(TObject *Sender);
     void __fastcall cb_WorkFileChange(TObject *Sender);
@@ -428,7 +414,9 @@ private:	// User declarations
     bool bLotApiPullAll;
     int  iLotApiPullCursor;
     int  iLotApiRetryCount;
+    bool bFeatureBadgeOverflowWarned;   //AI(ht160s-mainui) 20260617 : one-shot guard for the badge-grid overflow warning
     void __fastcall BuildFeatureStatusBadges();
+    void __fastcall LayoutFeatureBadges();   //AI(ht160s-mainui) 20260617 : arrange visible badges into the COLS x ROWS grid
     void __fastcall FeatureBadgeSecsClick(TObject *Sender);
     void __fastcall UpdateWorkFileComboBox();
     void __fastcall RefreshMainUserSelect();
@@ -453,11 +441,13 @@ public:		// User declarations
     void __fastcall SetFeatureStatusBadge(int BadgeIndex, AnsiString ValueText, TColor ValueColor);
     void __fastcall SetSimulateScreenStatus();
     void __fastcall ShowMotorInfo();
+    void __fastcall ShowUnloadAutoInfo();   //AI(ht160s-motion-view) 20260618 : fill Unload Auto1~6 Bin/Lot/ID/Cnt panels
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);
     void LoadRunModePicture();
     void LoadStartModePicture();
     void Start();
     bool CheckLotDataReady(AnsiString &Reason);
+    void ScanPanelKeys();   //AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch (HT172 ScanKey port)
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfMain *fMain;

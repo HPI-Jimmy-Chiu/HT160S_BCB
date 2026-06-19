@@ -1,4 +1,4 @@
-#include "IncludeAllHeader.h"       //Dell 將.h統一,可加速build
+#include "IncludeAllHeader.h"       //Dell : unify all .h into one to speed up build
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #include <TypInfo.hpp>
@@ -126,8 +126,20 @@ __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     ManualOutputLog=new TStringList();
     iSelectRow=0;
     iSelectCol=0;
+    bOutDataChange=false;
+    bFromTeach=false;
+    bBackSwitchPortData=NULL;
+    bBackCylinderPortData=NULL;
+    bBackSuckPortData=NULL;
+    iBackSwitchCount=0;
+    iBackCylinderCount=0;
+    iBackSuckCount=0;
+    palSuckAll=NULL;
+    palDestroyAll=NULL;
+    palAllOff=NULL;
     Color=IO_COLOR_FORM;
     fShow=false;
+    CreateSuckerGroupButtons();
 }
 //---------------------------------------------------------------------------
 __fastcall Tfiosetview::~Tfiosetview()
@@ -136,6 +148,136 @@ __fastcall Tfiosetview::~Tfiosetview()
     IOTableDeletedTags=NULL;
     delete ManualOutputLog;
     ManualOutputLog=NULL;
+    FreeOutputBackup();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260618 : group Suck/Destroy/AllOff buttons for the Sucker
+//tab, mirroring HT172 palAllOn/palAllOff/palCloseAll. Built in code (no DFM edit) and
+//parented to TabSheet5, placed to the right of the four sucker panels. Their Alias is
+//left empty so RefreshLegacyIOControls skips them instead of marking them unbound.
+void Tfiosetview::CreateSuckerGroupButtons()
+{
+    TWinControl *ParentCtrl=dynamic_cast<TWinControl *>(FindComponent("TabSheet5"));
+    if(ParentCtrl==NULL)
+        return;
+
+    int Left  =385;
+    int Width =56;
+    int Height=22;
+
+    palSuckAll=new TBtnPanel(this);
+    palSuckAll->Parent        =ParentCtrl;
+    palSuckAll->Name          ="palSuckAll";
+    palSuckAll->Left          =Left;
+    palSuckAll->Top           =80;
+    palSuckAll->Width         =Width;
+    palSuckAll->Height        =Height;
+    palSuckAll->BevelInner    =bvRaised;
+    palSuckAll->BevelOuter    =bvRaised;
+    palSuckAll->Color         =IO_COLOR_BUTTON_OFF;
+    palSuckAll->TrueColor     =IO_COLOR_BUTTON_ON;
+    palSuckAll->FalseColor    =IO_COLOR_BUTTON_OFF;
+    palSuckAll->FalseFontColor=clWhite;
+    palSuckAll->TrueFontColor =clBlack;
+    palSuckAll->Caption       ="Suck";
+    palSuckAll->Tag           =0;
+    palSuckAll->Style         =tsButtons;
+    palSuckAll->Font->Charset =DEFAULT_CHARSET;
+    palSuckAll->Font->Color   =clWhite;
+    palSuckAll->Font->Name    ="Arial";
+    palSuckAll->Font->Size    =10;
+    palSuckAll->OnClick       =SuckGroupAllClick;
+
+    palDestroyAll=new TBtnPanel(this);
+    palDestroyAll->Parent        =ParentCtrl;
+    palDestroyAll->Name          ="palDestroyAll";
+    palDestroyAll->Left          =Left;
+    palDestroyAll->Top           =110;
+    palDestroyAll->Width         =Width;
+    palDestroyAll->Height        =Height;
+    palDestroyAll->BevelInner    =bvRaised;
+    palDestroyAll->BevelOuter    =bvRaised;
+    palDestroyAll->Color         =IO_COLOR_BUTTON_OFF;
+    palDestroyAll->TrueColor     =IO_COLOR_BUTTON_ON;
+    palDestroyAll->FalseColor    =IO_COLOR_BUTTON_OFF;
+    palDestroyAll->FalseFontColor=clWhite;
+    palDestroyAll->TrueFontColor =clBlack;
+    palDestroyAll->Caption       ="Destroy";
+    palDestroyAll->Tag           =1;
+    palDestroyAll->Style         =tsButtons;
+    palDestroyAll->Font->Charset =DEFAULT_CHARSET;
+    palDestroyAll->Font->Color   =clWhite;
+    palDestroyAll->Font->Name    ="Arial";
+    palDestroyAll->Font->Size    =10;
+    palDestroyAll->OnClick       =SuckGroupAllClick;
+
+    palAllOff=new TBtnPanel(this);
+    palAllOff->Parent        =ParentCtrl;
+    palAllOff->Name          ="palSuckAllOff";
+    palAllOff->Left          =Left;
+    palAllOff->Top           =140;
+    palAllOff->Width         =Width;
+    palAllOff->Height        =Height;
+    palAllOff->BevelInner    =bvRaised;
+    palAllOff->BevelOuter    =bvRaised;
+    palAllOff->Color         =IO_COLOR_BUTTON_OFF;
+    palAllOff->TrueColor     =IO_COLOR_BUTTON_ON;
+    palAllOff->FalseColor    =IO_COLOR_BUTTON_OFF;
+    palAllOff->FalseFontColor=clWhite;
+    palAllOff->TrueFontColor =clBlack;
+    palAllOff->Caption       ="All Off";
+    palAllOff->Tag           =2;
+    palAllOff->Style         =tsButtons;
+    palAllOff->Font->Charset =DEFAULT_CHARSET;
+    palAllOff->Font->Color   =clWhite;
+    palAllOff->Font->Name    ="Arial";
+    palAllOff->Font->Size    =10;
+    palAllOff->OnClick       =SuckGroupAllClick;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260618 : drive every sucker in each kit to a fixed end state,
+//reusing TMySucker On()/Off()/Normal() so semantics match HT172 palAllSuck/Destroy/Off.
+//Suck = vacuum on + blow off; Destroy = vacuum off + blow on; All Off = both off.
+//Suck/Destroy respect per-sucker Enable; All Off forces every sucker off (HT172 parity).
+void __fastcall Tfiosetview::SuckGroupAllClick(TObject *Sender)
+{
+    TBtnPanel *ButtonPtr=dynamic_cast<TBtnPanel *>(Sender);
+    if(ButtonPtr==NULL)
+        return;
+
+    int Action=ButtonPtr->Tag;
+    AnsiString ActionName;
+    if(Action==0)
+        ActionName="SUCK_ALL";
+    else if(Action==1)
+        ActionName="DESTROY_ALL";
+    else
+        ActionName="ALL_OFF";
+
+    for(int SuckerIndex=0; SuckerIndex<HSys.iTotalSucker; SuckerIndex++)
+    {
+        TMyKitSuck *Kit=&HSys.SuckPtr[SuckerIndex];
+        for(int RowIndex=0; RowIndex<Kit->MaxItemR; RowIndex++)
+        {
+            for(int ColIndex=0; ColIndex<Kit->MaxItemC; ColIndex++)
+            {
+                TMySucker *SuckerPtr=&Kit->Suck[RowIndex][ColIndex];
+                if(Action==2)
+                    SuckerPtr->Normal();
+                else if(SuckerPtr->Enable)
+                {
+                    if(Action==0)
+                        SuckerPtr->On();
+                    else
+                        SuckerPtr->Off();
+                }
+            }
+        }
+    }
+
+    bOutDataChange=true;
+    LogManualOutputAction("SuckerGroup", ActionName, "OK");
+    RefreshCurrentView();
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::SetGridRowCount(TStringGrid *Grid, int RowCount)
@@ -711,7 +853,7 @@ void Tfiosetview::SaveIoTableFromGrid()
             ErrorMessage=ErrorMessage+AnsiString("\r\n")+Errors->Strings[Index];
         if(Errors->Count>20)
             ErrorMessage=ErrorMessage+AnsiString("\r\n...");
-        ShowMessage(ErrorMessage);
+        ShowMyOKMessageNoStop(ErrorMessage);
         delete Errors;
         return;
     }
@@ -720,7 +862,7 @@ void Tfiosetview::SaveIoTableFromGrid()
     BackupFile="";
     if(!BackupIOTableFile(&BackupFile))
     {
-        ShowMessage("IO_Table.csv backup failed. Save aborted.");
+        ShowMyOKMessageNoStop("IO_Table.csv backup failed. Save aborted.");
         return;
     }
 
@@ -769,13 +911,13 @@ void Tfiosetview::SaveIoTableFromGrid()
         RefreshLegacyIOControls();
         RefreshLegacyIOMaps();
         if(BackupFile!=AnsiString(""))
-            ShowMessage(AnsiString("IO_Table.csv saved.\r\nBackup: ")+BackupFile);
+            ShowMyOKMessageNoStop(AnsiString("IO_Table.csv saved.\r\nBackup: ")+BackupFile);
         else
-            ShowMessage("IO_Table.csv saved.");
+            ShowMyOKMessageNoStop("IO_Table.csv saved.");
     }
     catch(...)
     {
-        ShowMessage("IO_Table.csv save failed.");
+        ShowMyOKMessageNoStop("IO_Table.csv save failed.");
     }
 
     delete Fields;
@@ -1330,7 +1472,7 @@ void Tfiosetview::SaveIOMap(bool InputSide)
     Grid=dynamic_cast<TStringGrid *>(FindComponent(InputSide?"InputInformationGrid":"OutputInformationGrid"));
     if(Grid==NULL)
     {
-        ShowMessage("IO map grid not found.");
+        ShowMyOKMessageNoStop("IO map grid not found.");
         return;
     }
 
@@ -1340,7 +1482,7 @@ void Tfiosetview::SaveIOMap(bool InputSide)
         ForceDirectories(DirName);
     FileName=DirName+(InputSide?AnsiString("\\InputMap.csv"):AnsiString("\\OutputMap.csv"));
     SaveIOMapGrid(Grid, FileName);
-    ShowMessage(AnsiString("Saved ")+FileName);
+    ShowMyOKMessageNoStop(AnsiString("Saved ")+FileName);
 }
 //---------------------------------------------------------------------------
 bool Tfiosetview::ResolveLegacyLedState(AnsiString AliasName, bool *State)
@@ -1615,6 +1757,101 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
     return false;
 }
 //---------------------------------------------------------------------------
+//AI(general) 20260617 : snapshot every output state before the operator can toggle
+//them in the IO view. OutValue is the last commanded output level; cylinders and
+//suckers are driven through their member switches, so read those. Suck data is
+//flattened as [(kit*ROW+r)*COL+c]*2 + (0=OnSw,1=OffSw). Mirrors HT172 BackUpOutputData.
+void Tfiosetview::BackupOutputData()
+{
+    FreeOutputBackup();
+
+    iBackSwitchCount=HSys.iTotalSwitch;
+    if(iBackSwitchCount>0)
+    {
+        bBackSwitchPortData=new bool[iBackSwitchCount];
+        for(int i=0; i<iBackSwitchCount; i++)
+            bBackSwitchPortData[i]=HSys.SwPtr[i].OutValue;
+    }
+
+    iBackCylinderCount=HSys.iTotalCylinder;
+    if(iBackCylinderCount>0)
+    {
+        bBackCylinderPortData=new bool[iBackCylinderCount];
+        for(int i=0; i<iBackCylinderCount; i++)
+            bBackCylinderPortData[i]=HSys.CynPtr[i].Switch.OutValue;
+    }
+
+    iBackSuckCount=HSys.iTotalSucker;
+    if(iBackSuckCount>0)
+    {
+        int Total=iBackSuckCount*MAX_SUCKER_ROW*MAX_SUCKER_COL*2;
+        bBackSuckPortData=new bool[Total];
+        for(int i=0; i<Total; i++)
+            bBackSuckPortData[i]=false;
+        for(int Kit=0; Kit<iBackSuckCount; Kit++)
+        {
+            TMyKitSuck *KitPtr=&HSys.SuckPtr[Kit];
+            for(int Row=0; Row<KitPtr->MaxItemR && Row<MAX_SUCKER_ROW; Row++)
+            {
+                for(int Col=0; Col<KitPtr->MaxItemC && Col<MAX_SUCKER_COL; Col++)
+                {
+                    int Base=((Kit*MAX_SUCKER_ROW+Row)*MAX_SUCKER_COL+Col)*2;
+                    bBackSuckPortData[Base+0]=KitPtr->Suck[Row][Col].OnSw.OutValue;
+                    bBackSuckPortData[Base+1]=KitPtr->Suck[Row][Col].OffSw.OutValue;
+                }
+            }
+        }
+    }
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : drive every output back to the snapshot taken on entry.
+//Cylinders/suckers are restored through their member switches (raw OnOff) so the
+//component logic is not re-triggered, matching HT172 RestoreOutputData.
+void Tfiosetview::RestoreOutputData()
+{
+    for(int i=0; i<iBackSwitchCount && i<HSys.iTotalSwitch; i++)
+        HSys.SwPtr[i].OnOff(bBackSwitchPortData[i]);
+
+    for(int i=0; i<iBackCylinderCount && i<HSys.iTotalCylinder; i++)
+        HSys.CynPtr[i].Switch.OnOff(bBackCylinderPortData[i]);
+
+    for(int Kit=0; Kit<iBackSuckCount && Kit<HSys.iTotalSucker; Kit++)
+    {
+        TMyKitSuck *KitPtr=&HSys.SuckPtr[Kit];
+        for(int Row=0; Row<KitPtr->MaxItemR && Row<MAX_SUCKER_ROW; Row++)
+        {
+            for(int Col=0; Col<KitPtr->MaxItemC && Col<MAX_SUCKER_COL; Col++)
+            {
+                int Base=((Kit*MAX_SUCKER_ROW+Row)*MAX_SUCKER_COL+Col)*2;
+                KitPtr->Suck[Row][Col].OnSw.OnOff(bBackSuckPortData[Base+0]);
+                KitPtr->Suck[Row][Col].OffSw.OnOff(bBackSuckPortData[Base+1]);
+            }
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::FreeOutputBackup()
+{
+    if(bBackSwitchPortData!=NULL)
+    {
+        delete[] bBackSwitchPortData;
+        bBackSwitchPortData=NULL;
+    }
+    if(bBackCylinderPortData!=NULL)
+    {
+        delete[] bBackCylinderPortData;
+        bBackCylinderPortData=NULL;
+    }
+    if(bBackSuckPortData!=NULL)
+    {
+        delete[] bBackSuckPortData;
+        bBackSuckPortData=NULL;
+    }
+    iBackSwitchCount=0;
+    iBackCylinderCount=0;
+    iBackSuckCount=0;
+}
+//---------------------------------------------------------------------------
 TPageControl *Tfiosetview::GetLegacyPageIO()
 {
     return dynamic_cast<TPageControl *>(FindComponent("PageIO"));
@@ -1676,6 +1913,8 @@ void __fastcall Tfiosetview::FormShow(TObject *Sender)
 {
     (void)Sender;
     EnsureIOTableEditor();
+    BackupOutputData();
+    bOutDataChange=false;
     RefreshCurrentView();
     RefreshLegacyIOMaps();
     UpdateLegacyPageTabsVisible();
@@ -1697,7 +1936,7 @@ void __fastcall Tfiosetview::BtnPanelClick(TObject *Sender)
     if(!ToggleLegacyButtonOutput(ButtonPtr))
     {
         LogManualOutputAction(ButtonPtr->Alias, "TOGGLE", "UNBOUND_OR_DISABLED");
-        ShowMessage("Output is not bound or disabled.");
+        ShowMyOKMessageNoStop("Output is not bound or disabled.");
     }
     else
     {
@@ -1705,6 +1944,7 @@ void __fastcall Tfiosetview::BtnPanelClick(TObject *Sender)
         ResolveLegacyButtonState(ButtonPtr->Alias, &State);
         SyncPadSwitchStatus(ButtonPtr->Alias, State);
         LogManualOutputAction(ButtonPtr->Alias, "TOGGLE", State?AnsiString("ON"):AnsiString("OFF"));
+        bOutDataChange=true;
     }
 
     RefreshCurrentView();
@@ -1942,7 +2182,31 @@ void __fastcall Tfiosetview::tmr_IonFanTimer(TObject *Sender)
 void __fastcall Tfiosetview::FormClose(TObject *Sender,
       TCloseAction &Action)
 {
-    fShow=false;      
+    (void)Sender;
+    (void)Action;
+    //AI 20260619 : restore-on-close decision tree, aligned with HT172
+    //(maintenance.cpp spbIoMonitorClick). If any output was toggled in this IO view :
+    //  - opened from Teach (bFromTeach) -> do NOTHING : no prompt, no restore. HT172's
+    //    Teach opens iosetview with no backup/restore; its IO tool is a free-form probe.
+    //  - else material present (HasICUnderMachine()) -> FORCE restore, no choice
+    //    (safety : never leave outputs disturbed with product in the machine).
+    //  - else (machine empty) -> ASK the operator whether to restore.
+    if(bOutDataChange && bFromTeach==false)
+    {
+        if(HasICUnderMachine())
+        {
+            ShowMyMessage("IO already change, will restore IO!!");
+            RestoreOutputData();
+        }
+        else if(ShowMyMessageBox_YES_NO("IO already change, want to restore?")==TMyMessageBox::msgrtnYES)
+        {
+            RestoreOutputData();
+        }
+    }
+    bOutDataChange=false;
+    bFromTeach=false;
+    FreeOutputBackup();
+    fShow=false;
 }
 //---------------------------------------------------------------------------
 

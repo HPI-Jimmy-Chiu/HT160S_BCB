@@ -79,9 +79,74 @@ void ProcessAlarm()
 	HSys.mapAlarmContext.clear();
 }
 //---------------------------------------------------------------------------
+#ifdef SOFT_SIMULATE
+//AI(HT160S-Maintainer) 20260619 : --selftest-home headless self-test state (sim only).
+bool g_SelfTestHome=false;
+int  g_SelfTestExitCode=1;   // default 1 = did not complete; phase-2 sets 0(pass)/2(timeout)
+#endif
+//---------------------------------------------------------------------------
 void MainProc()
 {
 	static bool bProgramStart=false;
+
+	//AI(HT160S-Maintainer) 20260616 : match HT172 MainProc - while the IO Set View
+	//(manual IO test) is open, suspend the whole machine spin so DoSystem()/
+	//DoSystemMessage() do not re-drive outputs (tower lamp SwTowerRed/Yellow/Green,
+	//etc.) and override a manual IO test. Spin resumes when the view closes.
+	if(fiosetview!=NULL && fiosetview->Visible)
+	{
+		UpdateRunControlFlag();
+		return;
+	}
+
+#ifdef SOFT_SIMULATE
+	//AI(HT160S-Maintainer) 20260619 : --selftest-home headless self-test (sim only).
+	//Launched with --selftest-home, auto-trigger ONE full-machine home via the normal
+	//operator path (Run_Home + SystemStart + ArmMotorHome) so ProcessMotion homes it
+	//with IDENTICAL cases, then terminate with an exit code. Drives the offline
+	//build->run->judge workflow without a GUI click. Inert unless g_SelfTestHome.
+	if(g_SelfTestHome)
+	{
+		static int s_stPhase=0;
+		static DWORD s_stT0=0;
+		if(s_stPhase==0)
+		{
+			s_stT0=GetTickCount();
+			s_stPhase=1;
+		}
+		else if(s_stPhase==1)
+		{
+			//Wait for program start, then let it settle one beat before triggering.
+			if(bProgramStart && (int)(GetTickCount()-s_stT0)>=1500)
+			{
+				ChangeRunMode(Run_Home);
+				HSys.Sys.SystemStart=true;
+				ArmMotorHome();
+				s_stT0=GetTickCount();
+				s_stPhase=2;
+			}
+		}
+		else if(s_stPhase==2)
+		{
+			//Home done (fAllMotorHome) -> pass; else bounded timeout -> fail.
+			if(fAllMotorHome || (int)(GetTickCount()-s_stT0)>=30000)
+			{
+				g_SelfTestExitCode = fAllMotorHome ? 0 : 2;
+				s_stPhase=3;
+				if(Application!=NULL)
+					Application->Terminate();
+			}
+		}
+	}
+#endif
+
+	//AI(HT160S-Maintainer) 20260617 : consume the physical operator-panel keys
+	//(Start/Home/Pause/One Cycle/Clean Out) before ProcessStartMode so a key press
+	//takes effect this same cycle. Suspended with the rest of the spin while the IO
+	//Set View is open (early return above). fMain owns the dispatch because it calls
+	//the screen button handlers.
+	if(fMain!=NULL)
+		fMain->ScanPanelKeys();
 
 	ProcessStartMode();
 	DoSystem();
@@ -93,17 +158,14 @@ void MainProc()
 	if(fMain!=NULL)
 		fMain->ShowMotorInfo();
 
+	if(fMain!=NULL)
+		fMain->ShowUnloadAutoInfo();   //AI(ht160s-motion-view) 20260618 : Unload Auto1~6 Bin/Lot/ID/Cnt
+
 	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive any in-flight Lot WebAPI pull.
 	// MainProc runs on the VCL main thread (TRunControl::Synchronize), so this is a
 	// safe place to consume the async response and reproject the Lot list. No-op when idle.
 	if(fMain!=NULL)
 		fMain->PollLotDataWebApi();
-
-	if(fiosetview!=NULL && fiosetview->Visible)
-	{
-		UpdateRunControlFlag();
-		return;
-	}
 
 	if(bProgramStart==false)
 		bProgramStart=DoInitialProgramStart();
@@ -298,9 +360,47 @@ void ScanAllMotorStatus()
 		   HSys.MotPtr[i]->Led[iAlarmLed] && HSys.MotPtr[i]->GetEnable() &&
 		   HSys.MotPtr[i]->ReadServoAlarmOn())
 		{
+			//AI 20260619 : HT172-style limit guard (HT172 csystem.cpp ScanAllMotorStatus
+			//Led[iCwLed]||Led[iCcwLed] -> return). During a full-machine HOME an axis
+			//routinely sits on a CW/CCW limit; the limit FORCES Led[iAlarmLed] (and the
+			//A6 amp raises an OT alarm) -- EXPECTED here, NOT a fatal servo fault. Without
+			//this guard HOME randomly drops SystemStart whenever an axis touches a limit,
+			//closing the HOME monitor while motors are still moving. Skip (do not kill)
+			//when on a limit; a real off-limit servo alarm still stops the machine.
+			if(HSys.MotPtr[i]->Led[iCwLed] || HSys.MotPtr[i]->Led[iCcwLed])
+				continue;
+			//AI 20260619 : NEVER drop SystemStart silently on a real (off-limit) servo
+			//alarm -- avoiding a silent stop is an iron rule. Aligned with HT172 csystem.cpp
+			//ScanAllMotorStatus: if the machine was running, raise the motor-error Note via
+			//ShowMotorError (modal; it also DecStopAllMotor + SystemStart=false +
+			//ChangeRunMode(Run_Home)); if already stopped, just clear the home flag (and tell
+			//the operator once if it had been homed). Gating the popup on SystemStart stops it
+			//re-firing every scan cycle (the servo alarm latches until power-cycle / re-home).
+			//ShowModal would hang the headless --selftest-home (no UI pump), so the operator
+			//notifications are compiled out under SOFT_SIMULATE; sim drivers never alarm.
+			bool bWasHomed=fAllMotorHome;
 			HSys.MotPtr[i]->bHomeFlag=false;
 			fAllMotorHome=false;
-			HSys.Sys.SystemStart=false;
+			if(HSys.Sys.SystemStart)
+			{
+#ifndef SOFT_SIMULATE
+				int iRef=HSys.MotPtr[i]->GetErrorIndex();
+				if(iRef==9)
+					iRef=6;
+				AnsiString S=AnsiString().sprintf("%d%03d%1d",(int)eMotorAlarm,i,iRef);
+				ShowMotorError(S,"ScanAllMotorStatus");
+#endif
+				HSys.Sys.SystemStart=false;
+			}
+#ifndef SOFT_SIMULATE
+			else if(bWasHomed)
+			{
+				ShowMyMessage(AnsiString().sprintf("Motor %s home flag reset (servo alarm).",
+				              HSys.MotPtr[i]->NumberAlias.c_str()));
+			}
+#else
+			(void)bWasHomed;
+#endif
 		}
 	}
 }
@@ -317,33 +417,66 @@ void CheckMotorPowerShutDown()
 	if(bHomePowerCycling)
 		return;
 
+	//AI(HT160S-Maintainer) 20260616 : the panel Power On/Off buttons arrive over
+	//the RS232 Pad link. Before the panel has exchanged a valid frame those
+	//sensors hold stale defaults and must not drive the relay. Until the Pad has
+	//talked, auto-energize the motor relay (per request, no interlock) so power
+	//is up at software start; once bPadEverCommunicated is set we fall through to
+	//the normal panel-button logic below.
+	if(bPadEverCommunicated==false)
+	{
+		if(bMotorPowerState==false)
+		{
+			HSys.Sw.SwMotorRelay.On();
+			MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
+			bMotorPowerState=true;
+			bLampPowerOn=true;
+			bLampPowerOff=false;
+		}
+		return;
+	}
+
+	//AI(HT160S-Maintainer) 20260617 : the panel Power On/Off keys are Pad keys with
+	//no IO-card mapping, so TMySensor::Enable is false (Enable=IsValidIOData). The
+	//old if(.Enable) guards therefore skipped IsOn() entirely - the Pad scan buffer
+	//was never read and Power Off never cut the relay. Read unconditionally like
+	//HT172 csystem.cpp: IsOn() returns the live Pad-key state for a Pad key and a
+	//safe false for any unmapped non-Pad sensor (Input==NULL). bKeyPowerOffPressed
+	//(HT172) arms Power Off only after the relay is actually on, so a stale Pad
+	//default in the first cycle cannot trip it.
+	static bool bKeyPowerOffPressed=false;
 	bool bOn=false;
 	bool bOff=false;
 
-	if(HSys.Sen.SnFKPowerOn.Enable)
-		bOn|=HSys.Sen.SnFKPowerOn.IsOn();
-	if(HSys.Sen.SnRKPowerOn.Enable)
-		bOn|=HSys.Sen.SnRKPowerOn.IsOn();
-	if(HSys.Sen.SnFKPowerOff.Enable)
-		bOff|=HSys.Sen.SnFKPowerOff.IsOn();
-	if(HSys.Sen.SnRKPowerOff.Enable)
-		bOff|=HSys.Sen.SnRKPowerOff.IsOn();
+	bOn|=HSys.Sen.SnFKPowerOn.IsOn();
+	bOn|=HSys.Sen.SnRKPowerOn.IsOn();
+	bOff|=HSys.Sen.SnFKPowerOff.IsOn();
+	bOff|=HSys.Sen.SnRKPowerOff.IsOn();
 
 	if(bOff && bOn==false)
 	{
-		HSys.DecStopAllMotor();
-		AllBreakLock();
-		HSys.Sw.SwMotorRelay.Off();
-		bMotorPowerState=false;
-		HSys.Sys.SystemStart=false;
-		fAllMotorHome=false;
+		if(bKeyPowerOffPressed)
+		{
+			HSys.DecStopAllMotor();
+			AllBreakLock();
+			HSys.Sw.SwMotorRelay.Off();
+			bMotorPowerState=false;
+			HSys.Sys.SystemStart=false;
+			fAllMotorHome=false;
+			bLampPowerOn=false;
+			bLampPowerOff=true;
+		}
 	}
 	else if(bMotorPowerState==false && bOn)
 	{
 		HSys.Sw.SwMotorRelay.On();
 		MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
 		bMotorPowerState=true;
+		bLampPowerOn=true;
+		bLampPowerOff=false;
 	}
+
+	bKeyPowerOffPressed=bMotorPowerState;
 #endif
 }
 //---------------------------------------------------------------------------
@@ -359,6 +492,15 @@ void ScanSystemSenser()
 		{
 			HSys.StopAllMotor();
 			AllBreakLock();
+			//AI 20260619 : do not stop silently -- align with HT172 csystem.cpp
+			//ScanSystemSenser, which raises ShowSystemError before dropping SystemStart.
+			//Guarded by SystemStart so a held EMG does not re-pop the Note every scan cycle
+			//(SystemStart is already false on the next pass).
+			if(HSys.Sys.SystemStart)
+			{
+				RecordProcess("MACHINE STOP by emergency-stop");
+				ShowSystemError(AnsiString("Emergency Stop"), K_RETRY);
+			}
 			HSys.Sys.SystemStart=false;
 			fAllMotorHome=false;
 			MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
@@ -367,6 +509,11 @@ void ScanSystemSenser()
 		{
 			HSys.StopAllMotor();
 			AllBreakLock();
+			if(HSys.Sys.SystemStart)
+			{
+				RecordProcess("MACHINE STOP by system-power-off");
+				ShowSystemError(AnsiString("Motor Power Off"), K_RETRY);
+			}
 			HSys.Sys.SystemStart=false;
 			fAllMotorHome=false;
 			MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
@@ -377,30 +524,74 @@ void ScanSystemSenser()
 	{
 		if(SafeDoor>0)
 		{
+			//AI 20260619 : align with HT172 ScanSystemSenser -- notify before stopping
+			//(iron rule: never stop the running machine silently).
 			HSys.StopAllMotor();
+			RecordProcess("MACHINE STOP by safety-door");
+			ShowSystemError(AnsiString("Safety Door Open"), K_RETRY);
 			HSys.Sys.SystemStart=false;
 		}
 		else if(Emg>0)
 		{
 			HSys.StopAllMotor();
 			AllBreakLock();
+			RecordProcess("MACHINE STOP by emergency-stop");
+			ShowSystemError(AnsiString("Emergency Stop"), K_RETRY);
 			HSys.Sys.SystemStart=false;
 			fAllMotorHome=false;
 		}
 		else if(IonFan>0)
 		{
 			HSys.DecStopAllMotor();
+			RecordProcess("MACHINE PAUSE by ion-fan-alarm");
+			ShowSystemError(AnsiString("Ion Fan Alarm"), K_RETRY);
 			HSys.Sys.SystemStart=false;
 		}
 		else if(IsAirCheck())
 		{
 			HSys.DecStopAllMotor();
+			RecordProcess("MACHINE PAUSE by air-pressure-low");
+			ShowSystemError(AnsiString("Air Pressure Low"), K_RETRY);
 			HSys.Sys.SystemStart=false;
 		}
 		else if(MotorPowerOnDelay>0)
 		{
 			HSys.Sys.SystemStart=false;
 		}
+	}
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260617 : front-panel version of HT172 DoPanelLamp().
+//Pushes machine run-state (bLamp* flags) onto the front operator-panel button
+//LEDs over the Pad RS232 link (SwFK* -> fPadInterface). Runs only once the
+//motor power is up and the power-on delay has elapsed, matching HT172
+//ckernel.cpp. Rear (SwRK*) lamps are omitted: this machine is front-panel only.
+static void DoPanelLamp()
+{
+	if(bMotorPowerState && MotorPowerOnDelay==0)
+	{
+		HSys.Sw.SwFKPause.OnOff(bLampPause);
+		HSys.Sw.SwFKStart.OnOff(bLampStart);
+		HSys.Sw.SwFKRetry.OnOff(bLampRetry);
+		HSys.Sw.SwFKSkip.OnOff(bLampSkip);
+		HSys.Sw.SwFKTrayEnd.OnOff(bLampTrayEnd);
+		HSys.Sw.SwFKTrayFeed.OnOff(bLampTrayFeed);
+		HSys.Sw.SwFKCleanOut.OnOff(bLampCleanOut);
+		HSys.Sw.SwFKOneCycle.OnOff(bLampOneCycle);
+		HSys.Sw.SwFKPowerOn.OnOff(bLampPowerOn);
+		HSys.Sw.SwFKPowerOff.OnOff(bLampPowerOff);
+	}
+	else
+	{
+		HSys.Sw.SwFKPause.Off();
+		HSys.Sw.SwFKStart.Off();
+		HSys.Sw.SwFKRetry.Off();
+		HSys.Sw.SwFKSkip.Off();
+		HSys.Sw.SwFKTrayEnd.Off();
+		HSys.Sw.SwFKTrayFeed.Off();
+		HSys.Sw.SwFKCleanOut.Off();
+		HSys.Sw.SwFKOneCycle.Off();
 	}
 }
 //---------------------------------------------------------------------------
@@ -431,6 +622,21 @@ void DoSystemMessage()
 	HSys.Sw.SwTowerGreen.OnOff(GreenOn);
 	HSys.Sw.SwTowerYellow.OnOff(YellowOn);
 	HSys.Sw.SwTowerRed.OnOff(RedOn);
+
+	//AI(ht160s-maintainer) 20260617 : derive Start/Pause panel-lamp state from the
+	//run flag (mirrors HT172 ShowRunLed), then push all panel lamps. HT160 has no
+	//ShowRunLed, so this lives here, the sole per-scan system-message hook.
+	if(HSys.Sys.SystemStart)
+	{
+		bLampStart=true;
+		bLampPause=false;
+	}
+	else
+	{
+		bLampStart=false;
+		bLampPause=true;
+	}
+	DoPanelLamp();
 }
 //---------------------------------------------------------------------------
 void DoSystem()
@@ -471,6 +677,9 @@ void ProcessStartMode()
 	{
 		SoftStart=false;
 		SoftStop=false;
+		bLampSkip=false;
+		bLampRetry=false;
+		bLampTrayEnd=false;
 		SetMotorSpeed();                                                        //AI(HT160S-Maintainer) 20260602 : apply working speed once per START, before SystemStart guard (HT172 0420 csystem.cpp port). Must precede SystemStart=true.
 		HSys.Sys.SystemStart=true;
 	}
@@ -503,21 +712,27 @@ void ProcessRunStatus(bool bProgramStart)
         {
             Status="Clean Out";
 			Color=clYellow;
+            bLampCleanOut=true;
         }
         else if(HSys.Sys.RunMode==Run_TrayFeed)
         {
             Status="Tray Feed";
 			Color=clYellow;
+            bLampTrayFeed=true;
         }
         else if(HSys.Sys.RunMode==Run_OneCycle)
         {
             Status="One Cycle";
 			Color=clYellow;
+            bLampOneCycle=true;
         }
 		else
 		{
 			Status="RUNNING";
 			Color=clGreen;
+			bLampCleanOut=false;
+			bLampOneCycle=false;
+			bLampTrayFeed=false;
 		}
 	}
 	else if(IsSafeLock())
@@ -624,6 +839,92 @@ void ArmMotorHome()
 	fAllMotorHome=false;
 }
 //---------------------------------------------------------------------------
+//AI 20260619 : machine run-state command layer. Modelled on HT172 TfMain::
+//Start()/sbPauseClick() (each owns ONE transition + RecordProcess). Migration is
+//incremental: the HOME-abort path is wired (uHome timer); Pause/Stop are ready for
+//the next slice; the operator Start button (LotID/SECS/RunCheck) is deferred.
+const char* MachineTriggerName(eMachineTrigger trig)
+{
+	switch(trig)
+	{
+		case trigOperator:   return "operator";
+		case trigSafetyDoor: return "safety-door";
+		case trigEmg:        return "emergency-stop";
+		case trigServoAlarm: return "servo-alarm";
+		case trigHomeStop:   return "home-stop";
+		case trigSecsRemote: return "secs-remote";
+		default:             return "system";
+	}
+}
+//---------------------------------------------------------------------------
+//Graceful pause : decelerate-stop, leave the machine paused (home state kept).
+void MachinePause(eMachineTrigger trig)
+{
+	if(HSys.Sys.SystemStart==false)
+		return;
+	RecordProcess(AnsiString("MACHINE PAUSE by ")+MachineTriggerName(trig));
+	HSys.Sys.SystemStart=false;
+	HSys.DecStopAllMotor();
+	SoftStop=true;
+}
+//---------------------------------------------------------------------------
+//Hard stop : immediate stop (EMG / fault); same state effect, no decel.
+void MachineStop(eMachineTrigger trig)
+{
+	if(HSys.Sys.SystemStart)
+		RecordProcess(AnsiString("MACHINE STOP by ")+MachineTriggerName(trig));
+	HSys.Sys.SystemStart=false;
+	HSys.StopAllMotor();
+	SoftStop=true;
+}
+//---------------------------------------------------------------------------
+//HOME abort/stop : stop motors + clear the home-done flag so a fresh full-machine
+//home is required before running. Port of the HT172 ProcessMotorHome SystemStart==
+//false guard (DecStopAllMotor then close). The View (TfHome) still owns Close().
+void MachineHomeAbort(eMachineTrigger trig)
+{
+	RecordProcess(AnsiString("MACHINE HOME-ABORT by ")+MachineTriggerName(trig));
+	HSys.DecStopAllMotor();
+	HSys.Sys.SystemStart=false;
+	fAllMotorHome=false;
+	SoftStop=true;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260619 : HOME monitor lifecycle owner. Ported from HT172,
+//where ProcessMotorHome's own SystemStart==false top guard tears the monitor down.
+//HT160 cannot do that inside the engine because ProcessMotion early-returns on
+//SystemStart==false BEFORE it steps the engine, so the close/abort DECISION lives
+//here and is called from the TOP of ProcessMotion, ahead of that early-return. This
+//makes TfHome::Timer1Timer display-only. No-op unless the monitor is shown, so the
+//headless --selftest-home path (fHome never Show()n) is unaffected. Both this and
+//Timer1Timer run on the VCL main thread, so shared flags are touched cooperatively.
+static void ProcessHomeLifecycle()
+{
+	if(fHome==NULL || fHome->IsShown()==false)
+		return;
+
+	//ORDER IS LOAD-BEARING : check normal completion BEFORE the SystemStart-drop
+	//abort. On a HOME-button home the post-home SoftStop drives SystemStart=false,
+	//and the held-tray prompt (case200 ShowMyMessage) also leaves SystemStart=false;
+	//checking completion first lets such a home CLOSE-as-finished instead of being
+	//mis-aborted. Do NOT swap these two blocks.
+	if(fAllMotorHome)
+	{
+		fHome->RequestCloseFinished();
+		return;
+	}
+
+	//SystemStart dropped / paused while the monitor is up. Only after a start was
+	//actually observed (SeenStart) and NOT during a deliberate power-cycle
+	//(bHomePowerCycling drops SystemStart on purpose). Route the machine side through
+	//the single command layer, then ask the View to close.
+	if(fHome->SeenStart() && HSys.Sys.SystemStart==false && bHomePowerCycling==false)
+	{
+		MachineHomeAbort(trigHomeStop);
+		fHome->RequestClose();
+	}
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260602 : ported HT172 0420 ProcessMotion lifecycle in
 //HT160S procedural style (no FSM). Layers: UPH pause accounting -> home not done
 //-> home-just-finished finalize -> SortArm single Z-home -> normal production
@@ -642,6 +943,13 @@ void ProcessMotion()
 		}
 	}
 	bPrevSystemStart=HSys.Sys.SystemStart;
+
+	//AI(HT160S-Maintainer) 20260619 : drive the HOME monitor lifecycle (close on
+	//completion, abort+close on SystemStart-drop) BEFORE the SystemStart gate below,
+	//so the monitor can tear down even when SystemStart has already gone false. HT172
+	//does this inside the engine's top guard; HT160 cannot (the engine is not stepped
+	//once SystemStart==false), so the owner lives here.
+	ProcessHomeLifecycle();
 
 	if(HSys.Sys.SystemStart==false)
 		return;
@@ -856,5 +1164,48 @@ int GetCalculateUPH(TDateTime tEndTime)
 //---------------------------------------------------------------------------
 void RecordSafeDoorStates()
 {
+	//AI(ht160s-maintainer) 20260619 : log idle-state safety-door open events
+	//(rising edge) while the machine is stopped, using HT160's six named door
+	//sensors. Running-state stop-on-door-open is already logged in
+	//ScanSystemSenser; this adds idle/maintenance door-open audit records.
+	static bool bClear=false;
+	static bool bDoorOpen[6]={false,false,false,false,false,false};
+
+	TMySensor *pDoor[6];
+	pDoor[0]=&HSys.Sen.SnSafeDoorFront;
+	pDoor[1]=&HSys.Sen.SnSafeDoorRight;
+	pDoor[2]=&HSys.Sen.SnSafeDoorLeft;
+	pDoor[3]=&HSys.Sen.SnSafeSlideDoorRight;
+	pDoor[4]=&HSys.Sen.SnSafeSlideDoorLeft;
+	pDoor[5]=&HSys.Sen.SnSafeAuto6;
+
+	const char *pName[6];
+	pName[0]="Safe Door Front is Opened";
+	pName[1]="Safe Door Right is Opened";
+	pName[2]="Safe Door Left is Opened";
+	pName[3]="Safe Slide Door Right is Opened";
+	pName[4]="Safe Slide Door Left is Opened";
+	pName[5]="Safe Door Auto6 is Opened";
+
+	if(HSys.Sys.SystemStart)
+	{
+		if(bClear==false)
+		{
+			for(int i=0; i<6; i++)
+				bDoorOpen[i]=false;
+			bClear=true;
+		}
+		return;
+	}
+	bClear=false;
+
+	for(int i=0; i<6; i++)
+	{
+		if(pDoor[i]->Enable && pDoor[i]->IsOff() && bDoorOpen[i]==false)
+		{
+			RecordProcess(pName[i]);
+			bDoorOpen[i]=true;
+		}
+	}
 }
 //---------------------------------------------------------------------------

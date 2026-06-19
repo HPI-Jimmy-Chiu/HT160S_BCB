@@ -112,6 +112,21 @@ private:
     int iSelectRow;
     int iSelectCol;
 
+    //AI(general) 20260617 : output state backup/restore on IO view exit (HT172 ref).
+    //BackupOutputData snapshots every switch/cylinder/sucker output on FormShow;
+    //RestoreOutputData writes them back if the operator toggled anything (bOutDataChange)
+    //and confirms restore on FormClose. Mirrors HT172 BackUpOutputData/RestoreOutputData.
+    bool bOutDataChange;
+    bool *bBackSwitchPortData;
+    bool *bBackCylinderPortData;
+    bool *bBackSuckPortData;
+    int iBackSwitchCount;
+    int iBackCylinderCount;
+    int iBackSuckCount;
+    void BackupOutputData();
+    void RestoreOutputData();
+    void FreeOutputBackup();
+
     void RefreshCurrentView();
     void RefreshMN200();
     void RefreshLegacyIOControls();
@@ -170,10 +185,16 @@ private:
     void SetGridRowCount(TStringGrid *Grid, int RowCount);
     bool ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr);
     void SetRefreshTimerEnabled(bool Enabled);
+    TBtnPanel *palSuckAll;
+    TBtnPanel *palDestroyAll;
+    TBtnPanel *palAllOff;
+    void CreateSuckerGroupButtons();
+    void __fastcall SuckGroupAllClick(TObject *Sender);
 public:
     __fastcall Tfiosetview(TComponent* Owner);
     __fastcall ~Tfiosetview();
     bool fShow;
+    bool bFromTeach;   // true = opened from Teach -> FormClose skips restore prompt/force (HT172 Teach behavior)
 };
 //---------------------------------------------------------------------------
 extern PACKAGE Tfiosetview *fiosetview;

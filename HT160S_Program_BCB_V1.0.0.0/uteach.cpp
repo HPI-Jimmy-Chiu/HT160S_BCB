@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #pragma hdrstop
+#include "mymessbox.h"
 
 #include <IniFiles.hpp>
 #include <SysUtils.hpp>
@@ -10,6 +11,12 @@
 #include "uteach.h"
 #include "iosetview.h"
 #include "csystem.h"
+#include "cStepTrace.h"   //AI(general) 20260617 : MotorTaskLog home/limit diagnosis trace
+#include "aSortArm.h"
+#include "aEmpty.h"
+#include "aColor.h"
+#include "aLoader.h"
+#include "aAuto1To6.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -38,6 +45,23 @@ __fastcall TfTeach::TfTeach(TComponent* Owner)
     iHomeMotorIndex=-1;
     SelectedTeachIndex=-1;
     TECH_MAX_ITEM=0;
+
+    bSaTestRunning=false;
+    iSaTask=0;
+    iSaSlot=-1;
+    iSaTarget=-1;
+    iSaCol=0;
+    iSaRow=0;
+    bSaZDown=true;
+
+    bCarTestRunning=false;
+    iCarArea=0;
+    iCarPhase=0;
+    bCarLoop=false;
+    iCarLoopTarget=1;
+    iCarLoopDone=0;
+    bAutoTestRunning=false;
+    iAutoIndex=0;
 
     // UI is fully defined in uteach.dfm; VCL auto-binds the __published members on
     // form streaming. Only the lblStatus[]/ledStatus[] arrays are non-published and
@@ -71,6 +95,8 @@ void __fastcall TfTeach::FormShow(TObject *Sender)
         SelectTeachItem(0);
     if(tmrUpdate!=NULL)
         tmrUpdate->Enabled=true;
+    MotorTaskLogSetActive(true);   // one-shot home/limit capture while this screen is open
+    MotorTaskLog("Teach", "", "SCREEN_OPEN", "Teach shown");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfTeach::FormClose(TObject *Sender, TCloseAction &Action)
@@ -80,6 +106,10 @@ void __fastcall TfTeach::FormClose(TObject *Sender, TCloseAction &Action)
     if(tmrUpdate!=NULL)
         tmrUpdate->Enabled=false;
     StopActiveMotor();
+    StopSortArmTest();
+    StopCarTest();
+    MotorTaskLog("Teach", "", "SCREEN_CLOSE", "Teach closed");
+    MotorTaskLogSetActive(false);
 }
 //---------------------------------------------------------------------------
 void TfTeach::BuildUI()
@@ -97,6 +127,9 @@ void TfTeach::BuildUI()
     ConfigureTeachGrid(grdAuto);
     ConfigureTeachGrid(grdSortZ);
     ConfigureTeachGrid(grdOthers);
+
+    PopulateAdvancedCombos();
+    PopulateChannelCombos();
 
     bUIBuilt=true;
 }
@@ -741,7 +774,7 @@ bool TfTeach::CheckSortArmZHome()
     return true;
 }
 //---------------------------------------------------------------------------
-bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target)
+bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target, bool bAllowLimitAlarm)
 {
     int Emg;
 
@@ -752,7 +785,7 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
     }
     if(HSys.Sys.SystemStart)
     {
-        MessageDlg("Machine is running.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("Machine is running.");
         SetMessage("Move abort: system start");
         return false;
     }
@@ -760,7 +793,7 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
     Emg=IsEMGPressed();
     if(Emg>0)
     {
-        MessageDlg("EMG is pressed.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("EMG is pressed.");
         SetMessage("Move abort: EMG");
         return false;
     }
@@ -768,31 +801,39 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
     Motor->ScanMotorStatus();
     if(Motor->GetEnable()==false)
     {
-        MessageDlg("Motor is disabled.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("Motor is disabled.");
         SetMessage("Move abort: motor disable");
         return false;
     }
-    if(Motor->Led[iAlarmLed] || Motor->Led[iServoalarmLed] || Motor->Led[iEmgLed])
+    // A CW/CCW over-travel latches the generic ALARM led but is recoverable (home /
+    // jog-away clears it). When bAllowLimitAlarm, permit start if the ONLY fault is a
+    // limit; a real servo alarm or EMG still blocks. The SortArm-Z / soft-limit guards
+    // below still apply, so the cylinder/nozzle interlock is not relaxed.
+    bool bLimitOnlyAlarm = Motor->Led[iAlarmLed] &&
+                           (Motor->Led[iCwLed] || Motor->Led[iCcwLed]) &&
+                           !Motor->Led[iServoalarmLed] && !Motor->Led[iEmgLed];
+    if(Motor->Led[iServoalarmLed] || Motor->Led[iEmgLed] ||
+       (Motor->Led[iAlarmLed] && !(bAllowLimitAlarm && bLimitOnlyAlarm)))
     {
-        MessageDlg("Motor alarm is active.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("Motor alarm is active.");
         SetMessage("Move abort: motor alarm");
         return false;
     }
     if(bRequireHome && Motor->bHomeFlag==false)
     {
-        MessageDlg("Motor is not home.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("Motor is not home.");
         SetMessage("Move abort: motor not home");
         return false;
     }
     if(HSys.Mot.MSortingArmX!=NULL && Motor->Tag==HSys.Mot.MSortingArmX->Tag && CheckSortArmZHome()==false)
     {
-        MessageDlg("Sort arm Z must be home before X move.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("Sort arm Z must be home before X move.");
         SetMessage("Move abort: Sort Z not home");
         return false;
     }
     if(bUseTarget && Motor->CheckSoftLimit(Target)==false)
     {
-        MessageDlg("Target over soft limit.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+        ShowMyOKMessageNoStop("Target over soft limit.");
         SetMessage("Move abort: soft limit");
         return false;
     }
@@ -806,10 +847,31 @@ void TfTeach::StartJog(bool bPositive)
     if(Motor==NULL)
         return;
     // Jog is a manual move and must work BEFORE homing (e.g. to reach the home
-    // sensor), so it does NOT require bHomeFlag. Alarm/EMG/disable/soft-limit
-    // checks inside CheckCanTeachMove still apply. Move/Step keep bRequireHome=true.
-    if(CheckCanTeachMove(Motor, false, false, 0)==false)
+    // sensor), so it does NOT require bHomeFlag. A CW/CCW limit-only alarm must not
+    // block jogging AWAY (bAllowLimitAlarm=true); servo alarm/EMG/disable/SortArm-Z/
+    // soft-limit checks inside CheckCanTeachMove still apply. Move/Step keep
+    // bRequireHome=true and bAllowLimitAlarm=false.
+    if(CheckCanTeachMove(Motor, false, false, 0, true)==false)
         return;
+    // Block jogging FURTHER into a lit limit; only the away direction is allowed. AI(general)
+    // 20260618 : limit switches are wired by SPATIAL convention, uniform across axes
+    // (Jog+ -end = CW limit/iCwLed, Jog- -end = CCW limit/iCcwLed), Direction-INDEPENDENT --
+    // so a lit iCwLed blocks Jog+, a lit iCcwLed blocks Jog-. (A Direction-aware variant was
+    // tried and reverted; it flipped this on Direction=1 axes. See uMotorTest::StartJog +
+    // myMC88X1motor JogP/JogN for the MCD451 per-pulse-direction limit caveat.)
+    Motor->ScanMotorStatus();
+    if(bPositive && Motor->Led[iCwLed])
+    {
+        ShowMyOKMessageNoStop("CW (+) limit is triggered. Jog + is blocked; use Jog - to move away.");
+        SetMessage("Jog+ abort: CW limit");
+        return;
+    }
+    if(!bPositive && Motor->Led[iCcwLed])
+    {
+        ShowMyOKMessageNoStop("CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away.");
+        SetMessage("Jog- abort: CCW limit");
+        return;
+    }
     Speed=GetEditInt(edSpeed, Motor->GetJogLowSpeed());
     Motor->SetSpeed(Speed);
     if(bPositive)
@@ -919,6 +981,8 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
         {
             bEmgActive=true;
             StopActiveMotor();
+            StopSortArmTest();
+            StopCarTest();
             SetMessage("Move abort: EMG");
         }
         UpdateMotorMonitor();
@@ -931,15 +995,23 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
         Motor=HSys.MotPtr[iHomeMotorIndex];
         if(Motor!=NULL && Motor->Home(Err))
         {
+            //AI 20260619 : show home travel/steps on completion (HT172 Teach
+            //edHomeDistance port: -(int)(GearRatio * LastHomePos)). HT160's Teach
+            //panel has no dedicated home-distance field, so it is shown on the same
+            //message line as "Move to ...".
+            int iHomeSteps=-(int)(Motor->GetGearRatio()*Motor->GetLastHomePos());
             bHomeRunning=false;
             iHomeMotorIndex=-1;
-            SetMessage("Home finish");
+            SetMessage(AnsiString("Home finish, steps=")+IntToStr(iHomeSteps));
         }
         else if(Err!=AnsiString(""))
         {
             SetMessage(Err);
         }
     }
+    RunSortArmTest();
+    RunCarTest();
+    RunAutoTest();
     UpdateMotorMonitor();
 }
 //---------------------------------------------------------------------------
@@ -989,8 +1061,8 @@ void __fastcall TfTeach::btnSaveClick(TObject *Sender)
 {
     int Ret;
     (void)Sender;
-    Ret=MessageDlg("Sure to Save ?", mtConfirmation, TMsgDlgButtons() << mbYes << mbNo, 0);
-    if(Ret==mrYes)
+    Ret=ShowMyMessageBox_YES_NO("Sure to Save ?");
+    if(Ret==TMyMessageBox::msgrtnYES)
         SaveWorkFile(GetTeachFileName());
 }
 //---------------------------------------------------------------------------
@@ -1005,6 +1077,9 @@ void __fastcall TfTeach::btnIOFormClick(TObject *Sender)
     (void)Sender;
     if(fiosetview==NULL)
         fiosetview=new Tfiosetview(this);
+    //AI 20260619 : Teach IO tool -> suppress iosetview restore prompt/force on close
+    //(align HT172, whose Teach opens iosetview with no restore handling).
+    fiosetview->bFromTeach=true;
     fiosetview->Show();
     fiosetview->BringToFront();
 }
@@ -1063,11 +1138,14 @@ void __fastcall TfTeach::btnHomeClick(TObject *Sender)
     (void)Sender;
     if(Motor==NULL)
         return;
-    if(CheckCanTeachMove(Motor, false, false, 0)==false)
+    // bAllowLimitAlarm=true: HOME is the recovery path off a CW/CCW limit, so a
+    // limit-only alarm must not block it (the home sequence clears the limit itself).
+    if(CheckCanTeachMove(Motor, false, false, 0, true)==false)
         return;
     Motor->InitHomeTask_forSingleAxis();
     bHomeRunning=true;
     iHomeMotorIndex=ActiveMotorIndex;
+    MotorTaskLog("Teach", Motor->Alias, "HOME_BTN", "operator pressed HOME");
     SetMessage("Home start");
 }
 //---------------------------------------------------------------------------
@@ -1075,6 +1153,8 @@ void __fastcall TfTeach::btnStopClick(TObject *Sender)
 {
     (void)Sender;
     StopActiveMotor();
+    StopSortArmTest();
+    StopCarTest();
     SetMessage("Stop");
 }
 //---------------------------------------------------------------------------
@@ -1084,5 +1164,404 @@ void __fastcall TfTeach::btnRefreshClick(TObject *Sender)
     FillMotorList();
     RefreshTeachGrids();
     UpdateMotorMonitor();
+}
+//---------------------------------------------------------------------------
+// Advanced page : SortArm single-nozzle point test. Mirrors the HT172 GoBtn
+// pattern (read the UI selection, gate, then drive the motion) but the motion is
+// the non-FSM, task-stepped TSortArmModule::MoveSuckerToCell sequence driven from
+// tmrUpdate (same way bHomeRunning drives Home above).
+void TfTeach::PopulateAdvancedCombos()
+{
+    if(cbSuckUse!=NULL && cbSuckUse->Items->Count>0 && cbSuckUse->ItemIndex<0)
+        cbSuckUse->ItemIndex=0;
+    if(cbToArea!=NULL && cbToArea->Items->Count>0 && cbToArea->ItemIndex<0)
+        cbToArea->ItemIndex=0;
+}
+//---------------------------------------------------------------------------
+// cbToArea index 0=Loader1,1=Loader2,2..7=Auto1..6 -> module Target code
+// (1=Loader1,2=Loader2,11..16=Auto1..6). Returns -1 for no selection.
+int TfTeach::ComboIndexToTarget(int Index)
+{
+    if(Index==0)
+        return 1;
+    if(Index==1)
+        return 2;
+    if(Index>=2 && Index<=7)
+        return 11+(Index-2);
+    return -1;
+}
+//---------------------------------------------------------------------------
+TTrayMotor *TfTeach::GetSaTargetYMotor(int Target)
+{
+    switch(Target)
+    {
+        case 1:  return HSys.Mot.MLoaderY_1;
+        case 2:  return HSys.Mot.MLoaderY_2;
+        case 11: return HSys.Mot.MAutoY_1;
+        case 12: return HSys.Mot.MAutoY_2;
+        case 13: return HSys.Mot.MAutoY_3;
+        case 14: return HSys.Mot.MAutoY_4;
+        case 15: return HSys.Mot.MAutoY_5;
+        case 16: return HSys.Mot.MAutoY_6;
+    }
+    return NULL;
+}
+//---------------------------------------------------------------------------
+bool TfTeach::CheckSortArmTestReady(int SlotIndex, int Target)
+{
+    TTrayMotor *X=HSys.Mot.MSortingArmX;
+    TTrayMotor *Y=GetSaTargetYMotor(Target);
+    TTrayMotor *Z=NULL;
+
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyOKMessageNoStop("Machine is running.");
+        SetSaStatus("Abort: system start");
+        return false;
+    }
+    if(IsEMGPressed()>0)
+    {
+        ShowMyOKMessageNoStop("EMG is pressed.");
+        SetSaStatus("Abort: EMG");
+        return false;
+    }
+
+    switch(SlotIndex)
+    {
+        case 0: Z=HSys.Mot.MSuckZ_1; break;
+        case 1: Z=HSys.Mot.MSuckZ_2; break;
+        case 2: Z=HSys.Mot.MSuckZ_3; break;
+        case 3: Z=HSys.Mot.MSuckZ_4; break;
+    }
+    if(X==NULL || Y==NULL || Z==NULL)
+    {
+        SetSaStatus("Abort: motor missing");
+        return false;
+    }
+
+    X->ScanMotorStatus();
+    Y->ScanMotorStatus();
+    Z->ScanMotorStatus();
+    if(X->GetEnable()==false || Y->GetEnable()==false || Z->GetEnable()==false)
+    {
+        ShowMyOKMessageNoStop("SortArm X / target Y / Suck Z must be enabled.");
+        SetSaStatus("Abort: motor disabled");
+        return false;
+    }
+    if(X->Led[iAlarmLed] || X->Led[iServoalarmLed] ||
+       Y->Led[iAlarmLed] || Y->Led[iServoalarmLed] ||
+       Z->Led[iAlarmLed] || Z->Led[iServoalarmLed])
+    {
+        ShowMyOKMessageNoStop("Motor alarm is active.");
+        SetSaStatus("Abort: motor alarm");
+        return false;
+    }
+    if(X->bHomeFlag==false || Y->bHomeFlag==false)
+    {
+        ShowMyOKMessageNoStop("SortArm X and target Y must be home.");
+        SetSaStatus("Abort: not home");
+        return false;
+    }
+    if(CheckSortArmZHome()==false)
+    {
+        ShowMyOKMessageNoStop("All Suck Z must be home before X move.");
+        SetSaStatus("Abort: Suck Z not home");
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunSortArmTest()
+{
+    if(bSaTestRunning==false || SortArmModule==NULL)
+        return;
+    if(SortArmModule->MoveSuckerToCell(iSaSlot, iSaTarget, iSaCol, iSaRow, bSaZDown, iSaTask))
+    {
+        bSaTestRunning=false;
+        SetSaStatus("Sort arm test finish");
+    }
+}
+//---------------------------------------------------------------------------
+void TfTeach::StopSortArmTest()
+{
+    TTrayMotor *Y;
+
+    if(bSaTestRunning==false)
+        return;
+    bSaTestRunning=false;
+    iSaTask=0;
+    if(HSys.Mot.MSortingArmX!=NULL)
+        HSys.Mot.MSortingArmX->Stop();
+    if(HSys.Mot.MSuckZ_1!=NULL)
+        HSys.Mot.MSuckZ_1->Stop();
+    if(HSys.Mot.MSuckZ_2!=NULL)
+        HSys.Mot.MSuckZ_2->Stop();
+    if(HSys.Mot.MSuckZ_3!=NULL)
+        HSys.Mot.MSuckZ_3->Stop();
+    if(HSys.Mot.MSuckZ_4!=NULL)
+        HSys.Mot.MSuckZ_4->Stop();
+    Y=GetSaTargetYMotor(iSaTarget);
+    if(Y!=NULL)
+        Y->Stop();
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetSaStatus(AnsiString Text)
+{
+    if(lblSaStatus!=NULL)
+        lblSaStatus->Caption=Text;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
+{
+    int Slot;
+    int Target;
+    int Col;
+    int Row;
+    AnsiString Err;
+    (void)Sender;
+
+    if(SortArmModule==NULL)
+    {
+        SetSaStatus("SortArm module not ready");
+        return;
+    }
+    if(cbSuckUse==NULL || cbToArea==NULL)
+        return;
+    if(bSaTestRunning)
+    {
+        SetSaStatus("Test already running");
+        return;
+    }
+
+    Slot=cbSuckUse->ItemIndex;
+    if(Slot<0)
+    {
+        SetSaStatus("Select a sucker");
+        return;
+    }
+    Target=ComboIndexToTarget(cbToArea->ItemIndex);
+    if(Target<0)
+    {
+        SetSaStatus("Select a target area");
+        return;
+    }
+    // UI Col/Row are 1-based; convert to 0-based tray index.
+    Col=GetEditInt(edSaCol, 0)-1;
+    Row=GetEditInt(edSaRow, 0)-1;
+
+    if(CheckSortArmTestReady(Slot, Target)==false)
+        return;
+    if(SortArmModule->CanMoveSuckerToCell(Slot, Target, Col, Row, Err)==false)
+    {
+        ShowMyOKMessageNoStop(Err);
+        SetSaStatus(Err);
+        return;
+    }
+
+    iSaSlot=Slot;
+    iSaTarget=Target;
+    iSaCol=Col;
+    iSaRow=Row;
+    bSaZDown=(chkSaZDown!=NULL && chkSaZDown->Checked);
+    iSaTask=0;
+    bSaTestRunning=true;
+    SetSaStatus("Sort arm test start");
+}
+//---------------------------------------------------------------------------
+// Advanced page (Channel) : stacking-car destacker tests. Two groups.
+//  - gbCarGoUpGoDonw : Empty / Loader / Color dual-cylinder destacker. One round =
+//    GoUp then GoDown; optional Loop N. Drives the module cylinder-only Test wrappers
+//    from tmrUpdate, same way bHomeRunning drives Home.
+//  - gbAutoGoUp : Auto1-6 single-cylinder FrontRise, GoUp once (no loop).
+void TfTeach::PopulateChannelCombos()
+{
+    if(cbCarArea!=NULL && cbCarArea->Items->Count>0 && cbCarArea->ItemIndex<0)
+        cbCarArea->ItemIndex=0;
+    if(cbAutoArea!=NULL && cbAutoArea->Items->Count>0 && cbAutoArea->ItemIndex<0)
+        cbAutoArea->ItemIndex=0;
+}
+//---------------------------------------------------------------------------
+bool TfTeach::CheckCarTestReady()
+{
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyOKMessageNoStop("Machine is running.");
+        return false;
+    }
+    if(IsEMGPressed()>0)
+    {
+        ShowMyOKMessageNoStop("EMG is pressed.");
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+// cbCarArea index : 0=Empty, 1=Loader, 2=Color. Returns true when the phase is done.
+bool TfTeach::CallCarGoUp(int Area, int Flag)
+{
+    switch(Area)
+    {
+        case 0: return (EmptyModule==NULL) ? true : EmptyModule->TestGoUpTray(Flag);
+        case 1: return (LoaderModule==NULL) ? true : LoaderModule->TestGoUpTray(Flag);
+        case 2: return (ColorModule==NULL) ? true : ColorModule->TestGoUpTray(Flag);
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TfTeach::CallCarGoDown(int Area, int Flag)
+{
+    switch(Area)
+    {
+        case 0: return (EmptyModule==NULL) ? true : EmptyModule->TestGoDownTray(Flag);
+        case 1: return (LoaderModule==NULL) ? true : LoaderModule->TestGoDownTray(Flag);
+        case 2: return (ColorModule==NULL) ? true : ColorModule->TestGoDownTray(Flag);
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void TfTeach::StartCarPhase(int Phase)
+{
+    iCarPhase=Phase;
+    MotorTaskLog("Teach", "Car", (Phase==0)?"CAR_PHASE_GOUP":"CAR_PHASE_GODOWN",
+        AnsiString("area=")+IntToStr(iCarArea)+AnsiString(" round=")+IntToStr(iCarLoopDone)+AnsiString("/")+IntToStr(iCarLoopTarget));
+    if(Phase==0)
+        CallCarGoUp(iCarArea, 0);
+    else
+        CallCarGoDown(iCarArea, 0);
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunCarTest()
+{
+    if(bCarTestRunning==false)
+        return;
+
+    if(iCarPhase==0)
+    {
+        if(CallCarGoUp(iCarArea, 1))
+        {
+            MotorTaskLog("Teach", "Car", "CAR_GOUP_DONE", AnsiString("round=")+IntToStr(iCarLoopDone)+AnsiString("/")+IntToStr(iCarLoopTarget));
+            SetCarStatus("GoUp done, GoDown...");
+            StartCarPhase(1);
+        }
+    }
+    else
+    {
+        if(CallCarGoDown(iCarArea, 1))
+        {
+            iCarLoopDone++;
+            MotorTaskLog("Teach", "Car", "CAR_GODOWN_DONE", AnsiString("round=")+IntToStr(iCarLoopDone)+AnsiString("/")+IntToStr(iCarLoopTarget)+AnsiString(" loop=")+(bCarLoop?"1":"0"));
+            if(bCarLoop && iCarLoopDone<iCarLoopTarget)
+            {
+                SetCarStatus("Round "+IntToStr(iCarLoopDone)+"/"+IntToStr(iCarLoopTarget)+" done, next...");
+                StartCarPhase(0);
+            }
+            else
+            {
+                bCarTestRunning=false;
+                MotorTaskLog("Teach", "Car", "CAR_FINISH", AnsiString("rounds=")+IntToStr(iCarLoopDone));
+                SetCarStatus("Car test finish ("+IntToStr(iCarLoopDone)+" round)");
+            }
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void TfTeach::StopCarTest()
+{
+    bCarTestRunning=false;
+    bAutoTestRunning=false;
+    iCarPhase=0;
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunAutoTest()
+{
+    if(bAutoTestRunning==false)
+        return;
+    if(AutoModule==NULL || AutoModule->TestGoUpOnce(iAutoIndex, 1))
+    {
+        bAutoTestRunning=false;
+        SetAutoStatus("Auto GoUp once finish");
+    }
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetCarStatus(AnsiString Text)
+{
+    if(lblCarStatus!=NULL)
+        lblCarStatus->Caption=Text;
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetAutoStatus(AnsiString Text)
+{
+    if(lblAutoStatus!=NULL)
+        lblAutoStatus->Caption=Text;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnCarGoClick(TObject *Sender)
+{
+    int Area;
+    int Loop;
+    (void)Sender;
+
+    if(cbCarArea==NULL)
+        return;
+    if(bCarTestRunning)
+    {
+        SetCarStatus("Test already running");
+        return;
+    }
+    Area=cbCarArea->ItemIndex;
+    if(Area<0)
+    {
+        SetCarStatus("Select a car area");
+        return;
+    }
+    if(CheckCarTestReady()==false)
+    {
+        SetCarStatus("Abort: not ready");
+        return;
+    }
+
+    bCarLoop=(chkCarLoop!=NULL && chkCarLoop->Checked);
+    Loop=GetEditInt(edLoopTimes, 1);
+    if(Loop<1)
+        Loop=1;
+    iCarLoopTarget=bCarLoop?Loop:1;
+    iCarLoopDone=0;
+    iCarArea=Area;
+    bCarTestRunning=true;
+    MotorTaskLog("Teach", "Car", "CAR_GO_BTN",
+        AnsiString("area=")+IntToStr(iCarArea)+AnsiString(" loopChk=")+(bCarLoop?"1":"0")+AnsiString(" loopTimes=")+IntToStr(Loop)+AnsiString(" target=")+IntToStr(iCarLoopTarget));
+    StartCarPhase(0);
+    SetCarStatus("Car test start (GoUp...)");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnAutoGoUpClick(TObject *Sender)
+{
+    int Index;
+    (void)Sender;
+
+    if(cbAutoArea==NULL)
+        return;
+    if(bAutoTestRunning)
+    {
+        SetAutoStatus("Test already running");
+        return;
+    }
+    Index=cbAutoArea->ItemIndex;
+    if(Index<0)
+    {
+        SetAutoStatus("Select an Auto");
+        return;
+    }
+    if(CheckCarTestReady()==false)
+    {
+        SetAutoStatus("Abort: not ready");
+        return;
+    }
+
+    iAutoIndex=Index;
+    if(AutoModule!=NULL)
+        AutoModule->TestGoUpOnce(iAutoIndex, 0);
+    bAutoTestRunning=true;
+    SetAutoStatus("Auto GoUp once start");
 }
 //---------------------------------------------------------------------------

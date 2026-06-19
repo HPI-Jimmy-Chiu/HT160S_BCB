@@ -1086,8 +1086,8 @@ static int BinTextToDispValue(AnsiString s)
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-maintainer) 20260615 : page repurposed from TCP MCU to COM bin
-//display. Settings live in General.ini [BinDisplay] (GeneralSetting). The TCP
-//Port/MaxQueue fields are unused here and hidden in the DFM.
+//display. Settings live in General.ini [BinDisplay] (GeneralSetting). The old
+//TCP MaxQueue field has been removed; edMCUPort is reused as the Baud field.
 void __fastcall TfMaintenance::LoadMCUDisplaySettings()
 {
     if(chkMCUEnabled!=NULL)
@@ -1096,6 +1096,9 @@ void __fastcall TfMaintenance::LoadMCUDisplaySettings()
         edMCUIP->Text=GeneralSetting.sBinDispComPort;
     if(edMCUReconnect!=NULL)
         edMCUReconnect->Text=IntToStr(GeneralSetting.iBinDispDelaySec);
+    // edMCUPort is the old TCP-port edit, repurposed as the Baud field.
+    if(edMCUPort!=NULL)
+        edMCUPort->Text=IntToStr(GeneralSetting.iBinDispBaud);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::SaveMCUDisplaySettings()
@@ -1109,10 +1112,21 @@ void __fastcall TfMaintenance::SaveMCUDisplaySettings()
     if(Delay<1)
         Delay=1;
     GeneralSetting.iBinDispDelaySec=Delay;
+
+    // edMCUPort is a Baud dropdown (combo). Fall back to 9600 (HT9046 standard) on junk.
+    int Baud;
+    Baud=9600;
+    if(edMCUPort!=NULL && edMCUPort->Text.Trim()!=AnsiString(""))
+        Baud=atoi(edMCUPort->Text.c_str());
+    if(Baud<300)
+        Baud=9600;
+    GeneralSetting.iBinDispBaud=Baud;
     GeneralSetting.Save();
 
     if(edMCUReconnect!=NULL)
         edMCUReconnect->Text=IntToStr(Delay);
+    if(edMCUPort!=NULL)
+        edMCUPort->Text=IntToStr(Baud);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RestartMCUDisplay()
@@ -1409,6 +1423,8 @@ void __fastcall TfMaintenance::OpenIOView(TSpeedButton *Button)
     if(fiosetview==NULL)
         fiosetview=new Tfiosetview(this);
 
+    //AI 20260619 : Maintenance open -> normal restore-on-close (IC->force / else ask).
+    fiosetview->bFromTeach=false;
     if(fiosetview->Visible)
         fiosetview->BringToFront();
     else

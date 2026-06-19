@@ -1,11 +1,11 @@
 object fMain: TfMain
-  Left = 273
-  Top = 103
+  Left = 309
+  Top = 54
   BorderIcons = [biSystemMenu]
   BorderStyle = bsNone
-  Width = 1760
-  Height = 1142
   Caption = 'HT160S'
+  ClientHeight = 985
+  ClientWidth = 1264
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -21,25 +21,25 @@ object fMain: TfMain
   object pgcMain: TPageControl
     Left = 0
     Top = 0
-    Width = 1744
-    Height = 1103
-    ActivePage = tsMain
+    Width = 1264
+    Height = 985
+    ActivePage = tsMonitorView
     Align = alClient
-    TabIndex = 0
+    TabIndex = 1
     TabOrder = 0
     object tsMain: TTabSheet
       Caption = 'Main'
       object pnlMain: TPanel
         Left = 0
         Top = 0
-        Width = 1736
-        Height = 1075
+        Width = 1256
+        Height = 957
         Align = alClient
         TabOrder = 0
         object pnlMainMenu: TPanel
           Left = 1
           Top = 1
-          Width = 1734
+          Width = 1254
           Height = 53
           Align = alTop
           BevelOuter = bvLowered
@@ -1262,17 +1262,17 @@ object fMain: TfMain
           end
         end
         object pnlBinCntInfo: TPanel
-          Left = 950
+          Left = 682
           Top = 54
-          Width = 785
-          Height = 1020
+          Width = 573
+          Height = 902
           Align = alRight
           BevelOuter = bvNone
           TabOrder = 2
           object Panel7: TPanel
             Left = 0
             Top = 0
-            Width = 785
+            Width = 573
             Height = 36
             Align = alTop
             BevelInner = bvRaised
@@ -1292,9 +1292,9 @@ object fMain: TfMain
               ParentFont = False
             end
             object btnClearCount: TSpeedButton
-              Left = 527
+              Left = 351
               Top = 5
-              Width = 94
+              Width = 85
               Height = 25
               Caption = 'Clear All'
               Font.Charset = ANSI_CHARSET
@@ -1305,7 +1305,7 @@ object fMain: TfMain
               ParentFont = False
             end
             object lblUnloadingCount: TLabel
-              Left = 188
+              Left = 132
               Top = 10
               Width = 31
               Height = 16
@@ -1318,7 +1318,7 @@ object fMain: TfMain
               ParentFont = False
             end
             object lblloseCnt: TLabel
-              Left = 370
+              Left = 242
               Top = 10
               Width = 24
               Height = 16
@@ -1332,25 +1332,11 @@ object fMain: TfMain
               Visible = False
             end
             object sbPaperSummary: TSpeedButton
-              Left = 631
+              Left = 439
               Top = 5
-              Width = 94
+              Width = 85
               Height = 25
               Caption = 'Summary'
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clPurple
-              Font.Height = -13
-              Font.Name = 'Arial'
-              Font.Style = [fsBold]
-              ParentFont = False
-            end
-            object lblLotInfo: TLabel
-              Left = 479
-              Top = 12
-              Width = 44
-              Height = 16
-              Hint = 'Lot Quantity [Auto%] [Mag%]'
-              Caption = 'LotInfo'
               Font.Charset = ANSI_CHARSET
               Font.Color = clPurple
               Font.Height = -13
@@ -1361,7 +1347,7 @@ object fMain: TfMain
             object palloadingCount: TPanel
               Left = 58
               Top = 5
-              Width = 123
+              Width = 70
               Height = 26
               BevelInner = bvLowered
               Caption = '0'
@@ -1375,9 +1361,9 @@ object fMain: TfMain
               TabOrder = 0
             end
             object palUnloadingCount: TPanel
-              Left = 222
+              Left = 166
               Top = 5
-              Width = 131
+              Width = 70
               Height = 26
               BevelInner = bvLowered
               Caption = '0'
@@ -1391,9 +1377,9 @@ object fMain: TfMain
               TabOrder = 1
             end
             object palloseCnt: TPanel
-              Left = 400
+              Left = 272
               Top = 5
-              Width = 75
+              Width = 70
               Height = 26
               BevelInner = bvLowered
               Caption = '0'
@@ -1411,24 +1397,24 @@ object fMain: TfMain
           object Panel2: TPanel
             Left = 0
             Top = 36
-            Width = 785
-            Height = 984
+            Width = 573
+            Height = 866
             Align = alClient
             TabOrder = 1
             object Panel9: TPanel
-              Left = 23
+              Left = 1
               Top = 1
-              Width = 761
-              Height = 982
-              Align = alRight
+              Width = 574
+              Height = 864
+              Align = alLeft
               BevelOuter = bvNone
               BorderWidth = 4
               TabOrder = 0
               object grpTrack1: TGroupBox
                 Left = 4
                 Top = 4
-                Width = 753
-                Height = 170
+                Width = 566
+                Height = 141
                 Align = alTop
                 Caption = 'Unload'
                 Font.Charset = DEFAULT_CHARSET
@@ -1438,24 +1424,11 @@ object fMain: TfMain
                 Font.Style = [fsBold]
                 ParentFont = False
                 TabOrder = 0
-                object lblAuto06Cnt: TLabel
-                  Left = 615
-                  Top = 22
-                  Width = 36
-                  Height = 16
-                  Caption = 'Auto6'
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                end
                 object palAutoInfo01: TPanel
                   Left = 2
                   Top = 18
                   Width = 122
-                  Height = 150
+                  Height = 121
                   Align = alLeft
                   BevelOuter = bvNone
                   TabOrder = 0
@@ -1491,15 +1464,6 @@ object fMain: TfMain
                     ShowHint = True
                     TabOrder = 0
                   end
-                  object btnSetFullTray_Auto1: TButton
-                    Tag = 1
-                    Left = 33
-                    Top = 24
-                    Width = 85
-                    Height = 25
-                    Caption = 'SetFullTray'
-                    TabOrder = 1
-                  end
                   object palAuto01ID: TPanel
                     Left = 1
                     Top = 56
@@ -1517,7 +1481,7 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 2
+                    TabOrder = 1
                   end
                   object palAuto01Cnt: TPanel
                     Left = 1
@@ -1536,90 +1500,33 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
+                    TabOrder = 2
+                  end
+                  object plLotNumberAuto1: TPanel
+                    Left = 34
+                    Top = 24
+                    Width = 87
+                    Height = 26
+                    Hint = 'Lot No. bound to this Auto'
+                    Alignment = taLeftJustify
+                    BevelInner = bvLowered
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
                     TabOrder = 3
-                  end
-                  object palAuto01LotCnt: TPanel
-                    Left = 63
-                    Top = 88
-                    Width = 58
-                    Height = 26
-                    Hint = 'Bin count inside Lot'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 4
-                  end
-                  object pnlAuto01ICCnt: TPanel
-                    Left = 43
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC count in Auto Tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 5
-                  end
-                  object pnlAuto01EmptyCnt: TPanel
-                    Left = 85
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'Empty pocket of Auto tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 6
-                  end
-                  object palAuto01In: TPanel
-                    Left = 1
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC Count from Loader'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 7
                   end
                 end
                 object palAutoInfo02: TPanel
                   Left = 124
                   Top = 18
                   Width = 122
-                  Height = 150
+                  Height = 121
                   Align = alLeft
                   BevelOuter = bvNone
                   TabOrder = 1
@@ -1655,15 +1562,6 @@ object fMain: TfMain
                     ShowHint = True
                     TabOrder = 0
                   end
-                  object btnSetFullTray_Auto2: TButton
-                    Tag = 2
-                    Left = 33
-                    Top = 24
-                    Width = 85
-                    Height = 25
-                    Caption = 'SetFullTray'
-                    TabOrder = 1
-                  end
                   object palAuto02ID: TPanel
                     Left = 1
                     Top = 56
@@ -1681,7 +1579,7 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 2
+                    TabOrder = 1
                   end
                   object palAuto02Cnt: TPanel
                     Left = 1
@@ -1700,90 +1598,33 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
+                    TabOrder = 2
+                  end
+                  object plLotNumberAuto2: TPanel
+                    Left = 34
+                    Top = 24
+                    Width = 87
+                    Height = 26
+                    Hint = 'Lot No. bound to this Auto'
+                    Alignment = taLeftJustify
+                    BevelInner = bvLowered
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
                     TabOrder = 3
-                  end
-                  object palAuto02LotCnt: TPanel
-                    Left = 63
-                    Top = 88
-                    Width = 58
-                    Height = 26
-                    Hint = 'Bin count inside Lot'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 4
-                  end
-                  object pnlAuto02EmptyCnt: TPanel
-                    Left = 85
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'Empty pocket of Auto tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 5
-                  end
-                  object pnlAuto02ICCnt: TPanel
-                    Left = 43
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC count in Auto Tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 6
-                  end
-                  object palAuto02In: TPanel
-                    Left = 1
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC Count from Loader'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 7
                   end
                 end
                 object palAutoInfo03: TPanel
                   Left = 246
                   Top = 18
                   Width = 122
-                  Height = 150
+                  Height = 121
                   Align = alLeft
                   BevelOuter = bvNone
                   TabOrder = 2
@@ -1817,15 +1658,6 @@ object fMain: TfMain
                     ParentFont = False
                     TabOrder = 0
                   end
-                  object btnSetFullTray_Auto3: TButton
-                    Tag = 3
-                    Left = 36
-                    Top = 24
-                    Width = 85
-                    Height = 25
-                    Caption = 'SetFullTray'
-                    TabOrder = 1
-                  end
                   object palAuto03ID: TPanel
                     Left = 1
                     Top = 56
@@ -1843,7 +1675,7 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 2
+                    TabOrder = 1
                   end
                   object palAuto03Cnt: TPanel
                     Left = 1
@@ -1859,93 +1691,208 @@ object fMain: TfMain
                     Font.Name = 'Arial'
                     Font.Style = [fsBold]
                     ParentFont = False
+                    TabOrder = 2
+                  end
+                  object plLotNumberAuto3: TPanel
+                    Left = 34
+                    Top = 24
+                    Width = 87
+                    Height = 26
+                    Hint = 'Lot No. bound to this Auto'
+                    Alignment = taLeftJustify
+                    BevelInner = bvLowered
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
                     TabOrder = 3
                   end
-                  object palAuto03LotCnt: TPanel
-                    Left = 63
-                    Top = 88
-                    Width = 58
-                    Height = 26
-                    Hint = 'Bin count inside Lot'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
+                end
+              end
+              object pal1: TPanel
+                Left = 4
+                Top = 744
+                Width = 566
+                Height = 116
+                Align = alBottom
+                TabOrder = 1
+                object UPH_StringGrid: TStringGrid
+                  Left = 1
+                  Top = 1
+                  Width = 269
+                  Height = 114
+                  TabStop = False
+                  Align = alLeft
+                  ColCount = 4
+                  DefaultColWidth = 60
+                  DefaultRowHeight = 16
+                  FixedCols = 0
+                  RowCount = 14
+                  Font.Charset = ANSI_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -11
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  ColWidths = (
+                    60
+                    60
+                    60
+                    60)
+                end
+              end
+              object PageControl2: TPageControl
+                Left = 4
+                Top = 286
+                Width = 566
+                Height = 160
+                ActivePage = tsLotInfo
+                Align = alTop
+                TabIndex = 0
+                TabOrder = 2
+                object tsLotInfo: TTabSheet
+                  Caption = 'Lot'
+                  object lblLotNo: TLabel
+                    Left = 3
+                    Top = 13
+                    Width = 71
+                    Height = 20
+                    AutoSize = False
+                    Caption = 'Lot No.'
                     Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
+                    Font.Color = clNavy
+                    Font.Height = -16
                     Font.Name = 'Arial'
                     Font.Style = [fsBold]
                     ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 4
                   end
-                  object pnlAuto03EmptyCnt: TPanel
-                    Left = 85
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'Empty pocket of Auto tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
+                  object lblLotListHint: TLabel
+                    Left = 4
+                    Top = 523
+                    Width = 533
+                    Height = 16
+                    AutoSize = False
+                    Caption = 'Tip: double-click a lot row to view its 2D detail.'
                     Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
+                    Font.Color = clGrayText
+                    Font.Height = -12
                     Font.Name = 'Arial'
-                    Font.Style = [fsBold]
+                    Font.Style = []
                     ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 5
                   end
-                  object pnlAuto03ICCnt: TPanel
-                    Left = 43
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC count in Auto Tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 6
+                  object grpLotManualEdit: TGroupBox
+                    Left = 373
+                    Top = 0
+                    Width = 185
+                    Height = 132
+                    Align = alRight
+                    Caption = 'Lot Manual Edit'
+                    TabOrder = 0
+                    object edLotNo: TEdit
+                      Left = 8
+                      Top = 21
+                      Width = 161
+                      Height = 21
+                      TabOrder = 0
+                    end
+                    object btnAddLot: TButton
+                      Left = 8
+                      Top = 56
+                      Width = 73
+                      Height = 25
+                      Caption = 'Add Lot'
+                      TabOrder = 1
+                      OnClick = btnAddLotClick
+                    end
+                    object btnEditLot: TButton
+                      Left = 104
+                      Top = 56
+                      Width = 73
+                      Height = 25
+                      Caption = 'Edit Lot'
+                      TabOrder = 2
+                      OnClick = btnEditLotClick
+                    end
+                    object btnRemoveLot: TButton
+                      Left = 8
+                      Top = 88
+                      Width = 73
+                      Height = 25
+                      Caption = 'Remove Lot'
+                      TabOrder = 3
+                      OnClick = btnRemoveLotClick
+                    end
                   end
-                  object palAuto03In: TPanel
-                    Left = 1
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC Count from Loader'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
+                  object sgLotList: TStringGrid
+                    Left = 4
+                    Top = 32
+                    Width = 373
+                    Height = 100
+                    TabStop = False
+                    Align = alCustom
+                    ColCount = 1
+                    DefaultColWidth = 360
+                    DefaultRowHeight = 20
+                    FixedCols = 0
+                    RowCount = 14
                     Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
+                    Font.Color = clWindowText
+                    Font.Height = -11
+                    Font.Name = 'MS Sans Serif'
+                    Font.Style = []
                     ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 7
+                    ScrollBars = ssVertical
+                    TabOrder = 1
+                    OnClick = sgLotListClick
+                  end
+                  object btnLotStart: TButton
+                    Left = 83
+                    Top = 6
+                    Width = 105
+                    Height = 25
+                    Caption = 'Lot Start'
+                    TabOrder = 2
+                    OnClick = btnLotStartClick
+                  end
+                  object btnLotEnd: TButton
+                    Left = 215
+                    Top = 6
+                    Width = 105
+                    Height = 25
+                    Caption = 'Lot End'
+                    TabOrder = 3
+                    OnClick = btnLotEndClick
                   end
                 end
+              end
+              object GroupBox1: TGroupBox
+                Left = 4
+                Top = 145
+                Width = 566
+                Height = 141
+                Align = alTop
+                Caption = 'Unload'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clPurple
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                TabOrder = 3
                 object palAutoInfo04: TPanel
-                  Left = 368
+                  Left = 2
                   Top = 18
                   Width = 122
-                  Height = 150
+                  Height = 121
                   Align = alLeft
                   BevelOuter = bvNone
-                  TabOrder = 3
+                  TabOrder = 0
                   object lblAuto04Cnt: TLabel
                     Left = 1
                     Top = 4
@@ -1978,15 +1925,6 @@ object fMain: TfMain
                     ShowHint = True
                     TabOrder = 0
                   end
-                  object btnSetFullTray_Auto4: TButton
-                    Tag = 4
-                    Left = 34
-                    Top = 24
-                    Width = 85
-                    Height = 25
-                    Caption = 'SetFullTray'
-                    TabOrder = 1
-                  end
                   object palAuto04ID: TPanel
                     Left = 1
                     Top = 56
@@ -2004,7 +1942,7 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 2
+                    TabOrder = 1
                   end
                   object palAuto04Cnt: TPanel
                     Left = 1
@@ -2023,93 +1961,36 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
+                    TabOrder = 2
+                  end
+                  object plLotNumberAuto4: TPanel
+                    Left = 34
+                    Top = 24
+                    Width = 87
+                    Height = 26
+                    Hint = 'Lot No. bound to this Auto'
+                    Alignment = taLeftJustify
+                    BevelInner = bvLowered
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
                     TabOrder = 3
-                  end
-                  object palAuto04LotCnt: TPanel
-                    Left = 63
-                    Top = 88
-                    Width = 58
-                    Height = 26
-                    Hint = 'Bin count inside Lot'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 4
-                  end
-                  object pnlAuto04ICCnt: TPanel
-                    Left = 43
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC count in Auto Tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 5
-                  end
-                  object pnlAuto04EmptyCnt: TPanel
-                    Left = 85
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'Empty pocket of Auto tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 6
-                  end
-                  object palAuto04In: TPanel
-                    Left = 1
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC Count from Loader'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 7
                   end
                 end
                 object palAutoInfo05: TPanel
-                  Left = 490
+                  Left = 124
                   Top = 18
                   Width = 122
-                  Height = 150
+                  Height = 121
                   Align = alLeft
                   BevelOuter = bvNone
-                  TabOrder = 4
+                  TabOrder = 1
                   object lblAuto05Cnt: TLabel
                     Left = 1
                     Top = 4
@@ -2142,15 +2023,6 @@ object fMain: TfMain
                     ShowHint = True
                     TabOrder = 0
                   end
-                  object btnSetFullTray_Auto5: TButton
-                    Tag = 5
-                    Left = 32
-                    Top = 24
-                    Width = 85
-                    Height = 25
-                    Caption = 'SetFullTray'
-                    TabOrder = 1
-                  end
                   object palAuto05ID: TPanel
                     Left = 1
                     Top = 56
@@ -2168,7 +2040,7 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 2
+                    TabOrder = 1
                   end
                   object palAuto05Cnt: TPanel
                     Left = 1
@@ -2187,14 +2059,93 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
+                    TabOrder = 2
+                  end
+                  object plLotNumberAuto5: TPanel
+                    Left = 34
+                    Top = 24
+                    Width = 87
+                    Height = 26
+                    Hint = 'Lot No. bound to this Auto'
+                    Alignment = taLeftJustify
+                    BevelInner = bvLowered
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
                     TabOrder = 3
                   end
-                  object palAuto05LotCnt: TPanel
-                    Left = 63
+                end
+                object palAutoInfo06: TPanel
+                  Left = 246
+                  Top = 18
+                  Width = 122
+                  Height = 121
+                  Align = alLeft
+                  BevelOuter = bvNone
+                  TabOrder = 2
+                  object lblAuto06Cnt: TLabel
+                    Left = 1
+                    Top = 4
+                    Width = 36
+                    Height = 16
+                    Caption = 'Auto6'
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                  end
+                  object palAuto06Bin: TPanel
+                    Left = 1
+                    Top = 24
+                    Width = 30
+                    Height = 26
+                    Hint = 'Bin setting of Auto Tray'
+                    BevelInner = bvLowered
+                    Caption = '0'
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
+                    TabOrder = 0
+                  end
+                  object palAuto06ID: TPanel
+                    Left = 1
+                    Top = 56
+                    Width = 120
+                    Height = 26
+                    Hint = 'Tray ID of Auto Tray'
+                    Alignment = taLeftJustify
+                    BevelInner = bvLowered
+                    Color = clWhite
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clPurple
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                    ParentShowHint = False
+                    ShowHint = True
+                    TabOrder = 1
+                  end
+                  object palAuto06Cnt: TPanel
+                    Left = 1
                     Top = 88
                     Width = 58
                     Height = 26
-                    Hint = 'Bin count inside Lot'
+                    Hint = 'Click here to switch count and percent'
                     BevelInner = bvLowered
                     Caption = '0'
                     Color = clWhite
@@ -2206,16 +2157,16 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 4
+                    TabOrder = 2
                   end
-                  object pnlAuto05ICCnt: TPanel
-                    Left = 43
-                    Top = 120
-                    Width = 36
+                  object plLotNumberAuto6: TPanel
+                    Left = 34
+                    Top = 24
+                    Width = 87
                     Height = 26
-                    Hint = 'IC count in Auto Tray'
+                    Hint = 'Lot No. bound to this Auto'
+                    Alignment = taLeftJustify
                     BevelInner = bvLowered
-                    Caption = '0'
                     Color = clWhite
                     Font.Charset = ANSI_CHARSET
                     Font.Color = clPurple
@@ -2225,340 +2176,23 @@ object fMain: TfMain
                     ParentFont = False
                     ParentShowHint = False
                     ShowHint = True
-                    TabOrder = 5
+                    TabOrder = 3
                   end
-                  object pnlAuto05EmptyCnt: TPanel
-                    Left = 85
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'Empty pocket of Auto tray'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 6
-                  end
-                  object palAuto05In: TPanel
-                    Left = 1
-                    Top = 120
-                    Width = 36
-                    Height = 26
-                    Hint = 'IC Count from Loader'
-                    BevelInner = bvLowered
-                    Caption = '0'
-                    Color = clWhite
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clPurple
-                    Font.Height = -13
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                    ParentShowHint = False
-                    ShowHint = True
-                    TabOrder = 7
-                  end
-                end
-                object palAuto06Bin: TPanel
-                  Left = 615
-                  Top = 42
-                  Width = 30
-                  Height = 26
-                  Hint = 'Bin setting of Auto Tray'
-                  BevelInner = bvLowered
-                  Caption = '0'
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 5
-                end
-                object btnSetFullTray_Auto6: TButton
-                  Tag = 6
-                  Left = 647
-                  Top = 42
-                  Width = 85
-                  Height = 25
-                  Caption = 'SetFullTray'
-                  TabOrder = 6
-                end
-                object palAuto06ID: TPanel
-                  Left = 615
-                  Top = 74
-                  Width = 120
-                  Height = 26
-                  Hint = 'Tray ID of Auto Tray'
-                  Alignment = taLeftJustify
-                  BevelInner = bvLowered
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 7
-                end
-                object palAuto06Cnt: TPanel
-                  Left = 615
-                  Top = 106
-                  Width = 58
-                  Height = 26
-                  Hint = 'Click here to switch count and percent'
-                  BevelInner = bvLowered
-                  Caption = '0'
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 8
-                end
-                object palAuto06LotCnt: TPanel
-                  Left = 677
-                  Top = 106
-                  Width = 58
-                  Height = 26
-                  Hint = 'Bin count inside Lot'
-                  BevelInner = bvLowered
-                  Caption = '0'
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 9
-                end
-                object pnlAuto06EmptyCnt: TPanel
-                  Left = 699
-                  Top = 138
-                  Width = 36
-                  Height = 26
-                  Hint = 'Empty pocket of Auto tray'
-                  BevelInner = bvLowered
-                  Caption = '0'
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 10
-                end
-                object pnlAuto06ICCnt: TPanel
-                  Left = 657
-                  Top = 138
-                  Width = 36
-                  Height = 26
-                  Hint = 'IC count in Auto Tray'
-                  BevelInner = bvLowered
-                  Caption = '0'
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 11
-                end
-                object palAuto06In: TPanel
-                  Left = 615
-                  Top = 138
-                  Width = 36
-                  Height = 26
-                  Hint = 'IC Count from Loader'
-                  BevelInner = bvLowered
-                  Caption = '0'
-                  Color = clWhite
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clPurple
-                  Font.Height = -13
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  ParentFont = False
-                  ParentShowHint = False
-                  ShowHint = True
-                  TabOrder = 12
                 end
               end
-              object pal1: TPanel
+              object Panel1: TPanel
                 Left = 4
-                Top = 782
-                Width = 753
-                Height = 196
+                Top = 628
+                Width = 566
+                Height = 116
                 Align = alBottom
-                TabOrder = 1
-                object btnTranspose: TSpeedButton
-                  Left = 279
-                  Top = 10
-                  Width = 41
-                  Height = 38
-                  Flat = True
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clRed
-                  Font.Height = -16
-                  Font.Name = 'Arial'
-                  Font.Style = [fsBold]
-                  Glyph.Data = {
-                    360C0000424D360C000000000000360000002800000020000000200000000100
-                    180000000000000C0000C40E0000C40E00000000000000000000FFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFBFBF2F2F2F0F0F0F9F9
-                    F9FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFCFCEAEAEAD0D0D0D1D1D1EEEE
-                    EEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFCFCEBEBEBCDCDCD38996C008E4EE9E9
-                    E9FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFCFCFCEBEBEBCDCDCD3E986E00C686008B4BD8D8
-                    D8E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9E9EBEBEBF1F1F1F8
-                    F8F8FEFEFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFCFCFCEBEBEBCDCDCD3E986D00BF8200E3A6008848B7B7
-                    B7BCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBDBDBDC1C1C1CCCCCCDB
-                    DBDBEAEAEAF7F7F7FEFEFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFBFBFBEBEBEBCDCDCD3E986D00BA8100D8A000D9A10083420087
-                    46008847008847008847008847008847008847008947008948078B4D3C986D83
-                    AA98C4C4C4D9D9D9EEEEEEFBFBFBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFF2F2F2D1D1D13E986D00B88000D4A000D19C00D19C00D9A000DB
-                    A200DBA200DBA200DBA200DBA200DBA200DBA200D3A200D5A300C18B00AA7000
-                    8E4D058B4D85AB9ACCCCCCE7E7E7FAFAFAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFEDEDED3F9C7100B78100D09F00CC9B00CB9A00CB9A00CE9B00CE
-                    9B00CE9B00CE9B00CE9B00CE9B00CE9B00CF9B00CB9B00CC9C00CD9D00CF9F00
-                    CD9C00AC750089472E9666C8C8C8E8E8E8FCFCFCFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFF2F2F2008A482CD9B807CBA100C89B00C89B00C89B00C89900C8
-                    9900C89900C89900C89900C89900C89900C89900C89B00C89B00C89B00C99C00
-                    CA9E00CDA100C293008E4D139157CECECEEFEFEFFEFEFEFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFBFBFB4CAA7E00B28162DFC700C39A00C29900C29800C19800C1
-                    9900C19900C19900C19900C19900C19900C19900C39800C39800C39900C49A00
-                    C59B00C69C00C8A000C093008D4D3F9C71DADADAF7F7F7FFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFCFCFC51AB7F00AE7F60DCC600BE9794E5D74DE6D151E8
-                    D452E8D552E8D552E8D551E8D57FE1D37DE1D37CE4D172E1CC49D5B906C59E00
-                    C29900C39B00C49C00C6A000BE93008A478EB5A3EBEBEBFEFEFEFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFCFCFC51AB7F00AB7F5AD9C482E3D600823B0086
-                    42008743008743008743008743008743008A49169E6626B1826CD8C175E0CD27
-                    CBAD00BE9800C09A00C19C00C4A100A975068E4DDDDDDDF9F9F9FFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFCFC51AC7F00A97F7BE3DA008944E9E9
-                    E9FFFFFFFFFFFFFFFFFFFFFFFFFEFEFEC8E5D8CBE5D969B791008A484BC19D81
-                    E2D328C8AC00BC9800BE9B00C09D00C09D008E4DA5C1B4F1F1F1FFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFCFC51AC7F00AB87008C4AEEEE
-                    EEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFEFEDEEDE61D92574C
-                    C09F85E1D30EBFA200B99A00BB9C00BEA100A17043A074EBEBEBFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFBFB4CAD80008E4DF9F9
-                    F9FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEAEEEC00
-                    8A4775D8C758D3C100B69800B79A00B99D00AF8C078D4CEBEBEBFBFBFBF2F2F2
-                    EAEAEAE9E9E9E9E9E9E9E9E9E9E9E9EDEDEDF7F7F7FEFEFEFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9F9F961
-                    B18B2DB18A8FE4DE7BDDD47DDED47EDFD683E3DD008B48F2F2F2F2F2F2D4D4D4
-                    C0C0C0BCBCBCBCBCBCBCBCBCBCBCBCC7C7C7E3E3E3F9F9F9FFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFEFEC0
-                    E0D1008B49008944008843008843008944008A474BAC7FFBFBFBEBEBEB3B9D70
-                    008949008747008747008746008746008A49A0C0B1F1F1F1FFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9F9F9F0F0F0F2F2F2FBFBFBFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBEBEB008949
-                    11ECAE03E5A400E3A000E29E96FBDF2FBE89509F79E0E0E0F9F9F9FEFEFEFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEEEEEED1D1D1D0D0D0EAEAEAFC
-                    FCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1F1F1078B4D
-                    22D39A14E3A600DC9900DB9750EABC68E6BF008B49BEC2C0DFDFDFF1F1F1F9F9
-                    F9FCFCFCFEFEFEFFFFFFFFFFFFFFFFFFFFFFFFE9E9E9008E4E38996CCDCDCDEB
-                    EBEBFCFCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9F9F94CA77C
-                    20B67E35E9B400DB9700DB970CDD9F64EEC538C996168B52A6B5AECECECEDCDC
-                    DCE2E2E2E7E7E7E9E9E9E9E9E9E9E9E9E9E9E9D8D8D8008B4B00C6863E986ECD
-                    CDCDEBEBEBFCFCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFEFEBDD8CC
-                    048F5053E9BF19DEA600D89700D8971ADEA54EEABE2EC691008C4A4C9A7594AE
-                    A293B0A3BBBBBBBCBCBCBCBCBCBCBCBCBCBCBCB7B7B700884800E3A600BF823E
-                    986DCDCDCDEBEBEBFCFCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F7F7
-                    078B4D36BC8D62E8C604D49D00D19800D19813D7A33AE1B632D8AA11B37A0A9D
-                    610C8E4F00884600884700884700884700884700874600834200D9A100D8A000
-                    BA813E986DCDCDCDEBEBEBFBFBFBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFEFE
-                    ADD4C2008A4965DBB966E5C600CD9A00CB9700CC9801CE9B18D5A624D8AD27DB
-                    AF29E0B100D8A100D9A200D9A200D9A200D9A200D9A200D7A000D19C00D19C00
-                    D4A000B8803E986DD1D1D1F2F2F2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FCFCFC50AB811195598AE3CE75E4CD10CCA200C59800C69900C69A00C79A00C7
-                    9B00CB9A00CB9A00CB9B00CB9B00CB9B00CB9B00CB9B00CB9B00CB9A00CB9A00
-                    CC9B00D09F00B7813F9C71EDEDEDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFAFAFA18945912955978DAC18CE7D843D4B800C19B00C09700C09800C0
-                    9900C39900C39900C39900C39900C39900C39900C39900C29A00C89A00C89B00
-                    C89B07CBA12CD9B8008A48F2F2F2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFBFBFB3FA676008C4A44B8908DE2D58DE4D858D6C139CCB31BC4
-                    A71EC5A800C4A301C4A301C4A301C4A301C4A301C4A300C4A300C29800C29900
-                    C39A62DFC700B2814CAA7EFBFBFBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFEFEFEB4DAC9078C4C008D4C3AB1876DCFB898E6E198E5
-                    E09BE7E04EE3D551E3D552E3D552E3D552E3D551E2D54DE1D293E6D700BF9760
-                    DCC600AE7F51AB7FFCFCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFEFEB3DAC853AE82098C4C0088430087
-                    4200874200874300874300874300874300874300874200823B82E3D65ADAC400
-                    AB7F51AB7FFCFCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE9E9E90089447BE3DA00A97F51
-                    AC7FFCFCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEEEEEE008C4A00AB8751AC7FFC
-                    FCFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9F9F9008E4D4CAD80FBFBFBFF
-                    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}
-                  ParentFont = False
-                end
-                object UPH_StringGrid: TStringGrid
-                  Left = 4
-                  Top = 8
-                  Width = 269
-                  Height = 185
-                  TabStop = False
-                  Align = alCustom
-                  ColCount = 4
-                  DefaultColWidth = 60
-                  DefaultRowHeight = 16
-                  FixedCols = 0
-                  RowCount = 14
-                  Font.Charset = ANSI_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -11
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  TabOrder = 0
-                  ColWidths = (
-                    60
-                    60
-                    60
-                    60)
-                end
+                TabOrder = 4
                 object sgProductInfo: TStringGrid
-                  Left = 400
-                  Top = -3
-                  Width = 347
-                  Height = 239
-                  Align = alCustom
+                  Left = 1
+                  Top = 1
+                  Width = 336
+                  Height = 114
+                  Align = alLeft
                   ColCount = 3
                   DefaultColWidth = 105
                   DefaultRowHeight = 16
@@ -2569,134 +2203,18 @@ object fMain: TfMain
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
-                  TabOrder = 1
+                  TabOrder = 0
                   ColWidths = (
                     105
                     105
                     105)
-                end
-              end
-              object PageControl2: TPageControl
-                Left = 4
-                Top = 174
-                Width = 753
-                Height = 571
-                ActivePage = tsLotInfo
-                Align = alTop
-                TabIndex = 0
-                TabOrder = 2
-                object tsLotInfo: TTabSheet
-                  Caption = 'Lot'
-                  object lblLotNo: TLabel
-                    Left = 3
-                    Top = 13
-                    Width = 71
-                    Height = 20
-                    AutoSize = False
-                    Caption = 'Lot No.'
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clNavy
-                    Font.Height = -16
-                    Font.Name = 'Arial'
-                    Font.Style = [fsBold]
-                    ParentFont = False
-                  end
-                  object grpLotManualEdit: TGroupBox
-                    Left = 560
-                    Top = 0
-                    Width = 185
-                    Height = 543
-                    Align = alRight
-                    Caption = 'Lot Manual Edit'
-                    TabOrder = 0
-                    object edLotNo: TEdit
-                      Left = 8
-                      Top = 21
-                      Width = 161
-                      Height = 21
-                      TabOrder = 0
-                    end
-                    object btnAddLot: TButton
-                      Left = 8
-                      Top = 56
-                      Width = 89
-                      Height = 25
-                      Caption = 'Add Lot'
-                      TabOrder = 1
-                      OnClick = btnAddLotClick
-                    end
-                    object btnEditLot: TButton
-                      Left = 8
-                      Top = 88
-                      Width = 89
-                      Height = 25
-                      Caption = 'Edit Lot'
-                      TabOrder = 2
-                      OnClick = btnEditLotClick
-                    end
-                    object btnRemoveLot: TButton
-                      Left = 8
-                      Top = 120
-                      Width = 89
-                      Height = 25
-                      Caption = 'Remove Lot'
-                      TabOrder = 3
-                      OnClick = btnRemoveLotClick
-                    end
-                  end
-                  object sgLotList: TStringGrid
-                    Left = 4
-                    Top = 32
-                    Width = 533
-                    Height = 489
-                    TabStop = False
-                    Align = alCustom
-                    ColCount = 1
-                    DefaultColWidth = 360
-                    DefaultRowHeight = 20
-                    FixedCols = 0
-                    RowCount = 14
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clWindowText
-                    Font.Height = -11
-                    Font.Name = 'MS Sans Serif'
-                    Font.Style = []
-                    ParentFont = False
-                    TabOrder = 1
-                    OnClick = sgLotListClick
-                  end
-                  object btnLotStart: TButton
-                    Left = 83
-                    Top = 6
-                    Width = 105
-                    Height = 25
-                    Caption = 'Lot Start'
-                    TabOrder = 2
-                    OnClick = btnLotStartClick
-                  end
-                  object btnLotEnd: TButton
-                    Left = 279
-                    Top = 6
-                    Width = 105
-                    Height = 25
-                    Caption = 'Lot End'
-                    TabOrder = 3
-                    OnClick = btnLotEndClick
-                  end
-                  object lblLotListHint: TLabel
-                    Left = 4
-                    Top = 523
-                    Width = 533
-                    Height = 16
-                    AutoSize = False
-                    Caption = 'Tip: double-click a lot row to view its 2D detail.'
-                    Font.Charset = ANSI_CHARSET
-                    Font.Color = clGrayText
-                    Font.Height = -12
-                    Font.Name = 'Arial'
-                    Font.Style = []
-                    ParentFont = False
-                  end
+                  RowHeights = (
+                    16
+                    16
+                    16
+                    16
+                    16
+                    16)
                 end
               end
             end
@@ -2705,15 +2223,15 @@ object fMain: TfMain
         object pnlMain1: TPanel
           Left = 1
           Top = 54
-          Width = 949
-          Height = 1020
+          Width = 681
+          Height = 902
           Align = alClient
           BevelOuter = bvNone
           TabOrder = 1
           object pnlMain2: TPanel
             Left = 0
             Top = 0
-            Width = 949
+            Width = 681
             Height = 379
             Align = alTop
             Font.Charset = DEFAULT_CHARSET
@@ -2754,7 +2272,7 @@ object fMain: TfMain
             object palMainStatus: TPanel
               Left = 5
               Top = 11
-              Width = 580
+              Width = 436
               Height = 286
               BevelInner = bvRaised
               BevelOuter = bvLowered
@@ -2768,20 +2286,146 @@ object fMain: TfMain
               ParentFont = False
               TabOrder = 0
               DesignSize = (
-                580
+                436
                 286)
               object pnlFeatureStatus: TPanel
                 Left = 12
                 Top = 206
-                Width = 556
+                Width = 413
                 Height = 72
                 BevelOuter = bvNone
                 Color = clWhite
                 TabOrder = 0
+                object pnlFeatureBadge1: TPanel
+                  Left = 0
+                  Top = 0
+                  Width = 132
+                  Height = 30
+                  BevelInner = bvLowered
+                  TabOrder = 0
+                  object lblFeatureName1: TLabel
+                    Left = 4
+                    Top = 2
+                    Width = 38
+                    Height = 24
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'SECS'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clNavy
+                    Font.Height = -11
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                  object lblFeatureValue1: TLabel
+                    Left = 43
+                    Top = 4
+                    Width = 84
+                    Height = 20
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'OFF'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clTeal
+                    Font.Height = -12
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                end
+                object pnlFeatureBadge2: TPanel
+                  Left = 138
+                  Top = 0
+                  Width = 132
+                  Height = 30
+                  BevelInner = bvLowered
+                  TabOrder = 1
+                  object lblFeatureName2: TLabel
+                    Left = 4
+                    Top = 2
+                    Width = 38
+                    Height = 24
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'SAFE'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clNavy
+                    Font.Height = -11
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                  object lblFeatureValue2: TLabel
+                    Left = 43
+                    Top = 4
+                    Width = 84
+                    Height = 20
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'NORMAL'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clGreen
+                    Font.Height = -12
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                end
+                object pnlFeatureBadge3: TPanel
+                  Left = 276
+                  Top = 0
+                  Width = 132
+                  Height = 30
+                  BevelInner = bvLowered
+                  TabOrder = 2
+                  object lblFeatureName3: TLabel
+                    Left = 4
+                    Top = 2
+                    Width = 38
+                    Height = 24
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'AMR'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clNavy
+                    Font.Height = -11
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                  object lblFeatureValue3: TLabel
+                    Left = 43
+                    Top = 4
+                    Width = 84
+                    Height = 20
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'OFF'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clGray
+                    Font.Height = -12
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                end
               end
               object palMainStatus_En: TPanel
-                Left = 528
-                Top = 248
+                Left = 1
+                Top = 8
                 Width = 45
                 Height = 29
                 Anchors = [akTop]
@@ -2798,16 +2442,16 @@ object fMain: TfMain
               end
             end
             object pnlSetting: TPanel
-              Left = 585
-              Top = 1
-              Width = 336
+              Left = 449
+              Top = 9
+              Width = 240
               Height = 352
               BevelInner = bvRaised
               BevelOuter = bvLowered
               TabOrder = 1
               object lblRunMode: TLabel
                 Left = 14
-                Top = 49
+                Top = 9
                 Width = 107
                 Height = 20
                 AutoSize = False
@@ -2820,8 +2464,8 @@ object fMain: TfMain
                 ParentFont = False
               end
               object sbDummyIcon: TSpeedButton
-                Left = 231
-                Top = 39
+                Left = 159
+                Top = 23
                 Width = 41
                 Height = 38
                 Flat = True
@@ -2901,8 +2545,8 @@ object fMain: TfMain
                 OnClick = pnRealDummyClick
               end
               object sbRealIcon: TSpeedButton
-                Left = 231
-                Top = 39
+                Left = 119
+                Top = 23
                 Width = 41
                 Height = 38
                 Flat = True
@@ -2983,8 +2627,8 @@ object fMain: TfMain
                 OnClick = pnRealDummyClick
               end
               object sbInitial: TSpeedButton
-                Left = 231
-                Top = 106
+                Left = 159
+                Top = 114
                 Width = 41
                 Height = 38
                 Flat = True
@@ -3096,8 +2740,8 @@ object fMain: TfMain
                 OnClick = pnStartModeClick
               end
               object sbContinue: TSpeedButton
-                Left = 231
-                Top = 106
+                Left = 119
+                Top = 114
                 Width = 41
                 Height = 38
                 Flat = True
@@ -3211,7 +2855,7 @@ object fMain: TfMain
               end
               object lbStartMode: TLabel
                 Left = 14
-                Top = 118
+                Top = 86
                 Width = 91
                 Height = 19
                 AutoSize = False
@@ -3224,7 +2868,7 @@ object fMain: TfMain
                 ParentFont = False
               end
               object pnlLight: TPanel
-                Left = 291
+                Left = 203
                 Top = 3
                 Width = 28
                 Height = 70
@@ -3261,7 +2905,7 @@ object fMain: TfMain
                 end
               end
               object pnStartMode: TPanel
-                Left = 121
+                Left = 17
                 Top = 113
                 Width = 100
                 Height = 27
@@ -3278,8 +2922,8 @@ object fMain: TfMain
                 OnClick = pnStartModeClick
               end
               object pnRealDummy: TPanel
-                Left = 121
-                Top = 45
+                Left = 17
+                Top = 29
                 Width = 100
                 Height = 27
                 Cursor = crHandPoint
@@ -3298,7 +2942,7 @@ object fMain: TfMain
             object cb_WorkFile: TComboBox
               Left = 116
               Top = 299
-              Width = 469
+              Width = 325
               Height = 24
               Color = clMenu
               DropDownCount = 20
@@ -3317,7 +2961,7 @@ object fMain: TfMain
             object cbbUserSelect: TComboBox
               Left = 116
               Top = 326
-              Width = 469
+              Width = 325
               Height = 24
               Color = clMenu
               Font.Charset = DEFAULT_CHARSET
@@ -3339,7 +2983,7 @@ object fMain: TfMain
           object pnlLogMenu: TPanel
             Left = 0
             Top = 379
-            Width = 949
+            Width = 681
             Height = 39
             Align = alTop
             BevelOuter = bvLowered
@@ -3487,6 +3131,7 @@ object fMain: TfMain
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
+              OnClick = spbTrayStatusClick
             end
             object sbTimeData: TSpeedButton
               Left = 259
@@ -3630,6 +3275,7 @@ object fMain: TfMain
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
+              OnClick = sbTimeDataClick
             end
             object apbLogs: TSpeedButton
               Left = 131
@@ -3773,6 +3419,7 @@ object fMain: TfMain
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
+              OnClick = apbLogsClick
             end
             object btnTrayMap: TSpeedButton
               Left = 387
@@ -3916,28 +3563,21 @@ object fMain: TfMain
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
+              OnClick = btnTrayMapClick
             end
           end
           object pgcLog: TPageControl
             Left = 0
             Top = 418
-            Width = 949
-            Height = 602
-            ActivePage = tsMapTray
+            Width = 681
+            Height = 484
+            ActivePage = tsTrayStatus
             Align = alClient
-            TabIndex = 3
+            TabIndex = 0
             TabOrder = 2
             TabWidth = 128
             object tsTrayStatus: TTabSheet
               Caption = 'Tray Status'
-              object MemoBinCount: TMemo
-                Left = 528
-                Top = 4
-                Width = 515
-                Height = 427
-                Color = 14670284
-                TabOrder = 2
-              end
               object grpLoaderR: TGroupBox
                 Left = 262
                 Top = 0
@@ -4032,897 +3672,10 @@ object fMain: TfMain
             object tsLogs: TTabSheet
               Caption = 'Logs'
               ImageIndex = 4
-              object sbHome: TSpeedButton
-                Left = 90
-                Top = 222
-                Width = 120
-                Height = 40
-                Caption = 'Home'
-                Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWindowText
-                Font.Height = -16
-                Font.Name = 'Times New Roman'
-                Font.Style = [fsBold]
-                Glyph.Data = {
-                  66090000424D660900000000000036000000280000001C0000001C0000000100
-                  1800000000003009000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFB7B2B38782838A85868883848B81878881848984838B857E
-                  8D86838D858C888385888283868484878585878283A09B9CFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB4AFB0B9B4B5DE
-                  D9DAD1CCCDD8D3D4D6CFD21064BD0966C31363BA0C5BB60460C5095FB9D6D2D1
-                  D3D1D1D6D4D4DCD7D8C1BCBDA2A0A0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF999495DCD7D8C7C2C3BFBABBC1BFBFC2C0BF0D
-                  6DC03CD8F643C4F53CBEF344E0FF0869C0BDBFB9C0BEBEBAB8B8C7C2C3DCD7D8
-                  878585FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF959393E6E1E2CBC9C9C4C2C2C1BFBFC4BAC01073C94EC4F73E97F93B93F84B
-                  C1FC0E72CBC1BABDC4C2C2C1BFBFBDB8B9E1DCDD8F8D8DFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF959393EAE8E8DCDADACECE
-                  CEC4C4C4CAC1CB1183C24ED0F545A7F345A5F84BCBFB1383C9C7BFC9C3C1C1CA
-                  C8C8CAC5C6D9D4D5908E8EFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF989696F0EEEEE4E2E2E1E1E1D5D5D5CBC3CD1884DC4DC8
-                  FF36BFF036BDF30069B10B76D7CDC7D2CCCACAC7C5C5CBC6C7E0DBDC939191FF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA4A2A2
-                  EAE8E8EBEBEBDFDFDFE6E8E8D5DBD61B90DB27E0FA2BCCF82ACBFD27DDFF188C
-                  E0C7CECBCCCACACFCDCDCEC9CAE8E3E4949292FFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA2A0A0F0EEEEEDEDEDE8EAEAE3E5E5
-                  EBEAE01295E61EE7EA16DFF411D8F228EDFB088AE3D4D4CED2D0D0D4D2D2D4CF
-                  D0E5E0E19A9898FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFAAA2A3F3F2F4EAEFE6ECEDE9EEE6F0E5EAEB189AE721F8F91EEDFC
-                  1BEAF91EF9FC0C93E4C9D5DBD3D6DAD8CAD5CBD7D7E5E4E0A4969AFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEDC7A4F2C6A999A39DEBE7F2EF
-                  EDF3EFF0F4F2EBF8ECEDEB29A7EE139FEC18A4EB18A3EC109DED20A1EAD5DAD9
-                  D9DBCFDADAE6D6D3DCE9E7E79F9EA0F4E4BFEEB883FFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFEDCFA6C1742FDBA352908761D1D0D4EADFE2ECEDE4ECF1F2F7F8EFF2
-                  F0EFF0EDF6EAEDEBEAEDEBE1DFE5E3E2DEE0E1D7DEDBD7D8DFDADDDEE2EEE4EA
-                  9B8F6DC48234DC9E50E0B080FFFFFFFFFFFFFFFFFFFFFFFFCC934EE6AA6EFACF
-                  6EDDAA54B3957AE6D6D7E8EAE4ECF4E9E8F1FAB3B6BAB1B4B8A5B0A8ABB6AEA7
-                  A9AAACACACD9E2E5E6E8E8E5DDDED7E0DDAA9881CB7D36F0C263F4B974C1833D
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCF964BECB570EFCA80EAA758A78568D4D2
-                  D8EEE8EDF3F5FDB8B8B2FFF5EBD7DED1E3EADDFFF5E7B8B7ADECEBEDE9E6E2E4
-                  E1E3A1998CD07D3FEDC36AE7C270D48944F0E0C3FFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFD5944FE9BF6CF3D584E0AD57BC9A7CDDD3E0F2F0F6C7BFC0C5C3
-                  C9C1BDB8C6C3BBC2C1C5C6BEBFEFEEF0E6E3DFB49D87C8813EE6C177FAC87CC1
-                  873CF4E0C7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5F3E1D49E51
-                  E7BF66F5D788DBAD5FC0A482E2DCDDF4FCEBF6FAEFF8FAF4F6F7F3F1F7ECF5FF
-                  F0EDEAECB9AA97DA8C3FE7C474FCCD7BCA8B3BFFE5CCFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE19D62F8C36CEFDF92E7B563
-                  BC9F84E4E0DFF4F0F6FCF5FCF9F5FBF7F6FFE7E9EAC3AD94D49241F1C786F1D2
-                  7DDB993AC2803FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFD69C61F2CB76FDE396E2B56BBFA489E1DED6FCF6EF
-                  FCFAF9E9EEEDB7A58ED7924CE7D57CF6D082D4994AFECD83C48339FFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFD8A475F4CB7CFFE8A4E6B871C3A28FD8E6DBECF6F0BAA296D89556EDD58D
-                  F4CE8DE09852FFF1A0F8CF80D17E30FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE2A573F5D282FE
-                  E9A5F2C274BC9E81B3A085E39E58F6D694FFDD84DF995EEF9449FFECAEF6C684
-                  D28738FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE0A769F1D48FFFF3B1EDC67CF2BB76E9
-                  D699FBDB94E7A25CFFECCED59646FAF2A5F1CE7EC58433FFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFEEAF73ECCC91F6D694F5CF8FEFD99FE2A565F8EDD2FFFFFFDB
-                  934DFFF2B3EBCD80D28235FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEF3D8FAA8
-                  5AEFC582EFDF9CF9AE64FAEDD3FFFFFFFFFFFFD89050E2914DE29A46E0944CFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEED8B5F9AA61FCAE69F2EDCEFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFF1DBC9FFEADCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                ParentFont = False
-                Spacing = 10
-              end
-              object sbStart: TSpeedButton
-                Left = 540
-                Top = 222
-                Width = 120
-                Height = 40
-                Caption = 'Start'
-                Font.Charset = DEFAULT_CHARSET
-                Font.Color = clBlue
-                Font.Height = -16
-                Font.Name = 'Times New Roman'
-                Font.Style = [fsBold]
-                Glyph.Data = {
-                  66090000424D660900000000000036000000280000001C0000001C0000000100
-                  1800000000003009000001000000010000000000000000000000FFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDBFBDBD8C8A8A878283898485858585BFBFBFFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDC5C3C3BCBABADFDADB
-                  DED9DABBBBBBC3C3C3FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDB6B4B4A0
-                  9E9ED5D3D3FFFFFDFFFFFDC2C0C0B6B4B4CCCACACFCDCDB4B2B2C3C1C1FFFFFD
-                  FFFFFDD5D3D39F9D9DB8B6B6FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDB2B0B0B7B5B5D5D3D3ACAAAAD8D6D6D7D5D5AC
-                  AAAACFCDCDD1CFCFCCCACAD1CFCFAAA8A8D7D5D5D1CFCFB4B2B2D3D1D1B6B4B4
-                  B7B5B5FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDB7B5
-                  B5B9B7B7DEDCDCD8D6D6CBC9C9AAA8A8A8A6A6C5C3C3D4D2D2CDCBCBCECCCCD4
-                  D2D2C3C1C1A9A7A7AFADADCBC9C9DAD8D8D9D7D7B7B5B5B7B7B7FFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDA3A1A1DAD8D8D9D7D7CFCDCDD4D2
-                  D2D8D6D6D2D0D0D1CFCFD1CFCFCFCDCDD3D1D1D0CECED4D2D2D6D4D4D2D0D0D0
-                  CECED5D3D3DBD9D9D9D7D79F9F9FFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDD4D2D2B6B4B4CFCDCDD7D5D5D4D2D2CECCCCD2D0D0D8D6D6CFCD
-                  CDD3D1D1CFCDCDD2D0D0D0CECED2D0D0D6D4D4CFCDCDD2D0D0CECCCCB6B4B4D2
-                  D2D2FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFDFFFFD4D2D2
-                  B4B2B2DAD8D8D4D2D2D5D3D3D2D0D0D4D2D2D6D4D4D5D3D3D7D5D5D6D4D4D6D4
-                  D4D6D4D4CFCDCDDBD9D9D9D7D7B6B4B4D3D1D1FDFFFFFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFDFFFFDDDBDBAAA8A8DBD9D9D7D5D5DBD9D9
-                  D8D6D6D4D2D2DEDCDCDCDADADBD9D9D8D6D6D6D4D4DAD8D8D8D6D6D4D2D2DFDD
-                  DDA9A7A7D9D7D7FDFFFFFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDC5C5C5C8
-                  C8C8C7C5C5B3B1B1D4D2D2DFDDDDDAD8D8D8D6D6DBD9D9E2E0E0DAD8D8B8B6B6
-                  BAB8B8DCDADAE1DFDFD8D6D6DAD8D8DCDADADEDCDCD3D1D1B4B2B2C8C8C8C5C5
-                  C5C8C8C8FFFFFDFFFFFDFFFFFDFFFFFD919191C8C8C8C5C3C3E0DEDEE1DFDFDF
-                  DFDFDCDCDCD8D8D8E1E1E1DDDBDB9D9B9BD2D0D0D2D0D0A29C9DDED9DAE1DFDF
-                  DBDBDBD9D9D9DBDBDBDFDFDFE1DFDFC3C1C1C9C7C7929090FFFFFDFFFFFDFFFF
-                  FDFFFFFD919191F9F9F9DEDCDCE4E2E2DEDCDCDBDBDBE0E0E0DEDEDEE5E5E5BA
-                  BABAD0CECEFFFFFFFFFEFED4CFD0BFBABBE4E2E2DCDCDCDEDEDEDFDFDFDFDFDF
-                  E2E0E0E4E2E2F4F2F2939191FFFFFDFFFFFDFFFFFDFFFFFD909090F1F1F1EEEC
-                  ECE9E7E7E9E7E7EBEBEBEAEAEAF0F0F0E9E9E9BDBDBDD3D1D1FEFCFCFFFDFDD3
-                  CECFC1BFBFEDEBEBEDEDEDE6E6E6E8E8E8E3E3E3E7E5E5E8E6E6F9F7F7929090
-                  FFFFFDFFFFFDFFFFFDFFFFFD939393CDCDCDC4C2C2E5E3E3F3F1F1EEF0F0EBEB
-                  EBF5F5F5ECECECE9E9E99F9F9FCFCFCFD4D2D2A6A4A4E2E0E0F1F1F1F0F0F0EE
-                  EEEEEBEBEBEDEBEBEBE9E9C7C5C5C9C9C9939393FFFFFDFFFFFDFFFFFDFFFFFD
-                  C9C9C9CBCBCBCDCBCBBFBDBDDFDDDDECEEEEEFF1F1EFF1F1F2F2F2F2F2F2E5E5
-                  E5C3C3C3BDBDBDE5E3E3F5F5F5F1F1F1EDEFEFEAECECEDEDEDE1DFDFBDBBBBC9
-                  C9C9C9C9C9C8C8C8FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFDFFFFDBD9D9
-                  BFBDBDF0F2F2ECEEEEEDEFEFF1F3F3F2F2F2F5F5F5F1F1F1F3F3F3F4F4F4F4F4
-                  F4EEF0F0EAECECF0F2F2F0F0F0BEBCBCDCDADAFDFFFFFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFDFFFFD7D5D5C1BFBFF0F2F2E9EBEBF1F3F3
-                  F0F2F2EFEFEFF2F2F2F4F4F4F1F1F1F2F2F2EDEFEFECEEEEEFF1F1ECEEEEF2F2
-                  F2BEBCBCDAD8D8FDFFFFFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDD4D2D2C4C2C2ECEAEAF1F3F3EEF0F0EFF1F1ECEEEEF4F6F6F1F1F1F3F3F3
-                  F1F1F1F3F3F3EFF1F1EFF1F1EFF1F1EBEDEDF3F3F3EEECECC3BEBFD5D5D5FFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDAAAAAAEDEDEDF9F9F9F6
-                  F4F4F4F2F2F6F4F4FEFCFCF6F4F4F3F1F1F5F3F3F3F1F1F3F3F3F3F3F3F8F8F8
-                  F4F4F4F2F2F2F3F3F3FAFAFAE9E9E9ABABABFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDC3C3C3BEBEBEFFFFFFFCFAFAEFEDEDC5C3C3B9B7B7E5
-                  E3E3FDFBFBF4F2F2F6F4F4F9F9F9E3E3E3BABABABFBFBFEEEEEEFBFBFBFDFDFD
-                  C4C4C4C5C5C5FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDC4C4C4C4C4C4ECEAEAC4C2C2DDDBDBDEDCDCC2C0C0F6F4F4F8F6F6F7F5F5F4
-                  F4F4C0C0C0DEDEDEDBDBDBC3C3C3E9E9E9C4C4C4C1C1C1FFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDC0C0C0AEAEAED7D7
-                  D7FFFFFDFFFFFDCFCFCFCECECEFEFEFEFBFBFBD1D1D1CCCCCCFFFFFDFFFFFDD8
-                  D8D8B1B1B1C2C2C2FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDCACACAD3D3
-                  D3FBFBFBFFFFFFD1D1D1CBCBCBFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDCECECE9C9C9CA1A1A19A9A9A9F9F9FCBCB
-                  CBFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFF
-                  FFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFD
-                  FFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFFFDFFFF
-                  FDFFFFFDFFFFFDFFFFFD}
-                Margin = 10
-                ParentFont = False
-                Spacing = 10
-              end
-              object sbPause: TSpeedButton
-                Left = 690
-                Top = 222
-                Width = 120
-                Height = 40
-                Caption = 'Pause'
-                Font.Charset = DEFAULT_CHARSET
-                Font.Color = clRed
-                Font.Height = -16
-                Font.Name = 'Times New Roman'
-                Font.Style = [fsBold]
-                Glyph.Data = {
-                  66090000424D660900000000000036000000280000001C0000001C0000000100
-                  1800000000003009000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC7C9C987889C4B4F6B272E4F0B0C46
-                  05093A2429504B526B8586A0C6C5CFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC2
-                  C6CB676A900513440E10860C09A50E13A40D0DB70C0DBB110CAF0E0A9F0F0D85
-                  091349626D83BDBCDCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9C99AF202B5F180EA01816C31517D419
-                  19E91619DF1619E61519EA1F17F71A17E21113C5120FC20905A12036528D95AC
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF8286A906054F1C0FB71D11CF1D18D21517C91112C01116AE1214A8120EB410
-                  15B01819C11C1AD21416CE1215BE1205B40C134485859DFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9092B50510492215BF1517C91518
-                  BA0A0EA31014A30D11A0100FA5120FA119149F0F15A40E10A40A119E0D13B211
-                  15C71818C41E11BB020756959FA9FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFB9BDD9222B6B1D10BF1B1DC20718A9131A9901056400006D12139F0D17
-                  A10E12A60E0BA70A11A41513A200006900006A110EAA0F17B11118B51516BA22
-                  2871B7C1D2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6166971B10B41C19CC
-                  0D1BB11313A3060075F6FCFFF2FDFF03006D1416AA0B11A6171AA41210AA0400
-                  71EFFDF9F8FFFF0C00691F16AD1218AD1313C52117B16569A4FFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFC5C4CD0E10741D1DCF1315B91214AF080572F3F2FCF7FDFC
-                  FEFBFDFFFDF80408791C1BB1161DB0050178FEFAFFFFFDFEFFF5FDFAFFFE0600
-                  711919AD1417BF1C1AD2080E6FC4C2D8FFFFFFFFFFFFFFFFFFFFFFFF8F8CB31A
-                  169E1A1DC6161AB51719B3000084F2FCFFFFFAF7FBFFECFBFBFFFAFEF800047E
-                  0E0879FBFFFFEEFFECFEFBFDFBFFF2F9FFFD08087C1617AD151EB51A1DC61613
-                  9E8D8BB5FFFFFFFFFFFFFFFFFFFFFFFF4E4D8F201BCA181DC01C1BB9171CB51C
-                  1AB4020788FBF9FFFAF8F8FDF8F5F8FFF5F8FFFFF3FFFFFFFFEFFBFFFBFBF8F3
-                  F8FAFF00077C2419B5191CBB1A17C01A1EC31F1AC94F4E90FFFFFFFFFFFFFFFF
-                  FFFFFFFF2228752120E11B20C32219C3181DB82A2BBB1317B60C068DF7FFF5F6
-                  F8FFFEFAFFFFF6FFFFFFF7FFF9FFF8FBFFFBFFF9090289191AC2191BBD2122B8
-                  1E1BC41C1ECA201EDC24287BFFFFFFFFFFFFFFFFFFFFFFFF09116B2323F11D22
-                  C5271CC61A20BF1C1FC82E26C72123BD020389F3FFFBFFF9F7FCFBFFFDFDFDFF
-                  FFFBF2FEF806078D1D20BF2921BB2327C62025BD1E24BD2020CC2322EE0A1071
-                  FFFFFFFFFFFFFFFFFFFFFFFF0B0B752825FD1F23C82A24C52025C7302ED43332
-                  CE2F32D01717A7F4F9FCFAFFFEFFFFF7F8FFFFFFFFF7FFFFFB100BAA3230CA31
-                  2ED82221CB1B1FC42629C82224C82B26FD060B72FFFFFFFFFFFFFFFFFFFFFFFF
-                  2D2B8F2726EC2327D42C27C82227CA2A2EC92B2DCF0C09ACFEFCFBF6FFFBFAFF
-                  FEFFFFF0F7FCFDF0FBF9FFFFFEF6FCF711089F2B2DC8202FCC2725CB2020C627
-                  28D02A27EE23298AFFFFFFFFFFFFFFFFFFFFFFFF5054A22125D1292AE02C26D1
-                  2223CB1D26CE020CA6F9FCFFFFFCFEFBFDFDFFFBFDFFFDFCFCFFFDFFFCF5F5FC
-                  F9FFFDFFF3FCFF080AA42329CE2026D72521CE2E29E02025CE484FA6FFFFFFFF
-                  FFFFFFFFFFFFFFFF8985C7191DB22631ED282BE1322BD00607B5F9FFFAFEFBF3
-                  EFF9F9FEF6FFEAFFFB0000B8282ECDFEFCFFFCFAFFFAF4FFF2FCF0EAFAFF1209
-                  A6232ECC2F29DC2A33F52220BA8984C9FFFFFFFFFFFFFFFFFFFFFFFFC6C9E813
-                  15923433F52C2CEA2E2ED60208ADFDFEFFFFFCF9FEFEFEF2FCF6190BB02F2ED8
-                  2E2FD70E0CB2F0FFF1FCF8FDFFFFF7FAFFFF1304B92727D92D38E03635F71315
-                  92C2C4EDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6468B62E24D4413BFF2F36E32A
-                  23CC0B0BB7FDFFFEF5FBFF0A11BC2C27E03D2FE12932D9242BD61809C5FFFEFF
-                  F3F9FF0909B92D2EDC3D3DE53A34FF322AD55F65B8FFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFC3C8E1322BA43A33F0454FFF3E43F2201BD4040DC90004C434
-                  34DC352EEB3238DF2B2FE53537DB2E2CD90902C90B0BBD3134DC4C4EF34D48FD
-                  2B33EB312BA0BCC5EBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9699
-                  CC0F0D954549F57677FF6A71F64548E63F38E73032DE2C35DD2F36E12B34E92D
-                  33E43639E2323FE95A63F37C77FC6365F33937EF010D93999CC9FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8387C8120F94463DE77C8A
-                  FFB1AFFBA59BF88281F57C74FF706FF57D73F5837FFC8A90F3ADA8FF979FFC56
-                  59FF3638F0030C928D80CEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFF9492CD292FA02B2BDB4453F09898FFC4C5FDCAD3
-                  F9D2CCFFCCD8FFBEC2FCB9AFFC7474FF4641F63126DA2026A79397D2FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFC9BFE96668CC110BB02321CE2D37D13435F53938FE3E37F63533F72130
-                  DA221FC817149F666EC7C9C1EAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC8CAEC
-                  898ACE5858BC2E2FAF1113A70B0EAC2E2AB15352C08A8BD5C8CCEFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                ParentFont = False
-                Spacing = 10
-              end
-              object sbRetry: TSpeedButton
-                Left = 274
-                Top = 266
-                Width = 107
-                Height = 31
-                Caption = 'Retry'
-                Glyph.Data = {
-                  66090000424D660900000000000036000000280000001C0000001C0000000100
-                  1800000000003009000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFCAF4FF0D5CB70457B3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFF0FF0F61AF0B99DA
-                  0663C0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFC6EBF92063BF0D9ED526E0FF0065BCFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCEEFFF0E6ABD11
-                  96DA21B7ED24BEFF1463BAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFBEF4FB0B6AC11C9CDD35B3ED2294E842B9F00365CBFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC3EFFC216A
-                  C62298D94BB8F6388AFA298EEA4AB9FD0E6ABDFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFCAEEFE1273B52C9CE248B4FF3F94F04A8DFF3E8B
-                  F943A8F3369CE7046ECB0A65D2006CC1106FBF126BBC0D70C6FFFFFF1363C003
-                  68CB0D6FC31C6BC6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCAF4F9
-                  1571C02BA6DE4BBBFF419CF74695F04E98F84590FC409DFA42AEFB54C0F653C5
-                  FA5EC8FE5FC5FA68E9FC1272BEFFFFFF1773C066E2FF61E8FC1270C3FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFD8F6F70577CB2EA6E754C0F03B9DFB42A1F0
-                  4F9EF54894F83F9EF53999F7449BF14D9DFC3C9AF3459AFE439CF453F0FA0D6A
-                  D1FFFFFF0578C957C6F659EDF90073CCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD1
-                  F5FD0777CB35A5EB40C1FA48A9F940A0FA40A3F3419EF9419DFC42A2F5469FF7
-                  4CA0F23DA0F043A1FA40A0FD46A3F252F4EF1071D3FFFFFF0474C653CAFB52E8
-                  EF0075D2FFFFFFFFFFFFFFFFFFFFFFFFD7F1FF0C73D025ADED4CCDEE42AEFF37
-                  A9F0409FFF3EA4F639ADF436A5F543A3F647A3FC41AFF140A7F63AA9F147A4F9
-                  389EF75CF9EF0F74CAFFFFFF0978CE43C7FD61F0FF0071CFFFFFFFFFFFFFFFFF
-                  FFFFFFFF0F7CCA1EB2EE45D1F63BB6F643ADFA3FB1F739B1F239ACFC40AFF742
-                  B3F139ABF23AB2FA30AEF532B0F73BACFC3DAFF636ABFC69F4F7037FC5FFFFFF
-                  0B7AD647D1FF61EDF40B82CDFFFFFFFFFFFFFFFFFFFFFFFF1C87D82CB6E57AF6
-                  FE41C7F739C1FB48C4F447C9F451C3FF49C6F95DBFFB54CBF258CBF04FC8F24D
-                  C9F957C4F851C9F354CAFB7BF4F01E90E4FFFFFF0692DF51E1F36CF2F6148CDF
-                  FFFFFFFFFFFFFFFFFFFFFFFFD4F0FB1491E12FBAE17AF7FB56CCF645C8FA4ACD
-                  F848C6FF50D0ED53D5FF3FCCF74ED0F562CEFF51D0F64DD4FA51D3F04FCDFD91
-                  FEFC1696DDFFFFFF1C97E14BE1F97FF2FF1C92E5FFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFF0E96D830C3F188F6FF4ED8F546CEF851D4FC45D7F347D1FC4FD6
-                  F646DCFF45D1FA47D9FC55D1F94EDCFB43CFF687FAFD0EA4E4FFFFFF109FDD4B
-                  E8F884F7FF0F9DDAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD5F2FF0F99E1
-                  34BFEA83F8FD48D4FB4ED7F737DAFA3CD9F342DAF94DD7F45BEAF1A5FCF99FF7
-                  FD97F7FF95FBFF96FAFF1FA2E1FFFFFF1EA1EA90FBFF91F1FE17A1D6FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD1F0FF0F9DE429C5F390F9FC3EDAF8
-                  3BDBF939DEF74CE0F639E2FD90F8FF12AAEB17A2E713A5E62DABDB1BAFD91DA3
-                  EBFFFFFF11A2E00E9DE022A7E315A0DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFC4F0FF149FDE2CCFF097F6FF35E2F633E1EE35D8FF9EF6FF
-                  1BADE1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD7
-                  F3FF109FE328C8F28FFFF024DEFC3BE2FD98F8FE20A3ECFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD5F1FF19A5EC1CC5F890
-                  FFFB2CE8ED9EFEFE0EA9E8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFD1F1FE12A6F41AC2FFA2FFF59BFFFF0AA4EBFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFC7F5EF10A9EE22C7EE95FFFF13ABECFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFEFFC15AC
-                  E513C3F816A7F2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFF6FE0BAAEE07A6E8FFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                Spacing = 5
-                Visible = False
-              end
-              object sbSkip: TSpeedButton
-                Left = 394
-                Top = 266
-                Width = 107
-                Height = 31
-                Caption = 'Skip'
-                Glyph.Data = {
-                  66090000424D660900000000000036000000280000001C0000001C0000000100
-                  1800000000003009000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF2D5E2826641EDEF0DFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF286B20
-                  0EA226166B19E2F2DBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF206F180FE45811AA2F226D21D9EFD7
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF23781C00CC4E0BBC471AA133166F1FD5F8DDFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1E761813BB5600
-                  A64011B74C16A635176F1BDCF0DDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF1B742406BB4F059A440B9B4817BD520FA6321E
-                  7420DCF4D4FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  20732420752B18781A1F7A24FFFFFF337123196E24207622227A2014751E1C7C
-                  2215A33A14B059069A460E9B4C0B9E491DBB5718A643186D29DBF4D8FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF26782556FCBF15E06B1D7A29
-                  FFFFFF167B255CFFD502C75909CD5D12C16A24C56311B55615A35810A055179D
-                  551A9E580CAB550CBF5818A8491F7829FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFF1379284AF3CC05CE5F187D32FFFFFF1F7A2F62F1EF10A758
-                  15A3581A9D6411A35116A95913A45A14A15E189E5C1DA65C10A55508AD561DC4
-                  6310AF411E7E38D3F0D7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1C7C2F53
-                  F1CC13D263228432FFFFFF1D802A5AF7E311AC5B21AC621FAA591FB35B1BA85F
-                  14A8601BAD6515A55A1AAB5C1FB06219A96111AE5D18C76511B0481D8036DEF7
-                  DBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1D79325BEED218D377148034FFFFFF1A
-                  7E3262F8E119B2631FAA6617AE5F18AD6314B2661DAB6A19AD5F22B8651AAE62
-                  1EAD681BAD651EB26A1BAF691BCB6D10B750168033D3F4DFFFFFFFFFFFFFFFFF
-                  FFFFFFFF1987355AF5D021D3720C8A31FFFFFF1D823E70F9E320B56B26B46F1F
-                  B4752AB37612B66125B27321B16922B36925B67221B07121B26E24B36E29B274
-                  1CBD711BCC7C17B5572D8042FFFFFFFFFFFFFFFFFFFFFFFF27914468F7E033DF
-                  8D239A4FFFFFFF3297537FFFE23BC88545C98D37C58A53C68D3BCA8B3BCC8840
-                  C88E3DC58B34C38439C7863DC38738C68528C67A34C48370FFDE18B969209336
-                  FFFFFFFFFFFFFFFFFFFFFFFF2D975087FFDE2BE09B29A15AFFFFFF2DA65C8CFA
-                  E851D39C49CF9A4CD09B57D59A48D49949D4A14DCE9B52D19A45CD9341D39937
-                  CD9241C8983FCE907CFFE51FBC7228984BD8F2DAFFFFFFFFFFFFFFFFFFFFFFFF
-                  279B5876F4D73FE0AE2BA765FFFFFF28A65A97FFEA57D9A454DAA658D2A25AD7
-                  A54FD8A45CD7AB51D39E58DD9F58D99E50D29D55D4A142DC9589FFE220C07E32
-                  9861D0F3D8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF29A16091FFEA84FFE027A361
-                  FFFFFF30A8689FF9F990FBF294FFFC9BFDEF92FFE55FE4B94FE1AB5AE5AC59DE
-                  AC55E1A451E3A34FE0AC98FAEC22C980309D59D0F5DBFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFF32A25A2B9B6532A56629AA55FFFFFF30AD5D2EA9652CA95F
-                  2BA8602DAC6133A67488FFE34CECB062E9BD5AE0AC54E6B051E7B28EFEED2DC3
-                  8E289C59DCF2D6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2BAD6C
-                  8EFFEA64EAB661EDB761E8BC99FAF62FCB8B2AA55BD8EEDCFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF29AD6A9BFAF366E8BF59F2BA9AFFF4
-                  2AC88C24A562D9EFD7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF20AA6397FEEF5BECCC95FFF026CA8320A965D3EFDCFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1FAD6691FFED99
-                  FFF326CC9127AA67D4F3D6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF1FAD629AFFEB2CCE8D21AB63C8F7D7FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF0DAA6716CF8D23A06FCEF1DDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2DA17216AC66CFF1E0FFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                Spacing = 5
-                Visible = False
-              end
-              object sbTrayEnd: TSpeedButton
-                Left = 634
-                Top = 266
-                Width = 107
-                Height = 31
-                Caption = 'Tray End'
-                Glyph.Data = {
-                  66090000424D660900000000000036000000280000001C0000001C0000000100
-                  1800000000003009000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF868686868686888686888686888686
-                  8886868886868886868886868886868A88888684848886868785858886868684
-                  84898787FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF898787E2DDDED4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4
-                  D4D4D4D5D3D3D6D4D4D4D2D2D5D3D3D5D3D3E1DFDF888685FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF878585DFDADBC7
-                  C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7CAC8C8CAC8C8C8C6C6
-                  CAC8C8CBC9C9DBD9D9868483FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF868484DCD7D8CACACACACACACACACACACACACA
-                  CACACACACACACACACACACACBC9C9CBC9C9C9C7C7CAC8C8CBC9C9DCDADA888685
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF888686DED9DACCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCF
-                  CDCDD0CECECECCCCCECCCCCFCDCDDDDBDB878584FFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8B8989E1DCDDCECECECECE
-                  CECECECECECECECECECECECECECECECECECECECECCCCD0CECECECCCCCFCDCDD0
-                  CECEDFDDDD888685FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF8C8A8AE4DFE0CFCFCFCFCFCFCFCFCFCFCFCFCFCFCFCFCF
-                  CFCFCFCFCFCFCFD2D0D0D3D1D1D1CFCFD1CFCFD3D1D1E3E1E18C8A89FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8C8A8A
-                  E8E3E4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D5D3D3D6D4
-                  D4D4D2D2D4D2D2D5D3D3E5E3E38C8A89FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8D8B8BEAE5E6D5D5D5D5D5D5D5D5D5
-                  D5D5D5D5D5D5D5D5D5D5D5D5D5D5D5D7D5D5D8D6D6D6D4D4D7D5D5D9D7D7E7E5
-                  E58D8B8AFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF8C8C8CEAEAEADADADAD9D9D9D8D8D8D7D7D7D8D8D8D8D8D8D8D8D8
-                  D8D8D8D9D9D9D8D8D8D8D8D8D8D8D8D8D8D8EBE9E98F8D8DFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8D8D8DECECECDE
-                  DEDEDDDDDDDCDCDCDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDBDB
-                  DADADADBDBDBEDEBEB8F8D8DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF8E8E8EEFEFEFE1E1E1E0E0E0DFDFDFDEDEDEDE
-                  DEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEDEF0EEEE918F8F
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF909090F1F1F1E4E4E4E3E3E3E2E2E2E1E1E1E1E1E1E0E0E0E0E0E0E0E0E0E1
-                  E1E1E1E1E1E1E1E1E0E0E0E1E1E1F2F0F0929090FFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF919191F4F4F4E7E7E7E7E7
-                  E7E6E6E6E5E5E5E5E5E5E4E4E4E4E4E4E4E4E4E4E4E4E4E4E4E4E4E4E2E2E2E3
-                  E3E3F5F3F3949292FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF929292F7F7F7E9E9E9E9E9E9E9E9E9E8E8E8E7E7E7E6E6
-                  E6E6E6E6E6E6E6E7E7E7E7E7E7E6E6E6E5E5E5E6E6E6F8F6F6959393FFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF949494
-                  FAFAFAEBEBEBEBEBEBEBEBEBEAEAEAE9E9E9E9E9E9E9E9E9E9E9E9EAEAEAEAEA
-                  EAEAEAEAE8E8E8EAEAEAFBF9F9979595FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF959595FCFCFCEEEEEEEEEEEEEEEEEE
-                  EEEEEEEDEDEDECECECECECECEDEDEDECECECECECECECECECEBEBEBECECECFCFA
-                  FA979595FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF989898FDFDFDEEF0F0EEF0F0EFF1F1EFF1F1EEF0F0EEF0F0EDEFEF
-                  EDEFEFE7E9E9F1F1F1F0EEEEF7F2F3F0EBECFFFBFC9B9697FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF999999FFFFFFF1
-                  F3F3F2F4F4F2F4F4F2F4F4F1F3F3F1F3F3F0F2F2F0F2F2F1F3F3C0C0C0888686
-                  8B8687908B8C8D8889898787FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF979797FFFFFFF4F4F4F4F4F4F4F4F4F4F4F4F3
-                  F3F3F3F3F3F3F3F3F2F2F2EFEFEFD3D3D38F8D8DF8F3F4EEE9EAC0BBBC8D8B8B
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF9E9E9EFEFEFEF5F5F5F5F5F5F5F5F5F4F4F4F4F4F4F4F4F4F4F4F4F4F4F4F6
-                  F6F6D2D2D2959393F7F2F3C3BEBF908E8EFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF999999FFFFFFF8F8F8F8F8
-                  F8F8F8F8F8F8F8F7F7F7F7F7F7F7F7F7F7F7F7F8F8F8D2D2D2979595CAC8C891
-                  8F8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF9D9D9DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFDFDFDDDDDDD9896969D9B9BFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9A9A9A
-                  9E9E9E9C9C9C9C9C9C9B9B9B9B9B9B9B9B9B9B9B9B9C9C9C9C9C9C9999999F9D
-                  9D9F9D9DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                Spacing = 5
-                Visible = False
-              end
-              object sbTrayFeed: TSpeedButton
-                Left = 514
-                Top = 266
-                Width = 107
-                Height = 31
-                Caption = 'Tray Feed'
-                Glyph.Data = {
-                  86080000424D86080000000000003600000028000000190000001C0000000100
-                  1800000000005008000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0A65B60961AEFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0F
-                  69BE0C9CDD089BD90B5DC2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFF1676BC15AADC2EC6F514BDFA0D9ED61664B0FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF1577C317A4E337BFFA2396F11C87E9
-                  2EBEF5099CE21C63B3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0C76CE23AED5
-                  44CEFD2FA5ED3094F4328CEB348DEF3FBCEE119ED71961C6FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFF0973D02FB2DE4FD2FA47A2F33E9FEF4D9AF73689F22E8CF03997F049C0
-                  FE26A2D81464BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFF087ACE3DB3DD62CEFE4EB2F358A5FC4AA4F94CA2
-                  FC3F91F04196F23B8BFC4198F853C8F525A3E3196FBBFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFF8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0C7ECB3BB4DE65D3F55BB5
-                  F657A7FA53AFFC52ACF944A5F54996F64C90F94096F64095F9469CF652CCF02B
-                  A8E2096EC4FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0C80
-                  D730B7E55DD8F44FB7FC4DB1EC63B4F855B2FD5BB5F659AEFC4798F94196FC43
-                  99F94C9BF6499DF63BA0F651CEFF2EA7DF0877C7FFFFFFFFFFFFFFFFFFF9FFFF
-                  FFFFFFFFFFFFFF1889C22FB6E254DAF259BAF955B4FE55B4FE4DB7F758BCF359
-                  B8F752ABFB45A5F13F9FF246A1FC3DA0F63A9CFA48A1FC3EA7F657DDFB30A9E1
-                  0273CAFFFFFFFFFFFFF9FFFFFFFFFFFF1A87C52CAEF35DDFF650BAF756B5FF4B
-                  B9F549BCFF52BAFB53BFF558BFF850BDFB3AA6F73DA9F743A9F242A8F143ACF5
-                  3CA3F93EA6F93FAFF548D6FF2AAFEB1578C8FFFFFFFFFFFFFF0687D033B7ED5F
-                  EFFA49DBFF5FDDF64DD9FE4DD1F94CCEF34DBDFF46C6FB4BC5FB44C4F73DACFA
-                  31AAFA41B3F231A9F53DBEEB3EBFFE42CBFC41DAF94EDAF955EFFC2EADF10581
-                  C8FFFFFFFF0F8CDC0A8CD21195D1028FD81391E31998D52ABDEF6CEEF34DCDFD
-                  3ECEF146CAF93EC8F639B6FA34B9FD3BB7F337B9FE53DBFD26ABE91182D80583
-                  D50279D60086D2057ADD1685D5ECFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFF0B84CE73F5FF36D0FB3ED3FB3FD4F636CEF732C0F730C4FA2FBBF02DC0
-                  F85DECFF068ECEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0B89DB7FF9FF36D0FB3ED8FB37D8F431D3
-                  FD2BC6F42AC9F52BC4F722C4F460F3FD048AD2FFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF088BD57FF8
-                  F42CDAF124DCFA30D9F42DD5FE27CDF627CCF32ACCFC1FCBF564F3FB0D8DDFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6FFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFF148DED7CEFFF32DEFA2DDAFA2DDFF827D9FC23D3F824CFF520
-                  CEF81CD3F566F1FA0C8AE2FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0B90DA81F8FA22E2FF25E6F424
-                  E0F822DFF81CD8F522D7F71BD6F518DCF468F4FB0F90E7FFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF07
-                  94E482FBF715DEF828E5F420E3F71DE6F615D9F11FDBF815DBF311DDEE63F1F8
-                  1296EAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFF0197EF7CF8F225E6FA11E7F21DE6FB16E4F61CDDFF
-                  11E2F216DFF412E4F26AEFFD0E95EBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0B99EE87FAF715E5F7
-                  12E9FE1BEDF913EAF313DFF811E8F119E4F314E5EF66F4FF089FEAFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFF0198E288F9FB1FEAF517E8F812E6F110EBF412E2F812E6F11EDFF320E2
-                  F461F0FF019EE7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0BAAE48AFBFE84FBFD99F5FA8CFEF784FF
-                  F877F5FA6CF8F774F7FF68F7FF79F2FF19AAE2FFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0D99F411A4
-                  EC069FEE059EF30F9FF00AA0EE0BA1EF07A3E80EA1E7099EE01CA8E5009CEAFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                Spacing = 5
-                Visible = False
-              end
-              object sbOneCycle: TSpeedButton
-                Left = 240
-                Top = 222
-                Width = 120
-                Height = 40
-                Caption = 'One Cycle'
-                Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWindowText
-                Font.Height = -16
-                Font.Name = 'Times New Roman'
-                Font.Style = [fsBold]
-                Glyph.Data = {
-                  86080000424D86080000000000003600000028000000190000001C0000000100
-                  1800000000005008000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFDAA677E4D0A1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBD7637FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCF7D2FDFA454D6995BE6CCA8FFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  D28130E4AA5EC67D2BFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC67A
-                  27F2E88AFFC27BD6A458DCB392FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFD38128E9BC73FFD482DFAF61C67934FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFC98036FFDF85F9D484FFCE79ECB162E3C095FFFFFFFF
-                  FFFFFFFFFFF4FFFFFFFFFFFFFFFFFFFFFFFFD17F38ECD2AEF6D499FFD27AFFCE
-                  7DD3A962CE822FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCA813DFFDF7BFBD27DFF
-                  D280FFD571D6A35AE2CFB4FFFFFFFFFFFFF9FFFFFFFFFFFFFFFFFFC38238E9D9
-                  C9FFE9C0FFD68FFFBE7BFAC777F9CE7DE6AD52C28339FFFFFFFFFFFFFFFFFFFF
-                  FFFFCE822FF0D27FFFD288FCCD7BFBD37AFDCD75D59E65FFFFFFFFFFFFFFFFFF
-                  FFFFFFFFCB8B44FFE5C6FFF5D4F9E2B5FFC98EFFC775F9C071FFCC71FFD47CE6
-                  B157CF8446FFFFFFFFFFFFFFFFFFEBC49DDC9649F7BE81FBD27DF5CC7DFFDB89
-                  E4A963E6D0ADFFFFFFFFFFFFFFCC8C45FFE7BFFDEFCBFAE8CBFFE5C3FDD495F4
-                  C16BFFC873FCC77EFECD7FFFDF8FE6B462CE8A3FFFFFFFFFFFFFF1FEF6F0D7C3
-                  E09850F2CF7FFFD685FFD188E4C17FDAB387FFFFFFFFFFFFFFF4DFB2FFF7C4FC
-                  EBB2FCF0CCFCE5C5FFD5A1F5C476FFC681FFD377F7D593FFDE99FFF19CE3BE6A
-                  DD8B3DFFFFFFF3FCFFFFFFFBECC898EBB76BFFD989F2D590F4D685DFA45EFFFF
-                  FFD2FFFFFFFFFFFFFFFFFFFFFFFFECC59EFFEBCBFFDA9FFFCD87FCCB7BF3AB5D
-                  E39045D99149DB9541D68B46DE9153FFFFFFFAFFFFFFFCFEF7E9CCDEA256FFDF
-                  8FFFDA91F3E397DB9650FFFFFFDEFFFFFFFFFFFFFFFFFFFFFFFFE3B683F8F3D4
-                  FFE5A2FCD587F9DA85DF9751FEFEF8FFF8FFF2FFF8F3FFFFFFFDF5FFFFFFF9FD
-                  F8FAFBFFFDFBFBDC9A4CFBE194FFE293FDE6A2D99E58FFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFE7B67EF7F1DAFFE9C1FFD391FBD98DE3A460F4E6D3FCFBFDFFFF
-                  F7FFF8FBFFFFF9FFFFFFFAFFF7FFFBFFF2E4D8E3A75BFCE599FCECA0FDDA9AE2
-                  B37BFFFFFFFBFFFFFFFFFFFFFFFFFFFFFFFFE8BF8EFCF0CEF4F3DFF7DD9AFFDE
-                  90F1C37CEEC8A5FFF9FFFFFFFBFFFEFFF5FDF3FFFFFFF8FDFEFFFCFAE0CDA2F6
-                  C47CFFE7A1F0E7A4FFDFA1E9BF9AFFFFFFF6FFFFFFFFFFFFFFFFFFFFFFFFFBDA
-                  C0EFCCAAFFFEEAF3E8ACFFDA9BFBD392E2AC70EEE1BBFCFEEBFAFEFFF9FBFBFF
-                  FFFFFFFFF6F5DDC1E1AB6CFBDD9CFFE7A9F9F2B9F9CB95EED9C3FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFE3B875FCECC7F2F0C8FFE896FBEFA1F3D691DB
-                  AD60F8D1ABF8E5DDFFFDF5FCEDDDFACAA8E2AE72FFDE8FF5E8AAFFEDBBFFF3BF
-                  E7B48CFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD9C3F3D29AFD
-                  F7E4FFF7D5FFE8A2F9E6A9FFE7A5F5C98AEEB468ECA757E1B56EF8CB88FEE59D
-                  F8EFAFFEF6BBFFF9CEE4C090FFDCBBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFEFD1AEFAE1B9FFFADFFFFCDBFAEEB8FEE4AEFFEEB4FFEEAF
-                  FAECAAFDEEAFFDEDB2FFEEB9FFF7C7FFFFD8E8CB8EF5D6A3FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF4CEABECC98AFFFFD1
-                  FFF6F0FDFFDBF4F5CBF6F2C1FEF8C3FDF7C8FEF8D3FBF9E1F6F5E7ECC690E9D4
-                  B5FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFF9DDC5E7B591F2DDB7FFF3D9FFFAE6FFFFF4FFFFF4FFFAE9FFFA
-                  DDFFE5BCE5C08EFFDFBCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCE1BFFACB97F0BA
-                  7EE8AB67ECAE68F1BA7DEDC89CEFDDC6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                ParentFont = False
-                Spacing = 5
-              end
-              object sbCleanOut: TSpeedButton
-                Left = 390
-                Top = 222
-                Width = 120
-                Height = 40
-                Caption = 'Clean Out'
-                Font.Charset = DEFAULT_CHARSET
-                Font.Color = clWindowText
-                Font.Height = -16
-                Font.Name = 'Times New Roman'
-                Font.Style = [fsBold]
-                Glyph.Data = {
-                  86080000424D86080000000000003600000028000000190000001C0000000100
-                  1800000000005008000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFF9FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8585858886868886868886
-                  868886868886868886868886868886861B70BE1069D1165DCF0679B67983832A
-                  6C242B6E121C70173B632CFFFFFFC38029C97533CE7933C47C24FFFFFFFDFFFF
-                  FF898787E0E0E0D3D3D3D4D4D4D3D3D3D4D4D4D3D3D3D5D5D5D3D3D30F7BCD5A
-                  E3FD5FE7F90C77CCC7D5D11D7A190AE55806E35F1F6E1DFFFFFFC48027FFCC79
-                  FFD07DC97E2FFFFFFFFFFFFFFF8A8888D4D4D4C7C7C7C7C7C7C7C7C7C7C7C7C6
-                  C6C6C8C8C8C6C6C60C81DC33DFFD3CDBFF067AD9D5CAD2236D2114CF690ACD67
-                  1B7925FFFFFFCB862FFFD281FFD685D08537FFFFFFFFFFFFFF8B8989D7D7D7C9
-                  C9C9CACACAC9C9C9CACACAC9C9C9CBCBCBC9C9C9098FE327F8FC2BF2FB0292DA
-                  CFC9CE1F782915D77A0CD7761B7924FFFFFFCF8D3AFCD88CFEDC90D58C42FFFF
-                  FFFFFFFFFF8C8A8AD9D9D9CCCCCCCCCCCCCCCCCCCCCCCCCBCBCBCDCDCDCBCBCB
-                  099DEF039DE6029CED129CE8CCD0CB26782F1FDB8F1CDA88217E29FFFFFFD28F
-                  40FFDE98FFE39AD88D48FFFFFFFFFFFFFF8D8B8BDCDCDCCECECECFCFCFCECECE
-                  CECECECDCDCDCFCFCFCDCDCD7EB3DE3FA8D95CADE69BB8DFCED7C212872A32E9
-                  912CE08F16862EFFFFFFDF974AFFE5A0FFEBA3E29752FFFFFFFFFFFFFF8E8C8C
-                  DDDDDDD0D0D0D0D0D0CFCFCFD0D0D0CECECED0D0D0CECECECED0D8CAD1CCC9D0
-                  CBD1CDD2D5D7D714883B1FE7991EE2A8118A35FFFFFFDB994BF2F2A6F0F4A8E0
-                  9A54FFFFFFFFFFFFFF8F8D8DE2E2E2D5D5D5D5D5D5D4D4D4D4D4D4D3D3D3D5D5
-                  D5D3D3D3D3D7CCD8D2CDDDD0D8D8D3D0D1D5CA158E3D2FF0AD27ECAE178D3AFF
-                  FFFFE6A255FFF4A8FFF8A9EBA65DFFFFFFFFFFFFFF908E8EE3E3E3D6D6D6D6D6
-                  D6D6D6D6D5D5D5D4D4D4D6D6D6D4D4D4D6D2D8D5D6D4D9CEDECFD0D4E1D8D51A
-                  94463AEFB22AF1AD199543FFFFFFF2A457EAA560E4A961F5A65DFFFFFFFFFFFF
-                  FF929090E6E6E6DADADADBDBDBD9D9D9D8D8D8D6D6D6D8D8D8D7D7D7D4D8D9D3
-                  D9D8E5D8DAD5D5D5DBD7DC119B4735F5B633F9B21B9A4FFFFFFFEED9B3F3BF8A
-                  FEBB94F6E1BBFFFFFFFFFFFFFF929090EAEAEADDDDDDDFDFDFDDDDDDDCDCDCDA
-                  DADADCDCDCDBDBDBE2D8DED8DDDCD7D8D6DDDBDAE2DCE109994E3CFACB2EF5C2
-                  0AA249FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF949292ECECECE0
-                  E0E0E1E1E1E1E1E1DFDFDFDDDDDDDFDFDFDDDDDDE2D8DED4E5E2E1DDDCDFE0DE
-                  DADFE013A15C24FCC524FFC60D9F57FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF959393EEEEEEE2E2E2E4E4E4E4E4E4E3E3E3E0E0E0E1E1E1E0E0E0
-                  E4E5E1E2DDDCE5DCDFE7E0E3D8E2E226A15F13A26415A45B1B9E5FFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF979595F2F2F2E6E6E6E7E7E7E7E7E7
-                  E7E7E7E4E4E4E5E5E5E3E3E3E7E0DDDDE5E4E8E7E9D6E4E3E5EAE9AFDCB560BE
-                  8F45B778599E79FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF989696
-                  F4F4F4E8E8E8EAEAEAE9E9E9E9E9E9E7E7E7E8E8E8E6E6E6E7E9EAF0E1E5E9E3
-                  E4E2E7E5E4E6E6E5F1E5EBE6E5F8F8F2989590FFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF999797F6F6F6EAEAEAECECECEBEBEBEBEBEBE9E9E9EAEA
-                  EAE8E8E8E4E9EAE9E8EAEEE6E6E9EDE8E2E7E5ECE8EDE7E8F2F1F2FC9B9893FF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9A9898FAFAFAEDEDEDEFEF
-                  EFEFEFEFEEEEEEEDEDEDEEEEEEECECECEEECEBEDEDEDEAECECECEAE9F1EFEEEC
-                  E8EDEDEBEBF7FBF597979DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FF9C9A9AFBFDFDEDEFEFEEF0F0EFF1F1EEF0F0EFF1F1ECEEEEEEF0F0ECEEEEED
-                  EFEFEDEFEFEEEEEEEFEDEDF3F1F1F0EBECFEF9FA999999FFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFF9B9999FDFFFFF1F3F3F2F4F4F2F4F4F1F3F3F3
-                  F5F5F0F2F2F1F3F3EFF1F1EAECECEDEDEDC9C9C98D8B8B8785858E8C8C8D8889
-                  898989FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9E9C9CFFFFFFF4
-                  F4F4F4F4F4F4F4F4F3F3F3F4F4F4F2F2F2F3F3F3F4F6F6F0F2F2F2F2F2D0D0D0
-                  909090F3F1F1EEECECBAB8B8909090FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFF9E9C9CFDFDFDF5F5F5F5F5F5F5F5F5F4F4F4F5F5F5F4F4F4F4F4F4
-                  F4F4F4F4F4F4F6F6F6D3D3D38E8E8EF8F6F6B9B7B7969494FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA4A2A2FCFCFCF7F7F7F8F8F8F8F8F8
-                  F7F7F7F8F8F8F7F7F7F8F8F8F8F8F8F8F8F8F6F6F6D6D6D6949494C4C4C49997
-                  97FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFFFFFF9D9B9B
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDFDFDFCFC
-                  FCDADADA9A9A9A9C9C9CFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFF9F9D9D9B9B9B9C9C9C9B9B9B9B9B9B9C9C9C9C9C9C9C9C
-                  9C9B9B9B9B9999A2A2A29B9B9BA1A1A19D9D9DFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFF}
-                Margin = 10
-                ParentFont = False
-                Spacing = 5
-              end
-              object sbReset: TSpeedButton
-                Left = 154
-                Top = 266
-                Width = 107
-                Height = 31
-                Caption = 'Reset'
-                Glyph.Data = {
-                  FE0A0000424DFE0A00000000000036000000280000001E0000001E0000000100
-                  180000000000C80A000001000000010000000000000000000000FFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFF1E1CAE2C08ADCA865D48546C27836BB722ECC88
-                  45DD9B66DBBE97EEE2C6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFEEE3C5DEA97EC27B3CE0A150E0B047FFC15FFBC461FFC562F8C55DE3AF4B
-                  D2A54AC78435D1B082FCDFCAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE9C7A9C18D
-                  47EBB557F9CF6FFFE48BFFEC9EF9EC96FCF79CFFF097FFEE97FDE992F9D980FF
-                  C86DECAB56CF8F48ECCCA8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFC0A0C87D31F3C560F8DC7D
-                  FFE187FFE17CF4CB6EF5C15DFFBF58FCBE58FFC668FFD079FFD985F6D984FFD1
-                  68FFC35DC47C34ECBEA6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFF3CAAAC07E37FECC6CF8D976FFCD71FFB258FF
-                  B453FBB44CF9B64FF2B04AF5B64EF4B347FFB348FFB54EF7C35EFED071FDD370
-                  FFC76AC07F3BEACBAAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFF9E3C7C58E4BFFCC6FFDCB71FFC069FFBB55F9B74EFEB258F6B3
-                  57FFDA84FAE08CFFE08CF7E384FEB252FFB954F7B751FBB55AF6C76BF9D06DFD
-                  C467C79351FDE5C9FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFE3B481E8B968FFD26DFEC667FFB85DFEB853F7BB51F1B652EDC047EE7103
-                  EE6D00E66B03FAEB7DF5B759F1B659FCB75AFFB653FFBC5BFCC766FFCC72F7B2
-                  69D7B083FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9E4CFC791
-                  3EFFD079FFCA6FFCBF61FABD5DF8BA5CF8BA5CF7B85CF4B85FEE7200F27700F6
-                  7700F3E396F6B75BF0BB5AF7BD54F6BB57FFBC5FFDBD5FFDC976F9D373CF9145
-                  FAE0CFFFFFFFFFFFFFFFFFFFFBFFFFFFFFFFFFFFFFFFFFEACAA7E1AD5AFFD27D
-                  FEC66DFBC063FBBE60F8BB5EF7BA5DF8BA60F9B85CF17900F77A00EF7600FFE5
-                  A4FDB857F9B65FFCBB66F9BD5DFEBD61FFBE65FBC66FFFD777E2AA5DEBC7A9FF
-                  FFFFFFFFFFFFFFFFFAFEFFFFFFFFFFFFFFFFFFDFAE76F3C371FFCF7CF9C36CFA
-                  C067FABE64FBBF65F8BE65F7BE68EDBE63F08400F57F00E57D00F2E5A7F7C16A
-                  F5BB69F1BC62F9BD63FABE64FEBC69F9C668FFD478F3C375DEAB79FFFFFFFFFF
-                  FFFFFFFFFDFEFFFFFFFFFFFFFFFFFFE09E57FDD07FFFD07EFBC774FAC46DF7BE
-                  68F8C16CF6C06DF1BC6BFBBF6BF37D00FB8502F08204F5ECA9F5B665F9C06BF9
-                  C666FABE6AF8C36CFDBB6DFECC6CFFCF77F9D283DB9B5AFFFFFFFFFFFFFFFFFF
-                  FEFFFFFFFFFFFFFFFFFFFFDD9547FFD88AFBD081F9C977FAC673F6C06DF7C271
-                  F3C274F1C173FFC16CF78901EA8504F28708F2EBB4FFC46AF3C272F2C371FBC2
-                  73F6C771FDC076FDCF70FFCF7CFFDE8FD89449FFFFFFFFFFFFFFFFFFFEFEFFFF
-                  FFFFFFFFFFFFFFDA944EFFDF93FCD587FACC7EFCCB7BFECB7BFECC80FCCF85FF
-                  D48BFDD18AFFB019F9A81DFCA11EF6F1D8F7D37FF1CB8AFFCD85FCC57AF5C975
-                  FFC57DF8CD76FFD486FFE293D1914AFFFFFFFFFFFFFFFFFFFDFCFFFFFFFFFFFF
-                  FFFFFFE3A468F9D98EFDD98DF9CF82FBCA7EFDCC80FACB81F7CD86F9D28DFCD3
-                  95E6A931F5AC33F6A635FFF3D4F2CC8BFECD8FFFC880FBC981F5CB78FCC980F7
-                  D081FFD990FFDB8DDAA163FFFFFFFFFFFFFFFFFFFCFBFFFFFFFFFFFFFFFFFFF0
-                  B784F1D287FFDE94FFD88DFBCD80FFCE84FBCE85F6CD88F4CF8BF5CE89F6CF8A
-                  FFD987FED17AE6D48DF6CC89FDCF88EACF85FDCC86F7D07BFCCB7FFFD88EFFDD
-                  95F8D284ECBA80FFFFFFFFFFFFFFFFFFFDFBFFFFFFFFFFFFFFFFFFE3CEB8EEC6
-                  7EFEE4A2FCD997FFD88EF9D288FBCF88FDCD8BF9D092FCD188F3C982FEF1CBFF
-                  EBCCFAEBD8FECC90F9CF8EF9D189F6D08FFFCC8FFFD48EFBDC91FFE7A4E0C380
-                  F6D3A7FFFFFFFFFFFFFFFFFFF6FDFFFFFFFFFFFFFFFFFFF6E8D6E1A357FEE8AE
-                  FAE9AAFDD98BFFDB93FFD39AF9D595F6D38FFFD689FCB022FAA629E7AB29FFED
-                  C8FCDA8EF3CC98FFD78CF7D68DFFD996F7D796FCEBA8FFEDA8DB9E66FFE5CDFF
-                  FFFFFFFFFFFFFFFFF9FEFFFFFFFFFFFFFFFFFFFFFFFFF2C691FCD99AFFEEB5FC
-                  E5ADFFDB96F5DB95FFD69EF7DD97F7D79CF7B23DFDAD32F2B33BF5D6A1F6D792
-                  F7D9A0FDDD96FFDA96F9DC97FEE6B8FFE9BAEED98EEBC497FFFFFFFFFFFFFFFF
-                  FFFFFFFFFBFFFFFFFFFFFFFFFFFFFFFFFFFFF5E8DAEFAC73F8EDA9F5F4CEFFE9
-                  C0FFDDA2FCE3A3FEDC9AFADEA2FFDC9CFCE49CFFE09CF3DE9AFFDE9EFADE9EFF
-                  DFA7FFDFABFEEFC1FEF3C7F6E7A8ECB075EDEBCDFFFFFFFFFFFFFFFFFFFFFFFF
-                  FDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3D8B6DFA865FCF6BBFCF4E3F6F1D8
-                  F3EEB7FFE2B1FFE4A4FCE5A7F0E2A8F4DE9CF7E5A6FDE3A7F9E3B9FFEECAF9FA
-                  D2FFF5D8F9F7B6E5A05AFAD9B8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD5AEE8A861FDF6BDFDFBE3FCFFF1FF
-                  F9EBFCF4E3FFF0D6FFEEDCFFF0DBFFF5E7FEF6D9FBFCE8F4FEEEFFFCD4F3F2B5
-                  E99E66FFD7B7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFEFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5DAAEEAB473F3DBADFFF1DFFDFFE9F9FD
-                  F8FFFEFFFFFDFCFFF9FFFCFDF4FFFFF4FFFFE0FDF5D8FAD9A8E6B478EED7B7FF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFEFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFBEDDAF4CD99E3AF6DFAD291F4E6ABF6F1C4
-                  FAFFCCFEFFD4F1F6B9F1E4B8F8D095F4AD6AFCCB9FFDE8D3FFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFAECDAEBD6C0F8C48FF1B77CF0AC69F3
-                  AD67F5B574F3C490F6DBB6FDEFD3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                  FFFF}
-                Margin = 10
-                Spacing = 5
-                Visible = False
-              end
               object lstLog: TListBox
                 Left = 0
                 Top = 0
-                Width = 941
+                Width = 673
                 Height = 201
                 Align = alTop
                 ItemHeight = 13
@@ -4935,8 +3688,8 @@ object fMain: TfMain
               object sgTimeData: TStringGrid
                 Left = 0
                 Top = 0
-                Width = 911
-                Height = 529
+                Width = 673
+                Height = 415
                 Align = alClient
                 ColCount = 15
                 DefaultColWidth = 100
@@ -4945,8 +3698,8 @@ object fMain: TfMain
               end
               object btSaveTimeData: TPanel
                 Left = 0
-                Top = 529
-                Width = 911
+                Top = 415
+                Width = 673
                 Height = 41
                 Align = alBottom
                 Caption = 'Save Time Data'
@@ -4963,10 +3716,10 @@ object fMain: TfMain
               Caption = 'Map of Tray'
               ImageIndex = 3
               object Memo1: TMemo
-                Left = 642
+                Left = 374
                 Top = 0
                 Width = 299
-                Height = 574
+                Height = 456
                 Align = alRight
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWindowText
@@ -4980,8 +3733,8 @@ object fMain: TfMain
               object PageControl1: TPageControl
                 Left = 0
                 Top = 0
-                Width = 642
-                Height = 574
+                Width = 374
+                Height = 456
                 ActivePage = tsSimulation
                 Align = alClient
                 TabIndex = 0
@@ -4991,7 +3744,7 @@ object fMain: TfMain
                   object gbSimuSetting: TGroupBox
                     Left = 0
                     Top = 0
-                    Width = 634
+                    Width = 366
                     Height = 185
                     Align = alTop
                     Caption = 'Setting'
@@ -5019,178 +3772,6 @@ object fMain: TfMain
                 object tsOtherTool: TTabSheet
                   Caption = 'OtherTool'
                   ImageIndex = 1
-                  object grpNotUse: TGroupBox
-                    Left = 8
-                    Top = 2
-                    Width = 241
-                    Height = 242
-                    Caption = 'NotUse'
-                    TabOrder = 0
-                    Visible = False
-                    object lblNotUse: TLabel
-                      Left = 8
-                      Top = 20
-                      Width = 48
-                      Height = 16
-                      Caption = 'Not Use'
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                    end
-                    object palNotUseCnt: TPanel
-                      Left = 8
-                      Top = 104
-                      Width = 58
-                      Height = 26
-                      Hint = 'Click here to switch count and percent'
-                      BevelInner = bvLowered
-                      Caption = '0'
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 3
-                    end
-                    object palNotUseBin: TPanel
-                      Left = 8
-                      Top = 40
-                      Width = 30
-                      Height = 26
-                      Hint = 'Click here to switch count and percent'
-                      BevelInner = bvLowered
-                      Caption = '0'
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 0
-                    end
-                    object palNotUseID: TPanel
-                      Left = 8
-                      Top = 72
-                      Width = 120
-                      Height = 26
-                      Hint = 'Click here to switch count and percent'
-                      Alignment = taLeftJustify
-                      BevelInner = bvLowered
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 2
-                    end
-                    object palNotUse: TPanel
-                      Left = 134
-                      Top = 61
-                      Width = 87
-                      Height = 153
-                      Color = 9534289
-                      TabOrder = 1
-                      Visible = False
-                      object myNotUse: TTMyTray
-                        Left = 4
-                        Top = 4
-                        Width = 79
-                        Height = 145
-                        XItem = 4
-                        YItem = 5
-                      end
-                    end
-                    object palNoUseIn: TPanel
-                      Left = 8
-                      Top = 136
-                      Width = 36
-                      Height = 26
-                      Hint = 'IC Count from Loader'
-                      BevelInner = bvLowered
-                      Caption = '0'
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 5
-                    end
-                    object palNoUseICCnt: TPanel
-                      Left = 50
-                      Top = 136
-                      Width = 36
-                      Height = 26
-                      Hint = 'IC count in Auto Tray'
-                      BevelInner = bvLowered
-                      Caption = '0'
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 6
-                    end
-                    object palNoUseEmptyCnt: TPanel
-                      Left = 92
-                      Top = 136
-                      Width = 36
-                      Height = 26
-                      Hint = 'Empty pocket of Auto tray'
-                      BevelInner = bvLowered
-                      Caption = '0'
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 7
-                    end
-                    object palNotUseLotCnt: TPanel
-                      Left = 70
-                      Top = 104
-                      Width = 58
-                      Height = 26
-                      Hint = 'Click here to switch count and percent'
-                      BevelInner = bvLowered
-                      Caption = '123456'
-                      Color = clWhite
-                      Font.Charset = ANSI_CHARSET
-                      Font.Color = clPurple
-                      Font.Height = -13
-                      Font.Name = 'Arial'
-                      Font.Style = [fsBold]
-                      ParentFont = False
-                      ParentShowHint = False
-                      ShowHint = True
-                      TabOrder = 4
-                    end
-                  end
                 end
               end
             end
@@ -5204,14 +3785,14 @@ object fMain: TfMain
       object pnlMonitorView: TPanel
         Left = 0
         Top = 0
-        Width = 1736
-        Height = 1075
+        Width = 1256
+        Height = 957
         Align = alClient
         TabOrder = 0
         object pnlMonitorMenu: TPanel
           Left = 1
           Top = 1
-          Width = 1734
+          Width = 1254
           Height = 80
           Align = alTop
           BevelOuter = bvLowered
@@ -6223,10 +4804,10 @@ object fMain: TfMain
           end
         end
         object pnlControlBtn: TPanel
-          Left = 1589
+          Left = 1109
           Top = 81
           Width = 146
-          Height = 993
+          Height = 875
           Align = alRight
           BevelInner = bvLowered
           Color = 12761254
@@ -6794,12 +5375,12 @@ object fMain: TfMain
         object pgcMonitor: TPageControl
           Left = 1
           Top = 81
-          Width = 1588
-          Height = 993
-          ActivePage = tsMotorView
+          Width = 1108
+          Height = 875
+          ActivePage = tsMotionView
           Align = alClient
           Style = tsButtons
-          TabIndex = 1
+          TabIndex = 0
           TabOrder = 2
           TabWidth = 104
           object tsMotionView: TTabSheet
@@ -6808,14 +5389,14 @@ object fMain: TfMain
             object PanelMain6: TPanel
               Left = 0
               Top = 0
-              Width = 1580
-              Height = 962
+              Width = 1100
+              Height = 844
               Align = alClient
               Color = 12761254
               TabOrder = 0
               object pnlLed: TPanel
-                Left = 53
-                Top = 13
+                Left = 5
+                Top = 5
                 Width = 22
                 Height = 108
                 BevelOuter = bvNone
@@ -6857,7 +5438,7 @@ object fMain: TfMain
                 end
               end
               object plLoaderChLeft: TPanel
-                Left = 275
+                Left = 139
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6871,7 +5452,7 @@ object fMain: TfMain
                 TabOrder = 1
               end
               object plLoaderRChRight: TPanel
-                Left = 515
+                Left = 339
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6885,7 +5466,7 @@ object fMain: TfMain
                 TabOrder = 43
               end
               object plAuto3ChRight: TPanel
-                Left = 953
+                Left = 657
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6899,7 +5480,7 @@ object fMain: TfMain
                 TabOrder = 4
               end
               object plAuto3ChLeft: TPanel
-                Left = 859
+                Left = 563
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6913,7 +5494,7 @@ object fMain: TfMain
                 TabOrder = 3
               end
               object plAuto3TrayWork: TPanel
-                Left = 867
+                Left = 571
                 Top = 243
                 Width = 87
                 Height = 153
@@ -6929,7 +5510,7 @@ object fMain: TfMain
                 end
               end
               object plLoaderLTrayWork: TPanel
-                Left = 283
+                Left = 147
                 Top = 243
                 Width = 87
                 Height = 153
@@ -6945,7 +5526,7 @@ object fMain: TfMain
                 end
               end
               object plLoaderRTrayWork: TPanel
-                Left = 429
+                Left = 253
                 Top = 243
                 Width = 87
                 Height = 153
@@ -6961,7 +5542,7 @@ object fMain: TfMain
                 end
               end
               object plAuto4ChRight: TPanel
-                Left = 1099
+                Left = 763
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6975,7 +5556,7 @@ object fMain: TfMain
                 TabOrder = 8
               end
               object plAuto4ChLeft: TPanel
-                Left = 1005
+                Left = 669
                 Top = 52
                 Width = 9
                 Height = 700
@@ -6989,7 +5570,7 @@ object fMain: TfMain
                 TabOrder = 9
               end
               object plAuto4TrayWork: TPanel
-                Left = 1013
+                Left = 677
                 Top = 243
                 Width = 87
                 Height = 153
@@ -7005,7 +5586,7 @@ object fMain: TfMain
                 end
               end
               object plAuto5ChRight: TPanel
-                Left = 1245
+                Left = 869
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7019,7 +5600,7 @@ object fMain: TfMain
                 TabOrder = 11
               end
               object plAuto5ChLeft: TPanel
-                Left = 1151
+                Left = 775
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7033,7 +5614,7 @@ object fMain: TfMain
                 TabOrder = 12
               end
               object plAuto5TrayWork: TPanel
-                Left = 1159
+                Left = 783
                 Top = 243
                 Width = 87
                 Height = 153
@@ -7049,7 +5630,7 @@ object fMain: TfMain
                 end
               end
               object plEmptyChRight: TPanel
-                Left = 223
+                Left = 127
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7063,7 +5644,7 @@ object fMain: TfMain
                 TabOrder = 14
               end
               object plEmptyChLeft: TPanel
-                Left = 129
+                Left = 33
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7077,8 +5658,8 @@ object fMain: TfMain
                 TabOrder = 15
               end
               object plEmptyTrayWork: TPanel
-                Left = 137
-                Top = 243
+                Left = 41
+                Top = 251
                 Width = 87
                 Height = 153
                 Color = 9534289
@@ -7093,7 +5674,7 @@ object fMain: TfMain
                 end
               end
               object plAuto1ChRight: TPanel
-                Left = 661
+                Left = 445
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7107,7 +5688,7 @@ object fMain: TfMain
                 TabOrder = 17
               end
               object plAuto1ChLeft: TPanel
-                Left = 567
+                Left = 351
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7121,7 +5702,7 @@ object fMain: TfMain
                 TabOrder = 18
               end
               object plAuto1TrayWork: TPanel
-                Left = 575
+                Left = 359
                 Top = 243
                 Width = 87
                 Height = 153
@@ -7137,7 +5718,7 @@ object fMain: TfMain
                 end
               end
               object plAuto2ChRight: TPanel
-                Left = 807
+                Left = 551
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7151,7 +5732,7 @@ object fMain: TfMain
                 TabOrder = 20
               end
               object plAuto2ChLeft: TPanel
-                Left = 713
+                Left = 457
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7165,7 +5746,7 @@ object fMain: TfMain
                 TabOrder = 21
               end
               object plAuto2TrayWork: TPanel
-                Left = 721
+                Left = 465
                 Top = 243
                 Width = 87
                 Height = 153
@@ -7181,7 +5762,7 @@ object fMain: TfMain
                 end
               end
               object plCCDMotorLoader: TPanel
-                Left = 456
+                Left = 280
                 Top = 419
                 Width = 57
                 Height = 30
@@ -7196,7 +5777,7 @@ object fMain: TfMain
                 TabOrder = 25
               end
               object plEmptyLabel: TPanel
-                Left = 137
+                Left = 33
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7211,7 +5792,7 @@ object fMain: TfMain
                 TabOrder = 26
               end
               object plLoaderLLabel: TPanel
-                Left = 283
+                Left = 147
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7226,7 +5807,7 @@ object fMain: TfMain
                 TabOrder = 27
               end
               object plAuto1Label: TPanel
-                Left = 575
+                Left = 359
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7241,7 +5822,7 @@ object fMain: TfMain
                 TabOrder = 28
               end
               object plAuto2Label: TPanel
-                Left = 721
+                Left = 465
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7256,7 +5837,7 @@ object fMain: TfMain
                 TabOrder = 29
               end
               object plAuto3Label: TPanel
-                Left = 867
+                Left = 571
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7271,7 +5852,7 @@ object fMain: TfMain
                 TabOrder = 30
               end
               object plAuto4Label: TPanel
-                Left = 1013
+                Left = 677
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7286,7 +5867,7 @@ object fMain: TfMain
                 TabOrder = 31
               end
               object plAuto5Label: TPanel
-                Left = 1159
+                Left = 783
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7301,7 +5882,7 @@ object fMain: TfMain
                 TabOrder = 32
               end
               object plAuto6ChLeft: TPanel
-                Left = 1297
+                Left = 881
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7315,7 +5896,7 @@ object fMain: TfMain
                 TabOrder = 33
               end
               object plAuto6ChRight: TPanel
-                Left = 1391
+                Left = 975
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7329,7 +5910,7 @@ object fMain: TfMain
                 TabOrder = 34
               end
               object plAuto6Label: TPanel
-                Left = 1305
+                Left = 889
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7344,7 +5925,7 @@ object fMain: TfMain
                 TabOrder = 35
               end
               object plColorChLeft: TPanel
-                Left = 1443
+                Left = 987
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7358,7 +5939,7 @@ object fMain: TfMain
                 TabOrder = 36
               end
               object plColorChRight: TPanel
-                Left = 1537
+                Left = 1081
                 Top = 52
                 Width = 9
                 Height = 700
@@ -7372,7 +5953,7 @@ object fMain: TfMain
                 TabOrder = 37
               end
               object plColorLabel: TPanel
-                Left = 1451
+                Left = 995
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7387,7 +5968,7 @@ object fMain: TfMain
                 TabOrder = 38
               end
               object plAuto6TrayWork: TPanel
-                Left = 1305
+                Left = 889
                 Top = 243
                 Width = 87
                 Height = 153
@@ -7403,7 +5984,7 @@ object fMain: TfMain
                 end
               end
               object plColorTrayWork: TPanel
-                Left = 1449
+                Left = 995
                 Top = 243
                 Width = 87
                 Height = 153
@@ -7420,9 +6001,9 @@ object fMain: TfMain
                 end
               end
               object plTrayArmName: TPanel
-                Left = 114
+                Left = 34
                 Top = 63
-                Width = 1432
+                Width = 1056
                 Height = 17
                 Caption = 'Tray Arm '
                 Color = clSkyBlue
@@ -7435,7 +6016,7 @@ object fMain: TfMain
                 TabOrder = 23
               end
               object plTrayArm: TPanel
-                Left = 256
+                Left = 32
                 Top = 43
                 Width = 97
                 Height = 30
@@ -7460,7 +6041,7 @@ object fMain: TfMain
                 end
               end
               object plLoaderRLabel: TPanel
-                Left = 429
+                Left = 253
                 Top = 775
                 Width = 95
                 Height = 42
@@ -7475,7 +6056,7 @@ object fMain: TfMain
                 TabOrder = 41
               end
               object palSortArm1: TPanel
-                Left = 268
+                Left = 132
                 Top = 344
                 Width = 109
                 Height = 41
@@ -7525,9 +6106,9 @@ object fMain: TfMain
                 end
               end
               object plSortArmName: TPanel
-                Left = 122
+                Left = 34
                 Top = 399
-                Width = 1432
+                Width = 1056
                 Height = 17
                 Caption = 'Sort Arm '
                 Color = clSkyBlue
@@ -7540,7 +6121,7 @@ object fMain: TfMain
                 TabOrder = 2
               end
               object plCCDMotorColor: TPanel
-                Left = 1464
+                Left = 1008
                 Top = 419
                 Width = 57
                 Height = 30
@@ -7555,7 +6136,7 @@ object fMain: TfMain
                 TabOrder = 44
               end
               object chkLoadTray: TCheckBox
-                Left = 284
+                Left = 148
                 Top = 824
                 Width = 97
                 Height = 17
@@ -7572,8 +6153,8 @@ object fMain: TfMain
             object sgMotorStatus: TStringGrid
               Left = 0
               Top = 0
-              Width = 1580
-              Height = 962
+              Width = 1100
+              Height = 844
               Align = alClient
               Color = 14670284
               ColCount = 14
@@ -7599,8 +6180,8 @@ object fMain: TfMain
             object Panel12: TPanel
               Left = 0
               Top = 0
-              Width = 1580
-              Height = 962
+              Width = 1100
+              Height = 844
               Align = alClient
               BevelInner = bvLowered
               Color = 12761254
@@ -7608,8 +6189,8 @@ object fMain: TfMain
               object PageControlTaskView: TPageControl
                 Left = 2
                 Top = 2
-                Width = 1576
-                Height = 958
+                Width = 1096
+                Height = 840
                 ActivePage = tsTaskRecord
                 Align = alClient
                 TabIndex = 0
@@ -7620,8 +6201,8 @@ object fMain: TfMain
                   object lbTaskRecord: TListBox
                     Left = 0
                     Top = 0
-                    Width = 1568
-                    Height = 930
+                    Width = 1088
+                    Height = 812
                     Align = alClient
                     Color = 14670284
                     ItemHeight = 13
@@ -7637,8 +6218,8 @@ object fMain: TfMain
             object Panel13: TPanel
               Left = 0
               Top = 0
-              Width = 1580
-              Height = 962
+              Width = 1100
+              Height = 844
               Align = alClient
               BevelInner = bvLowered
               Color = 12761254
@@ -7646,8 +6227,8 @@ object fMain: TfMain
               object PageControl3: TPageControl
                 Left = 2
                 Top = 2
-                Width = 1576
-                Height = 958
+                Width = 1096
+                Height = 840
                 ActivePage = TabSheet2
                 Align = alClient
                 TabIndex = 0
@@ -7658,8 +6239,8 @@ object fMain: TfMain
                   object StringGridLockInfo: TStringGrid
                     Left = 0
                     Top = 0
-                    Width = 1345
-                    Height = 816
+                    Width = 1088
+                    Height = 812
                     Align = alClient
                     Color = 14670284
                     ColCount = 2
