@@ -1671,17 +1671,7 @@ object fMaintenance: TfMaintenance
             Width = 80
             Height = 20
             AutoSize = False
-            Caption = 'Port'
-            Visible = False
-          end
-          object lblMCUMaxQueueCap: TLabel
-            Left = 310
-            Top = 82
-            Width = 100
-            Height = 20
-            AutoSize = False
-            Caption = 'Max Queue'
-            Visible = False
+            Caption = 'Baud'
           end
           object lblMCUReconnectCap: TLabel
             Left = 310
@@ -1707,23 +1697,20 @@ object fMaintenance: TfMaintenance
             TabOrder = 1
             Text = 'COM5'
           end
-          object edMCUPort: TEdit
+          object edMCUPort: TComboBox
             Left = 108
             Top = 114
-            Width = 80
+            Width = 95
             Height = 24
+            ItemHeight = 16
             TabOrder = 2
-            Text = '7000'
-            Visible = False
-          end
-          object edMCUMaxQueue: TEdit
-            Left = 420
-            Top = 78
-            Width = 80
-            Height = 24
-            TabOrder = 3
-            Text = '500'
-            Visible = False
+            Text = '9600'
+            Items.Strings = (
+              '9600'
+              '19200'
+              '38400'
+              '57600'
+              '115200')
           end
           object edMCUReconnect: TEdit
             Left = 420

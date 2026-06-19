@@ -51,11 +51,15 @@ enum TTowerLightRunState
 // WebAPI pages were moved from runtime Build*Page() builders into the DFM, so they
 // now stream from the __published section below (member names preserved; the
 // Load/Save/Refresh code is unchanged).
-// IMPORTANT: keep this class body - the __published section above all - free of
-// comments, including trailing // comments on a member line. The BCB6 form
-// designer parses this header when you click a component event in the Object
-// Inspector; a comment among the members makes its parser raise
-// "Incorrect method declaration in class TfMaintenance". Put notes out here.
+// IMPORTANT: the BCB6 form designer parses this header when you click a component
+// event in the Object Inspector. Its simplified parser raises a whole-class modal
+// "Incorrect method declaration in class TfMaintenance" (breaking EVERY event on
+// the form) if the __published section either (a) contains any // comment among
+// the members, or (b) declares a component FIELD after an event-handler METHOD.
+// So keep __published in this exact order: ALL component fields first, THEN all
+// "void __fastcall ...Click(...)" handlers, and put explanatory notes out here.
+// When adding a new tab's controls, insert its fields into the field block above
+// the handlers - do NOT append field+handler pairs per tab.
 class TfMaintenance : public TForm
 {
 __published:
@@ -185,9 +189,7 @@ __published:
     TLabel *lblMCUIPCap;
     TEdit *edMCUIP;
     TLabel *lblMCUPortCap;
-    TEdit *edMCUPort;
-    TLabel *lblMCUMaxQueueCap;
-    TEdit *edMCUMaxQueue;
+    TComboBox *edMCUPort;
     TLabel *lblMCUReconnectCap;
     TEdit *edMCUReconnect;
     TButton *btnMCUSave;
@@ -211,12 +213,6 @@ __published:
     TButton *btnMCUSendCode;
     TButton *btnMCUSendLight;
     TMemo *memMCULog;
-    void __fastcall btnMCUSaveClick(TObject *Sender);
-    void __fastcall btnMCUReloadClick(TObject *Sender);
-    void __fastcall btnMCURefreshClick(TObject *Sender);
-    void __fastcall btnMCUSendDisplayClick(TObject *Sender);
-    void __fastcall btnMCUSendCodeClick(TObject *Sender);
-    void __fastcall btnMCUSendLightClick(TObject *Sender);
     TSpeedButton *spbMaintTopCcd;
     TTabSheet *tsMaintTopCcd;
     TPanel *pnlTopCcdSetup;
@@ -239,11 +235,6 @@ __published:
     TLabel *lblTopCcdResultCap;
     TEdit *edTopCcdResult;
     TMemo *memTopCcdLog;
-    void __fastcall btnTopCcdConnectClick(TObject *Sender);
-    void __fastcall btnTopCcdDisconnectClick(TObject *Sender);
-    void __fastcall btnTopCcdSaveClick(TObject *Sender);
-    void __fastcall btnTopCcdReloadClick(TObject *Sender);
-    void __fastcall btnTopCcdShotClick(TObject *Sender);
     TSpeedButton *spbMaintColorCcd;
     TTabSheet *tsMaintColorCcd;
     TPanel *pnlColorCcdSetup;
@@ -266,12 +257,6 @@ __published:
     TLabel *lblColorCcdResultCap;
     TEdit *edColorCcdResult;
     TMemo *memColorCcdLog;
-    void __fastcall btnColorCcdConnectClick(TObject *Sender);
-    void __fastcall btnColorCcdDisconnectClick(TObject *Sender);
-    void __fastcall btnColorCcdSaveClick(TObject *Sender);
-    void __fastcall btnColorCcdReloadClick(TObject *Sender);
-    void __fastcall btnColorCcdShotClick(TObject *Sender);
-    void __fastcall chkColorCcdEnableClick(TObject *Sender);
     TSpeedButton *spbMaintLotApi;
     TTabSheet *tsMaintLotApi;
     TPanel *pnlLotApiSetup;
@@ -290,6 +275,23 @@ __published:
     TButton *btnLotApiFetch;
     TMemo *memLotApiResult;
     TMemo *memLotApiLog;
+    void __fastcall btnMCUSaveClick(TObject *Sender);
+    void __fastcall btnMCUReloadClick(TObject *Sender);
+    void __fastcall btnMCURefreshClick(TObject *Sender);
+    void __fastcall btnMCUSendDisplayClick(TObject *Sender);
+    void __fastcall btnMCUSendCodeClick(TObject *Sender);
+    void __fastcall btnMCUSendLightClick(TObject *Sender);
+    void __fastcall btnTopCcdConnectClick(TObject *Sender);
+    void __fastcall btnTopCcdDisconnectClick(TObject *Sender);
+    void __fastcall btnTopCcdSaveClick(TObject *Sender);
+    void __fastcall btnTopCcdReloadClick(TObject *Sender);
+    void __fastcall btnTopCcdShotClick(TObject *Sender);
+    void __fastcall btnColorCcdConnectClick(TObject *Sender);
+    void __fastcall btnColorCcdDisconnectClick(TObject *Sender);
+    void __fastcall btnColorCcdSaveClick(TObject *Sender);
+    void __fastcall btnColorCcdReloadClick(TObject *Sender);
+    void __fastcall btnColorCcdShotClick(TObject *Sender);
+    void __fastcall chkColorCcdEnableClick(TObject *Sender);
     void __fastcall btnLotApiSaveClick(TObject *Sender);
     void __fastcall btnLotApiReloadClick(TObject *Sender);
     void __fastcall btnLotApiFetchClick(TObject *Sender);

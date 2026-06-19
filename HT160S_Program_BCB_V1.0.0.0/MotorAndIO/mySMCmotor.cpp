@@ -32,12 +32,16 @@ void TMySMCMotor::SetDec(double a) { HTMotor::SetDec(a); }
 int  TMySMCMotor::ReadPos() { return ReadEncoderPos(); }
 void TMySMCMotor::Stop() {}
 void TMySMCMotor::DecStop() {}
-bool TMySMCMotor::JogP() { return true; }
-bool TMySMCMotor::JogN() { return true; }
+// AI(ht160s-maintainer) 20260619 : SMC card SDK is not present in this build
+// (no CSMC.lib / CSmc.h). This driver is a fail-safe stub: it must NOT pretend
+// an SMC axis works. Jog reports failure, GetAlarm reports alarmed (so the
+// kernel halts), HomeFlag never reports homed. All 20 axes use MC88X1 today.
+bool TMySMCMotor::JogP() { return false; }
+bool TMySMCMotor::JogN() { return false; }
 bool TMySMCMotor::HomeObject() { return ResetPos(0); }
 void TMySMCMotor::SetRange(unsigned int a) { HTMotor::SetRange(a); }
-bool TMySMCMotor::GetAlarm(void) { return false; }
-bool TMySMCMotor::HomeFlag(void) { return true; }
+bool TMySMCMotor::GetAlarm(void) { return true; }   // fail-safe: treat as alarmed (no SMC SDK)
+bool TMySMCMotor::HomeFlag(void) { return false; }  // fail-safe: never claim homed (no SMC SDK)
 bool TMySMCMotor::MoveTo(int Tar) { SetCommand(Tar); return true; }
 bool TMySMCMotor::MoveToPosShortDistance(int Tar) { return MoveTo(Tar); }
 bool TMySMCMotor::ResetPos(int Pulse) { SetCommand(Pulse); return true; }

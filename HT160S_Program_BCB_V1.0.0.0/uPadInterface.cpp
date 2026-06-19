@@ -5,6 +5,8 @@
 #include "uPadInterface.h"
 #include "database.h"
 #include "cCommLog.h"
+#include "HTimer.h"
+#include "maintenance.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "SPComm"
@@ -550,6 +552,12 @@ void TfPadInterface::SendSwitchStatus(AnsiString aName, bool Type)
 {
     int i;
 
+    //AI(ht160s-maintainer) 20260616 : while the Pad Interface form is open the
+    //operator drives the panel manually, so suppress machine-driven writes to
+    //avoid fighting the manual buttons (HT172 SendSwitchStatus bShow guard).
+    if(bShow)
+        return;
+
     for(i=0; i<CheckPadItem; i++)
     {
         if(PadItem[i].PadName==aName)
@@ -637,28 +645,63 @@ void __fastcall TfPadInterface::ProcessReceiceData()
     int iAddress;
     int iPadKey;
 
+    AnsiString Entry;
+    AnsiString Frame;
+    int iPos;
+
     while(CommReceiveList->Count>0)
     {
-        S=CommReceiveList->Strings[0];
+        Entry=CommReceiveList->Strings[0];
         CommReceiveList->Delete(0);
         if(CommReceiveLength->Count>0)
             CommReceiveLength->Delete(0);
 
-        if(S.Length()>=14)
+        //AI(ht160s-maintainer) 20260616 : one receive event may carry several
+        //"\r"-delimited frames concatenated; split and process each, matching
+        //HT172 ProcessReceiceData. (A frame split ACROSS two receive events is
+        //not reassembled - same limitation as HT172, harmless at this frame size.)
+        do
         {
-            sAddress=S.SubString(4, 1);
-            iAddress=atoi(sAddress.c_str());
-            aPadKey=S.SubString(8, 6);
-            iPadKey=StrToIntDef("0x"+aPadKey, 0);
-            if(S.SubString(6, 2)=="00")
-                DoScanPanelLed(iAddress, iPadKey);
-            else if(S.SubString(6, 2)=="90")
-                DoUpdataPadStatus(iAddress, iPadKey);
+            iPos=Entry.Pos("\r");
+            if(iPos>0)
+                Frame=Entry.SubString(1, iPos-1);
+            else
+                Frame=Entry;
+            Frame=Frame.Trim();
+
+            //AI(ht160s-maintainer) 20260619 : an input/status frame is 13 chars
+            //(t05 + addr + type + func[6,2] + 6-hex key[8,13]). The trailing '\r'
+            //is already stripped above, so the minimum length is 13. HT172 used
+            //>=14 only because its buffer still held the '\r'; keeping >=14 here
+            //silently dropped every 13-char key('00')/switch('90') report and
+            //killed all Pad input. >= covers 13- and 14+ char frames safely.
+            if(Frame.Length()>=13)
+            {
+                sAddress=Frame.SubString(4, 1);
+                iAddress=atoi(sAddress.c_str());
+                aPadKey=Frame.SubString(8, 6);
+                iPadKey=StrToIntDef("0x"+aPadKey, 0);
+                //AI(HT160S-Maintainer) 20260616 : a valid status frame proves the
+                //Pad panel is talking; from here the panel Power On/Off sensors
+                //are live and CheckMotorPowerShutDown may act on them.
+                bPadEverCommunicated=true;
+                S=Frame.SubString(6, 2);
+                if(S=="00")
+                    DoScanPanelLed(iAddress, iPadKey);
+                else if(S=="90")
+                    DoUpdataPadStatus(iAddress, iPadKey);
+            }
+            else if(Frame.Length()>=8 && Frame.SubString(6, 2)=="20")
+            {
+                bRequestVer=true;
+            }
+
+            if(iPos>0)
+                Entry=Entry.SubString(iPos+1, Entry.Length()-iPos);
+            else
+                Entry="";
         }
-        else if(S.Length()>=8 && S.SubString(6, 2)=="20")
-        {
-            bRequestVer=true;
-        }
+        while(Entry.Pos("\r")>0);
     }
 }
 //---------------------------------------------------------------------------
@@ -705,8 +748,81 @@ bool __fastcall TfPadInterface::ProcessScanKey(AnsiString aSenName)
 //---------------------------------------------------------------------------
 void __fastcall TfPadInterface::Main232()
 {
+    static int Task=1;
+    static HTimer HeartbeatTimer;
+    static HTimer VerTimeout;
+    static HTimer ReconnectDelay;
+
+    //AI(ht160s-maintainer) 20260616 : always process inbound frames so the
+    //operator can still watch live Pad status during a manual test (user
+    //requirement: keep RX visible).
     ProcessReceiceData();
+
+    //AI(ht160s-maintainer) 20260616 : while the Maintenance screen (or any of its
+    //modal sub-pages - ComPort / IOView / Pad) is open, suspend ALL spin-driven
+    //outbound traffic (auto LED send, scan-enable, version heartbeat, auto-
+    //reconnect) so a manual test is not disturbed. Manual button sends still work
+    //(they call SendCommand directly, not via spin). Same fMaintenance->Visible
+    //probe as csystem.cpp; RX above stays live. Reset Task so the heartbeat
+    //restarts cleanly once Maintenance closes.
+    if(fMaintenance!=NULL && fMaintenance->Visible)
+    {
+        Task=1;
+        return;
+    }
+
     ProcessSendDataNew();
+
+    //AI(ht160s-maintainer) 20260616 : enable physical-key scan reporting once the
+    //Pad link is up (HT172 uPadInterface.cpp Main232 bScanSwitch block). Without
+    //this the Pad never sends "00" status frames, so DoScanPanelLed never fires
+    //and panel buttons never reach HSys -> panel control looks dead. bScanSwitch
+    //is re-armed by ComPort::RS232Init on every (re)connect.
+    if(bRs232Ok && bScanSwitch)
+    {
+        SendCommand("t051400000000");
+        bScanSwitch=false;
+    }
+
+    //AI(ht160s-maintainer) 20260616 : link keep-alive + auto-reconnect, ported
+    //from HT172 uPadInterface.cpp Main232 (its tray-motor gate and InitialOK
+    //check are dropped - HT160 has neither). Every 10s poll the Pad version; a
+    //reply means the link is healthy; if the COM has dropped (bRs232Ok==false)
+    //reconnect via ResetComm. HT172 timings: 10s poll / 1s reply / 0.1s settle
+    //(HTimer.Set unit is 100ms, so 100/10/1).
+    switch(Task)
+    {
+        case 1:
+            HeartbeatTimer.Set(100);
+            HeartbeatTimer.On();
+            Task=10;
+        case 10:
+            if(HeartbeatTimer.Off())
+            {
+                RequestPadVersion();
+                VerTimeout.Set(10);
+                VerTimeout.On();
+                Task=20;
+            }
+            break;
+        case 20:
+            if(bRs232Ok && bRequestVer)
+                Task=1;
+            else if(bRs232Ok==false)
+            {
+                ReconnectDelay.Set(1);
+                ReconnectDelay.On();
+                ResetComm();
+                Task=50;
+            }
+            else if(VerTimeout.Off())
+                Task=1;
+            break;
+        case 50:
+            if(ReconnectDelay.Off())
+                Task=1;
+            break;
+    }
 }
 //---------------------------------------------------------------------------
 void TfPadInterface::RecordCommunication(AnsiString aTitle, AnsiString Command)

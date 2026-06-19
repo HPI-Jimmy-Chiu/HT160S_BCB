@@ -869,8 +869,15 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
 //---------------------------------------------------------------------------
 void HT160Gem::S5F6_ListAlarmData()
 {
-    if(HGemPtr!=NULL)
-        HGemPtr->StringOut("[SECS] S5F6 alarm list is empty in HT160 framework skeleton");
+    //AI(ht160s-maintainer) 20260619 : reply to S5F5 with a well-formed (empty)
+    //S5F6 alarm list so a W-bit host request does not hit a T3 timeout. HT160
+    //has no alarm catalog store yet; emit an empty L,0 until one exists.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->InitLocalHead(5, 6, 0);
+    HGemPtr->DataItemOut(0, HType.LIST_TYPE, NULL);
+    HGemPtr->SendLocalData();
+    HGemPtr->StringOut("[SECS] S5F6 sent empty alarm list (HT160 has no alarm catalog yet)");
 }
 //---------------------------------------------------------------------------
 int HT160Gem::S7F2_ProcessProgramLoadGrant()
