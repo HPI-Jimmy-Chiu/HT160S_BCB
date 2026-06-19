@@ -26,7 +26,9 @@ __published:
     TPanel *pnlLog;
     TLabel *labPadCom;
     TLabel *labManualSend;
+    TLabel *labPadBaud;
     TComboBox *cbPadComm;
+    TComboBox *cbPadBaud;
     TButton *sbUpdate;
     TButton *spbResetCom;
     TButton *btnStopCom;
@@ -50,6 +52,7 @@ private:
     AnsiString GetWorkFileName();
     void EnsurePadInterface();
     void ConfigurePadComm();
+    int GetSelectedBaud();
     TComm *BinComm;
 public:
     __fastcall TfComPort(TComponent* Owner);
@@ -57,13 +60,15 @@ public:
 
     void __fastcall SaveWorkFile();
     void __fastcall OpenWorkFile();
-    bool __fastcall RS232Init();
+    bool __fastcall RS232Init(bool bNotifyOperator=false);
+    void StopPadCom();
     void StopAllCom();
     void Spin();
     void ConfigureBinDisplay();
     void ApplyBinDisplayConfig();
     void MemoAddString(TMemo *Memo, AnsiString Title, AnsiString Text);
     bool bShow;
+    bool bPadAutoStarted;
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfComPort *fComPort;
