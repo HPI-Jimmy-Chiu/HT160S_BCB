@@ -249,17 +249,51 @@ bool IsSafeLock()
 #endif
 }
 //---------------------------------------------------------------------------
-int IsIonFanAlarm()
+//AI 20260619 : ion-fan alarm debounce, aligned with old HT160S (Modules/System
+//cHT160SSystem.cpp CheckIonFan): a sensor must read OFF for ION_FAN_ALARM_THRESHOLD
+//CONSECUTIVE scan cycles before it counts as a real alarm; any OK read resets its
+//counter. The old single-OFF==alarm path -- now that an ion-fan fault pops a modal
+//and stops the machine (silent-stop fix) -- would let a momentary signal dip stop
+//the line. Counters are advanced ONCE per cycle by UpdateIonFanDebounce(); IsIonFanAlarm
+//is called from more than one place per cycle (GetTowerLightRunState + ScanSystemSenser)
+//so it must NOT count -- it only reads the latched result.
+static const int ION_FAN_ALARM_THRESHOLD=10;
+static int g_iIonFanPowerCount=0;
+static int g_iIonFanBalanceCount=0;
+static int g_iIonFanAlarmTag=0;
+//---------------------------------------------------------------------------
+static void UpdateIonFanDebounce()
 {
 #ifdef SOFT_SIMULATE
-	return 0;
+	g_iIonFanAlarmTag=0;
+	return;
 #else
-	int Index=0;
-	Index=GetSensorOffIndex(&HSys.Sen.SnIonFan_Power);
-	if(Index>0) return Index;
-	Index=GetSensorOffIndex(&HSys.Sen.SnIonFan_Balance);
-	return Index;
+	int iPowerTag  =GetSensorOffIndex(&HSys.Sen.SnIonFan_Power);
+	int iBalanceTag=GetSensorOffIndex(&HSys.Sen.SnIonFan_Balance);
+
+	if(iPowerTag>0)
+		g_iIonFanPowerCount++;
+	else
+		g_iIonFanPowerCount=0;
+	if(iBalanceTag>0)
+		g_iIonFanBalanceCount++;
+	else
+		g_iIonFanBalanceCount=0;
+
+	if(g_iIonFanPowerCount>=ION_FAN_ALARM_THRESHOLD)
+		g_iIonFanAlarmTag=iPowerTag;
+	else if(g_iIonFanBalanceCount>=ION_FAN_ALARM_THRESHOLD)
+		g_iIonFanAlarmTag=iBalanceTag;
+	else
+		g_iIonFanAlarmTag=0;
 #endif
+}
+//---------------------------------------------------------------------------
+int IsIonFanAlarm()
+{
+	//Pure read of the debounced/latched ion-fan tag (0 = none). Counting happens
+	//once per cycle in UpdateIonFanDebounce() so the several per-cycle callers agree.
+	return g_iIonFanAlarmTag;
 }
 //---------------------------------------------------------------------------
 bool IsAirCheck()
@@ -482,6 +516,7 @@ void CheckMotorPowerShutDown()
 //---------------------------------------------------------------------------
 void ScanSystemSenser()
 {
+	UpdateIonFanDebounce();
 	int SafeDoor=IsSafeDoorOpen();
 	int Emg=IsEMGPressed();
 	int IonFan=IsIonFanAlarm();
