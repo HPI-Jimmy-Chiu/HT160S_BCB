@@ -28,13 +28,14 @@ OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uHome.obj
     MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj \
     ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj MyBinDisp.obj \
     uPadInterface.obj SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj \
-    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj \
-    SecsGem\uAgvStation.obj
+    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uAgvStation.obj \
+    SecsGem\uHGemLogForm.obj
 RESFILES = ht160s.res
 MAINSOURCE = ht160s.cpp
 RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm \
     uQwertyKey.dfm language.dfm setup.dfm data.dfm maintenance.dfm uOffset.dfm \
-    uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm
+    uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm \
+    SecsGem\uHGemLogForm.dfm
 LIBFILES = 
 IDLFILES = 
 IDLGENFILES = 

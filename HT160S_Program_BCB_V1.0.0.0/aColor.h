@@ -21,6 +21,9 @@ private:
     int SortBinTask;
     int ScanTask;             //AI(HT160S-Maintainer) 20260608 : 2D CCD read sub-ladder state
     int GoDownTask;           //AI(HT160S-Maintainer) 20260608 : front-stack separate sub-ladder (mirrors Empty)
+    int TestUpTask;           //AI(general) 20260617 : Teach Advanced destacker test (GoUp)
+    int TestDownTask;         //AI(general) 20260617 : Teach Advanced destacker test (GoDown)
+    HTimer TestDelay;         //AI(general) 20260617 : Teach Advanced destacker test settle delay
     int iMode;
     int iSupplyThreshold;
     int iICCount;
@@ -68,6 +71,9 @@ public:
     int GetSupplyThreshold();
     int GetICCount();
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting
+
+    bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; Color has no production GoUp)
+    bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, mirrors Empty)
 };
 //---------------------------------------------------------------------------
 extern TColorModule *ColorModule;

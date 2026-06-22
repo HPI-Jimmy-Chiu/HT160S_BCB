@@ -2,6 +2,7 @@
 #include <vcl.h>
 #include <stdlib.h>
 #pragma hdrstop
+#include "mymessbox.h"
 
 #include "uQwertyKey.h"
 //---------------------------------------------------------------------------
@@ -328,7 +329,7 @@ bool TfQwertyKey::ValidateAndClamp(AnsiString &Text)
     {
         if(Text==AnsiString("") || Text==AnsiString("-") || Text==AnsiString(".") || Text==AnsiString("-."))
         {
-            MessageDlg("Input value is invalid.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+            ShowMyOKMessageNoStop("Input value is invalid.");
             return false;
         }
         Value=atof(Text.c_str());
@@ -405,7 +406,10 @@ void __fastcall TfQwertyKey::edContentKeyPress(TObject *Sender, char &Key)
         btnOkClick(this);
         return;
     }
-    if(Key==8)
+    // Let control keys (backspace, Ctrl+C/Ctrl+V/Ctrl+X/Ctrl+A, ...) reach the
+    // TEdit so its built-in clipboard/editing shortcuts keep working; the
+    // numeric/symbol filters below only police printable characters.
+    if(Key<32)
         return;
     if(IsNumericMode())
     {

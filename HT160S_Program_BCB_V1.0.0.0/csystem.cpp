@@ -17,6 +17,7 @@
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
 #include "note.h"                       //AI(HT160S-Maintainer) 20260603 : ShowSystemError for ProcessAlarm dispatch
+#include "mymessbox.h"                   //AI 20260622 : ShowMyMessage for the real-machine (#ifndef SOFT_SIMULATE) servo-alarm home-flag-reset notice in ScanAllMotorStatus
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -249,18 +250,27 @@ bool IsSafeLock()
 #endif
 }
 //---------------------------------------------------------------------------
-//AI 20260619 : ion-fan alarm debounce, aligned with old HT160S (Modules/System
-//cHT160SSystem.cpp CheckIonFan): a sensor must read OFF for ION_FAN_ALARM_THRESHOLD
-//CONSECUTIVE scan cycles before it counts as a real alarm; any OK read resets its
-//counter. The old single-OFF==alarm path -- now that an ion-fan fault pops a modal
-//and stops the machine (silent-stop fix) -- would let a momentary signal dip stop
-//the line. Counters are advanced ONCE per cycle by UpdateIonFanDebounce(); IsIonFanAlarm
-//is called from more than one place per cycle (GetTowerLightRunState + ScanSystemSenser)
-//so it must NOT count -- it only reads the latched result.
-static const int ION_FAN_ALARM_THRESHOLD=10;
-static int g_iIonFanPowerCount=0;
-static int g_iIonFanBalanceCount=0;
-static int g_iIonFanAlarmTag=0;
+//AI 20260622 : ion-fan alarm debounce, re-aligned to HT172 csystem.cpp IsIonFanAlarm
+//(TIME based, not cycle-count). A sensor must read OFF CONTINUOUSLY for a timeout
+//before it counts as a real alarm; any OK read re-arms it. The earlier cycle-COUNT
+//port (10 consecutive scans, "old HT160S CheckIonFan") did NOT translate: MainProc
+//runs on the ~1ms TRunControl thread loop, so 10 scans is tens of ms -- far too short.
+//The ion fans share the motor-relay power, so a HOME motor power-cycle restarts them
+//and they take SECONDS to spin back up to the OK signal; a sub-second window false-
+//trips an "Ion Fan Alarm" mid-HOME (machine kept homing, operator saw the fan fine in
+//the IO Set View). HT172 uses a LONGER window while homing (fans spinning up) and a
+//short one once homed. We also (a) skip the check while motor power is still settling
+//(MotorPowerOnDelay>0 : fans just re-energized) and (b) re-arm after any scan gap
+//>ION_FAN_SCAN_GAP_MS (the IO Set View and modal alarms suspend MainProc, so do not
+//charge that suspended time against the fan). Counting happens ONCE per cycle here;
+//IsIonFanAlarm() (GetTowerLightRunState + ScanSystemSenser) only reads the latched tag.
+static const DWORD ION_FAN_TIMEOUT_HOME_MS=20000;  // homing : fans spinning up after the power-cycle
+static const DWORD ION_FAN_TIMEOUT_RUN_MS = 5000;  // homed  : steady state
+static const DWORD ION_FAN_SCAN_GAP_MS    = 1500;  // re-arm if the scan was suspended longer than this
+static DWORD g_dwIonFanPowerOffStart=0;    // tick of the first OFF read (0 = OK / not counting)
+static DWORD g_dwIonFanBalanceOffStart=0;
+static DWORD g_dwIonFanLastScan=0;
+static int   g_iIonFanAlarmTag=0;
 //---------------------------------------------------------------------------
 static void UpdateIonFanDebounce()
 {
@@ -268,21 +278,56 @@ static void UpdateIonFanDebounce()
 	g_iIonFanAlarmTag=0;
 	return;
 #else
+	DWORD dwNow=GetTickCount();
+	if(dwNow==0)
+		dwNow=1;   // 0 is the "OK" sentinel; keep a real tick out of it
+
+	//Re-arm after a scan gap (IO Set View / a modal suspended MainProc): the fan was
+	//not being watched, so start its OFF window fresh rather than charge it the gap.
+	if(g_dwIonFanLastScan==0 || (dwNow-g_dwIonFanLastScan)>ION_FAN_SCAN_GAP_MS)
+	{
+		g_dwIonFanPowerOffStart=0;
+		g_dwIonFanBalanceOffStart=0;
+		g_dwIonFanLastScan=dwNow;
+		g_iIonFanAlarmTag=0;
+		return;
+	}
+	g_dwIonFanLastScan=dwNow;
+
+	//Fans just re-energized (motor power settling): do not watch them yet.
+	if(MotorPowerOnDelay>0)
+	{
+		g_dwIonFanPowerOffStart=0;
+		g_dwIonFanBalanceOffStart=0;
+		g_iIonFanAlarmTag=0;
+		return;
+	}
+
+	//HT172 : 20s while homing (fAllMotorHome==false, fans spinning up), 5s once homed.
+	DWORD dwTimeout=fAllMotorHome?ION_FAN_TIMEOUT_RUN_MS:ION_FAN_TIMEOUT_HOME_MS;
+
 	int iPowerTag  =GetSensorOffIndex(&HSys.Sen.SnIonFan_Power);
 	int iBalanceTag=GetSensorOffIndex(&HSys.Sen.SnIonFan_Balance);
 
 	if(iPowerTag>0)
-		g_iIonFanPowerCount++;
+	{
+		if(g_dwIonFanPowerOffStart==0)
+			g_dwIonFanPowerOffStart=dwNow;
+	}
 	else
-		g_iIonFanPowerCount=0;
-	if(iBalanceTag>0)
-		g_iIonFanBalanceCount++;
-	else
-		g_iIonFanBalanceCount=0;
+		g_dwIonFanPowerOffStart=0;
 
-	if(g_iIonFanPowerCount>=ION_FAN_ALARM_THRESHOLD)
+	if(iBalanceTag>0)
+	{
+		if(g_dwIonFanBalanceOffStart==0)
+			g_dwIonFanBalanceOffStart=dwNow;
+	}
+	else
+		g_dwIonFanBalanceOffStart=0;
+
+	if(g_dwIonFanPowerOffStart!=0 && (dwNow-g_dwIonFanPowerOffStart)>=dwTimeout)
 		g_iIonFanAlarmTag=iPowerTag;
-	else if(g_iIonFanBalanceCount>=ION_FAN_ALARM_THRESHOLD)
+	else if(g_dwIonFanBalanceOffStart!=0 && (dwNow-g_dwIonFanBalanceOffStart)>=dwTimeout)
 		g_iIonFanAlarmTag=iBalanceTag;
 	else
 		g_iIonFanAlarmTag=0;

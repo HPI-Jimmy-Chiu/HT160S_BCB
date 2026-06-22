@@ -11,6 +11,18 @@
 extern int CUSTOMER_CODE;
 extern int MotorPowerOnDelay;
 extern bool bMotorPowerState;
+//AI(ht160s-maintainer) 20260617 : panel-LED run-state flags (DoPanelLamp);
+//front-panel only port of HT172 bLamp* set.
+extern bool bLampPowerOff;
+extern bool bLampPowerOn;
+extern bool bLampPause;
+extern bool bLampStart;
+extern bool bLampRetry;
+extern bool bLampSkip;
+extern bool bLampTrayEnd;
+extern bool bLampTrayFeed;
+extern bool bLampCleanOut;
+extern bool bLampOneCycle;
 extern bool bMotorHomePowerOn;
 extern bool fAllMotorHome;
 extern bool SoftStart;
@@ -30,6 +42,11 @@ extern bool bSortArmNeedHome;
 //CheckMotorPowerShutDown relay control + ScanAllMotorStatus alarm-forcing +
 //Home-monitor auto-close so the power-cycle owns SwMotorRelay until done.
 extern bool bHomePowerCycling;
+//AI(HT160S-Maintainer) 20260616 : set true once the RS232 Pad panel has sent a
+//valid status frame. Until then the panel Power On/Off sensors are stale
+//defaults; CheckMotorPowerShutDown auto-energizes the motor relay (no interlock,
+//per request) and only defers to the panel signals after the Pad has talked.
+extern bool bPadEverCommunicated;
 extern bool bCalculatePauseTime;
 extern TDateTime tUPH_PauseTime;
 extern TDateTime tUPH_PauseStartTime;

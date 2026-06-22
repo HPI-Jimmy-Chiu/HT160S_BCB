@@ -37,6 +37,10 @@ void THT160GeneralSetting::SetDefault()
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
+	iBinDispBaud=9600;
+	bBinDispLogVerbose=false;
+	iLogRetentionEventDays=365;   // EventLog, WebAPI : audit value, keep ~1 year
+	iLogRetentionCommDays=90;     // comm/diagnostic logs : high volume, keep 90d
 	// Defaults mirror old-160: Empty=E, Loader=L, Auto1..6=1..6, Color=C.
 	{
 		const char *DefText[9]={"E","L","1","2","3","4","5","6","C"};
@@ -70,6 +74,10 @@ void THT160GeneralSetting::Load()
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
+	iBinDispBaud=Ini->ReadInteger("BinDisplay", "Baud", 9600);
+	bBinDispLogVerbose=Ini->ReadBool("BinDisplay", "LogVerbose", false);
+	iLogRetentionEventDays=Ini->ReadInteger("LogRetention", "EventDays", 365);
+	iLogRetentionCommDays=Ini->ReadInteger("LogRetention", "CommDays", 90);
 	for(int i=0;i<9;i++)
 	{
 		sBinDispText[i]=Ini->ReadString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);
@@ -97,6 +105,10 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);
+	Ini->WriteInteger("BinDisplay", "Baud", iBinDispBaud);
+	Ini->WriteBool("BinDisplay", "LogVerbose", bBinDispLogVerbose);
+	Ini->WriteInteger("LogRetention", "EventDays", iLogRetentionEventDays);
+	Ini->WriteInteger("LogRetention", "CommDays", iLogRetentionCommDays);
 	for(int i=0;i<9;i++)
 	{
 		Ini->WriteString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);

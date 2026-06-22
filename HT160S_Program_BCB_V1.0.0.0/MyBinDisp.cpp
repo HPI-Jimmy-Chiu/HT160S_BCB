@@ -13,6 +13,7 @@
 
 #include "MyBinDisp.h"
 #include "cCommLog.h"
+#include "GeneralSetting.h"
 //----------------------------------------------------------------------------
 #pragma package(smart_init)
 //----------------------------------------------------------------------------
@@ -392,9 +393,13 @@ void TMyBinDispCtrl::LogBinDisplay(AnsiString asAction, AnsiString asMessage, bo
     while(slBinDispLog->Count>500)
         slBinDispLog->Delete(0);
 
-    //AI(ht160s-maintainer) 20260615 : persist every TX/RX/open/close event to
-    //the daily BindisplayLog CSV so bin-display comm can be traced afterwards.
-    g_BinDispCommLog.Log(asAction, asMessage);
+    //AI(general) 20260617 : routine TX/Recv frames flood the daily CSV during
+    //production (one pair per bin update). Persist them only when verbose tracing
+    //is enabled; always persist non-routine events (open/close/errors/no-reply)
+    //so faults stay traceable. The 500-line in-memory memo above is unaffected.
+    bool bRoutineFrame = (asAction == "TX" || asAction == "Recv");
+    if(GeneralSetting.bBinDispLogVerbose || bRoutineFrame == false)
+        g_BinDispCommLog.Log(asAction, asMessage);
     // P3 TODO: when bMemo, also echo to the ComPort bin memo.
 }
 //----------------------------------------------------------------------------
@@ -506,14 +511,19 @@ void TMyBinDispHT9046::WriteBin(int Addr, int Command, short Value)
 {
     unsigned char Btmp1;
     AnsiString Str;
-    sprintf(SendBuffer, ":%02d06008%d00%02d00%c%c", Addr+1, Command, Value, Bin_CR, Bin_LF);
+    // AI(ht160s-maintainer) 20260616 : the HT9046 board is a single Modbus slave
+    // at the high (color) address; bin/version share that address and differ only
+    // by register. The inherited Addr+1 (low) target had no listener on this
+    // machine - use the same Addr+32(+38) hex base as WriteColor.
+    int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+    sprintf(SendBuffer, ":%02X06008%d00%02d00%c%c", wAddr, Command, Value, Bin_CR, Bin_LF);
 
     Btmp1=A_Create_LCR((unsigned char*)&SendBuffer[1], 12);
     SendBuffer[13]=T_HEX2ASCII_Mac(Btmp1>>4);
     SendBuffer[14]=T_HEX2ASCII_Mac(Btmp1);
     CommBin->WriteCommData(SendBuffer, strlen(SendBuffer));
 
-    Str.sprintf(":%02d06008%d00%02d00, WriteBin", Addr+1, Command, Value);
+    Str.sprintf(":%02X06008%d00%02d00, WriteBin", wAddr, Command, Value);
     LogBinDisplay("TX", Str, true);
 }
 //----------------------------------------------------------------------------
@@ -541,14 +551,18 @@ void TMyBinDispHT9046::ReadVersion(int Addr)
 {
     unsigned char Btmp1;
     AnsiString Str;
-    sprintf(SendBuffer, ":%02d030080000100%c%c", Addr+1, Bin_CR, Bin_LF);
+    // AI(ht160s-maintainer) 20260616 : read version from the same high address as
+    // WriteColor (see WriteBin note). The old Addr+1 target never replied, so
+    // iVersion stayed 0 and every bin/color reply was rejected as NoReply.
+    int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+    sprintf(SendBuffer, ":%02X030080000100%c%c", wAddr, Bin_CR, Bin_LF);
 
     Btmp1=A_Create_LCR((unsigned char*)&SendBuffer[1], 12);
     SendBuffer[13]=T_HEX2ASCII_Mac(Btmp1>>4);
     SendBuffer[14]=T_HEX2ASCII_Mac(Btmp1);
     CommBin->WriteCommData(SendBuffer, strlen(SendBuffer));
 
-    Str.sprintf(":%02d0300800001, ReadVersion", Addr+1);
+    Str.sprintf(":%02X0300800001, ReadVersion", wAddr);
     LogBinDisplay("TX", Str, true);
 }
 //----------------------------------------------------------------------------
@@ -607,7 +621,10 @@ bool TMyBinDispHT9046::DoStartSetBin()
                     {
                         WriteBin(Addr, 0, iSetBin[Addr][iCount[Addr]]);
                     }
-                    else if(Addr<=3 || iSetBin[Addr][iCount[Addr]]==104)
+                    // AI(ht160s-maintainer) 20260617 : HT160 layout puts Color
+                    // at the last unit (index 8); 9045 Addr<=3 only covered its
+                    // low-index L/E/C, so include the Color unit to send its letter.
+                    else if(Addr<=3 || Addr==BIN_DISP_UNIT_COUNT-1 || iSetBin[Addr][iCount[Addr]]==104)
                     {
                         WriteBin(Addr, 1, iSetBin[Addr][iCount[Addr]]-100);
                     }
@@ -634,18 +651,21 @@ bool TMyBinDispHT9046::DoStartSetBin()
                     Task=100;
                     break;
                 }
+                // AI(ht160s-maintainer) 20260616 : reply echoes the high address
+                // (Addr+32/+38), so the checkword must use that same hex base.
+                int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
                 if(iVersion[Addr]==1)
                 {
-                    sCheckWord.sprintf(":%02d06020010", Addr+1);
+                    sCheckWord.sprintf(":%02X06020010", wAddr);
                 }
                 else if(iVersion[Addr]==2)
                 {
                     if(iSetBin[Addr][0]==-1)
-                        sCheckWord.sprintf(":%02d060201%02d", Addr+1, 123-100);
+                        sCheckWord.sprintf(":%02X060201%02d", wAddr, 123-100);
                     else if(iSetBin[Addr][iCount[Addr]]<100)
-                        sCheckWord.sprintf(":%02d060200%02d", Addr+1, iSetBin[Addr][iCount[Addr]]);
+                        sCheckWord.sprintf(":%02X060200%02d", wAddr, iSetBin[Addr][iCount[Addr]]);
                     else
-                        sCheckWord.sprintf(":%02d060201%02d", Addr+1, iSetBin[Addr][iCount[Addr]]-100);
+                        sCheckWord.sprintf(":%02X060201%02d", wAddr, iSetBin[Addr][iCount[Addr]]-100);
                 }
 
                 if(sReadBuffer.Pos(sCheckWord)==1)
@@ -687,11 +707,21 @@ bool TMyBinDispHT9046::DoStartSetBin()
             {
                 Addr=0;
             }
-            if(iErrCount[Addr]>5)
+            if(iErrCount[Addr]>2)
             {
+                //AI(ht160s-maintainer) 20260616 : do not block the whole bus on a
+                //silent unit. Log the anomaly, flag the unit, clear its work flags
+                //and advance to the next address so other units still get updated.
+                AnsiString asErr;
+                asErr.sprintf("Addr=%d, no Bin reply, skip", Addr+1);
+                LogBinDisplay("BinNoReply", asErr, true);
                 iRusStatus=4;
-                Task=100;
                 bHasError[Addr]=true;
+                bSliding[Addr]=false;
+                bSetBin[Addr]=false;
+                iErrCount[Addr]=0;
+                Addr++;
+                Task=100;
             }
             break;
         case 1000:
@@ -779,15 +809,20 @@ bool TMyBinDispHT9046::DoStartSetColor()
                 Task=100;
             }
 
-            if(iErrCount[Addr]>5)
+            if(iErrCount[Addr]>2)
             {
+                //AI(ht160s-maintainer) 20260616 : a unit that never echoes its color
+                //used to force a full StopComm + restart, stalling every other unit.
+                //Now just log + flag the unit and move on to the next address.
+                AnsiString asErr;
+                asErr.sprintf("Addr=%d, no Color reply, skip", Addr+1);
+                LogBinDisplay("ColorNoReply", asErr, true);
                 iRusStatus=4;
                 bHasError[Addr]=true;
+                bSetColor[Addr]=false;
                 iErrCount[Addr]=0;
-                CommBin->StopComm();
-                iBinDispCtrlTask=1;
-                bStartSetColor=true;
-                bStartSetBin=true;
+                Addr++;
+                Task=100;
             }
             break;
     }
@@ -832,14 +867,17 @@ bool TMyBinDispHT9046::DoStartGetStatus()
         case 200:
             if(BinDispRecv)
             {
-                sCheckWord.sprintf(":%02d03020001", Addr+1);
+                // AI(ht160s-maintainer) 20260616 : version reply echoes the high
+                // address (Addr+32/+38); match the checkword to it.
+                int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+                sCheckWord.sprintf(":%02X03020001", wAddr);
                 if(sReadBuffer.Pos(sCheckWord)==1)
                 {
                     iVersion[Addr]=1;
                 }
                 else
                 {
-                    sCheckWord.sprintf(":%02d03020002", Addr+1);
+                    sCheckWord.sprintf(":%02X03020002", wAddr);
 
                     if(sReadBuffer.Pos(sCheckWord)==1)
                     {
@@ -868,10 +906,21 @@ bool TMyBinDispHT9046::DoStartGetStatus()
                 Task=100;
             }
 
-            if(iErrCount[Addr]>5)
+            if(iErrCount[Addr]>2)
             {
+                //AI(ht160s-maintainer) 20260616 : a unit that never returns its
+                //version used to be retried forever, blocking GetStatus from ever
+                //completing. Log + flag it, clear its poll flag and skip ahead.
+                AnsiString asErr;
+                asErr.sprintf("Addr=%d, no Version reply, skip", Addr+1);
+                LogBinDisplay("VerNoReply", asErr, true);
                 iRusStatus=4;
+                bHasError[Addr]=true;
+                bGetStatus[Addr]=false;
+                iVersion[Addr]=0;
                 iErrCount[Addr]=0;
+                Addr++;
+                Task=100;
             }
             break;
     }

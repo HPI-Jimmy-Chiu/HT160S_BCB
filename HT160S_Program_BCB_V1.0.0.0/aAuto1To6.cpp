@@ -77,6 +77,9 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
     FeedDelay.Clear();
     DischargeDelay.Clear();
     CleanOutDelay.Clear();
+    DischargeSubTask=1;
+    TestUpTask=1;
+    TestDelay.Clear();
 
     for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
     {
@@ -558,7 +561,6 @@ bool TAutoModule::DoDischargeTray(int Flag)
     TTrayMotor *TrayMotor=NULL;
     TMyCylinder *PushCylinder=NULL;
     TMyCylinder *LeanCylinder=NULL;
-    TMyCylinder *FrontRiseCylinder=NULL;
     int AutoCeid[6]={136, 137, 138, 140, 141, 142};
     int &Task = DischargeTask;
     if(Flag==0)
@@ -624,28 +626,19 @@ bool TAutoModule::DoDischargeTray(int Flag)
             break;
 
         case 6000:
+            //AI(general) 20260617 : post-Y settle done; the FrontRise On->settle->Off now
+            //lives in the shared DoFrontRiseOnce so Teach Advanced TestGoUpOnce drives the
+            //identical cylinder action as this production discharge.
             if(DischargeDelay.Off())
             {
-                FrontRiseCylinder=GetFrontRise(iDischargeAuto);
-                if(FrontRiseCylinder!=NULL)
-                    FrontRiseCylinder->On();
-                if(IsCylinderOnReady(FrontRiseCylinder, IsSoftSimulate()))
-                {
-                    DischargeDelay.Set(5);
-                    DischargeDelay.On();
-                    Task=7000;
-                }
+                DischargeSubTask=1;
+                Task=6100;
             }
             break;
 
-        case 7000:
-            if(DischargeDelay.Off())
-            {
-                FrontRiseCylinder=GetFrontRise(iDischargeAuto);
-                if(FrontRiseCylinder!=NULL)
-                    FrontRiseCylinder->Off();
+        case 6100:
+            if(DoFrontRiseOnce(iDischargeAuto, DischargeSubTask, DischargeDelay))
                 return true;
-            }
             break;
     }
     return false;
@@ -815,6 +808,15 @@ TMyCar *TAutoModule::GetAutoCar(int Index)
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return NULL;
     return &Car[Index];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-motion-view) 20260618 : 2D TrayID now at the working position, for the
+//Unload-area Auto-info ID panel (palAutoXXID). Empty until an identity tray is seen.
+AnsiString TAutoModule::GetWorkingTrayID(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return "";
+    return WorkingTrayID[Index];
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : tag stack roles : tray[0]=identity,
@@ -1181,6 +1183,61 @@ void TAutoModule::DoAuto(int &Task)
                 Task=1;
             break;
     }
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced single-cylinder GoUp-once test. Auto has only
+//one FrontRiseTray cylinder per station (no _2 / no production Separate use), so the
+//test just raises it, settles, then lowers : one GoUp, no GoDown. Mirrors the
+//FrontRise On->settle->Off used in DoDischargeTray case 6000-7000.
+//AI(general) 20260617 : shared single-cylinder FrontRise actuation (On->settle->Off).
+//Extracted from DoDischargeTray case 6000-7000 so the Teach Advanced TestGoUpOnce drives
+//the IDENTICAL cylinder action as the production discharge (no drift). Caller owns the
+//SubTask + settle Delay. Returns true when the rise+lower has completed.
+bool TAutoModule::DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay)
+{
+    TMyCylinder *Rise=GetFrontRise(Index);
+
+    if(Rise==NULL)
+    {
+        SubTask=1;
+        return true;
+    }
+
+    switch(SubTask)
+    {
+        case 1:
+            Rise->On();
+            if(IsCylinderOnReady(Rise, IsSoftSimulate()))
+            {
+                Delay.Set(5);
+                Delay.On();
+                SubTask=2;
+            }
+            break;
+
+        case 2:
+            if(Delay.Off())
+            {
+                Rise->Off();
+                SubTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced GoUp-once = the production FrontRise sub-action
+//(shared DoFrontRiseOnce), so the standalone test == the Auto-run discharge rise.
+bool TAutoModule::TestGoUpOnce(int Index, int Flag)
+{
+    if(Flag==0)
+    {
+        TestUpTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+    return DoFrontRiseOnce(Index, TestUpTask, TestDelay);
 }
 //---------------------------------------------------------------------------
 void InitializeAutoModule()

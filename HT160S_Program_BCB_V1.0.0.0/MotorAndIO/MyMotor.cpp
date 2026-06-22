@@ -373,6 +373,7 @@ void TMyMotor::SetIn1Logic(bool logic) { Motor->bIn1Logic=logic; }
 // the former per-motor Mot_Table HomeType column was removed. This setter is retained
 // for completeness but is no longer called from the table-load path.
 void TMyMotor::SetHomeType(int Type) { if(Motor!=NULL) Motor->iHomeType=Type; }
+void TMyMotor::SetEncodeMultiple(int m) { if(Motor!=NULL) Motor->iEncodeMultiple=m; }
 void TMyMotor::SetMotorKind(eMotorKind Kind) { Motor->SetMotorKind(Kind); }
 eMotorKind TMyMotor::GetMotorKind() { return Motor->GetMotorKind(); }
 void TMyMotor::SetMotionCardType(eMotionCardType Type) { Motor->SetMotionCardType(Type); }
@@ -734,7 +735,11 @@ void TMyMotor::InitHomeTask_forSingleAxis()
         Motor->HomeReset();
 }
 void TMyMotor::ServoOnOff(bool IsOn) { Motor->SetServoOn(IsOn); }
-void TMyMotor::ServoOnResetPos() { ResetPos(Position); }
+// AI 20260622 : snap command(NowPos) to the encoder(feedback), HT172-aligned. After a
+// servo-off (EMG) hand-move the practical/encoder register tracked the motion but the
+// command register stayed frozen; ResetPos(ReadEncoderPos()) re-aligns both to the real
+// position. Was ResetPos(Position) (snapped to the STALE command -> effectively a no-op).
+void TMyMotor::ServoOnResetPos() { ResetPos(ReadEncoderPos()); }
 void TMyMotor::ClearPosition(int cmd) { ResetPos(cmd); }
 void TMyMotor::EnableTrigger(int iFlag, int iMode, long lValue) { Motor->EnableTrigger(iFlag, iMode, lValue); }
 void TMyMotor::ManualTestTrigger(bool bOn) { Motor->ManualTestTrigger(bOn); }

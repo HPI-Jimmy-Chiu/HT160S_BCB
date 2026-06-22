@@ -17,6 +17,7 @@
 #include "aColor.h"
 #include "aLoader.h"
 #include "aAuto1To6.h"
+#include "uQwertyKey.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -255,7 +256,6 @@ void __fastcall TfTeach::InitialTeachParameter()
     AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFirstCCDYPosition", HSys.Mot.MLoaderY_2, &Teach.Loader2CarFirstCCDYPosition);
     AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFirstSortYPosition", HSys.Mot.MLoaderY_2, &Teach.Loader2CarFirstSortYPosition);
     AddTeachItem(grdLoaderSort, "TeachLoader", "LoaderCarFirstCCDXPosition", HSys.Mot.MTopCCDX, &Teach.LoaderCarFirstCCDXPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "LoaderCarLastCCDXPosition", HSys.Mot.MTopCCDX, &Teach.LoaderCarLastCCDXPosition);
     AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToLoader1XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToLoader1XPosition);
     AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToLoader2XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToLoader2XPosition);
     AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto1XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto1XPosition);
@@ -988,6 +988,17 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
         UpdateMotorMonitor();
         return;
     }
+    if(bEmgActive)
+    {
+        //AI 20260622 : EMG just RELEASED. While the servo was relaxed the operator may
+        //have hand-moved the axis; the encoder(practical) register tracked it but the
+        //command register / NowPos stayed frozen, so Teach "Set" (ReadPos) recorded the
+        //stale value. Snap NowPos->encoder on release (HT172 ServoOnResetPos) so Set
+        //captures the real position. Active axis only; no-op for steppers/idle.
+        TTrayMotor *EmgMotor=GetActiveMotor();
+        if(EmgMotor!=NULL && EmgMotor->GetEnable())
+            EmgMotor->ServoOnResetPos();
+    }
     bEmgActive=false;
 
     if(bHomeRunning && iHomeMotorIndex>=0 && iHomeMotorIndex<HSys.iTotalMotor)
@@ -995,14 +1006,14 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
         Motor=HSys.MotPtr[iHomeMotorIndex];
         if(Motor!=NULL && Motor->Home(Err))
         {
-            //AI 20260619 : show home travel/steps on completion (HT172 Teach
-            //edHomeDistance port: -(int)(GearRatio * LastHomePos)). HT160's Teach
-            //panel has no dedicated home-distance field, so it is shown on the same
-            //message line as "Move to ...".
-            int iHomeSteps=-(int)(Motor->GetGearRatio()*Motor->GetLastHomePos());
+            //AI 20260622 : show home travel on completion in mm (2 decimals), consistent
+            //with NowPos/Encoder (was an integer "steps=-(GearRatio*LastHomePos)" that
+            //mixed units on screen). LastHomePos is the card real-position (1/100mm)
+            //captured at home, rendered like every other position field.
+            AnsiString HomeTravel=FormatPositionText(Motor->GetLastHomePos());
             bHomeRunning=false;
             iHomeMotorIndex=-1;
-            SetMessage(AnsiString("Home finish, steps=")+IntToStr(iHomeSteps));
+            SetMessage(AnsiString("Home finish, ")+HomeTravel);
         }
         else if(Err!=AnsiString(""))
         {
@@ -1029,12 +1040,23 @@ void __fastcall TfTeach::grdTeachSelectCell(TObject *Sender, int ACol, int ARow,
 //---------------------------------------------------------------------------
 void __fastcall TfTeach::grdTeachDblClick(TObject *Sender)
 {
+    //AI 20260622 : double-click no longer RUNS to the teach position; it opens the
+    //on-screen number pad (fQwertyKey) so the operator can EDIT the calibration value
+    //(mm, 2dp). On OK the typed text is parsed back to 1/100mm and stored in iPara; the
+    //explicit Go button (btnGoTeach) still performs the physical move.
     TStringGrid *Grid=(TStringGrid *)Sender;
     int Index=FindTeachItem(Grid, Grid->Row);
-    if(Index>=0)
+    if(Index<0 || TechPara[Index].iPara==NULL)
+        return;
+    SelectTeachItem(Index);
+    edTarget->Text=FormatPositionText(*TechPara[Index].iPara);
+    if(fQwertyKey==NULL)
+        fQwertyKey=new TfQwertyKey(this);
+    if(fQwertyKey->ShowQwertyKey(edTarget, N_DOUBLE, 2, false, 0, 0, TechPara[Index].Caption))
     {
-        SelectTeachItem(Index);
-        MoveSelectedTeach();
+        *TechPara[Index].iPara=ParsePositionText(edTarget->Text);
+        RefreshTeachRow(Index);
+        SetMessage(AnsiString("Edit ")+TechPara[Index].Caption+AnsiString(" = ")+FormatPositionText(*TechPara[Index].iPara));
     }
 }
 //---------------------------------------------------------------------------

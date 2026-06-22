@@ -1693,9 +1693,9 @@ object fiosetview: Tfiosetview
     Top = 40
     Width = 849
     Height = 729
-    ActivePage = ts_IOTapeLoadUnload
+    ActivePage = ts_IORingCatch
     Style = tsButtons
-    TabIndex = 1
+    TabIndex = 3
     TabOrder = 2
     object ts_IOLoader: TTabSheet
       Caption = 'Loader'
@@ -5893,23 +5893,6 @@ object fiosetview: Tfiosetview
         BevelOuter = bvLowered
         Color = 12761254
         TabOrder = 0
-        object pn_PanelFrontTitle: TPanel
-          Left = 3
-          Top = 20
-          Width = 415
-          Height = 20
-          BevelInner = bvLowered
-          BevelOuter = bvSpace
-          Caption = 'FRONT'
-          Color = 9534289
-          Font.Charset = ANSI_CHARSET
-          Font.Color = clWhite
-          Font.Height = -16
-          Font.Name = #26032#32048#26126#39636
-          Font.Style = []
-          ParentFont = False
-          TabOrder = 0
-        end
         object pn_PanelFrontOb: TPanel
           Left = 3
           Top = 40
@@ -5918,121 +5901,10 @@ object fiosetview: Tfiosetview
           BevelInner = bvLowered
           BevelOuter = bvSpace
           Color = 12761254
-          TabOrder = 1
-          object lb_PanelFrontPower: TLabel
-            Left = 77
-            Top = 8
-            Width = 57
-            Height = 16
-            Caption = 'POWER'
-          end
-          object ml_FKPowerOff: TMyLed
-            Left = 52
-            Top = 30
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKPowerOff'
-          end
-          object ml_FKPowerOn: TMyLed
-            Left = 147
-            Top = 30
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKPowerOn'
-          end
-          object ml_FKReset: TMyLed
-            Left = 52
-            Top = 120
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKReset'
-          end
-          object ml_FKPause: TMyLed
-            Left = 147
-            Top = 120
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKPause'
-          end
-          object ml_FKOneCycle: TMyLed
-            Left = 52
-            Top = 210
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKOneCycle'
-          end
-          object ml_FKRetry: TMyLed
-            Left = 147
-            Top = 210
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKRetry'
-          end
-          object ml_FKTrayFeed: TMyLed
-            Left = 52
-            Top = 300
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKTrayFeed'
-          end
-          object ml_FKTrayEnd: TMyLed
-            Left = 147
-            Top = 300
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKTrayEnd'
-          end
-          object ml_FKHome: TMyLed
-            Left = 242
-            Top = 120
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKHome'
-          end
-          object ml_FKStart: TMyLed
-            Left = 337
-            Top = 120
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKStart'
-          end
-          object ml_FKSkip: TMyLed
-            Left = 242
-            Top = 210
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKSkip'
-          end
-          object ml_FKCleanOut: TMyLed
-            Left = 337
-            Top = 210
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKCleanOut'
-          end
-          object ml_FKAlarmReset: TMyLed
-            Left = 247
-            Top = 300
-            Width = 22
-            Height = 22
-            LEDStyle = LEDSqLarge
-            Alias = 'SnFKAlarmReset'
-          end
+          TabOrder = 0
           object sb_IO_CommunicationPad: TSpeedButton
             Left = 7
-            Top = 429
+            Top = 12
             Width = 80
             Height = 45
             Caption = 'Pad'
@@ -6167,356 +6039,6 @@ object fiosetview: Tfiosetview
               FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00}
             OnClick = sb_IO_CommunicationPadClick
           end
-          object Btn_FKPowerOff: TBtnPanel
-            Left = 20
-            Top = 60
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'OFF'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 0
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKPowerOff'
-            Style = tsButtons
-          end
-          object Btn_FKPowerOn: TBtnPanel
-            Left = 115
-            Top = 60
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'ON'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 1
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKPowerOn'
-            Style = tsButtons
-          end
-          object Btn_FKReset: TBtnPanel
-            Left = 20
-            Top = 150
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'RESET'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 2
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKReset'
-            Style = tsButtons
-          end
-          object Btn_FKPause: TBtnPanel
-            Left = 115
-            Top = 150
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'PAUSE'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 3
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKPause'
-            Style = tsButtons
-          end
-          object Btn_FKOneCycle: TBtnPanel
-            Left = 20
-            Top = 240
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'ONE CYCLE'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 4
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKOneCycle'
-            Style = tsButtons
-          end
-          object Btn_FKRetry: TBtnPanel
-            Left = 115
-            Top = 240
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'RETRY'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 5
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKRetry'
-            Style = tsButtons
-          end
-          object Btn_FKTrayFeed: TBtnPanel
-            Left = 20
-            Top = 330
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'TRAY FEED'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 6
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKTrayFeed'
-            Style = tsButtons
-          end
-          object Btn_FKTrayEnd: TBtnPanel
-            Left = 115
-            Top = 330
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'TRAY END'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 7
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKTrayEnd'
-            Style = tsButtons
-          end
-          object Btn_FKHome: TBtnPanel
-            Left = 210
-            Top = 150
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'HOME'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 8
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKHome'
-            Style = tsButtons
-          end
-          object Btn_FKStart: TBtnPanel
-            Left = 305
-            Top = 150
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'START'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 9
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKStart'
-            Style = tsButtons
-          end
-          object Btn_FKSkip: TBtnPanel
-            Left = 210
-            Top = 240
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'SKIP'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 10
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKSkip'
-            Style = tsButtons
-          end
-          object Btn_FKCleanOut: TBtnPanel
-            Left = 305
-            Top = 240
-            Width = 85
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'CLEAN OUT'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 11
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKCleanOut'
-            Style = tsButtons
-          end
-          object Btn_FKAlarmReset: TBtnPanel
-            Left = 210
-            Top = 330
-            Width = 95
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'ALARM RESET'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 12
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFKAlarmReset'
-            Style = tsButtons
-          end
-          object Btn_FrontActiveLed: TBtnPanel
-            Left = 250
-            Top = 60
-            Width = 80
-            Height = 50
-            BevelInner = bvRaised
-            BevelWidth = 2
-            Caption = 'FRONT'
-            Color = 8404992
-            Font.Charset = ANSI_CHARSET
-            Font.Color = clWhite
-            Font.Height = -12
-            Font.Name = 'Times New Roman'
-            Font.Style = []
-            ParentFont = False
-            ParentShowHint = False
-            ShowHint = True
-            TabOrder = 13
-            OnClick = BtnPanelClick
-            TrueColor = 16744448
-            FalseColor = 8404992
-            FalseFontColor = clWhite
-            Alias = 'SwFrontActiveLed'
-            Style = tsButtons
-          end
         end
         object pn_PanelLampTitle: TPanel
           Left = 419
@@ -6533,7 +6055,7 @@ object fiosetview: Tfiosetview
           Font.Name = #26032#32048#26126#39636
           Font.Style = []
           ParentFont = False
-          TabOrder = 2
+          TabOrder = 1
         end
         object pn_PanelMusicTitle: TPanel
           Left = 420
@@ -6550,7 +6072,7 @@ object fiosetview: Tfiosetview
           Font.Name = #26032#32048#26126#39636
           Font.Style = []
           ParentFont = False
-          TabOrder = 3
+          TabOrder = 2
         end
         object pn_PanelLamp: TPanel
           Left = 419
@@ -6645,7 +6167,7 @@ object fiosetview: Tfiosetview
           BevelInner = bvLowered
           BevelOuter = bvSpace
           Color = 12761254
-          TabOrder = 5
+          TabOrder = 3
           object Btn_Music1: TBtnPanel
             Left = 15
             Top = 20
@@ -8859,7 +8381,7 @@ object fiosetview: Tfiosetview
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
-            Alias = 'SnSafeDoor_Auto6'
+            Alias = 'SnSafeAuto6'
           end
           object BtnPanel40: TBtnPanel
             Left = 36
@@ -10340,22 +9862,6 @@ object fiosetview: Tfiosetview
     object ts_IOOthers: TTabSheet
       Caption = 'Others'
       ImageIndex = 9
-      object MyLed2: TMyLed
-        Left = 10
-        Top = 52
-        Width = 22
-        Height = 14
-        LEDStyle = LEDHorizontal
-        Alias = 'SnSafeDoor11'
-      end
-      object MyLed3: TMyLed
-        Left = 34
-        Top = 52
-        Width = 22
-        Height = 14
-        LEDStyle = LEDHorizontal
-        Alias = 'SnSafeDoor12'
-      end
       object pn_PanelRearTitle: TPanel
         Left = 420
         Top = 20
@@ -10899,31 +10405,6 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKManualTStart'
           Style = tsButtons
         end
-      end
-      object BtnPanel41: TBtnPanel
-        Left = 10
-        Top = 15
-        Width = 80
-        Height = 30
-        BevelInner = bvRaised
-        Caption = 'Server ON'
-        Color = 8404992
-        Font.Charset = ANSI_CHARSET
-        Font.Color = clWhite
-        Font.Height = -12
-        Font.Name = 'Times New Roman'
-        Font.Style = []
-        ParentFont = False
-        ParentShowHint = False
-        ShowHint = True
-        TabOrder = 2
-        Visible = False
-        OnClick = BtnPanelClick
-        TrueColor = 16744448
-        FalseColor = 8404992
-        FalseFontColor = clWhite
-        Alias = 'SwServerON'
-        Style = tsButtons
       end
     end
     object tsMN200: TTabSheet

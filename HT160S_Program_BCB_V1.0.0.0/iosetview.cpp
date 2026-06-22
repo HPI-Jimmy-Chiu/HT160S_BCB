@@ -1731,11 +1731,14 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
                     if(SuckerPtr->Enable==false || SuckerPtr->OnSw.Enable==false)
                         return false;
 
+                    // AI 20260622 : 9045-style interlock. Vacuum(V) and blow(D) are mutually
+                    // exclusive per nozzle -- turning V ON uses On() (= OffDestroy + OnSuck),
+                    // which also clears blow, so both can never be energized at once.
                     CurrentState=SuckerPtr->GetOnBit();
                     if(CurrentState)
                         SuckerPtr->OffSuck();
                     else
-                        SuckerPtr->OnSuck();
+                        SuckerPtr->On();
                     return true;
                 }
                 if(AliasName==SuckerPtr->OffPortName)
@@ -1743,11 +1746,14 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
                     if(SuckerPtr->Enable==false || SuckerPtr->OffSw.Enable==false)
                         return false;
 
+                    // AI 20260622 : 9045-style interlock. Turning blow(D) ON uses Off()
+                    // (= OffSuck + OnDestroy), which also clears vacuum(V), so V and D are
+                    // mutually exclusive per nozzle.
                     CurrentState=SuckerPtr->GetOffBit();
                     if(CurrentState)
                         SuckerPtr->OffDestroy();
                     else
-                        SuckerPtr->OnDestroy();
+                        SuckerPtr->Off();
                     return true;
                 }
             }

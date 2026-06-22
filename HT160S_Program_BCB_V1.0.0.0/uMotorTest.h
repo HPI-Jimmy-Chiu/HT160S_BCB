@@ -252,7 +252,7 @@ private:
     void UpdateLoopStatisticLabels(DWORD TripMS, DWORD AverageMS);
     void SetMessage(AnsiString Text);
     bool CheckSortArmZHome();
-    bool CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target);
+    bool CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target, bool bAllowLimitAlarm=false);
     int ApplySpeedPercent(TTrayMotor *Motor);
     void StartJog(bool bPositive);
     void StepMove(bool bPositive);

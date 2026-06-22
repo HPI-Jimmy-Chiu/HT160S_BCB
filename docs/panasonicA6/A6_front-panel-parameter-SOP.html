@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panasonic A6 驅動器 — 前面板參數設定 SOP</title>
+<style>
+  :root{ --ink:#1a2330; --muted:#5b6675; --line:#d6dde6; --accent:#16708a; --warn:#b4480b; --bg:#f7f9fb; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif; color:var(--ink);
+        max-width:920px; margin:24px auto; padding:0 20px; line-height:1.7; background:#fff; }
+  h1{ font-size:1.6rem; border-bottom:3px solid var(--accent); padding-bottom:.4rem; }
+  h2{ font-size:1.25rem; margin-top:2rem; color:var(--accent); border-left:5px solid var(--accent);
+      padding-left:.5rem; }
+  h3{ font-size:1.05rem; margin-top:1.3rem; }
+  blockquote{ background:var(--bg); border-left:4px solid var(--line); margin:1rem 0; padding:.6rem 1rem;
+              color:var(--muted); font-size:.92rem; }
+  table{ border-collapse:collapse; width:100%; margin:1rem 0; font-size:.93rem; }
+  th,td{ border:1px solid var(--line); padding:.5rem .65rem; text-align:left; vertical-align:top; }
+  th{ background:var(--accent); color:#fff; }
+  tr:nth-child(even) td{ background:var(--bg); }
+  code,.seg{ font-family:"Consolas","DejaVu Sans Mono",monospace; }
+  .seg{ display:inline-block; background:#10212b; color:#39e08a; padding:.05rem .5rem; border-radius:4px;
+        letter-spacing:.12em; font-weight:700; border:1px solid #0a161c; }
+  .key{ display:inline-block; min-width:1.7rem; text-align:center; background:#222; color:#fff;
+        border-radius:5px; padding:.05rem .4rem; font-weight:700; font-family:monospace;
+        box-shadow:0 1px 0 #000; }
+  ol{ padding-left:1.4rem; } ol li{ margin:.35rem 0; }
+  .warn{ color:var(--warn); font-weight:700; }
+  .flow{ font-family:monospace; background:var(--bg); border:1px solid var(--line); border-radius:6px;
+         padding:.8rem 1rem; overflow-x:auto; white-space:pre; font-size:.9rem; }
+  .note{ font-size:.85rem; color:var(--muted); }
+  @media print{ body{ margin:0; } h2{ break-after:avoid; } table,blockquote,.flow{ break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Panasonic A6 驅動器 — 前面板參數設定 SOP</h1>
+
+<blockquote>
+來源：<code>docs/panasonicA6/panasonicA6_document.pdf</code>，章節「14. 前面板的使用方法」（doc P.2-83～2-107 = PDF 132～156 頁）、「12. 參數和模式的設定」（doc P.2-59 = PDF 108）。<br>
+本文以 <b>Pr0.06（指令脈衝旋轉方向）</b> 為實例，流程適用任何 Pr 參數。<br>
+用途背景：軸卡極限脫離正規化（見 <code>docs/MC88X1_Driver/MC88X1_technical-note.md</code> §4 與 memory <code>motor-test-home-and-limit-findings</code>）。
+</blockquote>
+
+<h2>1. 前面板按鍵（手冊 P.2-83）</h2>
+<p>6 位數 7 段 LED 顯示 + 5 顆按鍵：</p>
+<table>
+  <tr><th>鍵</th><th>名稱</th><th>功能</th></tr>
+  <tr><td><span class="key">M</span></td><td>模式切換鍵 (MODE)</td><td>4 種模式循環：①監視器 → ②參數設定 → ③EEPROM 寫入 → ④輔助功能 →（回①）</td></tr>
+  <tr><td><span class="key">S</span></td><td>設置鍵 (SET)</td><td>「選擇狀態」↔「執行狀態」切換 / 確認</td></tr>
+  <tr><td><span class="key">◀</span></td><td>移位鍵</td><td>把要變更的位數往左移（選位）</td></tr>
+  <tr><td><span class="key">▲</span></td><td>—</td><td>數值增加</td></tr>
+  <tr><td><span class="key">▼</span></td><td>—</td><td>數值減少</td></tr>
+</table>
+<p><b>上電顯示順序</b>（P.2-84）：約 2 秒全亮 → <span class="seg">......</span> → <span class="seg">888888</span> → 監視器初始畫面（如 <span class="seg">r&nbsp;&nbsp;&nbsp;0</span>，由 Pr5.28 決定）。出現監視器畫面即可操作。</p>
+<div class="flow">監視器模式 --M--> 參數設定模式 --M--> EEPROM寫入模式 --M--> 輔助功能模式 --M--> (回監視器)
+ d00uEP           Pr 0.00           EE_SEt             AF_AcL...</div>
+
+<h2>2. 變更一個 Pr 參數的完整流程（以 Pr0.06 為例）</h2>
+<blockquote class="warn">⚠ 一次只調一顆軸；改完務必 EEPROM 寫入 + 斷電重開 才生效（Pr0.06 屬「r」類，需重新上電）。</blockquote>
+
+<h3>A. 進入參數設定模式</h3>
+<ol>
+  <li>上電、等監視器畫面出現。</li>
+  <li>按 <span class="key">M</span>，直到顯示變成參數編號（形如 <span class="seg">Pr 0.00</span>）= 參數設定「選擇狀態」。多按過頭就繼續按 M 轉一圈回來。</li>
+</ol>
+
+<h3>B. 選到 Pr0.06</h3>
+<ol start="3">
+  <li>用 <span class="key">◀</span> 移動閃爍位數、用 <span class="key">▲</span>/<span class="key">▼</span> 改數字，調到 <span class="seg">Pr 0.06</span>。（<code>Pr</code> 後第一位=類別 0，小數點後兩位=編號 06）</li>
+</ol>
+
+<h3>C. 顯示並變更數值</h3>
+<ol start="4">
+  <li>按 <span class="key">S</span> → 進入「執行狀態」，顯示<b>目前數值</b>（最右小數點閃爍 = 編輯位）。</li>
+  <li>用 <span class="key">▲</span>/<span class="key">▼</span> 改值。Pr0.06 只有 <code>0</code>/<code>1</code>，按一下即切到另一值。多位數參數可用 <span class="key">◀</span> 換位。</li>
+  <li>按 <span class="key">S</span> → 回「選擇狀態」（又顯示 <span class="seg">Pr 0.06</span>）。<span class="warn">此時只改在 RAM，尚未存檔。</span></li>
+</ol>
+
+<h3>D. 寫入 EEPROM（必做）</h3>
+<ol start="7">
+  <li>按 <span class="key">M</span>，直到顯示 <span class="seg">EE_SEt</span> = EEPROM 寫入模式。</li>
+  <li>按 <span class="key">S</span> → 執行狀態，顯示 <span class="seg">EEP -</span>。</li>
+  <li><b>長按 <span class="key">▲</span></b> → 右側橫線增加：<span class="seg">EEP -</span> → <span class="seg">EEP --</span> → <span class="seg">EEP ---</span> → … → <span class="seg">StArt</span>（開始）→ <span class="seg">FiniSh</span>（完成）。
+    <div class="note">• 顯示 <span class="seg">reSet</span>：此參數需重啟才生效（Pr0.06 屬此）。&nbsp;&nbsp;• 顯示 <span class="seg">Error</span>：寫入失敗，重做；Err11.0=控制電源不足則無法寫入。</div>
+  </li>
+</ol>
+
+<h3>E. 斷電重開 + 確認</h3>
+<ol start="10">
+  <li><b>切斷控制電源，重新上電。</b></li>
+  <li>重開後回參數設定模式調到 <span class="seg">Pr 0.06</span>、按 S 看值，確認已是新值。</li>
+</ol>
+
+<h2>3. 搭配軸卡正規化（A 路線）每軸要做的事</h2>
+<p>對每顆 <b>Direction=1</b> 的軸（M01–M04、M06–M11、M14–M17、M19、M20）：</p>
+<ol>
+  <li>驅動器：本文流程翻轉 <b>Pr0.06</b>（0↔1）+ EEPROM 寫入 + 斷電重開。</li>
+  <li><code>system/Mot_Table.csv</code>：該軸 <b>Direction 1→0</b>（執行期讀取，不必重編，重啟程式生效）。</li>
+  <li><code>Mot_Table.csv</code>：該軸 <b>HomeDirectior</b> 暫時翻一下，由 home 驗證決定對錯。</li>
+  <li>五項驗證：Jog 方向不變 / 極限燈對位（右=CW、左=CCW）/ 原生脫離可用 / NowPosition 與 Encoder 同向且貼近 / Home 正常。</li>
+</ol>
+<blockquote>兩個（Pr0.06 + Direction）一定要<b>成對翻</b>：只翻一個會讓實體動作反向，翻兩個才是淨中性（Jog/MoveTo/教導點位置不變），目的只是讓脈波方向對齊極限接線，卡片就原生允許脫離。</blockquote>
+<blockquote class="warn">排錯（M19 rollout 教訓）：若翻 Pr0.06 後 Jog 方向「看似沒變」，先別當成硬體手性/接線問題——多半是設定沒真的生效。依序確認：(1) Pr0.06 EEPROM 寫入後<b>斷電重開</b>並<b>讀回</b>確認值真的存進去；(2) <code>Pr0.07</code>(指令脈衝輸入模式) 與軸卡輸出模式一致（本機 <code>1P2P=1</code> → 軸卡 mode 4 CW/CCW 雙脈波，Pr0.07 要對應）；(3) 同型軸彼此比對方向相關欄位（如 M19 vs M20）。M20 方法本身正確，M19 卡關是設定沒對上，不是方法錯。先查這三點再考慮硬體。</blockquote>
+
+<h2>4. 日後調驅動器 / 軸卡要查哪份文件（免再搜尋）</h2>
+<table>
+  <tr><th>主題</th><th>文件</th><th>位置</th></tr>
+  <tr><td>A6 前面板按鍵操作（模式/選位/EEPROM 寫入）</td><td><code>panasonicA6_document.pdf</code></td><td>「14. 前面板的使用方法」P.2-83～2-107（PDF 132～156）</td></tr>
+  <tr><td>A6 參數分類總表（Pr0~15 在哪頁）</td><td>同上</td><td>「12. 參數和模式的設定」P.2-59～2-60（PDF 108～109）</td></tr>
+  <tr><td>A6 各參數詳解（意義/範圍/生效時機）</td><td>同上</td><td>「參數詳情」P.4-xx 章</td></tr>
+  <tr><td>A6 指令脈衝（Pr0.05 輸入選擇 / <b>Pr0.06 旋轉方向</b> / Pr0.07 輸入模式）</td><td>同上</td><td>位置控制概要 P.2（PDF 167）+ 接腳 P.3-39（PDF 204）+ 詳解 P.4-9,10</td></tr>
+  <tr><td>A6 電子齒輪/編碼器（Pr0.08、Pr0.11、4× 問題）</td><td><code>panasonicA6_servo-notes.md</code></td><td>全文（本專案實測整理）</td></tr>
+  <tr><td>A6 警報/警告碼</td><td><code>panasonicA6_document.pdf</code></td><td>警告表 P.2-85（PDF 134）；Err 碼於異常處理章</td></tr>
+  <tr><td>MC88X1 軸卡（速度/極限/HardLimitMode/Home/DI）</td><td><b><code>MC88X1_technical-note.md</code>（優先）</b></td><td>全文；§4 極限脫離兩層、§5 DI 位元</td></tr>
+  <tr><td>MC88X1 原廠手冊</td><td><code>MC88系列使用手冊v35.pdf</code></td><td>SetHardLimitMode P.194、Cmove dir P.92、GetMotionInput P.66</td></tr>
+  <tr><td>MCD451 底層（極限依脈波方向擋）</td><td><code>MCD451基本功能篇.pdf</code></td><td>+LM/-LM 行為 P.37</td></tr>
+  <tr><td>本機馬達/極限調機歷史與決策</td><td>memory</td><td><code>motor-test-home-and-limit-findings</code>、<code>mc88x1-driver-reference</code></td></tr>
+</table>
+<blockquote>小抄：<b>驅動器(旋轉方向/脈波/齒輪) → A6 文件 + servo-notes；軸卡(極限/速度/home) → MC88X1_technical-note 優先。</b></blockquote>
+
+</body>
+</html>

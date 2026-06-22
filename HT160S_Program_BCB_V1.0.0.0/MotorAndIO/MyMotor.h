@@ -219,6 +219,7 @@ public:
     void SetLimitLogic(bool logic);
     void SetIn1Logic(bool logic);
     void SetHomeType(int Type);
+    void SetEncodeMultiple(int m);   // configure MC88X1 A/B encoder multiplier (3=x4 for all axes); applied at InitMotor
     void SetMotorKind(eMotorKind Kind);
     eMotorKind GetMotorKind();
     void SetMotionCardType(eMotionCardType Type);

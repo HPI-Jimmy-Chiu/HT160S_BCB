@@ -343,7 +343,7 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
     ForceDirectories(ExtractFilePath(FileName));
     if(atoi(edXDivision->Text.c_str())>MAX_TRAY_X || atoi(edYDivision->Text.c_str())>MAX_TRAY_Y)
     {
-        ShowMessage(AnsiString("Tray division exceeds machine limit (X max=")+IntToStr(MAX_TRAY_X)+", Y max="+IntToStr(MAX_TRAY_Y)+"). Value clamped.");
+        ShowMyOKMessageNoStop(AnsiString("Tray division exceeds machine limit (X max=")+IntToStr(MAX_TRAY_X)+", Y max="+IntToStr(MAX_TRAY_Y)+"). Value clamped.");
     }
     XDivision=GetTrayEditInt(edXDivision, 1, 1, MAX_TRAY_X);
     YDivision=GetTrayEditInt(edYDivision, 1, 1, MAX_TRAY_Y);
@@ -515,7 +515,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     if(!ValidateBinSettingGrid(false))
     {
         if(ShowResultMessage)
-            ShowMessage("Bin map setting has invalid rows.");
+            ShowMyOKMessageNoStop("Bin map setting has invalid rows.");
         return false;
     }
 
@@ -532,7 +532,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     RefreshBinSettingStatus();
     RefreshRecipeStatus();
     if(ShowResultMessage)
-        ShowMessage("Bin map saved.");
+        ShowMyOKMessageNoStop("Bin map saved.");
     return true;
 }
 //---------------------------------------------------------------------------
@@ -602,7 +602,7 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
     if(ShowResultMessage)
     {
         Message=Result?AnsiString("Bin map setting is OK."):AnsiString("Bin map setting has invalid rows.");
-        ShowMessage(Message);
+        ShowMyOKMessageNoStop(Message);
     }
     return Result;
 }
@@ -897,7 +897,7 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     (void)Sender;
     if(edRecipeName->Text.Trim()==AnsiString(""))
     {
-        ShowMessage("Please input new recipe name.");
+        ShowMyOKMessageNoStop("Please input new recipe name.");
         return;
     }
 
@@ -905,19 +905,19 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     NewName=RecipeManager.NormalizeRecipeName(edRecipeName->Text);
     if(RecipeManager.RecipeExists(NewName))
     {
-        ShowMessage("Recipe already exists.");
+        ShowMyOKMessageNoStop("Recipe already exists.");
         return;
     }
 
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(false))
     {
-        ShowMessage("Bin map setting is invalid.");
+        ShowMyOKMessageNoStop("Bin map setting is invalid.");
         return;
     }
     if(!RecipeManager.CopyRecipe(SourceName, NewName))
     {
-        ShowMessage("Save As recipe failed.");
+        ShowMyOKMessageNoStop("Save As recipe failed.");
         return;
     }
 
@@ -926,7 +926,7 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     RefreshRecipeList();
     SelectRecipeInList(NewName);
     RefreshRecipeStatus();
-    ShowMessage("Recipe saved as "+NewName+AnsiString("."));
+    ShowMyOKMessageNoStop("Recipe saved as "+NewName+AnsiString("."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSetup::spbRecipeUseClick(TObject *Sender)
@@ -936,21 +936,21 @@ void __fastcall TfSetup::spbRecipeUseClick(TObject *Sender)
     (void)Sender;
     if(IsSystemRunning())
     {
-        ShowMessage("Can not change recipe while machine is running.");
+        ShowMyOKMessageNoStop("Can not change recipe while machine is running.");
         return;
     }
 
     Name=GetSelectedRecipeName();
     if(!RecipeManager.RecipeExists(Name))
     {
-        ShowMessage("Recipe does not exist.");
+        ShowMyOKMessageNoStop("Recipe does not exist.");
         return;
     }
 
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(false))
     {
-        ShowMessage("Bin map setting is invalid.");
+        ShowMyOKMessageNoStop("Bin map setting is invalid.");
         return;
     }
     RecipeManager.SetCurrentRecipeName(Name);
@@ -966,14 +966,14 @@ void __fastcall TfSetup::spbRecipeNewBlankClick(TObject *Sender)
     (void)Sender;
     if(edRecipeName->Text.Trim()==AnsiString(""))
     {
-        ShowMessage("Please input new recipe name.");
+        ShowMyOKMessageNoStop("Please input new recipe name.");
         return;
     }
 
     Name=RecipeManager.NormalizeRecipeName(edRecipeName->Text);
     if(!RecipeManager.CreateRecipe(Name))
     {
-        ShowMessage("Create recipe failed or recipe already exists.");
+        ShowMyOKMessageNoStop("Create recipe failed or recipe already exists.");
         return;
     }
 
@@ -994,14 +994,14 @@ void __fastcall TfSetup::spbRecipeDeleteClick(TObject *Sender)
     (void)Sender;
     if(IsSystemRunning())
     {
-        ShowMessage("Can not delete recipe while machine is running.");
+        ShowMyOKMessageNoStop("Can not delete recipe while machine is running.");
         return;
     }
 
     Name=GetSelectedRecipeName();
     if(Name.UpperCase()==RecipeManager.GetCurrentRecipeName().UpperCase())
     {
-        ShowMessage("Can not delete current recipe.");
+        ShowMyOKMessageNoStop("Can not delete current recipe.");
         return;
     }
 
@@ -1012,7 +1012,7 @@ void __fastcall TfSetup::spbRecipeDeleteClick(TObject *Sender)
 
     if(!RecipeManager.DeleteRecipe(Name))
     {
-        ShowMessage("Delete recipe failed.");
+        ShowMyOKMessageNoStop("Delete recipe failed.");
         return;
     }
     RefreshRecipeList();

@@ -917,6 +917,10 @@ void TSortArmModule::TransferPlaceDataToAuto()
         if(Slot[SlotIndex].bPlaceSelected)
         {
             TrayMotor->SetTraySingleData(Slot[SlotIndex].PlaceX, Slot[SlotIndex].PlaceY, HAS_OK_IC);
+            //AI(ht160s-motion-view) 20260618 : per-Auto output IC count for the Unload
+            //palAutoXXCnt display (HT172 ShowBinCount used tRunData.TrayICCnt). eAuto1=index 1.
+            if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)
+                tRunData.TrayICCnt[iActiveAutoIndex+1]++;
             g_DeviceInfo.AddBinInfo(SlotIndex, iActiveAutoIndex, Slot[SlotIndex].TrayData);
             g_DeviceInfo.AddOutputInfo(SlotIndex, "Auto"+IntToStr(iActiveAutoIndex+1), "", Slot[SlotIndex].PlaceY, Slot[SlotIndex].PlaceX);
             ClearSlot(SlotIndex);
@@ -1248,6 +1252,168 @@ void TSortArmModule::DoSortArm(int &Task)
             Task=1;
             break;
     }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-sortarm-flow) 20260617 : Teach Advanced single-nozzle point test.
+//Move ONE sucker over ONE tray cell (Loader1/2 or Auto1..6) reusing the same
+//geometry as MoveToLoaderPick/MoveToAutoPlace, generalised so any slot can be
+//placed over any column : ArmX = baseSortX + (Col-Slot)*XPitch. Non-blocking;
+//the caller (TfTeach) drives Task by its timer. Set Task=0 to start; returns
+//true when finished. Z-safe-before-XY is mandatory, exactly like the pick flow.
+//SlotIndex 0..3; Target 1=Loader1,2=Loader2,11..16=Auto1..6; Col/Row 0-based.
+bool TSortArmModule::CanMoveSuckerToCell(int SlotIndex, int Target, int Col, int Row, AnsiString &Err)
+{
+    int LoaderNo=0;
+    int AutoIndex=-1;
+    int BaseSortX;
+    int FirstSortY;
+    int XPosition;
+    int YPosition;
+    TTrayMotor *YMotor;
+
+    Err="";
+    if(SlotIndex<0 || SlotIndex>=SORT_ARM_SUCKER_COUNT)
+    {
+        Err="Invalid sucker";
+        return false;
+    }
+    if(Target==1 || Target==2)
+        LoaderNo=Target;
+    else if(Target>=11 && Target<=16)
+        AutoIndex=Target-11;
+    else
+    {
+        Err="Invalid target area";
+        return false;
+    }
+    if(Col<0 || Col>=GetTrayXCount())
+    {
+        Err="Column out of tray range (1.."+IntToStr(GetTrayXCount())+")";
+        return false;
+    }
+    if(Row<0 || Row>=GetTrayYCount())
+    {
+        Err="Row out of tray range (1.."+IntToStr(GetTrayYCount())+")";
+        return false;
+    }
+    if((Col-SlotIndex)<0)
+    {
+        Err="Sucker cannot reach this column (Suck index > Column)";
+        return false;
+    }
+    if(LoaderNo>0)
+    {
+        BaseSortX=GetLoaderSortX(LoaderNo);
+        FirstSortY=GetLoaderFirstSortY(LoaderNo);
+        YMotor=GetLoaderMotor(LoaderNo);
+    }
+    else
+    {
+        BaseSortX=GetAutoSortX(AutoIndex);
+        FirstSortY=GetAutoFirstSortY(AutoIndex);
+        YMotor=GetAutoMotor(AutoIndex);
+    }
+    XPosition=RoundPosition((double)BaseSortX+((double)(Col-SlotIndex))*GetTrayXPitch());
+    YPosition=RoundPosition((double)FirstSortY+((double)Row)*GetTrayYPitch());
+    if(HSys.Mot.MSortingArmX==NULL || HSys.Mot.MSortingArmX->CheckSoftLimit(XPosition)==false)
+    {
+        Err="Sorting Arm X target over soft limit";
+        return false;
+    }
+    if(YMotor==NULL || YMotor->CheckSoftLimit(YPosition)==false)
+    {
+        Err="Target Y target over soft limit";
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Row, bool bZDown, int &Task)
+{
+    int LoaderNo=0;
+    int AutoIndex=-1;
+    int BaseSortX;
+    int FirstSortY;
+    int XPosition;
+    int YPosition;
+    int ZPosition;
+    bool bXDone;
+    bool bYDone;
+    TTrayMotor *ZMotor;
+
+    if(SlotIndex<0 || SlotIndex>=SORT_ARM_SUCKER_COUNT)
+    {
+        Task=900;
+        return true;
+    }
+    if(Target==1 || Target==2)
+        LoaderNo=Target;
+    else if(Target>=11 && Target<=16)
+        AutoIndex=Target-11;
+    else
+    {
+        Task=900;
+        return true;
+    }
+
+    switch(Task)
+    {
+        case 0:
+            Task=10;
+            break;
+
+        case 10:
+            if(SortArmZToSafePos())
+                Task=20;
+            break;
+
+        case 20:
+            if(MovePitchToTrayPitch())
+                Task=30;
+            break;
+
+        case 30:
+            if(LoaderNo>0)
+            {
+                BaseSortX=GetLoaderSortX(LoaderNo);
+                FirstSortY=GetLoaderFirstSortY(LoaderNo);
+            }
+            else
+            {
+                BaseSortX=GetAutoSortX(AutoIndex);
+                FirstSortY=GetAutoFirstSortY(AutoIndex);
+            }
+            XPosition=RoundPosition((double)BaseSortX+((double)(Col-SlotIndex))*GetTrayXPitch());
+            YPosition=RoundPosition((double)FirstSortY+((double)Row)*GetTrayYPitch());
+            bXDone=MoveSortArmX(XPosition);
+            if(LoaderNo>0)
+                bYDone=MoveLoaderY(LoaderNo, YPosition);
+            else
+                bYDone=MoveAutoY(AutoIndex, YPosition);
+            if(bXDone && bYDone)
+                Task=bZDown?40:100;
+            break;
+
+        case 40:
+            ZMotor=GetSuckZMotor(SlotIndex);
+            if(ZMotor==NULL)
+            {
+                Task=100;
+                break;
+            }
+            ZPosition=(LoaderNo>0)?GetLoaderZPosition(LoaderNo, SlotIndex):GetAutoZPosition(AutoIndex, SlotIndex);
+            if(ZMotor->MotorMove(ZPosition))
+                Task=100;
+            break;
+
+        case 100:
+            return true;
+
+        default:
+            Task=900;
+            return true;
+    }
+    return false;
 }
 //---------------------------------------------------------------------------
 void InitializeSortArmModule()

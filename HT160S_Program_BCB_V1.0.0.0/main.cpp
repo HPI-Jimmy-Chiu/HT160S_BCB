@@ -807,7 +807,12 @@ void __fastcall TfMain::ShowMotorInfo()
             {
                 if(j==iHomeLed)
                 {
-                    sgMotorStatus->Canvas->Brush->Color=clGreen;
+                    // AI 20260622 : green only after a REAL full home completed for this axis
+                    // (fAllMotorHome && bHomeFinish), not merely because it sits on its home
+                    // sensor -- an axis parked on the sensor at power-up used to read as homed
+                    // before any home ran. Diverges from HT172 on-sensor=green by design.
+                    sgMotorStatus->Canvas->Brush->Color=
+                        (fAllMotorHome && HSys.MotPtr[i]->bHomeFinish)?clGreen:clRed;
                 }
                 else
                 {
@@ -1160,14 +1165,42 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
     }
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260622 : status icons now load on demand from
+// picture\status\*.bmp. One SpeedButton per group (sbRealIcon / sbStartIcon)
+// whose Glyph is swapped per state, replacing the old stacked always-resident
+// SpeedButtons (sbDummyIcon / sbContinue) that had to be moved together.
+static AnsiString GetStatusIconDir()
+{
+    return HSys.CurrentDir + AnsiString("\\picture\\status\\");
+}
+//---------------------------------------------------------------------------
+static void SetIconGlyph(TSpeedButton *Btn, AnsiString FileName)
+{
+    if(Btn == NULL)
+        return;
+    if(!FileExists(FileName))
+        return;                 // file missing: keep current glyph, never crash
+    try
+    {
+        Btn->Glyph->LoadFromFile(FileName);
+    }
+    catch(...)
+    {
+    }
+}
+//---------------------------------------------------------------------------
 void TfMain::LoadRunModePicture()
 {
     NormalizeMainRunSettings();
 
     if(sbRealIcon != NULL)
-        sbRealIcon->Visible = (HSys.LastSet.iRealDummy == REALLY);
-    if(sbDummyIcon != NULL)
-        sbDummyIcon->Visible = (HSys.LastSet.iRealDummy != REALLY);
+    {
+        if(HSys.LastSet.iRealDummy == REALLY)
+            SetIconGlyph(sbRealIcon, GetStatusIconDir() + AnsiString("real.bmp"));
+        else
+            SetIconGlyph(sbRealIcon, GetStatusIconDir() + AnsiString("dummy.bmp"));
+    }
+
     if(pnRealDummy == NULL)
         return;
 
@@ -1192,10 +1225,14 @@ void TfMain::LoadStartModePicture()
 {
     NormalizeMainRunSettings();
 
-    if(sbInitial != NULL)
-        sbInitial->Visible = (HSys.LastSet.iStartMode == 0);
-    if(sbContinue != NULL)
-        sbContinue->Visible = (HSys.LastSet.iStartMode != 0);
+    if(sbStartIcon != NULL)
+    {
+        if(HSys.LastSet.iStartMode == 0)
+            SetIconGlyph(sbStartIcon, GetStatusIconDir() + AnsiString("initial.bmp"));
+        else
+            SetIconGlyph(sbStartIcon, GetStatusIconDir() + AnsiString("continue.bmp"));
+    }
+
     if(pnStartMode == NULL)
         return;
 
@@ -1518,7 +1555,19 @@ void TfMain::Start()
 //
         if(fAllMotorHome==false)
         {
+            // AI 20260622 : START on an un-homed machine must HOME first WITH the monitor
+            // shown. The home engine already runs from the kernel (ProcessMotion sees
+            // fAllMotorHome==false) but nothing called fHome->Show(), so it homed silently
+            // and the run mode never switched to Home. Mirror the HOME button (sbHome1Click):
+            // re-arm every axis, enter Run_Home, show the monitor non-modally -- matching
+            // HT172/HT9045 where the home sequence owns the screen. Keep bHomeByStart=true so
+            // the kernel auto-continues into production after home (vs the HOME button stop).
             bHomeByStart=true;
+            ChangeRunMode(Run_Home);
+            ArmMotorHome();
+            fHome->lstHomeMsg->Clear();
+            fHome->lstHomeMsg->Items->Insert(0, "Starting home procedure....");
+            fHome->Show();
         }
 //        flagOneCycleTrayEnd=false;
     }

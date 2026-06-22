@@ -67,6 +67,7 @@ USEFORM("iosetview.cpp", fiosetview);
 #include "uruncontrol.h"
 #include "cEventLog.h"
 #include "cCommLog.h"
+#include "GeneralSetting.h"
 #include "deviceinfo.h"
 #include "cSelfCheck.h"
 #include "SecsGem\uHGemEquipment.h"
@@ -98,6 +99,13 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
     try
     {
+#ifdef SOFT_SIMULATE
+         //AI(HT160S-Maintainer) 20260619 : --selftest-home headless self-test (sim only).
+         //MainProc auto-runs one full-machine home and terminates with an exit code.
+         for(int ai=1; ai<=ParamCount(); ai++)
+             if(ParamStr(ai).LowerCase()=="--selftest-home")
+                 g_SelfTestHome=true;
+#endif
          Application->Initialize();
          //AI(general) 20260603 : iosetview.dfm uses custom components
          //(TMyLed/TBtnPanel/TALed) whose design packages are not installed in
@@ -131,10 +139,17 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          Application->CreateForm(__classid(TfComPort), &fComPort);
          Application->CreateForm(__classid(TfPadInterface), &fPadInterface);
          g_EventLog.Init();
+         //AI(general) 20260617 : log retention (auto-prune old day/month folders).
+         //Values from General.ini [LogRetention]; audit logs kept longer than the
+         //high-volume comm/diagnostic channels. GeneralSetting is already loaded
+         //(HSys.Initial -> InitialCosFunction -> GeneralSetting.Load).
+         g_EventLog.SetRetentionDays(GeneralSetting.iLogRetentionEventDays);
          //AI(ht160s-maintainer) 20260615 : per-channel serial comm CSV logs,
          //same folder layout as EventLog. Pad + LED bin display, for tracing.
          g_PadCommLog.Init("PadLog");
+         g_PadCommLog.SetRetentionDays(GeneralSetting.iLogRetentionCommDays);
          g_BinDispCommLog.Init("BindisplayLog");
+         g_BinDispCommLog.SetRetentionDays(GeneralSetting.iLogRetentionCommDays);
          g_DeviceInfo.Init();
          InitializeLoaderModule();
          InitializeEmptyModule();
@@ -210,6 +225,10 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
              Application->ShowException(&exception);
          }
     }
+#ifdef SOFT_SIMULATE
+    if(g_SelfTestHome)
+        return g_SelfTestExitCode;
+#endif
     return 0;
 }
 //---------------------------------------------------------------------------

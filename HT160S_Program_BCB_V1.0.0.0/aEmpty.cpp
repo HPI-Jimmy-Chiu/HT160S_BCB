@@ -33,6 +33,9 @@ void TEmptyModule::InitialFlag()
     FeedDelay.Clear();
     GoDownDelay.Clear();
     GoUpDelay.Clear();
+    TestUpTask=1;
+    TestDownTask=1;
+    TestDelay.Clear();
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::IsSoftSimulate()
@@ -529,6 +532,148 @@ bool TEmptyModule::DoGoUpTray(int Flag)
 
         case 10000:
             return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced destacker test. Cylinder-only versions of
+//GoDown/GoUp (no Y-motor / push / lean) so the front destacker rise+separate can be
+//exercised in isolation. GoDown mirrors DoGoDownTray; GoUp mirrors DoGoUpTray 100-600.
+bool TEmptyModule::TestGoDownTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestDownTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+
+    switch(TestDownTask)
+    {
+        case 1:
+            HSys.Cyn.C_Empty_FrontRiseTray_1.On();
+            TestDownTask=2000;
+            break;
+
+        case 2000:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_2.On();
+                TestDownTask=3000;
+            }
+            break;
+
+        case 3000:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
+                TestDelay.Set(5);
+                TestDelay.On();
+                TestDownTask=4000;
+            }
+            break;
+
+        case 4000:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_2.Off();
+                TestDelay.Set(5);
+                TestDelay.On();
+                TestDownTask=4100;
+            }
+            break;
+
+        case 4100:
+            if(TestDelay.Off())
+                TestDownTask=5000;
+            break;
+
+        case 5000:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
+                TestDelay.Set(5);
+                TestDelay.On();
+                TestDownTask=6000;
+            }
+            break;
+
+        case 6000:
+            if(TestDelay.Off())
+                TestDownTask=6500;
+            break;
+
+        case 6500:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            {
+                TestDownTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TEmptyModule::TestGoUpTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestUpTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+
+    switch(TestUpTask)
+    {
+        case 1:
+            HSys.Cyn.C_Empty_FrontRiseTray_1.On();
+            TestUpTask=200;
+            break;
+
+        case 200:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
+                TestDelay.Set(5);
+                TestDelay.On();
+                TestUpTask=300;
+            }
+            break;
+
+        case 300:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_2.On();
+                TestUpTask=400;
+            }
+            break;
+
+        case 400:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
+                TestDelay.Set(5);
+                TestDelay.On();
+                TestUpTask=500;
+            }
+            break;
+
+        case 500:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_2.Off();
+                if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+                    TestUpTask=600;
+            }
+            break;
+
+        case 600:
+            if(HSys.Cyn.C_Empty_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            {
+                TestUpTask=1;
+                return true;
+            }
+            break;
     }
     return false;
 }

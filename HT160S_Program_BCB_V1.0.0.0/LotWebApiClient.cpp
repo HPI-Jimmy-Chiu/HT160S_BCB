@@ -14,6 +14,7 @@
 #include "LotWebApiClient.h"
 #include "database.h"
 #include "cCsvDailyLog.h"
+#include "GeneralSetting.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -59,6 +60,9 @@ __fastcall THT160LotWebApiClient::THT160LotWebApiClient()
     //append). lgDailyFolder + ".log" + empty header keeps the exact legacy path
     //WebAPI\YYYYMMDD\WebAPI_YYYYMMDD.log so the state-record snapshot copy is unchanged.
     g_WebApiLog.InitLog("WebAPI", "WebAPI", "", cCsvDailyLog::lgDailyFolder, ".log");
+    //AI(general) 20260617 : auto-prune old WebAPI day-folders. Audit retention
+    //(EventDays). GeneralSetting is loaded by the time the client is created.
+    g_WebApiLog.SetRetentionDays(GeneralSetting.iLogRetentionEventDays);
 }
 //---------------------------------------------------------------------------
 __fastcall THT160LotWebApiClient::~THT160LotWebApiClient()

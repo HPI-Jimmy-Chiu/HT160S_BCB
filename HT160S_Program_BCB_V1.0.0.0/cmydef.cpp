@@ -9,6 +9,17 @@
 int CUSTOMER_CODE=HT160S_DEFAULT_CUSTOMER_CODE;
 int MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
 bool bMotorPowerState=false;
+//AI(ht160s-maintainer) 20260617 : panel-LED run-state flags (DoPanelLamp).
+bool bLampPowerOff=false;
+bool bLampPowerOn=false;
+bool bLampPause=false;
+bool bLampStart=false;
+bool bLampRetry=false;
+bool bLampSkip=false;
+bool bLampTrayEnd=false;
+bool bLampTrayFeed=false;
+bool bLampCleanOut=false;
+bool bLampOneCycle=false;
 bool bMotorHomePowerOn=false;
 bool fAllMotorHome=false;
 bool SoftStart=false;
@@ -24,6 +35,7 @@ bool bHomeByStart=false;
 bool bFirstRun=true;
 bool bSortArmNeedHome=false;
 bool bHomePowerCycling=false;
+bool bPadEverCommunicated=false;
 bool bCalculatePauseTime=false;
 TDateTime tUPH_PauseTime;
 TDateTime tUPH_PauseStartTime;

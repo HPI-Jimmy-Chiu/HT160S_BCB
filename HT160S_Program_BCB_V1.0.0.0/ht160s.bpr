@@ -8,25 +8,26 @@
       uQwertyKey.obj language.obj setup.obj data.obj maintenance.obj uOffset.obj 
       uspeed.obj systools.obj mymessbox.obj note.obj cmydef.obj cprod.obj 
       CosFunction.obj Include\cJSON.obj GeneralSetting.obj Config.obj 
-      UserRoleManager.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj cSelfCheck.obj cStepTrace.obj
-      cStateRecordHT160.obj 
-      database.obj aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj 
-      aSortArm.obj aColor.obj csystem.obj uruncontrol.obj HTimer.obj myio.obj 
-      myio_MN200.obj mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj 
-      deviceinfo.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj 
-      MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj 
-      MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj 
-      AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj
-      MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj
-      SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uHGemLogForm.obj
-      SecsGem\uAgvStation.obj"/>
+      UserRoleManager.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj 
+      cSelfCheck.obj cStepTrace.obj cStateRecordHT160.obj database.obj 
+      aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj aSortArm.obj aColor.obj 
+      csystem.obj uruncontrol.obj HTimer.obj myio.obj myio_MN200.obj 
+      mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj deviceinfo.obj 
+      MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj 
+      MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj 
+      MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj 
+      ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj MyBinDisp.obj 
+      uPadInterface.obj SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj 
+      SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uAgvStation.obj 
+      SecsGem\uHGemLogForm.obj"/>
     <RESFILES value="ht160s.res"/>
     <IDLFILES value=""/>
     <IDLGENFILES value=""/>
     <DEFFILE value=""/>
     <RESDEPEN value="$(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm 
       uQwertyKey.dfm language.dfm setup.dfm data.dfm maintenance.dfm uOffset.dfm 
-      uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm"/>
+      uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm 
+      SecsGem\uHGemLogForm.dfm"/>
     <LIBFILES value=""/>
     <LIBRARIES value="ws2_32.lib"/>
     <SPARELIBS value="vcl.lib rtl.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib bdertl.lib"/>

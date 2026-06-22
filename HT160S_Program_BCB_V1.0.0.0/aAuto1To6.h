@@ -32,6 +32,9 @@ private:
     int FeedTask;
     int DischargeTask;
     int CleanOutTask;
+    int DischargeSubTask;     //AI(general) 20260617 : FrontRise sub-step (shared by DoDischargeTray + TestGoUpOnce)
+    int TestUpTask;           //AI(general) 20260617 : Teach Advanced single-cylinder GoUp-once test
+    HTimer TestDelay;         //AI(general) 20260617 : Teach Advanced GoUp-once settle delay
     int iFeedAuto;
     int iDischargeAuto;
     bool bCleanOutCheck[6];
@@ -75,6 +78,7 @@ private:
     bool DoFeedTray(int Flag);
     bool DoDischargeTray(int Flag);
     bool DoAllAutoCleanOut(int Flag);
+    bool DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared single-cylinder FrontRise On->settle->Off
     //AI(HT160S-Maintainer) 20260612 : AMR output-car full service. Sim auto-clears
     //the full car; real machine alarms + operator confirm then clears; physical
     //InputFullTray sensor is the last line of defense (alarm until it reads OFF).
@@ -117,6 +121,9 @@ public:
     //for the Store Hangup SortArmDecision.txt (why SortArm cannot place / Auto cannot discharge).
     int        GetStationCount();
     AnsiString DescribeStation(int Index);
+    AnsiString GetWorkingTrayID(int Index);  //AI(ht160s-motion-view) 20260618 : 2D TrayID at working pos for Unload Auto-info ID panel
+
+    bool TestGoUpOnce(int Index, int Flag);   //AI(general) 20260617 : Teach Advanced single-cylinder FrontRise GoUp once (no GoDown)
 };
 //---------------------------------------------------------------------------
 extern TAutoModule *AutoModule;

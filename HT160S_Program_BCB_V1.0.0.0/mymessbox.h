@@ -50,6 +50,7 @@ void ShowMyMessage(char *S);
 void ShowMyMessage(int Code);
 void ShowMyOKMessage(char *str);
 void ShowMyOKMessage(int Code);
+void ShowMyOKMessageNoStop(AnsiString S);
 void ShowMyMessage_Run(AnsiString S1, AnsiString S2);
 int  ShowMyMessageBox_YES_NO(AnsiString str);
 int  ShowMyMessageBox_YES_NO(char *str);

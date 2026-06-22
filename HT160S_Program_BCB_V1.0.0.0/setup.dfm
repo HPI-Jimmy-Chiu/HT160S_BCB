@@ -1,10 +1,10 @@
 object fSetup: TfSetup
-  Left = 242
-  Top = 56
+  Left = 234
+  Top = 3
   BorderStyle = bsSingle
   Caption = 'Product Setup'
-  ClientHeight = 939
-  ClientWidth = 1507
+  ClientHeight = 834
+  ClientWidth = 1198
   Color = 11250603
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,10 +18,10 @@ object fSetup: TfSetup
   PixelsPerInch = 96
   TextHeight = 13
   object pnlMenu: TPanel
-    Left = 1311
+    Left = 1002
     Top = 0
     Width = 196
-    Height = 939
+    Height = 834
     Align = alRight
     BevelOuter = bvNone
     Color = 12761254
@@ -76,7 +76,7 @@ object fSetup: TfSetup
     end
     object spbSetupExit: TSpeedButton
       Left = 8
-      Top = 812
+      Top = 372
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -94,15 +94,15 @@ object fSetup: TfSetup
   object pnlClient: TPanel
     Left = 0
     Top = 0
-    Width = 1311
-    Height = 939
+    Width = 1002
+    Height = 834
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 1
     object pnlTitle: TPanel
       Left = 0
       Top = 0
-      Width = 1311
+      Width = 1002
       Height = 44
       Align = alTop
       Caption = 'Recipe'
@@ -118,11 +118,11 @@ object fSetup: TfSetup
     object pcSetup: TPageControl
       Left = 0
       Top = 44
-      Width = 1311
-      Height = 895
-      ActivePage = tsSetupBinSetting
+      Width = 1002
+      Height = 790
+      ActivePage = tsSetupRecipe
       Align = alClient
-      TabIndex = 2
+      TabIndex = 0
       TabOrder = 1
       TabWidth = 120
       object tsSetupRecipe: TTabSheet
@@ -130,7 +130,7 @@ object fSetup: TfSetup
         object pnlRecipeHeader: TPanel
           Left = 0
           Top = 0
-          Width = 1303
+          Width = 994
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -147,8 +147,8 @@ object fSetup: TfSetup
         object pnlRecipeBody: TPanel
           Left = 0
           Top = 31
-          Width = 1303
-          Height = 836
+          Width = 994
+          Height = 731
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -469,7 +469,7 @@ object fSetup: TfSetup
         object pnlTrayHeader: TPanel
           Left = 0
           Top = 0
-          Width = 1303
+          Width = 994
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -486,8 +486,8 @@ object fSetup: TfSetup
         object pnlTrayBody: TPanel
           Left = 0
           Top = 31
-          Width = 1303
-          Height = 836
+          Width = 994
+          Height = 731
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -13788,7 +13788,7 @@ object fSetup: TfSetup
         object pnlBinHeader: TPanel
           Left = 0
           Top = 0
-          Width = 1303
+          Width = 994
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -13805,8 +13805,8 @@ object fSetup: TfSetup
         object pnlBinBody: TPanel
           Left = 0
           Top = 31
-          Width = 1303
-          Height = 836
+          Width = 994
+          Height = 731
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254

@@ -11,6 +11,9 @@ private:
     int FeedTask;
     int GoDownTask;
     int GoUpTask;
+    int TestUpTask;
+    int TestDownTask;
+    HTimer TestDelay;
     bool bFrontHasTray;
     bool bRearHasTray;
     bool bBottomHasTray;
@@ -40,6 +43,9 @@ public:
     void SetRearHasTray(bool bHasTray);
     void RequestReturnTray();
     void NotifyTrayXToEmptyFinish();
+
+    bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp, mirrors DoGoUpTray rise steps)
+    bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, mirrors DoGoDownTray)
 };
 //---------------------------------------------------------------------------
 extern TEmptyModule *EmptyModule;

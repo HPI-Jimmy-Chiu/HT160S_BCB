@@ -3,8 +3,14 @@
 
 param(
     [switch]$Clean,
+    [switch]$Full,
     [string]$BCBRoot = "D:\ProgramFiles\Borland\CBuilder6"
 )
+# -Clean : delete a curated obj set, then build (fast; fine for source-only edits).
+# -Full  : delete EVERY *.obj/*.d/*.tds under the project, then build. Use after a
+#          shared-header STRUCT change (e.g. adding a member to TMyMotor) where the
+#          curated -Clean list is insufficient -- every TU embedding the struct must
+#          recompile. Implies the -Clean stale-output checks.
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
@@ -14,6 +20,7 @@ $projectRoot = Join-Path $repoRoot "HT160S_Program_BCB_V1.0.0.0"
 $projectFile = Join-Path $projectRoot "ht160s.bpr"
 $makeFile = Join-Path $projectRoot "ht160s.mak"
 $encodingCheck = Join-Path $PSScriptRoot "check-ht160s-source-encoding.ps1"
+$formLint = Join-Path $PSScriptRoot "check-bcb-form-published.ps1"
 $bpr2mak = Join-Path $BCBRoot "Bin\bpr2mak.exe"
 $make = Join-Path $BCBRoot "Bin\make.exe"
 $brcc32 = Join-Path $BCBRoot "Bin\brcc32.exe"
@@ -36,6 +43,10 @@ if (-not (Test-Path -LiteralPath $brcc32)) {
 
 if (-not (Test-Path -LiteralPath $encodingCheck)) {
     throw "Encoding check script not found: $encodingCheck"
+}
+
+if (-not (Test-Path -LiteralPath $formLint)) {
+    throw "Form __published lint script not found: $formLint"
 }
 
 $projectText = Get-Content -LiteralPath $projectFile -Raw
@@ -87,13 +98,27 @@ Push-Location $projectRoot
 try {
     & $encodingCheck -ProjectRoot $projectRoot
 
+    & $formLint -Path $projectRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "BCB form __published lint failed (fix the V1-V4 violations listed above)."
+    }
+
     $objRoot = Join-Path $repoRoot "Obj"
     if (-not (Test-Path -LiteralPath $objRoot)) {
         New-Item -ItemType Directory -Path $objRoot | Out-Null
     }
 
-    if ($Clean) {
+    if ($Clean -or $Full) {
         Assert-StaleOutputsNotRunning
+
+        if ($Full) {
+            $fullObjs = Get-ChildItem -LiteralPath $projectRoot -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { @(".obj", ".d", ".tds") -contains $_.Extension.ToLowerInvariant() }
+            if ($fullObjs) {
+                Remove-Item -LiteralPath ($fullObjs | ForEach-Object { $_.FullName }) -ErrorAction SilentlyContinue
+                Write-Output ("Full clean: removed {0} obj/d/tds file(s)." -f $fullObjs.Count)
+            }
+        }
 
         $cleanFiles = @(
             "ht160s.obj", "main.obj", "database.obj", "uruncontrol.obj",

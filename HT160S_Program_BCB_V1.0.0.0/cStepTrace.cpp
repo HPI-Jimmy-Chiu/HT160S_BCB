@@ -5,6 +5,8 @@
 
 #include "cStepTrace.h"
 #include "database.h"
+#include "cCsvDailyLog.h"
+#include "GeneralSetting.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -149,5 +151,49 @@ void StepTraceTick()
 
     s_LastRunMode = RunMode;
     s_LastCount   = Count;
+}
+//---------------------------------------------------------------------------
+// Motor task trace (Home / limit / jog diagnosis for Teach + Motor Test).
+//---------------------------------------------------------------------------
+static const AnsiString MOTORTASK_FLAG_FILE = "D:\\HT160S_Log\\motortask.on";
+static cCsvDailyLog s_MotorTaskLog;
+static bool s_MotorTaskInit   = false;
+static bool s_MotorTaskActive = false;
+//---------------------------------------------------------------------------
+bool MotorTaskLogActive()
+{
+    return s_MotorTaskActive || FileExists(MOTORTASK_FLAG_FILE);
+}
+//---------------------------------------------------------------------------
+void MotorTaskLogSetActive(bool bActive)
+{
+    s_MotorTaskActive = bActive;
+}
+//---------------------------------------------------------------------------
+void MotorTaskLog(const AnsiString& sSource, const AnsiString& sMotor,
+                  const AnsiString& sEvent,  const AnsiString& sDetail)
+{
+    if(MotorTaskLogActive() == false)
+        return;
+    if(s_MotorTaskInit == false)
+    {
+        s_MotorTaskLog.InitLog("MotorTaskLog", "MotorTask",
+                               "Date,Time,Source,Motor,Event,Detail",
+                               cCsvDailyLog::lgDailyFolder);
+        //AI(general) 20260617 : auto-prune old MotorTaskLog day-folders
+        //(comm/diagnostic retention). Lazy init runs during a Teach/MotorTest
+        //session, well after GeneralSetting.Load.
+        s_MotorTaskLog.SetRetentionDays(GeneralSetting.iLogRetentionCommDays);
+        s_MotorTaskInit = true;
+    }
+    TDateTime now = Now();
+    AnsiString sLine =
+        FormatDateTime("yyyy/mm/dd", now) + "," +
+        FormatDateTime("hh:nn:ss.zzz", now) + "," +
+        cCsvDailyLog::CsvQuote(sSource) + "," +
+        cCsvDailyLog::CsvQuote(sMotor) + "," +
+        cCsvDailyLog::CsvQuote(sEvent) + "," +
+        cCsvDailyLog::CsvQuote(sDetail);
+    s_MotorTaskLog.AppendLine(sLine);
 }
 //---------------------------------------------------------------------------

@@ -64,9 +64,9 @@ object MyMessageBox: TMyMessageBox
     end
   end
   object palPause: TPanel
-    Left = 168
+    Left = 120
     Top = 178
-    Width = 129
+    Width = 117
     Height = 33
     BevelWidth = 2
     Caption = 'Pause'
@@ -81,9 +81,9 @@ object MyMessageBox: TMyMessageBox
     OnClick = palPauseClick
   end
   object Button2: TButton
-    Left = 328
+    Left = 384
     Top = 178
-    Width = 129
+    Width = 90
     Height = 33
     Caption = 'Off Buzzer'
     Font.Charset = DEFAULT_CHARSET
@@ -97,9 +97,9 @@ object MyMessageBox: TMyMessageBox
   end
   object palYes: TPanel
     Tag = 1
-    Left = 68
+    Left = 4
     Top = 178
-    Width = 130
+    Width = 117
     Height = 33
     BevelWidth = 2
     Caption = 'Yes'
@@ -116,9 +116,9 @@ object MyMessageBox: TMyMessageBox
   end
   object palNo: TPanel
     Tag = 2
-    Left = 268
+    Left = 236
     Top = 178
-    Width = 130
+    Width = 117
     Height = 33
     BevelWidth = 2
     Caption = 'No'

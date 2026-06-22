@@ -81,10 +81,12 @@ public:
     bool            ServoAlarmOn;
     int             iMotNo;
     int             iHomeType;
+    int             iEncodeMultiple;   // MC88X1 A/B encoder input multiplier config (set before InitMotor): 3=x4 default, 1=x1 (M20)
     int             iHomeStep;
     int             iHomeStepRange;
     bool            bNeedHome;
     bool            bThreadHome;
+    bool            bHomePhaseTimeout;   // set by HomeType90 phase-B on leave/re-approach timeout
     PF_CHECK        MotorIdleSafeDoorCheck;
 
     unsigned int    ReadSpeed();
@@ -139,6 +141,12 @@ public:
     virtual bool    ReadStatus(DWORD offset, WORD *ReadData) { (void)offset; if(ReadData!=NULL) *ReadData=0; return true; }
     virtual bool    WriteStatus(DWORD offset, WORD WriteData) { (void)offset; (void)WriteData; return true; }
     virtual void    MotIpReset() {}
+    // AI(general) 20260617 : MC88X1 speed/accel range diagnostics. GetLastParaError
+    // returns the last MC88X1PMotAxisParaSet return code (0=ok, 0x1000+ = a SV/DV/MDV/AC
+    // param out of the card's range). VerifyHomeParaRange dry-runs the HOME-seek profile
+    // and returns that code, then restores the running params. Default no-op for non-MC88X1.
+    virtual DWORD   GetLastParaError(void) { return 0; }
+    virtual DWORD   VerifyHomeParaRange(void) { return 0; }
     virtual bool    IsMotorBusy() { return false; }
     virtual void    MotorReset() {}
     virtual bool    IsMotorAlarm() { return false; }

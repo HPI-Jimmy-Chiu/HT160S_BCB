@@ -67,6 +67,9 @@ static void PrepareNormalMessage(AnsiString S1, AnsiString S2, AnsiString Button
     MyMessageBox->palPause->Visible=true;
     MyMessageBox->palYes->Visible=false;
     MyMessageBox->palNo->Visible=false;
+    // Off Buzzer is an alarm-only control; default visible here so alarm
+    // dialogs keep it. YES/NO confirmations hide it (no buzzer is running).
+    MyMessageBox->Button2->Visible=true;
     MyMessageBox->ret=TMyMessageBox::msgrtnPAUSE;
 }
 //---------------------------------------------------------------------------
@@ -118,6 +121,24 @@ void ShowMyOKMessage(int Code)
     ShowMyOKMessage(S.c_str());
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260617 : OK-only popup that does NOT stop motors or clear
+//SystemStart (bFormShowNoStop=true). Behavior-preserving replacement for plain VCL
+//MessageDlg/ShowMessage info/warning dialogs, which never stopped the machine. Use the
+//stopping ShowMyMessage/ShowMyOKMessage for real machine alarms, Note for full alarms.
+void ShowMyOKMessageNoStop(AnsiString S)
+{
+    if(bCanShow==false)
+        return;
+    EnsureMyMessageBox();
+    if(MyMessageBox->fShow)
+        return;
+
+    PrepareNormalMessage(S, "", "OK");
+    MyMessageBox->fScanPanel=false;
+    MyMessageBox->bFormShowNoStop=true;
+    MyMessageBox->ShowModal();
+}
+//---------------------------------------------------------------------------
 void ShowMyMessage_Run(AnsiString S1, AnsiString S2)
 {
     EnsureMyMessageBox();
@@ -140,6 +161,7 @@ int ShowMyMessageBox_YES_NO(AnsiString str)
     MyMessageBox->palPause->Visible=false;
     MyMessageBox->palYes->Visible=true;
     MyMessageBox->palNo->Visible=true;
+    MyMessageBox->Button2->Visible=false;
     MyMessageBox->ret=TMyMessageBox::msgrtnNO;
     MyMessageBox->fScanPanel=false;
     MyMessageBox->bFormShowNoStop=true;

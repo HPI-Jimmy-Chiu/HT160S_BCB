@@ -23,6 +23,7 @@ struct TLoaderSideState
     int FeedTask;
     int CcdTask;
     int DischargeTask;
+    int DestackTask;        //AI(general) 20260617 : front-destacker sub-step (shared by DoFeedTray + TestGoDownTray)
     bool bTrayEmpty;
     bool bCcdLeftToRight;
     int CcdX;
@@ -41,6 +42,9 @@ private:
     int iFrontOwner;
     int iTopCcdCount;
     int iYOwner[2];
+    int TestUpTask;          //AI(general) 20260617 : Teach Advanced destacker test (GoUp)
+    int TestDownTask;        //AI(general) 20260617 : Teach Advanced destacker test (GoDown)
+    HTimer TestDelay;        //AI(general) 20260617 : Teach Advanced destacker test settle delay
     int SimuCcdCycleIndex;   // round-robin cursor over LotRegistry codes (simulation only)
     AnsiString CurrentLotNumber;
 
@@ -83,6 +87,7 @@ private:
     bool DoFeedTray(int LoaderNo, int Flag);
     bool DoCcdCheck(int LoaderNo, int Flag);
     bool DoDischargeTray(int LoaderNo, int Flag);
+    bool DoFrontDestackDown(int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared front-destacker separate-one-tray sequence (cylinder-only)
 
 public:
     TLoaderModule();
@@ -98,6 +103,9 @@ public:
     bool IsSortOwnerHeld(int LoaderNo);
     void NotifyTrayArmPickRearTray();
     bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
+
+    bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; shared destacker, no LoaderNo)
+    bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, extracted from DoFeedTray)
 };
 //---------------------------------------------------------------------------
 extern TLoaderModule *LoaderModule;

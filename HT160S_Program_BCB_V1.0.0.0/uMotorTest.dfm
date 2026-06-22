@@ -702,7 +702,7 @@ object fMotorTest: TfMotorTest
       OnClick = btnGoPos2Click
     end
     object btnJogP: TButton
-      Left = 18
+      Left = 132
       Top = 342
       Width = 90
       Height = 34
@@ -712,9 +712,9 @@ object fMotorTest: TfMotorTest
       OnMouseUp = btnJogMouseUp
     end
     object btnJogN: TButton
-      Left = 124
+      Left = 18
       Top = 342
-      Width = 90
+      Width = 95
       Height = 34
       Caption = 'JOG -'
       TabOrder = 15
@@ -722,7 +722,7 @@ object fMotorTest: TfMotorTest
       OnMouseUp = btnJogMouseUp
     end
     object btnStepP: TButton
-      Left = 230
+      Left = 292
       Top = 342
       Width = 54
       Height = 34
@@ -731,7 +731,7 @@ object fMotorTest: TfMotorTest
       OnClick = btnStepPClick
     end
     object btnStepN: TButton
-      Left = 292
+      Left = 230
       Top = 342
       Width = 54
       Height = 34

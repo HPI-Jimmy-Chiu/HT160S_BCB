@@ -67,6 +67,25 @@ public:
 	// Bin display COM port name (e.g. "COM5") and label hold time in seconds.
 	AnsiString sBinDispComPort;
 	int iBinDispDelaySec;
+	// Serial baud rate for the bin display COM line. Old-160 ran the LED board
+	// through an external MCU.exe TCP bridge, so the handler kept no baud; the
+	// HT9046 hardware standard (matching HT172) is 9600-8-N-1. Settable here so
+	// the field is changeable on the maintenance page without a rebuild.
+	int iBinDispBaud;
+	// When false (default), routine bin-display TX/Recv frames are NOT written
+	// to the BindisplayLog CSV (only open/close + error events are), so the
+	// daily comm file does not balloon during production. Set true for full
+	// frame-level tracing. Stored in General.ini [BinDisplay] LogVerbose.
+	bool bBinDispLogVerbose;
+
+	// Log retention (days). Day/month sub-folders older than this are deleted
+	// when a log channel opens / rolls over to a new day. 0 = keep forever.
+	// Audit logs (EventLog/WebAPI) are kept longer than the high-volume
+	// comm/diagnostic logs (BindisplayLog/PadLog/MotorTaskLog). Stored in
+	// General.ini [LogRetention]. See cCsvDailyLog::SetRetentionDays.
+	int iLogRetentionEventDays;   // EventLog, WebAPI
+	int iLogRetentionCommDays;    // BindisplayLog, PadLog, MotorTaskLog
+
 	// Per-unit fixed label text + color, old-160 style. Index order (P0 lock):
 	// 0=Empty 1=Loader 2..7=Auto1..6 8=Color. Text is one char: digit/letter/blank.
 	// Color is the raw LED code sent to the board (e.g. 1 or 3).

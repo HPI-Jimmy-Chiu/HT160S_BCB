@@ -128,10 +128,8 @@ __published:	// IDE-managed Components
     TALed *ledRed;
     TALed *ledGreen;
     TLabel *lblRunMode;
-    TSpeedButton *sbDummyIcon;
     TSpeedButton *sbRealIcon;
-    TSpeedButton *sbInitial;
-    TSpeedButton *sbContinue;
+    TSpeedButton *sbStartIcon;
     TLabel *lbStartMode;
     TPanel *pnRealDummy;
     TPanel *pnStartMode;

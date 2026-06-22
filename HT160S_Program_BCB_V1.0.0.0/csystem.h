@@ -44,5 +44,30 @@ bool HasAutoICInMachine();
 void InitialAllTask(bool bKeepMaterial=false);
 void ScanAllMotorStatus();
 void RecordSafeDoorStates();
+//AI 20260619 : machine run-state command layer (see csystem.cpp). Pass the
+//trigger source so every Pause/Stop/home-abort is logged with WHO did it.
+//Single choke point for HSys.Sys.SystemStart + its mandatory motor-stop, so the
+//invariant "SystemStart=false always stops the motors" holds in ONE place.
+enum eMachineTrigger {
+    trigOperator,
+    trigSafetyDoor,
+    trigEmg,
+    trigServoAlarm,
+    trigHomeStop,
+    trigSecsRemote,
+    trigSystem
+};
+const char* MachineTriggerName(eMachineTrigger trig);
+void MachinePause(eMachineTrigger trig);
+void MachineStop(eMachineTrigger trig);
+void MachineHomeAbort(eMachineTrigger trig);
+#ifdef SOFT_SIMULATE
+//AI(HT160S-Maintainer) 20260619 : --selftest-home headless self-test (sim only).
+//g_SelfTestHome is set in WinMain from the --selftest-home command-line arg; MainProc
+//then auto-runs ONE full-machine home and sets g_SelfTestExitCode (0=home completed,
+//2=timeout) before Application->Terminate(). WinMain returns that code.
+extern bool g_SelfTestHome;
+extern int  g_SelfTestExitCode;
+#endif
 //---------------------------------------------------------------------------
 #endif

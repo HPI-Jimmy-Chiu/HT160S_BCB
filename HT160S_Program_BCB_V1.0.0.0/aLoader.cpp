@@ -61,6 +61,9 @@ void TLoaderModule::InitialFlag()
     iYOwner[1]=LOADER_Y_OWNER_NONE;
     SimuCcdCycleIndex=0;
     CurrentLotNumber="";
+    TestUpTask=1;
+    TestDownTask=1;
+    TestDelay.Clear();
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::ResetSide(TLoaderSideState *State)
@@ -70,6 +73,7 @@ void TLoaderModule::ResetSide(TLoaderSideState *State)
     State->FeedTask=1;
     State->CcdTask=1;
     State->DischargeTask=1;
+    State->DestackTask=1;
     State->bTrayEmpty=false;
     State->bCcdLeftToRight=true;
     State->CcdX=0;
@@ -825,50 +829,16 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 4000:
-            HSys.Cyn.C_Loader_FrontRiseTray_1.On();
-            State->FeedTask=5000;
+            //AI(general) 20260617 : front-destacker separate-one-tray now lives in the
+            //shared DoFrontDestackDown so the Teach Advanced TestGoDownTray exercises the
+            //identical cylinder sequence as this production feed.
+            State->DestackTask=1;
+            State->FeedTask=4100;
             break;
 
-        case 5000:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-            {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.On();
-                State->FeedTask=6000;
-            }
-            break;
-
-        case 6000:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
-            {
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
-                State->FeedDelay.Set(10);
-                State->FeedDelay.On();
-                State->FeedTask=7000;
-            }
-            break;
-
-        case 7000:
-            if(State->FeedDelay.Off())
-            {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.Off();
-                State->FeedTask=8000;
-            }
-            break;
-
-        case 8000:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-            {
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
-                State->FeedTask=8100;
-            }
-            break;
-
-        case 8100:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())
-            {
-                HSys.Cyn.C_Loader_FrontRiseTray_1.Off();
+        case 4100:
+            if(DoFrontDestackDown(State->DestackTask, State->FeedDelay))
                 State->FeedTask=8200;
-            }
             break;
 
         case 8200:
@@ -1231,6 +1201,146 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
             if(MoveLoaderY(LoaderNo, GetLoaderFeedY(LoaderNo)))
             {
                 Task=5000;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : shared front-destacker "separate one tray down" sequence.
+//Extracted verbatim from DoFeedTray case 4000-8100 so the Teach Advanced
+//TestGoDownTray drives the IDENTICAL cylinders/steps as the production feed (no
+//drift). Cylinder-only (no Y / push / lean); destacker cylinders are shared by both
+//sides so no LoaderNo. Caller owns the SubTask + settle Delay. Returns true when done.
+bool TLoaderModule::DoFrontDestackDown(int &SubTask, HTimer &Delay)
+{
+    switch(SubTask)
+    {
+        case 1:
+            HSys.Cyn.C_Loader_FrontRiseTray_1.On();
+            SubTask=2;
+            break;
+
+        case 2:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.On();
+                SubTask=3;
+            }
+            break;
+
+        case 3:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
+                Delay.Set(10);
+                Delay.On();
+                SubTask=4;
+            }
+            break;
+
+        case 4:
+            if(Delay.Off())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Off();
+                SubTask=5;
+            }
+            break;
+
+        case 5:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
+                SubTask=6;
+            }
+            break;
+
+        case 6:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_1.Off();
+                SubTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced GoDown test = the production destacker
+//separate-one-tray sequence (shared DoFrontDestackDown), so test == Auto-run sub-action.
+bool TLoaderModule::TestGoDownTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestDownTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+    return DoFrontDestackDown(TestDownTask, TestDelay);
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced destacker test. Cylinder-only GoUp
+//(return one tray up into the stack) mirrors Empty DoGoUpTray rise steps 100-600.
+bool TLoaderModule::TestGoUpTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestUpTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+
+    switch(TestUpTask)
+    {
+        case 1:
+            HSys.Cyn.C_Loader_FrontRiseTray_1.On();
+            TestUpTask=200;
+            break;
+
+        case 200:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
+                TestDelay.Set(10);
+                TestDelay.On();
+                TestUpTask=300;
+            }
+            break;
+
+        case 300:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.On();
+                TestUpTask=400;
+            }
+            break;
+
+        case 400:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
+                TestDelay.Set(10);
+                TestDelay.On();
+                TestUpTask=500;
+            }
+            break;
+
+        case 500:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Off();
+                if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+                    TestUpTask=600;
+            }
+            break;
+
+        case 600:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_1.Off();
+                TestUpTask=1;
                 return true;
             }
             break;

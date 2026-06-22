@@ -66,7 +66,6 @@ typedef struct
     int Loader2CarFirstSortYPosition;
 
     int LoaderCarFirstCCDXPosition;
-    int LoaderCarLastCCDXPosition;
 
     int SortArmToLoader1XPosition;
     int SortArmToLoader2XPosition;
@@ -217,6 +216,35 @@ __published:
     TButton *btnStop;
     TButton *btnRefresh;
     TTimer *tmrUpdate;
+    TTabSheet *tsAdvanced;
+    TPageControl *pgcAdvanced;
+    TTabSheet *tsSortArm;
+    TGroupBox *gbSortArmPickPlace;
+    TLabel *lbSuckUse;
+    TLabel *lbToArea;
+    TLabel *lbSaCol;
+    TLabel *lbSaRow;
+    TLabel *lblSaStatus;
+    TComboBox *cbSuckUse;
+    TComboBox *cbToArea;
+    TEdit *edSaCol;
+    TEdit *edSaRow;
+    TCheckBox *chkSaZDown;
+    TButton *btnSaGo;
+    TTabSheet *tsChannel;
+    TGroupBox *gbCarGoUpGoDonw;
+    TLabel *lbCarArea;
+    TLabel *lbCarLoopTimes;
+    TLabel *lblCarStatus;
+    TComboBox *cbCarArea;
+    TCheckBox *chkCarLoop;
+    TEdit *edLoopTimes;
+    TButton *btnCarGo;
+    TGroupBox *gbAutoGoUp;
+    TLabel *lbAutoArea;
+    TLabel *lblAutoStatus;
+    TComboBox *cbAutoArea;
+    TButton *btnAutoGoUp;
 
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
@@ -241,6 +269,9 @@ __published:
     void __fastcall btnHomeClick(TObject *Sender);
     void __fastcall btnStopClick(TObject *Sender);
     void __fastcall btnRefreshClick(TObject *Sender);
+    void __fastcall btnSaGoClick(TObject *Sender);
+    void __fastcall btnCarGoClick(TObject *Sender);
+    void __fastcall btnAutoGoUpClick(TObject *Sender);
 private:
     bool bUIBuilt;
     bool bTeachReady;
@@ -249,6 +280,23 @@ private:
     int ActiveMotorIndex;
     int iHomeMotorIndex;
     int SelectedTeachIndex;
+
+    bool bSaTestRunning;
+    int iSaTask;
+    int iSaSlot;
+    int iSaTarget;
+    int iSaCol;
+    int iSaRow;
+    bool bSaZDown;
+
+    bool bCarTestRunning;
+    int iCarArea;
+    int iCarPhase;
+    bool bCarLoop;
+    int iCarLoopTarget;
+    int iCarLoopDone;
+    bool bAutoTestRunning;
+    int iAutoIndex;
 
     TLabel *lblStatus[iMotLedTotalCnt];
     TALed *ledStatus[iMotLedTotalCnt];
@@ -290,7 +338,24 @@ private:
     void StopActiveMotor();
     void SetMessage(AnsiString Text);
     bool CheckSortArmZHome();
-    bool CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target);
+    bool CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target, bool bAllowLimitAlarm=false);
+    void PopulateAdvancedCombos();
+    int ComboIndexToTarget(int Index);
+    TTrayMotor *GetSaTargetYMotor(int Target);
+    bool CheckSortArmTestReady(int SlotIndex, int Target);
+    void RunSortArmTest();
+    void StopSortArmTest();
+    void SetSaStatus(AnsiString Text);
+    void PopulateChannelCombos();
+    bool CheckCarTestReady();
+    bool CallCarGoUp(int Area, int Flag);
+    bool CallCarGoDown(int Area, int Flag);
+    void StartCarPhase(int Phase);
+    void RunCarTest();
+    void StopCarTest();
+    void RunAutoTest();
+    void SetCarStatus(AnsiString Text);
+    void SetAutoStatus(AnsiString Text);
 public:
     __fastcall TfTeach(TComponent* Owner);
     void __fastcall InitialTeachParameter();

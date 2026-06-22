@@ -1591,6 +1591,13 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
         // Authority for the home model: docs/MC88X1_Driver/MC88X1_technical-note.
         // Must run before InitMotor so the HomeType register is written for the axis.
         MotPtr[i]->SetHomeType(7);
+        // AI 20260622 : MC88X1 A/B encoder input multiplier = x4 (value 3) for EVERY axis.
+        // All A6 drives now output Pr0.11=2500/rev on OA/OB, so card x4 = 2500*4 = 10000/rev
+        // matches the 10000/rev command resolution (Pr0.08) -> NowPos==Encoder on every axis.
+        // M12 MTopCCDX and M20 MTopCCDX_Color (same mechanism+drive) once shipped Pr0.11=10000
+        // and read 4x; their drives were reset to Pr0.11=2500 to match the rest, so no per-axis
+        // special case remains. Must run before InitMotor (the card register is written there).
+        MotPtr[i]->SetEncodeMultiple(3);
         MotPtr[i]->bHomeFlag=false;
         if(bInitial)
             MotPtr[i]->InitMotor(iAdder);
