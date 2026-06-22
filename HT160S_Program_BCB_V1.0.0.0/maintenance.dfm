@@ -296,9 +296,9 @@ object fMaintenance: TfMaintenance
       Top = 44
       Width = 949
       Height = 943
-      ActivePage = tsMaintCOM
+      ActivePage = tsMaintTowerLight
       Align = alClient
-      TabIndex = 9
+      TabIndex = 0
       TabOrder = 1
       TabWidth = 90
       object tsMaintTowerLight: TTabSheet
@@ -644,7 +644,7 @@ object fMaintenance: TfMaintenance
             Top = 209
             Width = 116
             Height = 31
-            Caption = 'Heating'
+            Caption = 'Reserved'
             Color = 8421440
             Font.Charset = DEFAULT_CHARSET
             Font.Color = clWhite
@@ -653,6 +653,7 @@ object fMaintenance: TfMaintenance
             Font.Style = []
             ParentFont = False
             TabOrder = 4
+            Visible = False
           end
           object Panel18: TPanel
             Left = 24
@@ -778,6 +779,7 @@ object fMaintenance: TfMaintenance
               '[ 4 ] Music 4')
             ParentFont = False
             TabOrder = 10
+            Visible = False
           end
           object RadioGroup7: TRadioGroup
             Tag = 6
@@ -962,7 +964,7 @@ object fMaintenance: TfMaintenance
               object pnlHardwareOptionBox: TPanel
                 Left = 0
                 Top = 0
-                Width = 827
+                Width = 929
                 Height = 40
                 Align = alTop
                 BevelInner = bvLowered
@@ -1002,7 +1004,7 @@ object fMaintenance: TfMaintenance
               object Panel3: TPanel
                 Left = 0
                 Top = 40
-                Width = 827
+                Width = 929
                 Height = 40
                 Align = alTop
                 BevelInner = bvLowered
@@ -1026,7 +1028,7 @@ object fMaintenance: TfMaintenance
               object pnlSortModeBox: TPanel
                 Left = 0
                 Top = 80
-                Width = 827
+                Width = 929
                 Height = 64
                 Align = alTop
                 BevelInner = bvLowered
@@ -1037,7 +1039,7 @@ object fMaintenance: TfMaintenance
                   Width = 560
                   Height = 36
                   AutoSize = False
-                  Caption =
+                  Caption = 
                     'When ON, classify By Lot+Bin (each Lot+Bin pair binds to an Auto' +
                     ' dynamically). When OFF, Normal mode (static Bin->Auto table). C' +
                     'hanging this needs a software restart.'
@@ -1068,7 +1070,7 @@ object fMaintenance: TfMaintenance
               object pnlAutoEnableBox: TPanel
                 Left = 0
                 Top = 144
-                Width = 827
+                Width = 929
                 Height = 80
                 Align = alTop
                 BevelInner = bvLowered
@@ -1079,10 +1081,10 @@ object fMaintenance: TfMaintenance
                   Width = 780
                   Height = 16
                   AutoSize = False
-                  Caption =
+                  Caption = 
                     'Per-Auto enable (By Lot+Bin mode only). Unchecked Autos are skip' +
-                    'ped when binding new Lot+Bin pairs. Changing this needs a softwar' +
-                    'e restart.'
+                    'ped when binding new Lot+Bin pairs. Changing this needs a softwa' +
+                    're restart.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -1097,13 +1099,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Auto1'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 0
                   OnClick = chkAutoEnableClick
                 end
@@ -1114,13 +1116,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Auto2'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 1
                   OnClick = chkAutoEnableClick
                 end
@@ -1131,13 +1133,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Auto3'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 2
                   OnClick = chkAutoEnableClick
                 end
@@ -1148,13 +1150,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Auto4'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 3
                   OnClick = chkAutoEnableClick
                 end
@@ -1165,13 +1167,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Auto5'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 4
                   OnClick = chkAutoEnableClick
                 end
@@ -1182,13 +1184,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Auto6'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 5
                   OnClick = chkAutoEnableClick
                 end
@@ -1196,7 +1198,7 @@ object fMaintenance: TfMaintenance
               object pnlSuckerEnableBox: TPanel
                 Left = 0
                 Top = 224
-                Width = 827
+                Width = 929
                 Height = 80
                 Align = alTop
                 BevelInner = bvLowered
@@ -1207,7 +1209,7 @@ object fMaintenance: TfMaintenance
                   Width = 780
                   Height = 16
                   AutoSize = False
-                  Caption =
+                  Caption = 
                     'Per-nozzle enable (SortArm sucker). Unchecked nozzles are skippe' +
                     'd during pick/place so a broken nozzle can be taken out of servi' +
                     'ce. At least one must stay enabled.'
@@ -1225,13 +1227,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Nozzle1'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 0
                   OnClick = chkSuckEnableClick
                 end
@@ -1242,13 +1244,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Nozzle2'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 1
                   OnClick = chkSuckEnableClick
                 end
@@ -1259,13 +1261,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Nozzle3'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 2
                   OnClick = chkSuckEnableClick
                 end
@@ -1276,13 +1278,13 @@ object fMaintenance: TfMaintenance
                   Height = 20
                   Caption = 'Nozzle4'
                   Checked = True
-                  State = cbChecked
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -15
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                  State = cbChecked
                   TabOrder = 3
                   OnClick = chkSuckEnableClick
                 end
@@ -1701,8 +1703,8 @@ object fMaintenance: TfMaintenance
             Left = 108
             Top = 114
             Width = 95
-            Height = 24
-            ItemHeight = 16
+            Height = 21
+            ItemHeight = 13
             TabOrder = 2
             Text = '9600'
             Items.Strings = (
@@ -1717,7 +1719,7 @@ object fMaintenance: TfMaintenance
             Top = 114
             Width = 80
             Height = 24
-            TabOrder = 4
+            TabOrder = 3
             Text = '5'
           end
           object btnMCUSave: TButton
@@ -1726,7 +1728,7 @@ object fMaintenance: TfMaintenance
             Width = 90
             Height = 28
             Caption = 'Save'
-            TabOrder = 5
+            TabOrder = 4
             OnClick = btnMCUSaveClick
           end
           object btnMCUReload: TButton
@@ -1735,7 +1737,7 @@ object fMaintenance: TfMaintenance
             Width = 90
             Height = 28
             Caption = 'Reload'
-            TabOrder = 6
+            TabOrder = 5
             OnClick = btnMCUReloadClick
           end
           object btnMCURefresh: TButton
@@ -1753,7 +1755,7 @@ object fMaintenance: TfMaintenance
             Width = 734
             Height = 42
             BevelOuter = bvLowered
-            TabOrder = 8
+            TabOrder = 6
             object lblMCUStatusEnabled: TLabel
               Left = 8
               Top = 12

@@ -28,19 +28,27 @@ void TMyMN200_IO::SetPortInformation(AnsiString Card, AnsiString Port, AnsiStrin
     TMyIo::SetPortInformation(Card, Port, Bit);
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260622 : HT172 myio_MN200.cpp parity - the IO layer is now
+//HARDWARE-TRANSPARENT. Always attempt the real MN200 read/write; fall back to the cached
+//bOutValue (reads) / silent no-op (writes) ONLY when the card call fails (no MN200DLL or
+//card absent -> MN200ReadBit/WriteBit return false). The old code had a top-level
+//"#ifdef SOFT_SIMULATE return bOutValue/return;" in every method that bypassed the card
+//ENTIRELY in a sim build, so a SOFT_SIMULATE build on a real machine read/wrote garbage at
+//runtime while IOsetview (which uses base TMyIo, no bypass) saw the real card - the exact
+//"IOsetview correct / production sensor wrong" split. Card-absent dev/CI is unchanged (the
+//calls just fail and fall back, same values as the old sim branch). HT172 uses the same
+//attempt-first model; its #ifdef SOFT_SIMULATE only picks the on-failure value (mn ret<0).
+//NOTE: a SOFT_SIMULATE build run on real hardware now drives real outputs too (matches
+//HT172). Production ships with SOFT_SIMULATE off, where this path was always taken anyway.
 bool TMyMN200_IO::IsOn()
 {
-#ifdef SOFT_SIMULATE
-    return bOutValue;
-#else
     bool State=false;
 
     if(ISABase!=MN200_IO_BASE_MOTIONNET)
         return TMyIo::IsOn();
     if(MN200ReadBit(iBit, &State))
         return State;
-    return false;
-#endif
+    return bOutValue;
 }
 //---------------------------------------------------------------------------
 bool TMyMN200_IO::IsOff()
@@ -51,53 +59,38 @@ bool TMyMN200_IO::IsOff()
 void TMyMN200_IO::On()
 {
     bOutValue=true;
-#ifdef SOFT_SIMULATE
-    return;
-#else
     if(ISABase!=MN200_IO_BASE_MOTIONNET)
     {
         TMyIo::On();
         return;
     }
     MN200WriteBit(iBit, true);
-#endif
 }
 //---------------------------------------------------------------------------
 void TMyMN200_IO::Off()
 {
     bOutValue=false;
-#ifdef SOFT_SIMULATE
-    return;
-#else
     if(ISABase!=MN200_IO_BASE_MOTIONNET)
     {
         TMyIo::Off();
         return;
     }
     MN200WriteBit(iBit, false);
-#endif
 }
 //---------------------------------------------------------------------------
 void TMyMN200_IO::DO_Process(byte Value)
 {
-#ifdef SOFT_SIMULATE
     bOutValue=(Value!=0);
-    return;
-#else
     if(ISABase!=MN200_IO_BASE_MOTIONNET)
     {
         TMyIo::IOByteOut(iPort, Value);
         return;
     }
     MN200WriteByte(iPort, Value);
-#endif
 }
 //---------------------------------------------------------------------------
 byte TMyMN200_IO::DI_Process(bool bByte)
 {
-#ifdef SOFT_SIMULATE
-    return bOutValue?1:0;
-#else
     byte Value=0;
     bool State=false;
 
@@ -108,13 +101,12 @@ byte TMyMN200_IO::DI_Process(bool bByte)
     {
         if(MN200ReadInputByte(iPort, &Value))
             return Value;
-        return 0;
+        return bOutValue?1:0;
     }
 
     if(MN200ReadBit(iBit, &State))
         return State?1:0;
-    return 0;
-#endif
+    return bOutValue?1:0;
 }
 //---------------------------------------------------------------------------
 byte TMyMN200_IO::IOInputByte()

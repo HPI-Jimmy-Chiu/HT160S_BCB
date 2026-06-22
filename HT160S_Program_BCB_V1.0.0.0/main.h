@@ -427,6 +427,7 @@ private:	// User declarations
     void __fastcall SaveLastLotList();
     void __fastcall LoadLastLotList();
     void __fastcall RestoreLastWorkOrder();
+    void __fastcall AppActivate(TObject *Sender);   //AI(HT160S-Maintainer) 20260622 : Application->OnActivate; re-front modal child after desktop task-switch (z-order hang fix)
 public:		// User declarations
     __fastcall TfMain(TComponent* Owner);
     void __fastcall RefreshLotListFromRegistry();

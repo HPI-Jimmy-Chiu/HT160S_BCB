@@ -33,6 +33,10 @@ public:
     bool fShow;
     bool fScanPanel;
     bool bFormShowNoStop;
+    //AI(HT160S-Maintainer) 20260622 : message-box buzzer-mute latch, HT172 bOffBuzzer parity.
+    //Set by Button2Click (Off Buzzer), cleared each FormShow/FormClose; read by DoSystemMessage
+    //so a muted message box drops out of the LED_Message buzzer state instead of re-sounding.
+    bool fBuzzerOff;
     char Message[256];
     char CHMessage[256];
     char ENMessage[256];

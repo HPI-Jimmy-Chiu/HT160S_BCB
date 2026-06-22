@@ -173,6 +173,10 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     if(ComponentState.Contains(csDesigning))
         return;
 
+    //AI(HT160S-Maintainer) 20260622 : re-front a ShowModal() sub-screen after a desktop
+    //task-switch so it can't get stuck behind the (modally-disabled) main form. See AppActivate.
+    Application->OnActivate = AppActivate;
+
     //AI(HT160S-Maintainer) 20260603 : create central alarm object before any module can raise an alarm
     if(Alarm==NULL)
         Alarm = new HAlarm(this);
@@ -1637,6 +1641,20 @@ void TfMain::ScanPanelKeys()
 }
 //---------------------------------------------------------------------------
 
+//AI(HT160S-Maintainer) 20260622 : VCL modal z-order fix. The config/Teach/Maintenance
+//sub-screens are shown with ShowModal() (see ShowTopForm). When the operator switches to
+//the desktop and back, Windows raises the main form above the open modal child; because
+//the main form is modally disabled, the child is hidden behind it and nothing is
+//clickable - it looks hung. On app re-activation, re-front the active (modal) form so it
+//returns above the main window. No-op when no modal child is up (ActiveForm==fMain).
+//HT172 shares the same ShowModal pattern with no such guard; this is HT160 hardening.
+void __fastcall TfMain::AppActivate(TObject *Sender)
+{
+    (void)Sender;
+    if(Screen->ActiveForm != NULL && Screen->ActiveForm != this)
+        Screen->ActiveForm->BringToFront();
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::FormShow(TObject *Sender)
 {
     (void)Sender;

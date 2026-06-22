@@ -70,6 +70,7 @@ public:
     int Code;
     int ReturnCode;
     bool fShow;
+    bool IsBuzzerOff() { return bOffBuzzer; }   //AI(HT160S-Maintainer) 20260622 : per-scan buzzer driver reads the OFF BUZZER latch (ErrJam silence, HT172 bAlarmBuzzer parity)
     int KeyCode;
     bool Select[6];
     int iBackOldMemo2Y;

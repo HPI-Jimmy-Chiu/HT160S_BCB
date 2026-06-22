@@ -28,6 +28,7 @@ __fastcall TMyMessageBox::TMyMessageBox(TComponent* Owner)
     fShow=false;
     fScanPanel=false;
     bFormShowNoStop=false;
+    fBuzzerOff=false;
     Message[0]=0;
     CHMessage[0]=0;
     ENMessage[0]=0;
@@ -227,6 +228,9 @@ void __fastcall TMyMessageBox::FormShow(TObject *Sender)
         HSys.Sys.SystemStart=false;
     }
 
+    //AI(HT160S-Maintainer) 20260622 : a fresh message box starts UN-muted so its
+    //LED_Message buzzer (RadioGroup5) can sound, HT172 parity (bOffBuzzer reset).
+    fBuzzerOff=false;
     fShow=true;
 }
 //---------------------------------------------------------------------------
@@ -240,6 +244,10 @@ void __fastcall TMyMessageBox::FormClose(TObject *Sender, TCloseAction &Action)
 //---------------------------------------------------------------------------
 void __fastcall TMyMessageBox::Button2Click(TObject *Sender)
 {
+    //AI(HT160S-Maintainer) 20260622 : Off Buzzer -> latch mute so DoSystemMessage stops
+    //re-driving the LED_Message buzzer every scan (one CloseBuzzerOff alone would be
+    //overwritten next tick). HT172 mymessbox.cpp Button2Click bOffBuzzer parity.
+    fBuzzerOff=true;
     CloseBuzzerOff();
 }
 //---------------------------------------------------------------------------

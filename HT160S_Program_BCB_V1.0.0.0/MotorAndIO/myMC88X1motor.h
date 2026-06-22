@@ -50,6 +50,7 @@ public:
     virtual ~TMyMC88X1Motor();
 
     virtual void    Stop();
+    virtual void    DecStop();
     virtual bool    JogP();
     virtual bool    JogN();
     virtual int     ReadPos();

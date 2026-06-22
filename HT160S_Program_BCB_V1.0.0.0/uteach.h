@@ -49,6 +49,8 @@ typedef struct
     int TrayXArmToLoaderXPosition;
     int TrayXArmToColorXPosition;       //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup at Color station
     int ColorRead2DXPosition;           //AI(HT160S-Maintainer) 20260608 : Color 2D CCD reader X (on stepper, like Loader Top CCD)
+    int ColorRead2DYPosition;           //AI(HT160S-Maintainer) 20260622 : Color carriage Y (front) for the 2D read
+    int ColorTrayArmPickYPosition;      //AI(HT160S-Maintainer) 20260622 : Color carriage Y (rear) for TrayArm pickup
     int TrayXArmToAuto1XPosition;
     int TrayXArmToAuto2XPosition;
     int TrayXArmToAuto3XPosition;

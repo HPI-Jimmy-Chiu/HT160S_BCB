@@ -45,6 +45,7 @@ private:
     void RefreshStateFromSensors();
     bool PushCylinder(TMyCylinder &Cyn);
     bool PopCylinder(TMyCylinder &Cyn);
+    bool MoveColorY(int Position);   //AI(HT160S-Maintainer) 20260622 : move Color carriage in Y (front/back)
     bool DoGoDownTray(int Flag);   //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack -> front staging (like Empty)
     bool DoSupplyTray(int Flag);
     bool DoReleaseTray(int Flag);

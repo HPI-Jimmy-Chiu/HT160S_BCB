@@ -361,6 +361,22 @@ void TMyMC88X1Motor::Stop()
         MC88X1PMotStop((BYTE)iBoardID, bAxisID, 0);
 }
 //---------------------------------------------------------------------------
+void TMyMC88X1Motor::DecStop()
+{
+    // Deceleration stop for this axis. MC88X1 manual p.98: MC88X1PMotStop's
+    // byStopMode is a per-axis bit field; for the selected axis mode bit 0 =
+    // decelerate-stop, bit 1 = immediate (sudden) stop. Passing 0 keeps this
+    // axis bit clear -> decel stop (the same call Stop() already uses, so on
+    // MC88X1 Stop() and DecStop() both decelerate; the card sudden stop,
+    // mode = bAxisID, is deliberately not used here). This was the inherited
+    // HTMotor no-op, which made HSys.DecStopAllMotor() -- the decel path on
+    // every alarm (ShowNoteAlarm) and on SystemStart going false (DoAllProcess)
+    // -- do NOTHING on real MC88X1 cards. Implementing it makes that safety
+    // decel actually slow the hardware.
+    if(Enable && bCardOpened)
+        MC88X1PMotStop((BYTE)iBoardID, bAxisID, 0);
+}
+//---------------------------------------------------------------------------
 bool TMyMC88X1Motor::JogP()
 {
     if(!Enable || !bCardOpened)

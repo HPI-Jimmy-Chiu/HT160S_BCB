@@ -49,15 +49,24 @@ bool TEmptyModule::IsSoftSimulate()
 //---------------------------------------------------------------------------
 void TEmptyModule::RefreshStateFromSensors()
 {
-    bool bHasFrontSensor=false;
+    //AI(HT160S-Maintainer) 20260622 : in SOFT_SIMULATE / real-machine DUMMY mode there are no
+    //real trays, so DO NOT read the physical sensors here - the tray state is a LATCH owned by
+    //the action sequence (DoFeedTray/DoGoDownTray set it when a tray is fed / comes down; the
+    //TrayArm clears it via SetRearHasTray(false) when MotorY takes the tray away).
+    //WHY reading sensors is wrong in sim/dummy: these HasTray inputs are wired InType=0
+    //(active-low), and with no MN200 card TMyIo::IsOn() falls back to bOutValue(=false for a
+    //never-written input), which InType=0 then inverts to TMySensor::IsOn()==true. So every
+    //InType=0 input would read 'tray present' regardless of reality (the opposite of what
+    //IOsetview shows on real hardware), wiping the latch and stalling the module. (Mirrors the
+    //iRealDummy!=DUMMY gates on the sensor-miss checks in DoFeedTray/DoGoDownTray.)
+    if(IsSoftSimulate())
+        return;
+
     bool bHasRearSensor=false;
     bool bRearState=false;
 
     if(HSys.Sen.SnEmpty_InputHasTray.Enable==true)
-    {
-        bHasFrontSensor=true;
         bFrontHasTray=HSys.Sen.SnEmpty_InputHasTray.IsOn();
-    }
 
     if(HSys.Sen.SnEmpty_OutputHasTray.Enable==true)
     {
@@ -76,14 +85,6 @@ void TEmptyModule::RefreshStateFromSensors()
 
     if(bHasRearSensor)
         bRearHasTray=bRearState;
-    else if(IsSoftSimulate())
-    {
-        bRearHasTray=false;
-        bBottomHasTray=false;
-    }
-
-    if(bHasFrontSensor==false && IsSoftSimulate())
-        bFrontHasTray=false;
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::MoveEmptyY(int Position)

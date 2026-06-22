@@ -240,6 +240,8 @@ void __fastcall TfTeach::InitialTeachParameter()
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToLoaderXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToLoaderXPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToColorXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToColorXPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DXPosition", HSys.Mot.MTopCCDX_Color, &Teach.ColorRead2DXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DYPosition", HSys.Mot.MColorY, &Teach.ColorRead2DYPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorTrayArmPickYPosition", HSys.Mot.MColorY, &Teach.ColorTrayArmPickYPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto1XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto1XPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto2XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto2XPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto3XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto3XPosition);
@@ -763,15 +765,12 @@ void TfTeach::UpdateStatusLed(int LedIndex, bool Enabled, bool Value)
 //---------------------------------------------------------------------------
 bool TfTeach::CheckSortArmZHome()
 {
-    if(HSys.Mot.MSuckZ_1!=NULL && HSys.Mot.MSuckZ_1->bHomeFlag==false)
-        return false;
-    if(HSys.Mot.MSuckZ_2!=NULL && HSys.Mot.MSuckZ_2->bHomeFlag==false)
-        return false;
-    if(HSys.Mot.MSuckZ_3!=NULL && HSys.Mot.MSuckZ_3->bHomeFlag==false)
-        return false;
-    if(HSys.Mot.MSuckZ_4!=NULL && HSys.Mot.MSuckZ_4->bHomeFlag==false)
-        return false;
-    return true;
+    // AI(HT160S-Maintainer) 20260622 : single source of truth -- delegate to the canonical
+    // TSortArmModule interlock (live Home sensor, not the sticky bHomeFlag used before) so
+    // Teach / Motor Test / production all enforce the SAME rule.
+    if(SortArmModule==NULL)
+        return true;
+    return SortArmModule->AreAllSuckersHome();
 }
 //---------------------------------------------------------------------------
 bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target, bool bAllowLimitAlarm)

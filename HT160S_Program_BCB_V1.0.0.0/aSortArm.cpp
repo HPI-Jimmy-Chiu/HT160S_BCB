@@ -26,6 +26,7 @@ TSortArmModule *SortArmModule=NULL;
 static const int SORT_ARM_SUCKER_COUNT=4;
 static const int SORT_ARM_AUTO_COUNT=6;
 static const int SORT_ARM_SAFE_Z_POSITION=10;
+static const int SUCK_HOME_LOST_MS=100;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce window (ms); time-based, not cycle-count
 //---------------------------------------------------------------------------
 static int ClampIntValue(int Value, int MinValue, int MaxValue)
 {
@@ -55,6 +56,7 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     iPlaceY=0;
     bCleanOutFinish=false;
     bOneCycleFinish=false;
+    dwSuckHomeLostStart=0;
     for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
     {
         //AI(HT160S-Maintainer) 20260612 : recoverable home with a sucked IC still on this
@@ -417,6 +419,28 @@ int TSortArmModule::GetAutoZPosition(int AutoIndex, int SlotIndex)
     return 0;
 }
 //---------------------------------------------------------------------------
+bool TSortArmModule::AreAllSuckersHome()
+{
+    //AI(HT160S-Maintainer) 20260622 : the ONE canonical SortArm-move interlock, shared by the
+    //production MoveSortArmX gate and the Motor Test / Teach pre-move checks so every screen
+    //uses the SAME rule. The arm may move only when every ENABLED suck-Z sits on its Home
+    //sensor RIGHT NOW (live Led[iHomeLed], not the sticky bHomeFlag). Sim / DUMMY has no card,
+    //so ScanMotorStatus reports all LEDs off : short-circuit to true so the simulated / dry-run
+    //arm is not blocked (the real machine reads the live sensor).
+    if(IsSoftSimulate())
+        return true;
+    for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
+    {
+        TTrayMotor *Motor=GetSuckZMotor(SlotIndex);
+        if(Motor==NULL || Motor->GetEnable()==false)
+            continue;
+        Motor->ScanMotorStatus();
+        if(Motor->Led[iHomeLed]==false)
+            return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
 bool TSortArmModule::MoveSortArmX(int Position)
 {
     if(HSys.Mot.MSortingArmX==NULL)
@@ -426,6 +450,26 @@ bool TSortArmModule::MoveSortArmX(int Position)
         ShowMyMessage("Sorting Arm X motor will out of limit");
         return false;
     }
+    //AI(HT160S-Maintainer) 20260622 : suck-nozzle home interlock (single rule via
+    //AreAllSuckersHome). SortArmX may travel ONLY while every enabled suck-Z rests on its
+    //Home sensor. Checked on EVERY call, so a nozzle knocked off home mid-travel (lost steps /
+    //thrown off) is caught too, not just before the move starts. A short time-window debounce
+    //(not a cycle count, given the ~1ms scan loop) rejects a single bad sensor read; on a
+    //confirmed loss decel-stop all motion and raise the alarm (which also drops SystemStart).
+    if(AreAllSuckersHome()==false)
+    {
+        HSys.Mot.MSortingArmX->Stop();   //hold the arm each tick (mode-0 decel stop)
+        if(dwSuckHomeLostStart==0)
+            dwSuckHomeLostStart=GetTickCount();
+        else if((int)(GetTickCount()-dwSuckHomeLostStart)>=SUCK_HOME_LOST_MS)
+        {
+            dwSuckHomeLostStart=0;
+            HSys.StopAllMotor();   //confirmed loss : real decel-stop ALL (DecStopAllMotor is a no-op on MC88X1)
+            ShowSystemError("SortArm move blocked : a suck nozzle left its Home sensor (lost steps). Re-home the suckers.", K_RETRY);
+        }
+        return false;
+    }
+    dwSuckHomeLostStart=0;
     return HSys.Mot.MSortingArmX->MotorMove(Position);
 }
 //---------------------------------------------------------------------------

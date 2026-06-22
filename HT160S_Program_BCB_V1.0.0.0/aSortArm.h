@@ -34,6 +34,7 @@ private:
     bool bCleanOutFinish;   //AI(HT160S-Maintainer) 20260605 : SortArm drained in CleanOut
     bool bOneCycleFinish;   //AI(HT160S-Maintainer) 20260605 : SortArm placed held IC then stopped (OneCycle)
     TSortArmSlotState Slot[4];
+    unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
 
     void ClearSlot(int SlotIndex);
     void ClearPickSelection();
@@ -92,6 +93,7 @@ private:
 public:
     TSortArmModule();
     void InitialFlag(bool bKeepMaterial=false);
+    bool AreAllSuckersHome();   //AI(HT160S-Maintainer) 20260622 : canonical SortArm-move suck-home interlock (live Led[iHomeLed])
     void DoSortArm(int &Task);
     bool HasHoldingIC();
     bool IsCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm CleanOut finish

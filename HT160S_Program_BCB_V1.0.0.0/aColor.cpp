@@ -319,6 +319,22 @@ bool TColorModule::DoGoDownTray(int Flag)
     return false;
 }
 //---------------------------------------------------------------------------
+bool TColorModule::MoveColorY(int Position)
+{
+    //AI(HT160S-Maintainer) 20260622 : move the Color carriage in Y (front/back relative to the
+    //operator; X=left/right, Z=up/down). Mirrors MoveEmptyY. Returns true when in position (and
+    //immediately under sim, where MotorMove sim-completes). On a teach/limit error, report and
+    //return true so the supply ladder is not stalled.
+    if(HSys.Mot.MColorY==NULL)
+        return true;
+    if(HSys.Mot.MColorY->CheckSoftLimit(Position)==false)
+    {
+        ShowMyMessage("Color Y motor will out of limit");
+        return true;
+    }
+    return HSys.Mot.MColorY->MotorMove(Position);
+}
+//---------------------------------------------------------------------------
 bool TColorModule::DoSupplyTray(int Flag)
 {
     int Ret;
@@ -335,7 +351,16 @@ bool TColorModule::DoSupplyTray(int Flag)
         case 1:
             if(IsTraySupplyMode()==false)
                 return true;
-            SupplyTask=10;
+            SupplyTask=5;
+            break;
+
+        case 5:
+            //AI(HT160S-Maintainer) 20260622 : position the Color carriage at the FRONT
+            //receive/read Y (Teach.ColorRead2DYPosition) before the destacker pushes a tray
+            //onto it and before the 2D read. Y = front/back. Also returns the carriage to the
+            //front each cycle (it ends a cycle at the rear pickup Y).
+            if(MoveColorY(Teach.ColorRead2DYPosition))
+                SupplyTask=10;
             break;
 
         case 10:
@@ -393,6 +418,14 @@ bool TColorModule::DoSupplyTray(int Flag)
             //AI(HT160S-Maintainer) 20260608 : drive Color 2D CCD (LON/read/LOFF).
             //sTrayID2D filled by DoReadColor2D; empty when simulated or SKIPped.
             if(DoReadColor2D(1))
+                SupplyTask=950;
+            break;
+
+        case 950:
+            //AI(HT160S-Maintainer) 20260622 : after the 2D read, MColorY carries the tray to the
+            //REAR pickup Y (Teach.ColorTrayArmPickYPosition) so the TrayArm can grip it. Only
+            //then is the tray ready for pickup.
+            if(MoveColorY(Teach.ColorTrayArmPickYPosition))
             {
                 bTrayReady=true;
                 bTrayPicked=false;

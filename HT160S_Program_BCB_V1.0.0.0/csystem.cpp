@@ -675,6 +675,25 @@ static void DoPanelLamp()
 	}
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260622 : map the tower-light run-state to its tsMaintTowerLight
+//"Music Select" (RadioGroup2-7, one per state row). 0=mute, 1..4 -> Music1..4. Feeds the
+//per-state buzzer driver in DoSystemMessage (HT172 ShowRunLed parity).
+static int GetMaintenanceMusicSelect(int RunState)
+{
+	if(fMaintenance==NULL)
+		return 0;
+	switch(RunState)
+	{
+		case LED_Running: return (fMaintenance->RadioGroup2!=NULL)?fMaintenance->RadioGroup2->ItemIndex:0;
+		case LED_ErrJam:  return (fMaintenance->RadioGroup3!=NULL)?fMaintenance->RadioGroup3->ItemIndex:0;
+		case LED_Pause:   return (fMaintenance->RadioGroup4!=NULL)?fMaintenance->RadioGroup4->ItemIndex:0;
+		case LED_Message: return (fMaintenance->RadioGroup5!=NULL)?fMaintenance->RadioGroup5->ItemIndex:0;
+		case LED_Heating: return (fMaintenance->RadioGroup6!=NULL)?fMaintenance->RadioGroup6->ItemIndex:0;
+		case LED_Homeing: return (fMaintenance->RadioGroup7!=NULL)?fMaintenance->RadioGroup7->ItemIndex:0;
+	}
+	return 0;
+}
+//---------------------------------------------------------------------------
 void DoSystemMessage()
 {
 	int RunState;
@@ -702,6 +721,57 @@ void DoSystemMessage()
 	HSys.Sw.SwTowerGreen.OnOff(GreenOn);
 	HSys.Sw.SwTowerYellow.OnOff(YellowOn);
 	HSys.Sw.SwTowerRed.OnOff(RedOn);
+
+	//AI(HT160S-Maintainer) 20260622 : buzzer = a LITERAL transcription of HT172 ckernel.cpp
+	//ShowRunLed (lines 83-148). HT172 derives ONE RunState from a DIALOG ladder and plays
+	//RadioGroupPtr[RunState]'s "Music Select". Here the tower LAMPS keep HT160's live-sensor
+	//RunState (set above); ONLY the buzzer uses the HT172 dialog ladder via BuzzState. Ladder
+	//in HT172's exact order: alarm Note -> message box -> HOME monitor -> running -> pause.
+	//(HT172 also has a Heating rung; HT160 has no heater, so it collapses into Running. HT160's
+	//TfHome exposes IsShown() rather than HT172's fHome->fShow.) ErrJam is reached ONLY via a
+	//Note, never a raw EMG/door/air/ion-fan read, so a safety sensor that trips with no alarm
+	//dialog lights the red lamp but the buzzer stays silent. Music drive is also literal HT172:
+	//play row 'is'(=MusicSel), and for ErrJam honour the OFF BUZZER acknowledge (HT172
+	//bAlarmBuzzer==false -> Off; HT160 fNote->IsBuzzerOff()). The message-box rung is gated by
+	//its Off Buzzer latch (HT172 bOffBuzzer; bMessageAlarm is never set true in HT172, omitted).
+	//Suppress only while the Maintenance screen owns the buzzer alone (its sbMusic test buttons).
+	{
+		bool bMaintAlone=(fMaintenance!=NULL && fMaintenance->Visible &&
+			(fNote==NULL || fNote->fShow==false) && (MyMessageBox==NULL || MyMessageBox->fShow==false));
+
+		int BuzzState;
+		if(fNote!=NULL && fNote->fShow)
+			BuzzState=LED_ErrJam;
+		else if(MyMessageBox!=NULL && MyMessageBox->fShow && MyMessageBox->fBuzzerOff==false)
+			BuzzState=LED_Message;
+		else if(fHome!=NULL && fHome->IsShown())
+			BuzzState=LED_Homeing;
+		else if(HSys.Sys.SystemStart)
+			BuzzState=LED_Running;
+		else
+			BuzzState=LED_Pause;
+
+		if(bMaintAlone==false && HSys.SwPtr!=NULL)
+		{
+			int MusicSel=GetMaintenanceMusicSelect(BuzzState);
+			int Base=HSys.Sw.SwMusic1.Tag;
+			for(int m=0; m<4; m++)
+			{
+				int idx=Base+m;
+				if(idx<0 || idx>=HSys.iTotalSwitch)
+					continue;
+				bool bOn=false;
+				if(MusicSel!=0 && (MusicSel-1)==m)
+				{
+					if(BuzzState==LED_ErrJam && fNote!=NULL && fNote->IsBuzzerOff())
+						bOn=false;
+					else
+						bOn=true;
+				}
+				HSys.SwPtr[idx].OnOff(bOn);
+			}
+		}
+	}
 
 	//AI(ht160s-maintainer) 20260617 : derive Start/Pause panel-lamp state from the
 	//run flag (mirrors HT172 ShowRunLed), then push all panel lamps. HT160 has no

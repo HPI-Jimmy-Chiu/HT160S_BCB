@@ -11,6 +11,7 @@
 #include "cmydef.h"
 #include "csystem.h"
 #include "cStepTrace.h"   //AI(general) 20260617 : MotorTaskLog home/limit diagnosis trace
+#include "aSortArm.h"     //AI(HT160S-Maintainer) 20260622 : SortArmModule->AreAllSuckersHome() suck-home interlock
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -2409,26 +2410,11 @@ void TfMotorTest::SetMessage(AnsiString Text)
 //---------------------------------------------------------------------------
 bool TfMotorTest::CheckSortArmZHome()
 {
-    // SortArm X/Y may move only when every suck-nozzle Z is physically sitting on
-    // its Home sensor (sensor LED lit RIGHT NOW), not merely "has homed before"
-    // (bHomeFlag). Read the live Home sensor each call. Disabled nozzles are skipped
-    // (no meaningful sensor), matching the old bHomeFlag behaviour for !Enable.
-    TTrayMotor *SuckZ[4];
-    int Index;
-
-    SuckZ[0]=HSys.Mot.MSuckZ_1;
-    SuckZ[1]=HSys.Mot.MSuckZ_2;
-    SuckZ[2]=HSys.Mot.MSuckZ_3;
-    SuckZ[3]=HSys.Mot.MSuckZ_4;
-    for(Index=0; Index<4; Index++)
-    {
-        if(SuckZ[Index]==NULL || SuckZ[Index]->GetEnable()==false)
-            continue;
-        SuckZ[Index]->ScanMotorStatus();
-        if(SuckZ[Index]->Led[iHomeLed]==false)
-            return false;
-    }
-    return true;
+    // AI(HT160S-Maintainer) 20260622 : single source of truth -- delegate to the canonical
+    // TSortArmModule interlock so Motor Test / Teach / production all enforce the SAME rule.
+    if(SortArmModule==NULL)
+        return true;
+    return SortArmModule->AreAllSuckersHome();
 }
 //---------------------------------------------------------------------------
 bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target, bool bAllowLimitAlarm)
@@ -2576,6 +2562,15 @@ void TfMotorTest::StartJog(bool bPositive)
     {
         ShowMyOKMessageNoStop("EMG is pressed.");
         SetMessage("Jog abort: EMG");
+        return;
+    }
+    // AI(HT160S-Maintainer) 20260622 : SortArm X jog also requires all suck nozzles home (same
+    // rule as Move/production); jog otherwise bypassed this gate. Other axes -- including
+    // jogging a suck-Z itself -- are unaffected.
+    if(Motor==HSys.Mot.MSortingArmX && SortArmModule!=NULL && SortArmModule->AreAllSuckersHome()==false)
+    {
+        ShowMyOKMessageNoStop("Sort arm Z must be home before X jog.");
+        SetMessage("Jog abort: Sort Z not home");
         return;
     }
     Motor->ScanMotorStatus();

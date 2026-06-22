@@ -540,6 +540,15 @@ bool TMyMotor::Home(AnsiString &sErr)
                 AnsiString("alarm=")+(Motor->GetAlarm()?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")
                 +AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0")+AnsiString(" enc=")+IntToStr(Motor->ReadEncoderPos())
                 +AnsiString(" -> drive card home"));
+            // AI(HT160S-Maintainer) 20260622 : re-init the INNER motion-card home state
+            // machine (iHomeObjectTask) on every home entry, HT172-aligned. A full-machine
+            // HOME cancelled mid-sequence leaves the card-home Task frozen at a polling step;
+            // the re-arm path resets only the wrapper (InitHomeTask), so HomeObject() would
+            // resume that stale step, never re-issue MC88X1PMotHome, and the batch never
+            // converges (fHome hangs, no motion). HomeReset() also issues MC88X1PMotHomeReset
+            // to clear any aborted card home. Single-axis paths already do this via
+            // InitHomeTask_forSingleAxis; this covers the full-machine batch too.
+            Motor->HomeReset();
             Task=100;
             break;
         case 100:
