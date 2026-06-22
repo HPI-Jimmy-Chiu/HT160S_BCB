@@ -110,7 +110,7 @@ bool TMyCylinder::Push()
     ClearCylinderAlarm(OnAlarmCode);
     if(Task==1 || Task==2)
     {
-        if(OnSensor.Enable==true)
+        if(OnSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
         {
             if(OnSensor.IsOn())
             {
@@ -205,7 +205,7 @@ bool TMyCylinder::Pop()
     ClearCylinderAlarm(OffAlarmCode);
     if(Task==1 || Task==2)
     {
-        if(OffSensor.Enable==true)
+        if(OffSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
         {
             if(OffSensor.IsOn())
             {

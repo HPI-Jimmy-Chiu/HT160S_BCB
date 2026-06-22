@@ -620,7 +620,7 @@ void ScanSystemSenser()
 			HSys.Sys.SystemStart=false;
 			fAllMotorHome=false;
 		}
-		else if(IonFan>0)
+		else if(IonFan>0 && HSys.LastSet.iRealDummy==REALLY)
 		{
 			HSys.DecStopAllMotor();
 			RecordProcess("MACHINE PAUSE by ion-fan-alarm");

@@ -602,7 +602,7 @@ AnsiString TLoaderModule::ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, b
     //AI(HT160S-Maintainer) 20260608 : simulation path : no real Top CCD hardware.
     //Cycle through the virtual 2D codes that btnLoadSimuDataClick registered, so
     //every scanned cell gets a valid, registry-resolvable code (wraps around).
-    if(tSimuData.bRunSimulation)
+    if(tSimuData.bRunSimulation || HSys.LastSet.iRealDummy!=REALLY)
     {
         int Total=LotRegistry.GetItemCount();
         if(Total>0)
@@ -978,7 +978,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                 //while still letting the NULL-socket simulation path advance to state 5500.
                 if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)
                 {
-                    if(TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected()==false)
+                    if(HSys.LastSet.iRealDummy==REALLY && TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected()==false)
                     {
                         Ret=ShowMyError("Top CCD Connect not ready", K_RETRY|K_SKIP);
                         if(Ret==K_SKIP)
@@ -990,7 +990,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     }
                     //Guard NULL socket so the simulation path (no Top CCD hardware) can
                     //still advance to the 2D-code poll state. Real hardware triggers a shot.
-                    if(TopCcdSocket!=NULL)
+                    if(HSys.LastSet.iRealDummy==REALLY && TopCcdSocket!=NULL)
                         TopCcdSocket->TopCcdTriggerShot();
                     State->CcdDelay.SetMS(3000);
                     State->CcdDelay.On();

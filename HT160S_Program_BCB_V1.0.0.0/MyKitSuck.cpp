@@ -3,6 +3,7 @@
 #include <stdio.h>
 #pragma hdrstop
 
+#include "IncludeAllHeader.h"
 #include "MyKitSuck.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -67,6 +68,8 @@ bool TMySucker::GetOffBit()
 //---------------------------------------------------------------------------
 bool TMySucker::GetStatus()
 {
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return true;
     return Sensor.IsOn();
 }
 //---------------------------------------------------------------------------
@@ -121,7 +124,7 @@ bool TMySucker::Suck()
     {
         On();
         Error=false;
-        if(Sensor.Enable==true && Sensor.IsOn()==false)
+        if(Sensor.Enable==true && Sensor.IsOn()==false && HSys.LastSet.iRealDummy==REALLY)
         {
             Delay.Clear();
             Delay.SetMS(OnAlarmTime);
@@ -188,7 +191,7 @@ bool TMySucker::Destroy()
     {
         Off();
         Error=false;
-        if(Sensor.Enable==true && Sensor.IsOn()==true)
+        if(Sensor.Enable==true && Sensor.IsOn()==true && HSys.LastSet.iRealDummy==REALLY)
         {
             Delay.Clear();
             Delay.SetMS(OffAlarmTime);
@@ -255,7 +258,7 @@ void TMySucker::SetRetryCount(int Count)
 //---------------------------------------------------------------------------
 void TMySucker::CheckIsFallDown()
 {
-    if(Enable==false || Task>2)
+    if(Enable==false || Task>2 || HSys.LastSet.iRealDummy!=REALLY)
         return;
     if(Sensor.IsOn()==false)
         Normal();
