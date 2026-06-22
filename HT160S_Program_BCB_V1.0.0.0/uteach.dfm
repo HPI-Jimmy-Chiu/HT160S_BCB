@@ -500,7 +500,7 @@ object fTeach: TfTeach
       OnMouseUp = btnJogMouseUp
     end
     object btnStepP: TButton
-      Left = 232
+      Left = 294
       Top = 282
       Width = 54
       Height = 34
@@ -509,7 +509,7 @@ object fTeach: TfTeach
       OnClick = btnStepPClick
     end
     object btnStepN: TButton
-      Left = 294
+      Left = 232
       Top = 282
       Width = 54
       Height = 34
