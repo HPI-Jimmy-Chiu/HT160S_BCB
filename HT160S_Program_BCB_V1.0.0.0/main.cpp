@@ -994,6 +994,24 @@ void __fastcall TfMain::cbEnableSimulationClick(TObject *Sender)
     tSimuData.bRunSimulation=cbEnableSimulation->Checked;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : write the sim AMR per-zone max-tray grid back to GeneralSetting
+//[SimAMR] and persist. Sim-only test parameter; takes effect at the next AMR refill (or
+//restart). Index 0=Loader 1=Empty 2=Color 3..8=Auto1..6.
+void __fastcall TfMain::btnSaveSimMaxClick(TObject *Sender)
+{
+    (void)Sender;
+    if(sgSimMaxTray==NULL)
+        return;
+    for(int i=0;i<9;i++)
+    {
+        int v=StrToIntDef(sgSimMaxTray->Cells[1][i+1], 10);
+        if(v<1) v=1;
+        if(v>999) v=999;
+        GeneralSetting.iSimAmrMaxTray[i]=v;
+    }
+    GeneralSetting.Save();
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::btnLoadSimuDataClick(TObject *Sender)
 {
     //AI(HT160S-Maintainer) 20260604 : P2 auto-fill 5 simulate Lots, 20 unique 2D
@@ -1037,12 +1055,6 @@ void __fastcall TfMain::sbOtherClick(TObject *Sender)
 {
     if(pgcMonitor != NULL && TabOther != NULL)
         pgcMonitor->ActivePage = TabOther;
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMain::spbStripPosClick(TObject *Sender)
-{
-    if(pgcMonitor != NULL && tsStripPos != NULL)
-        pgcMonitor->ActivePage = tsStripPos;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::cb_WorkFileDropDown(TObject *Sender)
@@ -1672,6 +1684,21 @@ void __fastcall TfMain::FormShow(TObject *Sender)
     TrayForm.Load();
     SyncMonitorTrayDivision();
     RestoreLastWorkOrder();
+
+    //AI(ht160s-agv) 20260623 : populate the sim AMR per-zone max-tray grid from GeneralSetting.
+    if(sgSimMaxTray!=NULL)
+    {
+        const char *ZoneName[9]={"Loader","Empty","Color","Auto1","Auto2","Auto3","Auto4","Auto5","Auto6"};
+        sgSimMaxTray->ColWidths[0]=110;
+        sgSimMaxTray->ColWidths[1]=70;
+        sgSimMaxTray->Cells[0][0]="Zone";
+        sgSimMaxTray->Cells[1][0]="MaxTray";
+        for(int i=0;i<9;i++)
+        {
+            sgSimMaxTray->Cells[0][i+1]=ZoneName[i];
+            sgSimMaxTray->Cells[1][i+1]=IntToStr(GeneralSetting.iSimAmrMaxTray[i]);
+        }
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnLotStartClick(TObject *Sender)

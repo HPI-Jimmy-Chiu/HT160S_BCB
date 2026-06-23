@@ -48,8 +48,10 @@ private:
     bool bCleanOutFinish;
     bool bTrayFeedFinish;
     HTimer ArmDelay;
+    unsigned int dwZUpLostStart;       //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce (GetTickCount of first loss; 0=clear)
 
     bool IsSoftSimulate();
+    bool IsZUpAtPosition();            //AI(HT160S-Maintainer) 20260622 : canonical TrayArm X-move interlock (Z lift up-sensor lit)
     bool MoveTrayArmX(int Position);
     bool DoZUp();
     bool DoZDown();

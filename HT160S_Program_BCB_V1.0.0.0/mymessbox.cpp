@@ -232,6 +232,13 @@ void __fastcall TMyMessageBox::FormShow(TObject *Sender)
     //LED_Message buzzer (RadioGroup5) can sound, HT172 parity (bOffBuzzer reset).
     fBuzzerOff=false;
     fShow=true;
+
+    //AI(HT160S-Maintainer) 20260622 : a modal message box suspends MainProc, so the per-scan
+    //DoSystemMessage LED_Message buzzer driver never runs while it is up -> the message had no
+    //audible cue. Kick it here. Gate on the Off Buzzer button: alarm-style messages show it,
+    //YES/NO confirmations hide it and must stay silent (see PrepareNormalMessage).
+    if(Button2->Visible)
+        PlayMessageBuzzer();
 }
 //---------------------------------------------------------------------------
 void __fastcall TMyMessageBox::FormClose(TObject *Sender, TCloseAction &Action)

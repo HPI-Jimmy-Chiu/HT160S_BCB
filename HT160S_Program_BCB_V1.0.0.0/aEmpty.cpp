@@ -6,6 +6,7 @@
 
 #include "aEmpty.h"
 #include "database.h"
+#include "GeneralSetting.h"   //AI(ht160s-agv) 20260623 : iSimAmrMaxTray
 #include "cmydef.h"
 #include "mymessbox.h"
 #include "uteach.h"
@@ -21,7 +22,10 @@ TEmptyModule::TEmptyModule()
 //---------------------------------------------------------------------------
 void TEmptyModule::InitialFlag()
 {
+    bAmrLocked=false;
+    RefillSimInfeed();
     FeedTask=1;
+    FeedClampSub=0;
     GoDownTask=1;
     GoUpTask=1;
     bFrontHasTray=false;
@@ -45,6 +49,52 @@ bool TEmptyModule::IsSoftSimulate()
     #else
     return (HSys.LastSet.iRealDummy==DUMMY);
     #endif
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : AMR P2 (EmptyTray) handoff interface, mirrors TAutoModule.
+void TEmptyModule::SetAmrLock(bool bLock)
+{
+    bAmrLocked=bLock;
+}
+//---------------------------------------------------------------------------
+bool TEmptyModule::IsAmrLocked()
+{
+    return bAmrLocked;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Ready = front stacking cylinders back home (not commanded
+//up); destack idle so the AGV may refill. Held stable by bAmrLocked (DoEmpty stops
+//starting new destacks while locked).
+bool TEmptyModule::IsReadyForAmrHandoff()
+{
+    return (HSys.Cyn.C_Empty_FrontRiseTray_1.GetOutBit()==false
+            && HSys.Cyn.C_Empty_FrontRiseTray_2.GetOutBit()==false
+            && HSys.Cyn.C_Empty_FrontSeparateTray_1.GetOutBit()==false);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : shortage (call AGV). Sim drains iSimInfeedCount to 0; real
+//reads SnEmpty_InputEnd (ON=has tray, OFF=empty). Disabled sensor -> no call.
+bool TEmptyModule::IsInputShortageForAmr()
+{
+    if(IsSoftSimulate())
+        return (iSimInfeedCount<=0);
+    return (HSys.Sen.SnEmpty_InputEnd.Enable==true && HSys.Sen.SnEmpty_InputEnd.IsOff());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
+//real waits for SnEmpty_InputEnd to read a tray present (ON).
+bool TEmptyModule::IsInputHandoffFinishedForAmr()
+{
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Sen.SnEmpty_InputEnd.Enable==true && HSys.Sen.SnEmpty_InputEnd.IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : reset sim input-stack to configured max (AGV delivered a
+//full magazine). Real machine ignores the count (sensor-driven).
+void TEmptyModule::RefillSimInfeed()
+{
+    iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[1];   // index 1 = Empty
 }
 //---------------------------------------------------------------------------
 void TEmptyModule::RefreshStateFromSensors()
@@ -124,6 +174,8 @@ void TEmptyModule::DoEmpty(int &Task)
             break;
 
         case 100:
+            if(bAmrLocked)
+                break;
             RefreshStateFromSensors();
             if(bReturnTray)
             {
@@ -155,7 +207,11 @@ void TEmptyModule::DoEmpty(int &Task)
 
         case 1000:
             if(DoGoDownTray(1))
+            {
+                if(IsSoftSimulate() && iSimInfeedCount>0)
+                    iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/GoDown
                 Task=1;
+            }
             break;
 
         case 2000:
@@ -182,7 +238,13 @@ bool TEmptyModule::DoFeedTray(int Flag)
     if(Flag==0)
     {
         FeedTask=1;
+        FeedClampSub=0;
         FeedDelay.Clear();
+        //AI(HT160S-Maintainer) 20260623 : one-shot Reset clears stale Push() Task
+        //  left by an aborted feed (alarm/skip). Do NOT Reset before each Push()
+        //  poll -- that restarts the non-blocking state machine and hangs the step.
+        HSys.Cyn.C_Empty_LeanOnTray.Reset();
+        HSys.Cyn.C_Empty_PushTray.Reset();
         return true;
     }
 
@@ -205,40 +267,22 @@ bool TEmptyModule::DoFeedTray(int Flag)
             break;
 
         case 2000:
-            if(HSys.Cyn.C_Empty_LeanOnTray.Push() || IsSoftSimulate())
-                FeedTask=3000;
-            break;
-
-        case 3000:
-            if(HSys.Cyn.C_Empty_PushTray.Push() || IsSoftSimulate())
-            {
-                FeedDelay.Set(5);
-                FeedDelay.On();
-                FeedTask=3100;
-            }
-            break;
-
-        case 3100:
-            if(FeedDelay.Off())
-            {
-                if(HSys.Cyn.C_Empty_PushTray.OnSensor.Enable==false ||
-                   HSys.Cyn.C_Empty_PushTray.OnSensor.IsOn() || IsSoftSimulate())
-                {
-                    FeedTask=4000;
-                }
-                else
-                    FeedTask=3200;
-            }
-            break;
-
-        case 3200:
-            if(HSys.Cyn.C_Empty_PushTray.Pop() || IsSoftSimulate())
+        {
+            //AI(HT160S-Maintainer) 20260623 : standardized dual-cylinder clamp via
+            //DoClampTray (lean-stop first, push last, settle+confirm). Alarm text
+            //stays here so the display is module-specific.
+            int Clamp=DoClampTray(HSys.Cyn.C_Empty_LeanOnTray, HSys.Cyn.C_Empty_PushTray,
+                                  FeedClampSub, FeedDelay, IsSoftSimulate(), 5);
+            if(Clamp==1)
+                FeedTask=4000;
+            else if(Clamp==2)
             {
                 Ret=ShowMyError("Empty Push Tray Miss", K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
             break;
+        }
 
         case 4000:
             if(MoveEmptyY(Teach.EmptyCarDischargeTrayYPosition))
@@ -719,6 +763,25 @@ void TEmptyModule::NotifyTrayXToEmptyFinish()
 {
     bTrayXToEmptyFinish=true;
     bRearHasTray=true;
+}
+//---------------------------------------------------------------------------
+AnsiString TEmptyModule::DescribeState()
+{
+    //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state dump for
+    //FeederDecision.txt (latched members only; no RefreshStateFromSensors).
+    AnsiString s;
+    s  = "[Empty]\r\n";
+    s += "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0)
+       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
+       + "  bBottomHasTray=" + IntToStr(bBottomHasTray ? 1 : 0) + "\r\n";
+    s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
+       + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
+       + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)
+       + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
+    s += "  FeedTask=" + IntToStr(FeedTask)
+       + "  GoDownTask=" + IntToStr(GoDownTask)
+       + "  GoUpTask=" + IntToStr(GoUpTask) + "\r\n";
+    return s;
 }
 //---------------------------------------------------------------------------
 void InitializeEmptyModule()

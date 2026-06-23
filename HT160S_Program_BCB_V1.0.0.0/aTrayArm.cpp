@@ -16,6 +16,8 @@
 //---------------------------------------------------------------------------
 TTrayArmModule *TrayArmModule=NULL;
 //---------------------------------------------------------------------------
+static const int TRAYARM_ZUP_LOST_MS=100;   //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce window (ms); time-based, not cycle-count
+//---------------------------------------------------------------------------
 TTrayArmModule::TTrayArmModule()
 {
     Status=TAS_IDLE;
@@ -40,6 +42,7 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     bCleanOutFinish=true;
     bTrayFeedFinish=true;
     ArmDelay.Clear();
+    dwZUpLostStart=0;
     //AI(HT160S-Maintainer) 20260612 : recoverable home while a tray is in hand. Keep the
     //delivery job + destination (Auto target, AMR kind, 2D TrayID, place dest) so the arm
     //resumes placing the SAME tray after home instead of losing where it must go. The
@@ -97,6 +100,21 @@ bool TTrayArmModule::IsSoftSimulate()
     #endif
 }
 //---------------------------------------------------------------------------
+bool TTrayArmModule::IsZUpAtPosition()
+{
+    //AI(HT160S-Maintainer) 20260622 : the ONE canonical TrayArm X-move precondition - the Z lift
+    //cylinder is confirmed at the UP position (up-sensor lit). Anti-collision is a HARD safety
+    //law : it stays ACTIVE in real-machine DUMMY/HAS_TRAY/REALLY (in DUMMY the X motor and the Z
+    //cylinder still move PHYSICALLY; DUMMY only skips the correctness sensor confirmations).
+    //Bypass ONLY the SOFT_SIMULATE dev build, where there is no IO card and the sensor read is
+    //meaningless (a runtime DUMMY bypass would wrongly disarm the interlock on the real machine).
+    #ifdef SOFT_SIMULATE
+    return true;
+    #else
+    return HSys.Cyn.C_TrayArmZ_Up.IsOn();
+    #endif
+}
+//---------------------------------------------------------------------------
 bool TTrayArmModule::MoveTrayArmX(int Position)
 {
     if(HSys.Mot.MTrayArmX==NULL)
@@ -106,6 +124,28 @@ bool TTrayArmModule::MoveTrayArmX(int Position)
         ShowMyMessage("Tray Arm X motor will out of limit");
         return false;
     }
+    //AI(HT160S-Maintainer) 20260622 : Z-up lift interlock (single chokepoint via IsZUpAtPosition).
+    //TrayArm X may traverse ONLY while the Z lift is confirmed UP, so the head/tray can never swing
+    //across a station while lowered. Checked on EVERY call, so a head that drops off the up-sensor
+    //mid-travel (air loss / cylinder sag) is caught too, not only before the move. A short
+    //time-window debounce rejects a single bad read; on a confirmed loss decel-stop ALL motion and
+    //raise the alarm (which also drops SystemStart, mirroring SortArm AreAllSuckersHome). DoZUp
+    //already confirms the up-sensor before the first call in every run mode, so this never
+    //false-trips waiting for the initial rise. Unreachable in SOFT_SIMULATE (IsZUpAtPosition true).
+    if(IsZUpAtPosition()==false)
+    {
+        HSys.Mot.MTrayArmX->Stop();   //hold the arm each tick (mode-0 decel stop)
+        if(dwZUpLostStart==0)
+            dwZUpLostStart=GetTickCount();
+        else if((int)(GetTickCount()-dwZUpLostStart)>=TRAYARM_ZUP_LOST_MS)
+        {
+            dwZUpLostStart=0;
+            HSys.StopAllMotor();   //confirmed loss : real decel-stop ALL
+            ShowSystemError("TrayArm move blocked : the Z lift left its UP sensor. Check the TrayArmZ up cylinder / air pressure.", K_RETRY);
+        }
+        return false;
+    }
+    dwZUpLostStart=0;
     return HSys.Mot.MTrayArmX->MotorMove(Position);
 }
 //---------------------------------------------------------------------------
@@ -113,7 +153,16 @@ bool TTrayArmModule::DoZUp()
 {
     //AI(HT160S-Maintainer) 20260605 : dual-coil Z, drop the down coil before driving up.
     HSys.Cyn.C_TrayArmZ_Down.Off();
-    return (HSys.Cyn.C_TrayArmZ_Up.Push() || IsSoftSimulate());
+    //AI(HT160S-Maintainer) 20260622 : anti-collision hard safety - the X traverse that follows must
+    //NEVER start with the head still lowered, so do not report Z-up done until the UP sensor really
+    //confirms (IsZUpAtPosition). This is what the real-machine DUMMY mode needs : Push() returns
+    //true immediately in DUMMY (its own sensor wait is skipped for the dry run) and also returns
+    //true if the cylinder OnSensor.Enable flag is off, so the old "Push() || IsSoftSimulate()" let X
+    //start before the head physically rose. In REALLY/HAS_TRAY Push() already waits for + times-out-
+    //alarms on the sensor, so this never weakens the cylinder's own alarm. IsZUpAtPosition holds the
+    //single SOFT_SIMULATE bypass (dev simulation only), so this line is one rule for every run mode.
+    bool bPushed=HSys.Cyn.C_TrayArmZ_Up.Push();
+    return (bPushed && IsZUpAtPosition());
 }
 //---------------------------------------------------------------------------
 bool TTrayArmModule::DoZDown()

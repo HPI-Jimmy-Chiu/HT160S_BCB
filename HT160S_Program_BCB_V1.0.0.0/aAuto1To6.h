@@ -68,6 +68,7 @@ private:
     TMyCylinder *GetFrontRise(int Index);
     TMySensor *GetInputHasTray(int Index);
     TMySensor *GetInputFullTray(int Index);
+    TMySensor *GetInputEndSensor(int Index);
     TMySensor *GetOutputHasTray(int Index);
     TMySensor *GetOutputBottomHasTray(int Index);
     bool MoveAutoY(int Index, int Position);

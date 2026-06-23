@@ -45,7 +45,9 @@ HT160S 的 Bin 顯示器子系統位於 `HT160S_Program_BCB_V1.0.0.0/MyBinDisp.c
   ReadVersion/DoStartSetBin/DoStartSetColor/DoStartGetStatus` 由子類實作。
 - `TMyBinDispHT9046`（LED 子類）：實作上述 HT9046 Modbus-ASCII 命令。
 - 9045 額外有：`CommBin2`/雙鏈、Magazine（HTA18/BT008）、TFT（`*_TFT`、
-  `command_TFT_*`、`iAddArrayTFT`、`NUMBER_PANEL_TYPE==4`）—— **HT160 全部不移植**。
+  `command_TFT_*`、`iAddArrayTFT`、`NUMBER_PANEL_TYPE==4`）—— **HT160 目前只移植 LED**。
+  Magazine 不移植；TFT 之擴充設計（兄弟子類 + `ProcessTick()` 介面切點，**不採用**
+  9045 的 `NUMBER_PANEL_TYPE` 散落分支）見第 10 節。
 
 ## 3. HT9046 通訊命令（Modbus-ASCII over COM）
 
@@ -161,3 +163,22 @@ no-answer=wiring。用來把硬體/接線/協定問題從 HT160 Spin 架構中�
 - 9045 / HT172 為 read-only 參考；任何修改只落在 `D:\HT160S_BCB`。
 - 新註解用 ASCII 英文（BCB6 source 為 Big5，勿引入 UTF-8 mojibake）。
 - 改通訊命令前，先回讀 9045 對應 frame 確認格式，再對齊 HT160。
+
+## 10. LED/TFT 介面層擴充計畫（設計，未實作）
+
+完整設計草案：[`docs/plan/bindisplay-led-tft-interface-design.md`](../../../docs/plan/bindisplay-led-tft-interface-design.md)。
+
+要點：
+- LED（HT9046 Modbus-ASCII）與 TFT（HT9011 20-byte 繪圖框）是**兩套協定**，不能共用 frame builder。
+- HT160 已有抽象基底 `TMyBinDispCtrl`，但 `Spin()` 狀態機與那組純虛擬是「LED 形狀」，TFT 套不進。
+- 方案：把整個 tick 變成唯一跨協定虛擬 `virtual void ProcessTick()=0`；基底 `Spin()` 只做
+  run-gate 後委派。新增**兄弟子類** `TMyBinDispTFT`，與 `TMyBinDispHT9046` 並列；
+  LED 形狀的純虛擬（`WriteBin/.../DoStartGetStatus`）**下放** LED 子類，基底回歸協定無關。
+- 選型：`General.ini [BinDisplay] PanelType`（0=LED 預設 / 1=TFT）+ `database.cpp` 工廠
+  `new TMyBinDispTFT / TMyBinDispHT9046`；`ComPort/maintenance/TfComPort` 只認 `HSys.BinDisCtrl`
+  基底指標，切換零分支。
+- **不採用** 9045 的單一肥子類 + `NUMBER_PANEL_TYPE==4` 散落分支模型。
+- 分階段：T1 純重構（抽 `ProcessTick`、LED 方法下放，行為不變，可獨立交付）→ T2 TFT 空骨架+工廠+
+  PanelType key → T3 移植 TFT frame builder（`command_TFT_Input/Font`、`A_Create_LRC`、
+  `WriteBin_TFT` 家族、`iAddArrayTFT`）→ T4 TFT `ProcessTick`（DoOnce/DoCycle）→ T5 維護頁 →
+  T6 上機。T1/T2 不依賴 TFT 硬體可先做；T3 起待硬體需求確認（見草案 §8 開放決策）。

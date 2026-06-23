@@ -47,6 +47,8 @@ private:
     HTimer TestDelay;        //AI(general) 20260617 : Teach Advanced destacker test settle delay
     int SimuCcdCycleIndex;   // round-robin cursor over LotRegistry codes (simulation only)
     AnsiString CurrentLotNumber;
+    bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
+    int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
 
     TLoaderSideState *GetSide(int LoaderNo);
     TLoaderSideState *GetOtherSide(int LoaderNo);
@@ -93,6 +95,7 @@ public:
     TLoaderModule();
     void InitialFlag();
     void DoLoader(int LoaderNo, int &Task);
+    AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only per-side inner-state dump (FeederDecision.txt)
     bool IsRearHasTray();
     void SetCurrentLotNumber(AnsiString Lot);
     bool IsLoaderReadyForSort(int LoaderNo);
@@ -102,6 +105,14 @@ public:
     void ReleaseSortOwner(int LoaderNo);
     bool IsSortOwnerHeld(int LoaderNo);
     void NotifyTrayArmPickRearTray();
+
+    //AI(ht160s-agv) 20260623 : AMR handoff interface (mirrors TAutoModule).
+    void SetAmrLock(bool bLock);
+    bool IsAmrLocked();
+    bool IsReadyForAmrHandoff();
+    bool IsInputShortageForAmr();
+    bool IsInputHandoffFinishedForAmr();
+    void RefillSimInfeed();
     bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
 
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; shared destacker, no LoaderNo)

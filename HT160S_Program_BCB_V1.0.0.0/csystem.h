@@ -15,6 +15,12 @@ void AddNoNeedHomeSensorList();
 void DoTemptureControl();
 void ProcessStartMode();
 void DoSystem();
+//AI(HT160S-Maintainer) 20260622 : immediate FormShow buzzer kicks for the modal dialogs
+//(MyMessageBox -> PlayMessageBuzzer, fNote -> PlayAlarmBuzzer). A modal ShowModal suspends
+//MainProc, so the per-scan DoSystemMessage buzzer driver never runs while the dialog is up;
+//these sound the same configured "Music Select" the instant the dialog appears.
+void PlayMessageBuzzer();
+void PlayAlarmBuzzer();
 void ProcessRunStatus(bool bProgramStart=false);
 void ProcessMotion();
 bool DoInitialProgramStart();

@@ -11,6 +11,9 @@
 #include "main.h"
 #include "aSortArm.h"         //AI(ht160s-state-record-analysis) 20260612 : SortArmModule sub-task readout (TTrayMotor/TMyKitSuck come via database.h)
 #include "aAuto1To6.h"        //AI(ht160s-state-record-analysis) 20260616 : AutoModule per-station cell map for SortArmDecision.txt
+#include "aColor.h"           //AI(ht160s-state-record-analysis) 20260622 : ColorModule->DescribeState()
+#include "aEmpty.h"           //AI(ht160s-state-record-analysis) 20260622 : EmptyModule->DescribeState()
+#include "aLoader.h"          //AI(ht160s-state-record-analysis) 20260622 : LoaderModule->DescribeState()
 #include "uHGemEquipment.h"   //AI(ht160s-secsgem) 20260611 : HGem->FlushSecsLogToFile()
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -693,6 +696,54 @@ void cStateRecordHT160::WriteSortArmDecisionTxt(AnsiString Path)
     fclose(f);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260622 : FeederDecision.txt - Color/Empty/Loader
+//inner sub-task + flag latches plus the config gates that decide whether each feeder
+//is even active. KEY for the "Color latched bTrayReady and spins idle because Normal
+//mode (bUseAMR off / no AMR identity demand) never picks the tray" symptom, which the
+//outer Task-only history (1/10/100) cannot show. Read-only; runs ONLY at snapshot
+//trigger time (no per-cycle cost), mirroring WriteSortArmDecisionTxt.
+void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
+{
+    FILE *f = fopen(Path.c_str(), "wb");
+    if(f==NULL)
+        return;
+
+    AnsiString Out;
+    Out  = "Feeder (Color / Empty / Loader) inner-state + config-gate snapshot\r\n";
+    Out += "RunMode=" + RunModeText((int)HSys.Sys.RunMode)
+         + "  SystemStart=" + IntToStr(HSys.Sys.SystemStart ? 1 : 0) + "\r\n";
+    Out += "------------------------------------------------------------\r\n";
+
+    Out += "[Config gates]\r\n";
+    Out += "  bUseAMR=" + IntToStr(GeneralSetting.bUseAMR ? 1 : 0)
+         + "  bColorBinAreaInstalled=" + IntToStr(GeneralSetting.bColorBinAreaInstalled ? 1 : 0)
+         + "  bUseLotBinSortMode=" + IntToStr(GeneralSetting.bUseLotBinSortMode ? 1 : 0) + "\r\n";
+    Out += "  bUseColorCcd=" + IntToStr(CosFunction.bUseColorCcd ? 1 : 0)
+         + "  bUse2DBinMap=" + IntToStr(CosFunction.bUse2DBinMap ? 1 : 0) + "\r\n";
+    Out += "------------------------------------------------------------\r\n";
+
+    if(ColorModule!=NULL)
+        Out += ColorModule->DescribeState();
+    else
+        Out += "[Color] (module NULL)\r\n";
+    Out += "------------------------------------------------------------\r\n";
+
+    if(EmptyModule!=NULL)
+        Out += EmptyModule->DescribeState();
+    else
+        Out += "[Empty] (module NULL)\r\n";
+    Out += "------------------------------------------------------------\r\n";
+
+    if(LoaderModule!=NULL)
+        Out += LoaderModule->DescribeState();
+    else
+        Out += "[Loader] (module NULL)\r\n";
+
+    fwrite(Out.c_str(), 1, Out.Length(), f);
+    fflush(f);
+    fclose(f);
+}
+//---------------------------------------------------------------------------
 void cStateRecordHT160::CaptureConfig(AnsiString DstRootWithSlash)
 {
     ForceDirectories(DstRootWithSlash);
@@ -793,6 +844,7 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
     WriteLotDataJson    (TempDir + "LotData.json",     Reason, Stamp);   //AI(ht160s-lot-webapi) 20260612 : full lot + 2D detail as JSON
     WriteMotionDetailIni(TempDir + "MotionDetail.ini");   //AI(ht160s-state-record-analysis) 20260612 : motor pos + SortArm sub-task + sucker vacuum
     WriteSortArmDecisionTxt(TempDir + "SortArmDecision.txt");   //AI(ht160s-state-record-analysis) 20260616 : held-IC routing + per-Auto cell map (place/discharge deadlock evidence)
+    WriteFeederDecisionTxt(TempDir + "FeederDecision.txt");   //AI(ht160s-state-record-analysis) 20260622 : Color/Empty/Loader latch + config-gate dump
     CaptureConfig       (TempDir + "MachineConfig\\");
     CaptureSecsLog      (TempDir);   //AI(ht160s-secsgem) 20260611 : include SECS log if feature on
     CaptureWebApiLog    (TempDir);   //AI(ht160s-lot-webapi) 20260612 : include Lot WebAPI log if any pull ran today

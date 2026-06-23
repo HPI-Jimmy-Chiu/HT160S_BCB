@@ -274,7 +274,7 @@ bool GetTowerLightConfigOutput(int RowIndex, int ColorIndex, bool BlinkPhase)
     if(State==TOWER_LIGHT_STATE_ON)
         return true;
     if(State==TOWER_LIGHT_STATE_BLINK)
-        return BlinkPhase;
+        return true;   //AI(HT160S-Maintainer) 20260622 : tower light must NOT blink (user) -> BLINK shows STEADY ON (BlinkPhase now unused)
     return false;
 }
 //---------------------------------------------------------------------------
@@ -319,6 +319,7 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
         }
     }
 
+    bLoadingHardwareSettings=false;
     RegisterMaintenancePages();
     LayoutMaintenanceButtons();
     InitializeTowerLightPanels();
@@ -969,10 +970,17 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
 {
     GeneralSetting.Load();
     BinAreaMap.LoadDefault();
+    bLoadingHardwareSettings=true;
     if(chkHardwareColorBinArea!=NULL)
         chkHardwareColorBinArea->Checked=GeneralSetting.bColorBinAreaInstalled;
     if(chkUseAMR!=NULL)
         chkUseAMR->Checked=GeneralSetting.bUseAMR;
+    if(cbBinPanelType!=NULL)
+    {
+        int idx=GeneralSetting.iBinDispPanelType;
+        if(idx<0 || idx>1) idx=0;
+        cbBinPanelType->ItemIndex=idx;
+    }
     if(chkUseLotBinMode!=NULL)
         chkUseLotBinMode->Checked=GeneralSetting.bUseLotBinSortMode;
     {
@@ -993,6 +1001,7 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
             if(SuckChk[s]!=NULL)
                 SuckChk[s]->Checked=GeneralSetting.bSuckerEnabled[s];
     }
+    bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
 }
@@ -1003,6 +1012,12 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         GeneralSetting.bColorBinAreaInstalled=chkHardwareColorBinArea->Checked;
     if(chkUseAMR!=NULL)
         GeneralSetting.bUseAMR=chkUseAMR->Checked;
+    if(cbBinPanelType!=NULL)
+    {
+        int idx=cbBinPanelType->ItemIndex;
+        if(idx<0) idx=0;
+        GeneralSetting.iBinDispPanelType=idx;
+    }
     if(chkUseLotBinMode!=NULL)
         GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
     {
@@ -1177,7 +1192,7 @@ void __fastcall TfMaintenance::ApplyTowerLightConfigToLeds()
             if(Led==NULL)
                 continue;
             State=GetTowerLightConfigState(RowIndex, ColorIndex);
-            Led->Blink=(State==TOWER_LIGHT_STATE_BLINK);
+            Led->Blink=false;   //AI(HT160S-Maintainer) 20260622 : no blink on the tower-light grid -- show BLINK config as steady-on
             Led->Value=(State!=TOWER_LIGHT_STATE_OFF);
             Led->Invalidate();
         }
@@ -1629,9 +1644,9 @@ void __fastcall TfMaintenance::RGB00Click(TObject *Sender)
     if(RowIndex<0 || RowIndex>5 || ColorIndex<0 || ColorIndex>2)
         return;
 
-    if(Led->Value==true && Led->Blink==false)
-        State=TOWER_LIGHT_STATE_BLINK;
-    else if(Led->Value==true && Led->Blink==true)
+    //AI(HT160S-Maintainer) 20260622 : blink removed (user) -- the grid cell toggles
+    //ON <-> OFF only (no BLINK state). Read Value only (the grid no longer shows Blink).
+    if(Led->Value==true)
         State=TOWER_LIGHT_STATE_OFF;
     else
         State=TOWER_LIGHT_STATE_ON;
@@ -1687,6 +1702,8 @@ void __fastcall TfMaintenance::FormShow(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkHardwareColorBinAreaClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     (void)Sender;
     if(chkHardwareColorBinArea!=NULL)
         GeneralSetting.bColorBinAreaInstalled=chkHardwareColorBinArea->Checked;
@@ -1695,6 +1712,8 @@ void __fastcall TfMaintenance::chkHardwareColorBinAreaClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkUseAMRClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     (void)Sender;
     if(chkUseAMR!=NULL)
         GeneralSetting.bUseAMR=chkUseAMR->Checked;
@@ -1707,6 +1726,8 @@ void __fastcall TfMaintenance::chkUseAMRClick(TObject *Sender)
 //Warn (do not force) the operator, matching the user's "remind, not enforce" rule.
 void __fastcall TfMaintenance::chkUseLotBinModeClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     (void)Sender;
     if(chkUseLotBinMode!=NULL)
         GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
@@ -1721,6 +1742,8 @@ void __fastcall TfMaintenance::chkUseLotBinModeClick(TObject *Sender)
 //restart, matching the Sort-mode toggle behavior above.
 void __fastcall TfMaintenance::chkAutoEnableClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     TCheckBox *AutoChk[6];
     int a;
 
@@ -1743,6 +1766,8 @@ void __fastcall TfMaintenance::chkAutoEnableClick(TObject *Sender)
 //and warn instead of leaving the machine unable to pick.
 void __fastcall TfMaintenance::chkSuckEnableClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     TCheckBox *SuckChk[4];
     int s;
     int iEnabledCount;

@@ -25,6 +25,13 @@ public:
 	// mobile robot) docking interface? Commissioning fact, not a paid feature.
 	bool bUseAMR;
 
+	// AI(ht160s-agv) 20260623 : sim-only per-zone max tray tolerance. Index 0=Loader,
+	// 1=Empty, 2=Color, 3..8=Auto1..6. In SOFT_SIMULATE the infeed (Loader/Empty/Color)
+	// drains from this down to 0 (=SnX_Input(e)nd OFF=shortage), and an Auto fills its
+	// Car up to this (=InputFullTray ON=full). Edited via gbSimuSetting on the main form.
+	// Stored in General.ini [SimAMR] MaxTray0..8. Default 10.
+	int iSimAmrMaxTray[9];
+
 	// Sort mode (customer special request) : when true, classify ICs By Lot+Bin
 	// (dynamic (LotID,Bin)->Auto binding built at run time, see THT160LotBinBinding);
 	// when false, Normal mode (static Bin->Auto recipe table, THT160BinAreaMap).
@@ -72,6 +79,9 @@ public:
 	// HT9046 hardware standard (matching HT172) is 9600-8-N-1. Settable here so
 	// the field is changeable on the maintenance page without a rebuild.
 	int iBinDispBaud;
+	// Bin display panel protocol: 0 = LED (HT9046, default), 1 = TFT (HT9011
+	// graphic panel). Selected/swapped in ConfigureBinDisplay (after Load).
+	int iBinDispPanelType;
 	// When false (default), routine bin-display TX/Recv frames are NOT written
 	// to the BindisplayLog CSV (only open/close + error events are), so the
 	// daily comm file does not balloon during production. Set true for full

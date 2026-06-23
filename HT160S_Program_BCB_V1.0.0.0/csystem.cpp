@@ -694,6 +694,28 @@ static int GetMaintenanceMusicSelect(int RunState)
 	return 0;
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260622 : drive the 4 SwMusic outputs for one "Music Select"
+//(0=mute, 1..4 -> SwMusic1..4): the selected line ON, the rest OFF. Shared by the per-scan
+//DoSystemMessage buzzer driver and the dialog FormShow kicks (PlayMessageBuzzer /
+//PlayAlarmBuzzer) so a modal alarm that suspends MainProc still sounds the moment it shows.
+static void DriveSystemMusic(int MusicSel)
+{
+	int Base;
+	int m;
+	int idx;
+
+	if(HSys.SwPtr==NULL)
+		return;
+	Base=HSys.Sw.SwMusic1.Tag;
+	for(m=0; m<4; m++)
+	{
+		idx=Base+m;
+		if(idx<0 || idx>=HSys.iTotalSwitch)
+			continue;
+		HSys.SwPtr[idx].OnOff(MusicSel!=0 && (MusicSel-1)==m);
+	}
+}
+//---------------------------------------------------------------------------
 void DoSystemMessage()
 {
 	int RunState;
@@ -751,25 +773,13 @@ void DoSystemMessage()
 		else
 			BuzzState=LED_Pause;
 
-		if(bMaintAlone==false && HSys.SwPtr!=NULL)
+		if(bMaintAlone==false)
 		{
 			int MusicSel=GetMaintenanceMusicSelect(BuzzState);
-			int Base=HSys.Sw.SwMusic1.Tag;
-			for(int m=0; m<4; m++)
-			{
-				int idx=Base+m;
-				if(idx<0 || idx>=HSys.iTotalSwitch)
-					continue;
-				bool bOn=false;
-				if(MusicSel!=0 && (MusicSel-1)==m)
-				{
-					if(BuzzState==LED_ErrJam && fNote!=NULL && fNote->IsBuzzerOff())
-						bOn=false;
-					else
-						bOn=true;
-				}
-				HSys.SwPtr[idx].OnOff(bOn);
-			}
+			//ErrJam honours the OFF BUZZER acknowledge (HT172 bAlarmBuzzer==false -> Off).
+			if(BuzzState==LED_ErrJam && fNote!=NULL && fNote->IsBuzzerOff())
+				MusicSel=0;
+			DriveSystemMusic(MusicSel);
 		}
 	}
 
@@ -787,6 +797,21 @@ void DoSystemMessage()
 		bLampPause=true;
 	}
 	DoPanelLamp();
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260622 : FormShow buzzer kicks. A modal dialog (MyMessageBox /
+//fNote ShowModal) suspends MainProc, so DoSystemMessage never runs to sound the buzzer
+//while the dialog is up. The dialog calls these in FormShow to start the same "Music
+//Select" the scan driver would, so the message/alarm is audible the instant it appears.
+//The scan driver keeps it driven for non-modal cases; FormClose's CloseBuzzerOff stops it.
+void PlayMessageBuzzer()
+{
+	DriveSystemMusic(GetMaintenanceMusicSelect(LED_Message));
+}
+//---------------------------------------------------------------------------
+void PlayAlarmBuzzer()
+{
+	DriveSystemMusic(GetMaintenanceMusicSelect(LED_ErrJam));
 }
 //---------------------------------------------------------------------------
 void DoSystem()
@@ -1075,6 +1100,41 @@ static void ProcessHomeLifecycle()
 	}
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260623 : freeze/thaw the ACTUATOR (cylinder + sucker)
+//push/pop timeout windows across a machine pause. TMyCylinder::Push/Pop and
+//TMySucker::Suck/Destroy arm a wall-clock HTimer (Delay) for OnAlarmTime/
+//OffAlarmTime; that clock keeps running while the machine is paused, so a long
+//pause taken mid-travel burns the alarm budget and false-alarms on resume even
+//though the actuator never actually timed out. Pause the Delay on the SystemStart
+//falling edge and ReStart it on the resume edge so only RUNNING time counts.
+//Scope is DELIBERATE: cylinders + the 4 SortArmSuck suckers only, NOT a global
+//HTimer registry. The Pad operator-panel link and bin-display COM HTimers are
+//pumped by the free-running ComPort spin (no SystemStart gate) and MUST keep
+//running while paused -- a blanket pause would deadlock their Spin state machines.
+//(See the INTENTIONALLY-EMPTY stubs in HTimer.cpp.) Idle timers are unaffected:
+//HTimer::Clear() (run by the next Push/Suck arm) resets Paused, so even a timer
+//left Paused by a skipped resume edge (e.g. the bFirstRun lot-start re-init)
+//self-heals on its next arm.
+static void PauseActuatorTimeoutTimers()
+{
+	int i, r, c;
+	for(i=0; i<MaxCylinderItem; i++)
+		Cylinder[i].Delay.Pause();
+	for(r=0; r<MAX_SUCKER_ROW; r++)
+		for(c=0; c<MAX_SUCKER_COL; c++)
+			HSys.Suck.SortArmSuck.Suck[r][c].Delay.Pause();
+}
+//---------------------------------------------------------------------------
+static void ReStartActuatorTimeoutTimers()
+{
+	int i, r, c;
+	for(i=0; i<MaxCylinderItem; i++)
+		Cylinder[i].Delay.ReStart();
+	for(r=0; r<MAX_SUCKER_ROW; r++)
+		for(c=0; c<MAX_SUCKER_COL; c++)
+			HSys.Suck.SortArmSuck.Suck[r][c].Delay.ReStart();
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260602 : ported HT172 0420 ProcessMotion lifecycle in
 //HT160S procedural style (no FSM). Layers: UPH pause accounting -> home not done
 //-> home-just-finished finalize -> SortArm single Z-home -> normal production
@@ -1090,6 +1150,11 @@ void ProcessMotion()
 		{
 			tUPH_PauseStartTime=Now();
 			bCalculatePauseTime=true;
+			//AI(HT160S-Maintainer) 20260623 : freeze cylinder/sucker push-pop
+			//timeout windows on this same pause one-shot so the paused interval
+			//is not charged against OnAlarmTime/OffAlarmTime (no false alarm on
+			//resume). Runs even while SystemStart==false (it is before the gate).
+			PauseActuatorTimeoutTimers();
 		}
 	}
 	bPrevSystemStart=HSys.Sys.SystemStart;
@@ -1109,6 +1174,11 @@ void ProcessMotion()
 	{
 		tUPH_PauseTime=tUPH_PauseTime+(Now()-tUPH_PauseStartTime);
 		bCalculatePauseTime=false;
+		//AI(HT160S-Maintainer) 20260623 : thaw the actuator timeout windows on the
+		//resume edge (paired with PauseActuatorTimeoutTimers on the falling edge)
+		//so only running time counts. HTimer::ReStart() defers the paused span via
+		//iPauseLen; idle timers are harmlessly cleared on their next arm.
+		ReStartActuatorTimeoutTimers();
 	}
 
 	//Layer 1 : full-machine home not finished -> drive the home engine. The

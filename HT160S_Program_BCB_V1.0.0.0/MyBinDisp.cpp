@@ -211,7 +211,8 @@ void TMyBinDispCtrl::InstalledUnit(int Index)
 //----------------------------------------------------------------------------
 void TMyBinDispCtrl::Spin()
 {
-    AnsiString Str;
+    // AI(ht160s-bindisplay) 20260623 : run-gate only. The concrete protocol owns
+    // the state machine in ProcessTick() (LED switch lives in TMyBinDispHT9046).
     if(InitialOK==false)
         return;
     if(bStopProcess==false)
@@ -220,6 +221,15 @@ void TMyBinDispCtrl::Spin()
         return;
 
     bTimerRun=true;
+    ProcessTick();
+    bTimerRun=false;
+}
+//----------------------------------------------------------------------------
+// LED (HT9046) state machine: open COM -> GetStatus(version) -> Color -> Bin.
+//----------------------------------------------------------------------------
+void TMyBinDispHT9046::ProcessTick()
+{
+    AnsiString Str;
     int &Task=iBinDispCtrlTask;
     AnsiString CN;
 
@@ -229,8 +239,7 @@ void TMyBinDispCtrl::Spin()
             iRusStatus=0;
             if(ComPort.Pos("COM")==0)
             {
-                bTimerRun=false;
-                return;
+                return;          // bTimerRun is reset by Spin() after ProcessTick
             }
             bStartSetBin=true;
             for(int i=0; i<iUsedBinNumber; i++)
@@ -315,7 +324,6 @@ void TMyBinDispCtrl::Spin()
             }
             break;
     }
-    bTimerRun=false;
 }
 //----------------------------------------------------------------------------
 void TMyBinDispCtrl::WriteTargetBin(int Index, int *bin, int color)
@@ -925,5 +933,402 @@ bool TMyBinDispHT9046::DoStartGetStatus()
             break;
     }
     return false;
+}
+//----------------------------------------------------------------------------
+// TFT (HT9011 graphic panel) protocol. Frame builders ported 1:1 from HT9045
+// 905.8 BinDisplay/MyBinDisp.cpp (single serial chain; magazine NOT ported).
+// 20-byte binary frame: 0x3A addr ByteCount(2) FuncCode(2) DataItem(2) data(9)
+// LRC CR LF. FuncCode 0x03=text, 0x02=font/layout, 0x00/0x01=background.
+// LRC reuses base A_Create_LCR (== 9045 A_Create_LRC: (~sum)+1).
+// T3 STATUS: builders complete; ProcessTick still a no-op stub -- T4 wires the
+// DoOnce/DoCycle state machine that calls them.
+//----------------------------------------------------------------------------
+TMyBinDispTFT::TMyBinDispTFT()
+{
+    // High-address table per unit (0x20..), mirroring the LED Addr+32 scheme.
+    for(int i=0; i<Bin_MAX_NUM; i++)
+        iAddArrayTFT[i]=0x20+i;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::ShowCommLog(char *cmd, int Address, AnsiString sFun)
+{
+    AnsiString asHex=Chararr2Hexstring(cmd, 20);
+    AnsiString sLog;
+    if(Address==-1)
+        sLog="Recv, "+asHex;
+    else
+        sLog="Send u"+IntToStr(Address)+", "+sFun+" ["+asHex+"]";
+    LogBinDisplay("TFT", sLog, true);
+}
+//----------------------------------------------------------------------------
+// FuncCode 0x03 : text input. iDisplabel selects the field (1=Bin 2="Bin"
+// 3="EA" 4=Count). Each char -> its ASCII code. HT9045 routed this via
+// MyASCIIToDec(), which returns the ASCII value for any printable char, so a
+// direct (unsigned char) cast is exactly equivalent for bin-label text.
+void TMyBinDispTFT::command_TFT_Input(char *cStr, int index, int iDisplabel, AnsiString sValue)
+{
+    int iHeader         =0x3a,
+        iByteCount   [2]={0x00, 0x00},
+        iFunctionCode[2]={0x00, 0x00},
+        iDataItem    [2]={0x00, 0x01},
+        iNumberOfData[9]={0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
+    unsigned char cLRC1=0x00;
+
+    iFunctionCode[1]=0x03;
+    iByteCount[1]   =0x0d;
+    iDataItem[1]    =iDisplabel;
+
+    int iLen=0;
+    if(sValue!="")
+    {
+        iLen=sValue.Length();
+        if(iLen>9)
+            iLen=9;
+        for(int i=0; i<iLen; i++)
+            iNumberOfData[i]=(unsigned char)sValue[i+1];
+    }
+    else
+    {
+        iNumberOfData[0]=0x00;
+    }
+
+    sprintf(cStr, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1],
+            iFunctionCode[0], iFunctionCode[1], iDataItem[0], iDataItem[1],
+            iNumberOfData[0], iNumberOfData[1], iNumberOfData[2], iNumberOfData[3],
+            iNumberOfData[4], iNumberOfData[5], iNumberOfData[6], iNumberOfData[7],
+            iNumberOfData[8]);
+    cLRC1=A_Create_LCR((unsigned char*)&cStr[1], 16);   // addr..data[8], excl header
+    cStr[17]=cLRC1;
+    cStr[18]=Bin_CR;
+    cStr[19]=Bin_LF;
+}
+//----------------------------------------------------------------------------
+// FuncCode 0x02 : font/layout for a field (position, size, RGB color, fill).
+void TMyBinDispTFT::command_TFT_Font(char *cStr, int index, int iDisplabel,
+        Byte iXPos, Byte iYPos, Byte iWidth, Byte iHeigh, Byte iFontSize, Byte iFill, int iColor)
+{
+    int iHeader         =0x3a,
+        iFunctionCode[2]={0x00, 0x00},
+        iByteCount   [2]={0x00, 0x00},
+        iDataItem    [2]={0x00, 0x01},
+        iNumberOfData[9]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    unsigned char cLRC1=0x00;
+
+    iFunctionCode[1]=0x02;
+    iByteCount[1]   =0x0d;
+    iDataItem[1]    =iDisplabel;
+
+    iNumberOfData[0]=iXPos;
+    iNumberOfData[1]=iYPos;
+    iNumberOfData[2]=iWidth;
+    iNumberOfData[3]=iHeigh;
+
+    if(iColor==1)            // red
+    {
+        iNumberOfData[4]=0xff; iNumberOfData[5]=0x00; iNumberOfData[6]=0x00;
+    }
+    else if(iColor==2)       // green
+    {
+        iNumberOfData[4]=0x22; iNumberOfData[5]=0x8b; iNumberOfData[6]=0x22;
+    }
+    else if(iColor==3)       // orange
+    {
+        iNumberOfData[4]=0xff; iNumberOfData[5]=0x80; iNumberOfData[6]=0x00;
+    }
+    else if(iColor==4)       // light gray (transparent-bg "EA" & Count text)
+    {
+        iNumberOfData[4]=0xff; iNumberOfData[5]=0xff; iNumberOfData[6]=0xf0;
+    }
+    else                     // black
+    {
+        iNumberOfData[4]=0x00; iNumberOfData[5]=0x00; iNumberOfData[6]=0x00;
+    }
+
+    iNumberOfData[7]=iFontSize;
+    iNumberOfData[8]=iFill;
+
+    sprintf(cStr, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1],
+            iFunctionCode[0], iFunctionCode[1], iDataItem[0], iDataItem[1],
+            iNumberOfData[0], iNumberOfData[1], iNumberOfData[2], iNumberOfData[3],
+            iNumberOfData[4], iNumberOfData[5], iNumberOfData[6], iNumberOfData[7],
+            iNumberOfData[8]);
+    cLRC1=A_Create_LCR((unsigned char*)&cStr[1], 16);
+    cStr[17]=cLRC1;
+    cStr[18]=Bin_CR;
+    cStr[19]=Bin_LF;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::ReadVersion_TFT(int index)
+{
+    int iHeader         =0x3a,
+        iByteCount   [2]={0x00, 0x0d},
+        iFunctionCode[2]={0x08, 0x00},
+        iDataItem    [2]={0x30, 0x30},
+        iNumberOfData[9]={0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x31};
+    unsigned char cLRC1=0x00;
+    char cSendCommand[20]="";
+    sprintf(cSendCommand, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1],
+            iFunctionCode[0], iFunctionCode[1], iDataItem[0], iDataItem[1],
+            iNumberOfData[0], iNumberOfData[1], iNumberOfData[2], iNumberOfData[3],
+            iNumberOfData[4], iNumberOfData[5], iNumberOfData[6], iNumberOfData[7],
+            iNumberOfData[8]);
+    cLRC1=A_Create_LCR((unsigned char*)&cSendCommand[1], 16);
+    cSendCommand[17]=cLRC1;
+    cSendCommand[18]=Bin_CR;
+    cSendCommand[19]=Bin_LF;
+
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "ReadVersion");
+}
+//----------------------------------------------------------------------------
+// Bin value encoding matches SetUnitLabel: 104=E(Empty) 111=L(Loader)
+// 102=C(Color) -1=blank 0..99=digit (also 999 = explicit Empty sentinel).
+void TMyBinDispTFT::WriteBin_TFT(int index, int ivalue)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+    {
+        if(index==1)
+            sWrite="Empty";
+        else
+            sWrite="  E";
+    }
+    else if(ivalue==111)
+        sWrite="Loader";
+    else if(ivalue==102)
+        sWrite="Color";
+    else if(ivalue==-1)
+        sWrite="---";
+    else
+        sWrite.sprintf("%03d", ivalue);
+
+    command_TFT_Input(cSendCommand, index, 0x01, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write Bin : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::WriteBinWord_TFT(int index, int ivalue)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+        sWrite="";
+    else if(ivalue==111)
+        sWrite="";
+    else if(ivalue==102)
+        sWrite="";
+    else
+        sWrite="Bin";
+
+    command_TFT_Input(cSendCommand, index, 0x02, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write Bin Word : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::WriteEA_TFT(int index, int ivalue)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+        sWrite="";
+    else if(ivalue==111)
+        sWrite="";
+    else if(ivalue==102)
+        sWrite="";
+    else
+        sWrite="EA";
+
+    command_TFT_Input(cSendCommand, index, 0x03, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write EA : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::WriteCount_TFT(int index, int ivalue, int iCount)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+        sWrite="";
+    else if(ivalue==111)
+        sWrite="";
+    else if(ivalue==102)
+        sWrite="";
+    else if(ivalue==-1)
+        sWrite="";
+    else
+        sWrite.sprintf("%d", iCount);
+
+    command_TFT_Input(cSendCommand, index, 0x04, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write Count : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontBin_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+    if(iValue==999 || iValue==104)        // Empty
+    {
+        iXPos=0x10; iYPos=0x20; iWidth=0x00; iHeigh=0x00; iFontSize=0x14; iFill=0xff;
+    }
+    else if(iValue==111)                  // Loader
+    {
+        iXPos=0x09; iYPos=0x20; iWidth=0x00; iHeigh=0x00; iFontSize=0x14; iFill=0xff;
+    }
+    else if(iValue==102)                  // Color
+    {
+        iXPos=0x09; iYPos=0x20; iWidth=0x00; iHeigh=0x00; iFontSize=0x14; iFill=0xff;
+    }
+    else
+    {
+        iXPos=0x15; iYPos=0x15; iWidth=0x00; iHeigh=0x00; iFontSize=0x03; iFill=0xff;
+    }
+    command_TFT_Font(cSendCommand, index, 0x01, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set Bin Font");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontBinWord_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+
+    if(iValue==999 || iValue==104)        // Empty : keep default (blank)
+    {
+    }
+    else if(iValue==111)                  // Loader : keep default
+    {
+    }
+    else if(iValue==102)                  // Color : keep default
+    {
+    }
+    else                                  // BIN
+    {
+        iXPos=0x09; iYPos=0x01; iWidth=0x00; iHeigh=0x00; iFontSize=0x01; iFill=0xff;
+        // If color 3 (R+G), draw the "Bin" word blank so it does not clash with
+        // the "---" bin field display.
+        if(iColor==3)
+            iColor=-1;
+    }
+    command_TFT_Font(cSendCommand, index, 0x02, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set Bin Word Font");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontEA_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+    iColor=4;
+    if(iValue==999 || iValue==104)        // Empty : keep default
+    {
+    }
+    else if(iValue==111)                  // Loader : keep default
+    {
+    }
+    else if(iValue==102)                  // Color : keep default
+    {
+    }
+    else
+    {
+        iXPos=0x60; iYPos=0x58; iWidth=0x00; iHeigh=0x00; iFontSize=0x01; iFill=0xff;
+    }
+    command_TFT_Font(cSendCommand, index, 0x03, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set EA Font");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontCount_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+    iColor=4;
+    if(iValue==999 || iValue==104)        // Empty : keep default
+    {
+    }
+    else if(iValue==111)                  // Loader : keep default
+    {
+    }
+    else if(iValue==102)                  // Color : keep default
+    {
+    }
+    else
+    {
+        iXPos=0x01; iYPos=0x58; iWidth=0x00; iHeigh=0x00; iFontSize=0x01; iFill=0xff;
+    }
+    command_TFT_Font(cSendCommand, index, 0x04, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set Count Font");
+}
+//----------------------------------------------------------------------------
+// Background fill. NOTE T4: the `index<3` data-item branch is the 9045 layout
+// (its L/E/C live at units 0/1/2); HT160's layout is Empty=0 Loader=1 Color=8,
+// so revisit this gate when wiring ProcessTick (mirrors the LED Color-letter fix).
+void TMyBinDispTFT::SetBackGround_TFT(int index)
+{
+    int iHeader         =0x3a,
+        iByteCount[2]   ={0x00, 0x0d},
+        iFunctionCode[2]={0x00, 0x01},
+        iDataItem[2]    ={0x00, 0x02},
+        iNumberOfData[9]={0x30, 0x30, 0x00, 0x59, 0xaa, 0x30, 0x69, 0x69, 0x69},
+        iDelimiter[2]   ={0x0d, 0x0a};
+    char cSendCommand[20]="";
+    unsigned char Btmp1;
+
+    if(index<3)
+        iDataItem[1]=0x00;
+
+    Btmp1=iAddArrayTFT[index]+iByteCount[0]+iByteCount[1]+iFunctionCode[0]+iFunctionCode[1]+iDataItem[0]+iDataItem[1]+
+          iNumberOfData[0]+iNumberOfData[1]+iNumberOfData[2]+iNumberOfData[3]+iNumberOfData[4]+
+          iNumberOfData[5]+iNumberOfData[6]+iNumberOfData[7]+iNumberOfData[8];
+    Btmp1=~Btmp1;
+    Btmp1+=1;
+
+    sprintf(cSendCommand, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1], iFunctionCode[0],
+            iFunctionCode[1], iDataItem[0], iDataItem[1], iNumberOfData[0], iNumberOfData[1],
+            iNumberOfData[2], iNumberOfData[3], iNumberOfData[4], iNumberOfData[5], iNumberOfData[6],
+            iNumberOfData[7], iNumberOfData[8], Btmp1, iDelimiter[0], iDelimiter[1]);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set BackGround");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetNoBackGround_TFT(int index)
+{
+    int iHeader         =0x3a,
+        iFunctionCode[2]={0x00, 0x04},
+        iByteCount[2]   ={0x00, 0x0d},
+        iDataItem[2]    ={0x00, 0x01},
+        iNumberOfData[9]={0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x00, 0x07, 0x00},
+        iDelimiter[2]   ={0x0d, 0x0a};
+    char cSendCommand[20]="";
+    unsigned char Btmp1;
+
+    Btmp1=iAddArrayTFT[index]+iByteCount[0]+iByteCount[1]+iFunctionCode[0]+iFunctionCode[1]+iDataItem[0]+iDataItem[1]+
+          iNumberOfData[0]+iNumberOfData[1]+iNumberOfData[2]+iNumberOfData[3]+iNumberOfData[4]+
+          iNumberOfData[5]+iNumberOfData[6]+iNumberOfData[7]+iNumberOfData[8];
+    Btmp1=~Btmp1;
+    Btmp1+=1;
+
+    sprintf(cSendCommand, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1], iFunctionCode[0],
+            iFunctionCode[1], iDataItem[0], iDataItem[1], iNumberOfData[0], iNumberOfData[1],
+            iNumberOfData[2], iNumberOfData[3], iNumberOfData[4], iNumberOfData[5], iNumberOfData[6],
+            iNumberOfData[7], iNumberOfData[8], Btmp1, iDelimiter[0], iDelimiter[1]);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set NoBackGround");
+}
+//----------------------------------------------------------------------------
+// TFT state machine. FRAMEWORK SKELETON: still a safe no-op (T4 wires the
+// open-COM -> ReadVersion_TFT -> DoOnce(layout) -> DoCycle(bin/EA/count) flow
+// using the builders above). PanelType=1 today = quiescent controller.
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::ProcessTick()
+{
+    // Intentionally idle until the TFT state machine is wired (T4).
 }
 //----------------------------------------------------------------------------

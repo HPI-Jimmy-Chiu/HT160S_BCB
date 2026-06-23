@@ -25,7 +25,10 @@ TColorModule::TColorModule()
 //---------------------------------------------------------------------------
 void TColorModule::InitialFlag()
 {
+    bAmrLocked=false;
+    RefillSimInfeed();
     SupplyTask=1;
+    SupplyClampSub=0;
     ReleaseTask=1;
     SortBinTask=1;
     iICCount=0;
@@ -46,6 +49,51 @@ void TColorModule::InitialFlag()
     TestUpTask=1;
     TestDownTask=1;
     TestDelay.Clear();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : AMR P3 (ColorTray) handoff interface, mirrors TAutoModule.
+void TColorModule::SetAmrLock(bool bLock)
+{
+    bAmrLocked=bLock;
+}
+//---------------------------------------------------------------------------
+bool TColorModule::IsAmrLocked()
+{
+    return bAmrLocked;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Ready = front stacking cylinders back home (not commanded
+//up); destack idle so the AGV may refill. Held stable by bAmrLocked.
+bool TColorModule::IsReadyForAmrHandoff()
+{
+    return (HSys.Cyn.C_Color_FrontRiseTray_1.GetOutBit()==false
+            && HSys.Cyn.C_Color_FrontRiseTray_2.GetOutBit()==false
+            && HSys.Cyn.C_Color_FrontSeparateTray_1.GetOutBit()==false);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : shortage (call AGV). Sim drains iSimInfeedCount to 0; real
+//reads SnColor_InputEnd (ON=has tray, OFF=empty). Disabled sensor -> no call.
+bool TColorModule::IsInputShortageForAmr()
+{
+    if(IsSoftSimulate())
+        return (iSimInfeedCount<=0);
+    return (HSys.Sen.SnColor_InputEnd.Enable==true && HSys.Sen.SnColor_InputEnd.IsOff());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
+//real waits for SnColor_InputEnd to read a tray present (ON).
+bool TColorModule::IsInputHandoffFinishedForAmr()
+{
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Sen.SnColor_InputEnd.Enable==true && HSys.Sen.SnColor_InputEnd.IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : reset sim input-stack to configured max (AGV delivered a
+//full magazine). Real machine ignores the count (sensor-driven).
+void TColorModule::RefillSimInfeed()
+{
+    iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[2];
 }
 //---------------------------------------------------------------------------
 bool TColorModule::IsSoftSimulate()
@@ -167,6 +215,8 @@ void TColorModule::DoColor(int &Task)
             break;
 
         case 100:
+            if(bAmrLocked)
+                break;
             RefreshStateFromSensors();
             if(bTrayReady && bTrayPicked)
             {
@@ -195,7 +245,7 @@ void TColorModule::DoColor(int &Task)
                     Task=1;
                 break;
             }
-            if(bSupplyRequested || IsSoftSimulate())
+            if(bSupplyRequested)
             {
                 DoSupplyTray(0);
                 Task=1000;
@@ -211,7 +261,11 @@ void TColorModule::DoColor(int &Task)
 
         case 1200:
             if(DoGoDownTray(1))
+            {
+                if(IsSoftSimulate() && iSimInfeedCount>0)
+                    iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/GoDown
                 Task=1;
+            }
             break;
 
         case 1500:
@@ -342,6 +396,7 @@ bool TColorModule::DoSupplyTray(int Flag)
     if(Flag==0)
     {
         SupplyTask=1;
+        SupplyClampSub=0;
         SupplyDelay.Clear();
         return true;
     }
@@ -385,14 +440,17 @@ bool TColorModule::DoSupplyTray(int Flag)
             break;
 
         case 600:
-            if(PushCylinder(HSys.Cyn.C_Color_LeanOnTray))
-                SupplyTask=700;
-            break;
-
-        case 700:
-            if(PushCylinder(HSys.Cyn.C_Color_PushTray))
+        {
+            //AI(HT160S-Maintainer) 20260623 : standardized dual-cylinder clamp via
+            //DoClampTray, shared with Empty. SettleTicks=0 keeps Color's current
+            //behavior (no push-on-sensor confirm); the output sensor at case 800
+            //verifies the tray. Flip to >0 to add the push confirm later.
+            int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray,
+                                  SupplyClampSub, SupplyDelay, IsSoftSimulate(), 0);
+            if(Clamp==1)
                 SupplyTask=800;
             break;
+        }
 
         case 800:
             RefreshStateFromSensors();
@@ -454,9 +512,9 @@ bool TColorModule::DoReadColor2D(int Flag)
     switch(ScanTask)
     {
         case 1:
-            //Offline / DUMMY : no real Color CCD, fabricate a TrayID so the AMR
-            //pull flow can still run without the camera.
-            if(IsSoftSimulate())
+            //Offline / sim : no real Color CCD, fabricate a TrayID so the AMR
+            //pull flow runs without a camera; cbEnableSimulation fakes too.
+            if(IsSoftSimulate() || tSimuData.bRunSimulation)
             {
                 sTrayID2D=AnsiString("COLOR2D_")+Now().FormatString("hhnnsszzz");
                 return true;
@@ -842,6 +900,36 @@ bool TColorModule::TestGoUpTray(int Flag)
             break;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+AnsiString TColorModule::DescribeState()
+{
+    //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state dump for
+    //FeederDecision.txt. Reads latched members directly (does NOT call
+    //RefreshStateFromSensors, which clobbers the sim/dummy latch). The
+    //bTrayReady/bTrayPicked/bSupplyRequested trio is first : a latched bTrayReady
+    //with no pick is the Normal-mode (no AMR demand) idle-spin signature.
+    AnsiString s;
+    s  = "[Color]\r\n";
+    s += "  bTrayReady=" + IntToStr(bTrayReady ? 1 : 0)
+       + "  bTrayPicked=" + IntToStr(bTrayPicked ? 1 : 0)
+       + "  bSupplyRequested=" + IntToStr(bSupplyRequested ? 1 : 0)
+       + "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0) + "\r\n";
+    s += "  Installed=" + IntToStr(IsInstalled() ? 1 : 0)
+       + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)
+       + "  Mode=" + AnsiString(IsTraySupplyMode() ? "TraySupply" : (IsSortBinMode() ? "SortBin" : "?")) + "\r\n";
+    s += "  bInputHasTray=" + IntToStr(bInputHasTray ? 1 : 0)
+       + "  bInputFullTray=" + IntToStr(bInputFullTray ? 1 : 0)
+       + "  bOutputHasTray=" + IntToStr(bOutputHasTray ? 1 : 0) + "\r\n";
+    s += "  SupplyTask=" + IntToStr(SupplyTask)
+       + "  GoDownTask=" + IntToStr(GoDownTask)
+       + "  ReleaseTask=" + IntToStr(ReleaseTask)
+       + "  ScanTask=" + IntToStr(ScanTask)
+       + "  SortBinTask=" + IntToStr(SortBinTask) + "\r\n";
+    s += "  iICCount=" + IntToStr(iICCount)
+       + "  iSupplyThreshold=" + IntToStr(iSupplyThreshold)
+       + "  TrayID2D=" + sTrayID2D + "\r\n";
+    return s;
 }
 //---------------------------------------------------------------------------
 void InitializeColorModule()

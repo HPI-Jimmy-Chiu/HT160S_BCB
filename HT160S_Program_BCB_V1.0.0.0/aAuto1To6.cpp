@@ -23,23 +23,7 @@ static const int AUTO_STATION_COUNT=6;
 //  AGVSupplement trigger. Real machine uses the SnAutoX_InputFullTray sensor instead.
 static const int AMR_FULL_TRAY_SIM=10;
 //---------------------------------------------------------------------------
-static bool IsSensorOnReady(TMySensor *Sensor)
-{
-    if(Sensor==NULL || Sensor->Enable==false)
-        return true;
-    return Sensor->IsOn();
-}
-//---------------------------------------------------------------------------
-static bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
-{
-    if(Cylinder==NULL)
-        return false;
-    if(bSoftSimulate)
-        return true;
-    if(Cylinder->OnSensor.Enable==false)
-        return true;
-    return Cylinder->OnSensor.IsOn();
-}
+//AI(HT160S-Maintainer) 20260623 : IsSensorOnReady/IsCylinderOnReady moved to mycylin.h/.cpp (shared by Empty/Loader/Auto)
 //---------------------------------------------------------------------------
 static bool IsCylinderOffReady(TMyCylinder *Cylinder, bool bSoftSimulate)
 {
@@ -257,6 +241,20 @@ TMySensor *TAutoModule::GetInputFullTray(int Index)
     return NULL;
 }
 //---------------------------------------------------------------------------
+TMySensor *TAutoModule::GetInputEndSensor(int Index)
+{
+    switch(Index)
+    {
+        case 0: return &HSys.Sen.SnAuto1_InputEnd;
+        case 1: return &HSys.Sen.SnAuto2_InputEnd;
+        case 2: return &HSys.Sen.SnAuto3_InputEnd;
+        case 3: return &HSys.Sen.SnAuto4_InputEnd;
+        case 4: return &HSys.Sen.SnAuto5_InputEnd;
+        case 5: return &HSys.Sen.SnAuto6_InputEnd;
+    }
+    return NULL;
+}
+//---------------------------------------------------------------------------
 TMySensor *TAutoModule::GetOutputHasTray(int Index)
 {
     switch(Index)
@@ -393,8 +391,14 @@ int TAutoModule::FindFeedAuto()
 int TAutoModule::FindDischargeAuto()
 {
     for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+    {
+        //AI(ht160s-agv) 20260623 : skip an AMR-locked Auto - no new discharge during the
+        //handoff (FrontRise stays home; any in-flight discharge still finishes via DoAuto).
+        if(bAmrLocked[Index])
+            continue;
         if(State[Index].bFullIC)
             return Index;
+    }
     return -1;
 }
 //---------------------------------------------------------------------------
@@ -931,7 +935,7 @@ bool TAutoModule::IsOutputCarFullForAmr(int Index)
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return false;
     if(IsSoftSimulate())
-        return (Car[Index].iTrayCount >= AMR_FULL_TRAY_SIM);
+        return (Car[Index].iTrayCount >= GeneralSetting.iSimAmrMaxTray[3+Index]);
     TMySensor *FullSensor=GetInputFullTray(Index);
     return (FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
 }
@@ -958,10 +962,15 @@ bool TAutoModule::IsDrainedForAmr(int Index)
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return false;
     RefreshAutoState();
+    //AI(ht160s-agv) 20260623 : Ready also needs the stacking FrontRise back home (not
+    //commanded up) so the handoff starts with the front cylinder idle (user requirement).
+    TMyCylinder *Rise=GetFrontRise(Index);
+    bool bFrontHome=(Rise==NULL || Rise->GetOutBit()==false);
     return (!State[Index].bCarHasTray
             && !State[Index].bRearHasTray
             && !bRearDeliveredPending[Index]
-            && !State[Index].bFullIC);
+            && !State[Index].bFullIC
+            && bFrontHome);
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260615 : Finish (CEID274) condition. The AGV has removed the full car.
@@ -974,7 +983,10 @@ bool TAutoModule::IsAmrTaken(int Index)
         return false;
     if(IsSoftSimulate())
         return true;
-    return false;   // TODO: read the SnAutoX car-taken sensor once the IO point exists
+    //AI(ht160s-agv) 20260623 : car-taken = SnAutoX_InputEnd reads no tray (ON=has tray).
+    //Enable==false (sensor unwired) keeps this false -> holds at Ready (pre-sensor behavior).
+    TMySensor *EndSensor=GetInputEndSensor(Index);
+    return (EndSensor!=NULL && EndSensor->Enable==true && EndSensor->IsOff());
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260615 : AGV finish - empty the output car, re-seed the stack roles,

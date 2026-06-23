@@ -17,6 +17,7 @@ class TColorModule
 {
 private:
     int SupplyTask;
+    int SupplyClampSub;       //AI(HT160S-Maintainer) 20260623 : DoClampTray sub-state for DoSupplyTray
     int ReleaseTask;
     int SortBinTask;
     int ScanTask;             //AI(HT160S-Maintainer) 20260608 : 2D CCD read sub-ladder state
@@ -40,6 +41,9 @@ private:
     HTimer GoDownDelay;       //AI(HT160S-Maintainer) 20260608 : front separate settle delay
     HTimer ScanDelay;         //AI(HT160S-Maintainer) 20260608 : Color CCD shot response timeout
 
+    bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
+    int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
+
     bool IsSoftSimulate();
     bool IsInstalled();
     void RefreshStateFromSensors();
@@ -56,6 +60,7 @@ public:
     TColorModule();
     void InitialFlag();
     void DoColor(int &Task);
+    AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state + latch dump (FeederDecision.txt)
 
     bool SetMode(int Mode);
     int GetMode();
@@ -71,6 +76,14 @@ public:
     void SetSupplyThreshold(int Count);
     int GetSupplyThreshold();
     int GetICCount();
+
+    //AI(ht160s-agv) 20260623 : AMR handoff interface (mirrors TAutoModule).
+    void SetAmrLock(bool bLock);
+    bool IsAmrLocked();
+    bool IsReadyForAmrHandoff();
+    bool IsInputShortageForAmr();
+    bool IsInputHandoffFinishedForAmr();
+    void RefillSimInfeed();
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting
 
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; Color has no production GoUp)

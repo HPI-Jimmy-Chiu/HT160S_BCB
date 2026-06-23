@@ -424,11 +424,16 @@ bool TSortArmModule::AreAllSuckersHome()
     //AI(HT160S-Maintainer) 20260622 : the ONE canonical SortArm-move interlock, shared by the
     //production MoveSortArmX gate and the Motor Test / Teach pre-move checks so every screen
     //uses the SAME rule. The arm may move only when every ENABLED suck-Z sits on its Home
-    //sensor RIGHT NOW (live Led[iHomeLed], not the sticky bHomeFlag). Sim / DUMMY has no card,
-    //so ScanMotorStatus reports all LEDs off : short-circuit to true so the simulated / dry-run
-    //arm is not blocked (the real machine reads the live sensor).
-    if(IsSoftSimulate())
-        return true;
+    //sensor RIGHT NOW (live Led[iHomeLed], not the sticky bHomeFlag).
+    //AI(HT160S-Maintainer) 20260622 : anti-collision is a HARD safety law - keep it ACTIVE in
+    //real-machine DUMMY/HAS_TRAY/REALLY. In DUMMY the motors and cylinders STILL move physically
+    //(DUMMY only skips correctness sensor confirmation), so the arm can still crash; the interlock
+    //must read the live Home sensor in every run mode. Bypass ONLY the SOFT_SIMULATE dev build,
+    //where there is no card so ScanMotorStatus reports all LEDs off (a runtime DUMMY bypass would
+    //wrongly disarm the interlock on the real machine).
+    #ifdef SOFT_SIMULATE
+    return true;
+    #else
     for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
     {
         TTrayMotor *Motor=GetSuckZMotor(SlotIndex);
@@ -439,6 +444,7 @@ bool TSortArmModule::AreAllSuckersHome()
             return false;
     }
     return true;
+    #endif
 }
 //---------------------------------------------------------------------------
 bool TSortArmModule::MoveSortArmX(int Position)
@@ -549,7 +555,13 @@ bool TSortArmModule::MoveToLoaderPick()
         return false;
 
     BaseX=Slot[FirstSlot].PickX-FirstSlot;
-    if(BaseX<0)
+    //AI(ht160s-maintainer) 20260623 : SINGLE-PICK left-edge reach. With a leading site
+    //closed, the chosen sucker must overhang the tray's left frame to reach the left-edge
+    //columns, so BaseX is allowed to go negative - but only by at most
+    //(SORT_ARM_SUCKER_COUNT-1) pitches, the deepest a valid single-pick selection can
+    //produce (anchor sucker over column 0). The X motion layer still enforces the real
+    //soft travel limit; anything past this bound is bad data and is rejected.
+    if(BaseX<-(SORT_ARM_SUCKER_COUNT-1))
         return false;
 
     XPosition=RoundPosition((double)GetLoaderSortX(iActiveLoaderNo)+((double)BaseX)*GetTrayXPitch());
@@ -612,11 +624,15 @@ bool TSortArmModule::FindPickCells(int LoaderNo)
     if(TrayMotor==NULL || TrayMotor->fHasTray==false)
         return false;
 
-    //AI(ht160s-maintainer) 20260616 : per-nozzle enable. Find the first ENABLED sucker
-    //and anchor it (not slot 0) to the anchor cell, so a disabled leading slot does not
-    //deadlock (the anchor cell would otherwise always map to a slot that never picks).
-    //The X geometry in MoveToLoaderPick uses BaseX=PickX-FirstSlot, so any starting slot
-    //is handled. If every nozzle is disabled there is nothing to pick.
+    //AI(ht160s-maintainer) 20260623 : SINGLE-PICK (user requirement: one IC per stroke).
+    //Borrowed from HT9045 Find_InArm_Single - raster the WHOLE tray and return the first
+    //pickable cell; the run-loop re-calls FindPickCells each cycle to drain the tray one
+    //IC at a time. To CLEAR THE TRAY EVEN WITH A LEADING SITE CLOSED, scan from column 0
+    //and choose the active sucker by a HT172-style floating anchor: the largest ENABLED
+    //sucker whose index <= the cell column (smallest non-negative BaseX). For left-edge
+    //columns that no enabled sucker can reach without overhang, fall back to the lowest
+    //enabled sucker (FirstEnabled); MoveToLoaderPick then travels left (negative BaseX,
+    //leading nozzle overhanging the tray frame) so those edge ICs are still picked.
     FirstEnabled=-1;
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
     {
@@ -629,35 +645,28 @@ bool TSortArmModule::FindPickCells(int LoaderNo)
     if(FirstEnabled<0)
         return false;
 
-    //AI(ht160s-maintainer) 20260616 : the anchor cell column must be >= FirstEnabled.
-    //With the leftmost nozzle(s) disabled the suckers physically cannot reach tray
-    //columns 0..FirstEnabled-1 (BaseX would be negative and MoveToLoaderPick would
-    //retry forever), so those edge cells are LEFT in the tray instead of stalling.
     for(int YIndex=0; YIndex<YCount; YIndex++)
     {
-        for(int XIndex=FirstEnabled; XIndex<XCount; XIndex++)
+        for(int XIndex=0; XIndex<XCount; XIndex++)
         {
             if(IsPickableData(TrayMotor->Tray.Data[XIndex][YIndex]))
             {
-                for(int SlotIndex=FirstEnabled; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
+                int PickSlot=FirstEnabled;
+                for(int k=0; k<SORT_ARM_SUCKER_COUNT && k<=XIndex; k++)
                 {
-                    int TrayX=XIndex+(SlotIndex-FirstEnabled);
-                    if(GeneralSetting.bSuckerEnabled[SlotIndex]==false)
-                        continue;
-                    if(TrayX<XCount && IsPickableData(TrayMotor->Tray.Data[TrayX][YIndex]))
-                    {
-                        Slot[SlotIndex].bCanPick=true;
-                        Slot[SlotIndex].PickX=TrayX;
-                        Slot[SlotIndex].PickY=YIndex;
-                        Slot[SlotIndex].TrayData=TrayMotor->Tray.Data[TrayX][YIndex];
-                        //AI(HT160S-Maintainer) 20260604 : P4 capture 2D-looked-up bin for routing.
-                        Slot[SlotIndex].BinValue=TrayMotor->GetTrayBin(TrayX, YIndex);
-                        //AI(ht160s-lotbin) 20260615 : carry owning lot + 2D code for By Lot+Bin
-                        //routing and Production_Log; harmless in Normal mode (unused).
-                        Slot[SlotIndex].LotIndex=TrayMotor->GetTrayLot(TrayX, YIndex);
-                        Slot[SlotIndex].Code2D=TrayMotor->GetTrayCode2D(TrayX, YIndex);
-                    }
+                    if(GeneralSetting.bSuckerEnabled[k])
+                        PickSlot=k;
                 }
+                Slot[PickSlot].bCanPick=true;
+                Slot[PickSlot].PickX=XIndex;
+                Slot[PickSlot].PickY=YIndex;
+                Slot[PickSlot].TrayData=TrayMotor->Tray.Data[XIndex][YIndex];
+                //AI(HT160S-Maintainer) 20260604 : P4 capture 2D-looked-up bin for routing.
+                Slot[PickSlot].BinValue=TrayMotor->GetTrayBin(XIndex, YIndex);
+                //AI(ht160s-lotbin) 20260615 : carry owning lot + 2D code for By Lot+Bin
+                //routing and Production_Log; harmless in Normal mode (unused).
+                Slot[PickSlot].LotIndex=TrayMotor->GetTrayLot(XIndex, YIndex);
+                Slot[PickSlot].Code2D=TrayMotor->GetTrayCode2D(XIndex, YIndex);
                 return true;
             }
         }

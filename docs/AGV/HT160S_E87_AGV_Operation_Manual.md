@@ -158,14 +158,17 @@ sequenceDiagram
     participant H as Handler (HT160S)
     participant E as EAP / Host
     participant A as AGV
-    Note over H: 輸入缺料<br/>SnLoader_Inputend / SnEmpty_InputEnd / SnColor_InputEnd = ON
+    Note over H: 輸入缺料<br/>SnLoader_Inputend / SnEmpty_InputEnd / SnColor_InputEnd = OFF (ON=有盤, OFF=空)
     H->>E: S6F11 CEID272 AGVSupplement<br/>SVID38219 = P1/P2/P3 =1
     E-->>H: S6F12 (ACK)
     E->>A: 派車補料
     E->>H: S2F41 START_AGV(Loader/Empty/Color, Action)
     H-->>E: S2F42 HCACK=0
-    A-->>H: 補料 (實機 sensor 確認)
-    Note over H: Finish/解鎖機制同主流程<br/>(P1-P3 實體前置機構待硬體定義)
+    Note over H: 前堆疊汽缸(FrontRise/FrontSeparate)到位且鎖定<br/>運作完成不動作 = Ready 條件
+    H->>E: S6F11 CEID273 AGVLDUnLDStatus (Ready)<br/>SVID38220 = 目標 P =1
+    A-->>H: 補料 (實機到位)
+    Note over H: 補料完成 sensor=ON(有盤)<br/>(模擬:倒數計數補滿) → Finish
+    H->>E: S6F11 CEID274 AGVLDUnLDFinish<br/>SVID38221 = 目標 P =1 → 解鎖 + 補滿
 ```
 
 ---

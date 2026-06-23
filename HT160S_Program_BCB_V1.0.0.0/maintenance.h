@@ -157,9 +157,6 @@ __published:
     TLabel *lblHardwareErrorHint;
     TPanel *Panel3;
     TCheckBox *chkUseAMR;
-    TPanel *pnlSortModeBox;
-    TLabel *lblLotBinModeHint;
-    TCheckBox *chkUseLotBinMode;
     TPanel *pnlAutoEnableBox;
     TLabel *lblAutoEnableHint;
     TCheckBox *chkAutoEnable1;
@@ -168,12 +165,6 @@ __published:
     TCheckBox *chkAutoEnable4;
     TCheckBox *chkAutoEnable5;
     TCheckBox *chkAutoEnable6;
-    TPanel *pnlSuckerEnableBox;
-    TLabel *lblSuckerEnableHint;
-    TCheckBox *chkSuckEnable1;
-    TCheckBox *chkSuckEnable2;
-    TCheckBox *chkSuckEnable3;
-    TCheckBox *chkSuckEnable4;
     TTabSheet *tsNetwork;
     TPanel *Panel4;
     TEdit *edWebapiPath;
@@ -275,6 +266,22 @@ __published:
     TButton *btnLotApiFetch;
     TMemo *memLotApiResult;
     TMemo *memLotApiLog;
+    TTabSheet *tsSortArm;
+    TPanel *pnlSuckerEnableBox;
+    TLabel *lblSuckerEnableHint;
+    TCheckBox *chkSuckEnable1;
+    TCheckBox *chkSuckEnable2;
+    TCheckBox *chkSuckEnable3;
+    TCheckBox *chkSuckEnable4;
+    TTabSheet *tsOption;
+    TPanel *Panel5;
+    TLabel *lblBinPanelType;
+    TComboBox *cbBinPanelType;
+    TTabSheet *tsLotInfo;
+    TPanel *pnlSortModeBox;
+    TLabel *lblLotBinModeHint;
+    TCheckBox *chkUseLotBinMode;
+    TCheckBox *cbCommType;
     void __fastcall btnMCUSaveClick(TObject *Sender);
     void __fastcall btnMCUReloadClick(TObject *Sender);
     void __fastcall btnMCURefreshClick(TObject *Sender);
@@ -315,6 +322,7 @@ private:
     TSpeedButton *LastClickButton;
     TALed *TowerLightLeds[TOWER_LIGHT_ROW_COUNT][TOWER_LIGHT_COLOR_COUNT];
     bool bTowerLightBlinkPhase;
+    bool bLoadingHardwareSettings;   // guard: suppress save-on-click handlers during programmatic LoadHardwareSettings
 
     void __fastcall RegisterMaintenancePages();
     void __fastcall LayoutMaintenanceButtons();

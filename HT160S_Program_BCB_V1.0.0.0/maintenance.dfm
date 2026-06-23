@@ -296,9 +296,9 @@ object fMaintenance: TfMaintenance
       Top = 44
       Width = 949
       Height = 943
-      ActivePage = tsMaintTowerLight
+      ActivePage = tsMaintHardware
       Align = alClient
-      TabIndex = 0
+      TabIndex = 4
       TabOrder = 1
       TabWidth = 90
       object tsMaintTowerLight: TTabSheet
@@ -341,7 +341,7 @@ object fMaintenance: TfMaintenance
           object RGB40: TALed
             Tag = 12
             Left = 152
-            Top = 219
+            Top = 2000
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
@@ -421,7 +421,7 @@ object fMaintenance: TfMaintenance
           object RGB41: TALed
             Tag = 13
             Left = 208
-            Top = 219
+            Top = 2000
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
@@ -448,7 +448,7 @@ object fMaintenance: TfMaintenance
           object RGB42: TALed
             Tag = 14
             Left = 264
-            Top = 219
+            Top = 2000
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
@@ -955,9 +955,9 @@ object fMaintenance: TfMaintenance
             Top = 2
             Width = 937
             Height = 880
-            ActivePage = tsLoaderUnloader
+            ActivePage = tsOption
             Align = alClient
-            TabIndex = 0
+            TabIndex = 3
             TabOrder = 0
             object tsLoaderUnloader: TTabSheet
               Caption = 'Loader/Unloader'
@@ -1025,56 +1025,14 @@ object fMaintenance: TfMaintenance
                   OnClick = chkUseAMRClick
                 end
               end
-              object pnlSortModeBox: TPanel
-                Left = 0
-                Top = 80
-                Width = 929
-                Height = 64
-                Align = alTop
-                BevelInner = bvLowered
-                TabOrder = 2
-                object lblLotBinModeHint: TLabel
-                  Left = 240
-                  Top = 12
-                  Width = 560
-                  Height = 36
-                  AutoSize = False
-                  Caption = 
-                    'When ON, classify By Lot+Bin (each Lot+Bin pair binds to an Auto' +
-                    ' dynamically). When OFF, Normal mode (static Bin->Auto table). C' +
-                    'hanging this needs a software restart.'
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clNavy
-                  Font.Height = -13
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  WordWrap = True
-                end
-                object chkUseLotBinMode: TCheckBox
-                  Left = 16
-                  Top = 20
-                  Width = 210
-                  Height = 20
-                  Caption = 'Sort By Lot+Bin'
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -15
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  TabOrder = 0
-                  OnClick = chkUseLotBinModeClick
-                end
-              end
               object pnlAutoEnableBox: TPanel
                 Left = 0
-                Top = 144
+                Top = 80
                 Width = 929
                 Height = 80
                 Align = alTop
                 BevelInner = bvLowered
-                TabOrder = 3
+                TabOrder = 2
                 object lblAutoEnableHint: TLabel
                   Left = 16
                   Top = 10
@@ -1195,100 +1153,6 @@ object fMaintenance: TfMaintenance
                   OnClick = chkAutoEnableClick
                 end
               end
-              object pnlSuckerEnableBox: TPanel
-                Left = 0
-                Top = 224
-                Width = 929
-                Height = 80
-                Align = alTop
-                BevelInner = bvLowered
-                TabOrder = 4
-                object lblSuckerEnableHint: TLabel
-                  Left = 16
-                  Top = 10
-                  Width = 780
-                  Height = 16
-                  AutoSize = False
-                  Caption = 
-                    'Per-nozzle enable (SortArm sucker). Unchecked nozzles are skippe' +
-                    'd during pick/place so a broken nozzle can be taken out of servi' +
-                    'ce. At least one must stay enabled.'
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clNavy
-                  Font.Height = -13
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                end
-                object chkSuckEnable1: TCheckBox
-                  Left = 16
-                  Top = 44
-                  Width = 110
-                  Height = 20
-                  Caption = 'Nozzle1'
-                  Checked = True
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -15
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  State = cbChecked
-                  TabOrder = 0
-                  OnClick = chkSuckEnableClick
-                end
-                object chkSuckEnable2: TCheckBox
-                  Left = 136
-                  Top = 44
-                  Width = 110
-                  Height = 20
-                  Caption = 'Nozzle2'
-                  Checked = True
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -15
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  State = cbChecked
-                  TabOrder = 1
-                  OnClick = chkSuckEnableClick
-                end
-                object chkSuckEnable3: TCheckBox
-                  Left = 256
-                  Top = 44
-                  Width = 110
-                  Height = 20
-                  Caption = 'Nozzle3'
-                  Checked = True
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -15
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  State = cbChecked
-                  TabOrder = 2
-                  OnClick = chkSuckEnableClick
-                end
-                object chkSuckEnable4: TCheckBox
-                  Left = 376
-                  Top = 44
-                  Width = 110
-                  Height = 20
-                  Caption = 'Nozzle4'
-                  Checked = True
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -15
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                  State = cbChecked
-                  TabOrder = 3
-                  OnClick = chkSuckEnableClick
-                end
-              end
             end
             object tsErrorMag: TTabSheet
               Caption = 'ErrorMag'
@@ -1296,7 +1160,7 @@ object fMaintenance: TfMaintenance
               object pnlHardwareErrorBinBox: TPanel
                 Left = 0
                 Top = 0
-                Width = 827
+                Width = 929
                 Height = 170
                 Align = alTop
                 BevelInner = bvLowered
@@ -1356,6 +1220,194 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                   WordWrap = True
+                end
+              end
+            end
+            object tsSortArm: TTabSheet
+              Caption = 'Sort Arm'
+              ImageIndex = 2
+              object pnlSuckerEnableBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 80
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblSuckerEnableHint: TLabel
+                  Left = 16
+                  Top = 10
+                  Width = 905
+                  Height = 47
+                  AutoSize = False
+                  Caption = 
+                    'Per-nozzle enable (SortArm sucker). Unchecked nozzles are skippe' +
+                    'd during pick/place so a broken nozzle can be taken out of servi' +
+                    'ce. At least one must stay enabled.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkSuckEnable1: TCheckBox
+                  Left = 16
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle1'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 0
+                  OnClick = chkSuckEnableClick
+                end
+                object chkSuckEnable2: TCheckBox
+                  Left = 136
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle2'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 1
+                  OnClick = chkSuckEnableClick
+                end
+                object chkSuckEnable3: TCheckBox
+                  Left = 256
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle3'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 2
+                  OnClick = chkSuckEnableClick
+                end
+                object chkSuckEnable4: TCheckBox
+                  Left = 376
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle4'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 3
+                  OnClick = chkSuckEnableClick
+                end
+              end
+            end
+            object tsOption: TTabSheet
+              Caption = 'Option'
+              ImageIndex = 3
+              object Panel5: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblBinPanelType: TLabel
+                  Left = 32
+                  Top = 12
+                  Width = 110
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Bin Display Panel'
+                end
+                object cbBinPanelType: TComboBox
+                  Left = 150
+                  Top = 9
+                  Width = 160
+                  Height = 21
+                  Style = csDropDownList
+                  ItemHeight = 13
+                  ItemIndex = 0
+                  TabOrder = 0
+                  Text = 'LED (HT9046)'
+                  Items.Strings = (
+                    'LED (HT9046)'
+                    'TFT (HT9011)')
+                end
+                object cbCommType: TCheckBox
+                  Left = 360
+                  Top = 8
+                  Width = 97
+                  Height = 17
+                  Caption = 'CommType'
+                  TabOrder = 1
+                end
+              end
+            end
+            object tsLotInfo: TTabSheet
+              Caption = 'Lot Info'
+              ImageIndex = 4
+              object pnlSortModeBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 64
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblLotBinModeHint: TLabel
+                  Left = 240
+                  Top = 12
+                  Width = 609
+                  Height = 36
+                  AutoSize = False
+                  Caption = 
+                    'When ON, classify By Lot+Bin (each Lot+Bin pair binds to an Auto' +
+                    ' dynamically). When OFF, Normal mode (static Bin->Auto table). C' +
+                    'hanging this needs a software restart.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkUseLotBinMode: TCheckBox
+                  Left = 16
+                  Top = 20
+                  Width = 210
+                  Height = 20
+                  Caption = 'Sort By Lot+Bin'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkUseLotBinModeClick
                 end
               end
             end

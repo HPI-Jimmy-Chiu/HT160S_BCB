@@ -10,6 +10,78 @@
 //---------------------------------------------------------------------------
 class TMyCylinder Cylinder[MaxCylinderItem];
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260623 : shared "ready" predicates (decl in mycylin.h).
+//  Moved here from aAuto1To6.cpp static helpers so all cart modules share them.
+bool IsSensorOnReady(TMySensor *Sensor)
+{
+    if(Sensor==NULL || Sensor->Enable==false)
+        return true;
+    return Sensor->IsOn();
+}
+//---------------------------------------------------------------------------
+bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
+{
+    if(Cylinder==NULL)
+        return false;
+    if(bSoftSimulate)
+        return true;
+    if(Cylinder->OnSensor.Enable==false)
+        return true;
+    return Cylinder->OnSensor.IsOn();
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260623 : standardized dual-cylinder tray clamp shared
+//  by all cart modules. Motion fixed: lean-stop (Lean) first, then push (Push).
+//  The per-cylinder guard mirrors Color's PushCylinder: skip the stroke when
+//  simulating or the cylinder is disabled. SettleTicks>0 -> settle delay then
+//  confirm Push.OnSensor, Pop on miss. Display/alarm stays in the caller.
+int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
+                HTimer &Delay, bool bSoftSimulate, int SettleTicks)
+{
+    switch(SubTask)
+    {
+        case 0:   // lean-stop first
+            if(bSoftSimulate || Lean.Enable==false || Lean.Push())
+                SubTask=10;
+            break;
+
+        case 10:  // push last
+            if(bSoftSimulate || Push.Enable==false || Push.Push())
+            {
+                if(SettleTicks<=0)
+                {
+                    SubTask=0;
+                    return 1;
+                }
+                Delay.Set(SettleTicks);
+                Delay.On();
+                SubTask=20;
+            }
+            break;
+
+        case 20:  // settle then confirm push reached its on-sensor
+            if(Delay.Off())
+            {
+                if(IsCylinderOnReady(&Push, bSoftSimulate))
+                {
+                    SubTask=0;
+                    return 1;
+                }
+                SubTask=30;
+            }
+            break;
+
+        case 30:  // miss: retract push, report so caller can alarm/retry
+            if(bSoftSimulate || Push.Enable==false || Push.Pop())
+            {
+                SubTask=0;
+                return 2;
+            }
+            break;
+    }
+    return 0;
+}
+//---------------------------------------------------------------------------
 static void SetCylinderAlarm(int AlarmCode, AnsiString sFrom="")
 {
     //AI(HT160S-Maintainer) 20260603 : raise-hand to central dispatch (HAlarm). sFrom carries the
@@ -110,7 +182,7 @@ bool TMyCylinder::Push()
     ClearCylinderAlarm(OnAlarmCode);
     if(Task==1 || Task==2)
     {
-        if(OnSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
+        if(OnSensor.Enable==true)
         {
             if(OnSensor.IsOn())
             {
@@ -205,7 +277,7 @@ bool TMyCylinder::Pop()
     ClearCylinderAlarm(OffAlarmCode);
     if(Task==1 || Task==2)
     {
-        if(OffSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
+        if(OffSensor.Enable==true)
         {
             if(OffSensor.IsOn())
             {

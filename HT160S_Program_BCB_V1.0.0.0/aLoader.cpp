@@ -52,6 +52,8 @@ static const int LOADER_Y_OWNER_TRAYARM=2;
 //---------------------------------------------------------------------------
 void TLoaderModule::InitialFlag()
 {
+    bAmrLocked=false;
+    RefillSimInfeed();
     ResetSide(&Side[0]);
     ResetSide(&Side[1]);
     bRearHasTray=false;
@@ -265,6 +267,51 @@ bool TLoaderModule::MoveToCcdCell(int LoaderNo, int CellX, int CellY)
     bool bXFlag=MoveTopCcdX(XPos);
     bool bYFlag=MoveLoaderY(LoaderNo, YPos);
     return (bXFlag && bYFlag);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : AMR P1 (Loader) handoff interface, mirrors TAutoModule.
+void TLoaderModule::SetAmrLock(bool bLock)
+{
+    bAmrLocked=bLock;
+}
+//---------------------------------------------------------------------------
+bool TLoaderModule::IsAmrLocked()
+{
+    return bAmrLocked;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Ready = front stacking cylinders back home (not commanded
+//up); destack idle so the AGV may refill. Held stable by bAmrLocked.
+bool TLoaderModule::IsReadyForAmrHandoff()
+{
+    return (HSys.Cyn.C_Loader_FrontRiseTray_1.GetOutBit()==false
+            && HSys.Cyn.C_Loader_FrontRiseTray_2.GetOutBit()==false
+            && HSys.Cyn.C_Loader_FrontSeparateTray_1.GetOutBit()==false);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : shortage (call AGV). Sim drains iSimInfeedCount to 0; real
+//reads SnLoader_Inputend (ON=has tray, OFF=empty). Disabled sensor -> no call.
+bool TLoaderModule::IsInputShortageForAmr()
+{
+    if(IsSoftSimulate())
+        return (iSimInfeedCount<=0);
+    return (HSys.Sen.SnLoader_Inputend.Enable==true && HSys.Sen.SnLoader_Inputend.IsOff());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
+//real waits for SnLoader_Inputend to read a tray present (ON).
+bool TLoaderModule::IsInputHandoffFinishedForAmr()
+{
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Sen.SnLoader_Inputend.Enable==true && HSys.Sen.SnLoader_Inputend.IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : reset sim input-stack to configured max (AGV delivered a
+//full magazine). Real machine ignores the count (sensor-driven).
+void TLoaderModule::RefillSimInfeed()
+{
+    iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[0];
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsSoftSimulate()
@@ -683,7 +730,10 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         case 100:
             if(TrayMotor->fHasTray==false)
             {
-                if(OtherState->Status==LS_FEEDING)
+                if(bAmrLocked)   //AI(ht160s-agv) 20260623 : AMR handoff - no new front destack/feed
+                    break;
+                if(OtherState->Status==LS_FEEDING ||
+                   OtherState->Status==LS_CCD_SCAN)
                 {
                     break;
                 }
@@ -705,6 +755,8 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         case 1000:
             if(DoFeedTray(LoaderNo, 1))
             {
+                if(IsSoftSimulate() && iSimInfeedCount>0)
+                    iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/feed
                 if(OtherState->Status==LS_CCD_SCAN)
                 {
                     break;
@@ -978,7 +1030,10 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                 //while still letting the NULL-socket simulation path advance to state 5500.
                 if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)
                 {
-                    if(HSys.LastSet.iRealDummy==REALLY && TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected()==false)
+                    if(HSys.LastSet.iRealDummy==REALLY &&
+                       TopCcdSocket!=NULL &&
+                       TopCcdSocket->IsTopCcdConnected()==false &&
+                       IsSoftSimulate()==false)
                     {
                         Ret=ShowMyError("Top CCD Connect not ready", K_RETRY|K_SKIP);
                         if(Ret==K_SKIP)
@@ -1346,6 +1401,55 @@ bool TLoaderModule::TestGoUpTray(int Flag)
             break;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260622 : eLoaderStatus -> short text for FeederDecision.txt.
+static AnsiString SR_LoaderStatusText(int St)
+{
+    switch(St)
+    {
+        case LS_IDLE:       return "IDLE";
+        case LS_FEEDING:    return "FEEDING";
+        case LS_CCD_SCAN:   return "CCD_SCAN";
+        case LS_READY_SORT: return "READY_SORT";
+        case LS_SORTING:    return "SORTING";
+        case LS_ToRear:     return "ToRear";
+    }
+    return "?" + IntToStr(St);
+}
+//---------------------------------------------------------------------------
+AnsiString TLoaderModule::DescribeState()
+{
+    //AI(ht160s-state-record-analysis) 20260622 : read-only per-side inner-state for
+    //FeederDecision.txt. AllEmpty/HasOK expose the discharge gate : a side stuck at
+    //READY_SORT with HasOK=1 AllEmpty=0 is the stranded-cell pick/discharge deadlock.
+    AnsiString s;
+    s  = "[Loader]\r\n";
+    s += "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
+       + "  iFrontOwner=" + IntToStr(iFrontOwner)
+       + "  iYOwner=[" + IntToStr(iYOwner[0]) + "," + IntToStr(iYOwner[1]) + "]"
+       + "  iTopCcdCount=" + IntToStr(iTopCcdCount)
+       + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
+    for(int n=1; n<=2; n++)
+    {
+        TLoaderSideState *St = GetSide(n);
+        if(St==NULL)
+            continue;
+        TTrayMotor *Tm = (n==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
+        bool bHas = (Tm!=NULL && Tm->fHasTray);
+        s += "  Side" + IntToStr(n) + ": Status=" + SR_LoaderStatusText(St->Status)
+           + "  Feed=" + IntToStr(St->FeedTask)
+           + "  Ccd=" + IntToStr(St->CcdTask)
+           + "  Disc=" + IntToStr(St->DischargeTask)
+           + "  Destack=" + IntToStr(St->DestackTask) + "\r\n";
+        s += "         fHasTray=" + IntToStr(bHas ? 1 : 0)
+           + "  TrayEmptyFlag=" + IntToStr(St->bTrayEmpty ? 1 : 0)
+           + "  CleanOutFin=" + IntToStr(St->bCleanOutFinish ? 1 : 0)
+           + "  AllEmpty=" + IntToStr(ActiveTrayAllData(n, EMPTY_IC) ? 1 : 0)
+           + "  HasOK=" + IntToStr(HasActiveTrayData(n, HAS_OK_IC) ? 1 : 0)
+           + "  HasUncheck=" + IntToStr(HasActiveTrayData(n, UNCHECK_IC) ? 1 : 0) + "\r\n";
+    }
+    return s;
 }
 //---------------------------------------------------------------------------
 void InitializeLoaderModule()

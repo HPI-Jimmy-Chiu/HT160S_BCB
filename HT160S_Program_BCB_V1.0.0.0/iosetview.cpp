@@ -2035,14 +2035,6 @@ void __fastcall Tfiosetview::sbIORefreshClick(TObject *Sender)
     RefreshLegacyIOMaps();
 }
 //---------------------------------------------------------------------------
-void __fastcall Tfiosetview::sbIORingLoadClick(TObject *Sender)
-{
-    TSpeedButton *Button;
-
-    Button=dynamic_cast<TSpeedButton *>(Sender);
-    SelectLegacyIOPageByButton(Button);
-}
-//---------------------------------------------------------------------------
 void __fastcall Tfiosetview::sbOutputClick(TObject *Sender)
 {
     (void)Sender;

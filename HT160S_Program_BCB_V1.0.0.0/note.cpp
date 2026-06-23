@@ -350,6 +350,12 @@ void __fastcall TfNote::FormShow(TObject *Sender)
 
     if(FlushPanel!=NULL)
         FlushPanelColor=FlushPanel->Color;
+
+    //AI(HT160S-Maintainer) 20260622 : the alarm Note is modal and suspends MainProc, so the
+    //per-scan DoSystemMessage LED_ErrJam buzzer driver never runs while it is up. Kick it here
+    //so an alarm is audible the instant the screen appears (honours the OFF BUZZER latch).
+    if(bOffBuzzer==false)
+        PlayAlarmBuzzer();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
@@ -432,19 +438,67 @@ void __fastcall TfNote::BtnSkipClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnStartClick(TObject *Sender)
 {
-    SoftStop=false;
-    SoftStart=true;
-    RecordProcess("START pressed");
-    Close();
+    //AI(HT160S-Maintainer) 20260623 : align with HT172/HT9045 BtnStartClick+Start
+    //gating. START (resume) only dismisses the alarm when the operator has
+    //selected one of the offered recovery keys, OR when the note offers no
+    //recovery keys at all (KeyCode==0, a pure informational message). If recovery
+    //keys ARE offered but none is selected, START does nothing so the operator
+    //cannot resume past an unaddressed alarm. Replaces the old unconditional
+    //Close() that let any alarm be cleared by a single key press.
+    int Index;
+
+    for(Index=0; Index<6; Index++)
+    {
+        if(Select[Index])
+        {
+            SoftStop=false;
+            SoftStart=true;
+            RecordProcess("START pressed");
+            Close();
+            return;
+        }
+    }
+
+    if(KeyCode==0)
+    {
+        SoftStop=false;
+        SoftStart=true;
+        RecordProcess("START pressed");
+        Close();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnPauseClick(TObject *Sender)
 {
-    SoftStart=false;
-    SoftStop=true;
-    HSys.DecStopAllMotor();
-    RecordProcess("PAUSE pressed");
-    Close();
+    //AI(HT160S-Maintainer) 20260623 : align with HT172/HT9045 BtnPauseClick
+    //gating. PAUSE (stop) only dismisses the alarm when the operator has selected
+    //one of the offered recovery keys, OR when the note offers no recovery keys
+    //(KeyCode==0). If recovery keys ARE offered but none is selected, PAUSE does
+    //nothing -- the operator MUST pick a recovery action first. Replaces the old
+    //unconditional Close() that let PAUSE clear every alarm (non-compliant).
+    int Index;
+
+    for(Index=0; Index<6; Index++)
+    {
+        if(Select[Index])
+        {
+            SoftStart=false;
+            SoftStop=true;
+            HSys.DecStopAllMotor();
+            RecordProcess("PAUSE pressed");
+            Close();
+            return;
+        }
+    }
+
+    if(KeyCode==0)
+    {
+        SoftStart=false;
+        SoftStop=true;
+        HSys.DecStopAllMotor();
+        RecordProcess("PAUSE pressed");
+        Close();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnOffBuzzerClick(TObject *Sender)

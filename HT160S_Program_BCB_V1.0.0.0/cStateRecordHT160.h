@@ -71,6 +71,8 @@ private:
     //  working-tray cell map, so the place/discharge threshold-mismatch deadlock is
     //  diagnosable offline (which cell blocks the held pattern) without re-running config.
     void       WriteSortArmDecisionTxt(AnsiString Path);
+    //AI(ht160s-state-record-analysis) 20260622 : Color/Empty/Loader inner-state + config gates -> FeederDecision.txt (triggered-only)
+    void       WriteFeederDecisionTxt(AnsiString Path);
     void       CaptureConfig(AnsiString DstRootWithSlash);
     //AI(ht160s-secsgem) 20260611 : package today's SECS/GEM log (gated by CosFunction.bUseSecsGem)
     void       CaptureSecsLog(AnsiString DstRootWithSlash);

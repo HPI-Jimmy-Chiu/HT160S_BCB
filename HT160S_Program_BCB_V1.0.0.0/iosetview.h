@@ -56,6 +56,12 @@ __published:
     TPopupMenu *PopupMenu1;
     TMenuItem *SaveInputMap1;
     TMyLed *MyLed1;
+    TMyLed *MyLedAuto1InputEnd;
+    TMyLed *MyLedAuto2InputEnd;
+    TMyLed *MyLedAuto3InputEnd;
+    TMyLed *MyLedAuto4InputEnd;
+    TMyLed *MyLedAuto5InputEnd;
+    TMyLed *MyLedAuto6InputEnd;
     TBtnPanel *btnpnl1;
     TALed *ALedTool0;
     TMyLed *MyLed36;
@@ -89,7 +95,6 @@ __published:
     void __fastcall sbInputClick(TObject *Sender);
     void __fastcall sbIOExitClick(TObject *Sender);
     void __fastcall sbIORefreshClick(TObject *Sender);
-    void __fastcall sbIORingLoadClick(TObject *Sender);
     void __fastcall sbOutputClick(TObject *Sender);
     void __fastcall sbVacuumClick(TObject *Sender);
     void __fastcall spbTerminalProgramClick(TObject *Sender);

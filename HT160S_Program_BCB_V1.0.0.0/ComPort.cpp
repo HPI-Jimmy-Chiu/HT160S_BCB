@@ -111,6 +111,28 @@ void TfComPort::ConfigurePadComm()
 //(StartComport); here we only prepare the TComm line settings and the run gate.
 void TfComPort::ConfigureBinDisplay()
 {
+    // AI(ht160s-bindisplay) 20260623 : (re)create the controller to match the
+    // configured panel type. Done here, not the SYSTEM_MODULAR ctor, because the
+    // ctor runs before GeneralSetting.Load (PanelType unknown then). A later
+    // PanelType change takes effect on the next ConfigureBinDisplay (startup /
+    // maintenance Apply). PanelType: 0 = LED (HT9046, default), 1 = TFT (HT9011).
+    {
+        int iWantKind=0;
+        if(GeneralSetting.iBinDispPanelType==1)
+            iWantKind=1;
+        if(HSys.BinDisCtrl==NULL || HSys.BinDisCtrl->GetPanelKind()!=iWantKind)
+        {
+            if(HSys.BinDisCtrl!=NULL)
+            {
+                delete HSys.BinDisCtrl;
+                HSys.BinDisCtrl=NULL;
+            }
+            if(iWantKind==1)
+                HSys.BinDisCtrl=new TMyBinDispTFT;
+            else
+                HSys.BinDisCtrl=new TMyBinDispHT9046;
+        }
+    }
     if(HSys.BinDisCtrl==NULL)
         return;
     if(BinComm==NULL)

@@ -140,7 +140,7 @@ sequenceDiagram
     participant H as Handler (HT160S)
     participant E as EAP / Host
     participant A as AGV
-    Note over H: 輸入缺料 (SnLoader_Inputend / SnEmpty_InputEnd / SnColor_InputEnd = ON)
+    Note over H: 輸入缺料 (SnLoader_Inputend / SnEmpty_InputEnd / SnColor_InputEnd = OFF; ON=有盤)
     H->>E: S6F11 CEID272 AGVSupplement (SVID38219 P1/P2/P3=1)
     E-->>H: S6F12 ACK
     E->>A: 派車補料

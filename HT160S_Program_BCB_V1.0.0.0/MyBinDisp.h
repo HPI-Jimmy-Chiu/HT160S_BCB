@@ -60,13 +60,13 @@ protected:
     int iTotalInstalledUnit;
     int iTestBinCount;                                  // label cycle safety cap
 
-    // pure virtuals: implemented per hardware protocol in the subclass
-    virtual void WriteBin  (int Addr, int Command, short value)=0;
-    virtual void WriteColor(int Addr, short value)=0;
-    virtual void ReadVersion(int Addr)=0;
-    virtual bool DoStartSetBin()    {return false;};
-    virtual bool DoStartSetColor()  {return false;};
-    virtual bool DoStartGetStatus() {return false;};
+    // AI(ht160s-bindisplay) 20260623 : the ONLY cross-protocol virtual. Spin()
+    // run-gates then delegates one tick here; each concrete protocol (HT9046 LED
+    // / TFT) owns its own switch(iBinDispCtrlTask). The former LED-shaped virtuals
+    // (WriteBin/WriteColor/ReadVersion/DoStartSetBin/DoStartSetColor/
+    // DoStartGetStatus) now live in TMyBinDispHT9046 -- only its ProcessTick calls
+    // them -- so this base stays protocol-agnostic.
+    virtual void ProcessTick()=0;
 
     bool GetCOMPortStatus(AnsiString Com);
     unsigned char T_HEX2ASCII_Mac(unsigned char hex2ascii);
@@ -78,7 +78,7 @@ protected:
     AnsiString Chararr2Hexstring(char* cstr,int iNum);
 public:
     TMyBinDispCtrl();
-    ~TMyBinDispCtrl();
+    virtual ~TMyBinDispCtrl();   // virtual: deleted via base ptr (LED / TFT subclass)
     AnsiString Alias[Bin_MAX_NUM];
     TComm  *CommBin;
     void ProcessStopStart(bool Value)  ;// start or stop the state machine
@@ -96,6 +96,9 @@ public:
     void SerErrNow(int Index,bool bErr);// set a unit error flag
     AnsiString GetRunStatus()          ;// running status text
     AnsiString GetComPort(){return ComPort;}
+    // AI(ht160s-bindisplay) 20260623 : panel protocol identity for the
+    // ConfigureBinDisplay() factory/swap. 0=LED(HT9046)  1=TFT(HT9011).
+    virtual int GetPanelKind(){return 0;}
     void __fastcall CommBinReceiveData(TObject *Sender, Pointer Buffer, WORD BufferLength);
     TParity ComParity;                                  // COM parity
     void InstalledUnit(int Index);                      // declare a unit present
@@ -124,14 +127,62 @@ public:
 //----------------------------------------------------------------------------
 class TMyBinDispHT9046:public TMyBinDispCtrl
 {
-    private:
     protected:
-        virtual void WriteBin(int Addr, int Command, short Value);
-        virtual void WriteColor(int Addr, short Value);
-        virtual void ReadVersion(int Addr);
-        virtual bool DoStartSetBin();
-        virtual bool DoStartSetColor();
-        virtual bool DoStartGetStatus();
+        virtual void ProcessTick();   // LED state machine: case 1/50/100/200/300
+    private:
+        // LED-only Modbus-ASCII protocol (formerly base pure-virtuals; now owned
+        // here since only this subclass's ProcessTick calls them).
+        void WriteBin(int Addr, int Command, short Value);
+        void WriteColor(int Addr, short Value);
+        void ReadVersion(int Addr);
+        bool DoStartSetBin();
+        bool DoStartSetColor();
+        bool DoStartGetStatus();
+};
+//----------------------------------------------------------------------------
+// Concrete TFT protocol (HT-9011 graphic panel). 20-byte binary frames; richer
+// per-unit composition than LED. FRAMEWORK SKELETON: the frame builders and the
+// DoOnce/DoCycle composition are NOT yet ported -- see
+// docs/plan/bindisplay-led-tft-interface-design.md (phases T3/T4). Until then
+// ProcessTick is a safe no-op, so PanelType=1 selects a quiescent controller.
+//
+// Locked scope (user 2026-06-23): single serial chain (no CommBin2);
+// content = Bin number + "EA" + IC Count; magazine variants NOT ported.
+// T3 adds: CommBin(single)+iAddArrayTFT, A_Create_LRC, command_TFT_Input/
+// command_TFT_Font, ReadVersion_TFT, SetBackGround/SetFont*_TFT,
+// WriteBin/WriteBinWord/WriteEA/WriteCount_TFT, DoOnce/DoCycle(+TFT), InitialTask.
+//----------------------------------------------------------------------------
+class TMyBinDispTFT:public TMyBinDispCtrl
+{
+    public:
+        TMyBinDispTFT();
+        virtual int GetPanelKind(){return 1;}
+    protected:
+        // T4 will wire DoOnce/DoCycle here to call the builders below; today no-op.
+        virtual void ProcessTick();
+    private:
+        // HT9011 TFT high-address table per unit (0x20..), mirroring the LED
+        // Addr+32 high-address scheme. Single serial chain (base CommBin); the
+        // 9045 dual chain / CommBin2 is intentionally NOT ported.
+        int  iAddArrayTFT[Bin_MAX_NUM];
+        // 20-byte binary frame builders / per-field writers, ported 1:1 from
+        // HT9045 905.8. LRC reuses the base A_Create_LCR (== 9045 A_Create_LRC).
+        void ShowCommLog(char *cmd, int Address, AnsiString sFun);
+        void command_TFT_Input(char *cStr, int index, int iDisplabel, AnsiString sValue);
+        void command_TFT_Font(char *cStr, int index, int iDisplabel,
+                              Byte iXPos, Byte iYPos, Byte iWidth, Byte iHeigh,
+                              Byte iFontSize, Byte iFill, int iColor);
+        void ReadVersion_TFT(int index);
+        void SetBackGround_TFT(int index);
+        void SetNoBackGround_TFT(int index);
+        void SetFontBin_TFT(int index, int iColor, int iValue);
+        void SetFontBinWord_TFT(int index, int iColor, int iValue);
+        void SetFontEA_TFT(int index, int iColor, int iValue);
+        void SetFontCount_TFT(int index, int iColor, int iValue);
+        void WriteBin_TFT(int index, int ivalue);
+        void WriteBinWord_TFT(int index, int ivalue);
+        void WriteEA_TFT(int index, int ivalue);
+        void WriteCount_TFT(int index, int ivalue, int iCount);
 };
 //----------------------------------------------------------------------------
 #endif

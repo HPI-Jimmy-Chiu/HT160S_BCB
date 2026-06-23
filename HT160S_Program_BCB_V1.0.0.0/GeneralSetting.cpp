@@ -27,6 +27,8 @@ void THT160GeneralSetting::SetDefault()
 {
 	bColorBinAreaInstalled=false;
 	bUseAMR=false;
+	for(int z=0;z<9;z++)
+		iSimAmrMaxTray[z]=10;
 	bUseLotBinSortMode=false;
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=true;
@@ -38,6 +40,7 @@ void THT160GeneralSetting::SetDefault()
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
 	iBinDispBaud=9600;
+	iBinDispPanelType=0;
 	bBinDispLogVerbose=false;
 	iLogRetentionEventDays=365;   // EventLog, WebAPI : audit value, keep ~1 year
 	iLogRetentionCommDays=90;     // comm/diagnostic logs : high volume, keep 90d
@@ -64,6 +67,8 @@ void THT160GeneralSetting::Load()
 	Ini=new TIniFile(FileName);
 	bColorBinAreaInstalled=Ini->ReadBool("HardwareInstall", "ColorBinAreaInstalled", false);
 	bUseAMR=Ini->ReadBool("HardwareInstall", "UseAMR", false);
+	for(int z=0;z<9;z++)
+		iSimAmrMaxTray[z]=Ini->ReadInteger("SimAMR", "MaxTray"+IntToStr(z), 10);
 	bUseLotBinSortMode=Ini->ReadBool("SortMode", "UseLotBinMode", false);
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
@@ -75,6 +80,7 @@ void THT160GeneralSetting::Load()
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
 	iBinDispBaud=Ini->ReadInteger("BinDisplay", "Baud", 9600);
+	iBinDispPanelType=Ini->ReadInteger("BinDisplay", "PanelType", 0);
 	bBinDispLogVerbose=Ini->ReadBool("BinDisplay", "LogVerbose", false);
 	iLogRetentionEventDays=Ini->ReadInteger("LogRetention", "EventDays", 365);
 	iLogRetentionCommDays=Ini->ReadInteger("LogRetention", "CommDays", 90);
@@ -95,6 +101,8 @@ void THT160GeneralSetting::Save()
 	Ini=new TIniFile(FileName);
 	Ini->WriteBool("HardwareInstall", "ColorBinAreaInstalled", bColorBinAreaInstalled);
 	Ini->WriteBool("HardwareInstall", "UseAMR", bUseAMR);
+	for(int z=0;z<9;z++)
+		Ini->WriteInteger("SimAMR", "MaxTray"+IntToStr(z), iSimAmrMaxTray[z]);
 	Ini->WriteBool("SortMode", "UseLotBinMode", bUseLotBinSortMode);
 	for(int a=0;a<6;a++)
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);
@@ -106,6 +114,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);
 	Ini->WriteInteger("BinDisplay", "Baud", iBinDispBaud);
+	Ini->WriteInteger("BinDisplay", "PanelType", iBinDispPanelType);
 	Ini->WriteBool("BinDisplay", "LogVerbose", bBinDispLogVerbose);
 	Ini->WriteInteger("LogRetention", "EventDays", iLogRetentionEventDays);
 	Ini->WriteInteger("LogRetention", "CommDays", iLogRetentionCommDays);

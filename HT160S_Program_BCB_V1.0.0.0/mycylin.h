@@ -70,4 +70,16 @@ public:
 extern class TMyCylinder Cylinder[MaxCylinderItem];
 void InitialCylinderName();
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260623 : shared cylinder/sensor "ready" predicates,
+//  promoted from aAuto1To6.cpp so Empty/Loader/Auto share one definition.
+//  bSoftSimulate forces ready (sim build has no real IO).
+bool IsSensorOnReady(TMySensor *Sensor);
+bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate);
+//AI(HT160S-Maintainer) 20260623 : standardized dual-cylinder tray clamp
+//  (lean-stop first, push last). SettleTicks>0 adds settle+OnSensor confirm
+//  +Pop-on-miss; ==0 skips it. Returns 0=running, 1=clamped, 2=push miss.
+//  SubTask caller-owned (init 0); Delay caller-owned settle timer.
+int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
+                HTimer &Delay, bool bSoftSimulate, int SettleTicks);
+//---------------------------------------------------------------------------
 #endif

@@ -19,9 +19,51 @@
 #include "GeneralSetting.h"   // GeneralSetting.bUseAMR
 #include "aAuto1To6.h"        // AutoModule->GetAutoCar (TMyCar : iTrayCount/CarID/IsFull)
 //---------------------------------------------------------------------------
+#include "aLoader.h"          // LoaderModule (P1 infeed handoff)
+#include "aEmpty.h"           // EmptyModule  (P2 infeed handoff)
+#include "aColor.h"           // ColorModule  (P3 infeed handoff)
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 TAgvCoordinator AgvCoord;
+
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : P1-P3 (Loader/Empty/Color) infeed handoff dispatch. Each
+// infeed module owns its AMR state (bAmrLocked + sim tray count), mirroring how
+// TAutoModule owns the Auto side; these map a 0..2 station index to the module.
+static bool InfeedShortage(int p)
+{
+    if(p==0) return (LoaderModule!=NULL && LoaderModule->IsInputShortageForAmr());
+    if(p==1) return (EmptyModule!=NULL  && EmptyModule->IsInputShortageForAmr());
+    if(p==2) return (ColorModule!=NULL  && ColorModule->IsInputShortageForAmr());
+    return false;
+}
+static bool InfeedReady(int p)
+{
+    if(p==0) return (LoaderModule!=NULL && LoaderModule->IsReadyForAmrHandoff());
+    if(p==1) return (EmptyModule!=NULL  && EmptyModule->IsReadyForAmrHandoff());
+    if(p==2) return (ColorModule!=NULL  && ColorModule->IsReadyForAmrHandoff());
+    return false;
+}
+static bool InfeedFinished(int p)
+{
+    if(p==0) return (LoaderModule!=NULL && LoaderModule->IsInputHandoffFinishedForAmr());
+    if(p==1) return (EmptyModule!=NULL  && EmptyModule->IsInputHandoffFinishedForAmr());
+    if(p==2) return (ColorModule!=NULL  && ColorModule->IsInputHandoffFinishedForAmr());
+    return false;
+}
+static void InfeedSetLock(int p, bool bLock)
+{
+    if(p==0 && LoaderModule!=NULL) LoaderModule->SetAmrLock(bLock);
+    else if(p==1 && EmptyModule!=NULL) EmptyModule->SetAmrLock(bLock);
+    else if(p==2 && ColorModule!=NULL) ColorModule->SetAmrLock(bLock);
+}
+static void InfeedRefill(int p)
+{
+    if(p==0 && LoaderModule!=NULL) LoaderModule->RefillSimInfeed();
+    else if(p==1 && EmptyModule!=NULL) EmptyModule->RefillSimInfeed();
+    else if(p==2 && ColorModule!=NULL) ColorModule->RefillSimInfeed();
+}
+//---------------------------------------------------------------------------
 
 const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
 {
@@ -115,7 +157,14 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             }
         }
         for(int p = 0; p < 3; p++)
+        {
+            if(Handshake[p]!=AGV_IDLE)
+            {
+                InfeedSetLock(p, false);
+                Handshake[p] = AGV_IDLE;
+            }
             ShortageLatch[p] = 0;
+        }
         return;
     }
 
@@ -151,27 +200,24 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         }
     }
 
-    // --- P1-P3 : input shortage -> AGVSupplement (one-shot per shortage edge) ---
+    // --- P1-P3 : input shortage -> AGVSupplement (enter CALLED). Polarity: the input
+    // sensor reads ON=has tray, OFF=empty (user-confirmed 20260623 + draft section 9), so
+    // shortage = empty. IsInputShortageForAmr lives in the module (sim drains the tray
+    // count to 0; real reads SnX_Input(e)nd OFF). Mirrors the Auto full-call above.
     for(int p = 0; p < 3; p++)
     {
-        TMySensor *Sn = NULL;
-        if(p==0)      Sn = &HSys.Sen.SnLoader_Inputend;   // P1 Loader
-        else if(p==1) Sn = &HSys.Sen.SnEmpty_InputEnd;    // P2 EmptyTray
-        else          Sn = &HSys.Sen.SnColor_InputEnd;    // P3 ColorTray
-
-        bool bShort = (Sn!=NULL && Sn->Enable==true && Sn->IsOn());   // ON = shortage
-        if(bShort)
+        bool bShort = InfeedShortage(p);
+        if(bShort && Handshake[p]==AGV_IDLE)
         {
-            if(ShortageLatch[p]==0)
-            {
-                SupplementBitmap = BuildBitmap(AgvStation[p].PIndex);
-                Gem->EventReport(0, 272);   // CEID272 AGVSupplement
-                ShortageLatch[p] = 1;
-            }
+            SupplementBitmap = BuildBitmap(AgvStation[p].PIndex);
+            Gem->EventReport(0, 272);   // CEID272 AGVSupplement
+            Handshake[p] = AGV_CALLED;
+            ShortageLatch[p] = 1;       // kept for the FeederDecision snapshot
         }
-        else
+        else if(bShort==false && Handshake[p]==AGV_CALLED)
         {
-            ShortageLatch[p] = 0;           // refilled : re-arm
+            Handshake[p] = AGV_IDLE;    // refilled before the AGV engaged : re-arm
+            ShortageLatch[p] = 0;
         }
     }
 }
@@ -213,6 +259,35 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
             }
         }
     }
+
+    // --- P1-P3 : infeed handoff (CEID273 Ready / CEID274 Finish). Ready = the station's
+    // front stacking cylinders are home/idle (IsReadyForAmrHandoff), the BeginPrep lock
+    // holding them frozen through the handoff. Finish = refill complete (real: the input
+    // sensor reads a tray present; sim: auto-completes), then release + restock.
+    for(int p = 0; p < 3; p++)
+    {
+        if(Handshake[p]==AGV_PREP)
+        {
+            if(InfeedReady(p))
+            {
+                StatusBitmap = BuildBitmap(AgvStation[p].PIndex);
+                Gem->EventReport(0, 273);   // CEID273 AGVLDUnLDStatus (Ready)
+                Handshake[p] = AGV_READY;
+            }
+        }
+        else if(Handshake[p]==AGV_READY)
+        {
+            if(InfeedFinished(p))
+            {
+                FinishBitmap = BuildBitmap(AgvStation[p].PIndex);
+                Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish
+                InfeedSetLock(p, false);    // front destack may resume
+                InfeedRefill(p);            // sim : restock the input stack to max
+                Handshake[p] = AGV_IDLE;
+                ShortageLatch[p] = 0;
+            }
+        }
+    }
 }
 //---------------------------------------------------------------------------
 // Phase C : START_AGV(cpName) -> begin the station's AGV-handoff prep (AGV_PREP).
@@ -229,6 +304,8 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
     PrepDone[i]  = 0;
     if(AgvStation[i].Kind==ASK_AUTO && AutoModule!=NULL && AgvStation[i].AutoIndex>=0)
         AutoModule->SetAmrLock(AgvStation[i].AutoIndex, true);
+    else if(AgvStation[i].Kind!=ASK_AUTO && i < 3)
+        InfeedSetLock(i, true);   //AI(ht160s-agv) 20260623 : P1-P3 freeze front destack for the handoff
     return true;
 }
 //---------------------------------------------------------------------------
