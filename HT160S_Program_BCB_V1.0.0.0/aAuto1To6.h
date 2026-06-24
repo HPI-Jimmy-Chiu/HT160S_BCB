@@ -23,6 +23,7 @@ struct TAutoStationState
     bool bFrontHasTray;
     bool bFullIC;
     bool bCleanOutFinish;
+    bool bResidueClear;   //AI(ht160s-residue) 20260624 : place-residue cleared on target Auto (gate discharge / AMR leave)
 };
 //---------------------------------------------------------------------------
 class TAutoModule
@@ -53,6 +54,7 @@ private:
     int WorkingKind[6];   //AI(HT160S-Maintainer) 20260605 : AMR kind of tray now at the sort working position
     AnsiString RearTrayID[6];     //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the identity tray TrayArm placed at rear (from Color CCD)
     AnsiString WorkingTrayID[6];  //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray now at the working position
+    TMyTray RearGrid[6];          //AI(ht160s-tray-source) : per-cell grid TrayArm staged at rear (copied into working tray at DoFeedTray c7000)
     HTimer FeedDelay;
     HTimer DischargeDelay;
     HTimer CleanOutDelay;
@@ -92,10 +94,12 @@ public:
     int FindEmptyRearForTrayArm();
     bool IsRearHasTray(int Index);
     void SetRearHasTrayFromTrayArm(int Index, bool bHasTray);
+    void SetPlaceResidueClear(int Index, bool bClear);   //AI(ht160s-residue) 20260624 : SortArm reports place-residue result for the target Auto
     bool IsAllCleanOutFinish();  //AI(HT160S-Maintainer) 20260602 : expose for csystem CheckCleanOutFinish
     //AI(HT160S-Maintainer) 20260604 : stacking-car data containers for Auto1~6 (AMR pack source).
     TMyCar Car[6];
     TMyCar *GetAutoCar(int Index);          // NULL if out of range
+    int GetCarTrayCount(int Index);         //AI(ht160s-agv) 20260624 : trays stacked on the output car (PanelMain6 Motion View header); 0 if out of range
     //AI(ht160s-agv) 20260615 : AMR/AGV output-car-full test for the SECS AGVSupplement
     //  trigger. Real machine = the SnAutoX_InputFullTray sensor (IsOn); simulation =
     //  a logical tray threshold (AMR_FULL_TRAY_SIM). Distinct from TMyCar::IsFull()
@@ -105,6 +109,7 @@ public:
     //AI(HT160S-Maintainer) 20260605 : AMR stack-order support.
     int GetNextTrayKindForAuto(int Index);          // eTrayKind needed next, -1 if car full
     void NotifyTrayArmDelivered(int Index, int Kind, AnsiString TrayID); // TrayArm placed a tray of Kind (and identity 2D TrayID) at rear
+    void StageRearGrid(int Index, const TMyTray &Grid);   //AI(ht160s-tray-source) : TrayArm hands the carried grid to the rear staging slot (AMR + Normal)
     bool IsReadyForSortArmPlace(int Index);         // SortArm may fill working tray (Normal only in AMR)
     //AI(general) 20260608 : Stage1 demand API (Auto pulls trays on demand).
     //GetTrayRequest returns the eTrayKind this Auto wants at its rear now, or

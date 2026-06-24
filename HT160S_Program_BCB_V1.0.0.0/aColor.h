@@ -4,6 +4,7 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "HTimer.h"
+#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray SourceTray born at the 2D-read
 //---------------------------------------------------------------------------
 class TMyCylinder;
 //---------------------------------------------------------------------------
@@ -36,6 +37,7 @@ private:
     bool bTrayPicked;
     bool bSupplyRequested;
     AnsiString sTrayID2D;     //AI(HT160S-Maintainer) 20260608 : 2D code read from the supplied identity tray
+    TMyTray SourceTray;       //AI(ht160s-tray-source) : identity-tray grid born at 2D-read; Kind=Identity, TrayID=sTrayID2D
     HTimer SupplyDelay;
     HTimer ReleaseDelay;
     HTimer GoDownDelay;       //AI(HT160S-Maintainer) 20260608 : front separate settle delay
@@ -55,6 +57,7 @@ private:
     bool DoReleaseTray(int Flag);
     bool DoSortBin(int Flag);
     bool DoReadColor2D(int Flag);  //AI(HT160S-Maintainer) 20260608 : move CCD X, LON shot, read 2D, LOFF
+    void BirthIdentityTray();      //AI(ht160s-tray-source) : create identity-tray grid (Kind=Identity, TrayID=sTrayID2D)
 
 public:
     TColorModule();
@@ -84,7 +87,9 @@ public:
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
     void RefillSimInfeed();
+    int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the supply car (PanelMain6 Motion View header)
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting
+    TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the presented identity tray
 
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; Color has no production GoUp)
     bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, mirrors Empty)

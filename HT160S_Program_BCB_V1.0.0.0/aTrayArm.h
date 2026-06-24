@@ -4,6 +4,7 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "HTimer.h"
+#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray ArmTray carried grid (born at source)
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260605 : TrayArm single-axis transport arm. Picks an
 //empty tray and places it onto a target station, following the LoaderModule->
@@ -44,6 +45,7 @@ private:
     int iAutoTarget;
     int iDeliverKind;                  //AI(HT160S-Maintainer) 20260605 : eTrayKind being delivered this job (AMR)
     AnsiString iDeliverTrayID;         //AI(HT160S-Maintainer) 20260608 : 2D TrayID carried from Color for the identity tray
+    TMyTray ArmTray;                   //AI(ht160s-tray-source) : full per-cell grid carried by the arm (Empty/Color -> Auto)
     int PlaceDest;                     //AI(HT160S-Maintainer) 20260606 : eTrayArmPlaceDest for the current carry
     bool bCleanOutFinish;
     bool bTrayFeedFinish;
@@ -51,7 +53,6 @@ private:
     unsigned int dwZUpLostStart;       //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce (GetTickCount of first loss; 0=clear)
 
     bool IsSoftSimulate();
-    bool IsZUpAtPosition();            //AI(HT160S-Maintainer) 20260622 : canonical TrayArm X-move interlock (Z lift up-sensor lit)
     bool MoveTrayArmX(int Position);
     bool DoZUp();
     bool DoZDown();
@@ -73,6 +74,10 @@ public:
     int GetStatus();
     bool IsCleanOutFinish();
     bool IsTrayFeedFinish();
+    //AI(HT160S-Maintainer) 20260624 : public so Motor Test / Teach manual screens can gate TrayArm X
+    //move/jog on the SAME Z-up interlock as production (mirrors public SortArm AreAllSuckersHome).
+    //Pure sensor read, no side effects; returns true under SOFT_SIMULATE (dev build, no IO card).
+    bool IsZUpAtPosition();            //canonical TrayArm X-move interlock (Z lift up-sensor lit)
 };
 //---------------------------------------------------------------------------
 extern TTrayArmModule *TrayArmModule;

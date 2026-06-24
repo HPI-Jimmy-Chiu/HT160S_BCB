@@ -97,6 +97,13 @@ void TEmptyModule::RefillSimInfeed()
     iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[1];   // index 1 = Empty
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : trays currently on the Empty supply car (PanelMain6 header).
+//Sim drains per GoDown; real machine sensor-driven (count not maintained, reads max).
+int TEmptyModule::GetCarTrayCount()
+{
+    return iSimInfeedCount;
+}
+//---------------------------------------------------------------------------
 void TEmptyModule::RefreshStateFromSensors()
 {
     //AI(HT160S-Maintainer) 20260622 : in SOFT_SIMULATE / real-machine DUMMY mode there are no
@@ -134,7 +141,15 @@ void TEmptyModule::RefreshStateFromSensors()
     }
 
     if(bHasRearSensor)
+    {
+        //AI(ht160s-tray-source) : in REALLY mode a tray can latch present from the sensor
+        //without the DoFeedTray birth running (tray already at rear on startup/recovery).
+        //Birth the grid on the false->true edge so TrayArm always carries a born EMPTY_IC/Normal
+        //grid, never a stale SourceTray. (sim/dummy already returned above.)
+        if(bRearHasTray==false && bRearState)
+            BirthRearTray();
         bRearHasTray=bRearState;
+    }
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::MoveEmptyY(int Position)
@@ -321,6 +336,7 @@ bool TEmptyModule::DoFeedTray(int Flag)
             {
                 bRearHasTray=true;
                 bBottomHasTray=true;
+                BirthRearTray();   //AI(ht160s-tray-source) : born here (rear empty tray content)
                 FeedTask=13000;
             }
             break;
@@ -342,6 +358,7 @@ bool TEmptyModule::DoFeedTray(int Flag)
             {
                 bRearHasTray=true;
                 bBottomHasTray=false;
+                BirthRearTray();   //AI(ht160s-tray-source) : born here (rear empty tray content)
                 FeedTask=13000;
             }
             break;
@@ -350,6 +367,24 @@ bool TEmptyModule::DoFeedTray(int Flag)
             return true;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : create the rear empty tray's per-cell grid at the 'has tray'
+//latch. EMPTY_IC content, Kind=Normal, no TrayID. Hangs off the action latch (NOT a
+//sensor read), so it advances in DUMMY/sim exactly like the bRearHasTray latch it follows.
+void TEmptyModule::BirthRearTray()
+{
+    SourceTray.SetAll(EMPTY_IC);
+    SourceTray.ClearBin();
+    SourceTray.ClearLotCode();
+    SourceTray.SetKind(eTrayKindNormal);
+    SourceTray.TrayID="";
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm.
+TMyTray TEmptyModule::GetSourceTray()
+{
+    return SourceTray;
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::DoGoDownTray(int Flag)

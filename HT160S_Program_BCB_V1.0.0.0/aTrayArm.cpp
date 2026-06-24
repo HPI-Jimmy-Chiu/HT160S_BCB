@@ -59,6 +59,7 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     iAutoTarget=-1;
     iDeliverKind=eTrayKindNormal;
     iDeliverTrayID="";
+    ArmTray.Clear();   //AI(ht160s-tray-source) : drop carried grid when material is not kept across home
     PlaceDest=TAPLACE_AUTO;
 }
 //---------------------------------------------------------------------------
@@ -350,6 +351,7 @@ bool TTrayArmModule::DoPick(int Flag)
                 //free so it can feed/discharge the next tray.
                 if(LoaderModule!=NULL)
                     LoaderModule->NotifyTrayArmPickRearTray();
+                ArmTray.Clear();   //AI(ht160s-tray-source) : Loader has no source grid yet (Phase 6); carry a clean empty/Normal grid by intent, not by stale ArmTray
             }
             else if(IsPickFromColor())
             {
@@ -358,13 +360,17 @@ bool TTrayArmModule::DoPick(int Flag)
                 if(ColorModule!=NULL)
                 {
                     iDeliverTrayID=ColorModule->GetTrayID();
+                    ArmTray=ColorModule->GetSourceTray();   //AI(ht160s-tray-source) : carry identity-tray grid before release
                     ColorModule->NotifyTrayPicked();
                 }
             }
             else
             {
                 if(EmptyModule!=NULL)
+                {
+                    ArmTray=EmptyModule->GetSourceTray();   //AI(ht160s-tray-source) : carry EMPTY_IC/Normal grid before release
                     EmptyModule->SetRearHasTray(false);
+                }
             }
             if(HSys.VMot.MMTrayArmX!=NULL)
                 HSys.VMot.MMTrayArmX->fHasTray=true;
@@ -431,6 +437,11 @@ bool TTrayArmModule::DoPlace(int Flag)
         case 4000:
             if(AutoModule!=NULL && iAutoTarget>=0)
             {
+                //AI(ht160s-tray-source) : hand the carried grid to the Auto rear staging
+                //slot for BOTH AMR and Normal. The Auto copies RearGrid into the working
+                //tray at DoFeedTray case 7000; tray occupancy (fHasTray) is owned THERE,
+                //not here. Setting fHasTray now would flip bCarHasTray and starve FindFeedAuto.
+                AutoModule->StageRearGrid(iAutoTarget, ArmTray);
                 if(Job==TAJOB_AMR_SUPPLY)
                     //AI(HT160S-Maintainer) 20260605 : record the delivered tray's stack
                     //role so the Auto knows identity/cover trays must NOT receive IC.
@@ -440,6 +451,7 @@ bool TTrayArmModule::DoPlace(int Flag)
                 else
                     AutoModule->SetRearHasTrayFromTrayArm(iAutoTarget, true);
             }
+            ArmTray.Clear();   //AI(ht160s-tray-source) : arm is now empty
             if(HSys.VMot.MMTrayArmX!=NULL)
                 HSys.VMot.MMTrayArmX->fHasTray=false;
             bHasTray=false;
@@ -554,6 +566,7 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
             //the rear as having a tray, so it re-enters the supply pool).
             if(EmptyModule!=NULL)
                 EmptyModule->NotifyTrayXToEmptyFinish();
+            ArmTray.Clear();   //AI(ht160s-tray-source) : arm empty after recycle-to-Empty (parity with Auto place path)
             if(HSys.VMot.MMTrayArmX!=NULL)
                 HSys.VMot.MMTrayArmX->fHasTray=false;
             bHasTray=false;

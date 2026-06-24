@@ -96,6 +96,13 @@ void TColorModule::RefillSimInfeed()
     iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[2];
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : trays currently on the Color supply car (PanelMain6 header).
+//Sim drains per destack; real machine sensor-driven (count not maintained, reads max).
+int TColorModule::GetCarTrayCount()
+{
+    return iSimInfeedCount;
+}
+//---------------------------------------------------------------------------
 bool TColorModule::IsSoftSimulate()
 {
     #ifdef SOFT_SIMULATE
@@ -474,7 +481,7 @@ bool TColorModule::DoSupplyTray(int Flag)
 
         case 900:
             //AI(HT160S-Maintainer) 20260608 : drive Color 2D CCD (LON/read/LOFF).
-            //sTrayID2D filled by DoReadColor2D; empty when simulated or SKIPped.
+            //sTrayID2D filled by DoReadColor2D; a COLOR2D_ id when simulated/disabled, empty only on SKIP.
             if(DoReadColor2D(1))
                 SupplyTask=950;
             break;
@@ -512,20 +519,14 @@ bool TColorModule::DoReadColor2D(int Flag)
     switch(ScanTask)
     {
         case 1:
-            //Offline / sim : no real Color CCD, fabricate a TrayID so the AMR
-            //pull flow runs without a camera; cbEnableSimulation fakes too.
-            if(IsSoftSimulate() || tSimuData.bRunSimulation)
+            //AI(HT160S-Maintainer) 20260624 : per-CCD Enable. No real Color CCD scan
+            //in a sim tier OR when disabled -> fabricate a TrayID so the AMR pull
+            //flow keeps running. Enable=OFF now yields SIM data (was empty string).
+            //DUMMY always sim; HAS_TRAY/REALLY real-scan when bUseColorCcd, else sim.
+            if(IsSoftSimulate() || tSimuData.bRunSimulation || CosFunction.bUseColorCcd==false)
             {
                 sTrayID2D=AnsiString("COLOR2D_")+Now().FormatString("hhnnsszzz");
-                return true;
-            }
-            //AI(HT160S-Maintainer) 20260612 : gate the Color CCD connect/shot
-            //trigger on CosFunction.bUseColorCcd ([ColorCCD] Enable), mirroring how
-            //aLoader gates the Top CCD on CosFunction.bUse2DBinMap. When disabled,
-            //skip the camera and report no 2D code so the supply flow continues.
-            if(CosFunction.bUseColorCcd==false)
-            {
-                sTrayID2D="";
+                BirthIdentityTray();   //AI(ht160s-tray-source) : born here (sim/disabled identity)
                 return true;
             }
             EnsureColorCcdSocketCreated();
@@ -558,6 +559,7 @@ bool TColorModule::DoReadColor2D(int Flag)
                 if(Ret==K_SKIP)
                 {
                     sTrayID2D="";
+                    BirthIdentityTray();   //AI(ht160s-tray-source) : born here (skip; identity tray, empty 2D)
                     return true;
                 }
                 EnsureColorCcdSocketCreated();
@@ -579,6 +581,7 @@ bool TColorModule::DoReadColor2D(int Flag)
                     sTrayID2D=sCode;
                     if(ColorCcdSocket!=NULL)
                         ColorCcdSocket->ColorCcdEndShot();   //LOFF : end shot
+                    BirthIdentityTray();   //AI(ht160s-tray-source) : born here (real 2D read)
                     return true;
                 }
                 else if(ScanDelay.Off())
@@ -596,6 +599,7 @@ bool TColorModule::DoReadColor2D(int Flag)
                     else
                     {
                         sTrayID2D="";
+                        BirthIdentityTray();   //AI(ht160s-tray-source) : born here (skip; identity tray, empty 2D)
                         return true;
                     }
                 }
@@ -603,6 +607,25 @@ bool TColorModule::DoReadColor2D(int Flag)
             break;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : create the identity tray's per-cell grid. Identity trays carry
+//no IC, so the grid is all-empty; Kind=Identity and TrayID=sTrayID2D (the 2D code IS the
+//identity). The scalar iDeliverKind/iDeliverTrayID path stays the routing source of truth;
+//this grid is the carried-with-the-tray copy (redundant-but-consistent).
+void TColorModule::BirthIdentityTray()
+{
+    SourceTray.SetAll(EMPTY_IC);
+    SourceTray.ClearBin();
+    SourceTray.ClearLotCode();
+    SourceTray.SetKind(eTrayKindIdentity);
+    SourceTray.TrayID=sTrayID2D;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : return-by-value deep copy of the presented identity tray.
+TMyTray TColorModule::GetSourceTray()
+{
+    return SourceTray;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::DoReleaseTray(int Flag)

@@ -13,6 +13,7 @@ EXE/
 # BCB/IDE temporary and backup files
 *.~*
 *.bak
+*.bak_*
 *.ddp
 *.dsk
 

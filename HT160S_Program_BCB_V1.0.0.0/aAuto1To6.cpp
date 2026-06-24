@@ -70,6 +70,7 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         TrayMotor=GetAutoVMotor(Index);
         State[Index].bCarHasTray=(TrayMotor!=NULL && TrayMotor->fHasTray);
         State[Index].bCleanOutFinish=false;
+        State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : clear place-residue gate on home/init
         bCleanOutCheck[Index]=false;
         bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
         //AI(HT160S-Maintainer) 20260612 : on a recoverable home keep the car stack + its
@@ -86,6 +87,7 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         WorkingKind[Index]=eTrayKindNormal;  //AI(HT160S-Maintainer) 20260605 : AMR reset
         RearTrayID[Index]="";                //AI(HT160S-Maintainer) 20260608 : AMR 2D TrayID reset
         WorkingTrayID[Index]="";             //AI(HT160S-Maintainer) 20260608 : AMR 2D TrayID reset
+        RearGrid[Index].Clear();             //AI(ht160s-tray-source) : cleared rear => cleared staged grid (sensor re-latch must not feed a stale grid)
         //AI(HT160S-Maintainer) 20260604 : reset stacking-car data + roles
         Car[Index].Clear();
         InitAutoCarStack(Index);
@@ -396,7 +398,7 @@ int TAutoModule::FindDischargeAuto()
         //handoff (FrontRise stays home; any in-flight discharge still finishes via DoAuto).
         if(bAmrLocked[Index])
             continue;
-        if(State[Index].bFullIC)
+        if(State[Index].bFullIC && State[Index].bResidueClear)
             return Index;
     }
     return -1;
@@ -523,8 +525,13 @@ bool TAutoModule::DoFeedTray(int Flag)
             TrayMotor=GetAutoVMotor(iFeedAuto);
             if(TrayMotor!=NULL)
             {
+                //AI(ht160s-tray-source) : receive the grid TrayArm staged at rear (born at
+                //Empty/Color) instead of fabricating a fresh EMPTY_IC tray here. DoFeedTray
+                //only PROMOTES rear->working; occupancy (fHasTray) is owned here. RearGrid is
+                //default EMPTY_IC/Normal if a feed ever runs without a staged delivery.
+                TrayMotor->Tray=RearGrid[iFeedAuto];
                 TrayMotor->fHasTray=true;
-                TrayMotor->InitNewTray(EMPTY_IC);
+                TrayMotor->Refresh();   //AI(ht160s-tray-source) : InitNewTray used to Refresh; keep MotionView in sync
             }
             State[iFeedAuto].bCarHasTray=true;
             State[iFeedAuto].bRearHasTray=false;
@@ -598,9 +605,11 @@ bool TAutoModule::DoDischargeTray(int Flag)
                     TrayMotor->fHasTray=false;
                 }
                 State[iDischargeAuto].bFullIC=false;
+                State[iDischargeAuto].bResidueClear=true;   //AI(ht160s-residue) 20260624 : fresh tray on discharge
                 State[iDischargeAuto].bCarHasTray=false;
                 State[iDischargeAuto].bRearHasTray=false;
                 bRearDeliveredPending[iDischargeAuto]=false;  //AI(general) 20260608 : Stage0 latch clear
+                RearGrid[iDischargeAuto].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
                 State[iDischargeAuto].bFrontHasTray=true;
                 if(HGem!=NULL)
                     HGem->EventReport(1, AutoCeid[iDischargeAuto]);
@@ -783,6 +792,7 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                 State[Index].bRearHasTray=false;
                 State[Index].bRearCanUse=false;
                 bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 latch clear
+                RearGrid[Index].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
                 State[Index].bFrontHasTray=false;
                 State[Index].bFullIC=false;
                 State[Index].bCleanOutFinish=true;
@@ -812,6 +822,15 @@ TMyCar *TAutoModule::GetAutoCar(int Index)
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return NULL;
     return &Car[Index];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : trays stacked on the Auto output car (PanelMain6 header).
+//Grows on DoFeedTray; maintained in both sim and real (book-keeping, not sensor).
+int TAutoModule::GetCarTrayCount(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return 0;
+    return Car[Index].iTrayCount;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-motion-view) 20260618 : 2D TrayID now at the working position, for the
@@ -914,6 +933,17 @@ void TAutoModule::NotifyTrayArmDelivered(int Index, int Kind, AnsiString TrayID)
     bRearDeliveredPending[Index]=true;  //AI(general) 20260608 : Stage0 latch
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : TrayArm hands the carried grid to the Auto rear staging slot.
+//Called for BOTH AMR and Normal placements (just before NotifyTrayArmDelivered /
+//SetRearHasTrayFromTrayArm). DoFeedTray case 7000 copies RearGrid into the working tray.
+//Occupancy (fHasTray) is NOT set here, so FindFeedAuto can still feed this station.
+void TAutoModule::StageRearGrid(int Index, const TMyTray &Grid)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return;
+    RearGrid[Index]=Grid;
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260605 : SortArm fill gate. In Normal mode every working
 //   tray may receive IC. In AMR mode only a normal-kind working tray may : identity
 //   and cover trays carry no IC and must reach the stack untouched.
@@ -938,6 +968,13 @@ bool TAutoModule::IsOutputCarFullForAmr(int Index)
         return (Car[Index].iTrayCount >= GeneralSetting.iSimAmrMaxTray[3+Index]);
     TMySensor *FullSensor=GetInputFullTray(Index);
     return (FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
+}
+//---------------------------------------------------------------------------
+void TAutoModule::SetPlaceResidueClear(int Index, bool bClear)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return;
+    State[Index].bResidueClear=bClear;   //AI(ht160s-residue) 20260624 : SortArm place-residue result for the target Auto (gate discharge / AMR leave)
 }
 //---------------------------------------------------------------------------
 void TAutoModule::SetAmrLock(int Index, bool bLock)
@@ -970,6 +1007,7 @@ bool TAutoModule::IsDrainedForAmr(int Index)
             && !State[Index].bRearHasTray
             && !bRearDeliveredPending[Index]
             && !State[Index].bFullIC
+            && State[Index].bResidueClear
             && bFrontHome);
 }
 //---------------------------------------------------------------------------
@@ -999,6 +1037,7 @@ void TAutoModule::ClearAmrCar(int Index)
     Car[Index].Clear();
     InitAutoCarStack(Index);
     bAmrLocked[Index]=false;
+    State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : fresh car on AGV finish
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-state-record-analysis) 20260616 : read-only state + working-tray cell
