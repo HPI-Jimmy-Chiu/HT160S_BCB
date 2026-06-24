@@ -66,6 +66,8 @@ private:
     int GetTrayYCount();
     double GetTrayXPitch();
     double GetTrayYPitch();
+    double GetTrayXStart();   //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset (P2 HT172-align)
+    double GetTrayYStart();
     int GetLoaderFeedY(int LoaderNo);
     int GetLoaderDischargeY(int LoaderNo);
     int GetLoaderFirstCcdY(int LoaderNo);
@@ -75,7 +77,6 @@ private:
     bool MoveLoaderY(int LoaderNo, int Position);
     bool MoveTopCcdX(int Position);
     bool MoveToCcdCell(int LoaderNo, int CellX, int CellY);
-    bool IsLoaderYMoveSafe(int LoaderNo, int Position);   //AI(HT160S-Maintainer) 20260610 : cross-side safe-distance interlock
     bool IsOutputBottomOccupied();
     bool IsRearOccupied();
     void RefreshRearState();
@@ -99,6 +100,7 @@ public:
     bool IsRearHasTray();
     void SetCurrentLotNumber(AnsiString Lot);
     bool IsLoaderReadyForSort(int LoaderNo);
+    bool IsLoaderYMoveSafe(int LoaderNo, int Position);   //AI(ht160s-sortarm) 20260624 : public so SortArm's shared-rail Loader-Y move reuses this canonical cross-side gap interlock (was private)
     int GetSortingLoaderNo();
     int GetLoaderStatus(int LoaderNo);
     bool AcquireSortOwner(int LoaderNo);
@@ -113,6 +115,7 @@ public:
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
     void RefillSimInfeed();
+    int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the shared supply car (PanelMain6 Motion View header)
     bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
 
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; shared destacker, no LoaderNo)

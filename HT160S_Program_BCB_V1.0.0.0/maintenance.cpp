@@ -15,6 +15,8 @@
 #include "iosetview.h"
 #include "uteach.h"
 #include "uMotorTest.h"
+#include "uQwertyKey.h"
+#include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : account book + level gating
 #include "mymessbox.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : ShowSecsGemLog
 //---------------------------------------------------------------------------
@@ -320,6 +322,16 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     }
 
     bLoadingHardwareSettings=false;
+    bPasswordUiBuilt=false;
+    lbPwUsers=NULL;
+    edPwId=NULL;
+    edPwPass=NULL;
+    cbbPwLevel=NULL;
+    btnPwAddUpdate=NULL;
+    btnPwDelete=NULL;
+    btnPwSave=NULL;
+    btnPwReload=NULL;
+    labPwHint=NULL;
     RegisterMaintenancePages();
     LayoutMaintenanceButtons();
     InitializeTowerLightPanels();
@@ -368,11 +380,14 @@ void __fastcall TfMaintenance::LoadTopCcdSettings()
             edTopCcdIP->Text=Ini->ReadString("TopCCD", "Address", "172.16.8.89");
         if(edTopCcdPort!=NULL)
             edTopCcdPort->Text=IntToStr(Ini->ReadInteger("TopCCD", "Port", 5001));
+        if(chkTopCcdEnable!=NULL)
+            chkTopCcdEnable->Checked=Ini->ReadBool("TopCCD", "Enable", true);
     }
     __finally
     {
         delete Ini;
     }
+    CosFunction.bUseTopCcd=(chkTopCcdEnable!=NULL) ? chkTopCcdEnable->Checked : true;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::SaveTopCcdSettings()
@@ -396,6 +411,7 @@ void __fastcall TfMaintenance::SaveTopCcdSettings()
     {
         Ini->WriteString("TopCCD", "Address", Address);
         Ini->WriteInteger("TopCCD", "Port", Port);
+        Ini->WriteBool("TopCCD", "Enable", (chkTopCcdEnable!=NULL) ? chkTopCcdEnable->Checked : true);
     }
     __finally
     {
@@ -410,6 +426,7 @@ void __fastcall TfMaintenance::SaveTopCcdSettings()
     EnsureTopCcdSocketCreated();
     if(TopCcdSocket!=NULL)
         TopCcdSocket->SetEndpoint(Address, Port);
+    CosFunction.bUseTopCcd=(chkTopCcdEnable!=NULL) ? chkTopCcdEnable->Checked : true;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RefreshTopCcdStatus()
@@ -688,6 +705,29 @@ void __fastcall TfMaintenance::btnColorCcdShotClick(TObject *Sender)
         }
     }
     RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkTopCcdEnableClick(TObject *Sender)
+{
+    (void)Sender;
+    //AI(HT160S-Maintainer) 20260624 : per-CCD Enable. Persists to [TopCCD] Enable
+    //and drives CosFunction.bUseTopCcd. OFF -> aLoader feeds simulated Top CCD 2D
+    //codes instead of polling the camera (REALLY only; HAS_TRAY/DUMMY always sim).
+    SaveTopCcdSettings();
+    EnsureTopCcdSocketCreated();
+    if(chkTopCcdEnable!=NULL && chkTopCcdEnable->Checked)
+    {
+        if(TopCcdSocket!=NULL)
+            TopCcdSocket->TopCcdConnect();
+        AddTopCcdLog("Enable Top CCD -> connect");
+    }
+    else
+    {
+        if(TopCcdSocket!=NULL)
+            TopCcdSocket->TopCcdDisconnect();
+        AddTopCcdLog("Disable Top CCD -> use simulated 2D");
+    }
+    RefreshTopCcdStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkColorCcdEnableClick(TObject *Sender)
@@ -981,6 +1021,10 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         if(idx<0 || idx>1) idx=0;
         cbBinPanelType->ItemIndex=idx;
     }
+    if(cbCommType!=NULL)
+        cbCommType->Checked=GeneralSetting.bBinDispUseMyComm;
+    if(chkUseTrayDatumModel!=NULL)
+        chkUseTrayDatumModel->Checked=GeneralSetting.bUseTrayDatumModel;
     if(chkUseLotBinMode!=NULL)
         chkUseLotBinMode->Checked=GeneralSetting.bUseLotBinSortMode;
     {
@@ -1001,6 +1045,15 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
             if(SuckChk[s]!=NULL)
                 SuckChk[s]->Checked=GeneralSetting.bSuckerEnabled[s];
     }
+    //AI(ht160s-maintainer) 20260624 : Loader safe distance is stored as 1/100mm
+    //(teach/encoder domain) but edited in mm; show mm = stored/100. Existing
+    //below-range configs are displayed verbatim; only an operator re-save changes them.
+    if(edLoaderSafeDistance!=NULL)
+    {
+        AnsiString S;
+        S.sprintf("%.2f", (double)GeneralSetting.iLoaderYSafeDistance/100.0);
+        edLoaderSafeDistance->Text=S;
+    }
     bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
@@ -1018,6 +1071,10 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         if(idx<0) idx=0;
         GeneralSetting.iBinDispPanelType=idx;
     }
+    if(cbCommType!=NULL)
+        GeneralSetting.bBinDispUseMyComm=cbCommType->Checked;
+    if(chkUseTrayDatumModel!=NULL)
+        GeneralSetting.bUseTrayDatumModel=chkUseTrayDatumModel->Checked;
     if(chkUseLotBinMode!=NULL)
         GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
     {
@@ -1375,6 +1432,8 @@ void __fastcall TfMaintenance::SelectMaintenancePage(int PageIndex)
         return;
 
     pcMaintenance->ActivePage=MenuPages[PageIndex];
+    if(MenuPages[PageIndex]==tsMaintPassword)
+        ShowPasswordPage();   //AI(ht160s-password) 20260624 : build-once + refresh + level lock
     pnlTitle->Caption=MenuPages[PageIndex]->Caption;
     MenuButtons[PageIndex]->Down=true;
     LastClickButton=MenuButtons[PageIndex];
@@ -1796,3 +1855,289 @@ void __fastcall TfMaintenance::chkSuckEnableClick(TObject *Sender)
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260624 : Loader safe distance = minimum separation
+//between the two Loader-Y cars, consumed live by aLoader IsLoaderYMoveSafe.
+//Stored as 1/100mm in GeneralSetting.iLoaderYSafeDistance to match the teach/
+//encoder domain; operator edits in mm. Entry is via the on-screen keypad
+//(fQwertyKey), which clamps to 325..650 mm on OK; a YES/NO confirm gates the
+//save and the value persists live (mirrors the sucker-enable handler). The
+//redundant clamp below is a no-op safety net on the operator path only - it is
+//deliberately NOT placed in SaveHardwareSettings, so existing below-range
+//configs are never silently bumped on form close.
+void __fastcall TfMaintenance::edLoaderSafeDistanceClick(TObject *Sender)
+{
+    double mm;
+    int v;
+    AnsiString S;
+
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(edLoaderSafeDistance==NULL || fQwertyKey==NULL)
+        return;
+    if(fQwertyKey->ShowQwertyKey(edLoaderSafeDistance, N_DOUBLE, 2, true, 325.0, 650.0, "Loader Safe Distance (mm)")==false)
+        return;
+    if(ShowMyMessageBox_YES_NO("Save Loader safe distance?")!=1)
+    {
+        S.sprintf("%.2f", (double)GeneralSetting.iLoaderYSafeDistance/100.0);
+        edLoaderSafeDistance->Text=S;
+        return;
+    }
+    mm=atof(edLoaderSafeDistance->Text.c_str());
+    if(mm<325.0)
+        mm=325.0;
+    if(mm>650.0)
+        mm=650.0;
+    v=(int)(mm*100.0+0.5);
+    GeneralSetting.iLoaderYSafeDistance=v;
+    GeneralSetting.Save();
+    S.sprintf("%.2f", (double)v/100.0);
+    edLoaderSafeDistance->Text=S;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-password) 20260624 : tsMaintPassword account management UI. Built in
+// code (not the DFM) so the form designer cannot strip it and the OnClick
+// handlers stay private. Accounts live in THT160UserRoleManager;
+// SavePassword()/ReadPassword() persist system\login.txt.
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::BuildPasswordUI()
+{
+    int i;
+    TLabel *lab;
+
+    if(bPasswordUiBuilt || tsMaintPassword==NULL)
+        return;
+    bPasswordUiBuilt=true;
+
+    labPwHint=new TLabel(this);
+    labPwHint->Parent=tsMaintPassword;
+    labPwHint->SetBounds(16, 12, 720, 20);
+    labPwHint->Caption="Accounts: ID / password / level 0-3. Stored in system\\login.txt.";
+
+    lbPwUsers=new TListBox(this);
+    lbPwUsers->Parent=tsMaintPassword;
+    lbPwUsers->SetBounds(16, 44, 380, 320);
+    lbPwUsers->Font->Name="Courier New";
+    lbPwUsers->OnClick=PwListClick;
+
+    lab=new TLabel(this);
+    lab->Parent=tsMaintPassword;
+    lab->SetBounds(420, 50, 120, 20);
+    lab->Caption="Account ID";
+
+    edPwId=new TEdit(this);
+    edPwId->Parent=tsMaintPassword;
+    edPwId->SetBounds(420, 72, 240, 28);
+    edPwId->ReadOnly=true;
+    edPwId->OnClick=PwIdClick;
+
+    lab=new TLabel(this);
+    lab->Parent=tsMaintPassword;
+    lab->SetBounds(420, 110, 120, 20);
+    lab->Caption="Password";
+
+    edPwPass=new TEdit(this);
+    edPwPass->Parent=tsMaintPassword;
+    edPwPass->SetBounds(420, 132, 240, 28);
+    edPwPass->PasswordChar='*';
+    edPwPass->ReadOnly=true;
+    edPwPass->OnClick=PwPassClick;
+
+    lab=new TLabel(this);
+    lab->Parent=tsMaintPassword;
+    lab->SetBounds(420, 170, 120, 20);
+    lab->Caption="Level";
+
+    cbbPwLevel=new TComboBox(this);
+    cbbPwLevel->Parent=tsMaintPassword;
+    cbbPwLevel->SetBounds(420, 192, 240, 28);
+    cbbPwLevel->Style=csDropDownList;
+    for(i=ROLE_OPERATION; i<=ROLE_HONPREC; i++)
+        cbbPwLevel->Items->Add(IntToStr(i)+" - "+THT160UserRoleManager::GetLevelName(i));
+    cbbPwLevel->ItemIndex=ROLE_OPERATION;
+
+    btnPwAddUpdate=new TButton(this);
+    btnPwAddUpdate->Parent=tsMaintPassword;
+    btnPwAddUpdate->SetBounds(420, 240, 150, 40);
+    btnPwAddUpdate->Caption="Add / Update";
+    btnPwAddUpdate->OnClick=PwAddUpdateClick;
+
+    btnPwDelete=new TButton(this);
+    btnPwDelete->Parent=tsMaintPassword;
+    btnPwDelete->SetBounds(580, 240, 110, 40);
+    btnPwDelete->Caption="Delete";
+    btnPwDelete->OnClick=PwDeleteClick;
+
+    btnPwSave=new TButton(this);
+    btnPwSave->Parent=tsMaintPassword;
+    btnPwSave->SetBounds(420, 296, 150, 40);
+    btnPwSave->Caption="Save to File";
+    btnPwSave->OnClick=PwSaveClick;
+
+    btnPwReload=new TButton(this);
+    btnPwReload->Parent=tsMaintPassword;
+    btnPwReload->SetBounds(580, 296, 110, 40);
+    btnPwReload->Caption="Reload";
+    btnPwReload->OnClick=PwReloadClick;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::ShowPasswordPage()
+{
+    bool bCanEdit;
+
+    BuildPasswordUI();
+    RefreshPasswordGrid();
+
+    bCanEdit=UserRoleManager.HasLevel(ROLE_ENGINEER);
+    if(edPwId!=NULL)         edPwId->Enabled=bCanEdit;
+    if(edPwPass!=NULL)       edPwPass->Enabled=bCanEdit;
+    if(cbbPwLevel!=NULL)     cbbPwLevel->Enabled=bCanEdit;
+    if(btnPwAddUpdate!=NULL) btnPwAddUpdate->Enabled=bCanEdit;
+    if(btnPwDelete!=NULL)    btnPwDelete->Enabled=bCanEdit;
+    if(btnPwSave!=NULL)      btnPwSave->Enabled=bCanEdit;
+    if(btnPwReload!=NULL)    btnPwReload->Enabled=bCanEdit;
+    if(labPwHint!=NULL)
+    {
+        if(bCanEdit)
+            labPwHint->Caption="Accounts: ID / password / level 0-3. Stored in system\\login.txt.";
+        else
+            labPwHint->Caption="View only. Engineer level (2) or above is required to edit.";
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshPasswordGrid()
+{
+    int i;
+    AnsiString Line;
+
+    if(lbPwUsers==NULL)
+        return;
+
+    lbPwUsers->Items->BeginUpdate();
+    try
+    {
+        lbPwUsers->Items->Clear();
+        for(i=0; i<UserRoleManager.GetUserCount(); i++)
+        {
+            Line=UserRoleManager.GetUserID(i);
+            while(Line.Length()<16)
+                Line=Line+" ";
+            Line=Line+"  Lv"+IntToStr(UserRoleManager.GetUserLevel(i))+" "+
+                 THT160UserRoleManager::GetLevelName(UserRoleManager.GetUserLevel(i));
+            lbPwUsers->Items->Add(Line);
+        }
+    }
+    __finally
+    {
+        lbPwUsers->Items->EndUpdate();
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwListClick(TObject *Sender)
+{
+    int idx;
+
+    (void)Sender;
+    if(lbPwUsers==NULL || edPwId==NULL || cbbPwLevel==NULL)
+        return;
+    idx=lbPwUsers->ItemIndex;
+    if(idx<0 || idx>=UserRoleManager.GetUserCount())
+        return;
+    edPwId->Text=UserRoleManager.GetUserID(idx);
+    cbbPwLevel->ItemIndex=UserRoleManager.GetUserLevel(idx);
+    if(edPwPass!=NULL)
+        edPwPass->Text="";
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwIdClick(TObject *Sender)
+{
+    (void)Sender;
+    if(edPwId==NULL || fQwertyKey==NULL || edPwId->Enabled==false)
+        return;
+    fQwertyKey->ShowQwertyKey(edPwId, N_NO_SPACE, 0, false, 0, 0, "Account ID");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
+{
+    (void)Sender;
+    if(edPwPass==NULL || fQwertyKey==NULL || edPwPass->Enabled==false)
+        return;
+    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE, 0, false, 0, 0, "Password");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
+{
+    AnsiString sID, sPass;
+    int iLevel;
+
+    (void)Sender;
+    if(edPwId==NULL || edPwPass==NULL || cbbPwLevel==NULL)
+        return;
+    sID=edPwId->Text.Trim();
+    sPass=edPwPass->Text;
+    iLevel=cbbPwLevel->ItemIndex;
+    if(sID==AnsiString(""))
+    {
+        ShowMyMessage("Please enter an account ID.");
+        return;
+    }
+    if(sPass==AnsiString(""))
+    {
+        ShowMyMessage("Please enter a password.");
+        return;
+    }
+    if(!UserRoleManager.IsValidLevel(iLevel))
+    {
+        ShowMyMessage("Please select a level (0-3).");
+        return;
+    }
+    if(UserRoleManager.AddOrUpdateUser(sID, sPass, iLevel)==false)
+    {
+        ShowMyMessage("Account table is full (max 30).");
+        return;
+    }
+    edPwPass->Text="";
+    RefreshPasswordGrid();
+    ShowMyMessage("Account saved in memory. Press 'Save to File' to keep it.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
+{
+    int idx, iLevel;
+    AnsiString sID;
+
+    (void)Sender;
+    if(lbPwUsers==NULL)
+        return;
+    idx=lbPwUsers->ItemIndex;
+    if(idx<0 || idx>=UserRoleManager.GetUserCount())
+    {
+        ShowMyMessage("Please select an account to delete.");
+        return;
+    }
+    sID=UserRoleManager.GetUserID(idx);
+    iLevel=UserRoleManager.GetUserLevel(idx);
+    if(ShowMyMessageBox_YES_NO("Delete account: "+sID+" ?")!=1)
+        return;
+    UserRoleManager.DeleteUser(sID, iLevel);
+    RefreshPasswordGrid();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    SavePassword();
+    ShowMyMessage("User accounts saved to system\\login.txt.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    ReadPassword();
+    RefreshPasswordGrid();
+    if(edPwId!=NULL)    edPwId->Text="";
+    if(edPwPass!=NULL)  edPwPass->Text="";
+    ShowMyMessage("User accounts reloaded from system\\login.txt.");
+}

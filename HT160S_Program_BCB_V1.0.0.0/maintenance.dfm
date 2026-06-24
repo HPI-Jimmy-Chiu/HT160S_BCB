@@ -955,9 +955,9 @@ object fMaintenance: TfMaintenance
             Top = 2
             Width = 937
             Height = 880
-            ActivePage = tsOption
+            ActivePage = tsLoaderUnloader
             Align = alClient
-            TabIndex = 3
+            TabIndex = 0
             TabOrder = 0
             object tsLoaderUnloader: TTabSheet
               Caption = 'Loader/Unloader'
@@ -1151,6 +1151,67 @@ object fMaintenance: TfMaintenance
                   State = cbChecked
                   TabOrder = 5
                   OnClick = chkAutoEnableClick
+                end
+              end
+              object plLoaderSafeDistanceSet: TPanel
+                Left = 0
+                Top = 160
+                Width = 929
+                Height = 80
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 3
+                object lblLoaderSafeDistance: TLabel
+                  Left = 36
+                  Top = 12
+                  Width = 157
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Loader safe distance'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lbmm: TLabel
+                  Left = 284
+                  Top = 12
+                  Width = 45
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'mm'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edLoaderSafeDistance: TEdit
+                  Left = 216
+                  Top = 8
+                  Width = 65
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '100.00'
+                  OnClick = edLoaderSafeDistanceClick
+                end
+                object lblLoaderSafeHint: TLabel
+                  Left = 36
+                  Top = 48
+                  Width = 860
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Minimum separation between the two loader cars. Range 325-650 mm.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
                 end
               end
             end
@@ -1362,6 +1423,14 @@ object fMaintenance: TfMaintenance
                   Height = 17
                   Caption = 'CommType'
                   TabOrder = 1
+                end
+                object chkUseTrayDatumModel: TCheckBox
+                  Left = 470
+                  Top = 8
+                  Width = 250
+                  Height = 17
+                  Caption = 'Tray Datum (XStart/YStart)'
+                  TabOrder = 2
                 end
               end
             end
@@ -2032,6 +2101,15 @@ object fMaintenance: TfMaintenance
             Caption = 'Bottom CCD (reserved)'
             Enabled = False
             TabOrder = 2
+          end
+          object chkTopCcdEnable: TCheckBox
+            Left = 310
+            Top = 84
+            Width = 240
+            Height = 24
+            Caption = 'Enable Top CCD'
+            TabOrder = 8
+            OnClick = chkTopCcdEnableClick
           end
           object btnTopCcdSave: TButton
             Left = 560

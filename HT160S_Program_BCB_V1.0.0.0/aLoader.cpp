@@ -128,12 +128,26 @@ int TLoaderModule::GetTrayYCount()
 //---------------------------------------------------------------------------
 double TLoaderModule::GetTrayXPitch()
 {
-    return TrayForm.XPitch;
+    return TrayForm.XPitch*100.0;   //AI(ht160s-maintainer) 20260624 : mm to 1/100mm to match teach coords (same root cause as aSortArm; CCD cell scan pitch was 100x too small).
 }
 //---------------------------------------------------------------------------
 double TLoaderModule::GetTrayYPitch()
 {
-    return TrayForm.YPitch;
+    return TrayForm.YPitch*100.0;   //AI(ht160s-maintainer) 20260624 : mm to 1/100mm, see GetTrayXPitch.
+}
+//---------------------------------------------------------------------------
+static const int LOADER_X_DATUM_BIAS=-1000;   //AI(ht160s-maintainer) 20260624 : P2 datum bias, mirrors aSortArm
+static const int LOADER_Y_DATUM_BIAS=-1000;
+//---------------------------------------------------------------------------
+double TLoaderModule::GetTrayXStart()
+{
+    //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset X (mm->1/100mm), P2 HT172-align. Same TrayForm as SortArm => CCD shares origin.
+    return TrayForm.XStart*100.0;
+}
+//---------------------------------------------------------------------------
+double TLoaderModule::GetTrayYStart()
+{
+    return TrayForm.YStart*100.0;
 }
 //---------------------------------------------------------------------------
 int TLoaderModule::GetLoaderFeedY(int LoaderNo)
@@ -199,12 +213,15 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
 {
     //AI(HT160S-Maintainer) 20260610 : framework for option C (opposite-side tray
     //clamped + minimum distance). The two Loader-Y cars share the same physical
-    //rail, so their encoder positions are directly comparable (same units, as the
-    //legacy 160 discharge interlock did). Rules :
+    //rail. NOTE the two encoders read OPPOSITE signs for the same physical travel,
+    //so the gap math abs()-normalizes each side to its physical magnitude first.
+    //Rules :
     //  - Only the OTHER car holding a tray (fHasTray) is a collision risk; an empty
-    //    car parked clear is ignored.
-    //  - If the target position of THIS car would sit closer than the configured
-    //    safe distance to the OTHER car's current encoder position, block the move.
+    //    car parked clear is ignored. (Empty parked cars are NOT yet protected - see
+    //    the decouple/choreography follow-up.)
+    //  - When both cars are loaded they cannot cross, so keep a FIXED order : require THIS
+    //    car to end at least the safe distance on its OWN side of the OTHER car. A leading car
+    //    may always advance further forward; only closing-in / crossing is blocked.
     //  - Safe distance is read from GeneralSetting.iLoaderYSafeDistance
     //    ([Safety] LoaderYSafeDistance in General.ini, default 10000).
     //  - When data cannot be evaluated (NULL motors) the move is allowed so this
@@ -213,7 +230,6 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
     TTrayMotor *OtherMotor=NULL;
     TTrayMotor *OtherTray=NULL;
     int OtherPos;
-    int Gap;
 
     OtherNo=(LoaderNo==1) ? 2 : 1;
     if(OtherNo==1)
@@ -236,16 +252,50 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
     if(OtherTray->fHasTray==false)
         return true;
 
+    //AI(ht160s-sortarm) 20260624 : collision happens ONLY when BOTH cars carry a tray
+    //(operator-confirmed mechanical fact : the two carriages pass freely on their rails; it is
+    //the two overhanging TRAYS that clash). So an empty car - crucially a just-discharged car
+    //heading back to feed - may ALWAYS move past a loaded car. This is the core deadlock break :
+    //empty Loader1 no longer gets trapped behind loaded Loader2, and two empty cars near the
+    //home/origin zone no longer block each other. Restrict only when THIS car is loaded too.
+    TTrayMotor *ThisTray=(LoaderNo==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
+    if(ThisTray==NULL || ThisTray->fHasTray==false)
+        return true;
+
     if(GeneralSetting.iLoaderYSafeDistance<=0)
         return true;
 
+    //AI(ht160s-sortarm) 20260624 : ORDER-AWARE + sign-normalized interlock for the both-loaded
+    // case. The two encoders read OPPOSITE signs for the same physical travel (Y1 +, Y2 -), so
+    // abs()-normalize each to its physical magnitude first (rail is always >=0; manual negate, NOT
+    // std::abs which this BCB6 unit lacks). The two loaded cars cannot cross, so they hold a fixed
+    // order : enforce only that THIS car ends at least SafeDist on its OWN side of the OTHER car.
+    //   - THIS car AHEAD : may move freely FURTHER ahead, only as far back as Other+SafeDist. So a
+    //     leading car is NEVER blocked from advancing just because the trailing car sits close
+    //     behind (that over-block was the bug in the earlier swept-interval form).
+    //   - THIS car BEHIND : may move freely further back, only up to Other-SafeDist.
+    // Lets the front car keep going forward AND forbids closing-in / crossing.
+    TTrayMotor *ThisMotor=(LoaderNo==1) ? HSys.Mot.MLoaderY_1 : HSys.Mot.MLoaderY_2;
+    int ThisCur=(ThisMotor!=NULL) ? ThisMotor->ReadEncoderPos() : Position;
+    if(ThisCur<0)
+        ThisCur=-ThisCur;
+    int Tgt=Position;
+    if(Tgt<0)
+        Tgt=-Tgt;
     OtherPos=OtherMotor->ReadEncoderPos();
-    Gap=Position-OtherPos;
-    if(Gap<0)
-        Gap=-Gap;
-    if(Gap<GeneralSetting.iLoaderYSafeDistance)
+    if(OtherPos<0)
+        OtherPos=-OtherPos;
+    if(ThisCur>=OtherPos)
+    {
+        //this car leads : stay at least SafeDist ahead (forward moves always pass)
+        if(Tgt>=OtherPos+GeneralSetting.iLoaderYSafeDistance)
+            return true;
         return false;
-    return true;
+    }
+    //this car trails : stay at least SafeDist behind
+    if(Tgt<=OtherPos-GeneralSetting.iLoaderYSafeDistance)
+        return true;
+    return false;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::MoveTopCcdX(int Position)
@@ -262,8 +312,15 @@ bool TLoaderModule::MoveTopCcdX(int Position)
 //---------------------------------------------------------------------------
 bool TLoaderModule::MoveToCcdCell(int LoaderNo, int CellX, int CellY)
 {
-    int XPos=RoundPosition((double)GetTopCcdFirstX()+((double)CellX)*GetTrayXPitch());
-    int YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+((double)CellY)*GetTrayYPitch());
+    double DatumX=0.0;
+    double DatumY=0.0;
+    if(GeneralSetting.bUseTrayDatumModel)
+    {
+        DatumX=(double)LOADER_X_DATUM_BIAS+GetTrayXStart();
+        DatumY=(double)LOADER_Y_DATUM_BIAS+GetTrayYStart();
+    }
+    int XPos=RoundPosition((double)GetTopCcdFirstX()+DatumX+((double)CellX)*GetTrayXPitch());
+    int YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+DatumY+((double)CellY)*GetTrayYPitch());
     bool bXFlag=MoveTopCcdX(XPos);
     bool bYFlag=MoveLoaderY(LoaderNo, YPos);
     return (bXFlag && bYFlag);
@@ -312,6 +369,14 @@ bool TLoaderModule::IsInputHandoffFinishedForAmr()
 void TLoaderModule::RefillSimInfeed()
 {
     iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[0];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : trays currently on the shared Loader supply car, for the
+//PanelMain6 Motion View header. Sim drains this per feed; the real machine is
+//sensor-driven and does not maintain the count (reads the configured max).
+int TLoaderModule::GetCarTrayCount()
+{
+    return iSimInfeedCount;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsSoftSimulate()
@@ -649,7 +714,7 @@ AnsiString TLoaderModule::ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, b
     //AI(HT160S-Maintainer) 20260608 : simulation path : no real Top CCD hardware.
     //Cycle through the virtual 2D codes that btnLoadSimuDataClick registered, so
     //every scanned cell gets a valid, registry-resolvable code (wraps around).
-    if(tSimuData.bRunSimulation || HSys.LastSet.iRealDummy!=REALLY)
+    if(tSimuData.bRunSimulation || HSys.LastSet.iRealDummy!=REALLY || CosFunction.bUseTopCcd==false)
     {
         int Total=LotRegistry.GetItemCount();
         if(Total>0)
@@ -732,6 +797,18 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
             {
                 if(bAmrLocked)   //AI(ht160s-agv) 20260623 : AMR handoff - no new front destack/feed
                     break;
+                //AI(ht160s-sortarm) 20260624 : pipelined (NOT strict alternation) but hold off STARTING a
+                //feed while the OTHER car is in the FRONT ZONE - either FEEDING (at the feed pos) or
+                //CCD_SCAN (at the CCD pos). Those two front stations sit closer than SafeDist (feed ~1mm
+                //<-> CCD ~131mm = 130mm < 325mm), so feeding into that window would only get blocked by
+                //the IsLoaderYMoveSafe backstop anyway / risk a stall. Waiting until the other car leaves
+                //the front zone (it advances to sort/discharge, >=427mm, clear of SafeDist from feed) lets
+                //this car feed without contention. Mirrors DoFeedTray's own downstream FEEDING/CCD_SCAN
+                //guard. Still pipelined : once the other car is READY_SORT/SORTING/ToRear/IDLE this car
+                //feeds while the other runs its cycle - the gate does NOT block on the other car merely
+                //holding a tray (that was the earlier strict-alternation fHasTray form, since dropped).
+                //IsLoaderYMoveSafe stays the per-move collision backstop for the both-loaded case.
+                //Operator confirmed on-machine 20260624 : the two cars run without interfering.
                 if(OtherState->Status==LS_FEEDING ||
                    OtherState->Status==LS_CCD_SCAN)
                 {
@@ -980,8 +1057,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             else
             {
                 if(OtherState->Status==LS_READY_SORT ||
-                   OtherState->Status==LS_SORTING ||
-                   OtherState->Status==LS_ToRear)
+                   OtherState->Status==LS_SORTING)
                 {
                     //dont move
                 }
@@ -1032,7 +1108,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                 {
                     if(HSys.LastSet.iRealDummy==REALLY &&
                        TopCcdSocket!=NULL &&
-                       TopCcdSocket->IsTopCcdConnected()==false &&
+                       TopCcdSocket->IsTopCcdConnected()==false && CosFunction.bUseTopCcd &&
                        IsSoftSimulate()==false)
                     {
                         Ret=ShowMyError("Top CCD Connect not ready", K_RETRY|K_SKIP);
@@ -1045,7 +1121,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     }
                     //Guard NULL socket so the simulation path (no Top CCD hardware) can
                     //still advance to the 2D-code poll state. Real hardware triggers a shot.
-                    if(HSys.LastSet.iRealDummy==REALLY && TopCcdSocket!=NULL)
+                    if(HSys.LastSet.iRealDummy==REALLY && CosFunction.bUseTopCcd && TopCcdSocket!=NULL)
                         TopCcdSocket->TopCcdTriggerShot();
                     State->CcdDelay.SetMS(3000);
                     State->CcdDelay.On();
@@ -1448,6 +1524,33 @@ AnsiString TLoaderModule::DescribeState()
            + "  AllEmpty=" + IntToStr(ActiveTrayAllData(n, EMPTY_IC) ? 1 : 0)
            + "  HasOK=" + IntToStr(HasActiveTrayData(n, HAS_OK_IC) ? 1 : 0)
            + "  HasUncheck=" + IntToStr(HasActiveTrayData(n, UNCHECK_IC) ? 1 : 0) + "\r\n";
+    }
+    //AI(ht160s-state-record-analysis) 20260624 : cross-side Loader-Y interlock geometry.
+    //A hang where one side sits LS_ToRear while the other refuses to advance to READY_SORT is
+    //almost always IsLoaderYMoveSafe rejecting a move because the two shared-rail cars are
+    //closer than SafeDist. Record both car encoder positions, the live |gap|, the SafeDist
+    //limit, and a per-side feed/discharge move verdict so the blocked move is visible in the
+    //snapshot directly, instead of being hand-computed from tech.ini + General.ini after the fact.
+    {
+        int p1 = (HSys.Mot.MLoaderY_1!=NULL) ? HSys.Mot.MLoaderY_1->ReadEncoderPos() : 0;
+        int p2 = (HSys.Mot.MLoaderY_2!=NULL) ? HSys.Mot.MLoaderY_2->ReadEncoderPos() : 0;
+        int g = p1-p2;
+        if(g<0)
+            g=-g;
+        s += "[LoaderY interlock]\r\n";
+        s += "  SafeDist=" + IntToStr(GeneralSetting.iLoaderYSafeDistance)
+           + "  Y1enc=" + IntToStr(p1)
+           + "  Y2enc=" + IntToStr(p2)
+           + "  |gap|=" + IntToStr(g) + "\r\n";
+        for(int k=1; k<=2; k++)
+        {
+            int fy = GetLoaderFeedY(k);
+            int dy = GetLoaderDischargeY(k);
+            s += "  Side" + IntToStr(k)
+               + " ->feed(" + IntToStr(fy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, fy) ? "OK" : "BLOCK")
+               + "  ->disc(" + IntToStr(dy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, dy) ? "OK" : "BLOCK")
+               + "\r\n";
+        }
     }
     return s;
 }

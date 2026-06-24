@@ -35,6 +35,7 @@ void THT160GeneralSetting::SetDefault()
 	for(int s=0;s<4;s++)
 		bSuckerEnabled[s]=true;
 	bShowSortArmPlaceCheck=false;
+	bUseTrayDatumModel=true;
 	iLoaderYSafeDistance=10000;
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
@@ -42,6 +43,7 @@ void THT160GeneralSetting::SetDefault()
 	iBinDispBaud=9600;
 	iBinDispPanelType=0;
 	bBinDispLogVerbose=false;
+	bBinDispUseMyComm=false;
 	iLogRetentionEventDays=365;   // EventLog, WebAPI : audit value, keep ~1 year
 	iLogRetentionCommDays=90;     // comm/diagnostic logs : high volume, keep 90d
 	// Defaults mirror old-160: Empty=E, Loader=L, Auto1..6=1..6, Color=C.
@@ -75,6 +77,7 @@ void THT160GeneralSetting::Load()
 	for(int s=0;s<4;s++)
 		bSuckerEnabled[s]=Ini->ReadBool("HardwareInstall", "SuckerEnabled"+IntToStr(s), true);
 	bShowSortArmPlaceCheck=Ini->ReadBool("Diagnostic", "ShowSortArmPlaceCheck", false);
+	bUseTrayDatumModel=Ini->ReadBool("HardwareInstall", "UseTrayDatumModel", true);
 	iLoaderYSafeDistance=Ini->ReadInteger("Safety", "LoaderYSafeDistance", 10000);
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
@@ -82,6 +85,7 @@ void THT160GeneralSetting::Load()
 	iBinDispBaud=Ini->ReadInteger("BinDisplay", "Baud", 9600);
 	iBinDispPanelType=Ini->ReadInteger("BinDisplay", "PanelType", 0);
 	bBinDispLogVerbose=Ini->ReadBool("BinDisplay", "LogVerbose", false);
+	bBinDispUseMyComm=Ini->ReadBool("BinDisplay", "UseMyComm", false);
 	iLogRetentionEventDays=Ini->ReadInteger("LogRetention", "EventDays", 365);
 	iLogRetentionCommDays=Ini->ReadInteger("LogRetention", "CommDays", 90);
 	for(int i=0;i<9;i++)
@@ -109,6 +113,7 @@ void THT160GeneralSetting::Save()
 	for(int s=0;s<4;s++)
 		Ini->WriteBool("HardwareInstall", "SuckerEnabled"+IntToStr(s), bSuckerEnabled[s]);
 	Ini->WriteBool("Diagnostic", "ShowSortArmPlaceCheck", bShowSortArmPlaceCheck);
+	Ini->WriteBool("HardwareInstall", "UseTrayDatumModel", bUseTrayDatumModel);
 	Ini->WriteInteger("Safety", "LoaderYSafeDistance", iLoaderYSafeDistance);
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
@@ -116,6 +121,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("BinDisplay", "Baud", iBinDispBaud);
 	Ini->WriteInteger("BinDisplay", "PanelType", iBinDispPanelType);
 	Ini->WriteBool("BinDisplay", "LogVerbose", bBinDispLogVerbose);
+	Ini->WriteBool("BinDisplay", "UseMyComm", bBinDispUseMyComm);
 	Ini->WriteInteger("LogRetention", "EventDays", iLogRetentionEventDays);
 	Ini->WriteInteger("LogRetention", "CommDays", iLogRetentionCommDays);
 	for(int i=0;i<9;i++)

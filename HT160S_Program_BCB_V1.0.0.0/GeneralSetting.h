@@ -60,6 +60,7 @@ public:
 	// comparing actual vs expected motor positions. Per-machine engineering check,
 	// default OFF. Toggle via [Diagnostic] ShowSortArmPlaceCheck in General.ini.
 	bool bShowSortArmPlaceCheck;
+	bool bUseTrayDatumModel;   //AI(ht160s-maintainer) 20260624 : P2 HT172-align gate, default ON (company calibration model); toggle in tsOption; ON=inject XStart/YStart+datum into cell positioning
 
 	// Safety : minimum encoder gap (motor counts) the two Loader-Y cars must keep
 	// from each other before either car is allowed to move, used only when the
@@ -87,6 +88,7 @@ public:
 	// daily comm file does not balloon during production. Set true for full
 	// frame-level tracing. Stored in General.ini [BinDisplay] LogVerbose.
 	bool bBinDispLogVerbose;
+	bool bBinDispUseMyComm;   // false = SPComm TComm (default), true = self-built TMyComm
 
 	// Log retention (days). Day/month sub-folders older than this are deleted
 	// when a log channel opens / rolls over to a new day. 0 = keep forever.

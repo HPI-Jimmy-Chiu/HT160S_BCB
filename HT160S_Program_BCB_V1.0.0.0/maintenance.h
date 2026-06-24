@@ -215,6 +215,7 @@ __published:
     TLabel *lblTopCcdPortCap;
     TEdit *edTopCcdPort;
     TCheckBox *chkTopCcdBottomReserved;
+    TCheckBox *chkTopCcdEnable;
     TButton *btnTopCcdSave;
     TButton *btnTopCcdReload;
     TButton *btnTopCcdConnect;
@@ -281,7 +282,13 @@ __published:
     TPanel *pnlSortModeBox;
     TLabel *lblLotBinModeHint;
     TCheckBox *chkUseLotBinMode;
+    TCheckBox *chkUseTrayDatumModel;
     TCheckBox *cbCommType;
+    TPanel *plLoaderSafeDistanceSet;
+    TLabel *lblLoaderSafeDistance;
+    TEdit *edLoaderSafeDistance;
+    TLabel *lbmm;
+    TLabel *lblLoaderSafeHint;
     void __fastcall btnMCUSaveClick(TObject *Sender);
     void __fastcall btnMCUReloadClick(TObject *Sender);
     void __fastcall btnMCURefreshClick(TObject *Sender);
@@ -298,6 +305,7 @@ __published:
     void __fastcall btnColorCcdSaveClick(TObject *Sender);
     void __fastcall btnColorCcdReloadClick(TObject *Sender);
     void __fastcall btnColorCcdShotClick(TObject *Sender);
+    void __fastcall chkTopCcdEnableClick(TObject *Sender);
     void __fastcall chkColorCcdEnableClick(TObject *Sender);
     void __fastcall btnLotApiSaveClick(TObject *Sender);
     void __fastcall btnLotApiReloadClick(TObject *Sender);
@@ -313,6 +321,7 @@ __published:
     void __fastcall chkUseLotBinModeClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
+    void __fastcall edLoaderSafeDistanceClick(TObject *Sender);
 private:
     int iMaintenanceMenuCount;
     TSpeedButton *MenuButtons[MAX_MAINTENANCE_MENU_COUNT];
@@ -323,6 +332,16 @@ private:
     TALed *TowerLightLeds[TOWER_LIGHT_ROW_COUNT][TOWER_LIGHT_COLOR_COUNT];
     bool bTowerLightBlinkPhase;
     bool bLoadingHardwareSettings;   // guard: suppress save-on-click handlers during programmatic LoadHardwareSettings
+    bool bPasswordUiBuilt;
+    TListBox *lbPwUsers;
+    TEdit *edPwId;
+    TEdit *edPwPass;
+    TComboBox *cbbPwLevel;
+    TButton *btnPwAddUpdate;
+    TButton *btnPwDelete;
+    TButton *btnPwSave;
+    TButton *btnPwReload;
+    TLabel *labPwHint;
 
     void __fastcall RegisterMaintenancePages();
     void __fastcall LayoutMaintenanceButtons();
@@ -363,6 +382,16 @@ private:
     void __fastcall SaveLotWebApiSettings();
     void __fastcall RefreshLotWebApiStatus();
     void __fastcall AddLotWebApiLog(AnsiString Text);
+    void __fastcall BuildPasswordUI();
+    void __fastcall ShowPasswordPage();
+    void __fastcall RefreshPasswordGrid();
+    void __fastcall PwListClick(TObject *Sender);
+    void __fastcall PwIdClick(TObject *Sender);
+    void __fastcall PwPassClick(TObject *Sender);
+    void __fastcall PwAddUpdateClick(TObject *Sender);
+    void __fastcall PwDeleteClick(TObject *Sender);
+    void __fastcall PwSaveClick(TObject *Sender);
+    void __fastcall PwReloadClick(TObject *Sender);
 public:
     __fastcall TfMaintenance(TComponent* Owner);
     void __fastcall OpenWorkFile();

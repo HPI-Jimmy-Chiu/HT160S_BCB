@@ -24,7 +24,19 @@
 TSortArmModule *SortArmModule=NULL;
 //---------------------------------------------------------------------------
 static const int SORT_ARM_SUCKER_COUNT=4;
+//AI(ht160s-maintainer) 20260624 : datum (base) sucker index, 0-based. The taught station base
+//X (GetLoaderSortX/GetAutoSortX) is the absolute X at which THIS sucker sits over tray column
+//0; every other sucker fans out from it via the MPitchX comb, so it is the only nozzle whose
+//position does not move with tray pitch. This machine bolts suck2 to the X carriage => index
+//1. 0 reproduces the legacy suck1-datum behavior. Port of HT172 iBaseSuckX (1-based =1).
+static const int SORT_ARM_BASE_SUCKER_INDEX=1;
+//AI(ht160s-maintainer) 20260624 : P2 HT172-align datum bias = calibration base -> tray top-left
+//corner (10mm). HT172 uses -1000(X)/+1000(Y). User-confirmed 20260624: base->corner is X -10(left) Y -10(up,Y-down=+);
+//corner->first-cell is +XStart(right) +YStart(down) => X=base-1000+XStart, Y=base-1000+YStart (symmetric). Applied only when GeneralSetting.bUseTrayDatumModel.
+static const int SORT_ARM_X_DATUM_BIAS=-1000;
+static const int SORT_ARM_Y_DATUM_BIAS=-1000;
 static const int SORT_ARM_AUTO_COUNT=6;
+static const int iDestroyCheckMS=300;   //AI(ht160s-residue) 20260624 : re-suck settle (ms) for place residue check
 static const int SORT_ARM_SAFE_Z_POSITION=10;
 static const int SUCK_HOME_LOST_MS=100;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce window (ms); time-based, not cycle-count
 //---------------------------------------------------------------------------
@@ -43,6 +55,9 @@ static int ClampIntValue(int Value, int MinValue, int MaxValue)
 //---------------------------------------------------------------------------
 TSortArmModule::TSortArmModule()
 {
+    //AI(ht160s-maintainer) 20260624 : datum sucker for absolute SortArm X (HT172 iBaseSuckX
+    //port). Set once at construction - machine build attribute, not a per-run flag. suck2=1.
+    iBaseSuckX=SORT_ARM_BASE_SUCKER_INDEX;
     InitialFlag();
 }
 //---------------------------------------------------------------------------
@@ -57,6 +72,12 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     bCleanOutFinish=false;
     bOneCycleFinish=false;
     dwSuckHomeLostStart=0;
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)   //AI(ht160s-residue) 20260624 : reset residue-check state on home/init
+    {
+        bNeedResidueCheck[s]=false;
+        ResidueTask[s]=1;
+        ResidueDelay[s].Clear();
+    }
     for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
     {
         //AI(HT160S-Maintainer) 20260612 : recoverable home with a sucked IC still on this
@@ -260,12 +281,23 @@ int TSortArmModule::GetTrayYCount()
 //---------------------------------------------------------------------------
 double TSortArmModule::GetTrayXPitch()
 {
-    return TrayForm.XPitch;
+    return TrayForm.XPitch*100.0;   //AI(ht160s-maintainer) 20260624 : tray pitch is mm (setup.ini) but teach coords are 1/100mm; convert so cell-position math is unit-consistent. HT172 multiplies by 100 at load (aSortArm.cpp:208); port dropped it so pitch was 100x too small.
 }
 //---------------------------------------------------------------------------
 double TSortArmModule::GetTrayYPitch()
 {
-    return TrayForm.YPitch;
+    return TrayForm.YPitch*100.0;   //AI(ht160s-maintainer) 20260624 : mm to 1/100mm, see GetTrayXPitch.
+}
+//---------------------------------------------------------------------------
+double TSortArmModule::GetTrayXStart()
+{
+    //AI(ht160s-maintainer) 20260624 : tray top-left corner -> first IC offset, X (mm->1/100mm). P2 HT172-align.
+    return TrayForm.XStart*100.0;
+}
+//---------------------------------------------------------------------------
+double TSortArmModule::GetTrayYStart()
+{
+    return TrayForm.YStart*100.0;
 }
 //---------------------------------------------------------------------------
 int TSortArmModule::RoundPosition(double Value)
@@ -273,6 +305,30 @@ int TSortArmModule::RoundPosition(double Value)
     if(Value>=0.0)
         return (int)(Value+0.5);
     return (int)(Value-0.5);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260624 : single source for SortArm cell -> arm X. ColMinusSlot is the
+//raw comb offset (trayColumn - activeSuckerIndex). Add iBaseSuckX so the taught base X refers
+//to the datum sucker (suck2), not suck0:  X = baseX + (Col - Slot + iBaseSuckX)*pitch.
+//iBaseSuckX==0 reproduces the legacy formula; travel is still clamped by MoveSortArmX.
+int TSortArmModule::GetSortArmCellX(int BaseSortX, int ColMinusSlot)
+{
+    double Datum=0.0;
+    if(GeneralSetting.bUseTrayDatumModel)
+        Datum=(double)SORT_ARM_X_DATUM_BIAS+GetTrayXStart();
+    return RoundPosition((double)BaseSortX+Datum+
+        ((double)(ColMinusSlot+iBaseSuckX))*GetTrayXPitch());
+}
+//---------------------------------------------------------------------------
+int TSortArmModule::GetSortArmCellY(int BaseSortY, int Row)
+{
+    //AI(ht160s-maintainer) 20260624 : symmetric cell->arm Y helper (P1 of HT172-align).
+    //Single source for SortArm Y so the former inline sites (pick/place/teach/debug) no
+    //longer drift. Behavior identical to the old inline form; Start/datum bias arrive in P2.
+    double Datum=0.0;
+    if(GeneralSetting.bUseTrayDatumModel)
+        Datum=(double)SORT_ARM_Y_DATUM_BIAS+GetTrayYStart();
+    return RoundPosition((double)BaseSortY+Datum+((double)Row)*GetTrayYPitch());
 }
 //---------------------------------------------------------------------------
 int TSortArmModule::CalculatePitchPosition()
@@ -485,6 +541,15 @@ bool TSortArmModule::MoveLoaderY(int LoaderNo, int Position)
 
     if(Motor==NULL)
         return false;
+    //AI(ht160s-sortarm) 20260624 : two-car gap interlock. This SortArm-initiated move drives
+    //the SAME shared-rail Loader-Y car as TLoaderModule::MoveLoaderY, so it must honor the
+    //operator-configured safe distance ([Safety] LoaderYSafeDistance) against the opposite car
+    //too. Route through the single canonical TLoaderModule check rather than duplicating it.
+    //Silent return false (no modal) mirrors the aLoader path : the switch(Task) caller re-polls
+    //until the opposite car clears. NULL-guarded so a missing module never freezes the move.
+    //The check runs in DUMMY (motors physically move there); it is not runtime-bypassed.
+    if(LoaderModule!=NULL && LoaderModule->IsLoaderYMoveSafe(LoaderNo, Position)==false)
+        return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
         ShowMyMessage("Loader Y motor will out of limit");
@@ -564,8 +629,8 @@ bool TSortArmModule::MoveToLoaderPick()
     if(BaseX<-(SORT_ARM_SUCKER_COUNT-1))
         return false;
 
-    XPosition=RoundPosition((double)GetLoaderSortX(iActiveLoaderNo)+((double)BaseX)*GetTrayXPitch());
-    YPosition=RoundPosition((double)GetLoaderFirstSortY(iActiveLoaderNo)+((double)Slot[FirstSlot].PickY)*GetTrayYPitch());
+    XPosition=GetSortArmCellX(GetLoaderSortX(iActiveLoaderNo), BaseX);
+    YPosition=GetSortArmCellY(GetLoaderFirstSortY(iActiveLoaderNo), Slot[FirstSlot].PickY);
     bXDone=MoveSortArmX(XPosition);
     bYDone=MoveLoaderY(iActiveLoaderNo, YPosition);
     return (bXDone && bYDone);
@@ -573,8 +638,8 @@ bool TSortArmModule::MoveToLoaderPick()
 //---------------------------------------------------------------------------
 bool TSortArmModule::MoveToAutoPlace()
 {
-    int XPosition=RoundPosition((double)GetAutoSortX(iActiveAutoIndex)+((double)iPlaceBaseX)*GetTrayXPitch());
-    int YPosition=RoundPosition((double)GetAutoFirstSortY(iActiveAutoIndex)+((double)iPlaceY)*GetTrayYPitch());
+    int XPosition=GetSortArmCellX(GetAutoSortX(iActiveAutoIndex), iPlaceBaseX);
+    int YPosition=GetSortArmCellY(GetAutoFirstSortY(iActiveAutoIndex), iPlaceY);
     bool bXDone=MoveSortArmX(XPosition);
     bool bYDone=MoveAutoY(iActiveAutoIndex, YPosition);
 
@@ -897,6 +962,88 @@ bool TSortArmModule::SuckSelectedSlots()
     return bAllDone;
 }
 //---------------------------------------------------------------------------
+void TSortArmModule::MarkResidueTargets()
+{
+    //AI(ht160s-residue) 20260624 : remember which slots actually placed an IC this
+    //cycle so CheckPlaceResidue re-sucks only those nozzles. Called after
+    //DestroySelectedSlots succeeds and BEFORE TransferPlaceDataToAuto (ClearSlot).
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(Slot[s].bPlaceSelected)
+        {
+            bNeedResidueCheck[s]=true;
+            ResidueTask[s]=1;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+bool TSortArmModule::CheckPlaceResidue()
+{
+    //AI(ht160s-residue) 20260624 : HT172 CheckSortArmDestroyActive port. Per placed
+    //nozzle: break vacuum, RE-SUCK, wait, read status. Status ON after re-suck = IC
+    //still plugging the nozzle (residue) -> alarm, operator removes IC, retry. OFF =
+    //nozzle empty (clear). Real vacuum sensor only; DUMMY/HAS_TRAY/sim skip.
+    if(IsSoftSimulate())
+        return true;
+    bool bAllDone=true;
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(bNeedResidueCheck[s]==false)
+            continue;
+        if(HSys.LastSet.iRealDummy!=REALLY)   //no real vacuum sensor off REALLY
+        {
+            bNeedResidueCheck[s]=false;
+            continue;
+        }
+        TMySucker *Sucker=GetSucker(s);
+        if(Sucker==NULL)
+        {
+            bNeedResidueCheck[s]=false;
+            continue;
+        }
+        switch(ResidueTask[s])
+        {
+            case 1:
+                Sucker->OffDestroy();
+                ResidueDelay[s].SetMS(iDestroyCheckMS);
+                ResidueDelay[s].On();
+                ResidueTask[s]=200;
+                bAllDone=false;
+                break;
+            case 200:
+                Sucker->OnSuck();
+                ResidueDelay[s].SetMS(iDestroyCheckMS);
+                ResidueDelay[s].On();
+                ResidueTask[s]=300;
+                bAllDone=false;
+                break;
+            case 300:
+                if(ResidueDelay[s].Off())
+                {
+                    if(Sucker->GetStatus())
+                    {
+                        ShowSuckError(*Sucker, 2, K_RETRY, "SortArm Residue");
+                        ResidueTask[s]=200;
+                        bAllDone=false;
+                    }
+                    else
+                    {
+                        Sucker->Normal();
+                        bNeedResidueCheck[s]=false;
+                        ResidueTask[s]=1;
+                    }
+                }
+                else
+                    bAllDone=false;
+                break;
+            default:
+                ResidueTask[s]=1;
+                break;
+        }
+    }
+    return bAllDone;
+}
+//---------------------------------------------------------------------------
 bool TSortArmModule::DestroySelectedSlots()
 {
     bool bAllDone=true;
@@ -1088,8 +1235,8 @@ void TSortArmModule::ShowPlaceDebugInfo()
     if(iActiveAutoIndex<0)
         return;
 
-    int ExpectX=RoundPosition((double)GetAutoSortX(iActiveAutoIndex)+((double)iPlaceBaseX)*GetTrayXPitch());
-    int ExpectY=RoundPosition((double)GetAutoFirstSortY(iActiveAutoIndex)+((double)iPlaceY)*GetTrayYPitch());
+    int ExpectX=GetSortArmCellX(GetAutoSortX(iActiveAutoIndex), iPlaceBaseX);
+    int ExpectY=GetSortArmCellY(GetAutoFirstSortY(iActiveAutoIndex), iPlaceY);
     TTrayMotor *YMotor=GetAutoMotor(iActiveAutoIndex);
     int NowX=(HSys.Mot.MSortingArmX!=NULL)?HSys.Mot.MSortingArmX->ReadPos():0;
     int NowY=(YMotor!=NULL)?YMotor->ReadPos():0;
@@ -1157,14 +1304,24 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
         case 50:
             if(DestroySelectedSlots())
             {
+                MarkResidueTargets();                                    //AI(ht160s-residue) 20260624 : tag placed slots before ClearSlot
+                if(AutoModule!=NULL)
+                    AutoModule->SetPlaceResidueClear(iActiveAutoIndex, false);
                 TransferPlaceDataToAuto();
                 PlaceTask=60;
             }
             break;
 
         case 60:
-            if(SortArmZToSafePos())
+            if(SortArmZToSafePos())                                      //AI(ht160s-residue) 20260624 : nozzle to top, then residue-check
+                PlaceTask=70;
+            break;
+
+        case 70:
+            if(CheckPlaceResidue())                                      //AI(ht160s-residue) 20260624 : re-suck verify each placed nozzle is empty
             {
+                if(AutoModule!=NULL)
+                    AutoModule->SetPlaceResidueClear(iActiveAutoIndex, true);
                 PlaceTask=1;
                 return true;
             }
@@ -1366,8 +1523,8 @@ bool TSortArmModule::CanMoveSuckerToCell(int SlotIndex, int Target, int Col, int
         FirstSortY=GetAutoFirstSortY(AutoIndex);
         YMotor=GetAutoMotor(AutoIndex);
     }
-    XPosition=RoundPosition((double)BaseSortX+((double)(Col-SlotIndex))*GetTrayXPitch());
-    YPosition=RoundPosition((double)FirstSortY+((double)Row)*GetTrayYPitch());
+    XPosition=GetSortArmCellX(BaseSortX, Col-SlotIndex);
+    YPosition=GetSortArmCellY(FirstSortY, Row);
     if(HSys.Mot.MSortingArmX==NULL || HSys.Mot.MSortingArmX->CheckSoftLimit(XPosition)==false)
     {
         Err="Sorting Arm X target over soft limit";
@@ -1436,8 +1593,8 @@ bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Ro
                 BaseSortX=GetAutoSortX(AutoIndex);
                 FirstSortY=GetAutoFirstSortY(AutoIndex);
             }
-            XPosition=RoundPosition((double)BaseSortX+((double)(Col-SlotIndex))*GetTrayXPitch());
-            YPosition=RoundPosition((double)FirstSortY+((double)Row)*GetTrayYPitch());
+            XPosition=GetSortArmCellX(BaseSortX, Col-SlotIndex);
+            YPosition=GetSortArmCellY(FirstSortY, Row);
             bXDone=MoveSortArmX(XPosition);
             if(LoaderNo>0)
                 bYDone=MoveLoaderY(LoaderNo, YPosition);

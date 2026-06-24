@@ -3,6 +3,7 @@
 #define aSortArmH
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
+#include "HTimer.h"   //AI(ht160s-residue) 20260624 : per-slot residue-check timers
 //---------------------------------------------------------------------------
 struct TSortArmSlotState
 {
@@ -34,7 +35,11 @@ private:
     bool bCleanOutFinish;   //AI(HT160S-Maintainer) 20260605 : SortArm drained in CleanOut
     bool bOneCycleFinish;   //AI(HT160S-Maintainer) 20260605 : SortArm placed held IC then stopped (OneCycle)
     TSortArmSlotState Slot[4];
+    bool   bNeedResidueCheck[4];   //AI(ht160s-residue) 20260624 : slots that placed an IC this cycle (residue-check targets)
+    int    ResidueTask[4];         //AI(ht160s-residue) 20260624 : per-slot residue sub-FSM (1/200/300)
+    HTimer ResidueDelay[4];        //AI(ht160s-residue) 20260624 : per-slot re-suck settle timer
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
+    int iBaseSuckX;   //AI(ht160s-maintainer) 20260624 : 0-based datum sucker for absolute X (HT172 iBaseSuckX port); 1=suck2 (carriage-fixed nozzle), 0=legacy suck1
 
     void ClearSlot(int SlotIndex);
     void ClearPickSelection();
@@ -55,6 +60,10 @@ private:
     double GetTrayXPitch();
     double GetTrayYPitch();
     int RoundPosition(double Value);
+    int GetSortArmCellX(int BaseSortX, int ColMinusSlot);   //AI(ht160s-maintainer) 20260624 : cell->arm X with datum-sucker (iBaseSuckX) offset
+    int GetSortArmCellY(int BaseSortY, int Row);   //AI(ht160s-maintainer) 20260624 : symmetric Y helper (P1 HT172-align), behavior == old inline
+    double GetTrayXStart();   //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset X (P2 HT172-align)
+    double GetTrayYStart();
     int CalculatePitchPosition();
 
     int GetLoaderSortX(int LoaderNo);
@@ -83,6 +92,8 @@ private:
     bool CanPlaceSlotToAuto(int SlotIndex, int AutoIndex);
 
     bool SuckSelectedSlots();
+    void MarkResidueTargets();    //AI(ht160s-residue) 20260624 : tag this place's slots before ClearSlot
+    bool CheckPlaceResidue();     //AI(ht160s-residue) 20260624 : HT172 re-suck residue verify (REALLY only)
     bool DestroySelectedSlots();
     void TransferPickDataFromLoader();
     void TransferPlaceDataToAuto();
