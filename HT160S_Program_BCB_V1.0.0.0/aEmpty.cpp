@@ -167,7 +167,7 @@ bool TEmptyModule::MoveEmptyY(int Position)
         return false;
     if(HSys.Mot.MEmptyY->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Empty Y motor will out of limit");
+        ShowMyMessage("Empty Y motor will out of limit", HSys.Mot.MEmptyY->SoftLimitDetail(Position));
         return false;
     }
 
@@ -464,6 +464,8 @@ bool TEmptyModule::DoGoDownTray(int Flag)
         case 3000:
             if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
+                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
+                    break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
                 GoDownDelay.Set(5);
                 GoDownDelay.On();
@@ -554,6 +556,8 @@ bool TEmptyModule::DoGoUpTray(int Flag)
         case 200:
             if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
+                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
+                    break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
                 GoUpDelay.Set(5);
                 GoUpDelay.On();
@@ -689,6 +693,8 @@ bool TEmptyModule::TestGoDownTray(int Flag)
         case 3000:
             if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
+                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
+                    break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
                 TestDelay.Set(5);
                 TestDelay.On();
@@ -756,6 +762,8 @@ bool TEmptyModule::TestGoUpTray(int Flag)
         case 200:
             if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
+                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
+                    break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
                 TestDelay.Set(5);
                 TestDelay.On();

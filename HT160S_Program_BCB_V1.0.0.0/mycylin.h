@@ -81,5 +81,10 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate);
 //  SubTask caller-owned (init 0); Delay caller-owned settle timer.
 int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
                 HTimer &Delay, bool bSoftSimulate, int SettleTicks);
+//AI(ht160s-maintainer) 20260625 : short-term mechanical interlock. The Empty and
+//  Loader front separate-tray cylinders clash if both extend at once. Returns true
+//  when MY side must wait because the OTHER side's output is commanded out. Gated by
+//  General.ini [Safety] FrontSeparateInterlock (default on); set 0 after rework.
+bool IsFrontSeparateBlockedBy(TMyCylinder &Other);
 //---------------------------------------------------------------------------
 #endif

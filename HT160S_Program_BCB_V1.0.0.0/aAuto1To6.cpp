@@ -293,7 +293,7 @@ bool TAutoModule::MoveAutoY(int Index, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Auto Y motor will out of limit");
+        ShowMyMessage("Auto Y motor will out of limit", Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -383,7 +383,14 @@ int TAutoModule::FindFeedAuto()
         if(State[Index].bCarHasTray==false)
         {
             State[Index].bRearCanUse=true;
-            if(State[Index].bRearHasTray)
+            //AI(ht160s-tray-source) 20260625 : CHANGE1 collision-window fix. Feed only
+            //after the TrayArm-delivered latch is set (bRearDeliveredPending, set at
+            //DoPlace case4000 AFTER the Z-lift is confirmed UP). The raw rear sensor goes
+            //ON the instant the tray lands (DoPlace case2000) while the TrayArm head is
+            //still down; without the latch the Auto Y could start and collide. Keep
+            //RefreshAutoState's sensor->bRearHasTray write untouched (still needed for
+            //rear-occupied / TrayArm placement-avoidance).
+            if(State[Index].bRearHasTray && bRearDeliveredPending[Index])
                 return Index;
         }
     }
@@ -457,7 +464,46 @@ bool TAutoModule::DoFeedTray(int Flag)
             iFeedAuto=FindFeedAuto();
             if(iFeedAuto<0)
                 return true;
-            FeedTask=1000;
+            FeedTask=200;
+            break;
+
+        case 200:
+            //AI(ht160s-tray-source) 20260625 : CHANGE2 pre-move rear-sensor cross-check.
+            //We reached here only because the TrayArm-delivered latch is set (CHANGE1),
+            //so a tray MUST be at the Auto rear. Confirm the physical rear sensor reads
+            //ON BEFORE any Y motion. IsSensorOnReady returns true in sim or when the
+            //sensor is disabled (Enable==false), so sim/offline behavior is preserved.
+            //Only OutputBottomHasTray is wired on this machine (OutputHasTray removed as
+            //unused), so check just that one - same sensor as the post-Y check at case3000.
+            //If the latch is set but that rear sensor sees no tray, ask the operator:
+            //  Retry = re-read the sensor next cycle (after removing a stranded tray or
+            //          fixing the sensor),
+            //  Skip  = discard the staged rear data and abort this feed (TrayArm will
+            //          re-supply on demand). NO Y motion on Skip.
+            if(IsSoftSimulate()
+               || IsSensorOnReady(GetOutputBottomHasTray(iFeedAuto)))
+            {
+                FeedTask=1000;
+            }
+            else
+            {
+                ErrorText.sprintf("Auto%d: rear tray data transferred but no-tray sensor. Remove any stranded tray; if no tray, check the rear tray sensor. Retry=recheck sensor, Skip=clear tray data", iFeedAuto+1);
+                Ret=ShowMyError(ErrorText, K_SKIP|K_RETRY);
+                if(Ret==K_SKIP)
+                {
+                    //AI(ht160s-tray-source) 20260625 : clear the staged rear data so the
+                    //next cycle does not re-feed a phantom tray. Mirrors the field reset
+                    //in DoFeedTray case7000 / DoDischargeTray case1000 / cleanout case7000.
+                    State[iFeedAuto].bRearHasTray=false;
+                    State[iFeedAuto].bRearCanUse=false;
+                    bRearDeliveredPending[iFeedAuto]=false;
+                    RearGrid[iFeedAuto].Clear();
+                    RearKind[iFeedAuto]=eTrayKindNormal;
+                    RearTrayID[iFeedAuto]="";
+                    return true;
+                }
+                //K_RETRY (or any other) : stay in case 200 and re-read next cycle.
+            }
             break;
 
         case 1000:

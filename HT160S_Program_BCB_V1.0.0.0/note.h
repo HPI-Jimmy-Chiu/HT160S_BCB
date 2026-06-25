@@ -148,6 +148,7 @@ extern PACKAGE TfNote *fNote;
 void ShowCylinderError(int Code, int Type);
 void ShowMotorError(AnsiString Code);
 void ShowMotorError(AnsiString Code, AnsiString sFunc);
+int  ShowMotorLimitError(AnsiString Code, AnsiString Message, AnsiString Detail);
 int  ShowSuckError(TMySucker &Ptr, int CodeType, int KCode, AnsiString HappenRegion);
 int  ShowSuckError(TMyKitSuck &Ptr, int CodeType, int KCode, AnsiString errPart, int iDuplicate=0);
 int  ShowSystemError(int CodeType, int KCode);

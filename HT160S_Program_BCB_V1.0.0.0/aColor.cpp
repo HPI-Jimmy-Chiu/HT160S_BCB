@@ -598,7 +598,7 @@ bool TColorModule::MoveColorY(int Position)
         return true;
     if(HSys.Mot.MColorY->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Color Y motor will out of limit");
+        ShowMyMessage("Color Y motor will out of limit", HSys.Mot.MColorY->SoftLimitDetail(Position));
         return true;
     }
     return HSys.Mot.MColorY->MotorMove(Position);
@@ -752,7 +752,7 @@ bool TColorModule::DoReadColor2D(int Flag)
             }
             if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Teach.ColorRead2DXPosition)==false)
             {
-                ShowMyMessage("Color CCD X motor will out of limit");
+                ShowMyMessage("Color CCD X motor will out of limit", HSys.Mot.MTopCCDX_Color->SoftLimitDetail(Teach.ColorRead2DXPosition));
                 ScanTask=100;
                 break;
             }

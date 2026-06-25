@@ -92,6 +92,25 @@ void ShowMyMessage(AnsiString S)
     MyMessageBox->ShowModal();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260625 : alarm popup with an explicit second detail line (S2 ->
+//Label2). Same stopping behavior as the single-arg ShowMyMessage; used by the motor
+//out-of-limit callers to show the numeric target / soft-limit values.
+void ShowMyMessage(AnsiString S1, AnsiString S2)
+{
+    if(bCanShow==false)
+        return;
+    EnsureMyMessageBox();
+    if(MyMessageBox->fShow)
+        return;
+
+    HSys.DecStopAllMotor();
+    HSys.Sys.SystemStart=false;
+    PrepareNormalMessage(S1, S2, "Pause");
+    MyMessageBox->fScanPanel=true;
+    MyMessageBox->bFormShowNoStop=false;
+    MyMessageBox->ShowModal();
+}
+//---------------------------------------------------------------------------
 void ShowMyMessage(char *S)
 {
     ShowMyMessage(AnsiString(S));

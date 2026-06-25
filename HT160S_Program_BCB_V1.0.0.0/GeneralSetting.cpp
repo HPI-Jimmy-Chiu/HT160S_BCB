@@ -37,6 +37,7 @@ void THT160GeneralSetting::SetDefault()
 	bShowSortArmPlaceCheck=false;
 	bUseTrayDatumModel=true;
 	iLoaderYSafeDistance=10000;
+	bFrontSeparateInterlock=true;
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
@@ -82,6 +83,7 @@ void THT160GeneralSetting::Load()
 	bShowSortArmPlaceCheck=Ini->ReadBool("Diagnostic", "ShowSortArmPlaceCheck", false);
 	bUseTrayDatumModel=Ini->ReadBool("HardwareInstall", "UseTrayDatumModel", true);
 	iLoaderYSafeDistance=Ini->ReadInteger("Safety", "LoaderYSafeDistance", 10000);
+	bFrontSeparateInterlock=Ini->ReadBool("Safety", "FrontSeparateInterlock", true);
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
@@ -121,6 +123,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("Diagnostic", "ShowSortArmPlaceCheck", bShowSortArmPlaceCheck);
 	Ini->WriteBool("HardwareInstall", "UseTrayDatumModel", bUseTrayDatumModel);
 	Ini->WriteInteger("Safety", "LoaderYSafeDistance", iLoaderYSafeDistance);
+	Ini->WriteBool("Safety", "FrontSeparateInterlock", bFrontSeparateInterlock);
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);

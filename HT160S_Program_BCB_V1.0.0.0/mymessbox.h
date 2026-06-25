@@ -50,6 +50,7 @@ public:
 //---------------------------------------------------------------------------
 extern PACKAGE TMyMessageBox *MyMessageBox;
 void ShowMyMessage(AnsiString S);
+void ShowMyMessage(AnsiString S1, AnsiString S2);
 void ShowMyMessage(char *S);
 void ShowMyMessage(int Code);
 void ShowMyOKMessage(char *str);

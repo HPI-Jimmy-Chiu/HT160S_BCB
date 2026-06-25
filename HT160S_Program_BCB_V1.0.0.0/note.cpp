@@ -716,6 +716,15 @@ void ShowMotorError(AnsiString Code, AnsiString sFunc)
     ChangeRunMode(Run_Home);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260625 : motor soft-limit alarm via the full Note panel
+//(code + message + numeric detail line), mirroring HT9045 ShowErrorMessage("WAR0154",
+//.., "X=..") for the In-Arm X limit. Detail carries the explicit target / soft-limit
+//values. RETRY lets the operator correct teach / re-home and resume.
+int ShowMotorLimitError(AnsiString Code, AnsiString Message, AnsiString Detail)
+{
+    return ShowNoteAlarm(Code, Message, Detail, K_RETRY, "pn_System");
+}
+//---------------------------------------------------------------------------
 int ShowSuckError(TMySucker &Ptr, int CodeType, int KCode, AnsiString HappenRegion)
 {
     AnsiString Code;

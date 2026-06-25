@@ -1783,7 +1783,7 @@ object fiosetview: Tfiosetview
               Left = 65
               Top = 45
               Width = 45
-              Height = 14
+              Height = 18
               Hint = #20998#38626#27773#32568
               BevelInner = bvRaised
               Caption = '<->'
@@ -2171,7 +2171,7 @@ object fiosetview: Tfiosetview
               Left = 65
               Top = 45
               Width = 45
-              Height = 14
+              Height = 18
               Hint = #20998#38626#27773#32568
               BevelInner = bvRaised
               Caption = '<->'
@@ -2724,9 +2724,9 @@ object fiosetview: Tfiosetview
         Top = 0
         Width = 841
         Height = 698
-        ActivePage = TabSheet3
+        ActivePage = TabSheet2
         Align = alClient
-        TabIndex = 0
+        TabIndex = 1
         TabOrder = 0
         object TabSheet3: TTabSheet
           Caption = 'Auto 1~3'
@@ -3057,31 +3057,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel9: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto1_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel20: TPanel
               Left = 4
               Top = 3
@@ -3096,7 +3071,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel21: TPanel
               Left = 767
@@ -3112,7 +3087,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
             object BtnPanel12: TBtnPanel
               Left = 688
@@ -3130,7 +3105,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -3146,7 +3121,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
           end
           object Panel42: TPanel
@@ -3386,31 +3361,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel42: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto2_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel67: TPanel
               Left = 4
               Top = 3
@@ -3425,7 +3375,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel68: TPanel
               Left = 767
@@ -3441,7 +3391,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
             object BtnPanel43: TBtnPanel
               Left = 688
@@ -3459,7 +3409,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -3475,7 +3425,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
           end
           object Panel72: TPanel
@@ -3715,31 +3665,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel58: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto3_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel105: TPanel
               Left = 4
               Top = 3
@@ -3754,7 +3679,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel106: TPanel
               Left = 767
@@ -3770,7 +3695,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
             object BtnPanel59: TBtnPanel
               Left = 688
@@ -3788,7 +3713,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -3804,7 +3729,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
           end
         end
@@ -4137,31 +4062,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel64: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto4_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel118: TPanel
               Left = 4
               Top = 3
@@ -4176,7 +4076,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel119: TPanel
               Left = 767
@@ -4192,7 +4092,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
             object BtnPanel65: TBtnPanel
               Left = 688
@@ -4210,7 +4110,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -4226,7 +4126,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
           end
           object Panel121: TPanel
@@ -4466,31 +4366,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel75: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto5_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel125: TPanel
               Left = 4
               Top = 3
@@ -4505,7 +4380,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel126: TPanel
               Left = 767
@@ -4521,7 +4396,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
             object BtnPanel76: TBtnPanel
               Left = 688
@@ -4539,7 +4414,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -4555,7 +4430,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
           end
           object Panel128: TPanel
@@ -4795,31 +4670,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel81: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto6_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel143: TPanel
               Left = 4
               Top = 3
@@ -4834,7 +4684,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel144: TPanel
               Left = 767
@@ -4850,7 +4700,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
             object BtnPanel82: TBtnPanel
               Left = 688
@@ -4868,7 +4718,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -4884,7 +4734,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 9
+              TabOrder = 8
             end
           end
           object Panel146: TPanel

@@ -1,5 +1,5 @@
 Motorname,Alias,Direction,GearRatio,HomeDirectior,HomeHighSpeed,HomeLowSpeed,InitSpeed,JogHighSpeed,JogLowSpeed,Rate,SoftLimitN,SoftLimitP,Enable,ServoAlarmOn,Range,1P2P,SensorType,SimulateSpeed,CardModel,BoardID,Port,Acc,Dec,MotorKind,FlushPanel,HomeOrder,LimitLogic,In1Logic,EncoderDir
-M01,MSortingArmX,0,0.5,1,100,10,10,5000,10,1500,-100,160000,1,1,30,1,1,10000,MC88X1,0,0,0.05,0.05,0,,,0,0,1
+M01,MSortingArmX,0,0.5,1,100,10,10,5000,10,1500,-100,170000,1,1,30,1,1,10000,MC88X1,0,0,0.05,0.05,0,,,0,0,1
 M02,MTrayArmX,0,1,1,100,10,10,5000,10,2000,-100,173100,1,1,30,1,1,10000,MC88X1,0,1,1,1,0,,,0,0,1
 M03,MEmptyY,0,0.9,1,100,10,10,5000,10,1000,-100,83800,1,1,30,1,1,10000,MC88X1,0,2,1,1,0,,,0,0,1
 M04,MLoaderY_1,0,0.9,1,100,10,10,5000,10,1500,-100,83800,1,1,30,1,1,10000,MC88X1,0,3,0.1,0.1,0,,,0,0,1

@@ -511,7 +511,7 @@ bool TSortArmModule::MoveSortArmX(int Position)
         return false;
     if(HSys.Mot.MSortingArmX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Sorting Arm X motor will out of limit");
+        ShowMotorLimitError("WAR0154", "Sorting Arm X motor will out of limit", HSys.Mot.MSortingArmX->SoftLimitDetail(Position));
         return false;
     }
     //AI(HT160S-Maintainer) 20260622 : suck-nozzle home interlock (single rule via
@@ -554,7 +554,7 @@ bool TSortArmModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Loader Y motor will out of limit");
+        ShowMyMessage("Loader Y motor will out of limit", Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -568,7 +568,7 @@ bool TSortArmModule::MoveAutoY(int AutoIndex, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Auto Y motor will out of limit");
+        ShowMyMessage("Auto Y motor will out of limit", Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -582,7 +582,7 @@ bool TSortArmModule::MovePitchToTrayPitch()
         return true;
     if(HSys.Mot.MPitchX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Pitch X motor will out of limit");
+        ShowMyMessage("Pitch X motor will out of limit", HSys.Mot.MPitchX->SoftLimitDetail(Position));
         return false;
     }
     return HSys.Mot.MPitchX->MotorMove(Position);
@@ -1457,7 +1457,29 @@ void TSortArmModule::DoSortArm(int &Task)
                 break;
             }
 
-            iActiveLoaderNo=LoaderModule->GetSortingLoaderNo();
+            //AI(ht160s-sortarm) 20260625 : STICKY side-commit (operator rule : NEVER abandon a
+            //half-picked Loader tray). A tray needing multiple pick batches drops SortArm back to
+            //idle (Task=1) between batches; the old code RE-SELECTED via GetSortingLoaderNo every
+            //idle cycle and GetSortingLoaderNo always prefers side 1, so with both sides READY_SORT
+            //it would switch to side 1 mid-tray, park the abandoned loaded car in the sort zone, and
+            //deadlock the rail (PickTask stuck at 30; State Record 2026-06-25 22_29_43). Fix : while
+            //the LAST/CURRENT active side still has pickable ICs, KEEP that same side and do NOT call
+            //GetSortingLoaderNo. HasPickableIC reads ONLY the carriage tray grid (not State->Status),
+            //so it stays true across the per-batch ReleaseSortOwner LS_ToRear->LS_READY_SORT transient.
+            //Only once the active side's tray is fully drained (no pickable IC -> it discharges and
+            //leaves the rail) do we pick a new side. Net : one tray fully sorted at a time; the
+            //non-active car is never left parked mid-sort-zone (SortArm only moves a side into the
+            //sort zone while committed to picking it), so no explicit non-active "hold out of sort
+            //zone" guard is needed - SortArm is the sole mover of a Loader-Y into the sort zone, and
+            //IsLoaderYMoveSafe remains the per-move collision backstop.
+            if(iActiveLoaderNo>0 && LoaderModule->HasPickableIC(iActiveLoaderNo))
+            {
+                //keep the committed side (re-acquired inside DoPickFromLoader::AcquireSortOwner)
+            }
+            else
+            {
+                iActiveLoaderNo=LoaderModule->GetSortingLoaderNo();
+            }
             if(iActiveLoaderNo>0)
             {
                 PickTask=1;

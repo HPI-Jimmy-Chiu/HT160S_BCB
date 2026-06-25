@@ -455,6 +455,15 @@ bool TMyMotor::CheckSoftLimit(int p, bool bAlarm)
     return (p<=Motor->SoftLimitP && p>=Motor->SoftLimitN);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260625 : build the explicit numeric detail line for an
+//out-of-limit popup. Units are 1/100mm (same as teach / encoder), so an engineer can
+//read the requested target against the configured soft-limit band directly.
+AnsiString TMyMotor::SoftLimitDetail(int p)
+{
+    return AnsiString().sprintf("target=%d  now=%d  soft limit N=%d ~ P=%d  (unit:1/100mm)",
+        p, Position, GetSoftLimitN(), GetSoftLimitP());
+}
+//---------------------------------------------------------------------------
 bool TMyMotor::MotorMoveSub(int p, bool bCheckLed)
 {
     (void)bCheckLed;

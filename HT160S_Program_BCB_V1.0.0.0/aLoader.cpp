@@ -207,7 +207,7 @@ bool TLoaderModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Loader Y motor will out of limit");
+        ShowMyMessage("Loader Y motor will out of limit", Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -308,7 +308,7 @@ bool TLoaderModule::MoveTopCcdX(int Position)
         return false;
     if(HSys.Mot.MTopCCDX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Top CCD X motor will out of limit");
+        ShowMyMessage("Top CCD X motor will out of limit", HSys.Mot.MTopCCDX->SoftLimitDetail(Position));
         return false;
     }
     return HSys.Mot.MTopCCDX->MotorMove(Position);
@@ -666,6 +666,34 @@ bool TLoaderModule::HasActiveTrayData(int LoaderNo, int Data)
     for(int YIndex=0; YIndex<YCount; YIndex++)
         for(int XIndex=0; XIndex<XCount; XIndex++)
             if(TrayMotor->Tray.Data[XIndex][YIndex]==Data)
+                return true;
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-sortarm) 20260625 : robust "this side still has pickable ICs" predicate
+//used by DoSortArm case 1 to KEEP picking the active side until its tray is fully
+//drained (operator rule : never abandon a half-picked tray). Reads ONLY the carriage
+//Tray grid, NOT State->Status, so it is immune to the per-batch LS_ToRear transient
+//(ReleaseSortOwner sets LS_ToRear, then DoLoader case 3000 flips it back to
+//LS_READY_SORT). Pickable = a cell holding a real IC (data > UNCHECK_IC, i.e.
+//HAS_OK_IC/NG), matching FindPickCells/IsPickableData. Requires fHasTray so a
+//discharged (cleared) side reports false and may be released.
+bool TLoaderModule::HasPickableIC(int LoaderNo)
+{
+    TTrayMotor *TrayMotor=NULL;
+    int XCount=GetTrayXCount();
+    int YCount=GetTrayYCount();
+
+    if(LoaderNo==1)
+        TrayMotor=HSys.VMot.MMLoaderY_1;
+    else if(LoaderNo==2)
+        TrayMotor=HSys.VMot.MMLoaderY_2;
+    if(TrayMotor==NULL || TrayMotor->fHasTray==false)
+        return false;
+
+    for(int YIndex=0; YIndex<YCount; YIndex++)
+        for(int XIndex=0; XIndex<XCount; XIndex++)
+            if(TrayMotor->Tray.Data[XIndex][YIndex]>UNCHECK_IC)
                 return true;
     return false;
 }
@@ -1434,6 +1462,8 @@ bool TLoaderModule::DoFrontDestackDown(int &SubTask, HTimer &Delay)
         case 3:
             if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
+                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
+                    break;   // interlock: wait while Empty front-separate is out
                 HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
                 Delay.Set(10);
                 Delay.On();
@@ -1503,6 +1533,8 @@ bool TLoaderModule::TestGoUpTray(int Flag)
         case 200:
             if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
+                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
+                    break;   // interlock: wait while Empty front-separate is out
                 HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
                 TestDelay.Set(10);
                 TestDelay.On();
@@ -1620,9 +1652,11 @@ AnsiString TLoaderModule::DescribeState()
         {
             int fy = GetLoaderFeedY(k);
             int dy = GetLoaderDischargeY(k);
+            int sy = (k==1) ? Teach.Loader1CarFirstSortYPosition : Teach.Loader2CarFirstSortYPosition;   //AI(ht160s-state-record-analysis) 20260625 : first sort row Y (diagnostic only)
             s += "  Side" + IntToStr(k)
                + " ->feed(" + IntToStr(fy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, fy) ? "OK" : "BLOCK")
                + "  ->disc(" + IntToStr(dy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, dy) ? "OK" : "BLOCK")
+               + "  ->sort(" + IntToStr(sy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, sy) ? "OK" : "BLOCK")
                + "\r\n";
         }
     }

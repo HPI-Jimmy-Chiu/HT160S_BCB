@@ -193,6 +193,7 @@ public:
     int GetErrorIndex();
     int GetSoftLimitP();
     int GetSoftLimitN();
+    AnsiString SoftLimitDetail(int p);   // numeric target/limit line for out-of-limit popups
     int GetLastHomePos();
     double GetGearRatio();
     bool GetEnable();

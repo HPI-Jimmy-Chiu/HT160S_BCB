@@ -5,6 +5,7 @@
 #pragma hdrstop
 
 #include "mycylin.h"
+#include "GeneralSetting.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -80,6 +81,16 @@ int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
             break;
     }
     return 0;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260625 : short-term mechanical interlock (see mycylin.h /
+//  General.ini [Safety] FrontSeparateInterlock). GetOutBit() reflects the commanded
+//  output in both real and SOFT_SIMULATE builds, so this serializes in sim too.
+bool IsFrontSeparateBlockedBy(TMyCylinder &Other)
+{
+    if(GeneralSetting.bFrontSeparateInterlock==false)
+        return false;
+    return Other.GetOutBit();
 }
 //---------------------------------------------------------------------------
 static void SetCylinderAlarm(int AlarmCode, AnsiString sFrom="")

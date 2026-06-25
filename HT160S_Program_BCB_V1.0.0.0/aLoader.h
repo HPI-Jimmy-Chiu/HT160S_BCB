@@ -114,6 +114,7 @@ public:
     AnsiString GetRearTrayID();
     void SetCurrentLotNumber(AnsiString Lot);
     bool IsLoaderReadyForSort(int LoaderNo);
+    bool HasPickableIC(int LoaderNo);                     //AI(ht160s-sortarm) 20260625 : tray-content "still has pickable ICs" predicate (LS_ToRear-transient-safe) for DoSortArm sticky-side commit
     bool IsLoaderYMoveSafe(int LoaderNo, int Position);   //AI(ht160s-sortarm) 20260624 : public so SortArm's shared-rail Loader-Y move reuses this canonical cross-side gap interlock (was private)
     int GetSortingLoaderNo();
     int GetLoaderStatus(int LoaderNo);

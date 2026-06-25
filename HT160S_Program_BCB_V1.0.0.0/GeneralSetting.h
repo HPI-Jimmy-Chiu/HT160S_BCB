@@ -68,6 +68,15 @@ public:
 	// commissioning value. Set via [Safety] LoaderYSafeDistance in General.ini.
 	int iLoaderYSafeDistance;
 
+	// Safety (short-term mechanical interlock) : the Empty and Loader front
+	// separate-tray cylinders (C_Empty_FrontSeparateTray_1 /
+	// C_Loader_FrontSeparateTray_1) physically clash if both extend at the same
+	// time. When true (default), each side waits to extend its separate-tray
+	// cylinder while the other side's output is commanded out, serializing the two.
+	// Set [Safety] FrontSeparateInterlock=0 in General.ini once the mechanism is
+	// reworked so both can run concurrently again.
+	bool bFrontSeparateInterlock;
+
 	// Hardware install : does this machine physically have the LED bin display
 	// boards (HT9046 style, COM connected)? Commissioning fact. When false the
 	// bin display controller stays idle. Set via [BinDisplay] in General.ini.
