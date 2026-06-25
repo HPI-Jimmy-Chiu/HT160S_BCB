@@ -259,6 +259,19 @@ void HT160Gem::AddCEID()
     HGemPtr->SetCEIDContent(273, "AGVLDUnLDStatus", 1, rptSta, EquDefault);
     HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 1, rptFin, EquDefault);
     HGemPtr->SetCEIDContent(275, "AGVLdID",         1, rptCid, EquDefault);
+
+    //AI(ht160s-secsgem) 20260625 : two-stage Auto Full pre-notification. Register the
+    // discrete Full CEIDs (9045-aligned : Auto1-3=35/36/37, Auto4-6=148/149/150) on
+    // report 1 (machine context). Emitted from uAgvStation PollAndCall on the car-full
+    // edge. The matching Unloadtray CEIDs (136-138/140-142, fired in aAuto1To6
+    // DoDischargeTray) stay unregistered/empty on purpose : lightweight + 9045-faithful.
+    unsigned AutoFullCeid[6] = {35, 36, 37, 148, 149, 150};
+    for(int af=0; af<6; af++)
+    {
+        AnsiString DescAutoFull;
+        DescAutoFull.sprintf("Auto%d Full", af+1);
+        HGemPtr->SetCEIDContent(AutoFullCeid[af], DescAutoFull, 1, ReportID, EquDefault);
+    }
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddReprot()
@@ -901,6 +914,71 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
         HGemPtr->StringOut(sLog);
     }
     return 1;
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S1F2_OnLineData()
+{
+    //AI(ht160s-secsgem) 20260625 : host S1F1 Are-You-There -> reply S1F2 On Line Data.
+    //  L[2]{ A:MDLN, A:SOFTREV }. The sMachineType/sSoftwareVersion fields are private on
+    //  THGem (no public getter), so emit fixed ASCII literals here - same idiom HT172
+    //  uses at its GemInitial call site (literal model string). No clock/side effects.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->InitLocalHead(1, 2, 0);
+    HGemPtr->DataItemOut(2, HType.LIST_TYPE, NULL);
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("HT-160S"));
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("1.0.0.0"));
+    HGemPtr->SendLocalData();
+    HGemPtr->StringOut("[SECS] S1F2 on-line data sent (MDLN=HT-160S)");
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S1F14_ConnectRequestAcknowledge()
+{
+    //AI(ht160s-secsgem) 20260625 : host S1F13 Establish Communications Request -> reply
+    //  S1F14 L[2]{ B:COMMACK, L[2]{ A:MDLN, A:SOFTREV } }. COMMACK=0 (always accept),
+    //  matching HT172. MDLN/SOFTREV are ASCII literals (sMachineType/sSoftwareVersion are
+    //  private on THGem). No inbound parse needed - HT160 has no abort-on-format option.
+    if(HGemPtr==NULL)
+        return;
+    unsigned char COMMACK = 0;
+    HGemPtr->InitLocalHead(1, 14, 0);
+    HGemPtr->DataItemOut(2, HType.LIST_TYPE, NULL);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &COMMACK);
+    HGemPtr->DataItemOut(2, HType.LIST_TYPE, NULL);
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("HT-160S"));
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("1.0.0.0"));
+    HGemPtr->SendLocalData();
+    HGemPtr->StringOut("[SECS] S1F14 establish-comm acknowledged (COMMACK=0)");
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S2F32_DateAndTimeAcknowledge()
+{
+    //AI(ht160s-secsgem) 20260625 : host S2F31 Date and Time Set Request -> reply S2F32 TIACK.
+    //  TIACK=0 (accepted). MINIMAL port: acknowledge ONLY - deliberately does NOT write the
+    //  equipment OS clock (HT172 settime/setdate is excluded; setting the PC clock from a host
+    //  message is a side-effect that needs an explicit product decision + on-machine verify).
+    //  Single-byte reply via the proven S5F4 triad (HT160 has no LocalAcknowledge wrapper).
+    if(HGemPtr==NULL)
+        return;
+    unsigned char TIACK = 0;
+    HGemPtr->InitLocalHead(2, 32, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &TIACK);
+    HGemPtr->SendLocalData();
+    HGemPtr->StringOut("[SECS] S2F32 date/time acknowledged (TIACK=0, clock NOT set)");
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S5F4_EnableDisableAlarmAcknowledge()
+{
+    //AI(ht160s-secsgem) 20260625 : host S5F3 Enable/Disable Alarm Send -> reply S5F4
+    //  ACKC5=0 so the host's W-bit alarm-enable request does not T3-timeout. HT160
+    //  keeps alarms always-enabled for now (per-ALID enable/disable is a follow-up).
+    if(HGemPtr==NULL)
+        return;
+    unsigned char ACKC5 = 0;
+    HGemPtr->InitLocalHead(5, 4, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &ACKC5);
+    HGemPtr->SendLocalData();
+    HGemPtr->StringOut("[SECS] S5F4 alarm enable/disable acknowledged (ACKC5=0)");
 }
 //---------------------------------------------------------------------------
 void HT160Gem::S5F6_ListAlarmData()

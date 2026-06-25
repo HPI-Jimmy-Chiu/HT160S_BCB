@@ -82,6 +82,10 @@ public:
     virtual void AddReprot();
     virtual void S1F4_SelectedStatusReply();
     virtual void S1F12_StatusVariableNamelistReply();//AI(ht160s-secsgem) 20260611 : S1F11->S1F12 SV namelist
+    //AI(ht160s-secsgem) 20260625 : S1F1 are-you-there -> S1F2 on-line data
+    virtual void S1F2_OnLineData();
+    //AI(ht160s-secsgem) 20260625 : S1F13 establish-comm -> S1F14 connect-request ack
+    virtual void S1F14_ConnectRequestAcknowledge();
     //AI(ht160s-secsgem) 20260611 : GUI EC editor - same idle/range guard as S2F16.
     //  0=ok, 1=ECID not host-settable, 2=busy, 3=range/convert error.
     int GuiWriteTrayEC(unsigned ECID, AnsiString sValue);
@@ -90,6 +94,10 @@ public:
     virtual void S2F16_NewEquipmentConstantSendAcknowledge();//AI(ht160s-secsgem) 20260611 : S2F15->S2F16 EC write
     virtual void S2F14_EquipmentConstanData();
     virtual int  S2F42_Host_Command_Acknowledge();
+    //AI(ht160s-secsgem) 20260625 : S2F31 date/time set -> S2F32 TIACK (ack-only, no clock write)
+    virtual void S2F32_DateAndTimeAcknowledge();
+    //AI(ht160s-secsgem) 20260625 : S5F3 enable/disable alarm -> S5F4 ack
+    virtual void S5F4_EnableDisableAlarmAcknowledge();
     virtual void S5F6_ListAlarmData();
     virtual int  S7F2_ProcessProgramLoadGrant();
     virtual void S7F4_ProcessProgramAcknowledge();
