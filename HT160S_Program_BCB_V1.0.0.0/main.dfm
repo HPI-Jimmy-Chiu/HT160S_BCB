@@ -22,10 +22,10 @@ object fMain: TfMain
     Left = 0
     Top = 0
     Width = 1264
-    Height = 985
-    ActivePage = tsMonitorView
+    Height = 961
+    ActivePage = tsMain
     Align = alClient
-    TabIndex = 1
+    TabIndex = 0
     TabOrder = 0
     object tsMain: TTabSheet
       Caption = 'Main'
@@ -33,7 +33,7 @@ object fMain: TfMain
         Left = 0
         Top = 0
         Width = 1256
-        Height = 957
+        Height = 933
         Align = alClient
         TabOrder = 0
         object pnlMainMenu: TPanel
@@ -1265,7 +1265,7 @@ object fMain: TfMain
           Left = 682
           Top = 54
           Width = 573
-          Height = 902
+          Height = 878
           Align = alRight
           BevelOuter = bvNone
           TabOrder = 2
@@ -1398,14 +1398,14 @@ object fMain: TfMain
             Left = 0
             Top = 36
             Width = 573
-            Height = 866
+            Height = 842
             Align = alClient
             TabOrder = 1
             object Panel9: TPanel
               Left = 1
               Top = 1
               Width = 574
-              Height = 864
+              Height = 840
               Align = alLeft
               BevelOuter = bvNone
               BorderWidth = 4
@@ -1716,7 +1716,7 @@ object fMain: TfMain
               end
               object pal1: TPanel
                 Left = 4
-                Top = 744
+                Top = 720
                 Width = 566
                 Height = 116
                 Align = alBottom
@@ -2182,7 +2182,7 @@ object fMain: TfMain
               end
               object Panel1: TPanel
                 Left = 4
-                Top = 628
+                Top = 604
                 Width = 566
                 Height = 116
                 Align = alBottom
@@ -2224,7 +2224,7 @@ object fMain: TfMain
           Left = 1
           Top = 54
           Width = 681
-          Height = 902
+          Height = 878
           Align = alClient
           BevelOuter = bvNone
           TabOrder = 1
@@ -2478,7 +2478,7 @@ object fMain: TfMain
                 OnClick = pnRealDummyClick
               end
               object sbStartIcon: TSpeedButton
-                Left = 159
+                Left = 119
                 Top = 114
                 Width = 41
                 Height = 38
@@ -3208,7 +3208,7 @@ object fMain: TfMain
             Left = 0
             Top = 418
             Width = 681
-            Height = 484
+            Height = 460
             ActivePage = tsTrayStatus
             Align = alClient
             TabIndex = 0
@@ -3357,7 +3357,7 @@ object fMain: TfMain
                 Left = 374
                 Top = 0
                 Width = 299
-                Height = 456
+                Height = 432
                 Align = alRight
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWindowText
@@ -3372,7 +3372,7 @@ object fMain: TfMain
                 Left = 0
                 Top = 0
                 Width = 374
-                Height = 456
+                Height = 432
                 ActivePage = tsSimulation
                 Align = alClient
                 TabIndex = 0
@@ -3446,7 +3446,7 @@ object fMain: TfMain
         Left = 0
         Top = 0
         Width = 1256
-        Height = 957
+        Height = 933
         Align = alClient
         TabOrder = 0
         object pnlMonitorMenu: TPanel
@@ -4181,7 +4181,7 @@ object fMain: TfMain
           Left = 1109
           Top = 81
           Width = 146
-          Height = 875
+          Height = 851
           Align = alRight
           BevelInner = bvLowered
           Color = 12761254
@@ -4750,11 +4750,11 @@ object fMain: TfMain
           Left = 1
           Top = 81
           Width = 1108
-          Height = 875
-          ActivePage = TabOther
+          Height = 851
+          ActivePage = tsMotionView
           Align = alClient
           Style = tsButtons
-          TabIndex = 3
+          TabIndex = 0
           TabOrder = 2
           TabWidth = 104
           object tsMotionView: TTabSheet
@@ -4764,10 +4764,154 @@ object fMain: TfMain
               Left = 0
               Top = 0
               Width = 1100
-              Height = 844
+              Height = 820
               Align = alClient
               Color = 12761254
               TabOrder = 0
+              object lbCarTrayCount_Empty: TLabel
+                Left = 41
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Loader: TLabel
+                Left = 147
+                Top = 24
+                Width = 193
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Auto1: TLabel
+                Left = 359
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Auto2: TLabel
+                Left = 465
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Auto3: TLabel
+                Left = 571
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Auto4: TLabel
+                Left = 677
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Auto5: TLabel
+                Left = 783
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Auto6: TLabel
+                Left = 889
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
+              object lbCarTrayCount_Color: TLabel
+                Left = 995
+                Top = 24
+                Width = 87
+                Height = 16
+                Alignment = taCenter
+                AutoSize = False
+                Caption = '0'
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clNavy
+                Font.Height = -13
+                Font.Name = 'MS Sans Serif'
+                Font.Style = [fsBold]
+                ParentFont = False
+                Transparent = True
+              end
               object pnlLed: TPanel
                 Left = 5
                 Top = 5
@@ -5364,7 +5508,6 @@ object fMain: TfMain
                 Height = 153
                 Color = 9534289
                 TabOrder = 40
-                Visible = False
                 object mtColorTrayWork: TTMyTray
                   Left = 4
                   Top = 4
@@ -5555,7 +5698,7 @@ object fMain: TfMain
               Left = 0
               Top = 0
               Width = 1100
-              Height = 844
+              Height = 820
               Align = alClient
               BevelInner = bvLowered
               Color = 12761254
@@ -5564,7 +5707,7 @@ object fMain: TfMain
                 Left = 2
                 Top = 2
                 Width = 1096
-                Height = 840
+                Height = 816
                 ActivePage = tsTaskRecord
                 Align = alClient
                 TabIndex = 0
@@ -5576,7 +5719,7 @@ object fMain: TfMain
                     Left = 0
                     Top = 0
                     Width = 1088
-                    Height = 812
+                    Height = 788
                     Align = alClient
                     Color = 14670284
                     ItemHeight = 13
@@ -5593,7 +5736,7 @@ object fMain: TfMain
               Left = 0
               Top = 0
               Width = 1100
-              Height = 844
+              Height = 820
               Align = alClient
               BevelInner = bvLowered
               Color = 12761254
@@ -5602,7 +5745,7 @@ object fMain: TfMain
                 Left = 2
                 Top = 2
                 Width = 1096
-                Height = 840
+                Height = 816
                 ActivePage = TabSheet2
                 Align = alClient
                 TabIndex = 0
@@ -5693,5 +5836,47 @@ object fMain: TfMain
         end
       end
     end
+  end
+  object stbMain: TStatusBar
+    Left = 0
+    Top = 961
+    Width = 1264
+    Height = 24
+    Panels = <
+      item
+        Alignment = taCenter
+        Width = 150
+      end
+      item
+        Alignment = taCenter
+        Width = 150
+      end
+      item
+        Alignment = taCenter
+        Width = 150
+      end
+      item
+        Alignment = taCenter
+        Width = 120
+      end
+      item
+        Alignment = taCenter
+        Width = 80
+      end
+      item
+        Alignment = taCenter
+        Style = psOwnerDraw
+        Width = 100
+      end
+      item
+        Alignment = taCenter
+        Width = 80
+      end
+      item
+        Width = 160
+      end>
+    SimplePanel = False
+    SizeGrip = False
+    OnDrawPanel = stbMainDrawPanel
   end
 end

@@ -94,6 +94,99 @@ USEFORM("iosetview.cpp", fiosetview);
 #include "ComPort.h"
 #include "uPadInterface.h"
 #include "mymessbox.h"   //AI(general) 20260608 : ShowMyMessage instead of Application->MessageBox
+#include <ComCtrls.hpp>  //AI(ht160s-initflow) 20260624 : TProgressBar for the startup splash
+//---------------------------------------------------------------------------
+//AI(ht160s-initflow) 20260624 : startup progress splash (ref HT9045 fShowMessage/
+//UpdateForm). A code-built (no .dfm) frameless form shown during WinMain startup so the
+//operator sees an advancing progress bar instead of a frozen/blank screen ("looks
+//broken"). Paired with the whole-machine InitialOK flag (cmydef) so background handlers
+//no-op until startup finishes. NOT shown under headless --selftest-home. Phase B will
+//also drive UpdateInitProgress() from HSys.Initial() once that heavy init (currently in
+//the static SYSTEM_MODULAR ctor, before any window exists) is relocated into WinMain.
+static TForm        *gInitSplash = NULL;
+static TProgressBar *gInitBar    = NULL;
+static TLabel       *gInitLabel  = NULL;
+
+static void CreateInitSplash()
+{
+#ifdef SOFT_SIMULATE
+    if(g_SelfTestHome)
+        return;                              // headless self-test: no UI
+#endif
+    try
+    {
+        gInitSplash = new TForm(Application);
+        gInitSplash->BorderStyle = bsNone;
+        gInitSplash->Position    = poScreenCenter;
+        gInitSplash->Width       = 460;
+        gInitSplash->Height      = 150;
+        gInitSplash->Color       = clWhite;
+
+        gInitLabel = new TLabel(gInitSplash);
+        gInitLabel->Parent     = gInitSplash;
+        gInitLabel->Left       = 30;
+        gInitLabel->Top        = 34;
+        gInitLabel->Font->Size = 12;
+        gInitLabel->Caption    = "System initializing, please wait...";
+
+        gInitBar = new TProgressBar(gInitSplash);
+        gInitBar->Parent   = gInitSplash;
+        gInitBar->Left     = 30;
+        gInitBar->Top      = 80;
+        gInitBar->Width    = 400;
+        gInitBar->Height   = 24;
+        gInitBar->Min      = 0;
+        gInitBar->Max      = 100;
+        gInitBar->Position = 0;
+
+        gInitSplash->Show();
+        Application->ProcessMessages();
+    }
+    catch(...)
+    {
+        //a splash failure must never block boot - run without it
+        gInitSplash = NULL;
+        gInitBar    = NULL;
+        gInitLabel  = NULL;
+    }
+}
+
+//AI(ht160s-initflow) 20260624 : advance the startup progress bar and pump the message
+//queue so the splash repaints (window not flagged "Not Responding"). Safe no-op when the
+//splash was not created (headless / construction failed).
+void UpdateInitProgress(int iPercent)   //AI(ht160s-initflow) 20260624 : exported (cmydef.h) for HSys.Initial() in Phase B
+{
+    if(iPercent < 0)   iPercent = 0;
+    if(iPercent > 100) iPercent = 100;
+    try
+    {
+        if(gInitBar != NULL)
+            gInitBar->Position = iPercent;
+        if(gInitSplash != NULL)
+            Application->ProcessMessages();
+    }
+    catch(...)
+    {
+    }
+}
+
+static void DestroyInitSplash()
+{
+    try
+    {
+        if(gInitSplash != NULL)
+        {
+            gInitSplash->Close();
+            delete gInitSplash;              // owns and frees the child label/bar
+        }
+    }
+    catch(...)
+    {
+    }
+    gInitSplash = NULL;
+    gInitBar    = NULL;
+    gInitLabel  = NULL;
+}
 //---------------------------------------------------------------------------
 WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
@@ -115,22 +208,39 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //(HT172 does not need this because its IDE has those component
          //packages installed; HT160S_BCB uses local compatibility units.)
          RegisterIOViewStreamClasses();
+         //AI(ht160s-initflow) 20260624 : bring up the startup progress splash now,
+         //before the heavy CreateForm sequence + hardware init, so the operator sees
+         //progress instead of a dead screen. Torn down just before Application->Run().
+         CreateInitSplash();
+         UpdateInitProgress(2);
+         //AI(ht160s-initflow) 20260624 : Phase B - run the heavy hardware/config init
+         //HERE (relocated from the static SYSTEM_MODULAR ctor) so OpenMN200Card + file
+         //loads advance the splash instead of freezing a pre-window screen. MUST run
+         //before every CreateForm (forms read HSys) and InitializeXxxModule (read HSys.VMot).
+         HSys.Initial();
+         UpdateInitProgress(48);
          //AI(general) 20260603 : create every form once at startup (ref HT172
          //HT172.cpp WinMain). fMain must be first so it becomes Application->
-         //MainForm. HSys is a global, so its hardware database (motors/sensors)
-         //is already loaded before any form constructor runs. Forms are shown
-         //later via Show/ShowModal; their DFM Visible=False keeps them hidden.
+         //MainForm. HSys.Initial() above has loaded the hardware database, so form
+         //constructors that read HSys are safe. Forms are shown later via Show/
+         //ShowModal; their DFM Visible=False keeps them hidden.
          Application->CreateForm(__classid(TfMain), &fMain);
+         UpdateInitProgress(52);
          Application->CreateForm(__classid(TDataModule1), &DataModule1);
          Application->CreateForm(__classid(TMyMessageBox), &MyMessageBox);
          Application->CreateForm(__classid(TfNote), &fNote);
          Application->CreateForm(__classid(TfHome), &fHome);
+         UpdateInitProgress(58);
          Application->CreateForm(__classid(Tfiosetview), &fiosetview);
+         UpdateInitProgress(63);
          Application->CreateForm(__classid(TfSetup), &fSetup);
          Application->CreateForm(__classid(TfData), &fData);
          Application->CreateForm(__classid(TfMaintenance), &fMaintenance);
+         UpdateInitProgress(68);
          Application->CreateForm(__classid(TfTeach), &fTeach);
+         UpdateInitProgress(74);
          Application->CreateForm(__classid(TfMotorTest), &fMotorTest);
+         UpdateInitProgress(80);
          Application->CreateForm(__classid(TfOffset), &fOffset);
          Application->CreateForm(__classid(TfSpeed), &fSpeed);
          Application->CreateForm(__classid(TFormSysTools), &FormSysTools);
@@ -138,7 +248,12 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          Application->CreateForm(__classid(TfLan), &fLan);
          Application->CreateForm(__classid(TfComPort), &fComPort);
          Application->CreateForm(__classid(TfPadInterface), &fPadInterface);
+         UpdateInitProgress(86);
          g_EventLog.Init();
+         //AI(ht160s-statusbar) 20260624 : HT172 program-start version log (was logged
+         //from the systools timer reading the version panel). Routed through the HT160
+         //event-log path (RecordProcess -> g_EventLog). fNote already exists (created above).
+         RecordProcess(AnsiString("Program Start with version ")+MainVersion);
          //AI(general) 20260617 : log retention (auto-prune old day/month folders).
          //Values from General.ini [LogRetention]; audit logs kept longer than the
          //high-volume comm/diagnostic channels. GeneralSetting is already loaded
@@ -157,6 +272,7 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          InitializeTrayArmModule();
          InitializeSortArmModule();
          InitializeColorModule();
+         UpdateInitProgress(90);
          //AI(general) 20260608 : create the State Record snapshot recorder
          //(no FSM). Default output folder D:\HT160S_StateRecord\. Sampling is
          //driven from DataModule1::DoAllProcess(); snapshot from the main-form
@@ -170,6 +286,8 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
              AnsiString WiringReport;
              if(ValidateWiring(WiringReport) == false)
              {
+                 //AI(ht160s-initflow) 20260624 : drop the splash before the fatal dialog.
+                 DestroyInitSplash();
                  //AI(general) 20260608 : no Application->MessageBox - use ShowMyMessage.
                  ShowMyMessage("Wiring Check Failed\r\n" + WiringReport);
                  return 0;
@@ -179,7 +297,9 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          FSECS = new TFSECS(Application);
          HSys.MyGem = new HT160Gem("HT160S", HGem);
          FSECS->GemInitial("HT160S", "1.0.0.0");
+         UpdateInitProgress(94);
          InitializeHT160Automation(fMain);
+         UpdateInitProgress(96);
          //AI(general) 20260601 : start the run-control thread (ref HT172
          //main.cpp TfMain::FormShow "MyThread=new TRunControl(false)").
          //Without this, TRunControl::Execute()'s Synchronize(MainProc) loop
@@ -187,7 +307,14 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //called and the machine logic stays dead. false=run immediately.
          //Teardown is in TfMain::FormClose (Terminate+WaitFor while the VCL
          //message loop is still alive) to avoid a Synchronize deadlock.
+         //AI(ht160s-initflow) 20260624 : startup complete - release the whole-machine
+         //init guard so the worker thread's MainProc (and the serial-comm Timer1) run
+         //for real. Then tear the splash down right before Application->Run() shows the
+         //main form (no message pump in between, so no blank flash).
+         UpdateInitProgress(100);
+         InitialOK = true;
          MyThread = new TRunControl(false);
+         DestroyInitSplash();
          Application->Run();
          //AI(general) 20260601 : thread already Terminated+WaitFor in
          //TfMain::FormClose; safe to release here (ref HT172 "delete MyThread").

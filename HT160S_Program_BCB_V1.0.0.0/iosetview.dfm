@@ -2724,9 +2724,9 @@ object fiosetview: Tfiosetview
         Top = 0
         Width = 841
         Height = 698
-        ActivePage = TabSheet2
+        ActivePage = TabSheet3
         Align = alClient
-        TabIndex = 1
+        TabIndex = 0
         TabOrder = 0
         object TabSheet3: TTabSheet
           Caption = 'Auto 1~3'
@@ -2927,8 +2927,8 @@ object fiosetview: Tfiosetview
               Alias = 'SnAuto1_InputFullTray'
             end
             object MyLedAuto1InputEnd: TMyLed
-              Left = 35
-              Top = 24
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
@@ -3256,8 +3256,8 @@ object fiosetview: Tfiosetview
               Alias = 'SnAuto2_InputFullTray'
             end
             object MyLedAuto2InputEnd: TMyLed
-              Left = 35
-              Top = 24
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
@@ -3585,8 +3585,8 @@ object fiosetview: Tfiosetview
               Alias = 'SnAuto3_InputFullTray'
             end
             object MyLedAuto3InputEnd: TMyLed
-              Left = 35
-              Top = 24
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
@@ -4007,8 +4007,8 @@ object fiosetview: Tfiosetview
               Alias = 'SnAuto4_InputFullTray'
             end
             object MyLedAuto4InputEnd: TMyLed
-              Left = 35
-              Top = 24
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
@@ -4336,8 +4336,8 @@ object fiosetview: Tfiosetview
               Alias = 'SnAuto5_InputFullTray'
             end
             object MyLedAuto5InputEnd: TMyLed
-              Left = 35
-              Top = 24
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
@@ -4665,8 +4665,8 @@ object fiosetview: Tfiosetview
               Alias = 'SnAuto6_InputFullTray'
             end
             object MyLedAuto6InputEnd: TMyLed
-              Left = 35
-              Top = 24
+              Left = 6
+              Top = 45
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal

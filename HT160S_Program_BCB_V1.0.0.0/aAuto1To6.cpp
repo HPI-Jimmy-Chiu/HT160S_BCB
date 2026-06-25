@@ -996,6 +996,13 @@ bool TAutoModule::IsDrainedForAmr(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return false;
+    //AI(ht160s-agv) 20260625 : SIM-ONLY bypass so the PREP->READY (CEID273) gate
+    //cannot latch the AMR lock forever on a laptop run. MUST stay strictly inside
+    //IsSoftSimulate(): on real hardware this gate also enforces bResidueClear (the
+    //SortArm place-residue interlock) - an unconditional bypass would let the AGV
+    //leave with un-verified IC residue. The real-hardware checks below stay active.
+    if(IsSoftSimulate())
+        return true;
     RefreshAutoState();
     //AI(ht160s-agv) 20260623 : Ready also needs the stacking FrontRise back home (not
     //commanded up) so the handoff starts with the front cylinder idle (user requirement).

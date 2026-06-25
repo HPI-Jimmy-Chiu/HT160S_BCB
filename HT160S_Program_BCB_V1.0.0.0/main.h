@@ -36,6 +36,22 @@ enum
     MAIN_FEATURE_BADGE_CAPACITY = MAIN_FEATURE_BADGE_COLS * MAIN_FEATURE_BADGE_ROWS
 };
 
+//AI(ht160s-statusbar) 20260624 : symbolic stbMain panel indices (port of HT172
+// main.h eMainState). emsVersion(0)=software version; 1=Model 2=HandlerID
+// 3=SerialNo are filled by UpdateMachineIdentity(); emsSim(5)=compile-time
+// SIMULATE indicator (red, owner-drawn, #ifdef SOFT_SIMULATE only); 7=live clock.
+enum eMainState
+{
+    emsVersion = 0,
+    emsModel,
+    emsHandlerID,
+    emsSerialNo,
+    emsSpare4,
+    emsSim,
+    emsSpare6,
+    emsTime
+};
+//---------------------------------------------------------------------------
 enum TMainFeatureStatusIndex
 {
     eMainFeatureSECS = 0,
@@ -335,6 +351,16 @@ __published:	// IDE-managed Components
     TMemo *memoIOStatus;
     TTabSheet *TabSuckStatus;
     TMemo *memoSuckStatus;
+    TLabel *lbCarTrayCount_Loader;
+    TLabel *lbCarTrayCount_Empty;
+    TLabel *lbCarTrayCount_Color;
+    TLabel *lbCarTrayCount_Auto1;
+    TLabel *lbCarTrayCount_Auto2;
+    TLabel *lbCarTrayCount_Auto3;
+    TLabel *lbCarTrayCount_Auto4;
+    TLabel *lbCarTrayCount_Auto5;
+    TLabel *lbCarTrayCount_Auto6;
+    TStatusBar *stbMain;
     void __fastcall sbLaguageClick(TObject *Sender);
     void __fastcall sbProductClick(TObject *Sender);
     void __fastcall sbMaintanceClick(TObject *Sender);
@@ -375,6 +401,7 @@ __published:	// IDE-managed Components
     void __fastcall btnEditLotClick(TObject *Sender);
     void __fastcall btnRemoveLotClick(TObject *Sender);
     void __fastcall sgLotListClick(TObject *Sender);
+    void __fastcall stbMainDrawPanel(TStatusBar *StatusBar, TStatusPanel *Panel, const TRect &Rect);
 private:	// User declarations
     TPanel *FeatureStatusPanels[MAIN_FEATURE_STATUS_COUNT];
     TLabel *FeatureStatusNameLabels[MAIN_FEATURE_STATUS_COUNT];
@@ -415,10 +442,13 @@ public:		// User declarations
     void __fastcall SetSimulateScreenStatus();
     void __fastcall ShowMotorInfo();
     void __fastcall ShowUnloadAutoInfo();   //AI(ht160s-motion-view) 20260618 : fill Unload Auto1~6 Bin/Lot/ID/Cnt panels
+    void __fastcall ShowCarTrayCount();      //AI(ht160s-agv) 20260624 : PanelMain6 header per-zone trays-on-AMR-car count
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);
     void LoadRunModePicture();
     void LoadStartModePicture();
     void Start();
+    void DoStartArm();   //AI(machine-command-layer) 20260625 : arm half of Start; only MachineStart() calls it
+    void HomeCore();     //AI(machine-command-layer) 20260625 : shared HOME sequence (Home button + SECS HOME)
     bool CheckLotDataReady(AnsiString &Reason);
     void ScanPanelKeys();   //AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch (HT172 ScanKey port)
 };

@@ -62,6 +62,10 @@ void TLoaderModule::InitialFlag()
     iYOwner[0]=LOADER_Y_OWNER_NONE;
     iYOwner[1]=LOADER_Y_OWNER_NONE;
     SimuCcdCycleIndex=0;
+    iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - reset feed counter
+    RearKind=eTrayKindNormal;
+    RearTrayID="";
+    RearSourceTray.Clear();
     CurrentLotNumber="";
     TestUpTask=1;
     TestDownTask=1;
@@ -341,6 +345,11 @@ bool TLoaderModule::IsAmrLocked()
 //up); destack idle so the AGV may refill. Held stable by bAmrLocked.
 bool TLoaderModule::IsReadyForAmrHandoff()
 {
+    //AI(ht160s-agv) 20260625 : sim defense-in-depth - in SOFT_SIMULATE the front
+    //destacker out-bits are normally already false; assert ready so the PREP->READY
+    //gate cannot latch the lock on a laptop run. Real hardware keeps the interlock.
+    if(IsSoftSimulate())
+        return true;
     return (HSys.Cyn.C_Loader_FrontRiseTray_1.GetOutBit()==false
             && HSys.Cyn.C_Loader_FrontRiseTray_2.GetOutBit()==false
             && HSys.Cyn.C_Loader_FrontSeparateTray_1.GetOutBit()==false);
@@ -369,6 +378,24 @@ bool TLoaderModule::IsInputHandoffFinishedForAmr()
 void TLoaderModule::RefillSimInfeed()
 {
     iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[0];
+    iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - new car => restart feed serial
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - D2 stack-position convention.
+//No sensor reads the tray kind; software infers it from the feed order on the
+//shared supply car. Confirmed convention: the identity tray is fed LAST, the top
+//cover just before it, the rest are normal work trays.
+//   feedSerial==total   => Identity
+//   feedSerial==total-1 => Cover
+//   else                => Normal
+//Single source of truth for the kind-by-position rule.
+eTrayKind TLoaderModule::GetFedTrayKind(int feedSerial, int total)
+{
+    if(feedSerial>=total)
+        return eTrayKindIdentity;
+    if(feedSerial==total-1)
+        return eTrayKindCover;
+    return eTrayKindNormal;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260624 : trays currently on the shared Loader supply car, for the
@@ -547,7 +574,29 @@ bool TLoaderModule::IsAllCleanOutFinish()
 //---------------------------------------------------------------------------
 void TLoaderModule::NotifyTrayArmPickRearTray()
 {
+    //AI(ht160s-tray-source) 20260625 : Phase 6 A.5 - rear tray taken by TrayArm;
+    //the data has been transferred to the arm, so clear the rear hold too
+    //(extends the Phase 1-5 "cleared rear => cleared grid" invariant).
     bRearHasTray=false;
+    RearKind=eTrayKindNormal;
+    RearTrayID="";
+    RearSourceTray.Clear();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) 20260625 : Phase 6 A.5 - rear-tray accessors (return-by-value).
+eTrayKind TLoaderModule::GetRearTrayKind()
+{
+    return RearKind;
+}
+//---------------------------------------------------------------------------
+TMyTray TLoaderModule::GetRearSourceTray()
+{
+    return RearSourceTray;
+}
+//---------------------------------------------------------------------------
+AnsiString TLoaderModule::GetRearTrayID()
+{
+    return RearTrayID;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::AcquireFrontOwner(int LoaderNo)
@@ -991,6 +1040,21 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             {
                 TrayMotor->fHasTray=true;
                 PrepareTrayMap(LoaderNo);
+                //AI(ht160s-tray-source) 20260625 : Phase 6 A.3 - tag this fed tray's
+                //kind on the carriage Tray grid (born here, mirrors Color BirthIdentityTray).
+                //Identity trays get a sim TrayID; real machine leaves it blank (no 2D read at
+                //feed, D2) and Color re-reads/re-births the 2D on reuse.
+                iFeedSerial++;
+                {
+                    eTrayKind kFed=GetFedTrayKind(iFeedSerial, GetCarTrayCount());
+                    TrayMotor->Tray.SetKind(kFed);
+                    if(kFed==eTrayKindIdentity)
+                        TrayMotor->Tray.TrayID = IsSoftSimulate()
+                            ? (AnsiString("LOAD2D_")+Now().FormatString("hhnnsszzz"))
+                            : AnsiString("");
+                    else
+                        TrayMotor->Tray.TrayID = "";
+                }
                 State->FeedTask=10000;
             }
             else
@@ -1323,6 +1387,12 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 3000:
             if(LeanCylinder->Pop() || IsSoftSimulate())
             {
+                //AI(ht160s-tray-source) 20260625 : Phase 6 A.4 - transfer the tray's
+                //data into the module-level rear hold BEFORE ClearTray releases the
+                //carriage (U3 transfer-chain relay; carriage is reused by the next feed).
+                RearKind       = TrayMotor->Tray.GetKind();
+                RearTrayID     = TrayMotor->Tray.TrayID;
+                RearSourceTray = TrayMotor->Tray;
                 TrayMotor->ClearTray();
                 Task=4000;
             }
@@ -1506,6 +1576,10 @@ AnsiString TLoaderModule::DescribeState()
        + "  iYOwner=[" + IntToStr(iYOwner[0]) + "," + IntToStr(iYOwner[1]) + "]"
        + "  iTopCcdCount=" + IntToStr(iTopCcdCount)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
+    //AI(ht160s-tray-source) 20260625 : Phase 6 A.6 - rear-tray hold + feed serial.
+    s += "  RearKind=" + IntToStr((int)RearKind)
+       + "  RearTrayID=" + RearTrayID
+       + "  iFeedSerial=" + IntToStr(iFeedSerial) + "\r\n";
     for(int n=1; n<=2; n++)
     {
         TLoaderSideState *St = GetSide(n);

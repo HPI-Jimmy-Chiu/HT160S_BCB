@@ -9,6 +9,7 @@
 #include <ComCtrls.hpp>
 #include <ExtCtrls.hpp>
 #include "SPComm.hpp"
+#include "ICommPort.h"
 //---------------------------------------------------------------------------
 // AI(ht160s-maintainer) 20260615 : Bin-display LED COM support (no DFM control; the
 // port is created at runtime and wired to HSys.BinDisCtrl->CommBin). Notes kept out
@@ -53,7 +54,7 @@ private:
     void EnsurePadInterface();
     void ConfigurePadComm();
     int GetSelectedBaud();
-    TComm *BinComm;
+    ICommPort *BinComm;
 public:
     __fastcall TfComPort(TComponent* Owner);
     __fastcall ~TfComPort();

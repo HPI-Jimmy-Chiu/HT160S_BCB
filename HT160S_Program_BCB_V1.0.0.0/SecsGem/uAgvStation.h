@@ -53,7 +53,7 @@ public:
     unsigned char Handshake[AGV_STATION_COUNT];      // eAgvHandshake
     unsigned char PrepDone[AGV_STATION_COUNT];
     unsigned char ShortageLatch[AGV_STATION_COUNT];  // one-shot: fire CEID272 once
-    int           ShortageDebounce[AGV_STATION_COUNT];
+    int           ShortageDebounce[AGV_STATION_COUNT];  // AI(ht160s-agv) 20260625 : per-station PREP/READY age (ServiceHandshake watchdog ticks)
     unsigned char ReadyEntrySensor[AGV_STATION_COUNT]; // edge baseline for Finish
 
     TAgvCoordinator();
@@ -66,6 +66,11 @@ public:
     void PollAndCall(THGem *Gem);                // Phase B : shortage/full -> CEID272
     void ServiceHandshake(THGem *Gem);           // Phase D : drive CEID273 / CEID274
     bool BeginPrep(AnsiString cpName);           // Phase C : START_AGV -> prep
+
+    // AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state for
+    // the State Record snapshot + the AMR maintenance panel (header + one line per
+    // P1..P9 : lock / handshake / live ready). No state change.
+    AnsiString DescribeAgvState();
 };
 
 extern TAgvCoordinator AgvCoord;

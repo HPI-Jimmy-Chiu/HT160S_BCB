@@ -23,5 +23,7 @@ public:
 //---------------------------------------------------------------------------
 extern TFSECS *FSECS;
 void EventReport(unsigned Ceid);
+//AI(ht160s-secsgem) 20260625 : S5F1 alarm report (set/clear) glue, mirrors EventReport.
+void AlarmReport(AnsiString Code, AnsiString Message, bool bSet);
 //---------------------------------------------------------------------------
 #endif

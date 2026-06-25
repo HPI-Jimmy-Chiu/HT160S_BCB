@@ -82,6 +82,7 @@ public:
     int             iMotNo;
     int             iHomeType;
     int             iEncodeMultiple;   // MC88X1 A/B encoder input multiplier config (set before InitMotor): 3=x4 default, 1=x1 (M20)
+    int             iEncodeDir;        // MC88X1 encoder count direction (MC88X1PSetEncoderDir, set before InitMotor): 1=inverse default, 0=normal (M05 MLoaderY_2)
     int             iHomeStep;
     int             iHomeStepRange;
     bool            bNeedHome;

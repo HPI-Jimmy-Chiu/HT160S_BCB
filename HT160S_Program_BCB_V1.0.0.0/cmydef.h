@@ -9,6 +9,18 @@
 #define TEST_MAX_BIN 999
 //---------------------------------------------------------------------------
 extern int CUSTOMER_CODE;
+//AI(ht160s-statusbar) 20260624 : version + machine-identity globals (HT172 parity).
+//MainVersion is the single source for the status-bar version panel; asModel/
+//asHandlerID/asSerialNo mirror HT172 cmydef and are copied from GeneralSetting by
+//UpdateMachineIdentity(). asModel is seeded "HT160S" (NOT "HT172").
+extern AnsiString MainVersion;
+extern AnsiString asModel;
+extern AnsiString asHandlerID;
+extern AnsiString asSerialNo;
+//AI(ht160s-statusbar) 20260624 : copy GeneralSetting identity into the as* globals
+//and write stbMain panels 1-3 (HT172 MyFunctionB::Update analog). Safe to call any
+//time after GeneralSetting.Load() and fMain creation; NULL-guards the form/panels.
+void UpdateMachineIdentity();
 extern int MotorPowerOnDelay;
 extern bool bMotorPowerState;
 //AI(ht160s-maintainer) 20260617 : panel-LED run-state flags (DoPanelLamp);
@@ -25,6 +37,8 @@ extern bool bLampCleanOut;
 extern bool bLampOneCycle;
 extern bool bMotorHomePowerOn;
 extern bool fAllMotorHome;
+extern bool InitialOK;                 //AI(ht160s-initflow) 20260624 : whole-machine init-complete (ref HT9045)
+void UpdateInitProgress(int iPercent);  //AI(ht160s-initflow) 20260624 : startup splash progress (def ht160s.cpp; called from HSys.Initial)
 extern bool SoftStart;
 extern bool SoftStop;
 extern const int REALLY;

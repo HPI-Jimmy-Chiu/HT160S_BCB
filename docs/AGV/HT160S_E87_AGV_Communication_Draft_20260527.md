@@ -231,3 +231,77 @@ SVID38221 = P1:0,P2:0,P3:0,P4:1,P5:0,P6:0,P7:0,P8:0,P9:0
 HT160S E87 / AGV 對接建議採用 P1-P9 站點 bitmap，並以 `AGVSupplement`、`START_AGV`、`AGVLDUnLDStatus`、`AGVLDUnLDFinish`、`START` 形成清楚的叫車、準備、完成與生產控制分工。
 
 Auto4-Auto6 可由 Auto3 的通訊與站點動作模板順移延伸；但 SVID 配置需避開既有 Device Count / Bin Setting 區段，因此建議將 Auto4-Auto6 的 Tray Count、Device Count、Bin Setting 追加到 38237-38245。
+
+---
+
+> 以下第 12-15 節為 2026/06/25 補充規範。第 1-11 節維持原內容不變；本補充章節釐清交接 timeout 與防呆、模擬模式自動通過、`Action` CP 值語意，以及 State Record 記錄需求，避免 AGV 缺席或 host 中斷流程時造成生產硬鎖死。
+
+## 12. 交接 Timeout 與 AGV 缺席防呆
+
+### 12.1 問題背景
+
+每一站的 AMR infeed lock（或 Auto 滿盤 lock）由 host 的 `S2F41 START_AGV` 進入 `AGV_PREP` 時設定，僅在 handshake 完成 `PREP → READY (CEID273) → FINISH (CEID274)` 後才釋放。若 AGV 缺席、中途放棄，或 host 送出 `START_AGV` 後一直沒有完成 handshake，該站的 lock 會被永久 latch（原本只有 HOME 才能清除），凍結對應 feeder 的進料迴圈，進而拖垮整條產線。因此規範雙方都必須有 timeout 與明確的取消轉移。
+
+### 12.2 設備端 Timeout（Equipment-side，必備）
+
+| 項目 | 規範 |
+|---|---|
+| 監看狀態 | `AGV_PREP`、`AGV_READY` 兩個 handshake 狀態各自計時。 |
+| 最大停留時間 | 每個狀態設定一個 MAX dwell（建議以秒為單位，預設約 120 秒，需寬鬆到正常運送中的 AGV 不會被誤判）。 |
+| 逾時動作 | 設備端自動：(1) 釋放該站 AMR lock；(2) 將該站 handshake 重置為 `AGV_IDLE`；(3) 重新 arm（下一輪 `PollAndCall` 可重新叫車）。 |
+| 計時重置 | handshake 狀態一旦推進（PREP→READY 或 READY→IDLE）或回到 IDLE，計時歸零。僅在「狀態這個 tick 未推進」時累加，避免誤殺進行中的交接。 |
+| 連線中斷 | link drop（HSMS 非 SELECTED）時，設備端立即釋放所有站 lock 並重置 handshake，由 operator fallback 接手（與 timeout 為兩條互補的釋放路徑）。 |
+
+### 12.3 Host 端 Timeout（Host-side，建議）
+
+| 項目 | 規範 |
+|---|---|
+| 監看對象 | host 送出 `START_AGV` 後，等待對應站點的 `AGVLDUnLDStatus (CEID273)` 與 `AGVLDUnLDFinish (CEID274)`。 |
+| 逾時動作 | 在自訂時限內未收到 Ready / Finish，host 應放棄該筆 AGV 任務、重新派車或通報 operator，不可無限等待。 |
+| 與設備端關係 | host timeout 與設備 timeout 互相獨立；任一端逾時都應能讓該站脫離鎖定，不依賴對方先動作。 |
+
+### 12.4 取消轉移（Cancel Transition）
+
+| 轉移 | 觸發 | 結果 |
+|---|---|---|
+| `PREP → IDLE` | 設備端 PREP dwell 逾時 / link drop | 釋放 lock、重新 arm；可重新叫車。 |
+| `READY → IDLE` | 設備端 READY dwell 逾時 / link drop | 釋放 lock、重新 arm；視站別重新進入待補料或滿盤判定。 |
+| host 主動取消 | host 端 timeout 或 operator 取消 | 建議 host 不再對該站期待 Finish；設備端最終仍由自身 timeout 釋放，確保即使 host 不通知也不會硬鎖。 |
+
+> 設計準則：lock 的釋放絕不可只依賴「AGV 一定會完成 handshake」這個假設。設備端 timeout 是最後的安全網，任何缺席或中斷情境都必須能在有限時間內自動脫離鎖定。
+
+## 13. 模擬 / 維修模式
+
+| 模式 | Ready 條件 | Finish 條件 | 說明 |
+|---|---|---|---|
+| `SOFT_SIMULATE`（離線驗證） | 自動通過（AUTO-PASS） | 自動通過（AUTO-PASS） | 沒有實體感測器、沒有真實 AGV，故 sensor 判定的 Ready / Finish 在模擬下一律視為成立，讓 handshake 能完整跑完以供離線驗證。 |
+| 真機（normal） | 依第 9 節：交接機構到位且可接受 AGV 動作 | 依第 9 節：對應 sensor 確認 tray / device 到位或被取走 | 完整 interlock 啟用。模擬旁路嚴格限制在 `SOFT_SIMULATE` 內，真機路徑不受影響。 |
+
+> 重要：模擬旁路必須嚴格包在 `if(IsSoftSimulate()) return true;`（或 `#ifdef SOFT_SIMULATE`）之內，真機 `#else` interlock 必須完整保留、永不無條件旁路。尤其 Auto 站的「已排空可交接」判定在真機同時把關 SortArm 置料殘料 interlock（殘料未清不可放行 AGV）；該旁路只能 SIM-ONLY。
+
+## 14. `START_AGV` 的 `Action` CP 值語意
+
+現況：`START_AGV` 在設備端只用 `cpName`（站點名稱：`Loader` / `Empty` / `Color` / `AUTO1`..`AUTO6`）路由到對應站點，`Action` 這個 CP 值目前為裝飾性（設備端不解析其內容）。
+
+雙方需擇一確認：
+
+| 選項 | 定義 | 說明 |
+|---|---|---|
+| 選項 A：定義語意 | `Action = LOAD / UNLOAD / SUPPLY` | LOAD = 對 Handler 上料（P1 Loader）；SUPPLY = 補空盤 / 身分 Tray（P2 Empty、P3 Color）；UNLOAD = 取走滿盤（P4-P9 Auto）。若採用，設備端需驗證 `Action` 與站點方向是否一致，不一致則以 `HCACK` 拒絕。 |
+| 選項 B：保留欄位 | `Action` 明確標記為 reserved | 設備端僅以 `cpName` 路由，`Action` 不解析、不驗證，保留供未來擴充。host 仍可帶值，但設備端忽略。 |
+
+> 建議：在客戶尚未要求 LOAD/UNLOAD/SUPPLY 分流前，採選項 B（保留欄位），與目前實作一致；待需求明確再升級為選項 A 並加上方向驗證。第 4.1 節表格中的 `Action` 欄位語意以本節為準。
+
+## 15. State Record / Logging 需求
+
+為了讓離線分析能區分 PREP-stall、READY-stall 與 link-drop，設備端 State Record 必須記錄 AGV 協調器的 handshake 狀態，而非只記每模組的 lock。
+
+| 記錄項目 | 內容 | 用途 |
+|---|---|---|
+| 每站 handshake 狀態 | P1-P9 各站的 `IDLE / CALLED / PREP / READY / FINISH` | 判斷卡在哪一個 handshake 階段（PREP vs READY）。 |
+| 每站 lock 狀態 | P1-P9 各站的 AMR lock（0/1） | 對照 handshake，確認 lock 是否被孤立 latch。 |
+| 每站 live ready 值 | P1-P9 各站的即時 ready 判定（Infeed `IsReadyForAmrHandoff` / Auto `IsDrainedForAmr`） | 判斷 Ready gate 為何未通過。 |
+| SECS Selected 狀態 | HSMS 連線是否 SELECTED（0/1） | 區分 link-drop 與真正的 handshake stall。 |
+| `bUseAMR` | AMR 功能是否啟用（0/1） | 確認協調器是否本應運作。 |
+
+實作備註：以上資訊由 `TAgvCoordinator::DescribeAgvState()` 一次產出（header 含 `Selected` 與 `bUseAMR`，後接 P1-P9 各一行 `lock / hs / ready`），State Record 快照寫入器（`FeederDecision.txt` 的「AMR coordinator」區塊）與 AMR 維修畫面共用同一來源，不另開 getter。如此一來，「AMR lock 凍結某個 feeder」這類問題在離線快照即可直接看出卡點，無需上機重現。

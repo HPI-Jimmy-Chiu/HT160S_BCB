@@ -4,6 +4,7 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "HTimer.h"
+#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) 20260625 : eTrayKind/TMyTray for rear-tray hold (Phase 6 A.1)
 //---------------------------------------------------------------------------
 // Loader per-side handshake status for the shared Loader-Y axis. SortArm uses
 // this to know when a side has finished CCD scanning and the Y axis may be
@@ -49,6 +50,13 @@ private:
     AnsiString CurrentLotNumber;
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
+    //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray hold (transfer-chain relay).
+    //Kind is tagged on the carriage Tray grid at feed time; at discharge it is
+    //transferred into this module-level hold before ClearTray releases the carriage.
+    int iFeedSerial;          // 1-based feed counter on the shared supply car (sim count)
+    eTrayKind RearKind;       // kind of the tray currently parked at rear
+    AnsiString RearTrayID;    // identity 2D of the rear tray (identity trays only)
+    TMyTray RearSourceTray;   // full grid of the rear tray (transfer-chain relay)
 
     TLoaderSideState *GetSide(int LoaderNo);
     TLoaderSideState *GetOtherSide(int LoaderNo);
@@ -91,6 +99,7 @@ private:
     bool DoCcdCheck(int LoaderNo, int Flag);
     bool DoDischargeTray(int LoaderNo, int Flag);
     bool DoFrontDestackDown(int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared front-destacker separate-one-tray sequence (cylinder-only)
+    eTrayKind GetFedTrayKind(int feedSerial, int total);   //AI(ht160s-tray-source) 20260625 : D2 stack-position convention, identity fed LAST (Phase 6 A.2)
 
 public:
     TLoaderModule();
@@ -98,6 +107,11 @@ public:
     void DoLoader(int LoaderNo, int &Task);
     AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only per-side inner-state dump (FeederDecision.txt)
     bool IsRearHasTray();
+    //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray accessors (return-by-value,
+    //mirror Empty/Color GetSourceTray). TrayArm reads these at pickup to route by Kind.
+    eTrayKind GetRearTrayKind();
+    TMyTray GetRearSourceTray();
+    AnsiString GetRearTrayID();
     void SetCurrentLotNumber(AnsiString Lot);
     bool IsLoaderReadyForSort(int LoaderNo);
     bool IsLoaderYMoveSafe(int LoaderNo, int Position);   //AI(ht160s-sortarm) 20260624 : public so SortArm's shared-rail Loader-Y move reuses this canonical cross-side gap interlock (was private)

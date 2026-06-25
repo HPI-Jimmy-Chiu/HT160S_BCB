@@ -75,6 +75,13 @@ public:
 	// Bin display COM port name (e.g. "COM5") and label hold time in seconds.
 	AnsiString sBinDispComPort;
 	int iBinDispDelaySec;
+	// Machine identity (status-bar panels 1-3). Persisted in General.ini
+	// [MachineIdentity]. sMachineModel defaults "HT160S". These are the HT160
+	// source of truth; UpdateMachineIdentity() copies them into the cmydef
+	// as* globals for HT172 API parity.
+	AnsiString sMachineModel;
+	AnsiString sHandlerID;
+	AnsiString sSerialNo;
 	// Serial baud rate for the bin display COM line. Old-160 ran the LED board
 	// through an external MCU.exe TCP bridge, so the handler kept no baud; the
 	// HT9046 hardware standard (matching HT172) is 9600-8-N-1. Settable here so

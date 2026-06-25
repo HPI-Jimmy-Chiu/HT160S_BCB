@@ -722,13 +722,13 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
         }
         else if(S.AnsiPos("PAUSE")==1)
         {
-            //AI(ht160s-secsgem) 20260611 : PAUSE host command. Consume the (usually
-            // empty) parameter list, then replicate the operator sbPause side-effects
-            // ONLY: drop SystemStart and raise SoftStop. RecordProcess/EventReport are
-            // TfMain methods and are intentionally not called from the GEM layer.
+            //AI(ht160s-secsgem) 20260611 : PAUSE host command. Consume the (usually empty)
+            // parameter list, then pause via the shared MachinePause() choke point
+            // (csystem.cpp) : drop SystemStart, DecStop the motors, raise SoftStop, and
+            // RecordProcess-log "MACHINE PAUSE by secs-remote". EventReport stays out of
+            // the GEM layer (existing boundary; it is operator-specific).
             HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
-            HSys.Sys.SystemStart = false;
-            SoftStop = true;
+            MachinePause(trigSecsRemote);
             HCACK = 0;
         }
         else if(S.AnsiPos("ONLINE_REMOTE")==1 || S=="ONLINE")
@@ -813,37 +813,22 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
         }
         else if(S=="START")
         {
-            //AI(ht160s-secsgem) 20260625 : production START host command, equivalent
-            // to the operator pressing the Start button. Reuse TfMain::Start() so the
-            // SAME operator path runs (SetMotorSpeed via ProcessStartMode, SystemStart,
-            // OnLotStart device trace, LoaderModule lot number, home-first when unhomed).
-            // Exact "START" compare (NOT AnsiPos) so it does not swallow "START_AGV",
-            // which shares the prefix. Consume the inner L[0] param list. Pre-gate on
-            // SystemStart + CheckLotDataReady here so Start()'s internal ShowMyMessage()
-            // is never reached : a modal on the HSMS/VCL receive path would stall SECS
-            // comms (same rule as LOTSTART). Safety interlocks (EMG/door/safe-lock) stay
-            // enforced by the kernel safety scan after SystemStart rises, as for the
-            // operator button.
+            //AI(machine-command-layer) 20260625 : production START host command. Route
+            // through the single MachineStart() gate (csystem.cpp) -- the SAME entry the
+            // operator Start button uses, so the lot/2D gate, the SystemStart raise, the
+            // per-IC trace batch and home-first-when-unhomed all run identically. The gate
+            // now lives inside MachineStart (not duplicated here); map its result to HCACK.
+            // MachineStart never pops a modal, so the HSMS receive path is not stalled.
+            // Exact "START" compare (NOT AnsiPos) so it does not swallow "START_AGV".
             HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
-            if(fMain==NULL)
-            {
-                HCACK = 2;                                   // no UI context -> param error
-            }
-            else if(HSys.Sys.SystemStart==true)
-            {
-                HCACK = 4;                                   // already running -> busy
-            }
-            else
             {
                 AnsiString Reason;
-                if(fMain->CheckLotDataReady(Reason)==false)
+                switch(MachineStart(trigSecsRemote, Reason))
                 {
-                    HCACK = 2;                               // lot/2D not ready -> param error
-                }
-                else
-                {
-                    fMain->Start();                          // operator-equivalent start
-                    HCACK = 0;
+                    case msStarted:      HCACK = 0; break;   // armed (homes first if unhomed)
+                    case msRejBusy:      HCACK = 4; break;   // already running
+                    case msRejNoContext: HCACK = 2; break;   // no UI context
+                    default:             HCACK = 2; break;   // msRejNotReady : lot/2D not ready
                 }
             }
         }
@@ -888,6 +873,35 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             else
             {
                 HCACK = 1;                                       // bad list format
+            }
+        }
+        else if(S=="STOP")
+        {
+            //AI(machine-command-layer) 20260625 : STOP host command (S2F41 RCMD "STOP").
+            // Hard stop / remote abort. Route through the single MachineStop() choke point
+            // (csystem.cpp) so "SystemStart=false always stops the motors" holds : it
+            // clears SystemStart, StopAllMotor(), raises SoftStop and RecordProcess-logs
+            // the source. No modal, no UI context needed. (PAUSE only soft-pauses.)
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            MachineStop(trigSecsRemote);
+            HCACK = 0;
+        }
+        else if(S=="HOME")
+        {
+            //AI(machine-command-layer) 20260625 : HOME host command (S2F41 RCMD "HOME"),
+            // equivalent to the operator Home button. Calls the shared TfMain::HomeCore()
+            // (main.cpp) -- the sbHome1Click body WITHOUT the "Confirm home?" modal, which
+            // would stall the HSMS receive path. Runs on the VCL main thread; the home
+            // engine is non-blocking. Gate on fMain (UI context) + not-already-running.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(fMain==NULL)
+                HCACK = 2;                                       // no UI context -> param error
+            else if(HSys.Sys.SystemStart==true)
+                HCACK = 4;                                       // already running/homing -> busy
+            else
+            {
+                fMain->HomeCore();
+                HCACK = 0;
             }
         }
         else

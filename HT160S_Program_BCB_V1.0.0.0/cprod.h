@@ -135,14 +135,9 @@ typedef struct
 }SYSTEM_BIN_SELECT;
 extern SYSTEM_BIN_SELECT BinSelect[2];
 //---------------------------------------------------------------------------
-typedef struct
-{
-    int RecordCT;
-    char ID[30][30];
-    char PassWord[30][30];
-    int  Level[30];
-}PASS_WORD;
-extern PASS_WORD USER;
+//AI(ht160s-password) 20260624 : legacy binary PASS_WORD USER struct removed.
+//User accounts now live in THT160UserRoleManager (UserRoleManager.h),
+//persisted as notepad-openable text in system\login.txt.
 //---------------------------------------------------------------------------
 typedef struct
 {

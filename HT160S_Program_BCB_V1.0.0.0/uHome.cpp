@@ -215,6 +215,19 @@ bool TfHome::SeenStart() const
     return fSeenStart;
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260624 : latch "a HOME start was commanded" at the moment
+//the start paths set SystemStart=true (sbHome1Click / START-on-unhomed), instead of
+//waiting for the 100ms monitor Timer1 to sample SystemStart==true. A safety fault can
+//drop SystemStart inside that 100ms window, so Timer1 never sees true, fSeenStart stays
+//false, and the kernel SeenStart-guarded abort (ProcessHomeLifecycle) never closes the
+//monitor -> it sits "shown but never running, never closing". Latching here closes it
+//via the existing guarded kernel path (fAllMotorHome-first, bHomePowerCycling-skip,
+//MachineHomeAbort). Timer1 own latch stays a backup; the timer is NOT a closer.
+void TfHome::MarkSeenStart()
+{
+    fSeenStart=true;
+}
+//---------------------------------------------------------------------------
 void TfHome::RequestClose()
 {
     if(fShow==false)
@@ -385,14 +398,14 @@ bool TfHome::ProcessMotorHome()
 			//Servo-on settle complete -> release brakes, end the power-cycle and
 			//fall into the normal home (the previously-alarmed axis re-homes
 			//because ScanAllMotorStatus cleared its bHomeFlag).
-			//AI(HT160S-Maintainer) 20260619 : ALSO wait for MotorPowerOnDelay==0 before
-			//clearing bHomePowerCycling. The relay Off->On set MotorPowerOnDelay (~10s,
-			//via ScanSystemSenser IsSystemPowerOff) which forces SystemStart=false every
-			//cycle until it counts down; clearing bHomePowerCycling while that delay is
-			//still running would let the HOME lifecycle abort guard (ProcessHomeLifecycle)
-			//tear the monitor down before case 2 can re-home. HTimer::Off() keeps
-			//returning true after expiry, so gating on both is safe (no missed edge).
-			if(HomePowerTimer.Off() && MotorPowerOnDelay==0)
+			//AI(HT160S-Maintainer) 20260624 : settle on the HomePowerTimer alone (HT172 uhome.cpp
+			//ResetOKDeleyTime parity). The motor-power-off stop in ScanSystemSenser is now SKIPPED
+			//while the HOME monitor is shown (see csystem.cpp), so it no longer sets MotorPowerOnDelay
+			//during a home power-cycle -- the old && MotorPowerOnDelay==0 wait is gone. case 10s
+			//Set(30)=3s servo-on settle (after the case 1 Set(50)=5s discharge) lets the A6 amps
+			//re-energize before case 2 commands motion, and SystemStart now stays true throughout
+			//so the SystemStart-gated home engine keeps stepping (no freeze, no spurious alarm).
+			if(HomePowerTimer.Off())
 			{
 				AllBreakFree();
 				bMotorHomePowerOn=true;

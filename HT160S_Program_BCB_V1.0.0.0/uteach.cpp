@@ -13,6 +13,7 @@
 #include "csystem.h"
 #include "cStepTrace.h"   //AI(general) 20260617 : MotorTaskLog home/limit diagnosis trace
 #include "aSortArm.h"
+#include "aTrayArm.h"   //AI(HT160S-Maintainer) 20260624 : TrayArmModule->IsZUpAtPosition() Z-up interlock for manual TrayArm X
 #include "aEmpty.h"
 #include "aColor.h"
 #include "aLoader.h"
@@ -24,6 +25,8 @@
 #pragma resource "*.dfm"
 TfTeach *fTeach;
 TEACH Teach;
+TEACH TeachBase;   //AI 20260623 : Offset base; UpdateAllParameter folds Teach = TeachBase + Offset
+void UpdateAllParameter();   //AI 20260623 : Offset fold trigger (cprod.cpp)
 //---------------------------------------------------------------------------
 // Static layout/colors/captions for the Teach form now live in uteach.dfm. Only
 // the runtime LED color convention stays here (UpdateStatusLed switches between
@@ -234,95 +237,95 @@ void __fastcall TfTeach::InitialTeachParameter()
     ResetTeachGrid(grdSortZ);
     ResetTeachGrid(grdOthers);
 
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "EmptyCarFeedTrayYPosition", HSys.Mot.MEmptyY, &Teach.EmptyCarFeedTrayYPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "EmptyCarDischargeTrayYPosition", HSys.Mot.MEmptyY, &Teach.EmptyCarDischargeTrayYPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToEmptyXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToEmptyXPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToLoaderXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToLoaderXPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToColorXPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToColorXPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DXPosition", HSys.Mot.MTopCCDX_Color, &Teach.ColorRead2DXPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DYPosition", HSys.Mot.MColorY, &Teach.ColorRead2DYPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorTrayArmPickYPosition", HSys.Mot.MColorY, &Teach.ColorTrayArmPickYPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto1XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto1XPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto2XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto2XPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto3XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto3XPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto4XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto4XPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto5XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto5XPosition);
-    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto6XPosition", HSys.Mot.MTrayArmX, &Teach.TrayXArmToAuto6XPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "EmptyCarFeedTrayYPosition", HSys.Mot.MEmptyY, &TeachBase.EmptyCarFeedTrayYPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "EmptyCarDischargeTrayYPosition", HSys.Mot.MEmptyY, &TeachBase.EmptyCarDischargeTrayYPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToEmptyXPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToEmptyXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToLoaderXPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToLoaderXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToColorXPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToColorXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DXPosition", HSys.Mot.MTopCCDX_Color, &TeachBase.ColorRead2DXPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DYPosition", HSys.Mot.MColorY, &TeachBase.ColorRead2DYPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorTrayArmPickYPosition", HSys.Mot.MColorY, &TeachBase.ColorTrayArmPickYPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto1XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto1XPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto2XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto2XPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto3XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto3XPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto4XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto4XPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto5XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto5XPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto6XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto6XPosition);
 
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarFeedTrayYPosition", HSys.Mot.MLoaderY_1, &Teach.Loader1CarFeedTrayYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarDischargeTrayYPosition", HSys.Mot.MLoaderY_1, &Teach.Loader1CarDischargeTrayYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarFirstCCDYPosition", HSys.Mot.MLoaderY_1, &Teach.Loader1CarFirstCCDYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarFirstSortYPosition", HSys.Mot.MLoaderY_1, &Teach.Loader1CarFirstSortYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFeedTrayYPosition", HSys.Mot.MLoaderY_2, &Teach.Loader2CarFeedTrayYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarDischargeTrayYPosition", HSys.Mot.MLoaderY_2, &Teach.Loader2CarDischargeTrayYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFirstCCDYPosition", HSys.Mot.MLoaderY_2, &Teach.Loader2CarFirstCCDYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFirstSortYPosition", HSys.Mot.MLoaderY_2, &Teach.Loader2CarFirstSortYPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "LoaderCarFirstCCDXPosition", HSys.Mot.MTopCCDX, &Teach.LoaderCarFirstCCDXPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToLoader1XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToLoader1XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToLoader2XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToLoader2XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto1XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto1XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto2XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto2XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto3XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto3XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto4XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto4XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto5XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto5XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto6XPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToAuto6XPosition);
-    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToBottomCCDFirstXPosition", HSys.Mot.MSortingArmX, &Teach.SortArmToBottomCCDFirstXPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarFeedTrayYPosition", HSys.Mot.MLoaderY_1, &TeachBase.Loader1CarFeedTrayYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarDischargeTrayYPosition", HSys.Mot.MLoaderY_1, &TeachBase.Loader1CarDischargeTrayYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarFirstCCDYPosition", HSys.Mot.MLoaderY_1, &TeachBase.Loader1CarFirstCCDYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader1CarFirstSortYPosition", HSys.Mot.MLoaderY_1, &TeachBase.Loader1CarFirstSortYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFeedTrayYPosition", HSys.Mot.MLoaderY_2, &TeachBase.Loader2CarFeedTrayYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarDischargeTrayYPosition", HSys.Mot.MLoaderY_2, &TeachBase.Loader2CarDischargeTrayYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFirstCCDYPosition", HSys.Mot.MLoaderY_2, &TeachBase.Loader2CarFirstCCDYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "Loader2CarFirstSortYPosition", HSys.Mot.MLoaderY_2, &TeachBase.Loader2CarFirstSortYPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "LoaderCarFirstCCDXPosition", HSys.Mot.MTopCCDX, &TeachBase.LoaderCarFirstCCDXPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToLoader1XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToLoader1XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToLoader2XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToLoader2XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto1XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToAuto1XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto2XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToAuto2XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto3XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToAuto3XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto4XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToAuto4XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto5XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToAuto5XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToAuto6XPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToAuto6XPosition);
+    AddTeachItem(grdLoaderSort, "TeachLoader", "SortArmToBottomCCDFirstXPosition", HSys.Mot.MSortingArmX, &TeachBase.SortArmToBottomCCDFirstXPosition);
 
-    AddTeachItem(grdAuto, "TeachAuto", "Auto1CarFeedTrayYPosition", HSys.Mot.MAutoY_1, &Teach.Auto1CarFeedTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto1CarDischargeTrayYPosition", HSys.Mot.MAutoY_1, &Teach.Auto1CarDischargeTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto1CarFirstSortYPosition", HSys.Mot.MAutoY_1, &Teach.Auto1CarFirstSortYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto2CarFeedTrayYPosition", HSys.Mot.MAutoY_2, &Teach.Auto2CarFeedTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto2CarDischargeTrayYPosition", HSys.Mot.MAutoY_2, &Teach.Auto2CarDischargeTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto2CarFirstSortYPosition", HSys.Mot.MAutoY_2, &Teach.Auto2CarFirstSortYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto3CarFeedTrayYPosition", HSys.Mot.MAutoY_3, &Teach.Auto3CarFeedTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto3CarDischargeTrayYPosition", HSys.Mot.MAutoY_3, &Teach.Auto3CarDischargeTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto3CarFirstSortYPosition", HSys.Mot.MAutoY_3, &Teach.Auto3CarFirstSortYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto4CarFeedTrayYPosition", HSys.Mot.MAutoY_4, &Teach.Auto4CarFeedTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto4CarDischargeTrayYPosition", HSys.Mot.MAutoY_4, &Teach.Auto4CarDischargeTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto4CarFirstSortYPosition", HSys.Mot.MAutoY_4, &Teach.Auto4CarFirstSortYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto5CarFeedTrayYPosition", HSys.Mot.MAutoY_5, &Teach.Auto5CarFeedTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto5CarDischargeTrayYPosition", HSys.Mot.MAutoY_5, &Teach.Auto5CarDischargeTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto5CarFirstSortYPosition", HSys.Mot.MAutoY_5, &Teach.Auto5CarFirstSortYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto6CarFeedTrayYPosition", HSys.Mot.MAutoY_6, &Teach.Auto6CarFeedTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto6CarDischargeTrayYPosition", HSys.Mot.MAutoY_6, &Teach.Auto6CarDischargeTrayYPosition);
-    AddTeachItem(grdAuto, "TeachAuto", "Auto6CarFirstSortYPosition", HSys.Mot.MAutoY_6, &Teach.Auto6CarFirstSortYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto1CarFeedTrayYPosition", HSys.Mot.MAutoY_1, &TeachBase.Auto1CarFeedTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto1CarDischargeTrayYPosition", HSys.Mot.MAutoY_1, &TeachBase.Auto1CarDischargeTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto1CarFirstSortYPosition", HSys.Mot.MAutoY_1, &TeachBase.Auto1CarFirstSortYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto2CarFeedTrayYPosition", HSys.Mot.MAutoY_2, &TeachBase.Auto2CarFeedTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto2CarDischargeTrayYPosition", HSys.Mot.MAutoY_2, &TeachBase.Auto2CarDischargeTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto2CarFirstSortYPosition", HSys.Mot.MAutoY_2, &TeachBase.Auto2CarFirstSortYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto3CarFeedTrayYPosition", HSys.Mot.MAutoY_3, &TeachBase.Auto3CarFeedTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto3CarDischargeTrayYPosition", HSys.Mot.MAutoY_3, &TeachBase.Auto3CarDischargeTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto3CarFirstSortYPosition", HSys.Mot.MAutoY_3, &TeachBase.Auto3CarFirstSortYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto4CarFeedTrayYPosition", HSys.Mot.MAutoY_4, &TeachBase.Auto4CarFeedTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto4CarDischargeTrayYPosition", HSys.Mot.MAutoY_4, &TeachBase.Auto4CarDischargeTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto4CarFirstSortYPosition", HSys.Mot.MAutoY_4, &TeachBase.Auto4CarFirstSortYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto5CarFeedTrayYPosition", HSys.Mot.MAutoY_5, &TeachBase.Auto5CarFeedTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto5CarDischargeTrayYPosition", HSys.Mot.MAutoY_5, &TeachBase.Auto5CarDischargeTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto5CarFirstSortYPosition", HSys.Mot.MAutoY_5, &TeachBase.Auto5CarFirstSortYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto6CarFeedTrayYPosition", HSys.Mot.MAutoY_6, &TeachBase.Auto6CarFeedTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto6CarDischargeTrayYPosition", HSys.Mot.MAutoY_6, &TeachBase.Auto6CarDischargeTrayYPosition);
+    AddTeachItem(grdAuto, "TeachAuto", "Auto6CarFirstSortYPosition", HSys.Mot.MAutoY_6, &TeachBase.Auto6CarFirstSortYPosition);
 
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToLoader_1_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToLoader_1_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToLoader_1_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToLoader_1_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToLoader_2_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToLoader_2_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToLoader_2_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToLoader_2_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToAuto_1_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToAuto_1_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToAuto_1_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToAuto_1_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToAuto_2_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToAuto_2_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToAuto_2_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToAuto_2_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToAuto_3_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToAuto_3_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToAuto_3_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToAuto_3_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToAuto_4_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToAuto_4_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToAuto_4_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToAuto_4_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToAuto_5_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToAuto_5_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToAuto_5_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToAuto_5_Z4Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z1Position", HSys.Mot.MSuckZ_1, &Teach.SortArmToAuto_6_Z1Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z2Position", HSys.Mot.MSuckZ_2, &Teach.SortArmToAuto_6_Z2Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z3Position", HSys.Mot.MSuckZ_3, &Teach.SortArmToAuto_6_Z3Position);
-    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z4Position", HSys.Mot.MSuckZ_4, &Teach.SortArmToAuto_6_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToLoader_1_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToLoader_1_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToLoader_1_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_1_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToLoader_1_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToLoader_2_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToLoader_2_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToLoader_2_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToLoader_2_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToLoader_2_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToAuto_1_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToAuto_1_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToAuto_1_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_1_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToAuto_1_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToAuto_2_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToAuto_2_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToAuto_2_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_2_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToAuto_2_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToAuto_3_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToAuto_3_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToAuto_3_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_3_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToAuto_3_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToAuto_4_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToAuto_4_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToAuto_4_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_4_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToAuto_4_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToAuto_5_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToAuto_5_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToAuto_5_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_5_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToAuto_5_Z4Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z1Position", HSys.Mot.MSuckZ_1, &TeachBase.SortArmToAuto_6_Z1Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z2Position", HSys.Mot.MSuckZ_2, &TeachBase.SortArmToAuto_6_Z2Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z3Position", HSys.Mot.MSuckZ_3, &TeachBase.SortArmToAuto_6_Z3Position);
+    AddTeachItem(grdSortZ, "TeachLoader", "SortArmToAuto_6_Z4Position", HSys.Mot.MSuckZ_4, &TeachBase.SortArmToAuto_6_Z4Position);
 
-    AddTeachItem(grdOthers, "TeachLoader", "PitchArmXMinPositoin", HSys.Mot.MPitchX, &Teach.PitchArmXMinPositoin);
-    AddTeachItem(grdOthers, "TeachLoader", "PitchArmXMaxPositoin", HSys.Mot.MPitchX, &Teach.PitchArmXMaxPositoin);
-    AddTeachItem(grdOthers, "TeachEmptyAndTrayX", "BottomCCDYCapturePosition", HSys.Mot.MBottomCCDY, &Teach.BottomCCDYCapturePosition);
+    AddTeachItem(grdOthers, "TeachLoader", "PitchArmXMinPositoin", HSys.Mot.MPitchX, &TeachBase.PitchArmXMinPositoin);
+    AddTeachItem(grdOthers, "TeachLoader", "PitchArmXMaxPositoin", HSys.Mot.MPitchX, &TeachBase.PitchArmXMaxPositoin);
+    AddTeachItem(grdOthers, "TeachEmptyAndTrayX", "BottomCCDYCapturePosition", HSys.Mot.MBottomCCDY, &TeachBase.BottomCCDYCapturePosition);
 
     bTeachReady=true;
     RefreshTeachGrids();
@@ -461,6 +464,7 @@ void __fastcall TfTeach::OpenWorkFile()
         SetMessage(AnsiString("Teach file not found: ")+S);
     }
     RefreshTeachGrids();
+    UpdateAllParameter();   //AI 20260623 : re-fold Teach = TeachBase + Offset after (re)load
 }
 //---------------------------------------------------------------------------
 void __fastcall TfTeach::SaveWorkFile(AnsiString S)
@@ -830,6 +834,17 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
         SetMessage("Move abort: Sort Z not home");
         return false;
     }
+    // AI(HT160S-Maintainer) 20260624 : TrayArm X move requires the Z lift confirmed UP -- same anti-
+    // collision rule as production MoveTrayArmX. CheckCanTeachMove gates BOTH Teach Move/Step and Jog
+    // (StartJog routes through here), so this one check covers every manual TrayArm X move. Active in
+    // real-machine DUMMY (X motor physically moves); bypassed only under SOFT_SIMULATE inside IsZUpAtPosition.
+    if(HSys.Mot.MTrayArmX!=NULL && Motor->Tag==HSys.Mot.MTrayArmX->Tag &&
+       TrayArmModule!=NULL && TrayArmModule->IsZUpAtPosition()==false)
+    {
+        ShowMyOKMessageNoStop("Tray arm Z must be up before X move.");
+        SetMessage("Move abort: Tray Z not up");
+        return false;
+    }
     if(bUseTarget && Motor->CheckSoftLimit(Target)==false)
     {
         ShowMyOKMessageNoStop("Target over soft limit.");
@@ -1085,6 +1100,7 @@ void __fastcall TfTeach::btnSaveClick(TObject *Sender)
     Ret=ShowMyMessageBox_YES_NO("Sure to Save ?");
     if(Ret==TMyMessageBox::msgrtnYES)
         SaveWorkFile(GetTeachFileName());
+    UpdateAllParameter();   //AI 20260623 : re-fold effective Teach after base save
 }
 //---------------------------------------------------------------------------
 void __fastcall TfTeach::btnReloadClick(TObject *Sender)

@@ -241,6 +241,8 @@ public:
     void SetMachineTypeAndSoftwarseVer(char *MachineType, char *SoftwareVersion);
     void SaveEventReportData();
     void EventReport(unsigned iDataID, unsigned iCeid);
+    //AI(ht160s-secsgem) 20260625 : S5F1 alarm report sender (from primitives, like EventReport).
+    void SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx);
     bool IsEnableEvent(unsigned iDataID, unsigned iCeid);
     void StringOut(AnsiString Text);
     //AI(ht160s-secsgem) 20260611 : move accumulated log lines into Dest and clear

@@ -135,6 +135,9 @@ typedef struct
 	// Loaded from system\General.ini [ColorCCD] Enable; gates the Color CCD
 	// connect/shot trigger in aColor and is toggled by the maintenance page.
 	bool bUseColorCcd;
+	// Top CCD (Loader IC 2D) reader enable; mirrors bUseColorCcd. [TopCCD] Enable
+	// in General.ini; OFF -> simulated 2D (REALLY only; HAS_TRAY/DUMMY always sim).
+	bool bUseTopCcd;
 	// Which customer bin field drives sorting when the lot table comes from the
 	// customer 2DIDHistory format : 0=SBin (default), 1=HBin. HBin/SBin both
 	// stored as backup regardless. See HT160_SORT_BIN_SOURCE_*.
@@ -184,8 +187,8 @@ public:
 #define HT160_MAX_LOT 64                 // max Lots coexisting on the machine
 #define HT160_LOT_SOURCE_OFFLINE 0       // operator built the lot data by hand
 #define HT160_LOT_SOURCE_SECS    1       // remote host (SECS) pushed the lot data
-#define HT160_SORT_BIN_SOURCE_SBIN 0     // route by customer SBin field (default)
-#define HT160_SORT_BIN_SOURCE_HBIN 1     // route by customer HBin field
+#define HT160_SORT_BIN_SOURCE_SBIN 0     // route by customer SBin field
+#define HT160_SORT_BIN_SOURCE_HBIN 1     // route by customer HBin field (default)
 //---------------------------------------------------------------------------
 // Layer 1 : one production Lot instance currently held on the machine.
 typedef struct

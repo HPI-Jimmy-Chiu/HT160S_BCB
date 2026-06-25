@@ -16,10 +16,10 @@
       MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj 
       MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj 
       MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj 
-      ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj MyBinDisp.obj 
-      uPadInterface.obj SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj 
-      SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uAgvStation.obj 
-      SecsGem\uHGemLogForm.obj"/>
+      ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj MyComm.obj 
+      MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj 
+      SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj 
+      SecsGem\uAgvStation.obj SecsGem\uHGemLogForm.obj"/>
     <RESFILES value="ht160s.res"/>
     <IDLFILES value=""/>
     <IDLGENFILES value=""/>
@@ -133,6 +133,7 @@
       <FILE FILENAME="ColorCcdSocket.cpp" FORMNAME="" UNITNAME="ColorCcdSocket" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="LotWebApiClient.cpp" FORMNAME="" UNITNAME="LotWebApiClient" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="ComPort.cpp" FORMNAME="fComPort" UNITNAME="ComPort" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="MyComm.cpp" FORMNAME="" UNITNAME="MyComm" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="MyBinDisp.cpp" FORMNAME="" UNITNAME="MyBinDisp" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="uPadInterface.cpp" FORMNAME="" UNITNAME="uPadInterface" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="SecsGem\uHGemEquipment.cpp" FORMNAME="" UNITNAME="uHGemEquipment" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>

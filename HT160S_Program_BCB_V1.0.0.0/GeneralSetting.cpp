@@ -40,6 +40,9 @@ void THT160GeneralSetting::SetDefault()
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
+	sMachineModel="HT160S";
+	sHandlerID="";
+	sSerialNo="";
 	iBinDispBaud=9600;
 	iBinDispPanelType=0;
 	bBinDispLogVerbose=false;
@@ -82,6 +85,9 @@ void THT160GeneralSetting::Load()
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
+	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
+	sHandlerID=Ini->ReadString("MachineIdentity", "HandlerID", "");
+	sSerialNo=Ini->ReadString("MachineIdentity", "SerialNo", "");
 	iBinDispBaud=Ini->ReadInteger("BinDisplay", "Baud", 9600);
 	iBinDispPanelType=Ini->ReadInteger("BinDisplay", "PanelType", 0);
 	bBinDispLogVerbose=Ini->ReadBool("BinDisplay", "LogVerbose", false);
@@ -118,6 +124,9 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);
+	Ini->WriteString("MachineIdentity", "Model", sMachineModel);
+	Ini->WriteString("MachineIdentity", "HandlerID", sHandlerID);
+	Ini->WriteString("MachineIdentity", "SerialNo", sSerialNo);
 	Ini->WriteInteger("BinDisplay", "Baud", iBinDispBaud);
 	Ini->WriteInteger("BinDisplay", "PanelType", iBinDispPanelType);
 	Ini->WriteBool("BinDisplay", "LogVerbose", bBinDispLogVerbose);

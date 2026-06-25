@@ -5,6 +5,9 @@
 #pragma hdrstop
 
 #include "cprod.h"
+#include "uteach.h"   //AI 20260623 : TEACH Teach/TeachBase for Offset fold
+#include "uOffset.h"  //AI 20260623 : RUN_OFFSET Offset for Offset fold
+#include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : text login book persistence
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -15,7 +18,6 @@ TSimulationData tSimuData;
 TMotionnetIO tMotionnetIO;
 TRAY_DATA TrayDef;
 SYSTEM_BIN_SELECT BinSelect[2];
-PASS_WORD USER;
 RUN_INFO RunInfo;
 RUN_INFO RunInfo2;
 MACHINE_RUN_INFO MachineRun;
@@ -114,17 +116,31 @@ void ClearLastSet()
     tRunData.Clear();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-password) 20260624 : the password book is now a notepad-openable
+// text file (system\login.txt, one "ID,Password,Level" line per account)
+// owned by THT160UserRoleManager. The former binary login.dat / PASS_WORD
+// USER path was dead code (no caller) and is removed.
+static AnsiString GetLoginFileName()
+{
+    return HSys.CurrentDir+"\\system\\login.txt";
+}
+//---------------------------------------------------------------------------
 void SavePassword()
 {
-    AnsiString FileName=HSys.CurrentDir+"\\system\\login.dat";   //AI(HT160S-Maintainer) 20260609 : keep login data under system folder
-    WriteData(FileName.c_str(), (char *)&USER, sizeof(USER));
+    UserRoleManager.SaveToFile(GetLoginFileName());
 }
 //---------------------------------------------------------------------------
 void ReadPassword()
 {
-    AnsiString FileName=HSys.CurrentDir+"\\system\\login.dat";   //AI(HT160S-Maintainer) 20260609 : keep login data under system folder
-    if(ReadData(FileName.c_str(), (char *)&USER, sizeof(USER))==false)
-        ZeroMemory(&USER, sizeof(USER));
+    AnsiString FileName=GetLoginFileName();
+
+    UserRoleManager.LoadFromFile(FileName);
+    if(UserRoleManager.GetUserCount()<=0)
+    {
+        ForceDirectories(ExtractFilePath(FileName));
+        UserRoleManager.AddOrUpdateUser("Honprec", "27025312", ROLE_HONPREC);
+        UserRoleManager.SaveToFile(FileName);
+    }
 }
 //---------------------------------------------------------------------------
 void CheckLastData()
@@ -145,6 +161,68 @@ void WriteLastDataIni()
 //---------------------------------------------------------------------------
 void UpdateAllParameter()
 {
+    //AI(HT160S-Maintainer) 20260623 : Offset feature fold (Route A1, persistent).
+    //Effective Teach (read by motion, ~99 sites) = TeachBase (edited/saved by the
+    //Teach screen -> system\\tech.ini) + Offset (per-workfile -> data\\<wf>.ofs).
+    //Assignment fold (struct copy + 56 adds), NOT +=, so repeat calls are idempotent.
+    //Offset==0 (no .ofs) => Teach==TeachBase => zero behavior change.
+    Teach = TeachBase;
+    Teach.Loader1CarFeedTrayYPosition += Offset.Loader1CarFeedTrayYPosition;
+    Teach.Loader1CarDischargeTrayYPosition += Offset.Loader1CarDischargeTrayYPosition;
+    Teach.Loader1CarFirstCCDYPosition += Offset.Loader1CarFirstCCDYPosition;
+    Teach.Loader1CarFirstSortYPosition += Offset.Loader1CarFirstSortYPosition;
+    Teach.Loader2CarFeedTrayYPosition += Offset.Loader2CarFeedTrayYPosition;
+    Teach.Loader2CarDischargeTrayYPosition += Offset.Loader2CarDischargeTrayYPosition;
+    Teach.Loader2CarFirstCCDYPosition += Offset.Loader2CarFirstCCDYPosition;
+    Teach.Loader2CarFirstSortYPosition += Offset.Loader2CarFirstSortYPosition;
+    Teach.LoaderCarFirstCCDXPosition += Offset.LoaderCarFirstCCDXPosition;
+    Teach.SortArmToLoader1XPosition += Offset.SortArmToLoader1XPosition;
+    Teach.SortArmToLoader2XPosition += Offset.SortArmToLoader2XPosition;
+    Teach.SortArmToAuto1XPosition += Offset.SortArmToAuto1XPosition;
+    Teach.SortArmToAuto2XPosition += Offset.SortArmToAuto2XPosition;
+    Teach.SortArmToAuto3XPosition += Offset.SortArmToAuto3XPosition;
+    Teach.SortArmToAuto4XPosition += Offset.SortArmToAuto4XPosition;
+    Teach.SortArmToAuto5XPosition += Offset.SortArmToAuto5XPosition;
+    Teach.SortArmToAuto6XPosition += Offset.SortArmToAuto6XPosition;
+    Teach.SortArmToBottomCCDFirstXPosition += Offset.SortArmToBottomCCDFirstXPosition;
+    Teach.SortArmToLoader_1_Z1Position += Offset.SortArmToLoader_1_Z1Position;
+    Teach.SortArmToLoader_1_Z2Position += Offset.SortArmToLoader_1_Z2Position;
+    Teach.SortArmToLoader_1_Z3Position += Offset.SortArmToLoader_1_Z3Position;
+    Teach.SortArmToLoader_1_Z4Position += Offset.SortArmToLoader_1_Z4Position;
+    Teach.SortArmToLoader_2_Z1Position += Offset.SortArmToLoader_2_Z1Position;
+    Teach.SortArmToLoader_2_Z2Position += Offset.SortArmToLoader_2_Z2Position;
+    Teach.SortArmToLoader_2_Z3Position += Offset.SortArmToLoader_2_Z3Position;
+    Teach.SortArmToLoader_2_Z4Position += Offset.SortArmToLoader_2_Z4Position;
+    Teach.SortArmToAuto_1_Z1Position += Offset.SortArmToAuto_1_Z1Position;
+    Teach.SortArmToAuto_1_Z2Position += Offset.SortArmToAuto_1_Z2Position;
+    Teach.SortArmToAuto_1_Z3Position += Offset.SortArmToAuto_1_Z3Position;
+    Teach.SortArmToAuto_1_Z4Position += Offset.SortArmToAuto_1_Z4Position;
+    Teach.SortArmToAuto_2_Z1Position += Offset.SortArmToAuto_2_Z1Position;
+    Teach.SortArmToAuto_2_Z2Position += Offset.SortArmToAuto_2_Z2Position;
+    Teach.SortArmToAuto_2_Z3Position += Offset.SortArmToAuto_2_Z3Position;
+    Teach.SortArmToAuto_2_Z4Position += Offset.SortArmToAuto_2_Z4Position;
+    Teach.SortArmToAuto_3_Z1Position += Offset.SortArmToAuto_3_Z1Position;
+    Teach.SortArmToAuto_3_Z2Position += Offset.SortArmToAuto_3_Z2Position;
+    Teach.SortArmToAuto_3_Z3Position += Offset.SortArmToAuto_3_Z3Position;
+    Teach.SortArmToAuto_3_Z4Position += Offset.SortArmToAuto_3_Z4Position;
+    Teach.SortArmToAuto_4_Z1Position += Offset.SortArmToAuto_4_Z1Position;
+    Teach.SortArmToAuto_4_Z2Position += Offset.SortArmToAuto_4_Z2Position;
+    Teach.SortArmToAuto_4_Z3Position += Offset.SortArmToAuto_4_Z3Position;
+    Teach.SortArmToAuto_4_Z4Position += Offset.SortArmToAuto_4_Z4Position;
+    Teach.SortArmToAuto_5_Z1Position += Offset.SortArmToAuto_5_Z1Position;
+    Teach.SortArmToAuto_5_Z2Position += Offset.SortArmToAuto_5_Z2Position;
+    Teach.SortArmToAuto_5_Z3Position += Offset.SortArmToAuto_5_Z3Position;
+    Teach.SortArmToAuto_5_Z4Position += Offset.SortArmToAuto_5_Z4Position;
+    Teach.SortArmToAuto_6_Z1Position += Offset.SortArmToAuto_6_Z1Position;
+    Teach.SortArmToAuto_6_Z2Position += Offset.SortArmToAuto_6_Z2Position;
+    Teach.SortArmToAuto_6_Z3Position += Offset.SortArmToAuto_6_Z3Position;
+    Teach.SortArmToAuto_6_Z4Position += Offset.SortArmToAuto_6_Z4Position;
+    Teach.Auto1CarFirstSortYPosition += Offset.Auto1CarFirstSortYPosition;
+    Teach.Auto2CarFirstSortYPosition += Offset.Auto2CarFirstSortYPosition;
+    Teach.Auto3CarFirstSortYPosition += Offset.Auto3CarFirstSortYPosition;
+    Teach.Auto4CarFirstSortYPosition += Offset.Auto4CarFirstSortYPosition;
+    Teach.Auto5CarFirstSortYPosition += Offset.Auto5CarFirstSortYPosition;
+    Teach.Auto6CarFirstSortYPosition += Offset.Auto6CarFirstSortYPosition;
 }
 //---------------------------------------------------------------------------
 void CustomerFunctionSelect()

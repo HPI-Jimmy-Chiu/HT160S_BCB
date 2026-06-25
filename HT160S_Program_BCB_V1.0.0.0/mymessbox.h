@@ -17,12 +17,12 @@ __published:
     TPanel *palPause;
     TPanel *palYes;
     TPanel *palNo;
-    TButton *Button2;
+    TButton *btnOffBuzzer;
     void __fastcall palPauseClick(TObject *Sender);
     void __fastcall palYesClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
-    void __fastcall Button2Click(TObject *Sender);
+    void __fastcall btnOffBuzzerClick(TObject *Sender);
 private:
     int Status;
 public:
@@ -34,7 +34,7 @@ public:
     bool fScanPanel;
     bool bFormShowNoStop;
     //AI(HT160S-Maintainer) 20260622 : message-box buzzer-mute latch, HT172 bOffBuzzer parity.
-    //Set by Button2Click (Off Buzzer), cleared each FormShow/FormClose; read by DoSystemMessage
+    //Set by btnOffBuzzerClick (Off Buzzer), cleared each FormShow/FormClose; read by DoSystemMessage
     //so a muted message box drops out of the LED_Message buzzer state instead of re-sounding.
     bool fBuzzerOff;
     char Message[256];

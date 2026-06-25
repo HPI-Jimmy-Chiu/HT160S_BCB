@@ -38,6 +38,8 @@ private:
     bool   bNeedResidueCheck[4];   //AI(ht160s-residue) 20260624 : slots that placed an IC this cycle (residue-check targets)
     int    ResidueTask[4];         //AI(ht160s-residue) 20260624 : per-slot residue sub-FSM (1/200/300)
     HTimer ResidueDelay[4];        //AI(ht160s-residue) 20260624 : per-slot re-suck settle timer
+    int    iResidueAutoIndex;      //AI(ht160s-residue) 20260624 : Auto to report residue-clear to when bg check completes (-1 idle)
+    bool   bResidueArmed;          //AI(ht160s-residue) 20260625 : residue check enabled only after nozzle lifted to top (place case 60)
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
     int iBaseSuckX;   //AI(ht160s-maintainer) 20260624 : 0-based datum sucker for absolute X (HT172 iBaseSuckX port); 1=suck2 (carriage-fixed nozzle), 0=legacy suck1
 
@@ -94,6 +96,7 @@ private:
     bool SuckSelectedSlots();
     void MarkResidueTargets();    //AI(ht160s-residue) 20260624 : tag this place's slots before ClearSlot
     bool CheckPlaceResidue();     //AI(ht160s-residue) 20260624 : HT172 re-suck residue verify (REALLY only)
+    bool IsResidueCheckBusy();    //AI(ht160s-residue) 20260624 : pick gate - true while any nozzle re-suck pending
     bool DestroySelectedSlots();
     void TransferPickDataFromLoader();
     void TransferPlaceDataToAuto();

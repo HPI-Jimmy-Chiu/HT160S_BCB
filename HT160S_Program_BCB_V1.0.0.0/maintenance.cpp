@@ -19,6 +19,7 @@
 #include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : account book + level gating
 #include "mymessbox.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : ShowSecsGemLog
+#include "SecsGem/uAgvStation.h"   //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState for AMR tab
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -849,6 +850,16 @@ void __fastcall TfMaintenance::AddLotWebApiLog(AnsiString Text)
         memLotApiLog->Lines->Delete(0);
 }
 //---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshAmrStatus()
+{
+    // AI(ht160s-agv) 20260625 : live dump of the AGV coordinator lock/handshake
+    // state into the AMR maintenance tab. AgvCoord is a global object (not a
+    // pointer), so guard only the memo control. DescribeAgvState() is read-only.
+    if(memAmrStatus==NULL)
+        return;
+    memAmrStatus->Lines->Text = AgvCoord.DescribeAgvState();
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMaintenance::btnLotApiSaveClick(TObject *Sender)
 {
     AnsiString Url;
@@ -1054,6 +1065,15 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         S.sprintf("%.2f", (double)GeneralSetting.iLoaderYSafeDistance/100.0);
         edLoaderSafeDistance->Text=S;
     }
+    //AI(ht160s-statusbar) 20260624 : load machine identity into the edit fields
+    //(persisted in General.ini [MachineIdentity] by GeneralSetting). Guarded for
+    //NULL in case the DFM block is absent on an older form file.
+    if(edMachineModel!=NULL)
+        edMachineModel->Text=GeneralSetting.sMachineModel;
+    if(edHandlerID!=NULL)
+        edHandlerID->Text=GeneralSetting.sHandlerID;
+    if(edSerialNo!=NULL)
+        edSerialNo->Text=GeneralSetting.sSerialNo;
     bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
@@ -1095,8 +1115,17 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
             if(SuckChk[s]!=NULL)
                 GeneralSetting.bSuckerEnabled[s]=SuckChk[s]->Checked;
     }
+    //AI(ht160s-statusbar) 20260624 : capture machine identity from the edits before
+    //GeneralSetting.Save(), then push it to the cmydef globals + status-bar panels.
+    if(edMachineModel!=NULL)
+        GeneralSetting.sMachineModel=edMachineModel->Text;
+    if(edHandlerID!=NULL)
+        GeneralSetting.sHandlerID=edHandlerID->Text;
+    if(edSerialNo!=NULL)
+        GeneralSetting.sSerialNo=edSerialNo->Text;
     GeneralSetting.Save();
     BinAreaMap.LoadDefault();
+    UpdateMachineIdentity();
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
@@ -1302,6 +1331,7 @@ void __fastcall TfMaintenance::tmrTowerLightBlinkTimer(TObject *Sender)
     RefreshTopCcdStatus();
     RefreshColorCcdStatus();
     RefreshLotWebApiStatus();
+    RefreshAmrStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenWorkFile()

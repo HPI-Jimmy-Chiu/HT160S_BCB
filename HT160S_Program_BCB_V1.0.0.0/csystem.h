@@ -67,6 +67,18 @@ const char* MachineTriggerName(eMachineTrigger trig);
 void MachinePause(eMachineTrigger trig);
 void MachineStop(eMachineTrigger trig);
 void MachineHomeAbort(eMachineTrigger trig);
+//AI(machine-command-layer) 20260625 : single production-start gate (joins Pause/Stop/
+//HomeAbort). Operator button, SECS START and the panel key all funnel through
+//MachineStart so the lot/2D precondition gate + the SystemStart raise live in ONE place
+//(manual == auto). Returns a result; caller maps it (operator -> ShowMyMessage,
+//SECS -> HCACK). No modal here.
+enum eMachineStartResult {
+    msStarted,
+    msRejNoContext,
+    msRejBusy,
+    msRejNotReady
+};
+eMachineStartResult MachineStart(eMachineTrigger trig, AnsiString &Reason);
 #ifdef SOFT_SIMULATE
 //AI(HT160S-Maintainer) 20260619 : --selftest-home headless self-test (sim only).
 //g_SelfTestHome is set in WinMain from the --selftest-home command-line arg; MainProc

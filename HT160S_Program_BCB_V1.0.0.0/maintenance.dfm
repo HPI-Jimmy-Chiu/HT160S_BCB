@@ -65,7 +65,7 @@ object fMaintenance: TfMaintenance
       Height = 50
       AllowAllUp = True
       GroupIndex = 1
-      Caption = 'Soft Simulate'
+      Caption = 'AMR'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -15
@@ -863,7 +863,23 @@ object fMaintenance: TfMaintenance
         Caption = 'Password'
       end
       object tsMaintSoftSimu: TTabSheet
-        Caption = 'Soft Simulate'
+        Caption = 'AMR'
+        object memAmrStatus: TMemo
+          Left = 0
+          Top = 0
+          Width = 941
+          Height = 915
+          Align = alClient
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -13
+          Font.Name = 'Courier New'
+          Font.Style = []
+          ParentFont = False
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 0
+        end
       end
       object tsMaintFunctionDef: TTabSheet
         Caption = 'Function Define'
@@ -1212,6 +1228,81 @@ object fMaintenance: TfMaintenance
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
+                end
+              end
+              object pnlMachineIdentity: TPanel
+                Left = 0
+                Top = 240
+                Width = 929
+                Height = 130
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 4
+                object lblMachineModel: TLabel
+                  Left = 36
+                  Top = 16
+                  Width = 120
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Machine Model'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblHandlerID: TLabel
+                  Left = 36
+                  Top = 52
+                  Width = 120
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Machine ID'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSerialNo: TLabel
+                  Left = 36
+                  Top = 88
+                  Width = 120
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Serial No'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edMachineModel: TEdit
+                  Left = 168
+                  Top = 12
+                  Width = 200
+                  Height = 24
+                  TabOrder = 0
+                  Text = 'HT160S'
+                end
+                object edHandlerID: TEdit
+                  Left = 168
+                  Top = 48
+                  Width = 200
+                  Height = 24
+                  TabOrder = 1
+                  Text = ''
+                end
+                object edSerialNo: TEdit
+                  Left = 168
+                  Top = 84
+                  Width = 200
+                  Height = 24
+                  TabOrder = 2
+                  Text = ''
                 end
               end
             end

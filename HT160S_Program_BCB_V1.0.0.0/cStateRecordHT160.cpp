@@ -9,12 +9,14 @@
 #include "CosFunction.h"
 #include "GeneralSetting.h"   //AI(ht160s-lotbin) 20260615 : SortMode flag + LotBinBinding for the snapshot
 #include "main.h"
+#include "uHome.h"            //AI(ht160s-state-record-analysis) 20260624 : fHome IsShown/SeenStart for the HOME-lifecycle snapshot
 #include "aSortArm.h"         //AI(ht160s-state-record-analysis) 20260612 : SortArmModule sub-task readout (TTrayMotor/TMyKitSuck come via database.h)
 #include "aAuto1To6.h"        //AI(ht160s-state-record-analysis) 20260616 : AutoModule per-station cell map for SortArmDecision.txt
 #include "aColor.h"           //AI(ht160s-state-record-analysis) 20260622 : ColorModule->DescribeState()
 #include "aEmpty.h"           //AI(ht160s-state-record-analysis) 20260622 : EmptyModule->DescribeState()
 #include "aLoader.h"          //AI(ht160s-state-record-analysis) 20260622 : LoaderModule->DescribeState()
 #include "uHGemEquipment.h"   //AI(ht160s-secsgem) 20260611 : HGem->FlushSecsLogToFile()
+#include "uAgvStation.h"      //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState() for the AMR handshake block in FeederDecision.txt
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 static const AnsiString SR_VERSION = "HT160S 1.0.0.0";
@@ -371,6 +373,17 @@ void cStateRecordHT160::WriteMachineStateIni(AnsiString Path, AnsiString Reason,
     Ini->WriteString ("System", "RunModeName", RunModeText((int)HSys.Sys.RunMode));
     Ini->WriteInteger("System", "SystemStart", HSys.Sys.SystemStart ? 1 : 0);
     Ini->WriteInteger("System", "bCleanOut",   HSys.Sys.bCleanOut ? 1 : 0);
+    //AI(ht160s-state-record-analysis) 20260624 : HOME-lifecycle inputs. "HOME doesn't move" is
+    //almost always the SystemStart-gated home engine : ProcessMotion returns early when
+    //SystemStart==0, so CheckMotorHome / fHome->ProcessMotorHome never step the axes. These show
+    //WHY - whether the monitor is up (the ScanSystemSenser motor-power SystemStart-drops are
+    //guarded ONLY while fHome is shown), the power-cycle/settle state, and if home already finished.
+    Ini->WriteInteger("System", "fHomeShown",        (fHome!=NULL && fHome->IsShown()) ? 1 : 0);
+    Ini->WriteInteger("System", "fHomeSeenStart",    (fHome!=NULL && fHome->SeenStart()) ? 1 : 0);
+    Ini->WriteInteger("System", "fAllMotorHome",     fAllMotorHome ? 1 : 0);
+    Ini->WriteInteger("System", "MotorPowerOnDelay", MotorPowerOnDelay);
+    Ini->WriteInteger("System", "bMotorPowerState",  bMotorPowerState ? 1 : 0);
+    Ini->WriteInteger("System", "bHomePowerCycling", bHomePowerCycling ? 1 : 0);
 
     Ini->WriteString("Recipe", "Name", RecipeManager.GetCurrentRecipeName());
 
@@ -719,6 +732,7 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
          + "  bColorBinAreaInstalled=" + IntToStr(GeneralSetting.bColorBinAreaInstalled ? 1 : 0)
          + "  bUseLotBinSortMode=" + IntToStr(GeneralSetting.bUseLotBinSortMode ? 1 : 0) + "\r\n";
     Out += "  bUseColorCcd=" + IntToStr(CosFunction.bUseColorCcd ? 1 : 0)
+         + "  bUseTopCcd=" + IntToStr(CosFunction.bUseTopCcd ? 1 : 0)
          + "  bUse2DBinMap=" + IntToStr(CosFunction.bUse2DBinMap ? 1 : 0) + "\r\n";
     Out += "------------------------------------------------------------\r\n";
 
@@ -738,6 +752,14 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
         Out += LoaderModule->DescribeState();
     else
         Out += "[Loader] (module NULL)\r\n";
+
+    //AI(ht160s-agv) 20260625 : AMR coordinator handshake block. Lets offline analysis
+    //distinguish a PREP-stall vs a READY-stall vs a link drop (per-station lock +
+    //handshake state + live ready-gate + SECS Selected + bUseAMR), alongside the
+    //per-module feeder latches above - the missing view when an AMR lock freezes a feeder.
+    Out += "------------------------------------------------------------\r\n";
+    Out += "[AMR coordinator]\r\n";
+    Out += AgvCoord.DescribeAgvState();
 
     fwrite(Out.c_str(), 1, Out.Length(), f);
     fflush(f);

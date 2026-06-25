@@ -59,7 +59,7 @@
 | 2 | HT160 HTTP client 模組 + edWebapiPath 存讀 + WebAPI log | ✅ |
 | 3 | 客戶 JSON 結構擴充（TLotRunInfo + per-IC 欄位；相容 2DIDHistory；SBin 當分選 Bin） | ✅ |
 | 4 | 接機台流程（btnLotStart 手動 + SECS S2F42 LOTSTART 自動，非阻塞） | ✅ |
-| 5 | 實機/真實 API 驗收 | 待辦 |
+| 5 | 實機/真實 API 驗收 | 進行中 (2026/6/24 客戶端點 + 回傳格式已確認相容，零程式改動；待實機 Fetch 驗證 — 見第 9 節) |
 
 ---
 
@@ -233,3 +233,69 @@
 - SECS 自動拉取必須走「無 modal dialog」路徑，避免阻塞 HSMS 執行緒。
 - 階段 5（待辦）：實機 / 真實 API 驗收（需客戶 URL / port / 方法 / 認證）。
 - UsePull 預設 OFF；實機接好客戶 API 後，於 Maintenance Lot WebAPI 頁勾選 + Save 啟用。
+
+---
+
+## 9. 階段 5 — 真實 API 對接 (2026/6/24 客戶端點確認)
+
+> 客戶提供真實 WebAPI 端點與一份回傳樣本。經逐欄位核對，回傳即既有已支援的
+> `2DIDHistory` 格式，**解析器零改動**即可端到端運作。本節記錄端點、設定方式與
+> 實機驗證清單。
+
+### 9.1 真實端點 (客戶提供)
+```
+http://192.168.11.18:7825/api/GetBISummaryByLot?OSATLot=<LotID>
+```
+- IP 直連 (內網 192.168.11.18，port 7825)，`inet_addr` 可直接解析，無需 DNS。
+- 範例 `?OSATLot=內批` 的「內批」為**佔位字**，實際填真實 Lot 號 (樣本為純 ASCII
+  `A5921.RCS.TEST99`)。
+
+### 9.2 設定方式 (Maintenance → Lot WebAPI 頁，operator config，非程式改動)
+- 本機請求模型為 `BaseUrl + UrlEncodeLot(LotID)`：LotID **接在 BaseUrl 尾端**。
+- 故 `[LotWebApi] BaseUrl` (edWebapiPath) 要設成**結尾停在 `?OSATLot=` 的前綴**：
+  ```
+  http://192.168.11.18:7825/api/GetBISummaryByLot?OSATLot=
+  ```
+  **不可**把含 Lot 值的完整網址整串貼入 (會變成 `...OSATLot=內批<再接一次LotID>`)。
+- `ParseBaseUrl` 把 host 後整段 (含 `?OSATLot=`) 當 path 送出，GET 行正確；
+  Lot 號 ASCII 經 `UrlEncodeLot` 原樣輸出。最終：
+  `GET /api/GetBISummaryByLot?OSATLot=A5921.RCS.TEST99 HTTP/1.0`。
+
+### 9.3 回傳格式確認 = `2DIDHistory` (既有支援，零 parser 改動)
+客戶樣本與 `THT160LotRegistry::LoadFromJsonString` 的 `2DIDHistory` 解析區塊
+(`CosFunction.cpp` ~1262-1341) 逐欄位吻合：
+
+| 客戶欄位 | 程式讀取 | 用途 |
+|------|------|------|
+| `2DIDHistory`[] / `LOTID` | 根陣列 / `AddLot` | Lot |
+| `Substage` / `ProductCode` | TLotRunInfo 備用欄位 | 儲存 |
+| `ICIInfo`[] / `QRCodeID` | IC 陣列 / 2D 反查 key | 分選 key |
+| `HBin` / `SBin` (字串) | `StrToIntDef` 轉 int | routing Bin |
+| `RetestCode` / `DiePass` | 備用欄位 | 儲存 |
+
+- routing Bin **預設取 `HBin`** (2026/6/24 user 指示，`InitialCosFunction()` 改為
+  `iSortBinSource=HT160_SORT_BIN_SOURCE_HBIN`，CosFunction.cpp:1659)；SBin 仍解析儲存
+  備用。原 6/11 決策為 SBin (見第 2 節)，已由此覆寫。無 ini / per-customer 覆寫，改此
+  一行即全域切換。build EXIT=0。
+
+### 9.4 實機 Fetch 驗證清單 (在機台跑，開發筆電無法連客戶內網)
+1. Maintenance → Lot WebAPI：`edWebapiPath` 填 9.2 前綴版，按 **Save**。
+2. 測試 Lot 欄填真實 Lot 號，按 **Fetch** (手動、無 modal、不需開 UsePull)。
+3. 結果 Memo 應顯示 HTTP 200 + JSON body；確認 Lot 清單反查表有灌入。
+4. 仍需在實機確認的殘留點：
+   - **HTTP 版本**：本機送 HTTP/1.0 + `Connection: close`，靠 peer FIN 判定收完。
+     若 server 強回 HTTP/1.1 **chunked** 編碼，目前 parser 不會 de-chunk → body 含
+     chunk size 行、cJSON 解析失敗。需以 Fetch 實測確認 server 回 1.0/非 chunked。
+   - **嚴格 JSON**：cJSON 不接受**尾逗號** (樣本圖中 `"DiePass":"1",}` 的逗號為人工
+     示意)。確認 server 實際輸出為合法 JSON。
+   - **中文 Lot 編碼**：`UrlEncodeLot` 是對 Big5 bytes 做百分比編碼；目前真實 Lot 為
+     ASCII 故無影響。若日後出現含中文 Lot 號且 server 期待 UTF-8，需另行調整。
+5. 驗證 OK 後，於同頁勾選 **UsePull** + Save，啟用 LotStart / SECS S2F42 LOTSTART 自動拉。
+
+### 9.5 文件同步修正 (程式已超前 DEV_LOG 之處)
+- **整批拉取 + 重試**：階段 4 原記「只拉第一個 Lot」；現行 `main.cpp` 已是整批掃描
+  (`StartLotWebApiPullAll` / `StartNextLotApiPull`)，逐 Lot 拉、含 cursor，單 Lot 失敗
+  重試 `LOT_API_MAX_RETRY=3` 次才跳過，不靜默漏 Lot。手動 LotStart 與 SECS LOTSTART
+  共用此掃描。
+- **WebAPI Log 路徑**：第 5 節舊記 `WebAPI_Logs\yyyy_mm_dd_log.txt`；現已改用
+  `cCsvDailyLog` → `WebAPI\YYYYMMDD\WebAPI_YYYYMMDD.log` (會進 State Record 快照)。

@@ -73,6 +73,11 @@ bool TColorModule::IsAmrLocked()
 //up); destack idle so the AGV may refill. Held stable by bAmrLocked.
 bool TColorModule::IsReadyForAmrHandoff()
 {
+    //AI(ht160s-agv) 20260625 : sim defense-in-depth - in SOFT_SIMULATE the front
+    //destacker out-bits are normally already false; assert ready so the PREP->READY
+    //gate cannot latch the lock on a laptop run. Real hardware keeps the interlock.
+    if(IsSoftSimulate())
+        return true;
     return (HSys.Cyn.C_Color_FrontRiseTray_1.GetOutBit()==false
             && HSys.Cyn.C_Color_FrontRiseTray_2.GetOutBit()==false
             && HSys.Cyn.C_Color_FrontSeparateTray_1.GetOutBit()==false);
@@ -237,8 +242,6 @@ void TColorModule::DoColor(int &Task)
             break;
 
         case 100:
-            if(bAmrLocked)
-                break;
             RefreshStateFromSensors();
             //AI(phase6-loader-recycle) 20260625 : single-MColorY arbitration (CRITICAL).
             //The receive (return) dispatch is placed BEFORE the supply godown/supply
@@ -250,6 +253,14 @@ void TColorModule::DoColor(int &Task)
             //the deposit finishes (set in RequestReturnTray, cleared in case 1700).
             if(bReturnTray)
             {
+                //AI(ht160s-agv) 20260625 : DoGoUpTray also raises C_Color_FrontRise*/Separate,
+                //so hold it off while AMR-locked so the front stack stays home and the CEID273
+                //READY gate (IsReadyForAmrHandoff) can clear. Return resumes after the lock clears.
+                if(bAmrLocked)
+                {
+                    Task=1;
+                    break;
+                }
                 DoGoUpTray(0);
                 Task=1700;
                 break;
@@ -272,6 +283,17 @@ void TColorModule::DoColor(int &Task)
             //simulating), so the identity tray is not presented / scanned early.
             if(bFrontHasTray==false && bReturnTray==false)
             {
+                //AI(ht160s-agv) 20260625 : NARROW AMR lock. The FRONT-stack branches that
+                //raise C_Color_FrontRise*/Separate (this DoGoDownTray, and the bReturnTray
+                //DoGoUpTray above) are held off while the AGV refills the front stack, so
+                //IsReadyForAmrHandoff stays true and the lock can clear. The downstream
+                //branches (bTrayReady->DoReleaseTray, bSupplyRequested->DoSupplyTray) keep
+                //running so TrayArm/SortArm are not starved.
+                if(bAmrLocked)
+                {
+                    Task=1;
+                    break;
+                }
                 if(bInputHasTray || IsSoftSimulate())
                 {
                     DoGoDownTray(0);

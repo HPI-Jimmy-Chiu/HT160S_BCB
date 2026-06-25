@@ -72,6 +72,8 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     bCleanOutFinish=false;
     bOneCycleFinish=false;
     dwSuckHomeLostStart=0;
+    iResidueAutoIndex=-1;   //AI(ht160s-residue) 20260624 : no pending residue report
+    bResidueArmed=false;   //AI(ht160s-residue) 20260625 : disarm; armed at place case 60
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)   //AI(ht160s-residue) 20260624 : reset residue-check state on home/init
     {
         bNeedResidueCheck[s]=false;
@@ -979,12 +981,26 @@ void TSortArmModule::MarkResidueTargets()
 //---------------------------------------------------------------------------
 bool TSortArmModule::CheckPlaceResidue()
 {
-    //AI(ht160s-residue) 20260624 : HT172 CheckSortArmDestroyActive port. Per placed
-    //nozzle: break vacuum, RE-SUCK, wait, read status. Status ON after re-suck = IC
-    //still plugging the nozzle (residue) -> alarm, operator removes IC, retry. OFF =
-    //nozzle empty (clear). Real vacuum sensor only; DUMMY/HAS_TRAY/sim skip.
-    if(IsSoftSimulate())
+    //AI(ht160s-residue) 20260625 : HT172 CheckSortArmDestroyActive port, non-blocking.
+    //Runs every DoSortArm cycle but ONLY after the nozzle lifted to the top (bResidueArmed
+    //set in place case 60), so a re-suck never happens near the tray and cannot pull a
+    //just-placed IC back. Per armed nozzle: break vacuum, RE-SUCK, wait, read status.
+    //ON after re-suck = IC still plugging the nozzle (residue) -> alarm, operator removes
+    //IC, retry. OFF = nozzle empty (clear). Real vacuum sensor only; DUMMY/HAS_TRAY/sim skip.
+    if(bResidueArmed==false)        //not lifted to top yet : nothing armed to verify
         return true;
+    if(IsSoftSimulate())
+    {
+        for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            bNeedResidueCheck[s]=false;
+        if(iResidueAutoIndex>=0 && AutoModule!=NULL)
+        {
+            AutoModule->SetPlaceResidueClear(iResidueAutoIndex, true);
+            iResidueAutoIndex=-1;
+        }
+        bResidueArmed=false;
+        return true;
+    }
     bool bAllDone=true;
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
     {
@@ -1041,7 +1057,26 @@ bool TSortArmModule::CheckPlaceResidue()
                 break;
         }
     }
+    if(bAllDone)
+    {
+        if(iResidueAutoIndex>=0 && AutoModule!=NULL)   //all placed nozzles clear -> let target Auto leave
+        {
+            AutoModule->SetPlaceResidueClear(iResidueAutoIndex, true);
+            iResidueAutoIndex=-1;
+        }
+        bResidueArmed=false;
+    }
     return bAllDone;
+}
+//---------------------------------------------------------------------------
+bool TSortArmModule::IsResidueCheckBusy()
+{
+    //AI(ht160s-residue) 20260624 : true while any just-placed nozzle is still being
+    //re-suck verified. Pick Z-down gates on this so re-suck never overlaps pick suck.
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        if(bNeedResidueCheck[s])
+            return true;
+    return false;
 }
 //---------------------------------------------------------------------------
 bool TSortArmModule::DestroySelectedSlots()
@@ -1183,6 +1218,8 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             break;
 
         case 45:
+            if(IsResidueCheckBusy())                                     //AI(ht160s-residue) 20260624 : prior place re-suck must finish before pick suck
+                break;
             if(MovePickZDown())
                 PickTask=50;
             break;
@@ -1305,6 +1342,7 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
             if(DestroySelectedSlots())
             {
                 MarkResidueTargets();                                    //AI(ht160s-residue) 20260624 : tag placed slots before ClearSlot
+                iResidueAutoIndex=iActiveAutoIndex;       //AI(ht160s-residue) 20260624 : report to this Auto when bg check ends
                 if(AutoModule!=NULL)
                     AutoModule->SetPlaceResidueClear(iActiveAutoIndex, false);
                 TransferPlaceDataToAuto();
@@ -1313,15 +1351,9 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
             break;
 
         case 60:
-            if(SortArmZToSafePos())                                      //AI(ht160s-residue) 20260624 : nozzle to top, then residue-check
-                PlaceTask=70;
-            break;
-
-        case 70:
-            if(CheckPlaceResidue())                                      //AI(ht160s-residue) 20260624 : re-suck verify each placed nozzle is empty
+            if(SortArmZToSafePos())                                      //AI(ht160s-residue) 20260625 : nozzle reached top -> ARM residue check (never re-suck near tray); verify runs in background
             {
-                if(AutoModule!=NULL)
-                    AutoModule->SetPlaceResidueClear(iActiveAutoIndex, true);
+                bResidueArmed=true;
                 PlaceTask=1;
                 return true;
             }
@@ -1403,6 +1435,8 @@ void TSortArmModule::DoSortArm(int &Task)
 {
     if(LoaderModule==NULL)
         return;
+
+    CheckPlaceResidue();   //AI(ht160s-residue) 20260624 : background re-suck verify (HT172 non-blocking); pick/discharge gate on result
 
     switch(Task)
     {

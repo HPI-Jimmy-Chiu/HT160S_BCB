@@ -52,6 +52,10 @@ __fastcall TfComPort::TfComPort(TComponent* Owner)
 __fastcall TfComPort::~TfComPort()
 {
     StopAllCom();
+    if(HSys.BinDisCtrl!=NULL && HSys.BinDisCtrl->CommBin==BinComm)
+        HSys.BinDisCtrl->CommBin=NULL;
+    delete BinComm;
+    BinComm=NULL;
 }
 //---------------------------------------------------------------------------
 void TfComPort::PopulateComList()
@@ -135,19 +139,41 @@ void TfComPort::ConfigureBinDisplay()
     }
     if(HSys.BinDisCtrl==NULL)
         return;
+
+    // AI(ht160s-bindisplay) 20260624 : choose the COM backend from cbCommType
+    // (persisted as GeneralSetting.bBinDispUseMyComm). 0 = SPComm (proven path),
+    // 1 = self-built TMyComm. Swap only when the kind changes, and do it safely:
+    // quiesce the controller, then close + detach + delete the old port first.
+    bool bCommSwapped=false;
+    int iWantComm = GeneralSetting.bBinDispUseMyComm ? 1 : 0;
+    if(BinComm!=NULL && BinComm->GetKind()!=iWantComm)
+    {
+        HSys.BinDisCtrl->ProcessStopStart(false);
+        try { BinComm->StopComm(); } catch(...) {}
+        if(HSys.BinDisCtrl->CommBin==BinComm)
+            HSys.BinDisCtrl->CommBin=NULL;
+        delete BinComm;
+        BinComm=NULL;
+        bCommSwapped=true;
+    }
     if(BinComm==NULL)
-        BinComm=new TComm(this);
+    {
+        if(iWantComm==1)
+            BinComm=new TCommPortMy(this);
+        else
+            BinComm=new TCommPortSP(this);
+    }
 
     //AI(ht160s-maintainer) 20260616 : 9600bps needs ~100ms inter-byte gap to keep a
     //reply frame in one OnReceiveData (matches HT172 commBinDisStore). At 1ms the
     //9600 reply was split per-byte and CommBinReceiveData overwrites sReadBuffer each
     //event, so Pos(sCheckWord) never matched -> "no reply received".
-    BinComm->ReadIntervalTimeout=100;
-    BinComm->Parity=None;
-    BinComm->BaudRate=GeneralSetting.iBinDispBaud;
-    BinComm->ByteSize=_8;
-    BinComm->ParityCheck=false;
-    BinComm->StopBits=_1;
+    BinComm->SetReadIntervalTimeout(100);
+    BinComm->SetParity(0);
+    BinComm->SetBaudRate(GeneralSetting.iBinDispBaud);
+    BinComm->SetByteSize(8);
+    BinComm->SetParityCheck(false);
+    BinComm->SetStopBits(0);
 
     HSys.BinDisCtrl->CommBin=BinComm;
     HSys.BinDisCtrl->SetComParity(None);
@@ -164,7 +190,16 @@ void TfComPort::ConfigureBinDisplay()
     // un-started keeps bFirstInit true so a later enable still runs task 1
     // (which opens the COM port) rather than jumping straight to GetStatus.
     if(GeneralSetting.bBinDisplayInstalled)
+    {
         HSys.BinDisCtrl->ProcessStopStart(true);
+        // AI(ht160s-bindisplay) 20260624 : re-arm AFTER ProcessStopStart. On a
+        // runtime swap (not first init) ProcessStopStart(true) takes the else
+        // branch and forces task=50 (GetStatus), which skips task 1 (StartComport)
+        // and would never open the new backend's port. ResetBinFlow() last forces
+        // task=1 so the freshly created port is opened.
+        if(bCommSwapped)
+            HSys.BinDisCtrl->ResetBinFlow();
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-maintainer) 20260615 : convert one display-label string to the

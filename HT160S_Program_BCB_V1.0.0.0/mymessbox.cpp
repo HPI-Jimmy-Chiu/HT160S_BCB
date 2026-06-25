@@ -62,15 +62,17 @@ static void PrepareNormalMessage(AnsiString S1, AnsiString S2, AnsiString Button
     MyMessageBox->Label1->Caption=S1;
     MyMessageBox->Label2->Caption=S2;
     MyMessageBox->Label2->Visible=(S2!="");
-    MyMessageBox->palPause->Left=168;
-    MyMessageBox->palPause->Top=178;
+    //AI(HT160S-Maintainer) 20260624 : button Left/Width are no longer set here. After the
+    //visible set is chosen, LayoutMessageButtons() (called from FormShow) lays whichever
+    //buttons stay Visible into an equal-width, evenly-spaced row, so the 1- and 2-button
+    //modes both look uniform. Here we only pick the Caption and which buttons show.
     MyMessageBox->palPause->Caption=ButtonCaption;
     MyMessageBox->palPause->Visible=true;
     MyMessageBox->palYes->Visible=false;
     MyMessageBox->palNo->Visible=false;
     // Off Buzzer is an alarm-only control; default visible here so alarm
     // dialogs keep it. YES/NO confirmations hide it (no buzzer is running).
-    MyMessageBox->Button2->Visible=true;
+    MyMessageBox->btnOffBuzzer->Visible=true;
     MyMessageBox->ret=TMyMessageBox::msgrtnPAUSE;
 }
 //---------------------------------------------------------------------------
@@ -162,7 +164,7 @@ int ShowMyMessageBox_YES_NO(AnsiString str)
     MyMessageBox->palPause->Visible=false;
     MyMessageBox->palYes->Visible=true;
     MyMessageBox->palNo->Visible=true;
-    MyMessageBox->Button2->Visible=false;
+    MyMessageBox->btnOffBuzzer->Visible=false;
     MyMessageBox->ret=TMyMessageBox::msgrtnNO;
     MyMessageBox->fScanPanel=false;
     MyMessageBox->bFormShowNoStop=true;
@@ -210,6 +212,47 @@ void __fastcall TMyMessageBox::palYesClick(TObject *Sender)
     Close();
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260624 : lay whichever response buttons are currently Visible into
+//equal widths with equal gaps across the button row. The visible set differs by mode (palPause
+//+ Off Buzzer for alarm/info/OK, or palYes + palNo for confirmations), so the old fixed DFM
+//coords only lined up in one mode; this distributes the live set uniformly on every show.
+//Off Buzzer participates as an equal button (chosen layout). Display order: Yes, Pause, No,
+//Off Buzzer. TControl* covers both the TPanel action buttons and the TButton Off Buzzer.
+//---------------------------------------------------------------------------
+static void LayoutMessageButtons()
+{
+    if(MyMessageBox==NULL)
+        return;
+
+    TControl *Btns[4];
+    int N=0;
+    if(MyMessageBox->palYes->Visible)       Btns[N++]=MyMessageBox->palYes;
+    if(MyMessageBox->palPause->Visible)     Btns[N++]=MyMessageBox->palPause;
+    if(MyMessageBox->palNo->Visible)        Btns[N++]=MyMessageBox->palNo;
+    if(MyMessageBox->btnOffBuzzer->Visible) Btns[N++]=MyMessageBox->btnOffBuzzer;
+    if(N==0)
+        return;
+
+    int Margin=12;
+    int Gap=16;
+    int RowTop=178;
+    int RowHeight=33;
+    int Avail=MyMessageBox->ClientWidth-2*Margin-(N-1)*Gap;
+    if(Avail<N)
+        return;
+    int ButtonWidth=Avail/N;
+    int X=Margin;
+    int i;
+    for(i=0; i<N; i++)
+    {
+        Btns[i]->Left=X;
+        Btns[i]->Top=RowTop;
+        Btns[i]->Width=ButtonWidth;
+        Btns[i]->Height=RowHeight;
+        X+=ButtonWidth+Gap;
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall TMyMessageBox::FormShow(TObject *Sender)
 {
     if(fMain!=NULL)
@@ -233,11 +276,15 @@ void __fastcall TMyMessageBox::FormShow(TObject *Sender)
     fBuzzerOff=false;
     fShow=true;
 
+    //AI(HT160S-Maintainer) 20260624 : with the visible set now finalized (PrepareNormalMessage
+    //or the YES/NO path ran before ShowModal/Show), lay the live buttons into an equal-width row.
+    LayoutMessageButtons();
+
     //AI(HT160S-Maintainer) 20260622 : a modal message box suspends MainProc, so the per-scan
     //DoSystemMessage LED_Message buzzer driver never runs while it is up -> the message had no
     //audible cue. Kick it here. Gate on the Off Buzzer button: alarm-style messages show it,
     //YES/NO confirmations hide it and must stay silent (see PrepareNormalMessage).
-    if(Button2->Visible)
+    if(btnOffBuzzer->Visible)
         PlayMessageBuzzer();
 }
 //---------------------------------------------------------------------------
@@ -249,7 +296,7 @@ void __fastcall TMyMessageBox::FormClose(TObject *Sender, TCloseAction &Action)
     bFormShowNoStop=false;
 }
 //---------------------------------------------------------------------------
-void __fastcall TMyMessageBox::Button2Click(TObject *Sender)
+void __fastcall TMyMessageBox::btnOffBuzzerClick(TObject *Sender)
 {
     //AI(HT160S-Maintainer) 20260622 : Off Buzzer -> latch mute so DoSystemMessage stops
     //re-driving the LED_Message buzzer every scan (one CloseBuzzerOff alone would be

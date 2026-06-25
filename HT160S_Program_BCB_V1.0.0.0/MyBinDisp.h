@@ -11,6 +11,7 @@
 //----------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "SPComm.hpp"
+#include "ICommPort.h"
 #include "HTimer.h"
 #include "cmydef.h"          // TEST_MAX_BIN
 //----------------------------------------------------------------------------
@@ -80,7 +81,7 @@ public:
     TMyBinDispCtrl();
     virtual ~TMyBinDispCtrl();   // virtual: deleted via base ptr (LED / TFT subclass)
     AnsiString Alias[Bin_MAX_NUM];
-    TComm  *CommBin;
+    ICommPort  *CommBin;
     void ProcessStopStart(bool Value)  ;// start or stop the state machine
     void SetComPort(AnsiString port)   ;// set the COM port name
     void SetComParity(TParity Parity)  ;// set the COM parity
@@ -114,8 +115,8 @@ public:
     TStringList *slBinDispLog;                          // in-memory log buffer
     AnsiString sReadBuffer;
     void Spin();
-    bool StartComport(TComm *Comm,AnsiString port);
-    bool StopComport(TComm *Comm,AnsiString port);
+    bool StartComport(ICommPort *Comm,AnsiString port);
+    bool StopComport(ICommPort *Comm,AnsiString port);
     void SetUsedBinNumber(int iNum);
     int GetUsedBinNumber(){return iUsedBinNumber;}
     void ResetBinFlow(){iBinDispCtrlTask=1;}

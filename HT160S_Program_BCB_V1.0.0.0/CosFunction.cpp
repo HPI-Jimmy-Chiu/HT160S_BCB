@@ -1656,7 +1656,8 @@ void InitialCosFunction()
 	CosFunction.bUseBinAreaMap=true;
 	CosFunction.bUse2DBinMap=true;
 	CosFunction.bUseColorCcd=true;   // default on; overridden by [ColorCCD] Enable below
-	CosFunction.iSortBinSource=HT160_SORT_BIN_SOURCE_SBIN;   // route by SBin by default
+	CosFunction.bUseTopCcd=true;   // default on; overridden by [TopCCD] Enable below
+	CosFunction.iSortBinSource=HT160_SORT_BIN_SOURCE_HBIN;   // route by HBin by default
 	CosFunction.bUseSecsGem=false;   // paid SECS/GEM off unless a CUSTOMER_CODE enables it
 	DoCustomerFunction();
 	// General tier (ship + hardware install) : system\General.ini.
@@ -1669,6 +1670,7 @@ void InitialCosFunction()
 		try
 		{
 			CosFunction.bUseColorCcd=IniColorCcd->ReadBool("ColorCCD", "Enable", true);
+			CosFunction.bUseTopCcd=IniColorCcd->ReadBool("TopCCD", "Enable", true);
 		}
 		__finally
 		{

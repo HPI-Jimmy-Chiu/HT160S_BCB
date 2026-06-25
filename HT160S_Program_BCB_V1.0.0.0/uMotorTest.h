@@ -127,6 +127,7 @@ __published:
 
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
+    void __fastcall FormActivate(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall tmrUpdateTimer(TObject *Sender);
     void __fastcall grdOperateDrawCell(TObject *Sender, int ACol, int ARow, const TRect &Rect, TGridDrawState State);

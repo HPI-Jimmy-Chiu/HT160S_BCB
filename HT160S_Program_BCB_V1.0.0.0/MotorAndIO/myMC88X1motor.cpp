@@ -65,6 +65,7 @@ __fastcall TMyMC88X1Motor::TMyMC88X1Motor(int Addr)
     iWaitCount=0;
     iHomeType=MC88X1_DEFAULT_HOME_TYPE;
     iEncodeMultiple=3;   // A/B x4 default; database.cpp overrides per Alias (M20 -> 1) before InitMotor
+    iEncodeDir=1;        // SetEncodeDir: 1=inverse default; database.cpp overrides per Alias (M05 -> 0) before InitMotor
     iHomeStep=MC88X1_DEFAULT_HOME_STEP;
     iHomeStepRange=MC88X1_DEFAULT_HOME_STEP_RANGE;
     iStepRange=iHomeStepRange;
@@ -205,7 +206,14 @@ int TMyMC88X1Motor::InitMotor(int IoAddress)
     // algebraically identical to [SetEncodeDir(0) + if(Direction)] (a no-op refactor).
     // The real sign fix is dir=1 HERE plus the symmetric if(Direction) in
     // ReadMC88X1EnCoderRealPos, which together FLIP the encoder sign vs the old asymmetric form.
-    SetEncodeDir(1);
+    // NOTE: encoder count direction is now PER-AXIS (HTMotor::iEncodeDir, set in
+    // database.cpp before InitMotor). Default 1=inverse keeps the HT9045-aligned sign;
+    // M05 MLoaderY_2 is overridden to 0=normal because its A6 OA/OB feedback phase is
+    // wired opposite (its Encoder otherwise reads negated vs NowPos/command). The feedback
+    // (practical) counter is monitor-only in pulse-train P mode, so this flips ONLY the
+    // Encoder display sign -- command/positioning/soft-limit/home==0 are unaffected.
+    // Manual P.51 MC88X1PSetEncoderDir: Value 0=normal, 1=inverse.
+    SetEncodeDir(iEncodeDir);
     // A/B encoder input multiplier (MC88X1PSetEncoderMultiple value):
     //   0=CW/CCW, 1=A/B x1, 2=A/B x2, 3=A/B x4.
     // Every A6 drive now outputs Pr0.11=2500 pulses/rev on OA/OB, so x4 (value 3) gives

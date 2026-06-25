@@ -167,20 +167,39 @@ unsigned char TMyBinDispCtrl::A_Create_LCR(unsigned char *Sptr, unsigned char le
 void __fastcall TMyBinDispCtrl::CommBinReceiveData(TObject *Sender,
       Pointer Buffer, WORD BufferLength)
 {
-    if(BufferLength>=1024)
+    // AI(ht160s-bindisplay) 20260624 : accumulate across receive events and raise
+    // BinDispRecv only once a full frame (':' .. LF) is buffered. SPComm delivers a
+    // whole frame in one event (so this matches the old overwrite behavior), but
+    // TMyComm delivers a 9600bps reply across many partial events; the state machine
+    // (case 200) consumes the Pos() match the instant BinDispRecv is true, so it must
+    // not see a partial frame. sReadBuffer is cleared at SEND time (DoStartSetBin/
+    // DoStartSetColor/DoStartGetStatus), so a stale frame cannot cause a false Pos==1.
+    if(BufferLength==0 || BufferLength>=1024)
         return;
     ZeroMemory(BinDispCom2Buffer, sizeof(BinDispCom2Buffer));
     strncpy(BinDispCom2Buffer, (char*)Buffer, BufferLength);
     BinDispCom2Buffer[BufferLength]='\x0';
 
-    sReadBuffer.sprintf("%s", AnsiString(BinDispCom2Buffer));
-    if(sReadBuffer=="")
-        return;
+    // Bound the accumulator; if a terminator never arrives, restart from this chunk.
+    if(sReadBuffer.Length()+(int)BufferLength >= 1024)
+        sReadBuffer="";
+    sReadBuffer += AnsiString(BinDispCom2Buffer);
 
     AnsiString asHex=Chararr2Hexstring(BinDispCom2Buffer,BufferLength);
     LogBinDisplay("Recv", asHex, true);
 
-    BinDispRecv=true;
+    int iColon=sReadBuffer.Pos(":");
+    if(iColon>=1)
+    {
+        for(int i=iColon; i<=sReadBuffer.Length(); i++)
+        {
+            if(sReadBuffer[i]==(char)Bin_LF)
+            {
+                BinDispRecv=true;
+                break;
+            }
+        }
+    }
 }
 //----------------------------------------------------------------------------
 bool TMyBinDispCtrl::GetCOMPortStatus(AnsiString Com)
@@ -449,7 +468,7 @@ AnsiString TMyBinDispCtrl::Chararr2Hexstring(char* cstr, int iNum)
     return tempStr;
 }
 //----------------------------------------------------------------------------
-bool TMyBinDispCtrl::StartComport(TComm *Comm,AnsiString port)
+bool TMyBinDispCtrl::StartComport(ICommPort *Comm,AnsiString port)
 {
     bool bret=false;
     AnsiString CN="", Str="";
@@ -462,12 +481,12 @@ bool TMyBinDispCtrl::StartComport(TComm *Comm,AnsiString port)
             InitialOK=true;
             return false;
         }
-        Comm->Parity=ComParity;
-        Comm->OnReceiveData=CommBinReceiveData;
+        Comm->SetParity((int)ComParity);
+        Comm->SetOnReceiveData(CommBinReceiveData);
         CN="\\\\.\\"+port;
-        Comm->CommName=CN;
+        Comm->SetCommName(CN);
         Comm->StartComm();
-        Str.sprintf("BinDisp, Start Comm OK., %s", Comm->CommName);
+        Str.sprintf("BinDisp, Start Comm OK., %s", Comm->GetCommName());
         LogBinDisplay("Open", Str, true);
         bret=true;
     }
@@ -475,13 +494,13 @@ bool TMyBinDispCtrl::StartComport(TComm *Comm,AnsiString port)
     {
         ShowMyMessage("Error open com port");
         if(Comm!=NULL)
-            Str.sprintf("BinDisp, Start Comm NG!, %s", Comm->CommName);
+            Str.sprintf("BinDisp, Start Comm NG!, %s", Comm->GetCommName());
         LogBinDisplay("OpenNG", Str, true);
     }
     return bret;
 }
 //----------------------------------------------------------------------------
-bool TMyBinDispCtrl::StopComport(TComm *Comm,AnsiString port)
+bool TMyBinDispCtrl::StopComport(ICommPort *Comm,AnsiString port)
 {
     bool bret=false;
     AnsiString CN="", Str="";
@@ -494,12 +513,12 @@ bool TMyBinDispCtrl::StopComport(TComm *Comm,AnsiString port)
             InitialOK=true;
             return false;
         }
-        Comm->Parity=ComParity;
-        Comm->OnReceiveData=CommBinReceiveData;
+        Comm->SetParity((int)ComParity);
+        Comm->SetOnReceiveData(CommBinReceiveData);
         CN="\\\\.\\"+port;
-        Comm->CommName=CN;
+        Comm->SetCommName(CN);
         Comm->StopComm();
-        Str.sprintf("BinDisp, Stop Comm OK., %s", Comm->CommName);
+        Str.sprintf("BinDisp, Stop Comm OK., %s", Comm->GetCommName());
         LogBinDisplay("Close", Str, true);
         bret=true;
     }
@@ -507,7 +526,7 @@ bool TMyBinDispCtrl::StopComport(TComm *Comm,AnsiString port)
     {
         ShowMyMessage("Error close com port");
         if(Comm!=NULL)
-            Str.sprintf("BinDisp, Stop Comm NG!, %s", Comm->CommName);
+            Str.sprintf("BinDisp, Stop Comm NG!, %s", Comm->GetCommName());
         LogBinDisplay("CloseNG", Str, true);
     }
     return bret;
@@ -644,6 +663,7 @@ bool TMyBinDispHT9046::DoStartSetBin()
 
                     Task=200;
                     BinDispRecv=false;
+                    sReadBuffer="";
                     BinDisDelay.Set(2);
                     BinDisDelay.On();
                     break;
@@ -773,6 +793,7 @@ bool TMyBinDispHT9046::DoStartSetColor()
                     WriteColor(Addr, iSetColor[Addr]);
                     Task=200;
                     BinDispRecv=false;
+                    sReadBuffer="";
                     BinDisDelay.Set(2);
                     BinDisDelay.On();
                     break;
@@ -865,6 +886,7 @@ bool TMyBinDispHT9046::DoStartGetStatus()
                     ReadVersion(Addr);
                     Task=200;
                     BinDispRecv=false;
+                    sReadBuffer="";
                     BinDisDelay.Set(2);
                     BinDisDelay.On();
                     break;

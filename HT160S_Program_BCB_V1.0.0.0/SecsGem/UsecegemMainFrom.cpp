@@ -139,3 +139,21 @@ void EventReport(unsigned Ceid)
     HGem->EventReport(1, Ceid);
 }
 //---------------------------------------------------------------------------
+void AlarmReport(AnsiString Code, AnsiString Message, bool bSet)
+{
+    if(USE_SECS_GEM<=0 || HGem==NULL)
+        return;
+    //AI(ht160s-secsgem) 20260625 : HT160 self-defined standard S5F1. ALID = stable
+    // 31-polynomial hash of the unique alarm code string (host gets a stable numeric
+    // key; the readable code+message rides in ALTX). ALCD bit7 = alarm set(1)/clear(0),
+    // category bits 0 (unspecified). Mirrors the global EventReport glue above.
+    unsigned alid = 0;
+    for(int i=1; i<=Code.Length(); i++)
+        alid = alid*31u + (unsigned char)Code[i];
+    unsigned char alcd = bSet ? 0x80 : 0x00;
+    AnsiString altx = Code;
+    if(Message!="")
+        altx = Code + " " + Message;
+    HGem->SendAlarmS5F1(alid, alcd, altx);
+}
+//---------------------------------------------------------------------------

@@ -80,7 +80,7 @@ object MyMessageBox: TMyMessageBox
     TabOrder = 1
     OnClick = palPauseClick
   end
-  object Button2: TButton
+  object btnOffBuzzer: TButton
     Left = 384
     Top = 178
     Width = 90
@@ -93,7 +93,7 @@ object MyMessageBox: TMyMessageBox
     Font.Style = []
     ParentFont = False
     TabOrder = 2
-    OnClick = Button2Click
+    OnClick = btnOffBuzzerClick
   end
   object palYes: TPanel
     Tag = 1

@@ -69,6 +69,11 @@ bool TEmptyModule::IsAmrLocked()
 //starting new destacks while locked).
 bool TEmptyModule::IsReadyForAmrHandoff()
 {
+    //AI(ht160s-agv) 20260625 : SIM-ONLY bypass of the CEID273 READY cylinder-out-bit gate.
+    //In SOFT_SIMULATE/DUMMY the front-destack out-bits may not settle false, latching the
+    //AMR lock forever (no watchdog). Real-machine #else interlock below stays fully active.
+    if(IsSoftSimulate())
+        return true;
     return (HSys.Cyn.C_Empty_FrontRiseTray_1.GetOutBit()==false
             && HSys.Cyn.C_Empty_FrontRiseTray_2.GetOutBit()==false
             && HSys.Cyn.C_Empty_FrontSeparateTray_1.GetOutBit()==false);
@@ -193,11 +198,18 @@ void TEmptyModule::DoEmpty(int &Task)
             break;
 
         case 100:
-            if(bAmrLocked)
-                break;
+            //AI(ht160s-agv) 20260625 : NARROWED AMR lock (was 'if(bAmrLocked) break;'
+            //which froze the WHOLE feed loop and starved TrayArm/SortArm downstream).
+            //While AMR-locked we still SKIP the FRONT destack branches (bReturnTray
+            //GoUpTray; bFrontHasTray==false GoDownTray; bLotFinish GoUpTray) so the AGV
+            //may refill the front stack, but we ALLOW the REAR-feed branch (DoFeedTray)
+            //to keep moving an already-staged front tray to the rear so downstream is
+            //not starved. Mirrors Loader's narrow lock (aLoader.cpp case 100).
             RefreshStateFromSensors();
             if(bReturnTray)
             {
+                if(bAmrLocked)
+                    break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
                 DoGoUpTray(0);
                 Task=3000;
                 break;
@@ -205,6 +217,8 @@ void TEmptyModule::DoEmpty(int &Task)
 
             if(bFrontHasTray==false && bLotFinish==false)
             {
+                if(bAmrLocked)
+                    break;   //AI(ht160s-agv) front GoDown suspended during AMR handoff
                 DoGoDownTray(0);
                 Task=1000;
                 break;
@@ -212,13 +226,15 @@ void TEmptyModule::DoEmpty(int &Task)
 
             if(bRearHasTray==false && bLotFinish==false)
             {
-                DoFeedTray(0);
+                DoFeedTray(0);   //AI(ht160s-agv) rear feed RUNS while AMR-locked (anti-starve)
                 Task=2000;
                 break;
             }
 
             if(bLotFinish && bFrontHasTray)
             {
+                if(bAmrLocked)
+                    break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
                 DoGoUpTray(0);
                 Task=3000;
             }
@@ -849,6 +865,13 @@ AnsiString TEmptyModule::DescribeState()
     s += "  FeedTask=" + IntToStr(FeedTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)
        + "  GoUpTask=" + IntToStr(GoUpTask) + "\r\n";
+    //AI(ht160s-agv) 20260625 : expose the CEID273 READY gate so a State Record shows
+    //whether the AMR handoff can ever clear the lock (ReadyForAmr) and the raw front
+    //destack cylinder out-bits that gate it (real-machine path).
+    s += "  ReadyForAmr=" + IntToStr(IsReadyForAmrHandoff() ? 1 : 0)
+       + "  FrontRise1Out=" + IntToStr(HSys.Cyn.C_Empty_FrontRiseTray_1.GetOutBit() ? 1 : 0)
+       + "  FrontRise2Out=" + IntToStr(HSys.Cyn.C_Empty_FrontRiseTray_2.GetOutBit() ? 1 : 0)
+       + "  FrontSep1Out=" + IntToStr(HSys.Cyn.C_Empty_FrontSeparateTray_1.GetOutBit() ? 1 : 0) + "\r\n";
     return s;
 }
 //---------------------------------------------------------------------------

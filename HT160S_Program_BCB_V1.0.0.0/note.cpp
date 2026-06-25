@@ -687,7 +687,9 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
         fNote->FlushPanel=fNote->pn_System;
 
     fNote->ProcessErrMessage(Code, Message, 1);
+    AlarmReport(Code, Message, true);    //AI(ht160s-secsgem) 20260625 : S5F1 alarm set
     fNote->ShowModal();
+    AlarmReport(Code, Message, false);   //AI(ht160s-secsgem) 20260625 : S5F1 alarm clear (operator handled)
     return fNote->ReturnCode;
 }
 //---------------------------------------------------------------------------

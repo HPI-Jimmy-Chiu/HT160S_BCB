@@ -128,6 +128,7 @@ __published:
     TSpeedButton *sbMusic4;
     TTabSheet *tsMaintPassword;
     TTabSheet *tsMaintSoftSimu;
+    TMemo *memAmrStatus;
     TTabSheet *tsMaintFunctionDef;
     TTabSheet *tsMaintHardware;
     TPanel *pnlHardwareHeader;
@@ -289,6 +290,13 @@ __published:
     TEdit *edLoaderSafeDistance;
     TLabel *lbmm;
     TLabel *lblLoaderSafeHint;
+    TPanel *pnlMachineIdentity;
+    TLabel *lblMachineModel;
+    TEdit *edMachineModel;
+    TLabel *lblHandlerID;
+    TEdit *edHandlerID;
+    TLabel *lblSerialNo;
+    TEdit *edSerialNo;
     void __fastcall btnMCUSaveClick(TObject *Sender);
     void __fastcall btnMCUReloadClick(TObject *Sender);
     void __fastcall btnMCURefreshClick(TObject *Sender);
@@ -382,6 +390,7 @@ private:
     void __fastcall SaveLotWebApiSettings();
     void __fastcall RefreshLotWebApiStatus();
     void __fastcall AddLotWebApiLog(AnsiString Text);
+    void __fastcall RefreshAmrStatus();
     void __fastcall BuildPasswordUI();
     void __fastcall ShowPasswordPage();
     void __fastcall RefreshPasswordGrid();

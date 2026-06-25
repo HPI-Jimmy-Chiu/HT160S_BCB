@@ -12,6 +12,7 @@
 #include "csystem.h"
 #include "cStepTrace.h"   //AI(general) 20260617 : MotorTaskLog home/limit diagnosis trace
 #include "aSortArm.h"     //AI(HT160S-Maintainer) 20260622 : SortArmModule->AreAllSuckersHome() suck-home interlock
+#include "aTrayArm.h"     //AI(HT160S-Maintainer) 20260624 : TrayArmModule->IsZUpAtPosition() Z-up interlock for manual TrayArm X
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -75,6 +76,7 @@ enum
     eMpHomeOrder,
     eMpLimitLogic,
     eMpIn1Logic,
+    eMpEncoderDir,
     eMpTotal
 };
 
@@ -274,6 +276,19 @@ void __fastcall TfMotorTest::FormShow(TObject *Sender)
         tmrUpdate->Enabled=true;
     MotorTaskLogSetActive(true);   // one-shot home/limit capture while this screen is open
     MotorTaskLog("MotorTest", "", "SCREEN_OPEN", "Motor Test shown");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMotorTest::FormActivate(TObject *Sender)
+{
+    (void)Sender;
+    // AI(HT160S-Maintainer) 20260624 : after an Alt-Tab to the desktop and back, the
+    // runtime-reparented alRight control panel (palMotorControl, moved into tsOperate
+    // by ArrangeOperatePage) can lose its layout slot inside the PageControl tab. The
+    // operate grid then fills the full width and every jog/Close button is gone, so the
+    // operator cannot leave the screen. Re-assert the operate-page arrangement whenever
+    // the form regains focus; ArrangeOperatePage is idempotent when already correct.
+    if(bUIBuilt)
+        ArrangeOperatePage();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMotorTest::FormClose(TObject *Sender, TCloseAction &Action)
@@ -539,6 +554,7 @@ void TfMotorTest::ConfigureMotorParameterGrid()
     grdMotorParameter->Cells[eMpHomeOrder][0]="HomeOrder";
     grdMotorParameter->Cells[eMpLimitLogic][0]="LimitLogic";
     grdMotorParameter->Cells[eMpIn1Logic][0]="In1Logic";
+    grdMotorParameter->Cells[eMpEncoderDir][0]="EncoderDir";
     grdMotorParameter->ColWidths[eMpName]=80;
     grdMotorParameter->ColWidths[eMpAlias]=130;
     grdMotorParameter->ColWidths[eMpCard]=80;
@@ -1482,6 +1498,31 @@ static AnsiString DecodeAxisParaError(DWORD Code)
     }
 }
 //---------------------------------------------------------------------------
+// AI(general) 20260624 : per-code, DIRECTIONAL fix hint phrased in this grid's own column
+// names so the operator knows which cell to raise/lower. The card AC = (Speed x Range -
+// StartSpeed x Range) / Acc(sec), so a SHORTER Acc time gives a LARGER acceleration:
+// "AC under range" is fixed by LOWERING Acc/Dec, the OPPOSITE of "AC over range". (The old
+// blanket "raise Acc" header was only correct for the over-range case.) Empty when in range.
+static AnsiString DecodeAxisParaFix(DWORD Code)
+{
+    if(Code<0x1000)
+        return AnsiString("");
+    switch((int)(Code & 0x0F))
+    {
+        case 0: return AnsiString("=> raise 'Range' (start speed too low)");
+        case 1: return AnsiString("=> lower 'Range' (start speed too high)");
+        case 2: return AnsiString("=> raise 'Range' (run speed too low)");
+        case 3: return AnsiString("=> lower 'Range' (run speed too high; keep Speed x Range <= 65535)");
+        case 4: return AnsiString("=> raise 'Range' (max speed too low)");
+        case 5: return AnsiString("=> lower 'Range' (max speed too high)");
+        case 6: return AnsiString("=> LOWER 'Acc'/'Dec' (sec): shorter accel time = stronger accel");
+        case 7: return AnsiString("=> RAISE 'Acc'/'Dec' (sec): longer accel time = gentler accel");
+        case 8: return AnsiString("=> lower S-curve jerk");
+        case 9: return AnsiString("=> raise S-curve jerk");
+        default: return AnsiString("");
+    }
+}
+//---------------------------------------------------------------------------
 void TfMotorTest::SaveMotorParameterToFile()
 {
     TStringList *LineList;
@@ -1662,24 +1703,30 @@ void TfMotorTest::SaveMotorParameterToFile()
         for(RangeIndex=0; RangeIndex<MotorCount; RangeIndex++)
         {
             TTrayMotor *RangeMotor;
+            DWORD RunCode;
+            DWORD HomeCode;
             AnsiString RunMsg;
             AnsiString HomeMsg;
             RangeMotor=GetMotor(RangeIndex);
             if(RangeMotor==NULL)
                 continue;
-            RunMsg =DecodeAxisParaError(RangeMotor->GetLastParaError());
-            HomeMsg=DecodeAxisParaError(RangeMotor->VerifyHomeParaRange());
+            // Cache each profile's code: VerifyHomeParaRange() re-parameterises the card on
+            // every call, so read it once and reuse it for both the label and the fix hint.
+            RunCode =RangeMotor->GetLastParaError();
+            HomeCode=RangeMotor->VerifyHomeParaRange();
+            RunMsg =DecodeAxisParaError(RunCode);
+            HomeMsg=DecodeAxisParaError(HomeCode);
             if(RunMsg!="")
-                RangeReport=RangeReport+RangeMotor->Alias+AnsiString(" [run]: ")+RunMsg+AnsiString("\r\n");
+                RangeReport=RangeReport+RangeMotor->Alias+AnsiString(" [run]: ")+RunMsg+AnsiString("  ")+DecodeAxisParaFix(RunCode)+AnsiString("\r\n");
             if(HomeMsg!="")
-                RangeReport=RangeReport+RangeMotor->Alias+AnsiString(" [home]: ")+HomeMsg+AnsiString("\r\n");
+                RangeReport=RangeReport+RangeMotor->Alias+AnsiString(" [home]: ")+HomeMsg+AnsiString("  ")+DecodeAxisParaFix(HomeCode)+AnsiString("\r\n");
         }
         if(RangeReport!="")
         {
             // Use plain VCL ShowMessage (Application-owned, auto-sizing) so the
             // axis-card suggestion is never clipped or hidden behind fMotorTest.
             // The fixed-size TMyMessageBox (480x255) cut off this multi-axis report.
-            ShowMessage(AnsiString("Saved, but the motion card REJECTED these parameters (they will NOT take effect as entered; reduce Range/Speed or raise Acc):\r\n\r\n")+RangeReport);
+            ShowMessage(AnsiString("Saved, but the motion card REJECTED these parameters. They will NOT take effect -- each axis below keeps its previous values until the value is back in range. Suggested fix per axis (column names are this grid's columns):\r\n\r\n")+RangeReport);
             SetMessage("Motor parameter saved; card rejected some ranges");
         }
     }
@@ -1872,6 +1919,7 @@ void TfMotorTest::RefreshMotorParameterGrid()
         grdMotorParameter->Cells[eMpHomeOrder][RowIndex]=Data->HomeOrder;
         grdMotorParameter->Cells[eMpLimitLogic][RowIndex]=IntToStr(Data->iLimitLogic);
         grdMotorParameter->Cells[eMpIn1Logic][RowIndex]=IntToStr(Data->iIn1Logic);
+        grdMotorParameter->Cells[eMpEncoderDir][RowIndex]=IntToStr(Data->iEncoderDir);
     }
 }
 //---------------------------------------------------------------------------
@@ -2496,6 +2544,18 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
         SetMessage("Move abort: Sort Z not home");
         return false;
     }
+    // AI(HT160S-Maintainer) 20260624 : TrayArm X move requires the Z lift confirmed UP -- same anti-
+    // collision rule as production MoveTrayArmX, so the head/tray never traverses while lowered. The
+    // production path was already gated; the manual screen bypassed it (only SortArm was checked here).
+    // Active in real-machine DUMMY (the X motor physically moves there); bypassed only under
+    // SOFT_SIMULATE, inside IsZUpAtPosition. NULL TrayArmModule does not block (mirrors CheckSortArmZHome).
+    if(HSys.Mot.MTrayArmX!=NULL && Motor->Tag==HSys.Mot.MTrayArmX->Tag &&
+       TrayArmModule!=NULL && TrayArmModule->IsZUpAtPosition()==false)
+    {
+        ShowMyOKMessageNoStop("Tray arm Z must be up before X move.");
+        SetMessage("Move abort: Tray Z not up");
+        return false;
+    }
     if(bUseTarget && Motor->CheckSoftLimit(Target)==false)
     {
         ShowMyOKMessageNoStop("Target over soft limit.");
@@ -2571,6 +2631,14 @@ void TfMotorTest::StartJog(bool bPositive)
     {
         ShowMyOKMessageNoStop("Sort arm Z must be home before X jog.");
         SetMessage("Jog abort: Sort Z not home");
+        return;
+    }
+    // AI(HT160S-Maintainer) 20260624 : TrayArm X jog requires the Z lift UP, same rule as Move/production
+    // (jog otherwise bypassed this anti-collision gate). Active in DUMMY; bypassed only under SOFT_SIMULATE.
+    if(Motor==HSys.Mot.MTrayArmX && TrayArmModule!=NULL && TrayArmModule->IsZUpAtPosition()==false)
+    {
+        ShowMyOKMessageNoStop("Tray arm Z must be up before X jog.");
+        SetMessage("Jog abort: Tray Z not up");
         return;
     }
     Motor->ScanMotorStatus();

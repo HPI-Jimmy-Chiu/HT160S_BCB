@@ -366,6 +366,7 @@ public:
 };
 //---------------------------------------------------------------------------
 extern TEACH Teach;
+extern TEACH TeachBase;   //AI 20260623 : Offset base; effective Teach = TeachBase + Offset
 extern PACKAGE TfTeach *fTeach;
 //---------------------------------------------------------------------------
 #endif

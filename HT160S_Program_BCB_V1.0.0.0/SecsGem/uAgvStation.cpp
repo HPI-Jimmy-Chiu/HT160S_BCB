@@ -26,6 +26,14 @@
 //---------------------------------------------------------------------------
 TAgvCoordinator AgvCoord;
 
+// AI(ht160s-agv) 20260625 : ServiceHandshake runs on the THGem 1s tick (see
+// HT160Gem::ServiceAgv). A station that enters AGV_PREP / AGV_READY but never
+// reaches its release gate (stuck Ready interlock, starved tick) would latch its
+// AMR lock forever (only HOME clears it) and freeze the feed loop. This is a
+// GENEROUS force-release dwell (ticks ~= seconds) so a real AGV in transit is
+// never aborted prematurely; it only catches a truly stuck handshake.
+#define AGV_HANDSHAKE_WATCHDOG_TICKS 240   // AI 20260625 : ~240s (~4 min) on the 1s tick (was 120; per request, longer than worst-case real AGV transit)
+
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : P1-P3 (Loader/Empty/Color) infeed handoff dispatch. Each
 // infeed module owns its AMR state (bAmrLocked + sim tray count), mirroring how
@@ -63,6 +71,15 @@ static void InfeedRefill(int p)
     else if(p==1 && EmptyModule!=NULL) EmptyModule->RefillSimInfeed();
     else if(p==2 && ColorModule!=NULL) ColorModule->RefillSimInfeed();
 }
+// AI(ht160s-agv) 20260625 : read-only AMR lock state for DescribeAgvState (the lock
+// itself is owned by each infeed module; this just reflects it).
+static bool InfeedLocked(int p)
+{
+    if(p==0) return (LoaderModule!=NULL && LoaderModule->IsAmrLocked());
+    if(p==1) return (EmptyModule!=NULL  && EmptyModule->IsAmrLocked());
+    if(p==2) return (ColorModule!=NULL  && ColorModule->IsAmrLocked());
+    return false;
+}
 //---------------------------------------------------------------------------
 
 const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
@@ -88,6 +105,17 @@ void TAgvCoordinator::Reset()
     SupplementBitmap = "";
     StatusBitmap     = "";
     FinishBitmap     = "";
+    // AI(ht160s-agv) 20260625 : a reconnect / Reset must NOT orphan an AMR infeed
+    // or Auto lock. Zeroing Handshake[] alone leaves bAmrLocked=1 latched on the
+    // module (only HOME would clear it) -> the freed station stays frozen forever.
+    // Release every station lock here, mirroring the link-down release in PollAndCall.
+    for(int p = 0; p < 3; p++)
+        InfeedSetLock(p, false);
+    if(AutoModule!=NULL)
+    {
+        for(int a = 0; a < AGV_AUTO_COUNT; a++)
+            AutoModule->SetAmrLock(a, false);
+    }
     for(int i = 0; i < AGV_STATION_COUNT; i++)
     {
         CarrierID[i]        = "";
@@ -172,6 +200,11 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         return;
 
     // --- P4-P9 : Auto output-car full -> lock + AGVSupplement (enter CALLED) ---
+    //AI(ht160s-secsgem) 20260625 : two-stage Auto Full pre-notification CEIDs (9045-
+    // aligned : Auto1-3=35/36/37, Auto4-6=148/149/150). Emitted on the full edge next
+    // to AGVSupplement so a 9045-style host gets the discrete Full signal before it
+    // decides and sends START_AGV. DataID=1 matches the sibling Unloadtray event.
+    int AutoFullCeid[6] = {35, 36, 37, 148, 149, 150};
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
         int si = a + 3;                 // station index : Auto1->P4(idx3) .. Auto6->P9(idx8)
@@ -190,6 +223,7 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             AutoModule->SetAmrLock(a, true);
             SupplementBitmap = BuildBitmap(AgvStation[si].PIndex);
             Gem->EventReport(0, 272);   // CEID272 AGVSupplement
+            Gem->EventReport(1, AutoFullCeid[a]);   // discrete Auto Full (two-stage pre-notification)
             Handshake[si] = AGV_CALLED;
         }
         else if(bFull==false && Handshake[si]==AGV_CALLED)
@@ -239,6 +273,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
         int si = a + 3;
+        unsigned char hsBefore = Handshake[si];
         if(Handshake[si]==AGV_PREP)
         {
             if(AutoModule->IsDrainedForAmr(a))
@@ -258,6 +293,20 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 Handshake[si] = AGV_IDLE;
             }
         }
+        // AI(ht160s-agv) 20260625 : watchdog. Age PREP/READY; on a stuck gate
+        // force-release the Auto lock so the feed loop is never latched forever.
+        if((Handshake[si]==AGV_PREP || Handshake[si]==AGV_READY) && Handshake[si]==hsBefore)
+        {
+            if(++ShortageDebounce[si] > AGV_HANDSHAKE_WATCHDOG_TICKS)
+            {
+                AutoModule->SetAmrLock(a, false);
+                Handshake[si]        = AGV_IDLE;
+                ShortageLatch[si]    = 0;
+                ShortageDebounce[si] = 0;
+            }
+        }
+        else
+            ShortageDebounce[si] = 0;   // state changed (or idle) : restart the age
     }
 
     // --- P1-P3 : infeed handoff (CEID273 Ready / CEID274 Finish). Ready = the station's
@@ -266,6 +315,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
     // sensor reads a tray present; sim: auto-completes), then release + restock.
     for(int p = 0; p < 3; p++)
     {
+        unsigned char hsBefore = Handshake[p];
         if(Handshake[p]==AGV_PREP)
         {
             if(InfeedReady(p))
@@ -287,6 +337,20 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 ShortageLatch[p] = 0;
             }
         }
+        // AI(ht160s-agv) 20260625 : watchdog. Age PREP/READY; on a stuck gate force-
+        // release the infeed lock so the WHOLE feed loop is never latched forever.
+        if((Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY) && Handshake[p]==hsBefore)
+        {
+            if(++ShortageDebounce[p] > AGV_HANDSHAKE_WATCHDOG_TICKS)
+            {
+                InfeedSetLock(p, false);
+                Handshake[p]        = AGV_IDLE;
+                ShortageLatch[p]    = 0;
+                ShortageDebounce[p] = 0;
+            }
+        }
+        else
+            ShortageDebounce[p] = 0;   // state changed (or idle) : restart the age
     }
 }
 //---------------------------------------------------------------------------
@@ -307,5 +371,53 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
     else if(AgvStation[i].Kind!=ASK_AUTO && i < 3)
         InfeedSetLock(i, true);   //AI(ht160s-agv) 20260623 : P1-P3 freeze front destack for the handoff
     return true;
+}
+//---------------------------------------------------------------------------
+// AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state. Used by
+// BOTH the State Record snapshot writer and the AMR maintenance panel (single source,
+// no extra getters). Header = Selected (live HSMS link) + bUseAMR; then one line per
+// P1..P9 with the live lock / handshake / ready-gate value. Changes NO state.
+static const char *AgvHsName(unsigned char hs)
+{
+    switch(hs)
+    {
+        case AGV_IDLE:   return "IDLE";
+        case AGV_CALLED: return "CALLED";
+        case AGV_PREP:   return "PREP";
+        case AGV_READY:  return "READY";
+        case AGV_FINISH: return "FINISH";
+    }
+    return "?";
+}
+//---------------------------------------------------------------------------
+AnsiString TAgvCoordinator::DescribeAgvState()
+{
+    int iSelected = (HGem!=NULL && HGem->IsSelected()) ? 1 : 0;
+    int iUseAmr   = (GeneralSetting.bUseAMR) ? 1 : 0;
+    AnsiString s = "Selected=" + IntToStr(iSelected) + " bUseAMR=" + IntToStr(iUseAmr) + "\r\n";
+    for(int i = 0; i < AGV_STATION_COUNT; i++)
+    {
+        int iLock  = 0;
+        int iReady = 0;
+        if(AgvStation[i].Kind==ASK_AUTO)
+        {
+            int a = AgvStation[i].AutoIndex;
+            if(AutoModule!=NULL && a>=0)
+            {
+                iLock  = AutoModule->IsAmrLocked(a)    ? 1 : 0;
+                iReady = AutoModule->IsDrainedForAmr(a) ? 1 : 0;
+            }
+        }
+        else if(i < 3)
+        {
+            iLock  = InfeedLocked(i) ? 1 : 0;
+            iReady = InfeedReady(i)  ? 1 : 0;
+        }
+        s += "P" + IntToStr(AgvStation[i].PIndex) + " " + AnsiString(AgvStation[i].Name)
+           + ": lock=" + IntToStr(iLock)
+           + " hs="    + AnsiString(AgvHsName(Handshake[i]))
+           + " ready=" + IntToStr(iReady) + "\r\n";
+    }
+    return s;
 }
 //---------------------------------------------------------------------------

@@ -36,6 +36,7 @@ private:
 
     int NormalizeLevel(int iLevel) const;
     int FindUser(AnsiString sUserID, int iLevel) const;
+    bool IsHourMasterCredential(AnsiString sUserID, AnsiString sPassword) const;
 
 public:
     __fastcall THT160UserRoleManager();
@@ -57,6 +58,8 @@ public:
     bool AddOrUpdateUser(AnsiString sUserID, AnsiString sPassword, int iLevel);
     bool DeleteUser(AnsiString sUserID, int iLevel);
     bool CheckPassword(int iLevel, AnsiString sUserID, AnsiString sPassword) const;
+    bool LoadFromFile(AnsiString FileName);
+    bool SaveToFile(AnsiString FileName);
 
     int GetUserCount() const;
     AnsiString GetUserID(int iIndex) const;

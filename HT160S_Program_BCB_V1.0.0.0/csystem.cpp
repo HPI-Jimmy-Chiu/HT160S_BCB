@@ -90,6 +90,10 @@ void MainProc()
 {
 	static bool bProgramStart=false;
 
+	//AI(ht160s-initflow) 20260624 : whole-machine init guard (ref HT9045 InitialOK)
+	if(InitialOK==false)
+		return;
+
 	//AI(HT160S-Maintainer) 20260616 : match HT172 MainProc - while the IO Set View
 	//(manual IO test) is open, suspend the whole machine spin so DoSystem()/
 	//DoSystemMessage() do not re-drive outputs (tower lamp SwTowerRed/Yellow/Green,
@@ -179,7 +183,15 @@ void MainProc()
 		ProcessMotion();
 		//AI(HT160S-Maintainer) 20260602 : while a SortArm single Z-home is in
 		//progress, hold the module engine so it cannot fight the re-home.
-		if(DataModule1!=NULL && bSortArmNeedHome==false)
+		//AI(HT160S-Maintainer) 20260624 : ONLY run the production action engine while the
+		//machine is actually running. DoAllProcess() DecStopAllMotor()s every cycle when
+		//SystemStart==false (its top-of-loop guard), which decel-stopped a Motor-Test or
+		//Teach MANUAL jog the instant it started -> "jog only moves one step". HT172's
+		//MainProc runs its production engine only via ProcessMotion (idle-safe; it has no
+		//extra per-cycle DoAllProcess), so gate HT160's the same way and let idle / manual
+		//screens own the motors. The real pause/EMG/safety paths still DecStopAllMotor on
+		//the SystemStart falling edge, so production stop behaviour is unchanged.
+		if(DataModule1!=NULL && bSortArmNeedHome==false && HSys.Sys.SystemStart)
 			DataModule1->DoAllProcess();
 	}
 
@@ -435,7 +447,16 @@ void ScanAllMotorStatus()
 		//servo is intentionally de-energized (reads alarm); do not force a
 		//re-home / SystemStart=false off that expected transient. The cycle
 		//clears the latched alarm and re-homes the axis itself.
-		if(bHomePowerCycling==false &&
+		//AI(HT160S-Maintainer) 20260624 : also skip the alarm check during a HOME
+		//(RunMode==Run_Home). Per request: do NOT check/warn a motor alarm BEFORE the
+		//home power-cycle. HOME deliberately cuts motor power then restores it; a latched
+		//servo/OT alarm present at home start is EXPECTED and will be cleared by that
+		//cycle, so warning here would fire prematurely (and drop SystemStart, aborting
+		//the home before it can recover). The home engine owns alarm handling: it power-
+		//cycles, restores, waits, and only THEN checks + warns (uHome ProcessMotorHome
+		//case 20). bHomePowerCycling already covers the cut-power window; this also covers
+		//the home-start window before the cycle begins.
+		if(bHomePowerCycling==false && HSys.Sys.RunMode!=Run_Home &&
 		   HSys.MotPtr[i]->Led[iAlarmLed] && HSys.MotPtr[i]->GetEnable() &&
 		   HSys.MotPtr[i]->ReadServoAlarmOn())
 		{
@@ -585,7 +606,15 @@ void ScanSystemSenser()
 			fAllMotorHome=false;
 			MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
 		}
-		else if(IsSystemPowerOff())
+		//AI(HT160S-Maintainer) 20260624 : align with HT172 csystem.cpp ScanSystemSenser --
+		//SKIP the motor-power-off stop while the HOME monitor is shown (HT172 guards this
+		//same branch with fHome->fShow==false). A full-machine HOME deliberately power-cycles
+		//the motor relay to clear latched servo alarms (uHome ProcessMotorHome case 1->10->20);
+		//without this guard the cut-power window trips a spurious "Motor Power Off" alarm AND
+		//drops SystemStart, which freezes the SystemStart-gated home engine (ProcessMotion
+		//only steps ProcessMotorHome while SystemStart). EMG / safety-door / air / ion-fan
+		//stops in the if(SystemStart) block below stay UN-guarded -- a real fault still stops.
+		else if(IsSystemPowerOff() && (fHome==NULL || fHome->IsShown()==false))
 		{
 			HSys.StopAllMotor();
 			AllBreakLock();
@@ -634,7 +663,11 @@ void ScanSystemSenser()
 			ShowSystemError(AnsiString("Air Pressure Low"), K_RETRY);
 			HSys.Sys.SystemStart=false;
 		}
-		else if(MotorPowerOnDelay>0)
+		//AI(HT160S-Maintainer) 20260624 : do not drop SystemStart for the motor-power-on
+		//settle delay while the HOME monitor is shown. HT160 gates the home engine on
+		//SystemStart (HT172 does not), so dropping it mid-HOME freezes ProcessMotorHome.
+		//The home power-cycle owns the settle via uHome HomePowerTimer; let HOME keep running.
+		else if(MotorPowerOnDelay>0 && (fHome==NULL || fHome->IsShown()==false))
 		{
 			HSys.Sys.SystemStart=false;
 		}
@@ -649,6 +682,18 @@ void ScanSystemSenser()
 //ckernel.cpp. Rear (SwRK*) lamps are omitted: this machine is front-panel only.
 static void DoPanelLamp()
 {
+	//AI(HT160S-Maintainer) 20260624 : the Power On/Off lamps MUST always track the real
+	//relay state. The old code drove them only inside the power-up branch, so once the
+	//relay dropped (panel Power Off, fault, or a HOME power-cycle) the else branch left
+	//SwFKPowerOn at its last (lit) value -- the Power On lamp stayed lit while the motor
+	//relay was actually off (no motor power). Drive both lamps every cycle straight from
+	//bMotorPowerState (the relay command) so the lamp cannot lie; bLampPowerOn is not used
+	//here because other relay-off paths (HOME power-cycle) drop bMotorPowerState without
+	//updating that flag. (HT172 ckernel.cpp has the same branch shape but its panel LEDs
+	//lose power together with the relay; HT160's panel LEDs are powered independently.)
+	HSys.Sw.SwFKPowerOn.OnOff(bMotorPowerState);
+	HSys.Sw.SwFKPowerOff.OnOff(!bMotorPowerState);
+
 	if(bMotorPowerState && MotorPowerOnDelay==0)
 	{
 		HSys.Sw.SwFKPause.OnOff(bLampPause);
@@ -659,8 +704,6 @@ static void DoPanelLamp()
 		HSys.Sw.SwFKTrayFeed.OnOff(bLampTrayFeed);
 		HSys.Sw.SwFKCleanOut.OnOff(bLampCleanOut);
 		HSys.Sw.SwFKOneCycle.OnOff(bLampOneCycle);
-		HSys.Sw.SwFKPowerOn.OnOff(bLampPowerOn);
-		HSys.Sw.SwFKPowerOff.OnOff(bLampPowerOff);
 	}
 	else
 	{
@@ -964,6 +1007,23 @@ bool DoInitialProgramStart()
 			HSys.DecStopAllMotor();
 			InitialAllTask();
 			LoadMotorSpeedFromIni();                                            //AI(HT160S-Maintainer) 20260602 : load+apply per-motor speed baseline so iPersentSpeed never stays at the 1%% default (HT172 0420 Speed port)
+			//AI(HT160S-Maintainer) 20260624 : at software startup, make sure the motor
+			//relay is energized. If it was left off at boot the machine has no motor
+			//power, and ScanSystemSenser's per-cycle IsSystemPowerOff() stop then kills
+			//any manual Motor-Test jog/move (the "jog only moves one step" symptom) and
+			//the Power On lamp/state are wrong. One-time, real-machine only (sim forces
+			//power on in CheckMotorPowerShutDown). Mirrors HT172's startup energize.
+#ifndef SOFT_SIMULATE
+			if(bMotorPowerState==false)
+			{
+				HSys.Sw.SwMotorRelay.On();
+				bMotorPowerState=true;
+				MotorPowerOnDelay=SERVER_MOTOR_POWER_ON_DELAY;
+				bLampPowerOn=true;
+				bLampPowerOff=false;
+				RecordProcess("Startup: motor relay was off -> auto-energized");
+			}
+#endif
 			Task=200;
 			break;
 		case 200:
@@ -1030,6 +1090,25 @@ const char* MachineTriggerName(eMachineTrigger trig)
 		case trigSecsRemote: return "secs-remote";
 		default:             return "system";
 	}
+}
+//---------------------------------------------------------------------------
+//AI(machine-command-layer) 20260625 : production-start choke point. The gate + arm
+//sequence moved out of TfMain::Start so the operator button, the SECS START host command
+//and the panel key all reach production through ONE path. The UI-coupled arm work is in
+//TfMain::DoStartArm (main.cpp, where edLotNo/Loader/fHome are in scope); here we own the
+//precondition gate and the trigger log. No ShowMyMessage : the caller surfaces a
+//rejection (operator -> popup, SECS -> HCACK).
+eMachineStartResult MachineStart(eMachineTrigger trig, AnsiString &Reason)
+{
+	if(fMain==NULL)
+		return msRejNoContext;
+	if(HSys.Sys.SystemStart!=false)
+		return msRejBusy;
+	if(fMain->CheckLotDataReady(Reason)==false)
+		return msRejNotReady;
+	RecordProcess(AnsiString("MACHINE START by ")+MachineTriggerName(trig));
+	fMain->DoStartArm();
+	return msStarted;
 }
 //---------------------------------------------------------------------------
 //Graceful pause : decelerate-stop, leave the machine paused (home state kept).

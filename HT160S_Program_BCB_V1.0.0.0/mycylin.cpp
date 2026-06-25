@@ -182,7 +182,14 @@ bool TMyCylinder::Push()
     ClearCylinderAlarm(OnAlarmCode);
     if(Task==1 || Task==2)
     {
-        if(OnSensor.Enable==true)
+        //AI(HT160S-Maintainer) 20260624 : DUMMY skips the cylinder in-position confirm +
+        //timeout alarm so the dry-run can flow (user 2026-06-24). Switch.On() is still
+        //driven above; DUMMY just takes the no-sensor path here, so it never parks at
+        //Task=50 with an armed OnAlarmTime timer that the aTrayArm ||IsSoftSimulate()
+        //skip would abandon -> stale "can not on" alarm next cycle. HAS_TRAY/REALLY
+        //still confirm + alarm. Re-adds the iRealDummy!=DUMMY gate removed 2026-06-22
+        //(user reversed that call; the clamp has a real sensor the DUMMY bench cannot satisfy).
+        if(OnSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
         {
             if(OnSensor.IsOn())
             {
@@ -277,7 +284,14 @@ bool TMyCylinder::Pop()
     ClearCylinderAlarm(OffAlarmCode);
     if(Task==1 || Task==2)
     {
-        if(OffSensor.Enable==true)
+        //AI(HT160S-Maintainer) 20260624 : DUMMY skips the cylinder in-position confirm +
+        //timeout alarm so the dry-run can flow (user 2026-06-24). Switch.Off() is still
+        //driven above; DUMMY just takes the no-sensor path here, so it never parks at
+        //Task=50 with an armed OffAlarmTime timer that the aTrayArm ||IsSoftSimulate()
+        //skip would abandon -> stale "can not off" alarm next cycle (the 40020 seen on
+        //C_TrayArm_FrontClamp). HAS_TRAY/REALLY still confirm + alarm. Re-adds the
+        //iRealDummy!=DUMMY gate removed 2026-06-22 (user reversed that call 2026-06-24).
+        if(OffSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
         {
             if(OffSensor.IsOn())
             {
