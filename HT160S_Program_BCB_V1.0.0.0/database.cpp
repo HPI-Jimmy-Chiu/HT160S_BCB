@@ -22,6 +22,7 @@
 #include "SecsGem\uHGemClass.h"
 #include "cStepTrace.h"
 #include "cStateRecordHT160.h"
+#include "systools.h"
 #pragma package(smart_init)
 #pragma resource "*.dfm"
 //---------------------------------------------------------------------------
@@ -126,6 +127,10 @@ void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
 {
     static bool bRun=false;
 
+    //AI(ht160s-initflow) 20260624 : do not spin serial comm until startup done (ref HT9045 InitialOK)
+    if(InitialOK==false)
+        return;
+
     if(bRun)
         return;
 
@@ -133,6 +138,21 @@ void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
     try
     {
         SpinComPort();
+        //AI(ht160s-statusbar) 20260624 : derive a 1 Hz tick from this always-on
+        //100ms timer (10 ticks). RefreshMyTimeString self-throttles to once per
+        //changed second anyway, so calling it every tick is also safe; the counter
+        //just avoids the dynamic_cast loop 9 of every 10 ticks. NOT hung off the
+        //SECS THGem::Timer1 (that timer is SECS-paid-gated and dead on non-SECS units).
+        {
+            static int iSysToolTick=0;
+            iSysToolTick++;
+            if(iSysToolTick>=10)
+            {
+                iSysToolTick=0;
+                if(FormSysTools!=NULL)
+                    FormSysTools->RefreshMyTimeString();
+            }
+        }
     }
     catch(...)
     {
@@ -450,6 +470,7 @@ TMOTNO::TMOTNO()
     emotHomeOrder        =26;
     emotLimitLogic       =27;
     emotIn1Logic         =28;
+    emotEncoderDir       =-1;   // OPTIONAL; -1=absent -> TMOTDATA defaults iEncoderDir to 1
     // HomeType is no longer a Mot_Table column. The MC88X1 home mode is fixed in code
     // (TMyMC88X1Motor MC88X1_DEFAULT_HOME_TYPE = 90); the mechanism design is fixed so a
     // settable column only added operator risk.
@@ -521,6 +542,11 @@ int TMOTNO::SetMOTTableNo(AnsiString Str)
     emotIn1Logic=FindMotColumn(SL, "In1Logic");
     if(emotIn1Logic<0 && Result==emotTotal) Result=28;
 
+    // OPTIONAL trailing column (per-axis MC88X1 encoder count direction). Deliberately
+    // NOT guarded against Result like the columns above: a missing EncoderDir must NOT
+    // fail the table load -- it just defaults to 1 (inverse) in TMOTDATA. emotTotal stays 29.
+    emotEncoderDir=FindMotColumn(SL, "EncoderDir");
+
     delete SL;
     return Result;
 }
@@ -561,6 +587,7 @@ TMOTDATA::TMOTDATA(AnsiString Str)
     iLimitLogic     =GetMotInt(SL, HSys.MotNo.emotLimitLogic, 0);
     iIn1Logic       =GetMotInt(SL, HSys.MotNo.emotIn1Logic, 0);
     iSimulateSpeed  =GetMotInt(SL, HSys.MotNo.emotSimulateSpeed, 10000);
+    iEncoderDir     =GetMotInt(SL, HSys.MotNo.emotEncoderDir, 1);
 
     if(No==AnsiString("") || Alias==AnsiString("") || CardModel==AnsiString("") ||
        iBoardID<0 || iPort<0)
@@ -626,7 +653,9 @@ SYSTEM_MODULAR::SYSTEM_MODULAR()
     iTotalSubSucker = MAX_SUB_SUCKER_ITEM;
     memset(&Mot, 0, sizeof(Mot));
     memset(&VMot, 0, sizeof(VMot));
-    Initial();
+    //AI(ht160s-initflow) 20260624 : Initial() RELOCATED to WinMain (ht160s.cpp), called
+    //after the startup splash and before any CreateForm, so the heavy load + OpenMN200Card
+    //show progress instead of a dead pre-window screen. Ctor sets trivial members only.
 }
 //---------------------------------------------------------------------------
 SYSTEM_MODULAR::~SYSTEM_MODULAR()
@@ -711,7 +740,9 @@ SYSTEM_MODULAR::~SYSTEM_MODULAR()
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::Initial()
 {
+    UpdateInitProgress(4);
     InitialCosFunction();
+    UpdateInitProgress(16);
     MotPtr=(TTrayMotor **)&Mot;
     VMotPtr=(TTrayMotor **)&VMot;
     SenPtr=(TMySensor *)&Sen;
@@ -736,9 +767,11 @@ void SYSTEM_MODULAR::Initial()
     InitialSwitchName();
     InitialSuckerName();
     LoadIoData();
+    UpdateInitProgress(26);
     //AI(general) 20260613 : OPTION A - open MN200 card + start MotionNet rings once
     //IO addresses are known. No-op under SOFT_SIMULATE / when MN200DLL.dll is absent.
     OpenMN200Card();
+    UpdateInitProgress(40);
     LoadSensorParameterFromDataBase();
     LoadCylinderParameterFromDataBase();
     LoadSwitchParameterFromDataBase();
@@ -746,6 +779,7 @@ void SYSTEM_MODULAR::Initial()
     LoadMotorParameterFromDataBase();
     InitialVMotorParameter();
     CreateSystemAlarmCode();
+    UpdateInitProgress(46);
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260603 : build alarm-code text map, framework aligned with HT172
@@ -1082,6 +1116,7 @@ void SYSTEM_MODULAR::InitialVMotorName()
     VMot.MMSuck_2     ->Alias="MMSuck_2";
     VMot.MMSuck_3     ->Alias="MMSuck_3";
     VMot.MMSuck_4     ->Alias="MMSuck_4";
+    VMot.MMColorY     ->Alias="MMColorY";
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::InitialVMotorParameter()
@@ -1604,6 +1639,16 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
         // and read 4x; their drives were reset to Pr0.11=2500 to match the rest, so no per-axis
         // special case remains. Must run before InitMotor (the card register is written there).
         MotPtr[i]->SetEncodeMultiple(3);
+        // AI 20260624 : MC88X1 encoder count direction (MC88X1PSetEncoderDir; manual P.51
+        // Value 0=normal, 1=inverse). Now sourced PER-AXIS from the OPTIONAL Mot_Table
+        // "EncoderDir" column (Data->iEncoderDir; default 1=inverse when the column or cell is
+        // absent). M05 MLoaderY_2 = 0=normal in the CSV because its A6 OA/OB feedback phase is
+        // wired reversed (its Encoder otherwise reads negated vs NowPos/command, e.g. -43.62 vs
+        // 43.62). The feedback (practical) counter is monitor-only (the drive closes the loop in
+        // pulse-train P mode), so this flips ONLY the Encoder display sign: command, positioning,
+        // soft limits and the home==0 check are unaffected. Clamp to 0/1 keeps a stray CSV value
+        // safe. Must run before InitMotor (card register written there).
+        MotPtr[i]->SetEncodeDir((Data->iEncoderDir==0)?0:1);
         MotPtr[i]->bHomeFlag=false;
         if(bInitial)
             MotPtr[i]->InitMotor(iAdder);

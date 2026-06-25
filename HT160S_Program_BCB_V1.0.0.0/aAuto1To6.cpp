@@ -529,7 +529,7 @@ bool TAutoModule::DoFeedTray(int Flag)
                 //Empty/Color) instead of fabricating a fresh EMPTY_IC tray here. DoFeedTray
                 //only PROMOTES rear->working; occupancy (fHasTray) is owned here. RearGrid is
                 //default EMPTY_IC/Normal if a feed ever runs without a staged delivery.
-                TrayMotor->Tray=RearGrid[iFeedAuto];
+                TrayMotor->Tray.CopyFrom(RearGrid[iFeedAuto]);
                 TrayMotor->fHasTray=true;
                 TrayMotor->Refresh();   //AI(ht160s-tray-source) : InitNewTray used to Refresh; keep MotionView in sync
             }
@@ -601,8 +601,7 @@ bool TAutoModule::DoDischargeTray(int Flag)
                 TrayMotor=GetAutoVMotor(iDischargeAuto);
                 if(TrayMotor!=NULL)
                 {
-                    TrayMotor->InitNewTray(EMPTY_IC);
-                    TrayMotor->fHasTray=false;
+                    TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
                 }
                 State[iDischargeAuto].bFullIC=false;
                 State[iDischargeAuto].bResidueClear=true;   //AI(ht160s-residue) 20260624 : fresh tray on discharge
@@ -799,8 +798,7 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                 TrayMotor=GetAutoVMotor(Index);
                 if(TrayMotor!=NULL)
                 {
-                    TrayMotor->InitNewTray(EMPTY_IC);
-                    TrayMotor->fHasTray=false;
+                    TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
                 }
             }
             return true;
@@ -941,7 +939,7 @@ void TAutoModule::StageRearGrid(int Index, const TMyTray &Grid)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return;
-    RearGrid[Index]=Grid;
+    RearGrid[Index].CopyFrom(Grid);
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260605 : SortArm fill gate. In Normal mode every working

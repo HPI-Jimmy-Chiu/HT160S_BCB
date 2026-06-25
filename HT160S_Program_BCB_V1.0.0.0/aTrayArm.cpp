@@ -59,7 +59,7 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     iAutoTarget=-1;
     iDeliverKind=eTrayKindNormal;
     iDeliverTrayID="";
-    ArmTray.Clear();   //AI(ht160s-tray-source) : drop carried grid when material is not kept across home
+    if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.Clear();   //AI(ht160s-tray-source) : drop carried grid when material is not kept across home
     PlaceDest=TAPLACE_AUTO;
 }
 //---------------------------------------------------------------------------
@@ -211,7 +211,11 @@ int TTrayArmModule::DecideJob()
     if(LoaderModule!=NULL && LoaderModule->IsRearHasTray())
     {
         iAutoTarget=-1;
-        iDeliverKind=eTrayKindNormal;
+        //AI(HT160S-Maintainer) 20260625 : carry the REAL kind/2D the Loader stamped on the
+        //tray at feed (Phase 6 A : GetRearTrayKind/GetRearTrayID), so an identity tray is
+        //routed back to Color while empty/cover trays keep the existing Empty path.
+        iDeliverKind=(int)LoaderModule->GetRearTrayKind();
+        iDeliverTrayID=LoaderModule->GetRearTrayID();
         return TAJOB_LOADER_RECOVERY;
     }
 
@@ -347,11 +351,15 @@ bool TTrayArmModule::DoPick(int Flag)
         case 4000:
             if(Job==TAJOB_LOADER_RECOVERY)
             {
-                //AI(HT160S-Maintainer) 20260606 : tell the Loader its rear slot is now
-                //free so it can feed/discharge the next tray.
+                //AI(HT160S-Maintainer) 20260625 : transfer the rear tray data onto the arm
+                //(U3 born-at-source/handoff). The copy MUST precede NotifyTrayArmPickRearTray,
+                //which clears the Loader rear hold (RearSourceTray/RearKind/RearTrayID).
                 if(LoaderModule!=NULL)
+                {
+                    if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.CopyFrom(LoaderModule->GetRearSourceTray());
+                    iDeliverTrayID=LoaderModule->GetRearTrayID();
                     LoaderModule->NotifyTrayArmPickRearTray();
-                ArmTray.Clear();   //AI(ht160s-tray-source) : Loader has no source grid yet (Phase 6); carry a clean empty/Normal grid by intent, not by stale ArmTray
+                }
             }
             else if(IsPickFromColor())
             {
@@ -360,7 +368,7 @@ bool TTrayArmModule::DoPick(int Flag)
                 if(ColorModule!=NULL)
                 {
                     iDeliverTrayID=ColorModule->GetTrayID();
-                    ArmTray=ColorModule->GetSourceTray();   //AI(ht160s-tray-source) : carry identity-tray grid before release
+                    if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.CopyFrom(ColorModule->GetSourceTray());   //AI(ht160s-tray-source) : carry identity-tray grid before release
                     ColorModule->NotifyTrayPicked();
                 }
             }
@@ -368,7 +376,7 @@ bool TTrayArmModule::DoPick(int Flag)
             {
                 if(EmptyModule!=NULL)
                 {
-                    ArmTray=EmptyModule->GetSourceTray();   //AI(ht160s-tray-source) : carry EMPTY_IC/Normal grid before release
+                    if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.CopyFrom(EmptyModule->GetSourceTray());   //AI(ht160s-tray-source) : carry EMPTY_IC/Normal grid before release
                     EmptyModule->SetRearHasTray(false);
                 }
             }
@@ -394,6 +402,8 @@ bool TTrayArmModule::DoPlace(int Flag)
 
     //AI(HT160S-Maintainer) 20260606 : Loader-recovery jobs may instead recycle the tray
     //back to the EmptyTray rear when no Auto needs one. Dispatch to that path.
+    if(PlaceDest==TAPLACE_COLOR)
+        return DoPlaceToColor(Flag);
     if(PlaceDest==TAPLACE_EMPTY)
         return DoPlaceToEmpty(Flag);
 
@@ -441,7 +451,8 @@ bool TTrayArmModule::DoPlace(int Flag)
                 //slot for BOTH AMR and Normal. The Auto copies RearGrid into the working
                 //tray at DoFeedTray case 7000; tray occupancy (fHasTray) is owned THERE,
                 //not here. Setting fHasTray now would flip bCarHasTray and starve FindFeedAuto.
-                AutoModule->StageRearGrid(iAutoTarget, ArmTray);
+                if(HSys.VMot.MMTrayArmX!=NULL)
+                    AutoModule->StageRearGrid(iAutoTarget, HSys.VMot.MMTrayArmX->Tray);
                 if(Job==TAJOB_AMR_SUPPLY)
                     //AI(HT160S-Maintainer) 20260605 : record the delivered tray's stack
                     //role so the Auto knows identity/cover trays must NOT receive IC.
@@ -451,7 +462,7 @@ bool TTrayArmModule::DoPlace(int Flag)
                 else
                     AutoModule->SetRearHasTrayFromTrayArm(iAutoTarget, true);
             }
-            ArmTray.Clear();   //AI(ht160s-tray-source) : arm is now empty
+            if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.Clear();   //AI(ht160s-tray-source) : arm is now empty
             if(HSys.VMot.MMTrayArmX!=NULL)
                 HSys.VMot.MMTrayArmX->fHasTray=false;
             bHasTray=false;
@@ -467,6 +478,18 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
     //it recycles the tray back into the EmptyTray supply pool. AMR stacks have a strict
     //identity/cover/normal order that is built only by the dedicated AMR supply job, so a
     //recovered plain tray is never injected mid-stack in AMR mode : it always recycles.
+    //AI(HT160S-Maintainer) 20260625 : an identity tray (real Kind from the Loader, Phase 6 A)
+    //is never an Auto supply : route it back to Color using the SAME return contract as Empty
+    //(RequestReturnTray -> IsRearHasTray()==false -> NotifyTrayXToEmptyFinish). Cover/Normal
+    //fall through to the existing Auto-vs-Empty logic below unchanged (D3).
+    if(iDeliverKind==eTrayKindIdentity)
+    {
+        PlaceDest=TAPLACE_COLOR;
+        iAutoTarget=-1;
+        if(ColorModule!=NULL)
+            ColorModule->RequestReturnTray();
+        return;
+    }
     bool bSupplyAuto=false;
     if(GeneralSetting.bUseAMR==false && AutoModule!=NULL)
     {
@@ -566,7 +589,85 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
             //the rear as having a tray, so it re-enters the supply pool).
             if(EmptyModule!=NULL)
                 EmptyModule->NotifyTrayXToEmptyFinish();
-            ArmTray.Clear();   //AI(ht160s-tray-source) : arm empty after recycle-to-Empty (parity with Auto place path)
+            if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.Clear();   //AI(ht160s-tray-source) : arm empty after recycle-to-Empty (parity with Auto place path)
+            if(HSys.VMot.MMTrayArmX!=NULL)
+                HSys.VMot.MMTrayArmX->fHasTray=false;
+            bHasTray=false;
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TTrayArmModule::DoPlaceToColor(int Flag)
+{
+    //AI(HT160S-Maintainer) 20260625 : return the carried identity tray to the Color rear.
+    //Color and Empty are the SAME mechanism (U4), so this mirrors DoPlaceToEmpty exactly,
+    //changing only the target X (Color return teach point) and the destination module. The
+    //return handshake uses the SAME contract names as Empty : RequestReturnTray() (already
+    //called in DecidePlaceDestAfterPick) makes Color go up and free its rear; this places
+    //once IsRearHasTray()==false confirms the rear is clear, then signals completion with
+    //NotifyTrayXToEmptyFinish(). Clamp/Z cylinders self-alarm on a sensor timeout, so a
+    //stuck move is reported rather than silently hanging. MoveTrayArmX holds the Z-up
+    //interlock.
+    if(Flag==0)
+    {
+        PlaceTask=1;
+        ArmDelay.Clear();
+        return true;
+    }
+
+    switch(PlaceTask)
+    {
+        case 1:
+            if(DoZUp())
+                PlaceTask=10;
+            break;
+
+        case 10:
+            //AI(ht160s-tray-source) : reuse the Color pickup X as the return deposit X (same Color
+            //station). On-machine confirm whether a distinct deposit X is needed (tray-on-tray
+            //clash); a separate teach point belongs with the uOffset teach rework, not Phase 6.
+            if(MoveTrayArmX(Teach.TrayXArmToColorXPosition))
+                PlaceTask=1000;
+            break;
+
+        case 1000:
+            //Wait until Color has raised and cleared its rear before depositing.
+            if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
+                PlaceTask=2000;
+            break;
+
+        case 2000:
+            if(DoZDown())
+                PlaceTask=3000;
+            break;
+
+        case 3000:
+            if((HSys.Cyn.C_TrayArm_FrontClamp.Pop() &&
+                HSys.Cyn.C_TrayArm_RearClamp.Pop()) || IsSoftSimulate())
+            {
+                ArmDelay.Set(3);
+                ArmDelay.On();
+                PlaceTask=3100;
+            }
+            break;
+
+        case 3100:
+            if(ArmDelay.Off())
+                PlaceTask=4000;
+            break;
+
+        case 4000:
+            if(DoZUp())
+                PlaceTask=5000;
+            break;
+
+        case 5000:
+            //Tell Color the returned identity tray is now parked at its rear (this also
+            //marks the rear as having a tray, so it re-enters the supply pool).
+            if(ColorModule!=NULL)
+                ColorModule->NotifyTrayXToEmptyFinish();
+            if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.Clear();   //AI(ht160s-tray-source) : arm empty after return-to-Color (parity with Empty path)
             if(HSys.VMot.MMTrayArmX!=NULL)
                 HSys.VMot.MMTrayArmX->fHasTray=false;
             bHasTray=false;

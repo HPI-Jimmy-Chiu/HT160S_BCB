@@ -65,6 +65,29 @@ void TMyTray::SetAll(int data)
             Data[x][y]=data;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : unified grid birth. Clear() resets all grids + TrayID + Kind=Normal;
+//then stamp fill/kind/id. Birth(EMPTY_IC, Normal, empty) equals Clear(). Used by Empty/Color births.
+void TMyTray::Birth(int data, eTrayKind kind, AnsiString id)
+{
+    Clear();
+    SetAll(data);
+    Kind=kind;
+    TrayID=id;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : deep copy (default member-wise; arrays element-wise, AnsiString refcount).
+void TMyTray::CopyFrom(const TMyTray &src)
+{
+    *this = src;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : move = copy then clear the source (mirrors HT172 MoveTrayFrom).
+void TMyTray::MoveFrom(TMyTray &src)
+{
+    *this = src;
+    src.Clear();
+}
+//---------------------------------------------------------------------------
 bool TMyTray::HasIC()
 {
     int xEnd=GetTrayRealXCount();
@@ -374,6 +397,7 @@ void TMyMotor::SetIn1Logic(bool logic) { Motor->bIn1Logic=logic; }
 // for completeness but is no longer called from the table-load path.
 void TMyMotor::SetHomeType(int Type) { if(Motor!=NULL) Motor->iHomeType=Type; }
 void TMyMotor::SetEncodeMultiple(int m) { if(Motor!=NULL) Motor->iEncodeMultiple=m; }
+void TMyMotor::SetEncodeDir(int d) { if(Motor!=NULL) Motor->iEncodeDir=d; }
 void TMyMotor::SetMotorKind(eMotorKind Kind) { Motor->SetMotorKind(Kind); }
 eMotorKind TMyMotor::GetMotorKind() { return Motor->GetMotorKind(); }
 void TMyMotor::SetMotionCardType(eMotionCardType Type) { Motor->SetMotionCardType(Type); }
@@ -933,8 +957,23 @@ void TTrayMotor::SetIDPanel(TPanel *ptr) { fPanelID=(ptr!=NULL); pPalTrayID=ptr;
 void TTrayMotor::SetTrayPanel(TPanel *ptr) { fPanel=(ptr!=NULL); pPanel=ptr; }
 void TTrayMotor::SetHTrayPanel(TTMyTray *ptr) { fHTary=(ptr!=NULL); pHTray=ptr; InitTrayColorMap(ptr); UpdateTrayVisibleByHasTray(); }
 void TTrayMotor::SetSubHTrayPanel(TTMyTray *ptr) { fSubHTary=(ptr!=NULL); pSubHTray=ptr; InitTrayColorMap(ptr); UpdateTrayVisibleByHasTray(); }
-void TTrayMotor::CopyTrayFrom(int Index) { (void)Index; }
+void TTrayMotor::CopyTrayFrom(int Index) { (void)Index; }   //AI(ht160s-tray-source) : index form unused (no VMotPtr map here); use the pointer overload
 void TTrayMotor::MoveTrayFrom(int Index) { (void)Index; }
+//AI(ht160s-tray-source) : motor-level copy (mirrors HT172): receive a grid + own occupancy/display.
+void TTrayMotor::CopyTrayFrom(TTrayMotor *MotPtr)
+{
+    if(MotPtr==NULL) return;
+    Tray.CopyFrom(MotPtr->Tray);
+    fHasTray=true;
+    Refresh();
+}
+//AI(ht160s-tray-source) : motor-level move = copy + clear source.
+void TTrayMotor::MoveTrayFrom(TTrayMotor *MotPtr)
+{
+    if(MotPtr==NULL) return;
+    CopyTrayFrom(MotPtr);
+    MotPtr->ClearTray();
+}
 void TTrayMotor::SetTrayVisible(bool bVisible)
 {
     if(fHTary    && pHTray    !=NULL) pHTray->Visible=bVisible;
@@ -996,9 +1035,7 @@ AnsiString TTrayMotor::GetTrayCode2D(int x, int y)
 //---------------------------------------------------------------------------
 void TTrayMotor::InitNewTray(int data)
 {
-    Tray.SetAll(data);
-    Tray.ClearBin();   //AI(HT160S-Maintainer) 20260601 : new tray starts with no bin assignment
-    Tray.ClearLotCode();   //AI(ht160s-lotbin) 20260615 : new tray starts with no lot/2D
+    Tray.Birth(data, eTrayKindNormal, "");   //AI(ht160s-tray-source) : unified birth (callers re-tag Kind/TrayID, e.g. Loader)
     fHasTray=true;
     Refresh();
 }

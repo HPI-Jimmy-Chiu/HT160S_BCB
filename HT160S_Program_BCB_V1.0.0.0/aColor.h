@@ -4,7 +4,7 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "HTimer.h"
-#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray SourceTray born at the 2D-read
+#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray for MMColorY->Tray (identity grid lives on the motor)
 //---------------------------------------------------------------------------
 class TMyCylinder;
 //---------------------------------------------------------------------------
@@ -37,7 +37,6 @@ private:
     bool bTrayPicked;
     bool bSupplyRequested;
     AnsiString sTrayID2D;     //AI(HT160S-Maintainer) 20260608 : 2D code read from the supplied identity tray
-    TMyTray SourceTray;       //AI(ht160s-tray-source) : identity-tray grid born at 2D-read; Kind=Identity, TrayID=sTrayID2D
     HTimer SupplyDelay;
     HTimer ReleaseDelay;
     HTimer GoDownDelay;       //AI(HT160S-Maintainer) 20260608 : front separate settle delay
@@ -46,6 +45,16 @@ private:
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
 
+    //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow, ported near-verbatim
+    //from TEmptyModule (U4 : Empty and Color are the same destacker mechanism). The
+    //TrayArm returns a leftover identity tray to Color's rear handoff position; Color
+    //stacks it back onto the front supply car (DoGoUpTray) for closed-loop reuse.
+    int GoUpTask;
+    bool bReturnTray;
+    bool bTrayXToEmptyFinish;
+    int iReturnedCount;
+    HTimer GoUpDelay;
+
     bool IsSoftSimulate();
     bool IsInstalled();
     void RefreshStateFromSensors();
@@ -53,6 +62,7 @@ private:
     bool PopCylinder(TMyCylinder &Cyn);
     bool MoveColorY(int Position);   //AI(HT160S-Maintainer) 20260622 : move Color carriage in Y (front/back)
     bool DoGoDownTray(int Flag);   //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack -> front staging (like Empty)
+    bool DoGoUpTray(int Flag);     //AI(phase6-loader-recycle) 20260625 : stack a returned tray back onto the front supply car (mirrors TEmptyModule::DoGoUpTray)
     bool DoSupplyTray(int Flag);
     bool DoReleaseTray(int Flag);
     bool DoSortBin(int Flag);
@@ -75,6 +85,9 @@ public:
     bool IsAcceptingIC();
     void RequestSupplyTray();
     void NotifyTrayPicked();
+    void RequestReturnTray();        //AI(phase6-loader-recycle) 20260625 : TrayArm asks Color to accept a returned identity tray (same contract name as Empty)
+    bool IsRearHasTray();            //AI(phase6-loader-recycle) 20260625 : Color rear handoff position occupied (same contract name as Empty)
+    void NotifyTrayXToEmptyFinish(); //AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing onto Color's rear (same contract name as Empty)
     void NotifyICPlaced(int Count);
     void SetSupplyThreshold(int Count);
     int GetSupplyThreshold();

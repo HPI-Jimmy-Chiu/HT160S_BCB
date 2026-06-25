@@ -69,6 +69,9 @@ public:
     TMyTray();
     void Clear();
     void SetAll(int data);
+    void Birth(int data, eTrayKind kind, AnsiString id);   //AI(ht160s-tray-source) : unified birth = Clear+SetAll+Kind+TrayID
+    void CopyFrom(const TMyTray &src);                     //AI(ht160s-tray-source) : deep copy (member-wise)
+    void MoveFrom(TMyTray &src);                           //AI(ht160s-tray-source) : copy + clear source (HT172 MoveTrayFrom semantics)
     bool HasIC();
     bool FullIC();
     bool HasThisIC(int data);
@@ -220,6 +223,7 @@ public:
     void SetIn1Logic(bool logic);
     void SetHomeType(int Type);
     void SetEncodeMultiple(int m);   // configure MC88X1 A/B encoder multiplier (3=x4 for all axes); applied at InitMotor
+    void SetEncodeDir(int d);        // configure MC88X1 encoder count direction (1=inverse default, 0=normal M05); applied at InitMotor
     void SetMotorKind(eMotorKind Kind);
     eMotorKind GetMotorKind();
     void SetMotionCardType(eMotionCardType Type);
@@ -303,6 +307,8 @@ public:
     void SetSubHTrayPanel(TTMyTray *ptr);
     void CopyTrayFrom(int Index);
     void MoveTrayFrom(int Index);
+    void CopyTrayFrom(TTrayMotor *MotPtr);   //AI(ht160s-tray-source) : motor-level copy (mirrors HT172 API)
+    void MoveTrayFrom(TTrayMotor *MotPtr);   //AI(ht160s-tray-source) : motor-level move = copy + clear source
     void SetTray(int data, bool bWithCover=false);
     void ClearTray();
     void SetTrayID(AnsiString ID);

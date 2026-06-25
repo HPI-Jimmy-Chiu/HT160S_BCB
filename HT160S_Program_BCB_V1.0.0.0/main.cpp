@@ -13,6 +13,7 @@
 #include "cprod.h"
 #include "aAuto1To6.h"   //AI(ht160s-motion-view) 20260618 : AutoModule->GetWorkingTrayID for Unload Auto info
 #include "UserRoleManager.h"
+#include "uQwertyKey.h"   //AI(ht160s-password) 20260624 : on-screen keypad for login ID/password
 #include "uruncontrol.h"
 #include "iosetview.h"
 #include "uteach.h"
@@ -27,6 +28,8 @@
 #include "systools.h"
 #include "deviceinfo.h"
 #include "aLoader.h"
+#include "aEmpty.h"    //AI(ht160s-agv) 20260624 : EmptyModule->GetCarTrayCount for PanelMain6 header
+#include "aColor.h"    //AI(ht160s-agv) 20260624 : ColorModule->GetCarTrayCount for PanelMain6 header
 #include "LotWebApiClient.h"   //AI(ht160s-lot-webapi) 20260612 : Stage 4 : machine-flow Lot data pull
 #include "SecsGem/UsecegemMainFrom.h"
 #include "SecsGem/uHGemHT160.h"
@@ -183,9 +186,26 @@ __fastcall TfMain::TfMain(TComponent* Owner)
 
     BuildFeatureStatusBadges();
 
+    //AI(ht160s-statusbar) 20260624 : port of HT172 main.cpp:31-41 version-string set.
+    //HT160 has no VerInfo()/GetSVNRev() and no __CODEGUARD__, so drop the SVN-rev call
+    //and the .CG suffix; keep the optional .QC suffix (CUSTOMER_CODE==CC_HONPREC_QC).
+    //MainVersion is the single version constant (cmydef). emsSim panel is filled ONLY
+    //on a SOFT_SIMULATE build (compile-time, separate from the runtime Real/Dummy icon).
+    if(stbMain!=NULL)
+    {
+        AnsiString VerText=MainVersion;
+        if(CUSTOMER_CODE==CC_HONPREC_QC)
+            VerText=MainVersion+".QC";
+        stbMain->Panels->Items[emsVersion]->Text=VerText;
+        #ifdef SOFT_SIMULATE
+        stbMain->Panels->Items[emsSim]->Text="SIMULATE";
+        #endif
+    }
+
     LoadMainRunSettingsFromIni();
     LoadRunModePicture();
     LoadStartModePicture();
+    ReadPassword();   //AI(ht160s-password) 20260624 : load system\login.txt user book (seed default if missing)
     UserRoleManager.InitializeByBuildMode();
 
     bUpdatingMainSelections = true;
@@ -684,9 +704,56 @@ void __fastcall TfMain::SetSimulateScreenStatus()
                     HSys.VMotPtr[i]->UpdateTrayVisibleByHasTray();
             }
         }
+
+        //AI(ht160s-agv) 20260624 : refresh the per-zone "trays on the AMR car" header.
+        //Motion View only, so gated here with the rest of the per-frame visible-page work.
+        ShowCarTrayCount();
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : format an AMR-car tray total as "identity/cover/other".
+//Given the live total t and how many identity(id0)/cover(cv0) trays a full car holds,
+//derive the per-kind split assuming normal trays drain first, then cover, then
+//identity. Sum(id,cv,nm) always equals t so the shown total still matches the count.
+//id0<0 means the whole car is identity trays (Color supply).
+static AnsiString FmtCarKinds(int t, int id0, int cv0)
+{
+    int id, cv, nm;
+    if(t<0) t=0;
+    if(id0<0)                   // whole car is identity (Color)
+        return IntToStr(t) + "/0/0";
+    id = (t<id0) ? t : id0;     // identity reserved (drains last)
+    cv = t - id;                // remaining after identity
+    if(cv > cv0) cv = cv0;      // cover capped (drains after normal)
+    if(cv < 0)   cv = 0;
+    nm = t - id - cv;           // normal = remainder (drains first)
+    return IntToStr(id) + "/" + IntToStr(cv) + "/" + IntToStr(nm);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : PanelMain6 Motion View header - per-zone "trays on the AMR
+//car" count. Input zones (Loader/Empty/Color) show the sim supply-car remaining count
+//(drains as trays feed); Auto1~6 show the output-car accumulated stack count. Display
+//only and NULL-guarded; reads module accessors, never writes machine state. In real
+//mode the input counts are sensor-driven and not maintained (they show the configured
+//max); the Auto output counts are book-keeping and valid in both sim and real.
+void __fastcall TfMain::ShowCarTrayCount()
+{
+    if(LoaderModule!=NULL && lbCarTrayCount_Loader!=NULL)
+        lbCarTrayCount_Loader->Caption=FmtCarKinds(LoaderModule->GetCarTrayCount(), 1, 1);
+    if(EmptyModule!=NULL && lbCarTrayCount_Empty!=NULL)
+        lbCarTrayCount_Empty->Caption=FmtCarKinds(EmptyModule->GetCarTrayCount(), 0, 1);
+    if(ColorModule!=NULL && lbCarTrayCount_Color!=NULL)
+        lbCarTrayCount_Color->Caption=FmtCarKinds(ColorModule->GetCarTrayCount(), -1, 0);
+
+    if(AutoModule!=NULL)
+    {
+        TLabel *AutoLbl[6]={lbCarTrayCount_Auto1, lbCarTrayCount_Auto2, lbCarTrayCount_Auto3,
+                            lbCarTrayCount_Auto4, lbCarTrayCount_Auto5, lbCarTrayCount_Auto6};
+        for(int i=0; i<6; i++)
+            if(AutoLbl[i]!=NULL)
+                AutoLbl[i]->Caption=FmtCarKinds(AutoModule->GetCarTrayCount(i), 1, 1);
+    }
+}
 //---------------------------------------------------------------------------
 //AI(ht160s-motion-view) 20260618 : fill the Unload-area Auto1~6 info panels.
 // Bin/Lot from the routing core : Normal mode = BinAreaMap static Bin<-Auto reverse;
@@ -954,6 +1021,12 @@ void __fastcall TfMain::InitSimulateScreenBinding()
 
     BindMovingTrayPanel(HSys.Mot.MEmptyY, HSys.VMot.MMEmptyY, plEmptyTrayWork, mtEmptyTrayWork);
 
+    //AI(ht160s-motion-view-tray-display) 20260624 : Color column carrier position-binds
+    // to MColorY (front<->rear). //AI(ht160s-tray-source) 20260625 : Color now drives the
+    // MMColorY content motor so the presented identity tray shows on MotionView (frame =
+    // has-tray; identity grid is empty, no IC). Visibility is fHasTray-driven per frame.
+    BindMovingTrayPanel(HSys.Mot.MColorY, HSys.VMot.MMColorY, plColorTrayWork, mtColorTrayWork);
+
     // Loader has two physical Y lanes: MLoaderY_1 (Left) and MLoaderY_2 (Right).
     BindMovingTrayPanel(HSys.Mot.MLoaderY_1, HSys.VMot.MMLoaderY_1, plLoaderLTrayWork, mtLoaderLTrayWork);
     BindMovingTrayPanel(HSys.Mot.MLoaderY_2, HSys.VMot.MMLoaderY_2, plLoaderRTrayWork, mtLoaderRTrayWork);
@@ -981,6 +1054,7 @@ void __fastcall TfMain::SyncMonitorTrayDivision()
     ApplyTrayDivisionToPanel(mtAuto6TrayWork, HSys.VMot.MMAutoY_6, X, Y);
 
     ApplyTrayDivisionToPanel(mtEmptyTrayWork, HSys.VMot.MMEmptyY, X, Y);
+    ApplyTrayDivisionToPanel(mtColorTrayWork, HSys.VMot.MMColorY, X, Y);
 
     ApplyTrayDivisionToPanel(mtLoaderLTrayWork, HSys.VMot.MMLoaderY_1, X, Y);
     ApplyTrayDivisionToPanel(mtLoaderRTrayWork, HSys.VMot.MMLoaderY_2, X, Y);
@@ -1123,6 +1197,8 @@ void __fastcall TfMain::cb_WorkFileChange(TObject *Sender)
         fTeach->OpenWorkFile();
     if(fMaintenance != NULL)
         fMaintenance->OpenWorkFile();
+    if(fOffset != NULL)   //AI 20260623 : load new recipe offset and re-fold effective Teach
+        fOffset->OpenWorkFile();
 
     //AI(HT160S-Maintainer) 20260608 : refresh Monitor Col/Row grid for new recipe
     SyncMonitorTrayDivision();
@@ -1131,6 +1207,36 @@ void __fastcall TfMain::cb_WorkFileChange(TObject *Sender)
     RecordProcess(LogText);
     EventReport(SECS_EVENT.RecipeChange);
 }
+//---------------------------------------------------------------------------
+#ifndef SOFT_SIMULATE   //AI(ht160s-password) 20260624 : login keypad helper (real build only; sim auto-grants)
+// Prompt one text value via the on-screen QWERTY keypad using a hidden scratch
+// edit (parented so the VCL handle is valid). Returns false if operator cancels.
+static bool PromptLoginInput(TWinControl *AParent, AnsiString ATitle, int AFunc, AnsiString &AValue)
+{
+    TEdit *Scratch;
+    bool bOK;
+
+    if(fQwertyKey==NULL || AParent==NULL)
+        return false;
+
+    Scratch=new TEdit(AParent);
+    bOK=false;
+    try
+    {
+        Scratch->Parent=AParent;
+        Scratch->Visible=false;
+        Scratch->Text=AValue;
+        bOK=fQwertyKey->ShowQwertyKey(Scratch, AFunc, 0, false, 0, 0, ATitle);
+        if(bOK)
+            AValue=Scratch->Text;
+    }
+    __finally
+    {
+        delete Scratch;
+    }
+    return bOK;
+}
+#endif
 //---------------------------------------------------------------------------
 void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
 {
@@ -1161,11 +1267,31 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         #ifdef SOFT_SIMULATE
         UserRoleManager.ForceLevel(RoleLevel, UserRoleManager.GetLevelName(RoleLevel));
         #else
-        ShowMyMessage("User password login is not available yet.");
-        bUpdatingMainSelections = true;
-        RefreshMainUserSelect();
-        bUpdatingMainSelections = false;
-        return;
+        AnsiString sLoginID="";
+        AnsiString sLoginPass="";
+        if(PromptLoginInput(this, "Login User ID", N_NO_SPACE, sLoginID)==false ||
+           sLoginID.Trim()==AnsiString(""))
+        {
+            bUpdatingMainSelections = true;
+            RefreshMainUserSelect();
+            bUpdatingMainSelections = false;
+            return;
+        }
+        if(PromptLoginInput(this, "Login Password", N_PASSWORD|N_NO_SPACE, sLoginPass)==false)
+        {
+            bUpdatingMainSelections = true;
+            RefreshMainUserSelect();
+            bUpdatingMainSelections = false;
+            return;
+        }
+        if(UserRoleManager.Login(RoleLevel, sLoginID, sLoginPass)==false)
+        {
+            ShowMyMessage("User ID or password is incorrect.");
+            bUpdatingMainSelections = true;
+            RefreshMainUserSelect();
+            bUpdatingMainSelections = false;
+            return;
+        }
         #endif
     }
 
@@ -1386,6 +1512,30 @@ bool __fastcall TfMain::SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &
 
 
 
+//AI(machine-command-layer) 20260625 : shared full-machine HOME sequence, extracted from
+//sbHome1Click so the Home button AND the SECS HOME host command run the SAME steps (no
+//drift). Excludes the "Confirm home?" modal and the button cosmetics -- the button
+//handler keeps those; the SECS path must not pop a modal on the receive thread.
+void TfMain::HomeCore()
+{
+    if(fHome==NULL)   //AI(machine-command-layer) 20260625 : SECS HOME reaches here via fMain->HomeCore; guard fHome like the kernel (csystem.cpp) does. fHome is created right after fMain at startup, so this is defensive.
+        return;
+    fHome->lstHomeMsg->Clear();
+    fHome->lstHomeMsg->Items->Insert(0, "Starting home procedure....");
+    fHome->Show();
+
+    RecordProcess("HOME pressed");
+    EventReport(SECS_EVENT.PressHome);
+    ChangeRunMode(Run_Home);
+    HSys.Sys.SystemStart=true;
+    fHome->MarkSeenStart();
+
+    fAllMotorHome=false;
+    ArmMotorHome();
+    SoftStart=true;
+    bHomeByStart=false;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::sbHome1Click(TObject *Sender)
 {
     //AI(HT160S-Maintainer) 20260602 : HT172-style home. Press Home starts the
@@ -1396,19 +1546,7 @@ void __fastcall TfMain::sbHome1Click(TObject *Sender)
     if(ret==TMyMessageBox::msgrtnYES)
 #endif
     {
-        fHome->lstHomeMsg->Clear();
-        fHome->lstHomeMsg->Items->Insert(0, "Starting home procedure....");
-        fHome->Show();
-
-        RecordProcess("HOME pressed");
-        EventReport(SECS_EVENT.PressHome);
-        ChangeRunMode(Run_Home);
-        HSys.Sys.SystemStart=true;                                              //20140411 wei
-
-        fAllMotorHome=false;
-        ArmMotorHome();                                                        //AI(HT160S-Maintainer) 20260602 : force fresh full-machine home
-        SoftStart=true;
-        bHomeByStart=false;
+        HomeCore();   //AI(machine-command-layer) 20260625 : shared with SECS HOME
     }
 #ifndef SOFT_SIMULATE
     else
@@ -1460,13 +1598,14 @@ void __fastcall TfMain::sbStart1Click(TObject *Sender)
 
 void __fastcall TfMain::sbPause1Click(TObject *Sender)
 {
+    //AI(machine-command-layer) 20260625 : route the operator Pause through the single
+    //MachinePause() choke point (csystem.cpp) so the SAME RecordProcess + SystemStart-drop
+    //+ DecStop + SoftStop runs for the button, the panel key and SECS PAUSE. EventReport
+    //(PressPause) stays here : it is operator-specific and MachinePause is shared with the
+    //safety/EMG stop paths that must not raise a Pause event.
     if(HSys.Sys.SystemStart==true)
-    {
-        RecordProcess("PAUSE pressed");
         EventReport(SECS_EVENT.PressPause);
-        HSys.Sys.SystemStart=false;                                             //20140411 wei
-    }
-    SoftStop=true;
+    MachinePause(trigOperator);
 }
 //---------------------------------------------------------------------------
 
@@ -1525,6 +1664,20 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
         Reason="No 2D data : load lot 2D/Bin data before Start !";
         return false;
     }
+    //AI(machine-command-layer) 20260625 : the global GetItemCount() above only proves SOME
+    //lot has 2D data. Verify the ACTIVE lot (edLotNo) itself has 2D/Bin loaded, else a
+    //SECS name-only lot coexisting with another lot's data would pass and start with no
+    //routable data. GetLotIcList filters by sLotID and returns the per-lot record count.
+    {
+        TStringList *IcList=new TStringList;
+        int IcCount=LotRegistry.GetLotIcList(edLotNo->Text, IcList);
+        delete IcList;
+        if(IcCount<=0)
+        {
+            Reason="No 2D data for lot "+edLotNo->Text+" : load this lot's 2D/Bin before Start !";
+            return false;
+        }
+    }
     //AI(poka-yoke) 20260616 : By Lot+Bin mode needs at least one (Lot,Bin)->Auto
     // binding, otherwise nothing can be routed. Block start until bindings exist.
     if(GeneralSetting.bUseLotBinSortMode && LotBinBinding.GetBindingCount()<=0)
@@ -1537,17 +1690,23 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
 //---------------------------------------------------------------------------
 void TfMain::Start()
 {
-    if(HSys.Sys.SystemStart==false)
-    {
-        AnsiString Reason;
-        if(CheckLotDataReady(Reason)==false)
-        {
-            ShowMyMessage(Reason);
-            return;
-        }
+    //AI(machine-command-layer) 20260625 : operator Start button -> single MachineStart
+    //gate. The modal lives on the caller side so the kernel/SECS reuse of MachineStart
+    //never pops a dialog on a non-UI / receive-thread path.
+    AnsiString Reason;
+    if(MachineStart(trigOperator, Reason)==msRejNotReady)
+        ShowMyMessage(Reason);
+}
+//---------------------------------------------------------------------------
+//AI(machine-command-layer) 20260625 : the arm half of the old Start(). Called ONLY by
+//MachineStart (csystem.cpp) after the lot/2D gate + trigger log pass. Sets the run
+//latches, opens the per-IC trace batch, and home-firsts an unhomed machine (bHomeByStart
+//kept : START on an unhomed machine homes then auto-runs, per 2026-06-25 decision).
+void TfMain::DoStartArm()
+{
 //        CheckContinusStartIsReady();                                            //Sam 20240710 : StartMode exception handling
 //
-        RecordProcess("START pressed");
+//        RecordProcess moved into MachineStart() : logs "MACHINE START by <trig>"
         tSimuData.bRunSimulation=cbEnableSimulation->Checked;                   //sync simulation IC flag from UI at lot start
 //
 //        if(HasICUnderMachine())
@@ -1584,9 +1743,9 @@ void TfMain::Start()
             fHome->lstHomeMsg->Clear();
             fHome->lstHomeMsg->Items->Insert(0, "Starting home procedure....");
             fHome->Show();
+            fHome->MarkSeenStart();   //AI(HT160S-Maintainer) 20260624 : SystemStart already true above; latch start (see uHome.cpp) for reliable kernel-side monitor close on a fault drop
         }
 //        flagOneCycleTrayEnd=false;
-    }
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch. Ported
@@ -1667,9 +1826,48 @@ void __fastcall TfMain::AppActivate(TObject *Sender)
         Screen->ActiveForm->BringToFront();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-statusbar) 20260624 : owner-draw the emsSim panel in red. Only the SIM
+//panel is psOwnerDraw (set in main.dfm), so this fires for it alone; default text
+//color is used for every other (psText) panel. Compile-time SIMULATE indicator -
+//the panel Text is set ONLY under #ifdef SOFT_SIMULATE (ctor), so on a real build
+//the panel is empty and this draws nothing.
+void __fastcall TfMain::stbMainDrawPanel(TStatusBar *StatusBar, TStatusPanel *Panel,
+    const TRect &Rect)
+{
+    if(StatusBar==NULL || Panel==NULL)
+        return;
+    StatusBar->Canvas->Font->Color=clRed;
+    StatusBar->Canvas->Font->Style=TFontStyles()<<fsBold;
+    StatusBar->Canvas->TextRect(Rect, Rect.Left+4, Rect.Top+2, Panel->Text);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-statusbar) 20260624 : HT172 MyFunctionB::Update() analog. Source the
+//identity from GeneralSetting (single source of truth), mirror into the cmydef as*
+//globals for HT172 API parity, then write stbMain panels 1-3. Defined here (not
+//cmydef.cpp) so the low-level cmydef TU need not pull main.h's include graph.
+void UpdateMachineIdentity()
+{
+    asModel=GeneralSetting.sMachineModel;
+    asHandlerID=GeneralSetting.sHandlerID;
+    asSerialNo=GeneralSetting.sSerialNo;
+    if(fMain!=NULL && fMain->stbMain!=NULL)
+    {
+        fMain->stbMain->Panels->Items[emsModel]->Text=asModel;
+        fMain->stbMain->Panels->Items[emsHandlerID]->Text=asHandlerID;
+        fMain->stbMain->Panels->Items[emsSerialNo]->Text=asSerialNo;
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::FormShow(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-statusbar) 20260624 : port of HT172 main.cpp:315 - register the clock
+    //panel with the time-string subsystem so TFormSysTools::RefreshMyTimeString()
+    //(driven 1 Hz off TDataModule1::Timer1) fills it. Also push current identity into
+    //panels 1-3 (HT172 MyFunctionB::Update analog). Registration de-dups by pointer.
+    if(stbMain!=NULL && FormSysTools!=NULL)
+        FormSysTools->AddMyTimeStringShow((TObject *)stbMain->Panels->Items[emsTime], 0);
+    UpdateMachineIdentity();
     #ifdef SOFT_SIMULATE
 //    cbEnableSimulation->Checked=true;
 //    btnLoadSimuData->Click();

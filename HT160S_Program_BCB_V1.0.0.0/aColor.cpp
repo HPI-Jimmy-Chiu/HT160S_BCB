@@ -39,8 +39,15 @@ void TColorModule::InitialFlag()
     bTrayPicked=false;
     bSupplyRequested=false;
     bFrontHasTray=false;
+    if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : hide Color grid on init
     ScanTask=1;
     GoDownTask=1;
+    //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow (mirrors Empty).
+    GoUpTask=1;
+    bReturnTray=false;
+    bTrayXToEmptyFinish=false;
+    iReturnedCount=0;
+    GoUpDelay.Clear();
     sTrayID2D="";
     SupplyDelay.Clear();
     ReleaseDelay.Clear();
@@ -165,7 +172,15 @@ void TColorModule::RefreshStateFromSensors()
     if(bHasOutputSensor)
         bOutputHasTray=bOutputState;
     else if(IsSoftSimulate())
-        bOutputHasTray=bTrayReady;
+    {
+        //AI(phase6-loader-recycle) 20260625 : while a receive (return) is in progress
+        //bOutputHasTray is the rear-handoff LATCH owned by the receive ladder (set by
+        //NotifyTrayXToEmptyFinish, cleared by DoGoUpTray). Do NOT clobber it from the
+        //sim bTrayReady fallback here, or the latch is wiped and the TrayArm deposit /
+        //DoGoUpTray handshake breaks (Empty avoids this by returning early in sim).
+        if(bReturnTray==false && bTrayXToEmptyFinish==false)
+            bOutputHasTray=bTrayReady;
+    }
 
     if(bHasInputSensor==false && IsSoftSimulate())
         bInputHasTray=true;
@@ -225,6 +240,20 @@ void TColorModule::DoColor(int &Task)
             if(bAmrLocked)
                 break;
             RefreshStateFromSensors();
+            //AI(phase6-loader-recycle) 20260625 : single-MColorY arbitration (CRITICAL).
+            //The receive (return) dispatch is placed BEFORE the supply godown/supply
+            //branches. Under sim IsSoftSimulate() is always true, so the godown branch
+            //below would otherwise win every idle pass and starve the return. Because
+            //DoColor owns a single Task at a time, once we enter the return ladder
+            //(Task=1700) no supply branch can run until DoGoUpTray completes, so the
+            //return cannot deadlock against supply. The bReturnTray latch is held until
+            //the deposit finishes (set in RequestReturnTray, cleared in case 1700).
+            if(bReturnTray)
+            {
+                DoGoUpTray(0);
+                Task=1700;
+                break;
+            }
             if(bTrayReady && bTrayPicked)
             {
                 DoReleaseTray(0);
@@ -241,7 +270,7 @@ void TColorModule::DoColor(int &Task)
             //DoGoDownTray). Stage 2 pushes that staged tray to the output and reads
             //its 2D code, but only when an AMR supply was actually requested (or
             //simulating), so the identity tray is not presented / scanned early.
-            if(bFrontHasTray==false)
+            if(bFrontHasTray==false && bReturnTray==false)
             {
                 if(bInputHasTray || IsSoftSimulate())
                 {
@@ -252,7 +281,7 @@ void TColorModule::DoColor(int &Task)
                     Task=1;
                 break;
             }
-            if(bSupplyRequested)
+            if(bSupplyRequested && bReturnTray==false)
             {
                 DoSupplyTray(0);
                 Task=1000;
@@ -278,6 +307,25 @@ void TColorModule::DoColor(int &Task)
         case 1500:
             if(DoReleaseTray(1))
                 Task=1;
+            break;
+
+        case 1700:
+            //AI(phase6-loader-recycle) 20260625 : Color receive ladder (mirrors
+            //TEmptyModule::DoEmpty case 3000). Hold here until the TrayArm has finished
+            //depositing the returned tray onto Color's rear (NotifyTrayXToEmptyFinish
+            //sets bTrayXToEmptyFinish + bOutputHasTray). Then DoGoUpTray stacks it back
+            //onto the front car. On completion the returned identity tray re-enters the
+            //supply pool (iSimInfeedCount++); a later DoSupplyTray -> DoReadColor2D ->
+            //BirthIdentityTray reproduces Kind=Identity + TrayID (no new code).
+            if(DoGoUpTray(1))
+            {
+                if(bReturnTray && bTrayXToEmptyFinish==false)
+                    return;
+                bReturnTray=false;
+                iReturnedCount++;
+                iSimInfeedCount++;
+                Task=1;
+            }
             break;
 
         case 2000:
@@ -376,6 +424,144 @@ bool TColorModule::DoGoDownTray(int Flag)
                 return true;
             }
             break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(phase6-loader-recycle) 20260625 : stack a returned identity tray (sitting at the
+//rear handoff position) back onto the front supply car, then re-stage the front. This
+//is a near-verbatim port of TEmptyModule::DoGoUpTray (U4 : Empty and Color share the
+//destacker mechanism). Cylinder names C_Empty_*->C_Color_*, MoveEmptyY->MoveColorY,
+//Empty rear/front teach Y -> Color rear (ColorTrayArmPickYPosition) / front
+//(ColorRead2DYPosition). The rear-occupied latch is bOutputHasTray (Color has no
+//bRearHasTray; the output/read position is Color's rear handoff slot). The Color rear
+//riser C_Color_RearRiseTray is intentionally NOT pushed here: its use as a receive
+//stacking cylinder is mechanism-unconfirmed (plan section 0 item 2). The front
+//destacker port is the working core; RearRiseTray is left out for now.
+bool TColorModule::DoGoUpTray(int Flag)
+{
+    if(Flag==0)
+    {
+        GoUpTask=1;
+        GoUpDelay.Clear();
+        return true;
+    }
+
+    switch(GoUpTask)
+    {
+        case 1:
+            GoUpTask=10;
+            break;
+
+        case 10:
+            GoUpTask=100;
+            break;
+
+        case 100:
+            HSys.Cyn.C_Color_FrontRiseTray_1.On();
+            GoUpTask=200;
+            break;
+
+        case 200:
+            if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.On();
+                GoUpDelay.Set(5);
+                GoUpDelay.On();
+                GoUpTask=300;
+            }
+            break;
+
+        case 300:
+            if(GoUpDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.On();
+                GoUpTask=400;
+            }
+            break;
+
+        case 400:
+            if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
+                GoUpDelay.Set(5);
+                GoUpDelay.On();
+                GoUpTask=500;
+            }
+            break;
+
+        case 500:
+            if(GoUpDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Off();
+                if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+                    GoUpTask=600;
+            }
+            break;
+
+        case 600:
+            if(HSys.Cyn.C_Color_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            {
+                bFrontHasTray=false;
+                GoUpTask=1000;
+            }
+            break;
+
+        case 1000:
+            RefreshStateFromSensors();
+            if(bOutputHasTray)
+                GoUpTask=2000;
+            else
+                GoUpTask=9000;
+            break;
+
+        case 2000:
+            //AI(phase6-loader-recycle) 20260625 : carry the rear/output tray to the rear
+            //pickup Y (Color's rear handoff Y) before leaning/pushing it onto the car.
+            if(MoveColorY(Teach.ColorTrayArmPickYPosition))
+                GoUpTask=3000;
+            break;
+
+        case 3000:
+            if(HSys.Cyn.C_Color_LeanOnTray.Push() || IsSoftSimulate())
+                GoUpTask=4000;
+            break;
+
+        case 4000:
+            if(HSys.Cyn.C_Color_PushTray.Push() || IsSoftSimulate())
+                GoUpTask=5000;
+            break;
+
+        case 5000:
+            //AI(phase6-loader-recycle) 20260625 : return the carriage to the front car Y.
+            if(MoveColorY(Teach.ColorRead2DYPosition))
+                GoUpTask=6000;
+            break;
+
+        case 6000:
+            if(HSys.Cyn.C_Color_PushTray.Pop() || IsSoftSimulate())
+                GoUpTask=7000;
+            break;
+
+        case 7000:
+            if(HSys.Cyn.C_Color_LeanOnTray.Pop() || IsSoftSimulate())
+            {
+                bFrontHasTray=true;
+                bOutputHasTray=false;
+                GoUpTask=8000;
+            }
+            break;
+
+        case 8000:
+            GoUpTask=9000;
+            break;
+
+        case 9000:
+            GoUpTask=10000;
+            break;
+
+        case 10000:
+            return true;
     }
     return false;
 }
@@ -615,17 +801,21 @@ bool TColorModule::DoReadColor2D(int Flag)
 //this grid is the carried-with-the-tray copy (redundant-but-consistent).
 void TColorModule::BirthIdentityTray()
 {
-    SourceTray.SetAll(EMPTY_IC);
-    SourceTray.ClearBin();
-    SourceTray.ClearLotCode();
-    SourceTray.SetKind(eTrayKindIdentity);
-    SourceTray.TrayID=sTrayID2D;
+    if(HSys.VMot.MMColorY!=NULL)
+    {
+        HSys.VMot.MMColorY->Tray.Birth(EMPTY_IC, eTrayKindIdentity, sTrayID2D);
+        HSys.VMot.MMColorY->fHasTray=true;   //AI(ht160s-tray-source) : presented -> show grid
+        HSys.VMot.MMColorY->Refresh();
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-tray-source) : return-by-value deep copy of the presented identity tray.
 TMyTray TColorModule::GetSourceTray()
 {
-    return SourceTray;
+    if(HSys.VMot.MMColorY!=NULL)
+        return HSys.VMot.MMColorY->Tray;
+    TMyTray empty;
+    return empty;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::DoReleaseTray(int Flag)
@@ -674,6 +864,7 @@ bool TColorModule::DoReleaseTray(int Flag)
                 bTrayReady=false;
                 bTrayPicked=false;
                 bOutputHasTray=false;
+                if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : released/picked -> hide grid
                 return true;
             }
             break;
@@ -753,6 +944,34 @@ void TColorModule::NotifyTrayPicked()
 {
     if(bTrayReady)
         bTrayPicked=true;
+}
+//---------------------------------------------------------------------------
+//AI(phase6-loader-recycle) 20260625 : Color receive-tray contract, identical name and
+//semantics to TEmptyModule's so TrayArm::DoPlaceToColor and DoPlaceToEmpty are the same
+//shape. RequestReturnTray arms the receive ladder; the deposit handshake mirrors Empty.
+void TColorModule::RequestReturnTray()
+{
+    bReturnTray=true;
+    bTrayXToEmptyFinish=false;
+}
+//---------------------------------------------------------------------------
+//AI(phase6-loader-recycle) 20260625 : Color has no bRearHasTray; its rear handoff slot
+//is the output/read position (bOutputHasTray). TrayArm waits IsRearHasTray()==false
+//before depositing, exactly as it waits on Empty's rear.
+bool TColorModule::IsRearHasTray()
+{
+    RefreshStateFromSensors();
+    return bOutputHasTray;
+}
+//---------------------------------------------------------------------------
+//AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing the returned tray onto
+//Color's rear handoff slot. Mirrors Empty (sets the finish flag + marks rear occupied).
+//This is the SOLE trigger that lets the receive ladder (case 1700) proceed; sim does NOT
+//auto-advance it, matching Empty's single trigger point.
+void TColorModule::NotifyTrayXToEmptyFinish()
+{
+    bTrayXToEmptyFinish=true;
+    bOutputHasTray=true;
 }
 //---------------------------------------------------------------------------
 void TColorModule::NotifyICPlaced(int Count)
@@ -946,9 +1165,13 @@ AnsiString TColorModule::DescribeState()
        + "  bOutputHasTray=" + IntToStr(bOutputHasTray ? 1 : 0) + "\r\n";
     s += "  SupplyTask=" + IntToStr(SupplyTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)
+       + "  GoUpTask=" + IntToStr(GoUpTask)
        + "  ReleaseTask=" + IntToStr(ReleaseTask)
        + "  ScanTask=" + IntToStr(ScanTask)
        + "  SortBinTask=" + IntToStr(SortBinTask) + "\r\n";
+    s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
+       + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
+       + "  iReturnedCount=" + IntToStr(iReturnedCount) + "\r\n";
     s += "  iICCount=" + IntToStr(iICCount)
        + "  iSupplyThreshold=" + IntToStr(iSupplyThreshold)
        + "  TrayID2D=" + sTrayID2D + "\r\n";

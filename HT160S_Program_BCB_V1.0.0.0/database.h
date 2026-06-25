@@ -154,6 +154,7 @@ typedef struct TMOTDATA
     int iLimitLogic;
     int iIn1Logic;
     int iSimulateSpeed;
+    int iEncoderDir;   // OPTIONAL Mot_Table EncoderDir column; default 1=inverse when absent
 
     TMOTDATA(AnsiString Str=AnsiString(""));
 }TMOTDATA;
@@ -189,6 +190,7 @@ typedef struct TMOTNO
     int emotHomeOrder;
     int emotLimitLogic;
     int emotIn1Logic;
+    int emotEncoderDir;   // OPTIONAL trailing column index (-1 when CSV has no EncoderDir)
     int emotTotal;
 
     TMOTNO();
@@ -239,6 +241,8 @@ typedef struct VIRTUAL_MOTOR_MODULAR_STRUCT
     TTrayMotor *MMSuck_2;
     TTrayMotor *MMSuck_3;
     TTrayMotor *MMSuck_4;
+
+    TTrayMotor *MMColorY;   //AI(ht160s-tray-source) : Color identity-tray content motor (drives MotionView Color grid)
 }VIRTUAL_MOTOR_MODULAR;
 //---------------------------------------------------------------------------
 enum RunModeEnum

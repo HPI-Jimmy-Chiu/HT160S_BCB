@@ -4,7 +4,7 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "HTimer.h"
-#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray SourceTray born at the rear latch
+#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray FrontSourceTray holder; rear tray on MEmptyY
 //---------------------------------------------------------------------------
 class TEmptyModule
 {
@@ -22,7 +22,7 @@ private:
     bool bReturnTray;
     bool bTrayXToEmptyFinish;
     bool bLotFinish;
-    TMyTray SourceTray;       //AI(ht160s-tray-source) : grid born at the rear 'has tray' latch; deep-copied to TrayArm on pickup
+    TMyTray FrontSourceTray;  //AI(ht160s-tray-source) : FRONT staging holder only (rule #1); REAR tray lives on HSys.Mot.MEmptyY->Tray (parity with Loader, drives MotionView)
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR P2 handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per GoDown)
     HTimer FeedDelay;
@@ -31,7 +31,8 @@ private:
 
     bool IsSoftSimulate();
     void RefreshStateFromSensors();
-    void BirthRearTray();     //AI(ht160s-tray-source) : create EMPTY_IC/Normal grid at the rear latch (DUMMY-tolerant)
+    void BirthFrontTray();    //AI(ht160s-tray-source) : born at DoGoDownTray front confirm (rule #1)
+    void BirthRearTray();     //AI(ht160s-tray-source) : direct rear birth for REALLY-mode startup/recovery re-latch
     bool MoveEmptyY(int Position);
     bool DoFeedTray(int Flag);
     bool DoGoDownTray(int Flag);

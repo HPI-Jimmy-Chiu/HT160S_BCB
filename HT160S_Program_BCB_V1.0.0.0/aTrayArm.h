@@ -4,7 +4,7 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "HTimer.h"
-#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray ArmTray carried grid (born at source)
+#include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : MyMotor.h for MMTrayArmX->Tray (arm grid lives on the motor)
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260605 : TrayArm single-axis transport arm. Picks an
 //empty tray and places it onto a target station, following the LoaderModule->
@@ -32,6 +32,7 @@ enum eTrayArmPlaceDest
 {
     TAPLACE_AUTO=0,                    //place onto a target Auto rear (supply)
     TAPLACE_EMPTY,                     //recycle back to the EmptyTray rear
+    TAPLACE_COLOR,                     //AI(HT160S-Maintainer) 20260625 : return identity tray to Color (same contract as Empty)
 };
 //---------------------------------------------------------------------------
 class TTrayArmModule
@@ -45,7 +46,6 @@ private:
     int iAutoTarget;
     int iDeliverKind;                  //AI(HT160S-Maintainer) 20260605 : eTrayKind being delivered this job (AMR)
     AnsiString iDeliverTrayID;         //AI(HT160S-Maintainer) 20260608 : 2D TrayID carried from Color for the identity tray
-    TMyTray ArmTray;                   //AI(ht160s-tray-source) : full per-cell grid carried by the arm (Empty/Color -> Auto)
     int PlaceDest;                     //AI(HT160S-Maintainer) 20260606 : eTrayArmPlaceDest for the current carry
     bool bCleanOutFinish;
     bool bTrayFeedFinish;
@@ -60,6 +60,7 @@ private:
     bool DoPick(int Flag);
     bool DoPlace(int Flag);
     bool DoPlaceToEmpty(int Flag);     //AI(HT160S-Maintainer) 20260606 : recycle carried tray to EmptyTray rear
+    bool DoPlaceToColor(int Flag);     //AI(HT160S-Maintainer) 20260625 : return identity tray to Color rear (mirrors DoPlaceToEmpty)
     void DecidePlaceDestAfterPick();   //AI(HT160S-Maintainer) 20260606 : Loader-recovery : choose supply Auto vs recycle Empty
     int GetPickSourceX();              //AI(HT160S-Maintainer) 20260606 : pick X for current job (Loader/Color/Empty)
     int GetAutoX(int Index);

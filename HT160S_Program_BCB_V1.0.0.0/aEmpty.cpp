@@ -34,6 +34,8 @@ void TEmptyModule::InitialFlag()
     bReturnTray=false;
     bTrayXToEmptyFinish=false;
     bLotFinish=false;
+    FrontSourceTray.Clear();   //AI(ht160s-tray-source) : no stale front grid across init/lot
+    if(HSys.VMot.MMEmptyY!=NULL) HSys.VMot.MMEmptyY->ClearTray();   //AI(ht160s-tray-source) : rear tray lives on MEmptyY; hide grid on init
     FeedDelay.Clear();
     GoDownDelay.Clear();
     GoUpDelay.Clear();
@@ -145,9 +147,11 @@ void TEmptyModule::RefreshStateFromSensors()
         //AI(ht160s-tray-source) : in REALLY mode a tray can latch present from the sensor
         //without the DoFeedTray birth running (tray already at rear on startup/recovery).
         //Birth the grid on the false->true edge so TrayArm always carries a born EMPTY_IC/Normal
-        //grid, never a stale SourceTray. (sim/dummy already returned above.)
+        //grid, never a stale rear grid. (sim/dummy already returned above.)
         if(bRearHasTray==false && bRearState)
             BirthRearTray();
+        else if(bRearHasTray && bRearState==false && HSys.VMot.MMEmptyY!=NULL)
+            HSys.VMot.MMEmptyY->ClearTray();   //AI(ht160s-tray-source) : rear tray gone -> hide motor grid
         bRearHasTray=bRearState;
     }
 }
@@ -336,7 +340,12 @@ bool TEmptyModule::DoFeedTray(int Flag)
             {
                 bRearHasTray=true;
                 bBottomHasTray=true;
-                BirthRearTray();   //AI(ht160s-tray-source) : born here (rear empty tray content)
+                if(HSys.VMot.MMEmptyY!=NULL)
+                {
+                    HSys.VMot.MMEmptyY->Tray.MoveFrom(FrontSourceTray);   //AI(ht160s-tray-source) : hand off front-born grid to rear motor (rule #1)
+                    HSys.VMot.MMEmptyY->fHasTray=true;
+                    HSys.VMot.MMEmptyY->Refresh();
+                }
                 FeedTask=13000;
             }
             break;
@@ -358,7 +367,12 @@ bool TEmptyModule::DoFeedTray(int Flag)
             {
                 bRearHasTray=true;
                 bBottomHasTray=false;
-                BirthRearTray();   //AI(ht160s-tray-source) : born here (rear empty tray content)
+                if(HSys.VMot.MMEmptyY!=NULL)
+                {
+                    HSys.VMot.MMEmptyY->Tray.MoveFrom(FrontSourceTray);   //AI(ht160s-tray-source) : hand off front-born grid to rear motor (rule #1)
+                    HSys.VMot.MMEmptyY->fHasTray=true;
+                    HSys.VMot.MMEmptyY->Refresh();
+                }
                 FeedTask=13000;
             }
             break;
@@ -374,17 +388,23 @@ bool TEmptyModule::DoFeedTray(int Flag)
 //sensor read), so it advances in DUMMY/sim exactly like the bRearHasTray latch it follows.
 void TEmptyModule::BirthRearTray()
 {
-    SourceTray.SetAll(EMPTY_IC);
-    SourceTray.ClearBin();
-    SourceTray.ClearLotCode();
-    SourceTray.SetKind(eTrayKindNormal);
-    SourceTray.TrayID="";
+    if(HSys.VMot.MMEmptyY!=NULL) HSys.VMot.MMEmptyY->InitNewTray(EMPTY_IC);   //AI(ht160s-tray-source) : born onto rear motor (grid shows + fHasTray)
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : born at DoGoDownTray front confirm (rule #1). Same EMPTY_IC/Normal
+//content as the rear; handed off to MEmptyY->Tray when DoFeedTray moves front->rear.
+void TEmptyModule::BirthFrontTray()
+{
+    FrontSourceTray.Birth(EMPTY_IC, eTrayKindNormal, "");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm.
 TMyTray TEmptyModule::GetSourceTray()
 {
-    return SourceTray;
+    if(HSys.VMot.MMEmptyY!=NULL)
+        return HSys.VMot.MMEmptyY->Tray;
+    TMyTray empty;
+    return empty;
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::DoGoDownTray(int Flag)
@@ -483,6 +503,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             else
             {
                 bFrontHasTray=true;
+                BirthFrontTray();   //AI(ht160s-tray-source) : born at front confirm (rule #1)
                 return true;
             }
             break;
@@ -555,6 +576,7 @@ bool TEmptyModule::DoGoUpTray(int Flag)
             if(HSys.Cyn.C_Empty_FrontRiseTray_1.Pop() || IsSoftSimulate())
             {
                 bFrontHasTray=false;
+                FrontSourceTray.Clear();   //AI(ht160s-tray-source) : front carrier pushed back to stack
                 GoUpTask=1000;
             }
             break;
@@ -598,6 +620,11 @@ bool TEmptyModule::DoGoUpTray(int Flag)
                 bFrontHasTray=true;
                 bRearHasTray=false;
                 bBottomHasTray=false;
+                if(HSys.VMot.MMEmptyY!=NULL)
+                {
+                    FrontSourceTray.CopyFrom(HSys.VMot.MMEmptyY->Tray);   //AI(ht160s-tray-source) : rear motor tray pulled back to front holder
+                    HSys.VMot.MMEmptyY->ClearTray();
+                }
                 GoUpTask=8000;
             }
             break;
@@ -785,7 +812,11 @@ void TEmptyModule::SetRearHasTray(bool bHasTray)
 {
     bRearHasTray=bHasTray;
     if(bHasTray==false)
+    {
         bBottomHasTray=false;
+        if(HSys.VMot.MMEmptyY!=NULL)
+            HSys.VMot.MMEmptyY->ClearTray();   //AI(ht160s-tray-source) : TrayArm took rear tray -> clear motor grid + hide
+    }
 }
 //---------------------------------------------------------------------------
 void TEmptyModule::RequestReturnTray()
@@ -812,6 +843,8 @@ AnsiString TEmptyModule::DescribeState()
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
        + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
        + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)
+       //AI(ht160s-state-record-analysis) 20260625 : AMR lock freezes DoEmpty case100 (no rear-tray feed) -> tray-supply-starve deadlock
+       + "  bAmrLocked=" + IntToStr(bAmrLocked ? 1 : 0)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
     s += "  FeedTask=" + IntToStr(FeedTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)
