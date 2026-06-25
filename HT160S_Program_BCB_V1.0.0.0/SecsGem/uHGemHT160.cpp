@@ -798,6 +798,42 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                 HCACK = 1;                                       // bad list format
             }
         }
+        else if(S=="START")
+        {
+            //AI(ht160s-secsgem) 20260625 : production START host command, equivalent
+            // to the operator pressing the Start button. Reuse TfMain::Start() so the
+            // SAME operator path runs (SetMotorSpeed via ProcessStartMode, SystemStart,
+            // OnLotStart device trace, LoaderModule lot number, home-first when unhomed).
+            // Exact "START" compare (NOT AnsiPos) so it does not swallow "START_AGV",
+            // which shares the prefix. Consume the inner L[0] param list. Pre-gate on
+            // SystemStart + CheckLotDataReady here so Start()'s internal ShowMyMessage()
+            // is never reached : a modal on the HSMS/VCL receive path would stall SECS
+            // comms (same rule as LOTSTART). Safety interlocks (EMG/door/safe-lock) stay
+            // enforced by the kernel safety scan after SystemStart rises, as for the
+            // operator button.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(fMain==NULL)
+            {
+                HCACK = 2;                                   // no UI context -> param error
+            }
+            else if(HSys.Sys.SystemStart==true)
+            {
+                HCACK = 4;                                   // already running -> busy
+            }
+            else
+            {
+                AnsiString Reason;
+                if(fMain->CheckLotDataReady(Reason)==false)
+                {
+                    HCACK = 2;                               // lot/2D not ready -> param error
+                }
+                else
+                {
+                    fMain->Start();                          // operator-equivalent start
+                    HCACK = 0;
+                }
+            }
+        }
         else if(S.AnsiPos("START_AGV")==1)
         {
             //AI(ht160s-agv) 20260615 : Phase C START_AGV. Inner L[n] of
