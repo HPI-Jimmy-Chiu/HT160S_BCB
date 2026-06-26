@@ -556,7 +556,6 @@ __published:
     TLabel *lb_PanelFrontRear;
     TPanel *plIOForm;
     TMenuItem *SaveOutputMap1;
-    TTimer *tmr_IonFan;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall BtnPanelClick(TObject *Sender);
     void __fastcall ComboBox1Change(TObject *Sender);
@@ -573,7 +572,6 @@ __published:
     void __fastcall sbVacuumClick(TObject *Sender);
     void __fastcall spbTerminalProgramClick(TObject *Sender);
     void __fastcall Timer1Timer(TObject *Sender);
-    void __fastcall tmr_IonFanTimer(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall btnAddIOClick(TObject *Sender);
     void __fastcall btnDeleteIOClick(TObject *Sender);

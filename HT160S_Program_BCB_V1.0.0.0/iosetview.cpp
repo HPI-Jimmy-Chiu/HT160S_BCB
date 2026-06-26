@@ -2173,11 +2173,6 @@ void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)
     UpdateLegacyPageTabsVisible();
 }
 //---------------------------------------------------------------------------
-void __fastcall Tfiosetview::tmr_IonFanTimer(TObject *Sender)
-{
-    (void)Sender;
-}
-//---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormClose(TObject *Sender,
       TCloseAction &Action)
 {

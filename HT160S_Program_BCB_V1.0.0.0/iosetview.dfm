@@ -10052,10 +10052,4 @@ object fiosetview: Tfiosetview
       OnClick = SaveOutputMap1Click
     end
   end
-  object tmr_IonFan: TTimer
-    Enabled = False
-    OnTimer = tmr_IonFanTimer
-    Left = 808
-    Top = 48
-  end
 end
