@@ -497,7 +497,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             else
             {
                 ErrorText.sprintf("Auto%d Feed Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("JAM%d70", 11+iFeedAuto), ErrorText, K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("WAR%d30", 11+iFeedAuto), ErrorText, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
@@ -535,7 +535,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             if(PushCylinder!=NULL && (PushCylinder->Pop() || IsSoftSimulate()))
             {
                 ErrorText.sprintf("Auto%d Push Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("JAM%d01", 11+iFeedAuto), ErrorText, K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d02", 11+iFeedAuto), ErrorText, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=5000;
             }

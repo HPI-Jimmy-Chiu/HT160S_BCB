@@ -210,8 +210,8 @@ rg -n 'mapNameToAlarm|mapAlarmCodeList' HT160S_Program_BCB_V1.0.0.0/database.cpp
 ```
 - Registration is ONLY in `CreateSystemAlarmCode()` (database.cpp). The high-value
   CCD/vision alarms are registered there with their 9045 codes
-  (`TopCCD_Connect`->WAR16120, `TopCCD_2D`->WAR0462, `ColorCCD_Connect`->WAR0930,
-  `ColorCCD_2D`->WAR0971) and render bilingual EN/ZH + remedy. The call sites pass the
+  (`TopCCD_Connect`->WAR16120, `TopCCD_2D`->WAR0462, `ColorCCD_Connect`->WAR16121,
+  `ColorCCD_2D`->WAR0970) and render bilingual EN/ZH + remedy. The call sites pass the
   **Name** (`ShowSystemError("TopCCD_2D", ...)`), so to go code->site: look the code up
   in the registration block to get the Name, then grep the Name.
 

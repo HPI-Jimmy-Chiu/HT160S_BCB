@@ -912,12 +912,12 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
     {
         AnsiString CcdDesc="[1] check CCD power/cable \\r\\n[2] check vision PC program \\r\\n[3] check COM/socket";
         const char *CcdName[4]={"TopCCD_Connect","TopCCD_2D","ColorCCD_Connect","ColorCCD_2D"};
-        const char *CcdCode[4]={"WAR16120","WAR0462","WAR0930","WAR0971"};
+        const char *CcdCode[4]={"WAR16120","WAR0462","WAR16121","WAR0970"};
         const char *CcdEng [4]={
             "Top CCD connect not ready (Loader Tray ID no respond)",
             "Top CCD 2D no response (2DID communication time out)",
-            "Color CCD connect not ready (OCR vision program off)",
-            "Color CCD 2D no response (Tray ID exposure time out)"};
+            "Color CCD connect not ready (Color Tray ID no respond)",
+            "Color CCD 2D no response (Tray ID communication time out)"};
         for(int ci=0; ci<4; ci++)
         {
             AnsiString cd=CcdCode[ci], eg=CcdEng[ci];
