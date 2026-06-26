@@ -254,7 +254,7 @@
 **現況**：實機硬回 false → 交握永久卡在 AGV_READY，CEID274 永不觸發、產線鎖死該 Auto。下游全已完成（`ClearAmrCar` 已實作）。可仿的 accessor 樣式已存在：`GetInputFullTray`（`aAuto1To6.cpp:246-258`，switch 回 `&HSys.Sen.SnAutoX_InputFullTray`），消費於 `IsOutputCarFullForAmr`（`929-937`）。正確型別是 `TMySensor`（非稽核 fixSummary 誤寫的 `THTSensor`），慣用判斷 `Sn!=NULL && Sn->Enable==true && Sn->IsOn()`。感測點綁定鏈：`database.h` `SENSOR_MODULAR` struct（`296-331`）→ `database.cpp` `InitialSensorName()`（`926-961`）→ `LoadSensorParameterFromDataBase()`（`997-1014`）依 `.Name` 對 `system/IO_Table.csv` 自動綁。HT172 **無**取車/AMR 感測（`uAgvStation` 為 HT160-original）。
 
 **修法步驟（Option A：專用 per-Auto 取車感測，最乾淨）**：
-1. **決策閘**：選來源 —— a=新 per-Auto 取車感測（6 點）/ b=反相沿用既有 `SnAutoX_OutputHasTray`（無新線，誤觸風險）/ c=AGV 端 SECS 訊息驅動 Finish（`IsAmrTaken` 維持 sim-only，改在 `uAgvStation` AGV_READY 分支處理）。
+1. **決策閘**：選來源 —— a=新 per-Auto 取車感測（6 點）/ b=反相沿用既有 `SnAutoX_OutputHasTray`（⚠ 已於 2026-06-25 移除，此選項作廢）/ c=AGV 端 SECS 訊息驅動 Finish（`IsAmrTaken` 維持 sim-only，改在 `uAgvStation` AGV_READY 分支處理）。
 2. `IO_Table.csv` 加 6 列 `SnAuto1_CarTaken..SnAuto6_CarTaken`（沿用既有 Auto 感測欄位佈局，如 row 47 `Sensor,SnAuto1_InputFullTray,0,0,3,0,5,0,0,1,...`；實際 MN200 位址待硬體圖；位址未定前 `Enable=0`，等同今日 false）。
 3. `database.h` `SENSOR_MODULAR` 在 `~331` 加 6 個 `TMySensor SnAutoX_CarTaken`。
 4. `database.cpp` `InitialSensorName()` `~961` 後加 6 行 `.Name` 字串（須精確等於 CSV alias）。

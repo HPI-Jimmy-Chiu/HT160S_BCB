@@ -1,0 +1,672 @@
+; HT160S bilingual UI dictionary  (Big5 / CP950)
+; format:  formName <TAB> component <TAB> English <TAB> Traditional-Chinese
+; consumed by language.cpp TfLan::LoadDictionary ; lang 0=EN 1=ZH
+
+; ---- fMain ----
+fMain	fMain	HT160S	HT160S
+fMain	tsMain	Main	主畫面
+fMain	sbLaguage	Language	語言
+fMain	sbProduct	Product	產品
+fMain	sbMaintance	Maintance	維護
+fMain	sbOffset	Offset	偏移
+fMain	sbSpeed	Speed	速度
+fMain	sbTool	Tools	工具
+fMain	sbMessage	Message	訊息
+fMain	sbExit	Exit	離開
+fMain	sbMonitor	Monitor	監控
+fMain	Label1	Load	載入
+fMain	btnClearCount	Clear All	全部清除
+fMain	lblUnloadingCount	Total	總計
+fMain	lblloseCnt	Fail	不良
+fMain	sbPaperSummary	Summary	統計
+fMain	grpTrack1	Unload	下料
+fMain	lblAuto01Cnt	Auto1	Auto1
+fMain	lblAuto02Cnt	Auto2	Auto2
+fMain	lblAuto03Cnt	Auto3	Auto3
+fMain	tsLotInfo	Lot	Lot
+fMain	lblLotNo	Lot No.	Lot No.
+fMain	lblLotListHint	Tip: double-click a lot row to view its 2D detail.	提示：雙擊 Lot 列以檢視其 2D 明細。
+fMain	grpLotManualEdit	Lot Manual Edit	Lot 手動編輯
+fMain	btnAddLot	Add Lot	新增 Lot
+fMain	btnEditLot	Edit Lot	編輯 Lot
+fMain	btnRemoveLot	Remove Lot	移除 Lot
+fMain	btnLotStart	Lot Start	Lot 啟動
+fMain	btnLotEnd	Lot End	Lot 結束
+fMain	GroupBox1	Unload	下料
+fMain	lblAuto04Cnt	Auto4	Auto4
+fMain	lblAuto05Cnt	Auto5	Auto5
+fMain	lblAuto06Cnt	Auto6	Auto6
+fMain	lbl_WorkFile	Recipe Name	配方名稱
+fMain	lblUserSelect	User	使用者
+fMain	lblFeatureName1	SECS	SECS
+fMain	lblFeatureName2	SAFE	安全
+fMain	lblFeatureName3	AMR	AMR
+fMain	lblRunMode	Real/Dummy	實機/模擬
+fMain	lbStartMode	Start Mode	啟動模式
+fMain	spbTrayStatus	Tray Status	料盤狀態
+fMain	sbTimeData	Time Data	時間數據
+fMain	apbLogs	Logs	日誌
+fMain	btnTrayMap	Map Tray	料盤圖
+fMain	tsTrayStatus	Tray Status	料盤狀態
+fMain	grpLoaderR	Loader 2D Right	Loader 2D 右
+fMain	lblLoaderCarID	Loader ID	Loader ID
+fMain	grpLoaderL	Loader 2D Left	Loader 2D 左
+fMain	lblLoadCurrBin_1	Current Sorting Bin :	目前分類 Bin：
+fMain	lblLoadCurrID_1	Loader ID	Loader ID
+fMain	tsLogs	Logs	日誌
+fMain	tsTimeData	Time Data	時間數據
+fMain	btSaveTimeData	Save Time Data	儲存時間數據
+fMain	tsMapTray	Map of Tray	料盤圖
+fMain	tsSimulation	Simulation	模擬
+fMain	gbSimuSetting	Setting	設定
+fMain	cbEnableSimulation	Enable Simulation	啟用模擬
+fMain	btnLoadSimuData	Load Data	載入資料
+fMain	btnSaveSimMax	Save Max Tray	儲存最大料盤
+fMain	tsOtherTool	OtherTool	其他工具
+fMain	tsMonitorView	MonitorView	監控檢視
+fMain	sbRecord	Record	紀錄
+fMain	sbMotorView	Motor View	馬達檢視
+fMain	sbMotionView	Motion View	動作檢視
+fMain	sbOther	Other	其他
+fMain	btnMainShow	Return	返回
+fMain	sbHome1	Home	復歸
+fMain	sbStart1	Start	啟動
+fMain	sbPause1	Pause	暫停
+fMain	sbOneCycle1	One Cycle	單次循環
+fMain	sbCleanOut1	Clean Out	清機
+fMain	sbStoreHangup	Store Hangup	儲存當機紀錄
+fMain	tsMotionView	Motion View	動作檢視
+fMain	plCCDMotorLoader	CCD	CCD
+fMain	plEmptyLabel	Empty	空盤
+fMain	plLoaderLLabel	Load L	載入 左
+fMain	plAuto1Label	Auto1	Auto1
+fMain	plAuto2Label	Auto2	Auto2
+fMain	plAuto3Label	Auto3	Auto3
+fMain	plAuto4Label	Auto4	Auto4
+fMain	plAuto5Label	Auto5	Auto5
+fMain	plAuto6Label	Auto6	Auto6
+fMain	plColorLabel	Color	色盤
+fMain	plTrayArmName	Tray Arm 	料盤臂 
+fMain	plTrayArm	Tray Arm   	料盤臂   
+fMain	plLoaderRLabel	Load R	載入 右
+fMain	plSortArmName	Sort Arm 	分類臂 
+fMain	plCCDMotorColor	CCD	CCD
+fMain	chkLoadTray	Load New Tray	載入新料盤
+fMain	tsMotorView	Motor View	馬達檢視
+fMain	TabRecord	Record	紀錄
+fMain	tsTaskRecord	Task Record	工作紀錄
+fMain	TabOther	Other	其他
+fMain	TabSheet2	Motor Lock Information	馬達鎖定資訊
+fMain	TabSheet13	Vision Debug View	視覺除錯檢視
+fMain	Button2	Trigger	觸發
+fMain	Button4	GetResult	取得結果
+fMain	tsIOStatus	IO Status	IO 狀態
+fMain	TabSuckStatus	Suck Status	吸取狀態
+
+; ---- fNote ----
+fNote	fNote	Note	訊息
+fNote	Label2	  Err Code                          Message	  錯誤碼                          訊息
+fNote	BtnHome	HOME && RETRY	復歸 && 重試
+fNote	BtnSkip	SKIP	跳過
+fNote	BtnRetry	RETRY	重試
+fNote	BtnTrayFeed	TRAY FEED	送盤
+fNote	BtnTrayEnd	TRAY END	收盤
+fNote	BtnCleanOut	CLEAN OUT	清機
+fNote	BtnStart	START	啟動
+fNote	BtnPause	PAUSE	暫停
+fNote	BtnOffBuzzer	Off Buzzer	關閉蜂鳴器
+
+; ---- fHome ----
+fHome	fHome	Motor Home Monitor	馬達復歸監控
+fHome	Panel104	Motor Home Monitor	馬達復歸監控
+fHome	SpeedButton1	Abort Home	中止復歸
+
+; ---- fiosetview ----
+fiosetview	fiosetview	IO check and verify	IO 檢查與驗證
+fiosetview	sbIORingLoad	Load	載入
+fiosetview	sbIOTool	TOOL	工具
+fiosetview	sbIODatabase	DATABASE	資料庫
+fiosetview	sbIOExit	Exit	離開
+fiosetview	spbTerminalProgram	Terminal Program	終端程式
+fiosetview	sbIOMap	MAP	對應表
+fiosetview	sbIOTapeShuttle	Sucker	吸嘴
+fiosetview	sbIOTapeLoadUnload	Unloader	下料機構
+fiosetview	sbIOSystem	SYSTEM	系統
+fiosetview	sbIOPanel	PANEL	面板
+fiosetview	ts_IOLoader	Loader	上料機構
+fiosetview	TabSheet1	Loader	上料機構
+fiosetview	Panel6	Front	前
+fiosetview	Panel8	Rear	後
+fiosetview	Panel7	Empty	空盤
+fiosetview	Panel9	M :'#39340#36948	M：馬達
+fiosetview	Panel12	<-> : '#21069#24460#27773#32568	<-> ：前後汽缸
+fiosetview	Panel15	v  ^ : '#19978#19979#27773#32568	v ^ ：上下汽缸
+fiosetview	Panel13	V : '#30495#31354	V：真空
+fiosetview	Panel14	D : '#30772#22750	D：破壞
+fiosetview	Panel52	Loader	上料機構
+fiosetview	Panel100	Front	前
+fiosetview	Panel101	Rear	後
+fiosetview	GroupBox1	Loader Car 1	上料車 1
+fiosetview	GroupBox2	Loader Car 2	上料車 2
+fiosetview	Panel28	Tray Arm	取盤臂
+fiosetview	pnl7	Front	前
+fiosetview	pnl8	Rear	後
+fiosetview	ts_IOTapeLoadUnload	Unloader	下料機構
+fiosetview	TabSheet3	Auto 1~3	Auto 1~3
+fiosetview	Panel23	M :'#39340#36948	M：馬達
+fiosetview	Panel24	<-> : '#21069#24460#27773#32568	<-> ：前後汽缸
+fiosetview	Panel25	v  ^ : '#19978#19979#27773#32568	v ^ ：上下汽缸
+fiosetview	Panel26	V : '#30495#31354	V：真空
+fiosetview	Panel27	D : '#30772#22750	D：破壞
+fiosetview	Panel16	Auto 1	Auto 1
+fiosetview	Panel20	Front	前
+fiosetview	Panel21	Rear	後
+fiosetview	Panel42	Auto 2	Auto 2
+fiosetview	Panel67	Front	前
+fiosetview	Panel68	Rear	後
+fiosetview	Panel72	Auto 3	Auto 3
+fiosetview	Panel105	Front	前
+fiosetview	Panel106	Rear	後
+fiosetview	TabSheet2	Auto 4~6	Auto 4~6
+fiosetview	Panel109	M :'#39340#36948	M：馬達
+fiosetview	Panel110	<-> : '#21069#24460#27773#32568	<-> ：前後汽缸
+fiosetview	Panel111	v  ^ : '#19978#19979#27773#32568	v ^ ：上下汽缸
+fiosetview	Panel112	V : '#30495#31354	V：真空
+fiosetview	Panel113	D : '#30772#22750	D：破壞
+fiosetview	Panel114	Auto 4	Auto 4
+fiosetview	Panel118	Front	前
+fiosetview	Panel119	Rear	後
+fiosetview	Panel121	Auto 5	Auto 5
+fiosetview	Panel125	Front	前
+fiosetview	Panel126	Rear	後
+fiosetview	Panel128	Auto 6	Auto 6
+fiosetview	Panel143	Front	前
+fiosetview	Panel144	Rear	後
+fiosetview	Panel146	Color	色盤
+fiosetview	Panel150	Front	前
+fiosetview	Panel151	Rear	後
+fiosetview	ts_IOTapeShuttle	Sucker	吸嘴
+fiosetview	TabSheet5	Sucker	吸嘴
+fiosetview	Panel35	M :'#39340#36948	M：馬達
+fiosetview	Panel36	<-> : '#21069#24460#27773#32568	<-> ：前後汽缸
+fiosetview	Panel37	v  ^ : '#19978#19979#27773#32568	v ^ ：上下汽缸
+fiosetview	Panel38	V : '#30495#31354	V：真空
+fiosetview	Panel39	D : '#30772#22750	D：破壞
+fiosetview	Panel30	Sucker	吸嘴
+fiosetview	ts_IOPanel	Panel	面板
+fiosetview	sb_IO_CommunicationPad	Pad	操作盤
+fiosetview	pn_PanelLampTitle	LAMP	燈號
+fiosetview	pn_PanelMusicTitle	MUSIC	音樂
+fiosetview	Btn_TowerRed	RED	紅燈
+fiosetview	Btn_TowerYellow	YELLOW	黃燈
+fiosetview	Btn_TowerGreen	GREEN	綠燈
+fiosetview	Btn_Music1	MUSIC 1	音樂 1
+fiosetview	Btn_Music2	MUSIC 2	音樂 2
+fiosetview	Btn_Music3	MUSIC 3	音樂 3
+fiosetview	Btn_Music4	MUSIC 4	音樂 4
+fiosetview	ts_IOSystem	System	系統
+fiosetview	BtnPanel40	Motor Power	馬達電源
+fiosetview	BtnPanel1	Light	照明
+fiosetview	Panel173	EMG 1	急停 1
+fiosetview	Panel171	EMG 2	急停 2
+fiosetview	Panel172	EMG 3	急停 3
+fiosetview	Panel174	EMG 4	急停 4
+fiosetview	pnl1	EMG 	急停 
+fiosetview	pnl2	Door	門
+fiosetview	pnl3	Door	門
+fiosetview	pnl4	Door	門
+fiosetview	pnl5	Door	門
+fiosetview	pnl6	Door	門
+fiosetview	pnl9	Door	門
+fiosetview	Label1	Lock	鎖定
+fiosetview	Label2	Air 	氣壓 
+fiosetview	Label3	IonFan BalanceAlarm	離子風扇 平衡警報
+fiosetview	Label4	IonFan Power	離子風扇 電源
+fiosetview	ts_IOTool	Tool	工具
+fiosetview	pn_ToolTitle	Tool	工具
+fiosetview	lb_IOToolOBCard	Card	卡片
+fiosetview	lb_IOToolOBPort	PORT	埠
+fiosetview	lb_IOToolOBOut	OUT	輸出
+fiosetview	lb_IOToolOBIn	IN	輸入
+fiosetview	cbToolBit0	Bit 0	Bit 0
+fiosetview	cbToolBit1	Bit 1	Bit 1
+fiosetview	cbToolBit2	Bit 2	Bit 2
+fiosetview	cbToolBit3	Bit 3	Bit 3
+fiosetview	cbToolBit4	Bit 4	Bit 4
+fiosetview	cbToolBit5	Bit 5	Bit 5
+fiosetview	cbToolBit6	Bit 6	Bit 6
+fiosetview	cbToolBit7	Bit 7	Bit 7
+fiosetview	cbToolLoop0	Loop	循環
+fiosetview	cbToolLoop1	Loop	循環
+fiosetview	cbToolLoop2	Loop	循環
+fiosetview	cbToolLoop3	Loop	循環
+fiosetview	cbToolLoop4	Loop	循環
+fiosetview	cbToolLoop5	Loop	循環
+fiosetview	cbToolLoop6	Loop	循環
+fiosetview	cbToolLoop7	Loop	循環
+fiosetview	lb_IOToolOBCard1	Card	卡片
+fiosetview	lb_IOToolOBPort1	PORT	埠
+fiosetview	lb_IOToolOBOut1	OUT	輸出
+fiosetview	lb_IOToolOBIn1	IN	輸入
+fiosetview	cbToolBit8	Bit 0	Bit 0
+fiosetview	cbToolBit9	Bit 1	Bit 1
+fiosetview	cbToolBit10	Bit 2	Bit 2
+fiosetview	cbToolBit11	Bit 3	Bit 3
+fiosetview	cbToolBit12	Bit 4	Bit 4
+fiosetview	cbToolBit13	Bit 5	Bit 5
+fiosetview	cbToolBit14	Bit 6	Bit 6
+fiosetview	cbToolBit15	Bit 7	Bit 7
+fiosetview	cbToolLoop8	Loop	循環
+fiosetview	cbToolLoop9	Loop	循環
+fiosetview	cbToolLoop10	Loop	循環
+fiosetview	cbToolLoop11	Loop	循環
+fiosetview	cbToolLoop12	Loop	循環
+fiosetview	cbToolLoop13	Loop	循環
+fiosetview	cbToolLoop14	Loop	循環
+fiosetview	cbToolLoop15	Loop	循環
+fiosetview	sbEnableIOChang	Enable IO Change 	啟用 IO 變更 
+fiosetview	lb_IOToolOB1	Loop Output Interval	循環輸出間隔
+fiosetview	lb_IOToolOB2	SEC	秒
+fiosetview	ts_IODatabase	IODatabase	IO 資料庫
+fiosetview	lblIOType	Type	類型
+fiosetview	lblIOLane	Lane	通道
+fiosetview	lblIOSearch	Search Alias	搜尋別名
+fiosetview	btnAddIO	Add	新增
+fiosetview	btnDeleteIO	Delete	刪除
+fiosetview	btnModify	Modify	修改
+fiosetview	sbUpdate	Save	儲存
+fiosetview	sbIOEditorRefresh	Refresh	重新整理
+fiosetview	ts_IOMap	IOMap	IO 對應表
+fiosetview	lb_IOMapOB1	type =  0 (sensor.db),      1 (cylinder.db),      2 (sucker.db)     3(switch.db)	type = 0 (sensor.db)，   1 (cylinder.db)，   2 (sucker.db)   3 (switch.db)
+fiosetview	lb_IOMapOBInputMap	Input Map	輸入對應表
+fiosetview	lb_IOMapOBOutputMap	Output Map	輸出對應表
+fiosetview	ts_IOOthers	Others	其他
+fiosetview	pn_PanelRearTitle	REAR	後方
+fiosetview	lb_PanelRearPower	POWER	電源
+fiosetview	lb_PanelFrontRear	FRONT/REAR	前/後
+fiosetview	Btn_RKPowerOff	OFF	關
+fiosetview	Btn_RKPowerOn	ON	開
+fiosetview	Btn_RKReset	RESET	重置
+fiosetview	Btn_RKPause	PAUSE	暫停
+fiosetview	Btn_RKHome	HOME	復歸
+fiosetview	Btn_RKStart	START	啟動
+fiosetview	Btn_RKOneCycle	ONE CYCLE	單循環
+fiosetview	Btn_RKRetry	RETRY	重試
+fiosetview	Btn_RKSkip	SKIP	跳過
+fiosetview	Btn_RKCleanOut	CLEAN OUT	清機
+fiosetview	Btn_RKTrayFeed	TRAY FEED	送盤
+fiosetview	Btn_RKTrayEnd	TRAY END	收盤
+fiosetview	Btn_RKAlarmReset	ALARM RESET	警報重置
+fiosetview	Btn_RKManualStep	STEP	單步
+fiosetview	Btn_RKManualTStart	T.START	測試啟動
+fiosetview	tsMN200	MN200	MN200
+fiosetview	SaveInputMap1	Save Input Map	儲存輸入對應表
+fiosetview	SaveOutputMap1	Save Output Map	儲存輸出對應表
+
+; ---- fSetup ----
+fSetup	fSetup	Product Setup	產品設定
+fSetup	spbSetupRecipe	Recipe	配方
+fSetup	spbSetupTrayForm	Tray Form	盤格式
+fSetup	spbSetupBinSetting	Bin Setting	Bin 設定
+fSetup	spbSetupExit	Exit	離開
+fSetup	tsSetupRecipe	Recipe	配方
+fSetup	pnlRecipeHeader	Recipe management	配方管理
+fSetup	lblCurrentRecipeTitle	Current Recipe	目前配方
+fSetup	lblRecipeDirTitle	Recipe Folder	配方資料夾
+fSetup	lblSetupFileTitle	Setup File	設定檔
+fSetup	lblBinAreaMapTitle	Bin Area Map	Bin 區域圖
+fSetup	lblRecipeNote	Recipe data is saved under data\<recipe name>.	配方資料儲存於 data\<配方名稱>。
+fSetup	lblSetupFileStatusTitle	Setup Status	設定狀態
+fSetup	lblManifestTitle	Manifest	清單
+fSetup	lblRecipeListTitle	Recipe List	配方列表
+fSetup	lblNewRecipeTitle	Recipe Name	配方名稱
+fSetup	spbRecipeSave	Save	儲存
+fSetup	spbRecipeSaveAs	Save As	另存新檔
+fSetup	spbRecipeUse	Use Recipe	使用配方
+fSetup	spbRecipeNewBlank	New Blank	新增空白
+fSetup	spbRecipeDelete	Delete	刪除
+fSetup	spbRecipeRefresh	Refresh	重新整理
+fSetup	tsSetupTrayForm	Tray Form	盤格式
+fSetup	pnlTrayHeader	Tray form	盤格式
+fSetup	Label20	X-Start	X 起點
+fSetup	Label39	X-Pitch	X 間距
+fSetup	Label41	Y-Start	Y 起點
+fSetup	Label42	Y-Pitch	Y 間距
+fSetup	Label43	X-Division	X 分割數
+fSetup	Label44	Y-Division	Y 分割數
+fSetup	labTrayForm	Tray Form	盤格式
+fSetup	tsSetupBinSetting	Bin Setting	Bin 設定
+fSetup	pnlBinHeader	Bin setting	Bin 設定
+fSetup	lblBinPlaceholder	Bin 0 means this area is not assigned.	Bin 0 表示此區域未指定。
+fSetup	lblBinMapStatusTitle	Map Status	對應圖狀態
+fSetup	lblBinRecipeTitle	Recipe	配方
+fSetup	lblBinFileTitle	Map File	對應圖檔
+fSetup	lblBinMappedTitle	Mapped	已對應
+fSetup	lblBinColorTitle	Color	色盤
+fSetup	lblBinErrorTitle	Error Bin	不良 Bin
+fSetup	spbBinLoadMap	Load Current	載入目前
+fSetup	spbBinSaveMap	Save Map	儲存對應圖
+fSetup	spbBinValidate	Validate	驗證
+fSetup	spbBinClear	Clear All	全部清除
+
+; ---- fData ----
+fData	fData	Message	訊息
+
+; ---- fMaintenance ----
+fMaintenance	fMaintenance	Maintance	維護
+fMaintenance	spbMaintTowerLight	Tower Light	三色燈
+fMaintenance	spbMaintPassword	Password	密碼
+fMaintenance	spbMaintSoftSimu	AMR	AMR
+fMaintenance	spbMaintFunctionDef	Function Define	功能定義
+fMaintenance	spbMaintHardware	Hardware Setup	硬體設定
+fMaintenance	spbMaintIO	IO Monitor	IO監控
+fMaintenance	spbMaintTeach	Teach	教導
+fMaintenance	spbMaintMotor	Motor Test	馬達測試
+fMaintenance	spbMaintCOM	Pad COM Port	Pad COM埠
+fMaintenance	spbMaintSECS	SECS/GEM	SECS/GEM
+fMaintenance	spbMaintMCUDisplay	Bin Display	Bin顯示
+fMaintenance	spbMaintTopCcd	Top CCD	上CCD
+fMaintenance	spbMaintColorCcd	Color CCD	顏色CCD
+fMaintenance	spbMaintLotApi	Lot WebAPI	Lot WebAPI
+fMaintenance	spbMaintExit	Exit	離開
+fMaintenance	tsMaintTowerLight	Tower Light	三色燈
+fMaintenance	Panel2	Tower light and  music setup	三色燈與音樂設定
+fMaintenance	Label3	Green	綠
+fMaintenance	Label4	Yellow	黃
+fMaintenance	Label6	Red	紅
+fMaintenance	Label7	Music Select	音樂選擇
+fMaintenance	Label43	Click to change	點擊變更
+fMaintenance	Label17	Music Test	音樂測試
+fMaintenance	Panel13	Running	運轉中
+fMaintenance	Panel14	Error/Jam	異常/卡料
+fMaintenance	Panel15	Pause	暫停
+fMaintenance	Panel16	Message	訊息
+fMaintenance	Panel17	Reserved	保留
+fMaintenance	Panel18	Homing	復歸中
+fMaintenance	sbMusic1	Music1	音樂1
+fMaintenance	sbMusic2	Music2	音樂2
+fMaintenance	sbMusic3	Music3	音樂3
+fMaintenance	sbMusic4	Music4	音樂4
+fMaintenance	tsMaintPassword	Password	密碼
+fMaintenance	tsMaintSoftSimu	AMR	AMR
+fMaintenance	tsMaintFunctionDef	Function Define	功能定義
+fMaintenance	pnlFunctionDefHeader	Function define setup	功能定義設定
+fMaintenance	tsFunctionGeneral	G[General]	G[一般]
+fMaintenance	tsNetwork	N[Network]	N[網路]
+fMaintenance	tsMaintHardware	Hardware Setup	硬體設定
+fMaintenance	tsLoaderUnloader	Loader/Unloader	上料/下料
+fMaintenance	lblHardwareColorHint	Enable this only when the Color bin area hardware is installed on this machine.	僅在本機已安裝顏色Bin區硬體時才啟用此項。
+fMaintenance	chkHardwareColorBinArea	Color bin area installed	已安裝顏色Bin區
+fMaintenance	chkUseAMR	Use AMR	使用AMR
+fMaintenance	lblAutoEnableHint	Per-Auto enable (By Lot+Bin mode only). Unchecked Autos are skipped when binding new Lot+Bin pairs. Changing this needs a software restart.	各Auto啟用(僅依Lot+Bin模式)。未勾選的Auto在綁定新Lot+Bin配對時會略過。變更後需重新啟動軟體。
+fMaintenance	chkAutoEnable1	Auto1	Auto1
+fMaintenance	chkAutoEnable2	Auto2	Auto2
+fMaintenance	chkAutoEnable3	Auto3	Auto3
+fMaintenance	chkAutoEnable4	Auto4	Auto4
+fMaintenance	chkAutoEnable5	Auto5	Auto5
+fMaintenance	chkAutoEnable6	Auto6	Auto6
+fMaintenance	lblLoaderSafeDistance	Loader safe distance	上料安全距離
+fMaintenance	lbmm	mm	mm
+fMaintenance	lblLoaderSafeHint	Minimum separation between the two loader cars. Range 325-650 mm.	兩台上料車之間的最小間距。範圍325-650 mm。
+fMaintenance	lblMachineModel	Machine Model	機台型號
+fMaintenance	lblHandlerID	Machine ID	機台ID
+fMaintenance	lblSerialNo	Serial No	序號
+fMaintenance	tsErrorMag	ErrorMag	異常匣
+fMaintenance	lblHardwareErrorTitle	Error Bin Code Frame	異常Bin碼框架
+fMaintenance	lblHardwareErrorHint	Special error bins follow the recipe Error Bin area by default and can be extended to per-code area mapping later.	特殊異常Bin預設沿用配方的異常Bin區，日後可擴充為各錯誤碼對應分區。
+fMaintenance	tsSortArm	Sort Arm	分類臂
+fMaintenance	lblSuckerEnableHint	Per-nozzle enable (SortArm sucker). Unchecked nozzles are skipped during pick/place so a broken nozzle can be taken out of service. At least one must stay enabled.	各吸嘴啟用(分類臂吸盤)。未勾選的吸嘴在取放時會略過，可將故障吸嘴停用。至少須保留一個啟用。
+fMaintenance	chkSuckEnable1	Nozzle1	吸嘴1
+fMaintenance	chkSuckEnable2	Nozzle2	吸嘴2
+fMaintenance	chkSuckEnable3	Nozzle3	吸嘴3
+fMaintenance	chkSuckEnable4	Nozzle4	吸嘴4
+fMaintenance	tsOption	Option	選項
+fMaintenance	lblBinPanelType	Bin Display Panel	Bin顯示面板
+fMaintenance	cbCommType	CommType	通訊類型
+fMaintenance	chkUseTrayDatumModel	Tray Datum (XStart/YStart)	料盤基準(XStart/YStart)
+fMaintenance	tsLotInfo	Lot Info	Lot資訊
+fMaintenance	lblLotBinModeHint	When ON, classify By Lot+Bin (each Lot+Bin pair binds to an Auto dynamically). When OFF, Normal mode (static Bin->Auto table). Changing this needs a software restart.	開啟時，依Lot+Bin分類(各Lot+Bin配對動態綁定至Auto)。關閉時為一般模式(固定Bin->Auto對照表)。變更後需重新啟動軟體。
+fMaintenance	chkUseLotBinMode	Sort By Lot+Bin	依Lot+Bin分類
+fMaintenance	sbUpdateTray	Save	儲存
+fMaintenance	sbtReloadTray	Load Data	載入資料
+fMaintenance	tsMaintTeach	Teach	教導
+fMaintenance	tsMaintMotor	Motor Test	馬達測試
+fMaintenance	tsMaintIO	IO Monitor	IO監控
+fMaintenance	tsMaintSECS	SECS/GEM	SECS/GEM
+fMaintenance	tsMaintCOM	COM Port	COM埠
+fMaintenance	tsMaintMCUDisplay	Bin Display	Bin顯示
+fMaintenance	lblMCUSetupTitle	Bin Display TCP Setup	Bin顯示TCP設定
+fMaintenance	lblMCUIPCap	COM Port	COM埠
+fMaintenance	lblMCUPortCap	Baud	鮑率
+fMaintenance	lblMCUReconnectCap	Delay (s)	延遲(秒)
+fMaintenance	chkMCUEnabled	Bin Display Installed	已安裝Bin顯示
+fMaintenance	btnMCUSave	Save	儲存
+fMaintenance	btnMCUReload	Reload	重新載入
+fMaintenance	btnMCURefresh	Refresh Status	重新整理狀態
+fMaintenance	lblMCUTestTitle	Manual Test	手動測試
+fMaintenance	lblMCUAddressCap	Address	位址
+fMaintenance	lblMCUTextCap	Text	文字
+fMaintenance	lblMCUColorCap	Color	色盤
+fMaintenance	lblMCULightValueCap	Color Code	顏色碼
+fMaintenance	chkMCUCodeSymbol	Symbol Code	符號碼
+fMaintenance	btnMCUSendDisplay	Send Display	傳送顯示
+fMaintenance	btnMCUSendCode	Send Code	傳送碼
+fMaintenance	btnMCUSendLight	Send Light	傳送燈號
+fMaintenance	tsMaintTopCcd	Top CCD	上CCD
+fMaintenance	lblTopCcdSetupTitle	Top CCD TCP Setup	上CCD TCP設定
+fMaintenance	lblTopCcdIPCap	IP	IP
+fMaintenance	lblTopCcdPortCap	Port	埠
+fMaintenance	chkTopCcdBottomReserved	Bottom CCD (reserved)	下CCD(保留)
+fMaintenance	chkTopCcdEnable	Enable Top CCD	啟用上CCD
+fMaintenance	btnTopCcdSave	Save	儲存
+fMaintenance	btnTopCcdReload	Reload	重新載入
+fMaintenance	btnTopCcdConnect	Connect	連線
+fMaintenance	btnTopCcdDisconnect	Disconnect	中斷連線
+fMaintenance	lblTopCcdTestTitle	Manual Shot (LON)	手動拍攝(LON)
+fMaintenance	lblTopCcdResultCap	Result	結果
+fMaintenance	btnTopCcdShot	Trigger Shot	觸發拍攝
+fMaintenance	tsMaintColorCcd	Color CCD	顏色CCD
+fMaintenance	lblColorCcdSetupTitle	Color CCD TCP Setup	顏色CCD TCP設定
+fMaintenance	lblColorCcdIPCap	IP	IP
+fMaintenance	lblColorCcdPortCap	Port	埠
+fMaintenance	chkColorCcdEnable	Enable Color CCD	啟用顏色CCD
+fMaintenance	btnColorCcdSave	Save	儲存
+fMaintenance	btnColorCcdReload	Reload	重新載入
+fMaintenance	btnColorCcdConnect	Connect	連線
+fMaintenance	btnColorCcdDisconnect	Disconnect	中斷連線
+fMaintenance	lblColorCcdTestTitle	Manual Shot (LON)	手動拍攝(LON)
+fMaintenance	lblColorCcdResultCap	Result	結果
+fMaintenance	btnColorCcdShot	Trigger Shot	觸發拍攝
+fMaintenance	tsMaintLotApi	Lot WebAPI	Lot WebAPI
+fMaintenance	Label1	WebAPI Path	WebAPI路徑
+fMaintenance	lblLotApiSaveHint	Save/Reload persist the URL to system\General.ini [LotWebApi] BaseUrl.	儲存/重新載入會將URL存入system\General.ini [LotWebApi] BaseUrl。
+fMaintenance	btnLotApiSave	Save	儲存
+fMaintenance	btnLotApiReload	Reload	重新載入
+fMaintenance	chkLotApiUsePull	Auto-pull on Lot Start / SECS LOTSTART (off until customer API ready)	於Lot啟動/SECS LOTSTART時自動拉取(客戶API就緒前關閉)
+fMaintenance	lblLotApiTestTitle	Manual Fetch (test)	手動擷取(測試)
+fMaintenance	lblLotApiTestLotCap	Lot ID	Lot ID
+fMaintenance	btnLotApiFetch	Fetch	擷取
+
+; ---- fTeach ----
+fTeach	fTeach	Teach	教導
+fTeach	lblActiveMot	Activel Motor	作用馬達
+fTeach	lblNowPos	Now Position	目前位置
+fTeach	lblEncoder	Encoder	編碼器
+fTeach	lblSpeed	Speed	速度
+fTeach	lblStep	Step	步距
+fTeach	lblTarget	Move To	移動至
+fTeach	lblStatus0	CW	正轉
+fTeach	lblStatus1	HOME	復歸
+fTeach	lblStatus2	CCW	反轉
+fTeach	lblStatus3	EMG	急停
+fTeach	lblStatus4	ALARM	警報
+fTeach	lblStatus5	Soft CW	軟體正轉
+fTeach	lblStatus6	Soft CCW	軟體反轉
+fTeach	lblStatus7	Servo Alarm	伺服警報
+fTeach	lblStatus8	In Pos	到位
+fTeach	lblStatus9	Z Phase	Z 相
+fTeach	lblStatus10	Servo On	伺服開
+fTeach	lblMotorList	Motor List	馬達清單
+fTeach	btnMotorSet	SET	設定
+fTeach	btnMove	MOVE	移動
+fTeach	btnJogP	JOG +	寸動 +
+fTeach	btnJogN	JOG -	寸動 -
+fTeach	btnStepP	+	+
+fTeach	btnStepN	-	-
+fTeach	btnHome	HOME	復歸
+fTeach	btnStop	STOP	停止
+fTeach	btnRefresh	REFRESH	重新整理
+fTeach	palTitle	Teach	教導
+fTeach	btnSetTeach	SET NOW	設為目前
+fTeach	btnGoTeach	GO	前往
+fTeach	btnSave	SAVE	儲存
+fTeach	btnReload	RELOAD	重新載入
+fTeach	btnIOForm	IO TOOL	IO 工具
+fTeach	tsEmptyTray	Empty / Tray X	空盤 / 盤 X
+fTeach	tsLoaderSort	Loader / Sort X	上料 / 分類 X
+fTeach	tsAuto	Auto 1-6	Auto 1-6
+fTeach	tsSortZ	Sort Z	分類 Z
+fTeach	tsOthers	Others	其他
+fTeach	tsAdvanced	Advanced	進階
+fTeach	tsSortArm	Sort Arm	分類臂
+fTeach	gbSortArmPickPlace	SortArm Pick / Place Test	分類手臂取/放測試
+fTeach	lbSuckUse	Suck Use	吸嘴使用
+fTeach	lbToArea	To Area	目標區域
+fTeach	lbSaCol	Column (1..)	欄 (1..)
+fTeach	lbSaRow	Row (1..)	列 (1..)
+fTeach	chkSaZDown	Z Down to teach Z after XY	XY 後 Z 下降至教導 Z
+fTeach	btnSaGo	GO (Move Suck To Cell)	前往 (吸嘴移至格位)
+fTeach	tsChannel	Channel	通道
+fTeach	gbCarGoUpGoDonw	Car GoUp / GoDown Test (Empty / Loader / Color)	載具升/降測試 (空盤 / 上料 / 顏色)
+fTeach	lbCarArea	Car Area	載具區域
+fTeach	lbCarLoopTimes	Loop Times	循環次數
+fTeach	chkCarLoop	Loop	循環
+fTeach	btnCarGo	GO (GoUp -> GoDown)	前往 (上升 -> 下降)
+fTeach	gbAutoGoUp	Auto GoUp Once Test (Auto1-6, single cylinder)	Auto 單次上升測試 (Auto1-6, 單氣缸)
+fTeach	lbAutoArea	Auto Area	Auto 區域
+fTeach	btnAutoGoUp	GO (GoUp Once)	前往 (單次上升)
+
+; ---- fMotorTest ----
+fMotorTest	fMotorTest	Motor Test	馬達測試
+fMotorTest	lblTitle	Active Motor	作用中馬達
+fMotorTest	lblNowPos	Now Position	目前位置
+fMotorTest	lblEncoder	Encoder	編碼器
+fMotorTest	lblSpeedPercent	Speed %	速度 %
+fMotorTest	lblStep	Step	步距
+fMotorTest	lblTarget	Move To	移動至
+fMotorTest	lblPos1	Pos1	位置1
+fMotorTest	lblPos2	Pos2	位置2
+fMotorTest	lblLoopCount	Loop Count	循環次數
+fMotorTest	lblLoopWait	Wait	等待
+fMotorTest	lblLoopTrip	Trip Time	單趟時間
+fMotorTest	lblLoopAverage	Average	平均
+fMotorTest	lblLoopTotal	Total Count	總次數
+fMotorTest	lblStatus0	CW	正轉
+fMotorTest	lblStatus1	HOME	復歸
+fMotorTest	lblStatus2	CCW	反轉
+fMotorTest	lblStatus3	EMG	急停
+fMotorTest	lblStatus4	ALARM	警報
+fMotorTest	lblStatus5	Soft CW	軟體正轉
+fMotorTest	lblStatus6	Soft CCW	軟體反轉
+fMotorTest	lblStatus7	Servo Alarm	伺服警報
+fMotorTest	lblStatus8	In Pos	到位
+fMotorTest	lblStatus9	Z Phase	Z 相
+fMotorTest	lblStatus10	Servo On	伺服開
+fMotorTest	btnMove	MOVE	移動
+fMotorTest	btnSetPos1	SET	設定
+fMotorTest	btnGoPos1	GO	前往
+fMotorTest	btnSetPos2	SET	設定
+fMotorTest	btnGoPos2	GO	前往
+fMotorTest	btnJogP	JOG +	寸動 +
+fMotorTest	btnJogN	JOG -	寸動 -
+fMotorTest	btnStepP	+	+
+fMotorTest	btnStepN	-	-
+fMotorTest	btnStop	STOP	停止
+fMotorTest	btnRefresh	REFRESH	重新整理
+fMotorTest	btnLoopStart	LOOP	循環
+fMotorTest	btnLoopStop	LOOP STOP	停止循環
+fMotorTest	btnSave	SAVE	儲存
+fMotorTest	chkMultiLoop	MULTI LOOP	多重循環
+fMotorTest	btnReload	RELOAD	重新載入
+fMotorTest	btnGoSoftN	SOFT -	軟體 -
+fMotorTest	btnGoSoftP	SOFT +	軟體 +
+fMotorTest	btnClose	CLOSE	關閉
+fMotorTest	btnServoOn	SERVO ON	伺服開
+fMotorTest	btnServoOff	SERVO OFF	伺服關
+fMotorTest	tsOperate	Operate	操作
+fMotorTest	tsMotorParameter	Motor Parameter	馬達參數
+fMotorTest	btnParamSave	SAVE PARAM	儲存參數
+fMotorTest	btnParamReload	RELOAD PARAM	重新載入參數
+fMotorTest	btnParamValidate	VALIDATE ALL	全部驗證
+fMotorTest	tsInformation	Information	資訊
+fMotorTest	tsDriverRegister	Driver Register	驅動器暫存器
+fMotorTest	lblRegisterOffset	Offset	偏移
+fMotorTest	btnRegisterRead	READ OFFSET	讀取偏移
+fMotorTest	btnRegisterReadDefault	READ DEFAULTS	讀取預設值
+fMotorTest	tsServoGuard	Servo Guard	伺服防護
+fMotorTest	btnServoGuardOn	SERVO ON GUARD	伺服開防護
+fMotorTest	btnServoGuardOff	SERVO OFF GUARD	伺服關防護
+fMotorTest	btnServoApplyOn	SERVO ON APPLY	伺服開套用
+fMotorTest	btnServoApplyOff	SERVO OFF APPLY	伺服關套用
+
+; ---- fOffset ----
+fOffset	fOffset	Offset	偏移
+fOffset	palTitle	Offset - per-workfile position fine-tune (mm)	偏移 - 各配方位置微調 (mm)
+fOffset	btnApply	Apply / Save	套用 / 儲存
+fOffset	btnReAlign	Re-alignment (bake)	重新對位 (寫入)
+fOffset	btnExit	Exit	離開
+fOffset	btnClear	Clear All	全部清除
+fOffset	lblExplain	Double-click a row to edit offset. Right-click for Max/Min limit.	雙擊列以編輯偏移，右鍵設定上/下限
+fOffset	miSetMax	Set Max Limit ...	設定上限 ...
+fOffset	miSetMin	Set Min Limit ...	設定下限 ...
+fOffset	tsLoader	Loader	上料機構
+fOffset	tsSortArm	SortArm	分類臂
+fOffset	tsAuto	Auto	自動
+fOffset	grdLoader.Col0Header	Offset Item	偏移項目
+fOffset	grdLoader.Col1Header	Offset(mm)	偏移(mm)
+fOffset	grdLoader.Col2Header	Min(mm)	下限(mm)
+fOffset	grdLoader.Col3Header	Max(mm)	上限(mm)
+
+; ---- fSpeed ----
+fSpeed	fSpeed	Speed Setup	速度設定
+fSpeed	spbFullSpeed	Full Speed	全速
+fSpeed	spbAddSpeed	Speed +	速度 +
+fSpeed	spbSubSpeed	Speed -	速度 -
+fSpeed	spbExit	EXIT	離開
+
+; ---- FormSysTools ----
+FormSysTools	FormSysTools	Tools	工具
+
+; ---- fQwertyKey ----
+fQwertyKey	labCurrent	Current	目前
+fQwertyKey	labMin	Min	最小
+fQwertyKey	labMax	Max	最大
+fQwertyKey	spbChangeCase	Case	大小寫
+fQwertyKey	spbBackspace	BS	退格
+fQwertyKey	spbClear	Del	刪除
+fQwertyKey	spbCancel	Abort	中止
+fQwertyKey	spbOk	OK	OK
+fQwertyKey	spbStepMode	Step	步距
+fQwertyKey	spbNumBackspace	BS	退格
+fQwertyKey	spbNumClear	Del	刪除
+fQwertyKey	spbNumCancel	Abort	中止
+fQwertyKey	spbNumOk	OK	OK
+
+; ---- fComPort ----
+fComPort	fComPort	COM Port	COM埠
+fComPort	pnlTop	Pad COM Port	Pad COM埠
+fComPort	sbExit	Exit	離開
+fComPort	labPadCom	Pad COM	Pad COM
+fComPort	spbResetCom	Open / Reset	開啟/重置
+fComPort	btnStopCom	Close	關閉
+fComPort	sbUpdate	Save	儲存
+fComPort	btnClearMemo	Clear Log	清除記錄
+fComPort	labPadBaud	Baud	鮑率
+fComPort	labManualSend	Manual Send	手動發送
+fComPort	sbPanelSend_Com	Send	發送
+
+; ---- MyMessageBox ----
+MyMessageBox	MyMessageBox	Message	訊息
+MyMessageBox	palYes	Yes	是
+MyMessageBox	palNo	No	否
+MyMessageBox	btnOffBuzzer	Off Buzzer	關閉蜂鳴器

@@ -1533,9 +1533,9 @@ object fiosetview: Tfiosetview
     Top = 40
     Width = 849
     Height = 729
-    ActivePage = ts_IOTapeLoadUnload
+    ActivePage = ts_IOLoader
     Style = tsButtons
-    TabIndex = 1
+    TabIndex = 0
     TabOrder = 2
     object ts_IOLoader: TTabSheet
       Caption = 'Loader'
@@ -1560,7 +1560,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 0
-            object MyLed175: TMyLed
+            object mlC_Empty_FrontRiseTray_1_On: TMyLed
               Left = 43
               Top = 96
               Width = 22
@@ -1568,7 +1568,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_FrontRiseTray_1_On'
             end
-            object MyLed181: TMyLed
+            object mlC_Empty_FrontRiseTray_2_On: TMyLed
               Left = 43
               Top = 77
               Width = 22
@@ -1576,7 +1576,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_FrontRiseTray_2_On'
             end
-            object MyLed13: TMyLed
+            object mlC_Empty_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -1584,7 +1584,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_PushTray_On'
             end
-            object MyLed17: TMyLed
+            object mlC_Empty_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -1592,7 +1592,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_PushTray_Off'
             end
-            object MyLed18: TMyLed
+            object mlC_Empty_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -1600,7 +1600,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_LeanOnTray_On'
             end
-            object MyLed24: TMyLed
+            object mlC_Empty_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -1608,7 +1608,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_LeanOnTray_Off'
             end
-            object MyLed25: TMyLed
+            object mlC_Empty_RearRiseTray_On: TMyLed
               Left = 666
               Top = 81
               Width = 22
@@ -1616,7 +1616,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_RearRiseTray_On'
             end
-            object MyLed45: TMyLed
+            object mlC_Empty_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 96
               Width = 22
@@ -1624,7 +1624,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_RearRiseTray_Off'
             end
-            object MyLed46: TMyLed
+            object mlSnEmpty_InputHasTray: TMyLed
               Left = 6
               Top = 77
               Width = 22
@@ -1632,7 +1632,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnEmpty_InputHasTray'
             end
-            object MyLed47: TMyLed
+            object mlSnEmpty_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -1640,15 +1640,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnEmpty_InputFullTray'
             end
-            object MyLed66: TMyLed
-              Left = 756
-              Top = 136
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnEmpty_OutputHasTray'
-            end
-            object MyLed67: TMyLed
+            object mlSnEmpty_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -1656,7 +1648,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnEmpty_OutputBottomHasTray'
             end
-            object MyLed69: TMyLed
+            object mlSnEmpty_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -1664,15 +1656,15 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnEmpty_TrayPos1'
             end
-            object MyLed70: TMyLed
+            object mlSnEmpty_TrayPos2: TMyLed
               Left = 455
               Top = 136
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
-              Alias = 'SnEmpty_TrayPos2 '
+              Alias = 'SnEmpty_TrayPos2'
             end
-            object MyLed1: TMyLed
+            object mlSnEmpty_InputEnd: TMyLed
               Left = 6
               Top = 61
               Width = 22
@@ -1680,7 +1672,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnEmpty_InputEnd'
             end
-            object MyLed35: TMyLed
+            object mlC_Empty_FrontRiseTray_1_Off: TMyLed
               Left = 43
               Top = 108
               Width = 22
@@ -1688,7 +1680,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_FrontRiseTray_1_Off'
             end
-            object BtnPanel69: TBtnPanel
+            object bpC_Empty_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -1712,7 +1704,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Empty_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel70: TBtnPanel
+            object bpC_Empty_FrontRiseTray_1: TBtnPanel
               Left = 65
               Top = 96
               Width = 45
@@ -1736,7 +1728,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Empty_FrontRiseTray_1'
               Style = tsButtons
             end
-            object BtnPanel71: TBtnPanel
+            object bpC_Empty_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -1779,31 +1771,6 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel7: TBtnPanel
-              Left = 65
-              Top = 45
-              Width = 45
-              Height = 18
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Empty_FrontSeparateTray_1'
-              Style = tsButtons
-            end
             object Panel6: TPanel
               Left = 4
               Top = 3
@@ -1818,7 +1785,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 6
+              TabOrder = 5
             end
             object Panel8: TPanel
               Left = 767
@@ -1834,9 +1801,9 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
             end
-            object BtnPanel45: TBtnPanel
+            object bpC_Empty_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -1852,7 +1819,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 8
+              TabOrder = 7
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -1861,7 +1828,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Empty_RearRiseTray'
               Style = tsButtons
             end
-            object BtnPanel46: TBtnPanel
+            object bpC_Empty_RearSeparateTray_1: TBtnPanel
               Left = 688
               Top = 45
               Width = 44
@@ -1878,7 +1845,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 9
+              TabOrder = 8
               Visible = False
               OnClick = BtnPanelClick
               TrueColor = 16744448
@@ -1894,9 +1861,9 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 10
+              TabOrder = 9
             end
-            object btnpnl1: TBtnPanel
+            object bpC_Empty_FrontRiseTray_2: TBtnPanel
               Left = 66
               Top = 76
               Width = 45
@@ -1912,12 +1879,37 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 11
+              TabOrder = 10
               OnClick = BtnPanelClick
               TrueColor = 16744448
               FalseColor = 8404992
               FalseFontColor = clWhite
               Alias = 'C_Empty_FrontRiseTray_2'
+              Style = tsButtons
+            end
+            object bpC_Empty_FrontSeparateTray_1: TBtnPanel
+              Left = 65
+              Top = 45
+              Width = 45
+              Height = 18
+              Hint = #20998#38626#27773#32568
+              BevelInner = bvRaised
+              Caption = '<->'
+              Color = 8404992
+              Font.Charset = CHINESEBIG5_CHARSET
+              Font.Color = clWhite
+              Font.Height = -12
+              Font.Name = #26032#32048#26126#39636
+              Font.Style = []
+              ParentFont = False
+              ParentShowHint = False
+              ShowHint = True
+              TabOrder = 11
+              OnClick = BtnPanelClick
+              TrueColor = 16744448
+              FalseColor = 8404992
+              FalseFontColor = clWhite
+              Alias = 'C_Empty_FrontSeparateTray_1'
               Style = tsButtons
             end
           end
@@ -2053,7 +2045,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 4
-            object MyLed78: TMyLed
+            object mlC_Loader_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -2061,7 +2053,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Loader_RearRiseTray_On'
             end
-            object MyLed79: TMyLed
+            object mlC_Loader_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -2069,7 +2061,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Loader_RearRiseTray_Off'
             end
-            object MyLed80: TMyLed
+            object mlSnLoader_InputHasTray: TMyLed
               Left = 6
               Top = 78
               Width = 22
@@ -2077,23 +2069,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnLoader_InputHasTray'
             end
-            object MyLed81: TMyLed
-              Left = 6
-              Top = 24
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnLoader_InputFullTray'
-            end
-            object MyLed82: TMyLed
-              Left = 716
-              Top = 160
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnLoader_OutputHasTray'
-            end
-            object MyLed83: TMyLed
+            object mlSnLoader_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -2101,7 +2077,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnLoader_OutputBottomHasTray'
             end
-            object MyLed84: TMyLed
+            object mlSnLoader_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -2109,7 +2085,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnLoader_TrayPos1'
             end
-            object MyLed85: TMyLed
+            object mlSnLoader_TrayPos2: TMyLed
               Left = 567
               Top = 168
               Width = 22
@@ -2117,7 +2093,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnLoader_TrayPos2'
             end
-            object myld11: TMyLed
+            object mlC_Loader_FrontRiseTray_2_On: TMyLed
               Left = 43
               Top = 77
               Width = 22
@@ -2125,7 +2101,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Loader_FrontRiseTray_2_On'
             end
-            object myld12: TMyLed
+            object mlC_Loader_FrontRiseTray_1_On: TMyLed
               Left = 43
               Top = 96
               Width = 22
@@ -2133,7 +2109,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Loader_FrontRiseTray_1_On'
             end
-            object MyLed12: TMyLed
+            object mlSnLoader_Inputend: TMyLed
               Left = 6
               Top = 61
               Width = 22
@@ -2141,13 +2117,21 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnLoader_Inputend'
             end
-            object MyLed34: TMyLed
+            object mlC_Loader_FrontRiseTray_1_Off: TMyLed
               Left = 43
               Top = 110
               Width = 22
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'C_Loader_FrontRiseTray_1_Off'
+            end
+            object mlSnLoader_InputFullTray: TMyLed
+              Left = 6
+              Top = 24
+              Width = 22
+              Height = 14
+              LEDStyle = LEDHorizontal
+              Alias = 'SnLoader_InputFullTray'
             end
             object Panel98: TPanel
               Left = 32
@@ -2167,7 +2151,7 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 1
             end
-            object BtnPanel50: TBtnPanel
+            object bpC_Loader_FrontSeparateTray_1: TBtnPanel
               Left = 65
               Top = 45
               Width = 45
@@ -2224,7 +2208,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 4
             end
-            object BtnPanel51: TBtnPanel
+            object bpC_Loader_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -2271,7 +2255,7 @@ object fiosetview: Tfiosetview
               Font.Style = []
               ParentFont = False
               TabOrder = 7
-              object MyLed86: TMyLed
+              object mlC_Loader1_PushTray_Off: TMyLed
                 Left = 20
                 Top = 42
                 Width = 22
@@ -2279,7 +2263,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader1_PushTray_Off'
               end
-              object MyLed87: TMyLed
+              object mlC_Loader1_PushTray_On: TMyLed
                 Left = 20
                 Top = 27
                 Width = 22
@@ -2287,7 +2271,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader1_PushTray_On'
               end
-              object MyLed88: TMyLed
+              object mlC_Loader1_LeanOnTray_On: TMyLed
                 Left = 100
                 Top = 27
                 Width = 22
@@ -2295,7 +2279,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader1_LeanOnTray_On'
               end
-              object MyLed89: TMyLed
+              object mlC_Loader1_LeanOnTray_Off: TMyLed
                 Left = 100
                 Top = 42
                 Width = 22
@@ -2303,7 +2287,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader1_LeanOnTray_Off'
               end
-              object BtnPanel53: TBtnPanel
+              object bpC_Loader1_PushTray: TBtnPanel
                 Left = 44
                 Top = 27
                 Width = 45
@@ -2328,7 +2312,7 @@ object fiosetview: Tfiosetview
                 Alias = 'C_Loader1_PushTray'
                 Style = tsButtons
               end
-              object BtnPanel54: TBtnPanel
+              object bpC_Loader1_LeanOnTray: TBtnPanel
                 Left = 124
                 Top = 27
                 Width = 45
@@ -2367,7 +2351,7 @@ object fiosetview: Tfiosetview
               Font.Style = []
               ParentFont = False
               TabOrder = 8
-              object MyLed74: TMyLed
+              object mlC_Loader2_PushTray_Off: TMyLed
                 Left = 20
                 Top = 42
                 Width = 22
@@ -2375,7 +2359,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader2_PushTray_Off'
               end
-              object MyLed75: TMyLed
+              object mlC_Loader2_PushTray_On: TMyLed
                 Left = 20
                 Top = 27
                 Width = 22
@@ -2383,7 +2367,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader2_PushTray_On'
               end
-              object MyLed76: TMyLed
+              object mlC_Loader2_LeanOnTray_On: TMyLed
                 Left = 100
                 Top = 27
                 Width = 22
@@ -2391,7 +2375,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader2_LeanOnTray_On'
               end
-              object MyLed77: TMyLed
+              object mlC_Loader2_LeanOnTray_Off: TMyLed
                 Left = 100
                 Top = 42
                 Width = 22
@@ -2399,7 +2383,7 @@ object fiosetview: Tfiosetview
                 LEDStyle = LEDHorizontal
                 Alias = 'C_Loader2_LeanOnTray_Off'
               end
-              object BtnPanel47: TBtnPanel
+              object bpC_Loader2_PushTray: TBtnPanel
                 Left = 44
                 Top = 27
                 Width = 45
@@ -2424,7 +2408,7 @@ object fiosetview: Tfiosetview
                 Alias = 'C_Loader2_PushTray'
                 Style = tsButtons
               end
-              object BtnPanel49: TBtnPanel
+              object bpC_Loader2_LeanOnTray: TBtnPanel
                 Left = 124
                 Top = 27
                 Width = 45
@@ -2450,7 +2434,7 @@ object fiosetview: Tfiosetview
                 Style = tsButtons
               end
             end
-            object btnpnl2: TBtnPanel
+            object bpC_Loader_FrontRiseTray_2: TBtnPanel
               Left = 66
               Top = 76
               Width = 45
@@ -2474,7 +2458,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Loader_FrontRiseTray_2'
               Style = tsButtons
             end
-            object btnpnl3: TBtnPanel
+            object bpC_Loader_FrontRiseTray_1: TBtnPanel
               Left = 65
               Top = 96
               Width = 45
@@ -2525,7 +2509,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 6
-            object MyLed19: TMyLed
+            object mlC_TrayArm_FrontClamp_On: TMyLed
               Left = 352
               Top = 48
               Width = 22
@@ -2533,7 +2517,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_TrayArm_FrontClamp_On'
             end
-            object MyLed20: TMyLed
+            object mlC_TrayArm_FrontClamp_Off: TMyLed
               Left = 352
               Top = 127
               Width = 22
@@ -2541,7 +2525,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_TrayArm_FrontClamp_Off'
             end
-            object MyLed27: TMyLed
+            object mlC_TrayArmZ_Up_On: TMyLed
               Left = 390
               Top = 8
               Width = 22
@@ -2549,7 +2533,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_TrayArmZ_Up_On'
             end
-            object MyLed28: TMyLed
+            object mlC_TrayArmZ_Down_On: TMyLed
               Left = 390
               Top = 27
               Width = 22
@@ -2557,7 +2541,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_TrayArmZ_Down_On'
             end
-            object MyLed5: TMyLed
+            object mlC_TrayArm_RearClamp_On: TMyLed
               Left = 440
               Top = 48
               Width = 22
@@ -2565,7 +2549,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_TrayArm_RearClamp_On'
             end
-            object MyLed14: TMyLed
+            object mlC_TrayArm_RearClamp_Off: TMyLed
               Left = 440
               Top = 127
               Width = 22
@@ -2573,7 +2557,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_TrayArm_RearClamp_Off'
             end
-            object BtnPanel8: TBtnPanel
+            object bpC_TrayArmZ_Down: TBtnPanel
               Left = 415
               Top = 26
               Width = 45
@@ -2597,7 +2581,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_TrayArmZ_Down'
               Style = tsButtons
             end
-            object BtnPanel11: TBtnPanel
+            object bpC_TrayArm_FrontClamp: TBtnPanel
               Left = 377
               Top = 48
               Width = 45
@@ -2631,7 +2615,7 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 2
             end
-            object BtnPanel10: TBtnPanel
+            object bpC_TrayArm_RearClamp: TBtnPanel
               Left = 465
               Top = 48
               Width = 45
@@ -2688,7 +2672,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 5
             end
-            object BtnPanel4: TBtnPanel
+            object bpC_TrayArmZ_Up: TBtnPanel
               Left = 415
               Top = 6
               Width = 45
@@ -2846,7 +2830,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 2
-            object MyLed4: TMyLed
+            object mlC_Auto1_FrontRiseTray_Off: TMyLed
               Left = 43
               Top = 95
               Width = 22
@@ -2854,7 +2838,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_FrontRiseTray_Off'
             end
-            object MyLed6: TMyLed
+            object mlC_Auto1_FrontRiseTray_On: TMyLed
               Left = 43
               Top = 80
               Width = 22
@@ -2862,7 +2846,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_FrontRiseTray_On'
             end
-            object MyLed7: TMyLed
+            object mlC_Auto1_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -2870,7 +2854,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_PushTray_On'
             end
-            object MyLed8: TMyLed
+            object mlC_Auto1_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -2878,7 +2862,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_PushTray_Off'
             end
-            object MyLed9: TMyLed
+            object mlC_Auto1_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -2886,7 +2870,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_LeanOnTray_On'
             end
-            object MyLed10: TMyLed
+            object mlC_Auto1_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -2894,7 +2878,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_LeanOnTray_Off'
             end
-            object MyLed11: TMyLed
+            object mlC_Auto1_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -2902,7 +2886,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_RearRiseTray_On'
             end
-            object MyLed15: TMyLed
+            object mlC_Auto1_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -2910,7 +2894,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_RearRiseTray_Off'
             end
-            object MyLed16: TMyLed
+            object mlSnAuto1_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -2918,7 +2902,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_InputHasTray'
             end
-            object MyLed21: TMyLed
+            object mlSnAuto1_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -2926,7 +2910,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_InputFullTray'
             end
-            object MyLedAuto1InputEnd: TMyLed
+            object mlSnAuto1_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -2934,15 +2918,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_InputEnd'
             end
-            object MyLed22: TMyLed
-              Left = 780
-              Top = 128
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto1_OutputHasTray'
-            end
-            object MyLed23: TMyLed
+            object mlSnAuto1_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -2950,7 +2926,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_OutputBottomHasTray'
             end
-            object MyLed26: TMyLed
+            object mlSnAuto1_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -2958,7 +2934,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_TrayPos1'
             end
-            object MyLed31: TMyLed
+            object mlSnAuto1_TrayPos2: TMyLed
               Left = 447
               Top = 48
               Width = 22
@@ -2966,7 +2942,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_TrayPos2'
             end
-            object BtnPanel2: TBtnPanel
+            object bpC_Auto1_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -2990,7 +2966,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto1_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel3: TBtnPanel
+            object bpC_Auto1_FrontRiseTray: TBtnPanel
               Left = 65
               Top = 80
               Width = 45
@@ -3014,7 +2990,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto1_FrontRiseTray'
               Style = tsButtons
             end
-            object BtnPanel5: TBtnPanel
+            object bpC_Auto1_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -3089,7 +3065,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object BtnPanel12: TBtnPanel
+            object bpC_Auto1_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -3150,7 +3126,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 4
-            object MyLed32: TMyLed
+            object mlC_Auto2_FrontRiseTray_Off: TMyLed
               Left = 43
               Top = 95
               Width = 22
@@ -3158,7 +3134,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_FrontRiseTray_Off'
             end
-            object MyLed43: TMyLed
+            object mlC_Auto2_FrontRiseTray_On: TMyLed
               Left = 43
               Top = 80
               Width = 22
@@ -3166,7 +3142,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_FrontRiseTray_On'
             end
-            object MyLed44: TMyLed
+            object mlC_Auto2_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -3174,7 +3150,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_PushTray_On'
             end
-            object MyLed48: TMyLed
+            object mlC_Auto2_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -3182,7 +3158,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_PushTray_Off'
             end
-            object MyLed49: TMyLed
+            object mlC_Auto2_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -3190,7 +3166,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_LeanOnTray_On'
             end
-            object MyLed50: TMyLed
+            object mlC_Auto2_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -3198,7 +3174,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_LeanOnTray_Off'
             end
-            object MyLed51: TMyLed
+            object mlC_Auto2_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -3206,7 +3182,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_RearRiseTray_On'
             end
-            object MyLed52: TMyLed
+            object mlC_Auto2_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -3214,7 +3190,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_RearRiseTray_Off'
             end
-            object MyLed53: TMyLed
+            object mlSnAuto2_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -3222,7 +3198,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_InputHasTray'
             end
-            object MyLed57: TMyLed
+            object mlSnAuto2_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -3230,7 +3206,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_InputFullTray'
             end
-            object MyLedAuto2InputEnd: TMyLed
+            object mlSnAuto2_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -3238,15 +3214,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_InputEnd'
             end
-            object MyLed58: TMyLed
-              Left = 772
-              Top = 128
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto2_OutputHasTray'
-            end
-            object MyLed59: TMyLed
+            object mlSnAuto2_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -3254,7 +3222,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_OutputBottomHasTray'
             end
-            object MyLed65: TMyLed
+            object mlSnAuto2_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -3262,7 +3230,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_TrayPos1'
             end
-            object MyLed90: TMyLed
+            object mlSnAuto2_TrayPos2: TMyLed
               Left = 447
               Top = 48
               Width = 22
@@ -3270,7 +3238,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_TrayPos2'
             end
-            object BtnPanel16: TBtnPanel
+            object bpC_Auto2_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -3294,7 +3262,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto2_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel38: TBtnPanel
+            object bpC_Auto2_FrontRiseTray: TBtnPanel
               Left = 65
               Top = 80
               Width = 45
@@ -3318,7 +3286,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto2_FrontRiseTray'
               Style = tsButtons
             end
-            object BtnPanel39: TBtnPanel
+            object bpC_Auto2_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -3393,7 +3361,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object BtnPanel43: TBtnPanel
+            object bpC_Auto2_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -3454,7 +3422,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 6
-            object MyLed91: TMyLed
+            object mlC_Auto3_FrontRiseTray_Off: TMyLed
               Left = 43
               Top = 95
               Width = 22
@@ -3462,7 +3430,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_FrontRiseTray_Off'
             end
-            object MyLed92: TMyLed
+            object mlC_Auto3_FrontRiseTray_On: TMyLed
               Left = 43
               Top = 80
               Width = 22
@@ -3470,7 +3438,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_FrontRiseTray_On'
             end
-            object MyLed93: TMyLed
+            object mlC_Auto3_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -3478,7 +3446,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_PushTray_On'
             end
-            object MyLed94: TMyLed
+            object mlC_Auto3_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -3486,7 +3454,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_PushTray_Off'
             end
-            object MyLed95: TMyLed
+            object mlC_Auto3_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -3494,7 +3462,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_LeanOnTray_On'
             end
-            object MyLed96: TMyLed
+            object mlC_Auto3_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -3502,7 +3470,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_LeanOnTray_Off'
             end
-            object MyLed97: TMyLed
+            object mlC_Auto3_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -3510,7 +3478,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_RearRiseTray_On'
             end
-            object MyLed98: TMyLed
+            object mlC_Auto3_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -3518,7 +3486,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_RearRiseTray_Off'
             end
-            object MyLed99: TMyLed
+            object mlSnAuto3_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -3526,7 +3494,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_InputHasTray'
             end
-            object MyLed100: TMyLed
+            object mlSnAuto3_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -3534,7 +3502,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_InputFullTray'
             end
-            object MyLedAuto3InputEnd: TMyLed
+            object mlSnAuto3_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -3542,15 +3510,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_InputEnd'
             end
-            object MyLed101: TMyLed
-              Left = 780
-              Top = 136
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto3_OutputHasTray'
-            end
-            object MyLed102: TMyLed
+            object mlSnAuto3_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -3558,7 +3518,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_OutputBottomHasTray'
             end
-            object MyLed103: TMyLed
+            object mlSnAuto3_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -3566,7 +3526,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_TrayPos1'
             end
-            object MyLed104: TMyLed
+            object mlSnAuto3_TrayPos2: TMyLed
               Left = 447
               Top = 48
               Width = 22
@@ -3574,7 +3534,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_TrayPos2'
             end
-            object BtnPanel55: TBtnPanel
+            object bpC_Auto3_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -3598,7 +3558,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto3_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel56: TBtnPanel
+            object bpC_Auto3_FrontRiseTray: TBtnPanel
               Left = 65
               Top = 80
               Width = 45
@@ -3622,7 +3582,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto3_FrontRiseTray'
               Style = tsButtons
             end
-            object BtnPanel57: TBtnPanel
+            object bpC_Auto3_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -3697,7 +3657,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object BtnPanel59: TBtnPanel
+            object bpC_Auto3_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -3851,7 +3811,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 2
-            object MyLed105: TMyLed
+            object mlC_Auto4_FrontRiseTray_Off: TMyLed
               Left = 43
               Top = 95
               Width = 22
@@ -3859,7 +3819,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_FrontRiseTray_Off'
             end
-            object MyLed106: TMyLed
+            object mlC_Auto4_FrontRiseTray_On: TMyLed
               Left = 43
               Top = 80
               Width = 22
@@ -3867,7 +3827,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_FrontRiseTray_On'
             end
-            object MyLed107: TMyLed
+            object mlC_Auto4_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -3875,7 +3835,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_PushTray_On'
             end
-            object MyLed108: TMyLed
+            object mlC_Auto4_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -3883,7 +3843,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_PushTray_Off'
             end
-            object MyLed109: TMyLed
+            object mlC_Auto4_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -3891,7 +3851,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_LeanOnTray_On'
             end
-            object MyLed110: TMyLed
+            object mlC_Auto4_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -3899,7 +3859,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_LeanOnTray_Off'
             end
-            object MyLed111: TMyLed
+            object mlC_Auto4_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -3907,7 +3867,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_RearRiseTray_On'
             end
-            object MyLed112: TMyLed
+            object mlC_Auto4_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -3915,7 +3875,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_RearRiseTray_Off'
             end
-            object MyLed113: TMyLed
+            object mlSnAuto4_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -3923,7 +3883,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_InputHasTray'
             end
-            object MyLed114: TMyLed
+            object mlSnAuto4_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -3931,7 +3891,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_InputFullTray'
             end
-            object MyLedAuto4InputEnd: TMyLed
+            object mlSnAuto4_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -3939,15 +3899,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_InputEnd'
             end
-            object MyLed115: TMyLed
-              Left = 780
-              Top = 128
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto4_OutputHasTray'
-            end
-            object MyLed116: TMyLed
+            object mlSnAuto4_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -3955,7 +3907,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_OutputBottomHasTray'
             end
-            object MyLed118: TMyLed
+            object mlSnAuto4_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -3963,7 +3915,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_TrayPos1'
             end
-            object MyLed119: TMyLed
+            object mlSnAuto4_TrayPos2: TMyLed
               Left = 447
               Top = 48
               Width = 22
@@ -3971,7 +3923,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_TrayPos2'
             end
-            object BtnPanel61: TBtnPanel
+            object bpC_Auto4_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -3995,7 +3947,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto4_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel62: TBtnPanel
+            object bpC_Auto4_FrontRiseTray: TBtnPanel
               Left = 65
               Top = 80
               Width = 45
@@ -4019,7 +3971,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto4_FrontRiseTray'
               Style = tsButtons
             end
-            object BtnPanel63: TBtnPanel
+            object bpC_Auto4_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -4094,7 +4046,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object BtnPanel65: TBtnPanel
+            object bpC_Auto4_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -4155,7 +4107,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 4
-            object MyLed120: TMyLed
+            object mlC_Auto5_FrontRiseTray_Off: TMyLed
               Left = 43
               Top = 95
               Width = 22
@@ -4163,7 +4115,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_FrontRiseTray_Off'
             end
-            object MyLed121: TMyLed
+            object mlC_Auto5_FrontRiseTray_On: TMyLed
               Left = 43
               Top = 80
               Width = 22
@@ -4171,7 +4123,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_FrontRiseTray_On'
             end
-            object MyLed147: TMyLed
+            object mlC_Auto5_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -4179,7 +4131,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_PushTray_On'
             end
-            object MyLed148: TMyLed
+            object mlC_Auto5_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -4187,7 +4139,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_PushTray_Off'
             end
-            object MyLed150: TMyLed
+            object mlC_Auto5_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -4195,7 +4147,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_LeanOnTray_On'
             end
-            object MyLed151: TMyLed
+            object mlC_Auto5_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -4203,7 +4155,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_LeanOnTray_Off'
             end
-            object MyLed152: TMyLed
+            object mlC_Auto5_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -4211,7 +4163,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_RearRiseTray_On'
             end
-            object MyLed153: TMyLed
+            object mlC_Auto5_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -4219,7 +4171,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_RearRiseTray_Off'
             end
-            object MyLed154: TMyLed
+            object mlSnAuto5_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -4227,7 +4179,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_InputHasTray'
             end
-            object MyLed155: TMyLed
+            object mlSnAuto5_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -4235,7 +4187,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_InputFullTray'
             end
-            object MyLedAuto5InputEnd: TMyLed
+            object mlSnAuto5_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -4243,15 +4195,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_InputEnd'
             end
-            object MyLed156: TMyLed
-              Left = 772
-              Top = 136
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto5_OutputHasTray'
-            end
-            object MyLed157: TMyLed
+            object mlSnAuto5_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -4259,7 +4203,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_OutputBottomHasTray'
             end
-            object MyLed158: TMyLed
+            object mlSnAuto5_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -4267,7 +4211,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_TrayPos1'
             end
-            object MyLed159: TMyLed
+            object mlSnAuto5_TrayPos2: TMyLed
               Left = 447
               Top = 48
               Width = 22
@@ -4275,7 +4219,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_TrayPos2'
             end
-            object BtnPanel67: TBtnPanel
+            object bpC_Auto5_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -4299,7 +4243,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto5_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel68: TBtnPanel
+            object bpC_Auto5_FrontRiseTray: TBtnPanel
               Left = 65
               Top = 80
               Width = 45
@@ -4323,7 +4267,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto5_FrontRiseTray'
               Style = tsButtons
             end
-            object BtnPanel72: TBtnPanel
+            object bpC_Auto5_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -4398,7 +4342,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object BtnPanel76: TBtnPanel
+            object bpC_Auto5_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -4459,7 +4403,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 6
-            object MyLed160: TMyLed
+            object mlC_Auto6_FrontRiseTray_Off: TMyLed
               Left = 43
               Top = 95
               Width = 22
@@ -4467,7 +4411,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_FrontRiseTray_Off'
             end
-            object MyLed161: TMyLed
+            object mlC_Auto6_FrontRiseTray_On: TMyLed
               Left = 43
               Top = 80
               Width = 22
@@ -4475,7 +4419,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_FrontRiseTray_On'
             end
-            object MyLed162: TMyLed
+            object mlC_Auto6_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -4483,7 +4427,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_PushTray_On'
             end
-            object MyLed163: TMyLed
+            object mlC_Auto6_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -4491,7 +4435,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_PushTray_Off'
             end
-            object MyLed164: TMyLed
+            object mlC_Auto6_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -4499,7 +4443,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_LeanOnTray_On'
             end
-            object MyLed165: TMyLed
+            object mlC_Auto6_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -4507,7 +4451,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_LeanOnTray_Off'
             end
-            object MyLed166: TMyLed
+            object mlC_Auto6_RearRiseTray_On: TMyLed
               Left = 666
               Top = 80
               Width = 22
@@ -4515,7 +4459,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_RearRiseTray_On'
             end
-            object MyLed167: TMyLed
+            object mlC_Auto6_RearRiseTray_Off: TMyLed
               Left = 666
               Top = 95
               Width = 22
@@ -4523,7 +4467,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_RearRiseTray_Off'
             end
-            object MyLed168: TMyLed
+            object mlSnAuto6_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -4531,7 +4475,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_InputHasTray'
             end
-            object MyLed169: TMyLed
+            object mlSnAuto6_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -4539,7 +4483,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_InputFullTray'
             end
-            object MyLedAuto6InputEnd: TMyLed
+            object mlSnAuto6_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -4547,15 +4491,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_InputEnd'
             end
-            object MyLed170: TMyLed
-              Left = 772
-              Top = 136
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto6_OutputHasTray'
-            end
-            object MyLed171: TMyLed
+            object mlSnAuto6_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -4563,7 +4499,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_OutputBottomHasTray'
             end
-            object MyLed172: TMyLed
+            object mlSnAuto6_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -4571,7 +4507,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_TrayPos1'
             end
-            object MyLed173: TMyLed
+            object mlSnAuto6_TrayPos2: TMyLed
               Left = 447
               Top = 48
               Width = 22
@@ -4579,7 +4515,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_TrayPos2'
             end
-            object BtnPanel78: TBtnPanel
+            object bpC_Auto6_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -4603,7 +4539,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto6_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel79: TBtnPanel
+            object bpC_Auto6_FrontRiseTray: TBtnPanel
               Left = 65
               Top = 80
               Width = 45
@@ -4627,7 +4563,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Auto6_FrontRiseTray'
               Style = tsButtons
             end
-            object BtnPanel80: TBtnPanel
+            object bpC_Auto6_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -4702,7 +4638,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object BtnPanel82: TBtnPanel
+            object bpC_Auto6_RearRiseTray: TBtnPanel
               Left = 688
               Top = 80
               Width = 45
@@ -4764,7 +4700,7 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 8
-            object MyLed174: TMyLed
+            object mlC_Color_FrontRiseTray_1_Off: TMyLed
               Left = 43
               Top = 111
               Width = 22
@@ -4772,7 +4708,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_FrontRiseTray_1_Off'
             end
-            object MyLed176: TMyLed
+            object mlC_Color_FrontRiseTray_1_On: TMyLed
               Left = 43
               Top = 96
               Width = 22
@@ -4780,7 +4716,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_FrontRiseTray_1_On'
             end
-            object MyLed177: TMyLed
+            object mlC_Color_PushTray_On: TMyLed
               Left = 175
               Top = 80
               Width = 22
@@ -4788,7 +4724,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_PushTray_On'
             end
-            object MyLed178: TMyLed
+            object mlC_Color_PushTray_Off: TMyLed
               Left = 175
               Top = 95
               Width = 22
@@ -4796,7 +4732,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_PushTray_Off'
             end
-            object MyLed179: TMyLed
+            object mlC_Color_LeanOnTray_On: TMyLed
               Left = 255
               Top = 80
               Width = 22
@@ -4804,7 +4740,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_LeanOnTray_On'
             end
-            object MyLed180: TMyLed
+            object mlC_Color_LeanOnTray_Off: TMyLed
               Left = 255
               Top = 95
               Width = 22
@@ -4812,7 +4748,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_LeanOnTray_Off'
             end
-            object MyLed184: TMyLed
+            object mlSnColor_InputHasTray: TMyLed
               Left = 6
               Top = 56
               Width = 22
@@ -4820,7 +4756,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnColor_InputHasTray'
             end
-            object MyLed185: TMyLed
+            object mlSnColor_InputFullTray: TMyLed
               Left = 6
               Top = 24
               Width = 22
@@ -4828,7 +4764,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnColor_InputFullTray'
             end
-            object MyLed187: TMyLed
+            object mlSnColor_OutputBottomHasTray: TMyLed
               Left = 780
               Top = 56
               Width = 22
@@ -4836,7 +4772,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnColor_OutputBottomHasTray'
             end
-            object MyLed188: TMyLed
+            object mlSnColor_TrayPos1: TMyLed
               Left = 271
               Top = 48
               Width = 22
@@ -4844,7 +4780,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnColor_TrayPos1'
             end
-            object MyLed36: TMyLed
+            object mlSnColor_InputEnd: TMyLed
               Left = 6
               Top = 45
               Width = 22
@@ -4852,7 +4788,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnColor_InputEnd'
             end
-            object MyLed37: TMyLed
+            object mlC_Color_FrontRiseTray_2_On: TMyLed
               Left = 43
               Top = 77
               Width = 22
@@ -4860,7 +4796,7 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Color_FrontRiseTray_2_On'
             end
-            object BtnPanel90: TBtnPanel
+            object bpC_Color_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
               Width = 45
@@ -4884,7 +4820,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Color_LeanOnTray'
               Style = tsButtons
             end
-            object BtnPanel91: TBtnPanel
+            object bpC_Color_FrontRiseTray_1: TBtnPanel
               Left = 65
               Top = 96
               Width = 45
@@ -4908,7 +4844,7 @@ object fiosetview: Tfiosetview
               Alias = 'C_Color_FrontRiseTray_1'
               Style = tsButtons
             end
-            object BtnPanel92: TBtnPanel
+            object bpC_Color_PushTray: TBtnPanel
               Left = 197
               Top = 80
               Width = 45
@@ -4951,7 +4887,7 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 4
             end
-            object BtnPanel93: TBtnPanel
+            object bpC_Color_FrontSeparateTray_1: TBtnPanel
               Left = 65
               Top = 45
               Width = 45
@@ -5017,7 +4953,7 @@ object fiosetview: Tfiosetview
               Color = 9534289
               TabOrder = 8
             end
-            object BtnPanel6: TBtnPanel
+            object bpC_Color_FrontRiseTray_2: TBtnPanel
               Left = 66
               Top = 76
               Width = 45
@@ -5182,7 +5118,7 @@ object fiosetview: Tfiosetview
               BevelOuter = bvLowered
               Color = 12761254
               TabOrder = 0
-              object ml_ICArmSuck: TMyLed
+              object mlSuck1: TMyLed
                 Left = 30
                 Top = 106
                 Width = 22
@@ -5206,7 +5142,7 @@ object fiosetview: Tfiosetview
                 ParentFont = False
                 TabOrder = 0
               end
-              object btn_ICArmSuck_On: TBtnPanel
+              object bpSuck1_On: TBtnPanel
                 Left = 10
                 Top = 81
                 Width = 30
@@ -5230,7 +5166,7 @@ object fiosetview: Tfiosetview
                 Alias = 'Suck1_On'
                 Style = tsButtons
               end
-              object btn_ICArmSuck_Off: TBtnPanel
+              object bpSuck1_Off: TBtnPanel
                 Left = 43
                 Top = 81
                 Width = 30
@@ -5264,7 +5200,7 @@ object fiosetview: Tfiosetview
               BevelOuter = bvLowered
               Color = 12761254
               TabOrder = 1
-              object MyLed29: TMyLed
+              object mlSuck2: TMyLed
                 Left = 30
                 Top = 106
                 Width = 22
@@ -5288,7 +5224,7 @@ object fiosetview: Tfiosetview
                 ParentFont = False
                 TabOrder = 0
               end
-              object BtnPanel13: TBtnPanel
+              object bpSuck2_On: TBtnPanel
                 Left = 10
                 Top = 81
                 Width = 30
@@ -5312,7 +5248,7 @@ object fiosetview: Tfiosetview
                 Alias = 'Suck2_On'
                 Style = tsButtons
               end
-              object BtnPanel14: TBtnPanel
+              object bpSuck2_Off: TBtnPanel
                 Left = 43
                 Top = 81
                 Width = 30
@@ -5346,7 +5282,7 @@ object fiosetview: Tfiosetview
               BevelOuter = bvLowered
               Color = 12761254
               TabOrder = 2
-              object MyLed30: TMyLed
+              object mlSuck3: TMyLed
                 Left = 30
                 Top = 106
                 Width = 22
@@ -5370,7 +5306,7 @@ object fiosetview: Tfiosetview
                 ParentFont = False
                 TabOrder = 0
               end
-              object BtnPanel17: TBtnPanel
+              object bpSuck3_On: TBtnPanel
                 Left = 10
                 Top = 81
                 Width = 30
@@ -5394,7 +5330,7 @@ object fiosetview: Tfiosetview
                 Alias = 'Suck3_On'
                 Style = tsButtons
               end
-              object BtnPanel18: TBtnPanel
+              object bpSuck3_Off: TBtnPanel
                 Left = 43
                 Top = 81
                 Width = 30
@@ -5428,7 +5364,7 @@ object fiosetview: Tfiosetview
               BevelOuter = bvLowered
               Color = 12761254
               TabOrder = 3
-              object MyLed33: TMyLed
+              object mlSuck4: TMyLed
                 Left = 30
                 Top = 106
                 Width = 22
@@ -5452,7 +5388,7 @@ object fiosetview: Tfiosetview
                 ParentFont = False
                 TabOrder = 0
               end
-              object BtnPanel19: TBtnPanel
+              object bpSuck4_On: TBtnPanel
                 Left = 10
                 Top = 81
                 Width = 30
@@ -5476,7 +5412,7 @@ object fiosetview: Tfiosetview
                 Alias = 'Suck4_On'
                 Style = tsButtons
               end
-              object BtnPanel20: TBtnPanel
+              object bpSuck4_Off: TBtnPanel
                 Left = 43
                 Top = 81
                 Width = 30
@@ -5713,7 +5649,7 @@ object fiosetview: Tfiosetview
           BevelOuter = bvSpace
           Color = 12761254
           TabOrder = 4
-          object Btn_TowerRed: TBtnPanel
+          object bpSwTowerRed: TBtnPanel
             Left = 40
             Top = 20
             Width = 85
@@ -5738,7 +5674,7 @@ object fiosetview: Tfiosetview
             Alias = 'SwTowerRed'
             Style = tsButtons
           end
-          object Btn_TowerYellow: TBtnPanel
+          object bpSwTowerYellow: TBtnPanel
             Left = 165
             Top = 20
             Width = 85
@@ -5763,7 +5699,7 @@ object fiosetview: Tfiosetview
             Alias = 'SwTowerYellow'
             Style = tsButtons
           end
-          object Btn_TowerGreen: TBtnPanel
+          object bpSwTowerGreen: TBtnPanel
             Left = 285
             Top = 20
             Width = 85
@@ -5798,7 +5734,7 @@ object fiosetview: Tfiosetview
           BevelOuter = bvSpace
           Color = 12761254
           TabOrder = 3
-          object Btn_Music1: TBtnPanel
+          object bpSwMusic1: TBtnPanel
             Left = 15
             Top = 20
             Width = 85
@@ -5823,7 +5759,7 @@ object fiosetview: Tfiosetview
             Alias = 'SwMusic1'
             Style = tsButtons
           end
-          object Btn_Music2: TBtnPanel
+          object bpSwMusic2: TBtnPanel
             Left = 115
             Top = 20
             Width = 85
@@ -5848,7 +5784,7 @@ object fiosetview: Tfiosetview
             Alias = 'SwMusic2'
             Style = tsButtons
           end
-          object Btn_Music3: TBtnPanel
+          object bpSwMusic3: TBtnPanel
             Left = 215
             Top = 20
             Width = 85
@@ -5873,7 +5809,7 @@ object fiosetview: Tfiosetview
             Alias = 'SwMusic3'
             Style = tsButtons
           end
-          object Btn_Music4: TBtnPanel
+          object bpSwMusic4: TBtnPanel
             Left = 315
             Top = 20
             Width = 85
@@ -5921,7 +5857,7 @@ object fiosetview: Tfiosetview
           BevelInner = bvLowered
           Color = 12761254
           TabOrder = 0
-          object MyLed72: TMyLed
+          object mlSnMotorPower: TMyLed
             Left = 10
             Top = 546
             Width = 22
@@ -5929,7 +5865,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnMotorPower'
           end
-          object myld1: TMyLed
+          object mlSnEMG: TMyLed
             Left = 207
             Top = 543
             Width = 22
@@ -7933,7 +7869,7 @@ object fiosetview: Tfiosetview
               E9BA845E4DDD9E996D04F1EE0DB1D22556190483820F20E2B6E8A2800A28A280
               3FFFD9}
           end
-          object myld2: TMyLed
+          object mlSnEMG_1: TMyLed
             Left = 55
             Top = 315
             Width = 22
@@ -7941,7 +7877,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnEMG_1'
           end
-          object myld3: TMyLed
+          object mlSnEMG_2: TMyLed
             Left = 719
             Top = 454
             Width = 22
@@ -7949,7 +7885,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnEMG_2'
           end
-          object myld4: TMyLed
+          object mlSnEMG_3: TMyLed
             Left = 756
             Top = 86
             Width = 22
@@ -7957,7 +7893,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnEMG_3'
           end
-          object myld5: TMyLed
+          object mlSnEMG_4: TMyLed
             Left = 55
             Top = 88
             Width = 22
@@ -7965,7 +7901,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnEMG_4'
           end
-          object myld6: TMyLed
+          object mlSnSafeDoorFront: TMyLed
             Left = 135
             Top = 495
             Width = 22
@@ -7973,7 +7909,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnSafeDoorFront'
           end
-          object myld7: TMyLed
+          object mlSnSafeSlideDoorLeft: TMyLed
             Left = 135
             Top = 59
             Width = 22
@@ -7981,7 +7917,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnSafeSlideDoorLeft'
           end
-          object myld8: TMyLed
+          object mlSnSafeSlideDoorRight: TMyLed
             Left = 567
             Top = 63
             Width = 22
@@ -7989,7 +7925,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnSafeSlideDoorRight'
           end
-          object myld9: TMyLed
+          object mlSnSafeDoorLeft: TMyLed
             Left = 55
             Top = 159
             Width = 22
@@ -7997,7 +7933,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnSafeDoorLeft'
           end
-          object myld10: TMyLed
+          object mlSnSafeDoorRight: TMyLed
             Left = 716
             Top = 127
             Width = 22
@@ -8005,7 +7941,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnSafeDoorRight'
           end
-          object myld13: TMyLed
+          object mlSnSafeAuto6: TMyLed
             Left = 563
             Top = 495
             Width = 22
@@ -8013,7 +7949,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnSafeAuto6'
           end
-          object BtnPanel40: TBtnPanel
+          object bpSwMotorRelay: TBtnPanel
             Left = 36
             Top = 539
             Width = 80
@@ -8037,7 +7973,7 @@ object fiosetview: Tfiosetview
             Alias = 'SwMotorRelay'
             Style = tsButtons
           end
-          object BtnPanel1: TBtnPanel
+          object bpSwLight: TBtnPanel
             Left = 120
             Top = 539
             Width = 80
@@ -8246,7 +8182,7 @@ object fiosetview: Tfiosetview
           BevelInner = bvLowered
           Color = 12761254
           TabOrder = 1
-          object MyLed122: TMyLed
+          object mlSnSafeLock: TMyLed
             Left = 12
             Top = 6
             Width = 22
@@ -8271,7 +8207,7 @@ object fiosetview: Tfiosetview
             ParentColor = False
             ParentFont = False
           end
-          object MyLed123: TMyLed
+          object mlSnAirIsEnough: TMyLed
             Left = 12
             Top = 36
             Width = 22
@@ -8296,7 +8232,7 @@ object fiosetview: Tfiosetview
             ParentColor = False
             ParentFont = False
           end
-          object MyLed124: TMyLed
+          object mlSnIonFan_Power: TMyLed
             Left = 132
             Top = 6
             Width = 22
@@ -8304,7 +8240,7 @@ object fiosetview: Tfiosetview
             LEDStyle = LEDSqLarge
             Alias = 'SnIonFan_Power'
           end
-          object MyLed125: TMyLed
+          object mlSnIonFan_Balance: TMyLed
             Left = 132
             Top = 36
             Width = 22
@@ -9518,7 +9454,7 @@ object fiosetview: Tfiosetview
         BevelOuter = bvSpace
         Color = 12761254
         TabOrder = 1
-        object ml_RKPowerOff: TMyLed
+        object mlSnRKPowerOff: TMyLed
           Left = 52
           Top = 30
           Width = 22
@@ -9526,7 +9462,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKPowerOff'
         end
-        object ml_RKPowerOn: TMyLed
+        object mlSnRKPowerOn: TMyLed
           Left = 147
           Top = 30
           Width = 22
@@ -9541,7 +9477,7 @@ object fiosetview: Tfiosetview
           Height = 13
           Caption = 'POWER'
         end
-        object ml_RKStart: TMyLed
+        object mlSnRKStart: TMyLed
           Left = 337
           Top = 120
           Width = 22
@@ -9549,7 +9485,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKStart'
         end
-        object ml_RKHome: TMyLed
+        object mlSnRKHome: TMyLed
           Left = 242
           Top = 120
           Width = 22
@@ -9557,7 +9493,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKHome'
         end
-        object ml_RKPause: TMyLed
+        object mlSnRKPause: TMyLed
           Left = 147
           Top = 120
           Width = 22
@@ -9565,7 +9501,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKPause'
         end
-        object ml_RKReset: TMyLed
+        object mlSnRKReset: TMyLed
           Left = 52
           Top = 120
           Width = 22
@@ -9573,7 +9509,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKReset'
         end
-        object ml_RKCleanOut: TMyLed
+        object mlSnRKCleanOut: TMyLed
           Left = 337
           Top = 210
           Width = 22
@@ -9581,7 +9517,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKCleanOut'
         end
-        object ml_RKSkip: TMyLed
+        object mlSnRKSkip: TMyLed
           Left = 242
           Top = 210
           Width = 22
@@ -9589,7 +9525,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKSkip'
         end
-        object ml_RKRetry: TMyLed
+        object mlSnRKRetry: TMyLed
           Left = 147
           Top = 210
           Width = 22
@@ -9597,7 +9533,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKRetry'
         end
-        object ml_RKOneCycle: TMyLed
+        object mlSnRKOneCycle: TMyLed
           Left = 52
           Top = 210
           Width = 22
@@ -9605,7 +9541,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKOneCycle'
         end
-        object ml_RKAlarmReset: TMyLed
+        object mlSnRKAlarmReset: TMyLed
           Left = 247
           Top = 300
           Width = 22
@@ -9613,7 +9549,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKAlarmReset'
         end
-        object ml_RKTray: TMyLed
+        object mlSnRKTray: TMyLed
           Left = 147
           Top = 300
           Width = 22
@@ -9621,7 +9557,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKTray'
         end
-        object ml_RKTrayFeed: TMyLed
+        object mlSnRKTrayFeed: TMyLed
           Left = 52
           Top = 300
           Width = 22
@@ -9629,7 +9565,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKTrayFeed'
         end
-        object ml_RearPadActive: TMyLed
+        object mlSnRearPadActive: TMyLed
           Left = 292
           Top = 36
           Width = 22
@@ -9644,7 +9580,7 @@ object fiosetview: Tfiosetview
           Height = 13
           Caption = 'FRONT/REAR'
         end
-        object ml_RKManualStep: TMyLed
+        object mlSnRKManualStep: TMyLed
           Left = 242
           Top = 390
           Width = 22
@@ -9652,7 +9588,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKManualStep'
         end
-        object ml_RKManualTStart: TMyLed
+        object mlSnRKManualTStart: TMyLed
           Left = 337
           Top = 390
           Width = 22
@@ -9660,7 +9596,7 @@ object fiosetview: Tfiosetview
           LEDStyle = LEDSqLarge
           Alias = 'SnRKManualTStart'
         end
-        object Btn_RKPowerOff: TBtnPanel
+        object bpSwRKPowerOff: TBtnPanel
           Left = 20
           Top = 60
           Width = 85
@@ -9685,7 +9621,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKPowerOff'
           Style = tsButtons
         end
-        object Btn_RKPowerOn: TBtnPanel
+        object bpSwRKPowerOn: TBtnPanel
           Left = 115
           Top = 60
           Width = 85
@@ -9710,7 +9646,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKPowerOn'
           Style = tsButtons
         end
-        object Btn_RKReset: TBtnPanel
+        object bpSwRKReset: TBtnPanel
           Left = 20
           Top = 150
           Width = 85
@@ -9735,7 +9671,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKReset'
           Style = tsButtons
         end
-        object Btn_RKPause: TBtnPanel
+        object bpSwRKPause: TBtnPanel
           Left = 115
           Top = 150
           Width = 85
@@ -9760,7 +9696,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKPause'
           Style = tsButtons
         end
-        object Btn_RKHome: TBtnPanel
+        object bpSwRKHome: TBtnPanel
           Left = 210
           Top = 150
           Width = 85
@@ -9785,7 +9721,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKHome'
           Style = tsButtons
         end
-        object Btn_RKStart: TBtnPanel
+        object bpSwRKStart: TBtnPanel
           Left = 305
           Top = 150
           Width = 85
@@ -9810,7 +9746,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKStart'
           Style = tsButtons
         end
-        object Btn_RKOneCycle: TBtnPanel
+        object bpSwRKOneCycle: TBtnPanel
           Left = 20
           Top = 240
           Width = 85
@@ -9835,7 +9771,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKOneCycle'
           Style = tsButtons
         end
-        object Btn_RKRetry: TBtnPanel
+        object bpSwRKRetry: TBtnPanel
           Left = 115
           Top = 240
           Width = 85
@@ -9860,7 +9796,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKRetry'
           Style = tsButtons
         end
-        object Btn_RKSkip: TBtnPanel
+        object bpSwRKSkip: TBtnPanel
           Left = 210
           Top = 240
           Width = 85
@@ -9885,7 +9821,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKSkip'
           Style = tsButtons
         end
-        object Btn_RKCleanOut: TBtnPanel
+        object bpSwRKCleanOut: TBtnPanel
           Left = 305
           Top = 240
           Width = 85
@@ -9910,7 +9846,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKCleanOut'
           Style = tsButtons
         end
-        object Btn_RKTrayFeed: TBtnPanel
+        object bpSwRKTrayFeed: TBtnPanel
           Left = 20
           Top = 330
           Width = 85
@@ -9935,7 +9871,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKTrayFeed'
           Style = tsButtons
         end
-        object Btn_RKTrayEnd: TBtnPanel
+        object bpSwRKTrayEnd: TBtnPanel
           Left = 115
           Top = 330
           Width = 85
@@ -9960,7 +9896,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKTrayEnd'
           Style = tsButtons
         end
-        object Btn_RKAlarmReset: TBtnPanel
+        object bpSwRKAlarmReset: TBtnPanel
           Left = 210
           Top = 330
           Width = 95
@@ -9985,7 +9921,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKAlarmReset'
           Style = tsButtons
         end
-        object Btn_RKManualStep: TBtnPanel
+        object bpSwRKManualStep: TBtnPanel
           Left = 210
           Top = 420
           Width = 85
@@ -10010,7 +9946,7 @@ object fiosetview: Tfiosetview
           Alias = 'SwRKManualStep'
           Style = tsButtons
         end
-        object Btn_RKManualTStart: TBtnPanel
+        object bpSwRKManualTStart: TBtnPanel
           Left = 305
           Top = 420
           Width = 85

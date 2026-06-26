@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 
 #include "database.h"
 #include "maintenance.h"
@@ -457,7 +458,7 @@ void __fastcall TfMaintenance::RefreshTopCcdStatus()
         if(lblTopCcdStatusConn!=NULL)
             lblTopCcdStatusConn->Caption="Connected: -";
         if(lblTopCcdStatusError!=NULL)
-            lblTopCcdStatusError->Caption="Last Error: not started";
+            lblTopCcdStatusError->Caption=LangT("Last Error: not started");
     }
 }
 //---------------------------------------------------------------------------
@@ -631,7 +632,7 @@ void __fastcall TfMaintenance::RefreshColorCcdStatus()
         if(lblColorCcdStatusConn!=NULL)
             lblColorCcdStatusConn->Caption="Connected: -";
         if(lblColorCcdStatusError!=NULL)
-            lblColorCcdStatusError->Caption="Last Error: not started";
+            lblColorCcdStatusError->Caption=LangT("Last Error: not started");
     }
 }
 //---------------------------------------------------------------------------
@@ -802,7 +803,7 @@ void __fastcall TfMaintenance::RefreshLotWebApiStatus()
     if(LotWebApiClient==NULL)
     {
         if(lblLotApiStatus!=NULL)
-            lblLotApiStatus->Caption="State: not started";
+            lblLotApiStatus->Caption=LangT("State: not started");
         return;
     }
 
@@ -837,7 +838,7 @@ void __fastcall TfMaintenance::RefreshLotWebApiStatus()
     else if(!LotWebApiClient->IsBusy() && !bLotApiResultPending)
     {
         if(lblLotApiStatus!=NULL && lblLotApiStatus->Caption.Pos("busy")>0)
-            lblLotApiStatus->Caption="State: idle";
+            lblLotApiStatus->Caption=LangT("State: idle");
     }
 }
 //---------------------------------------------------------------------------
@@ -1155,7 +1156,7 @@ void __fastcall TfMaintenance::ApplyHardwareEditLock()
     if(pnlHardwareHeader!=NULL)
     {
         if(bEnable)
-            pnlHardwareHeader->Caption="Hardware install setup";
+            pnlHardwareHeader->Caption=LangT("Hardware install setup");
         else
             pnlHardwareHeader->Caption="Hardware install setup (locked - lot running, end lot to edit)";
     }
@@ -1874,7 +1875,7 @@ void __fastcall TfMaintenance::chkSuckEnableClick(TObject *Sender)
         TCheckBox *Box=dynamic_cast<TCheckBox *>(Sender);
         if(Box!=NULL)
             Box->Checked=true;
-        ShowMyMessage("At least one nozzle must stay enabled.");
+        ShowMyMessage(LangT("At least one nozzle must stay enabled."));
         return;
     }
 
@@ -1955,7 +1956,7 @@ void __fastcall TfMaintenance::BuildPasswordUI()
     lab=new TLabel(this);
     lab->Parent=tsMaintPassword;
     lab->SetBounds(420, 50, 120, 20);
-    lab->Caption="Account ID";
+    lab->Caption=LangT("Account ID");
 
     edPwId=new TEdit(this);
     edPwId->Parent=tsMaintPassword;
@@ -1966,7 +1967,7 @@ void __fastcall TfMaintenance::BuildPasswordUI()
     lab=new TLabel(this);
     lab->Parent=tsMaintPassword;
     lab->SetBounds(420, 110, 120, 20);
-    lab->Caption="Password";
+    lab->Caption=LangT("Password");
 
     edPwPass=new TEdit(this);
     edPwPass->Parent=tsMaintPassword;
@@ -1978,7 +1979,7 @@ void __fastcall TfMaintenance::BuildPasswordUI()
     lab=new TLabel(this);
     lab->Parent=tsMaintPassword;
     lab->SetBounds(420, 170, 120, 20);
-    lab->Caption="Level";
+    lab->Caption=LangT("Level");
 
     cbbPwLevel=new TComboBox(this);
     cbbPwLevel->Parent=tsMaintPassword;
@@ -1997,19 +1998,19 @@ void __fastcall TfMaintenance::BuildPasswordUI()
     btnPwDelete=new TButton(this);
     btnPwDelete->Parent=tsMaintPassword;
     btnPwDelete->SetBounds(580, 240, 110, 40);
-    btnPwDelete->Caption="Delete";
+    btnPwDelete->Caption=LangT("Delete");
     btnPwDelete->OnClick=PwDeleteClick;
 
     btnPwSave=new TButton(this);
     btnPwSave->Parent=tsMaintPassword;
     btnPwSave->SetBounds(420, 296, 150, 40);
-    btnPwSave->Caption="Save to File";
+    btnPwSave->Caption=LangT("Save to File");
     btnPwSave->OnClick=PwSaveClick;
 
     btnPwReload=new TButton(this);
     btnPwReload->Parent=tsMaintPassword;
     btnPwReload->SetBounds(580, 296, 110, 40);
-    btnPwReload->Caption="Reload";
+    btnPwReload->Caption=LangT("Reload");
     btnPwReload->OnClick=PwReloadClick;
 }
 //---------------------------------------------------------------------------
@@ -2086,7 +2087,7 @@ void __fastcall TfMaintenance::PwIdClick(TObject *Sender)
     (void)Sender;
     if(edPwId==NULL || fQwertyKey==NULL || edPwId->Enabled==false)
         return;
-    fQwertyKey->ShowQwertyKey(edPwId, N_NO_SPACE, 0, false, 0, 0, "Account ID");
+    fQwertyKey->ShowQwertyKey(edPwId, N_NO_SPACE, 0, false, 0, 0, LangT("Account ID"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
@@ -2094,7 +2095,7 @@ void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
     (void)Sender;
     if(edPwPass==NULL || fQwertyKey==NULL || edPwPass->Enabled==false)
         return;
-    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE, 0, false, 0, 0, "Password");
+    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE, 0, false, 0, 0, LangT("Password"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
@@ -2110,27 +2111,27 @@ void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
     iLevel=cbbPwLevel->ItemIndex;
     if(sID==AnsiString(""))
     {
-        ShowMyMessage("Please enter an account ID.");
+        ShowMyMessage(LangT("Please enter an account ID."));
         return;
     }
     if(sPass==AnsiString(""))
     {
-        ShowMyMessage("Please enter a password.");
+        ShowMyMessage(LangT("Please enter a password."));
         return;
     }
     if(!UserRoleManager.IsValidLevel(iLevel))
     {
-        ShowMyMessage("Please select a level (0-3).");
+        ShowMyMessage(LangT("Please select a level (0-3)."));
         return;
     }
     if(UserRoleManager.AddOrUpdateUser(sID, sPass, iLevel)==false)
     {
-        ShowMyMessage("Account table is full (max 30).");
+        ShowMyMessage(LangT("Account table is full (max 30)."));
         return;
     }
     edPwPass->Text="";
     RefreshPasswordGrid();
-    ShowMyMessage("Account saved in memory. Press 'Save to File' to keep it.");
+    ShowMyMessage(LangT("Account saved in memory. Press 'Save to File' to keep it."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
@@ -2144,12 +2145,12 @@ void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
     idx=lbPwUsers->ItemIndex;
     if(idx<0 || idx>=UserRoleManager.GetUserCount())
     {
-        ShowMyMessage("Please select an account to delete.");
+        ShowMyMessage(LangT("Please select an account to delete."));
         return;
     }
     sID=UserRoleManager.GetUserID(idx);
     iLevel=UserRoleManager.GetUserLevel(idx);
-    if(ShowMyMessageBox_YES_NO("Delete account: "+sID+" ?")!=1)
+    if(ShowMyMessageBox_YES_NO(Format(LangT("Delete account: %s ?"), ARRAYOFCONST((sID)))) !=1)
         return;
     UserRoleManager.DeleteUser(sID, iLevel);
     RefreshPasswordGrid();
@@ -2159,7 +2160,7 @@ void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
 {
     (void)Sender;
     SavePassword();
-    ShowMyMessage("User accounts saved to system\\login.txt.");
+    ShowMyMessage(LangT("User accounts saved to system\\login.txt."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
@@ -2169,5 +2170,5 @@ void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
     RefreshPasswordGrid();
     if(edPwId!=NULL)    edPwId->Text="";
     if(edPwPass!=NULL)  edPwPass->Text="";
-    ShowMyMessage("User accounts reloaded from system\\login.txt.");
+    ShowMyMessage(LangT("User accounts reloaded from system\\login.txt."));
 }

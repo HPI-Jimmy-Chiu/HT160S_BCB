@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "setup.h"
 #include "CosFunction.h"
@@ -343,7 +344,7 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
     ForceDirectories(ExtractFilePath(FileName));
     if(atoi(edXDivision->Text.c_str())>MAX_TRAY_X || atoi(edYDivision->Text.c_str())>MAX_TRAY_Y)
     {
-        ShowMyOKMessageNoStop(AnsiString("Tray division exceeds machine limit (X max=")+IntToStr(MAX_TRAY_X)+", Y max="+IntToStr(MAX_TRAY_Y)+"). Value clamped.");
+        ShowMyOKMessageNoStop(Format(LangT("Tray division exceeds machine limit (X max=%d, Y max=%d). Value clamped."), ARRAYOFCONST((MAX_TRAY_X, MAX_TRAY_Y))));
     }
     XDivision=GetTrayEditInt(edXDivision, 1, 1, MAX_TRAY_X);
     YDivision=GetTrayEditInt(edYDivision, 1, 1, MAX_TRAY_Y);
@@ -463,10 +464,10 @@ void __fastcall TfSetup::ConfigureBinSettingGrid()
     grdBinAreaMap->Options=grdBinAreaMap->Options << goEditing << goTabs << goColSizing;
     grdBinAreaMap->OnExit=grdBinAreaMapExit;
     grdBinAreaMap->OnSelectCell=grdBinAreaMapSelectCell;
-    grdBinAreaMap->Cells[BIN_GRID_COL_AREA][0]="Area";
+    grdBinAreaMap->Cells[BIN_GRID_COL_AREA][0]=LangT("Area");
     grdBinAreaMap->Cells[BIN_GRID_COL_BIN][0]="Bin";
-    grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][0]="Status";
-    grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][0]="Note";
+    grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][0]=LangT("Status");
+    grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][0]=LangT("Note");
     grdBinAreaMap->ColWidths[BIN_GRID_COL_AREA]=120;
     grdBinAreaMap->ColWidths[BIN_GRID_COL_BIN]=80;
     grdBinAreaMap->ColWidths[BIN_GRID_COL_STATUS]=100;
@@ -515,7 +516,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     if(!ValidateBinSettingGrid(false))
     {
         if(ShowResultMessage)
-            ShowMyOKMessageNoStop("Bin map setting has invalid rows.");
+            ShowMyOKMessageNoStop(LangT("Bin map setting has invalid rows."));
         return false;
     }
 
@@ -532,7 +533,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     RefreshBinSettingStatus();
     RefreshRecipeStatus();
     if(ShowResultMessage)
-        ShowMyOKMessageNoStop("Bin map saved.");
+        ShowMyOKMessageNoStop(LangT("Bin map saved."));
     return true;
 }
 //---------------------------------------------------------------------------
@@ -559,7 +560,7 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
         Bin=GetBinGridValue(Row, ValidValue);
         if(!ValidValue)
         {
-            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Invalid";
+            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Invalid");
             grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Bin must be 0-999. Error code starts from 1000.";
             Result=false;
             continue;
@@ -573,15 +574,15 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
             }
             else
             {
-                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Empty";
-                grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Not assigned.";
+                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Empty");
+                grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=LangT("Not assigned.");
             }
             continue;
         }
         DuplicateArea=TempMap.GetAreaByBin(Bin);
         if(DuplicateArea!=eHT160BinAreaNotUse && DuplicateArea!=Area)
         {
-            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Duplicate";
+            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Duplicate");
             grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=AnsiString("Same bin as ")+BinAreaMap.GetAreaName(DuplicateArea)+AnsiString(".");
             Result=false;
             continue;
@@ -602,7 +603,7 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
     if(ShowResultMessage)
     {
         Message=Result?AnsiString("Bin map setting is OK."):AnsiString("Bin map setting has invalid rows.");
-        ShowMyOKMessageNoStop(Message);
+        ShowMyOKMessageNoStop(LangT(Message));
     }
     return Result;
 }
@@ -897,7 +898,7 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     (void)Sender;
     if(edRecipeName->Text.Trim()==AnsiString(""))
     {
-        ShowMyOKMessageNoStop("Please input new recipe name.");
+        ShowMyOKMessageNoStop(LangT("Please input new recipe name."));
         return;
     }
 
@@ -905,19 +906,19 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     NewName=RecipeManager.NormalizeRecipeName(edRecipeName->Text);
     if(RecipeManager.RecipeExists(NewName))
     {
-        ShowMyOKMessageNoStop("Recipe already exists.");
+        ShowMyOKMessageNoStop(LangT("Recipe already exists."));
         return;
     }
 
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(false))
     {
-        ShowMyOKMessageNoStop("Bin map setting is invalid.");
+        ShowMyOKMessageNoStop(LangT("Bin map setting is invalid."));
         return;
     }
     if(!RecipeManager.CopyRecipe(SourceName, NewName))
     {
-        ShowMyOKMessageNoStop("Save As recipe failed.");
+        ShowMyOKMessageNoStop(LangT("Save As recipe failed."));
         return;
     }
 
@@ -926,7 +927,7 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     RefreshRecipeList();
     SelectRecipeInList(NewName);
     RefreshRecipeStatus();
-    ShowMyOKMessageNoStop("Recipe saved as "+NewName+AnsiString("."));
+    ShowMyOKMessageNoStop(LangT("Recipe saved as ")+NewName+AnsiString(LangT(".")));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSetup::spbRecipeUseClick(TObject *Sender)
@@ -936,21 +937,21 @@ void __fastcall TfSetup::spbRecipeUseClick(TObject *Sender)
     (void)Sender;
     if(IsSystemRunning())
     {
-        ShowMyOKMessageNoStop("Can not change recipe while machine is running.");
+        ShowMyOKMessageNoStop(LangT("Can not change recipe while machine is running."));
         return;
     }
 
     Name=GetSelectedRecipeName();
     if(!RecipeManager.RecipeExists(Name))
     {
-        ShowMyOKMessageNoStop("Recipe does not exist.");
+        ShowMyOKMessageNoStop(LangT("Recipe does not exist."));
         return;
     }
 
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(false))
     {
-        ShowMyOKMessageNoStop("Bin map setting is invalid.");
+        ShowMyOKMessageNoStop(LangT("Bin map setting is invalid."));
         return;
     }
     RecipeManager.SetCurrentRecipeName(Name);
@@ -966,14 +967,14 @@ void __fastcall TfSetup::spbRecipeNewBlankClick(TObject *Sender)
     (void)Sender;
     if(edRecipeName->Text.Trim()==AnsiString(""))
     {
-        ShowMyOKMessageNoStop("Please input new recipe name.");
+        ShowMyOKMessageNoStop(LangT("Please input new recipe name."));
         return;
     }
 
     Name=RecipeManager.NormalizeRecipeName(edRecipeName->Text);
     if(!RecipeManager.CreateRecipe(Name))
     {
-        ShowMyOKMessageNoStop("Create recipe failed or recipe already exists.");
+        ShowMyOKMessageNoStop(LangT("Create recipe failed or recipe already exists."));
         return;
     }
 
@@ -994,25 +995,25 @@ void __fastcall TfSetup::spbRecipeDeleteClick(TObject *Sender)
     (void)Sender;
     if(IsSystemRunning())
     {
-        ShowMyOKMessageNoStop("Can not delete recipe while machine is running.");
+        ShowMyOKMessageNoStop(LangT("Can not delete recipe while machine is running."));
         return;
     }
 
     Name=GetSelectedRecipeName();
     if(Name.UpperCase()==RecipeManager.GetCurrentRecipeName().UpperCase())
     {
-        ShowMyOKMessageNoStop("Can not delete current recipe.");
+        ShowMyOKMessageNoStop(LangT("Can not delete current recipe."));
         return;
     }
 
     //AI(general) 20260608 : no Application->MessageBox - use the project message tool.
-    Ret=ShowMyMessageBox_YES_NO(AnsiString("Delete recipe ")+Name+AnsiString("?"));
+    Ret=ShowMyMessageBox_YES_NO(AnsiString(LangT("Delete recipe "))+Name+AnsiString(LangT("?")));
     if(Ret!=TMyMessageBox::msgrtnYES)
         return;
 
     if(!RecipeManager.DeleteRecipe(Name))
     {
-        ShowMyOKMessageNoStop("Delete recipe failed.");
+        ShowMyOKMessageNoStop(LangT("Delete recipe failed."));
         return;
     }
     RefreshRecipeList();

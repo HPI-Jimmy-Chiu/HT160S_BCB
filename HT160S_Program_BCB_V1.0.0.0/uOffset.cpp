@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #pragma hdrstop
+#include "language.h"
 
 #include <IniFiles.hpp>
 #include <SysUtils.hpp>
@@ -37,7 +38,7 @@ void TfOffset::BuildUI()
     if(bUIBuilt)
         return;
 
-    Caption="Offset";
+    Caption=LangT("Offset");
     Position=poScreenCenter;
     BorderStyle=bsSingle;
     ClientWidth=720;
@@ -48,7 +49,7 @@ void TfOffset::BuildUI()
     palTitle->Parent=this;
     palTitle->Align=alTop;
     palTitle->Height=32;
-    palTitle->Caption="Offset - per-workfile position fine-tune (mm)";
+    palTitle->Caption=LangT("Offset - per-workfile position fine-tune (mm)");
     palTitle->Font->Style=TFontStyles()<<fsBold;
 
     palButtons=new TPanel(this);
@@ -65,19 +66,19 @@ void TfOffset::BuildUI()
     btnReAlign=new TButton(this);
     btnReAlign->Parent=palButtons;
     btnReAlign->Left=180; btnReAlign->Top=10; btnReAlign->Width=190; btnReAlign->Height=32;
-    btnReAlign->Caption="Re-alignment (bake)";
+    btnReAlign->Caption=LangT("Re-alignment (bake)");
     btnReAlign->OnClick=btnReAlignClick;
 
     btnExit=new TButton(this);
     btnExit->Parent=palButtons;
     btnExit->Left=560; btnExit->Top=10; btnExit->Width=140; btnExit->Height=32;
-    btnExit->Caption="Exit";
+    btnExit->Caption=LangT("Exit");
     btnExit->OnClick=btnExitClick;
 
     btnClear=new TButton(this);
     btnClear->Parent=palButtons;
     btnClear->Left=384; btnClear->Top=10; btnClear->Width=160; btnClear->Height=32;
-    btnClear->Caption="Clear All";
+    btnClear->Caption=LangT("Clear All");
     btnClear->OnClick=btnClearClick;
 
     palExplain=new TPanel(this);
@@ -108,13 +109,13 @@ void TfOffset::BuildUI()
 
     tsLoader=new TTabSheet(this);
     tsLoader->PageControl=PageOffset;
-    tsLoader->Caption="Loader";
+    tsLoader->Caption=LangT("Loader");
     tsSortArm=new TTabSheet(this);
     tsSortArm->PageControl=PageOffset;
-    tsSortArm->Caption="SortArm";
+    tsSortArm->Caption=LangT("SortArm");
     tsAuto=new TTabSheet(this);
     tsAuto->PageControl=PageOffset;
-    tsAuto->Caption="Auto";
+    tsAuto->Caption=LangT("Auto");
 
     grdLoader=new TStringGrid(this);
     grdLoader->Parent=tsLoader;
@@ -148,10 +149,10 @@ void TfOffset::ConfigureGrid(TStringGrid *Grid)
     Grid->RowCount=2;
     Grid->DefaultRowHeight=24;
     Grid->Options=Grid->Options << goRowSelect << goColSizing << goVertLine << goHorzLine;
-    Grid->Cells[0][0]="Offset Item";
-    Grid->Cells[1][0]="Offset(mm)";
-    Grid->Cells[2][0]="Min(mm)";
-    Grid->Cells[3][0]="Max(mm)";
+    Grid->Cells[0][0]=LangT("Offset Item");
+    Grid->Cells[1][0]=LangT("Offset(mm)");
+    Grid->Cells[2][0]=LangT("Min(mm)");
+    Grid->Cells[3][0]=LangT("Max(mm)");
     Grid->ColWidths[0]=300;
     Grid->ColWidths[1]=110;
     Grid->ColWidths[2]=95;
@@ -387,15 +388,15 @@ AnsiString TfOffset::GetOffsetExplain(AnsiString Caption)
     if(Caption.Pos("_Z")>0)
         return "SortArm sucker Z height fine-tune at this station";
     if(Caption.Pos("BottomCCDFirstX")>0)
-        return "SortArm X stop at Bottom-CCD first column";
+        return LangT("SortArm X stop at Bottom-CCD first column");
     if(Caption.Pos("SortArmTo")==1)
-        return "SortArm X stop fine-tune at this station";
+        return LangT("SortArm X stop fine-tune at this station");
     if(Caption.Pos("LoaderCarFirstCCDX")==1)
-        return "Loader top-CCD X capture fine-tune";
+        return LangT("Loader top-CCD X capture fine-tune");
     if(Caption.Pos("Loader")==1)
         return "Loader carriage Y fine-tune (feed/discharge/CCD/sort)";
     if(Caption.Pos("Auto")==1)
-        return "Auto carriage first-sort Y fine-tune";
+        return LangT("Auto carriage first-sort Y fine-tune");
     return "Position offset (mm), added on top of base teach";
 }
 //---------------------------------------------------------------------------
@@ -514,7 +515,7 @@ void __fastcall TfOffset::btnApplyClick(TObject *Sender)
         return;
     SaveWorkFile();
     UpdateAllParameter();
-    ShowMyMessage("Offset saved and applied.");
+    ShowMyMessage(LangT("Offset saved and applied."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::btnReAlignClick(TObject *Sender)
@@ -584,7 +585,7 @@ void __fastcall TfOffset::btnReAlignClick(TObject *Sender)
     SaveWorkFile();
     UpdateAllParameter();
     RefreshGrids();
-    ShowMyMessage("Re-alignment done: offset folded into base teach.");
+    ShowMyMessage(LangT("Re-alignment done: offset folded into base teach."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::btnExitClick(TObject *Sender)
@@ -600,7 +601,7 @@ void __fastcall TfOffset::btnClearClick(TObject *Sender)
         return;
     memset(&Offset, 0, sizeof(Offset));
     RefreshGrids();
-    ShowMyMessage("All offsets cleared. Press Apply to save and take effect, or Exit to discard.");
+    ShowMyMessage(LangT("All offsets cleared. Press Apply to save and take effect, or Exit to discard."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::SetMaxClick(TObject *Sender)

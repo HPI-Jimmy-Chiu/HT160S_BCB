@@ -2,6 +2,7 @@
 
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "csystem.h"
 #include "cmydef.h"
@@ -495,7 +496,7 @@ void ScanAllMotorStatus()
 #ifndef SOFT_SIMULATE
 			else if(bWasHomed)
 			{
-				ShowMyMessage(AnsiString().sprintf("Motor %s home flag reset (servo alarm).",
+				ShowMyMessage(AnsiString().sprintf(LangT("Motor %s home flag reset (servo alarm).").c_str(),
 				              HSys.MotPtr[i]->NumberAlias.c_str()));
 			}
 #else

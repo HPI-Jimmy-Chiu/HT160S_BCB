@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #pragma hdrstop
+#include "language.h"
 #include "mymessbox.h"
 
 #include <IniFiles.hpp>
@@ -172,11 +173,11 @@ void TfTeach::ConfigureTeachGrid(TStringGrid *Grid)
     // Layout/colors/events are set in the DFM; only the header row text and column
     // widths must be applied in code (a TStringGrid does not stream cell content).
     Grid->Options=Grid->Options << goRowSelect << goColSizing;
-    Grid->Cells[0][0]="Teach Position";
+    Grid->Cells[0][0]=LangT("Teach Position");
     Grid->Cells[1][0]="Motor";
-    Grid->Cells[2][0]="Teach(mm)";
-    Grid->Cells[3][0]="Now(mm)";
-    Grid->Cells[4][0]="Soft Limit(mm)";
+    Grid->Cells[2][0]=LangT("Teach(mm)");
+    Grid->Cells[3][0]=LangT("Now(mm)");
+    Grid->Cells[4][0]=LangT("Soft Limit(mm)");
     Grid->ColWidths[0]=250;
     Grid->ColWidths[1]=210;
     Grid->ColWidths[2]=90;
@@ -783,20 +784,20 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
 
     if(Motor==NULL)
     {
-        SetMessage("Move abort: no motor");
+        SetMessage(LangT("Move abort: no motor"));
         return false;
     }
     if(HSys.Sys.SystemStart)
     {
-        ShowMyOKMessageNoStop("Machine is running.");
-        SetMessage("Move abort: system start");
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
+        SetMessage(LangT("Move abort: system start"));
         return false;
     }
 
     Emg=IsEMGPressed();
     if(Emg>0)
     {
-        ShowMyOKMessageNoStop("EMG is pressed.");
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
         SetMessage("Move abort: EMG");
         return false;
     }
@@ -804,8 +805,8 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
     Motor->ScanMotorStatus();
     if(Motor->GetEnable()==false)
     {
-        ShowMyOKMessageNoStop("Motor is disabled.");
-        SetMessage("Move abort: motor disable");
+        ShowMyOKMessageNoStop(LangT("Motor is disabled."));
+        SetMessage(LangT("Move abort: motor disable"));
         return false;
     }
     // A CW/CCW over-travel latches the generic ALARM led but is recoverable (home /
@@ -818,20 +819,20 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
     if(Motor->Led[iServoalarmLed] || Motor->Led[iEmgLed] ||
        (Motor->Led[iAlarmLed] && !(bAllowLimitAlarm && bLimitOnlyAlarm)))
     {
-        ShowMyOKMessageNoStop("Motor alarm is active.");
-        SetMessage("Move abort: motor alarm");
+        ShowMyOKMessageNoStop(LangT("Motor alarm is active."));
+        SetMessage(LangT("Move abort: motor alarm"));
         return false;
     }
     if(bRequireHome && Motor->bHomeFlag==false)
     {
-        ShowMyOKMessageNoStop("Motor is not home.");
-        SetMessage("Move abort: motor not home");
+        ShowMyOKMessageNoStop(LangT("Motor is not home."));
+        SetMessage(LangT("Move abort: motor not home"));
         return false;
     }
     if(HSys.Mot.MSortingArmX!=NULL && Motor->Tag==HSys.Mot.MSortingArmX->Tag && CheckSortArmZHome()==false)
     {
-        ShowMyOKMessageNoStop("Sort arm Z must be home before X move.");
-        SetMessage("Move abort: Sort Z not home");
+        ShowMyOKMessageNoStop(LangT("Sort arm Z must be home before X move."));
+        SetMessage(LangT("Move abort: Sort Z not home"));
         return false;
     }
     // AI(HT160S-Maintainer) 20260624 : TrayArm X move requires the Z lift confirmed UP -- same anti-
@@ -841,14 +842,14 @@ bool TfTeach::CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseT
     if(HSys.Mot.MTrayArmX!=NULL && Motor->Tag==HSys.Mot.MTrayArmX->Tag &&
        TrayArmModule!=NULL && TrayArmModule->IsZUpAtPosition()==false)
     {
-        ShowMyOKMessageNoStop("Tray arm Z must be up before X move.");
-        SetMessage("Move abort: Tray Z not up");
+        ShowMyOKMessageNoStop(LangT("Tray arm Z must be up before X move."));
+        SetMessage(LangT("Move abort: Tray Z not up"));
         return false;
     }
     if(bUseTarget && Motor->CheckSoftLimit(Target)==false)
     {
-        ShowMyOKMessageNoStop("Target over soft limit.");
-        SetMessage("Move abort: soft limit");
+        ShowMyOKMessageNoStop(LangT("Target over soft limit."));
+        SetMessage(LangT("Move abort: soft limit"));
         return false;
     }
     return true;
@@ -876,14 +877,14 @@ void TfTeach::StartJog(bool bPositive)
     Motor->ScanMotorStatus();
     if(bPositive && Motor->Led[iCwLed])
     {
-        ShowMyOKMessageNoStop("CW (+) limit is triggered. Jog + is blocked; use Jog - to move away.");
-        SetMessage("Jog+ abort: CW limit");
+        ShowMyOKMessageNoStop(LangT("CW (+) limit is triggered. Jog + is blocked; use Jog - to move away."));
+        SetMessage(LangT("Jog+ abort: CW limit"));
         return;
     }
     if(!bPositive && Motor->Led[iCcwLed])
     {
-        ShowMyOKMessageNoStop("CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away.");
-        SetMessage("Jog- abort: CCW limit");
+        ShowMyOKMessageNoStop(LangT("CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away."));
+        SetMessage(LangT("Jog- abort: CCW limit"));
         return;
     }
     Speed=GetEditInt(edSpeed, Motor->GetJogLowSpeed());
@@ -1097,7 +1098,7 @@ void __fastcall TfTeach::btnSaveClick(TObject *Sender)
 {
     int Ret;
     (void)Sender;
-    Ret=ShowMyMessageBox_YES_NO("Sure to Save ?");
+    Ret=ShowMyMessageBox_YES_NO(LangT("Sure to Save ?"));
     if(Ret==TMyMessageBox::msgrtnYES)
         SaveWorkFile(GetTeachFileName());
     UpdateAllParameter();   //AI 20260623 : re-fold effective Teach after base save
@@ -1183,7 +1184,7 @@ void __fastcall TfTeach::btnHomeClick(TObject *Sender)
     bHomeRunning=true;
     iHomeMotorIndex=ActiveMotorIndex;
     MotorTaskLog("Teach", Motor->Alias, "HOME_BTN", "operator pressed HOME");
-    SetMessage("Home start");
+    SetMessage(LangT("Home start"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfTeach::btnStopClick(TObject *Sender)
@@ -1252,14 +1253,14 @@ bool TfTeach::CheckSortArmTestReady(int SlotIndex, int Target)
 
     if(HSys.Sys.SystemStart)
     {
-        ShowMyOKMessageNoStop("Machine is running.");
-        SetSaStatus("Abort: system start");
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
+        SetSaStatus(LangT("Abort: system start"));
         return false;
     }
     if(IsEMGPressed()>0)
     {
-        ShowMyOKMessageNoStop("EMG is pressed.");
-        SetSaStatus("Abort: EMG");
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
+        SetSaStatus(LangT("Abort: EMG"));
         return false;
     }
 
@@ -1272,7 +1273,7 @@ bool TfTeach::CheckSortArmTestReady(int SlotIndex, int Target)
     }
     if(X==NULL || Y==NULL || Z==NULL)
     {
-        SetSaStatus("Abort: motor missing");
+        SetSaStatus(LangT("Abort: motor missing"));
         return false;
     }
 
@@ -1281,28 +1282,28 @@ bool TfTeach::CheckSortArmTestReady(int SlotIndex, int Target)
     Z->ScanMotorStatus();
     if(X->GetEnable()==false || Y->GetEnable()==false || Z->GetEnable()==false)
     {
-        ShowMyOKMessageNoStop("SortArm X / target Y / Suck Z must be enabled.");
-        SetSaStatus("Abort: motor disabled");
+        ShowMyOKMessageNoStop(LangT("SortArm X / target Y / Suck Z must be enabled."));
+        SetSaStatus(LangT("Abort: motor disabled"));
         return false;
     }
     if(X->Led[iAlarmLed] || X->Led[iServoalarmLed] ||
        Y->Led[iAlarmLed] || Y->Led[iServoalarmLed] ||
        Z->Led[iAlarmLed] || Z->Led[iServoalarmLed])
     {
-        ShowMyOKMessageNoStop("Motor alarm is active.");
-        SetSaStatus("Abort: motor alarm");
+        ShowMyOKMessageNoStop(LangT("Motor alarm is active."));
+        SetSaStatus(LangT("Abort: motor alarm"));
         return false;
     }
     if(X->bHomeFlag==false || Y->bHomeFlag==false)
     {
-        ShowMyOKMessageNoStop("SortArm X and target Y must be home.");
-        SetSaStatus("Abort: not home");
+        ShowMyOKMessageNoStop(LangT("SortArm X and target Y must be home."));
+        SetSaStatus(LangT("Abort: not home"));
         return false;
     }
     if(CheckSortArmZHome()==false)
     {
-        ShowMyOKMessageNoStop("All Suck Z must be home before X move.");
-        SetSaStatus("Abort: Suck Z not home");
+        ShowMyOKMessageNoStop(LangT("All Suck Z must be home before X move."));
+        SetSaStatus(LangT("Abort: Suck Z not home"));
         return false;
     }
     return true;
@@ -1315,7 +1316,7 @@ void TfTeach::RunSortArmTest()
     if(SortArmModule->MoveSuckerToCell(iSaSlot, iSaTarget, iSaCol, iSaRow, bSaZDown, iSaTask))
     {
         bSaTestRunning=false;
-        SetSaStatus("Sort arm test finish");
+        SetSaStatus(LangT("Sort arm test finish"));
     }
 }
 //---------------------------------------------------------------------------
@@ -1359,7 +1360,7 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
 
     if(SortArmModule==NULL)
     {
-        SetSaStatus("SortArm module not ready");
+        SetSaStatus(LangT("SortArm module not ready"));
         return;
     }
     if(cbSuckUse==NULL || cbToArea==NULL)
@@ -1373,13 +1374,13 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
     Slot=cbSuckUse->ItemIndex;
     if(Slot<0)
     {
-        SetSaStatus("Select a sucker");
+        SetSaStatus(LangT("Select a sucker"));
         return;
     }
     Target=ComboIndexToTarget(cbToArea->ItemIndex);
     if(Target<0)
     {
-        SetSaStatus("Select a target area");
+        SetSaStatus(LangT("Select a target area"));
         return;
     }
     // UI Col/Row are 1-based; convert to 0-based tray index.
@@ -1390,7 +1391,7 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
         return;
     if(SortArmModule->CanMoveSuckerToCell(Slot, Target, Col, Row, Err)==false)
     {
-        ShowMyOKMessageNoStop(Err);
+        ShowMyOKMessageNoStop(LangT(Err));
         SetSaStatus(Err);
         return;
     }
@@ -1402,7 +1403,7 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
     bSaZDown=(chkSaZDown!=NULL && chkSaZDown->Checked);
     iSaTask=0;
     bSaTestRunning=true;
-    SetSaStatus("Sort arm test start");
+    SetSaStatus(LangT("Sort arm test start"));
 }
 //---------------------------------------------------------------------------
 // Advanced page (Channel) : stacking-car destacker tests. Two groups.
@@ -1422,12 +1423,12 @@ bool TfTeach::CheckCarTestReady()
 {
     if(HSys.Sys.SystemStart)
     {
-        ShowMyOKMessageNoStop("Machine is running.");
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
         return false;
     }
     if(IsEMGPressed()>0)
     {
-        ShowMyOKMessageNoStop("EMG is pressed.");
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
         return false;
     }
     return true;
@@ -1516,7 +1517,7 @@ void TfTeach::RunAutoTest()
     if(AutoModule==NULL || AutoModule->TestGoUpOnce(iAutoIndex, 1))
     {
         bAutoTestRunning=false;
-        SetAutoStatus("Auto GoUp once finish");
+        SetAutoStatus(LangT("Auto GoUp once finish"));
     }
 }
 //---------------------------------------------------------------------------
@@ -1542,18 +1543,18 @@ void __fastcall TfTeach::btnCarGoClick(TObject *Sender)
         return;
     if(bCarTestRunning)
     {
-        SetCarStatus("Test already running");
+        SetCarStatus(LangT("Test already running"));
         return;
     }
     Area=cbCarArea->ItemIndex;
     if(Area<0)
     {
-        SetCarStatus("Select a car area");
+        SetCarStatus(LangT("Select a car area"));
         return;
     }
     if(CheckCarTestReady()==false)
     {
-        SetCarStatus("Abort: not ready");
+        SetCarStatus(LangT("Abort: not ready"));
         return;
     }
 
@@ -1580,18 +1581,18 @@ void __fastcall TfTeach::btnAutoGoUpClick(TObject *Sender)
         return;
     if(bAutoTestRunning)
     {
-        SetAutoStatus("Test already running");
+        SetAutoStatus(LangT("Test already running"));
         return;
     }
     Index=cbAutoArea->ItemIndex;
     if(Index<0)
     {
-        SetAutoStatus("Select an Auto");
+        SetAutoStatus(LangT("Select an Auto"));
         return;
     }
     if(CheckCarTestReady()==false)
     {
-        SetAutoStatus("Abort: not ready");
+        SetAutoStatus(LangT("Abort: not ready"));
         return;
     }
 
@@ -1599,6 +1600,6 @@ void __fastcall TfTeach::btnAutoGoUpClick(TObject *Sender)
     if(AutoModule!=NULL)
         AutoModule->TestGoUpOnce(iAutoIndex, 0);
     bAutoTestRunning=true;
-    SetAutoStatus("Auto GoUp once start");
+    SetAutoStatus(LangT("Auto GoUp once start"));
 }
 //---------------------------------------------------------------------------

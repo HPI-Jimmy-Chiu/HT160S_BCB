@@ -4,6 +4,7 @@
 #include <TypInfo.hpp>
 #include <stdlib.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "iosetview.h"
 #include "csystem.h"
@@ -179,7 +180,7 @@ void Tfiosetview::CreateSuckerGroupButtons()
     palSuckAll->FalseColor    =IO_COLOR_BUTTON_OFF;
     palSuckAll->FalseFontColor=clWhite;
     palSuckAll->TrueFontColor =clBlack;
-    palSuckAll->Caption       ="Suck";
+    palSuckAll->Caption       =LangT("Suck");
     palSuckAll->Tag           =0;
     palSuckAll->Style         =tsButtons;
     palSuckAll->Font->Charset =DEFAULT_CHARSET;
@@ -202,7 +203,7 @@ void Tfiosetview::CreateSuckerGroupButtons()
     palDestroyAll->FalseColor    =IO_COLOR_BUTTON_OFF;
     palDestroyAll->FalseFontColor=clWhite;
     palDestroyAll->TrueFontColor =clBlack;
-    palDestroyAll->Caption       ="Destroy";
+    palDestroyAll->Caption       =LangT("Destroy");
     palDestroyAll->Tag           =1;
     palDestroyAll->Style         =tsButtons;
     palDestroyAll->Font->Charset =DEFAULT_CHARSET;
@@ -225,7 +226,7 @@ void Tfiosetview::CreateSuckerGroupButtons()
     palAllOff->FalseColor    =IO_COLOR_BUTTON_OFF;
     palAllOff->FalseFontColor=clWhite;
     palAllOff->TrueFontColor =clBlack;
-    palAllOff->Caption       ="All Off";
+    palAllOff->Caption       =LangT("All Off");
     palAllOff->Tag           =2;
     palAllOff->Style         =tsButtons;
     palAllOff->Font->Charset =DEFAULT_CHARSET;
@@ -309,10 +310,10 @@ void Tfiosetview::RefreshMN200()
     //code-built BuildPages(); set here so the DFM StringGrid shows MN200 columns.
     grdMN200->ColCount=4;
     grdMN200->FixedRows=1;
-    grdMN200->Cells[0][0]="Ring";
-    grdMN200->Cells[1][0]="Started";
-    grdMN200->Cells[2][0]="Devices";
-    grdMN200->Cells[3][0]="ErrorCode";
+    grdMN200->Cells[0][0]=LangT("Ring");
+    grdMN200->Cells[1][0]=LangT("Started");
+    grdMN200->Cells[2][0]=LangT("Devices");
+    grdMN200->Cells[3][0]=LangT("ErrorCode");
 
     TMN200Connection *Conn=GetMN200Connection();
 
@@ -396,7 +397,7 @@ void Tfiosetview::SetupIOTableEditorGrid()
     strngrdIoTable->Options=TGridOptions() << goFixedVertLine << goFixedHorzLine << goVertLine << goHorzLine << goRangeSelect << goColSizing;
     for(int Col=0; Col<eIOTableColTotal; Col++)
     {
-        strngrdIoTable->Cells[Col][0]=Headers[Col];
+        strngrdIoTable->Cells[Col][0]=LangT(Headers[Col]);
         strngrdIoTable->ColWidths[Col]=Widths[Col];
     }
 }
@@ -853,7 +854,7 @@ void Tfiosetview::SaveIoTableFromGrid()
             ErrorMessage=ErrorMessage+AnsiString("\r\n")+Errors->Strings[Index];
         if(Errors->Count>20)
             ErrorMessage=ErrorMessage+AnsiString("\r\n...");
-        ShowMyOKMessageNoStop(ErrorMessage);
+        ShowMyOKMessageNoStop(LangT(ErrorMessage));
         delete Errors;
         return;
     }
@@ -862,7 +863,7 @@ void Tfiosetview::SaveIoTableFromGrid()
     BackupFile="";
     if(!BackupIOTableFile(&BackupFile))
     {
-        ShowMyOKMessageNoStop("IO_Table.csv backup failed. Save aborted.");
+        ShowMyOKMessageNoStop(LangT("IO_Table.csv backup failed. Save aborted."));
         return;
     }
 
@@ -913,11 +914,11 @@ void Tfiosetview::SaveIoTableFromGrid()
         if(BackupFile!=AnsiString(""))
             ShowMyOKMessageNoStop(AnsiString("IO_Table.csv saved.\r\nBackup: ")+BackupFile);
         else
-            ShowMyOKMessageNoStop("IO_Table.csv saved.");
+            ShowMyOKMessageNoStop(LangT("IO_Table.csv saved."));
     }
     catch(...)
     {
-        ShowMyOKMessageNoStop("IO_Table.csv save failed.");
+        ShowMyOKMessageNoStop(LangT("IO_Table.csv save failed."));
     }
 
     delete Fields;
@@ -1325,12 +1326,12 @@ void Tfiosetview::FillIOMapGrid(TStringGrid *Grid, bool InputSide)
     Grid->ColCount=6;
     Grid->FixedRows=1;
     Grid->FixedCols=0;
-    Grid->Cells[0][0]="Lane";
+    Grid->Cells[0][0]=LangT("Lane");
     Grid->Cells[1][0]="IP";
-    Grid->Cells[2][0]="Port";
-    Grid->Cells[3][0]="Bit";
-    Grid->Cells[4][0]="Type";
-    Grid->Cells[5][0]="Alias";
+    Grid->Cells[2][0]=LangT("Port");
+    Grid->Cells[3][0]=LangT("Bit");
+    Grid->Cells[4][0]=LangT("Type");
+    Grid->Cells[5][0]=LangT("Alias");
     Grid->ColWidths[0]=45;
     Grid->ColWidths[1]=45;
     Grid->ColWidths[2]=55;
@@ -1472,7 +1473,7 @@ void Tfiosetview::SaveIOMap(bool InputSide)
     Grid=dynamic_cast<TStringGrid *>(FindComponent(InputSide?"InputInformationGrid":"OutputInformationGrid"));
     if(Grid==NULL)
     {
-        ShowMyOKMessageNoStop("IO map grid not found.");
+        ShowMyOKMessageNoStop(LangT("IO map grid not found."));
         return;
     }
 
@@ -1556,7 +1557,7 @@ bool Tfiosetview::ResolveLegacyLedState(AnsiString AliasName, bool *State)
                     if(SuckerPtr->Sensor.Enable==false)
                         return false;
                     if(State!=NULL)
-                        *State=SuckerPtr->GetStatus();
+                        *State=SuckerPtr->Sensor.IsOn();   // show live vacuum sensor, not dummy-gated GetStatus (align HT172/9045/plain-SENSOR)
                     return true;
                 }
                 if(AliasName==SuckerPtr->OnPortName || AliasName==SuckerPtr->OnPortName+AnsiString("_On"))
@@ -1942,7 +1943,7 @@ void __fastcall Tfiosetview::BtnPanelClick(TObject *Sender)
     if(!ToggleLegacyButtonOutput(ButtonPtr))
     {
         LogManualOutputAction(ButtonPtr->Alias, "TOGGLE", "UNBOUND_OR_DISABLED");
-        ShowMyOKMessageNoStop("Output is not bound or disabled.");
+        ShowMyOKMessageNoStop(LangT("Output is not bound or disabled."));
     }
     else
     {
@@ -2193,7 +2194,7 @@ void __fastcall Tfiosetview::FormClose(TObject *Sender,
     {
         if(HasICUnderMachine())
         {
-            ShowMyMessage("IO already change, will restore IO!!");
+            ShowMyMessage(LangT("IO already change, will restore IO!!"));
             RestoreOutputData();
         }
         else if(ShowMyMessageBox_YES_NO("IO already change, want to restore?")==TMyMessageBox::msgrtnYES)

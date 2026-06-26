@@ -2,6 +2,7 @@
 #include <vcl.h>
 #include <stdlib.h>
 #pragma hdrstop
+#include "language.h"
 #include "mymessbox.h"
 
 #include "uQwertyKey.h"
@@ -329,7 +330,7 @@ bool TfQwertyKey::ValidateAndClamp(AnsiString &Text)
     {
         if(Text==AnsiString("") || Text==AnsiString("-") || Text==AnsiString(".") || Text==AnsiString("-."))
         {
-            ShowMyOKMessageNoStop("Input value is invalid.");
+            ShowMyOKMessageNoStop(LangT("Input value is invalid."));
             return false;
         }
         Value=atof(Text.c_str());

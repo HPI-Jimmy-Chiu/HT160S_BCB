@@ -18,6 +18,7 @@ struct TSortArmSlotState
     int BinValue;
     int LotIndex;        //AI(ht160s-lotbin) 20260615 : owning LotIndex (By Lot+Bin routing key)
     AnsiString Code2D;   //AI(ht160s-lotbin) 20260615 : IC 2D code (Production_Log trace)
+    bool bManual2D;   //AI(ht160s-ccd-manual2d) : IC 2D was operator hand-entered (Production_Log Manual2D)
 };
 //---------------------------------------------------------------------------
 class TTrayMotor;

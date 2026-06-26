@@ -2,6 +2,7 @@
 #include <vcl.h>
 #include <stdlib.h>
 #pragma hdrstop
+#include "language.h"
 #include "mymessbox.h"
 
 #include <IniFiles.hpp>
@@ -479,19 +480,19 @@ void TfMotorTest::ConfigureOperateGrid()
     grdOperate->Options=grdOperate->Options << goColSizing;
     grdOperate->OnDrawCell=grdOperateDrawCell;
     grdOperate->OnMouseDown=grdOperateMouseDown;
-    grdOperate->Cells[eOperateColLoop][0]="Loop";
-    grdOperate->Cells[eOperateColNo][0]="No";
+    grdOperate->Cells[eOperateColLoop][0]=LangT("Loop");
+    grdOperate->Cells[eOperateColNo][0]=LangT("No");
     grdOperate->Cells[eOperateColMotor][0]="Motor";
-    grdOperate->Cells[eOperateColCommand][0]="Command";
-    grdOperate->Cells[eOperateColEncoder][0]="Encoder";
-    grdOperate->Cells[eOperateColHome][0]="Home";
-    grdOperate->Cells[eOperateColEnable][0]="Enable";
-    grdOperate->Cells[eOperateColServoOn][0]="Servo";
-    grdOperate->Cells[eOperateColServoAlarm][0]="Svr Alm";
-    grdOperate->Cells[eOperateColEmg][0]="EMG";
-    grdOperate->Cells[eOperateColAlarm][0]="Alarm";
-    grdOperate->Cells[eOperateColInPos][0]="InPos";
-    grdOperate->Cells[eOperateColSoftLimit][0]="Soft Limit";
+    grdOperate->Cells[eOperateColCommand][0]=LangT("Command");
+    grdOperate->Cells[eOperateColEncoder][0]=LangT("Encoder");
+    grdOperate->Cells[eOperateColHome][0]=LangT("Home");
+    grdOperate->Cells[eOperateColEnable][0]=LangT("Enable");
+    grdOperate->Cells[eOperateColServoOn][0]=LangT("Servo");
+    grdOperate->Cells[eOperateColServoAlarm][0]=LangT("Svr Alm");
+    grdOperate->Cells[eOperateColEmg][0]=LangT("EMG");
+    grdOperate->Cells[eOperateColAlarm][0]=LangT("Alarm");
+    grdOperate->Cells[eOperateColInPos][0]=LangT("InPos");
+    grdOperate->Cells[eOperateColSoftLimit][0]=LangT("Soft Limit");
     grdOperate->ColWidths[eOperateColLoop]=42;
     grdOperate->ColWidths[eOperateColNo]=45;
     grdOperate->ColWidths[eOperateColMotor]=145;
@@ -576,21 +577,21 @@ void TfMotorTest::ConfigureInformationGrid()
     grdInformation->DefaultRowHeight=24;
     grdInformation->Color=MOTOR_TEST_COLOR_GRID;
     grdInformation->Options=grdInformation->Options << goRowSelect << goColSizing;
-    grdInformation->Cells[eInfoColNo][0]="No";
-    grdInformation->Cells[eInfoColAlias][0]="Alias";
-    grdInformation->Cells[eInfoColCard][0]="Card";
-    grdInformation->Cells[eInfoColBoard][0]="Board";
-    grdInformation->Cells[eInfoColPort][0]="Port";
-    grdInformation->Cells[eInfoColAddress][0]="Address";
-    grdInformation->Cells[eInfoColKind][0]="Kind";
-    grdInformation->Cells[eInfoColFlushPanel][0]="Flush Panel";
-    grdInformation->Cells[eInfoColServoConfig][0]="ServoCfg";
-    grdInformation->Cells[eInfoColIsServo][0]="IsServo";
-    grdInformation->Cells[eInfoColMotorRelay][0]="MotorRelay";
-    grdInformation->Cells[eInfoColServerON][0]="ServerON";
-    grdInformation->Cells[eInfoColMotorPower][0]="SnMotorPower";
-    grdInformation->Cells[eInfoColPowerState][0]="PowerState";
-    grdInformation->Cells[eInfoColPowerDelay][0]="Delay";
+    grdInformation->Cells[eInfoColNo][0]=LangT("No");
+    grdInformation->Cells[eInfoColAlias][0]=LangT("Alias");
+    grdInformation->Cells[eInfoColCard][0]=LangT("Card");
+    grdInformation->Cells[eInfoColBoard][0]=LangT("Board");
+    grdInformation->Cells[eInfoColPort][0]=LangT("Port");
+    grdInformation->Cells[eInfoColAddress][0]=LangT("Address");
+    grdInformation->Cells[eInfoColKind][0]=LangT("Kind");
+    grdInformation->Cells[eInfoColFlushPanel][0]=LangT("Flush Panel");
+    grdInformation->Cells[eInfoColServoConfig][0]=LangT("ServoCfg");
+    grdInformation->Cells[eInfoColIsServo][0]=LangT("IsServo");
+    grdInformation->Cells[eInfoColMotorRelay][0]=LangT("MotorRelay");
+    grdInformation->Cells[eInfoColServerON][0]=LangT("ServerON");
+    grdInformation->Cells[eInfoColMotorPower][0]=LangT("SnMotorPower");
+    grdInformation->Cells[eInfoColPowerState][0]=LangT("PowerState");
+    grdInformation->Cells[eInfoColPowerDelay][0]=LangT("Delay");
     grdInformation->ColWidths[eInfoColNo]=45;
     grdInformation->ColWidths[eInfoColAlias]=145;
     grdInformation->ColWidths[eInfoColCard]=80;
@@ -621,9 +622,9 @@ void TfMotorTest::ConfigureDriverRegisterGrid()
     grdDriverRegister->DefaultRowHeight=24;
     grdDriverRegister->Color=MOTOR_TEST_COLOR_GRID;
     grdDriverRegister->Options=TGridOptions() << goFixedVertLine << goFixedHorzLine << goVertLine << goHorzLine << goRowSelect << goColSizing;
-    grdDriverRegister->Cells[eDriverRegColRegister][0]="Register";
-    grdDriverRegister->Cells[eDriverRegColValue][0]="Value";
-    grdDriverRegister->Cells[eDriverRegColResult][0]="Result";
+    grdDriverRegister->Cells[eDriverRegColRegister][0]=LangT("Register");
+    grdDriverRegister->Cells[eDriverRegColValue][0]=LangT("Value");
+    grdDriverRegister->Cells[eDriverRegColResult][0]=LangT("Result");
     grdDriverRegister->ColWidths[eDriverRegColRegister]=110;
     grdDriverRegister->ColWidths[eDriverRegColValue]=160;
     grdDriverRegister->ColWidths[eDriverRegColResult]=420;
@@ -631,7 +632,7 @@ void TfMotorTest::ConfigureDriverRegisterGrid()
     {
         grdDriverRegister->Cells[eDriverRegColRegister][Index+1]=DefaultRegisters[Index];
         grdDriverRegister->Cells[eDriverRegColValue][Index+1]="";
-        grdDriverRegister->Cells[eDriverRegColResult][Index+1]="Legacy MC88X1 read-only offset";
+        grdDriverRegister->Cells[eDriverRegColResult][Index+1]=LangT("Legacy MC88X1 read-only offset");
     }
 }
 //---------------------------------------------------------------------------
@@ -646,9 +647,9 @@ void TfMotorTest::ConfigureServoGuardGrid()
     grdServoGuard->DefaultRowHeight=24;
     grdServoGuard->Color=MOTOR_TEST_COLOR_GRID;
     grdServoGuard->Options=TGridOptions() << goFixedVertLine << goFixedHorzLine << goVertLine << goHorzLine << goRowSelect << goColSizing;
-    grdServoGuard->Cells[eServoGuardColItem][0]="Item";
-    grdServoGuard->Cells[eServoGuardColValue][0]="Value";
-    grdServoGuard->Cells[eServoGuardColNote][0]="Note";
+    grdServoGuard->Cells[eServoGuardColItem][0]=LangT("Item");
+    grdServoGuard->Cells[eServoGuardColValue][0]=LangT("Value");
+    grdServoGuard->Cells[eServoGuardColNote][0]=LangT("Note");
     grdServoGuard->ColWidths[eServoGuardColItem]=160;
     grdServoGuard->ColWidths[eServoGuardColValue]=160;
     grdServoGuard->ColWidths[eServoGuardColNote]=470;
@@ -781,7 +782,7 @@ bool TfMotorTest::ConfirmDiscardMotorParameterEdit()
     if(bMotorParameterDirty==false)
         return true;
 
-    Ret=ShowMyMessageBox_YES_NO("Discard unsaved motor parameter changes?");
+    Ret=ShowMyMessageBox_YES_NO(LangT("Discard unsaved motor parameter changes?"));
     if(Ret==TMyMessageBox::msgrtnYES)
     {
         bMotorParameterDirty=false;
@@ -796,7 +797,7 @@ bool TfMotorTest::CheckNoUnsavedMotorParameter(AnsiString ActionText)
 {
     if(bMotorParameterDirty==false)
         return true;
-    ShowMyOKMessageNoStop(AnsiString("Save or reload motor parameter first before ")+ActionText+AnsiString("."));
+    ShowMyOKMessageNoStop(Format(LangT("Save or reload motor parameter first before %s."),ARRAYOFCONST((ActionText))));
     SetMessage("Action blocked: parameter not saved");
     return false;
 }
@@ -805,7 +806,7 @@ bool TfMotorTest::CheckNoUnsavedMotorTable(AnsiString ActionText)
 {
     if(bMotorTableDirty==false)
         return true;
-    ShowMyOKMessageNoStop(AnsiString("Save or reload Mot_Table first before ")+ActionText+AnsiString("."));
+    ShowMyOKMessageNoStop(Format(LangT("Save or reload Mot_Table first before %s."),ARRAYOFCONST((ActionText))));
     SetMessage("Action blocked: Mot_Table not saved");
     return false;
 }
@@ -814,13 +815,13 @@ bool TfMotorTest::CheckMotorDataEditIdle()
 {
     if(HSys.Sys.SystemStart)
     {
-        ShowMyOKMessageNoStop("Machine is running.");
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
         SetMessage("Action blocked: system start");
         return false;
     }
     if(bHomeRunning || bLoopRunning)
     {
-        ShowMyOKMessageNoStop("Motor is busy.");
+        ShowMyOKMessageNoStop(LangT("Motor is busy."));
         SetMessage("Action blocked: motor busy");
         return false;
     }
@@ -1404,13 +1405,13 @@ void TfMotorTest::EditMotorParameterCell(int RowIndex, int ColIndex)
         ValueText=(CurFlag==AnsiString("ON"))?AnsiString("OFF"):AnsiString("ON");
         if(ValidateMotorParameterValue(ColIndex, ValueText, DisplayText, CsvText, ErrorText)==false)
         {
-            ShowMyOKMessageNoStop(ErrorText);
+            ShowMyOKMessageNoStop(LangT(ErrorText));
             return;
         }
         grdMotorParameter->Cells[ColIndex][RowIndex]=DisplayText;
         if(ValidateMotorParameterRow(RowIndex, ErrorText)==false)
         {
-            ShowMyOKMessageNoStop(ErrorText);
+            ShowMyOKMessageNoStop(LangT(ErrorText));
             RefreshMotorParameterGrid();
             return;
         }
@@ -1458,14 +1459,14 @@ void TfMotorTest::EditMotorParameterCell(int RowIndex, int ColIndex)
 
     if(ValidateMotorParameterValue(ColIndex, ValueText, DisplayText, CsvText, ErrorText)==false)
     {
-        ShowMyOKMessageNoStop(ErrorText);
+        ShowMyOKMessageNoStop(LangT(ErrorText));
         return;
     }
 
     grdMotorParameter->Cells[ColIndex][RowIndex]=DisplayText;
     if(ValidateMotorParameterRow(RowIndex, ErrorText)==false)
     {
-        ShowMyOKMessageNoStop(ErrorText);
+        ShowMyOKMessageNoStop(LangT(ErrorText));
         RefreshMotorParameterGrid();
         return;
     }
@@ -1565,7 +1566,7 @@ void TfMotorTest::SaveMotorParameterToFile()
             continue;
         if(ValidateMotorParameterRow(MotorIndex+1, ErrorText)==false)
         {
-            ShowMyOKMessageNoStop(ErrorText);
+            ShowMyOKMessageNoStop(LangT(ErrorText));
             return;
         }
     }
@@ -1639,7 +1640,7 @@ void TfMotorTest::SaveMotorParameterToFile()
                 PreviewText=PreviewText+AnsiString("\r\n")+ChangeList->Strings[Index];
             if(ChangeCount>PreviewLimit)
                 PreviewText=PreviewText+AnsiString("\r\n...")+IntToStr(ChangeCount-PreviewLimit)+AnsiString(" more change(s)");
-            if(ShowMyMessageBox_YES_NO(PreviewText+AnsiString("\r\n\r\nSave motor parameter changes?"))!=TMyMessageBox::msgrtnYES)
+            if(ShowMyMessageBox_YES_NO(PreviewText+AnsiString(LangT("\r\n\r\nSave motor parameter changes?")))!=TMyMessageBox::msgrtnYES)
                 throw Exception("User cancelled motor parameter save.");
 
             if(BackupMotorTable(BackupPath, ErrorText)==false)
@@ -1670,7 +1671,7 @@ void TfMotorTest::SaveMotorParameterToFile()
             SetMessage("Motor parameter save cancelled");
             return;
         }
-        ShowMyOKMessageNoStop(ErrorText);
+        ShowMyOKMessageNoStop(LangT(ErrorText));
         SetMessage("Motor parameter save failed");
         return;
     }
@@ -1732,7 +1733,7 @@ void TfMotorTest::SaveMotorParameterToFile()
     }
     if(bLogOK==false)
     {
-        ShowMyOKMessageNoStop(AnsiString("Motor parameter saved, but log failed: ")+LogError);
+        ShowMyOKMessageNoStop(AnsiString(LangT("Motor parameter saved, but log failed: "))+LogError);
         SetMessage("Motor parameter saved. Log failed");
     }
     else
@@ -2007,13 +2008,13 @@ void TfMotorTest::ReadDriverRegister(bool bDefaultList)
         return;
     if(Motor->GetEnable()==false)
     {
-        ShowMyOKMessageNoStop("Active motor is disabled.");
+        ShowMyOKMessageNoStop(LangT("Active motor is disabled."));
         SetMessage("Register read abort: motor disabled");
         return;
     }
     if(Motor->CardModel.UpperCase()!=AnsiString("MC88X1"))
     {
-        ShowMyOKMessageNoStop("Register read is enabled only for MC88X1 motors.");
+        ShowMyOKMessageNoStop(LangT("Register read is enabled only for MC88X1 motors."));
         SetMessage("Register read abort: not MC88X1");
         return;
     }
@@ -2029,7 +2030,7 @@ void TfMotorTest::ReadDriverRegister(bool bDefaultList)
         EndRow=1;
         if(edRegisterOffset==NULL || ParseRegisterOffset(edRegisterOffset->Text, Offset)==false)
         {
-            ShowMyOKMessageNoStop("Input an even hex register offset, for example 0x08.");
+            ShowMyOKMessageNoStop(LangT("Input an even hex register offset, for example 0x08."));
             SetMessage("Register read abort: invalid offset");
             return;
         }
@@ -2313,23 +2314,23 @@ bool TfMotorTest::ExecuteServoPowerGuard(bool bServoOn, bool bApplyMode)
     }
 
     if(bLogOK==false)
-        ShowMyOKMessageNoStop(AnsiString("Servo Guard log failed: ")+LogError);
+        ShowMyOKMessageNoStop(AnsiString(LangT("Servo Guard log failed: "))+LogError);
     if(GuardOK)
     {
         if(bApplyMode)
         {
-            ShowMyOKMessageNoStop(AnsiString("Servo apply executed. Servo command count: ")+IntToStr(ActuatedCount));
+            ShowMyOKMessageNoStop(AnsiString(LangT("Servo apply executed. Servo command count: "))+IntToStr(ActuatedCount));
             SetMessage("Servo apply executed");
         }
         else
         {
-            ShowMyOKMessageNoStop("Servo guard passed. Actual servo control is still locked.");
+            ShowMyOKMessageNoStop(LangT("Servo guard passed. Actual servo control is still locked."));
             SetMessage("Servo guard passed, actuation locked");
         }
     }
     else
     {
-        ShowMyOKMessageNoStop(AnsiString("Servo ")+(bApplyMode?AnsiString("apply"):AnsiString("guard"))+AnsiString(" blocked: ")+ReasonText);
+        ShowMyOKMessageNoStop(Format(LangT("Servo %s blocked: %s"),ARRAYOFCONST(((bApplyMode?LangT("apply"):LangT("guard")),ReasonText))));
         SetMessage(bApplyMode?AnsiString("Servo apply blocked"):AnsiString("Servo guard blocked, actuation locked"));
     }
     return GuardOK;
@@ -2476,19 +2477,19 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
     }
     if(bMotorParameterDirty)
     {
-        ShowMyOKMessageNoStop("Save or reload motor parameter first.");
+        ShowMyOKMessageNoStop(LangT("Save or reload motor parameter first."));
         SetMessage("Move abort: parameter not saved");
         return false;
     }
     if(bMotorTableDirty)
     {
-        ShowMyOKMessageNoStop("Save or reload Mot_Table first.");
+        ShowMyOKMessageNoStop(LangT("Save or reload Mot_Table first."));
         SetMessage("Move abort: Mot_Table not saved");
         return false;
     }
     if(HSys.Sys.SystemStart)
     {
-        ShowMyOKMessageNoStop("Machine is running.");
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
         SetMessage("Move abort: system start");
         return false;
     }
@@ -2498,14 +2499,14 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
     // gate calls this, so the first home/loop start is not self-blocked.
     if(bHomeRunning || bLoopRunning)
     {
-        ShowMyOKMessageNoStop("Motor Test is busy (home or loop running).");
+        ShowMyOKMessageNoStop(LangT("Motor Test is busy (home or loop running)."));
         SetMessage("Move abort: home/loop busy");
         return false;
     }
     Emg=IsEMGPressed();
     if(Emg>0)
     {
-        ShowMyOKMessageNoStop("EMG is pressed.");
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
         SetMessage("Move abort: EMG");
         return false;
     }
@@ -2513,7 +2514,7 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
     Motor->ScanMotorStatus();
     if(Motor->GetEnable()==false)
     {
-        ShowMyOKMessageNoStop("Motor is disabled.");
+        ShowMyOKMessageNoStop(LangT("Motor is disabled."));
         SetMessage("Move abort: motor disable");
         return false;
     }
@@ -2528,19 +2529,19 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
     if(Motor->Led[iServoalarmLed] || Motor->Led[iEmgLed] ||
        (Motor->Led[iAlarmLed] && !(bAllowLimitAlarm && bLimitOnlyAlarm)))
     {
-        ShowMyOKMessageNoStop("Motor alarm is active.");
+        ShowMyOKMessageNoStop(LangT("Motor alarm is active."));
         SetMessage("Move abort: motor alarm");
         return false;
     }
     if(bRequireHome && Motor->bHomeFlag==false)
     {
-        ShowMyOKMessageNoStop("Motor is not home.");
+        ShowMyOKMessageNoStop(LangT("Motor is not home."));
         SetMessage("Move abort: motor not home");
         return false;
     }
     if(HSys.Mot.MSortingArmX!=NULL && Motor->Tag==HSys.Mot.MSortingArmX->Tag && CheckSortArmZHome()==false)
     {
-        ShowMyOKMessageNoStop("Sort arm Z must be home before X move.");
+        ShowMyOKMessageNoStop(LangT("Sort arm Z must be home before X move."));
         SetMessage("Move abort: Sort Z not home");
         return false;
     }
@@ -2552,13 +2553,13 @@ bool TfMotorTest::CheckCanMotorMove(TTrayMotor *Motor, bool bRequireHome, bool b
     if(HSys.Mot.MTrayArmX!=NULL && Motor->Tag==HSys.Mot.MTrayArmX->Tag &&
        TrayArmModule!=NULL && TrayArmModule->IsZUpAtPosition()==false)
     {
-        ShowMyOKMessageNoStop("Tray arm Z must be up before X move.");
+        ShowMyOKMessageNoStop(LangT("Tray arm Z must be up before X move."));
         SetMessage("Move abort: Tray Z not up");
         return false;
     }
     if(bUseTarget && Motor->CheckSoftLimit(Target)==false)
     {
-        ShowMyOKMessageNoStop("Target over soft limit.");
+        ShowMyOKMessageNoStop(LangT("Target over soft limit."));
         SetMessage("Move abort: soft limit");
         return false;
     }
@@ -2614,13 +2615,13 @@ void TfMotorTest::StartJog(bool bPositive)
     // The limit-derived ALARM LED does NOT block jog. Move/Step keep the full CheckCanMotorMove gate.
     if(bHomeRunning || bLoopRunning)
     {
-        ShowMyOKMessageNoStop("Motor Test is busy (home or loop running).");
+        ShowMyOKMessageNoStop(LangT("Motor Test is busy (home or loop running)."));
         SetMessage("Jog abort: home/loop busy");
         return;
     }
     if(IsEMGPressed()>0)
     {
-        ShowMyOKMessageNoStop("EMG is pressed.");
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
         SetMessage("Jog abort: EMG");
         return;
     }
@@ -2629,7 +2630,7 @@ void TfMotorTest::StartJog(bool bPositive)
     // jogging a suck-Z itself -- are unaffected.
     if(Motor==HSys.Mot.MSortingArmX && SortArmModule!=NULL && SortArmModule->AreAllSuckersHome()==false)
     {
-        ShowMyOKMessageNoStop("Sort arm Z must be home before X jog.");
+        ShowMyOKMessageNoStop(LangT("Sort arm Z must be home before X jog."));
         SetMessage("Jog abort: Sort Z not home");
         return;
     }
@@ -2637,20 +2638,20 @@ void TfMotorTest::StartJog(bool bPositive)
     // (jog otherwise bypassed this anti-collision gate). Active in DUMMY; bypassed only under SOFT_SIMULATE.
     if(Motor==HSys.Mot.MTrayArmX && TrayArmModule!=NULL && TrayArmModule->IsZUpAtPosition()==false)
     {
-        ShowMyOKMessageNoStop("Tray arm Z must be up before X jog.");
+        ShowMyOKMessageNoStop(LangT("Tray arm Z must be up before X jog."));
         SetMessage("Jog abort: Tray Z not up");
         return;
     }
     Motor->ScanMotorStatus();
     if(bPositive && Motor->Led[iCwLed])
     {
-        ShowMyOKMessageNoStop("CW (+) limit is triggered. Jog + is blocked; use Jog - to move away.");
+        ShowMyOKMessageNoStop(LangT("CW (+) limit is triggered. Jog + is blocked; use Jog - to move away."));
         SetMessage("Jog+ abort: CW limit");
         return;
     }
     if(!bPositive && Motor->Led[iCcwLed])
     {
-        ShowMyOKMessageNoStop("CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away.");
+        ShowMyOKMessageNoStop(LangT("CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away."));
         SetMessage("Jog- abort: CCW limit");
         return;
     }
@@ -2824,7 +2825,7 @@ void TfMotorTest::StartMultiLoopMove()
     SelectedCount=GetSelectedMultiLoopCount();
     if(SelectedCount<2)
     {
-        ShowMyOKMessageNoStop("Select at least two motors in Motor List for multi loop.");
+        ShowMyOKMessageNoStop(LangT("Select at least two motors in Motor List for multi loop."));
         SetMessage("Multi loop abort: select motors");
         return;
     }
@@ -3146,12 +3147,12 @@ void __fastcall TfMotorTest::tmrUpdateTimer(TObject *Sender)
         bHomeBtnShown=bHomeRunning;
         if(bHomeRunning)
         {
-            btnHome->Caption="HOMING..";
+            btnHome->Caption=LangT("HOMING..");
             btnHome->Font->Color=clRed;
         }
         else
         {
-            btnHome->Caption="HOME";
+            btnHome->Caption=LangT("HOME");
             btnHome->Font->Color=clWindowText;
         }
     }
@@ -3456,19 +3457,19 @@ void __fastcall TfMotorTest::btnParamValidateClick(TObject *Sender)
     (void)Sender;
     if(bMotorParameterDirty || bMotorTableDirty)
     {
-        if(ShowMyMessageBox_YES_NO("Unsaved MotorTest edits are not included in file validation. Continue?")!=TMyMessageBox::msgrtnYES)
+        if(ShowMyMessageBox_YES_NO(LangT("Unsaved MotorTest edits are not included in file validation. Continue?"))!=TMyMessageBox::msgrtnYES)
             return;
     }
 
     if(ValidateMotorTableCsv(SummaryText, ErrorText))
     {
         SetMessage(SummaryText);
-        ShowMyOKMessageNoStop(SummaryText);
+        ShowMyOKMessageNoStop(LangT(SummaryText));
     }
     else
     {
         SetMessage("Mot_Table validation failed");
-        ShowMyOKMessageNoStop(ErrorText);
+        ShowMyOKMessageNoStop(LangT(ErrorText));
     }
 }
 //---------------------------------------------------------------------------

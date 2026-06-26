@@ -53,6 +53,7 @@ void TMyTray::Clear()
             iBin[x][y]=0;   //AI(HT160S-Maintainer) 20260601 : 0 = bin not assigned yet
             iLot[x][y]=-1;  //AI(ht160s-lotbin) 20260615 : -1 = no owning lot yet
             sCode2D[x][y]="";
+            bManual2D[x][y]=false;
         }
     TrayID="";
     Kind=eTrayKindNormal;   //AI(HT160S-Maintainer) 20260604 : default role = normal work tray
@@ -169,6 +170,7 @@ void TMyTray::ClearLotCode()
         {
             iLot[x][y]=-1;
             sCode2D[x][y]="";
+            bManual2D[x][y]=false;
         }
 }
 //---------------------------------------------------------------------------
@@ -198,6 +200,20 @@ AnsiString TMyTray::GetCode2D(int x, int y)
     if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
         return "";
     return sCode2D[x][y];
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetManual2D(int x, int y, bool b)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    bManual2D[x][y]=b;
+}
+//---------------------------------------------------------------------------
+bool TMyTray::GetManual2D(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return false;
+    return bManual2D[x][y];
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
@@ -1040,6 +1056,16 @@ void TTrayMotor::SetTrayCode2D(int x, int y, AnsiString code)
 AnsiString TTrayMotor::GetTrayCode2D(int x, int y)
 {
     return Tray.GetCode2D(x, y);
+}
+//---------------------------------------------------------------------------
+void TTrayMotor::SetTrayManual2D(int x, int y, bool b)
+{
+    Tray.SetManual2D(x, y, b);
+}
+//---------------------------------------------------------------------------
+bool TTrayMotor::GetTrayManual2D(int x, int y)
+{
+    return Tray.GetManual2D(x, y);
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::InitNewTray(int data)

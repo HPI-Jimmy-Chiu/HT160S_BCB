@@ -49,6 +49,9 @@ static void ShowTopForm(TForm *FormPtr, TSpeedButton *ButtonPtr)
 {
     if(FormPtr != NULL)
     {
+        //AI(ht160s-language) 20260626 : apply current UI language before showing.
+        if(fLan != NULL)
+            fLan->ChangeLanguage(FormPtr);
         FormPtr->ShowModal();
     }
     if(ButtonPtr != NULL)
@@ -467,11 +470,11 @@ void __fastcall TfMain::LayoutFeatureBadges()
     if(bOverflow && !bFeatureBadgeOverflowWarned)
     {
         bFeatureBadgeOverflowWarned = true;
-        ShowMyOKMessageNoStop(
+        ShowMyOKMessageNoStop(LangT(
             "Main status badges exceed the grid (max "
             "3 cols x 2 rows = 6). The extra badges are hidden.\n"
             "Increase MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS in "
-            "main.h and widen pnlFeatureStatus to make room.");
+            "main.h and widen pnlFeatureStatus to make room."));
     }
 }
 //---------------------------------------------------------------------------
@@ -492,7 +495,7 @@ void __fastcall TfMain::SetFeatureStatusBadge(int BadgeIndex, AnsiString ValueTe
     if(FeatureStatusValueLabels[BadgeIndex] == NULL)
         return;
 
-    FeatureStatusValueLabels[BadgeIndex]->Caption = ValueText;
+    FeatureStatusValueLabels[BadgeIndex]->Caption = LangT(ValueText);
     FeatureStatusValueLabels[BadgeIndex]->Font->Color = ValueColor;
     if(FeatureStatusPanels[BadgeIndex] != NULL)
         FeatureStatusPanels[BadgeIndex]->Visible = true;
@@ -541,7 +544,18 @@ void __fastcall TfMain::UpdateSecsFeatureBadge()
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbLaguageClick(TObject *Sender)
 {
-    ShowTopForm(fLan, sbLaguage);
+    //AI(ht160s-language) 20260626 : toggle EN/ZH and re-apply live, instead of
+    //  opening the (now retired) empty fLan form. Blocked while running.
+    if(HSys.Sys.SystemStart)
+        return;
+    if(HSys.LastSet.iLanguageCountry==0)
+        HSys.LastSet.iLanguageCountry=1;
+    else
+        HSys.LastSet.iLanguageCountry=0;
+    SaveMainRunSettingsToIni();
+    if(fLan != NULL)
+        fLan->ChangeLanguage(this);
+    sbLaguage->Down=false;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbProductClick(TObject *Sender)
@@ -828,21 +842,21 @@ void __fastcall TfMain::ShowMotorInfo()
         flag=true;
         sgMotorStatus->ColCount=iMotLedTotalCnt+4;
         sgMotorStatus->ColWidths[0]=120;
-        sgMotorStatus->Cells[ 0][0]="Motor Name";
-        sgMotorStatus->Cells[ 1][0]="Target";
-        sgMotorStatus->Cells[ 2][0]="Position";
-        sgMotorStatus->Cells[ 3][0]="Encoder";
-        sgMotorStatus->Cells[ 4][0]="CW";
-        sgMotorStatus->Cells[ 5][0]="HOME";
-        sgMotorStatus->Cells[ 6][0]="CCW";
-        sgMotorStatus->Cells[ 7][0]="Emg";
-        sgMotorStatus->Cells[ 8][0]="Alarm";
-        sgMotorStatus->Cells[ 9][0]="SoftCW";
-        sgMotorStatus->Cells[10][0]="SoftCCW";
-        sgMotorStatus->Cells[11][0]="ServoAlarm";
-        sgMotorStatus->Cells[12][0]="InPos";
-        sgMotorStatus->Cells[13][0]="Z Phase";
-        sgMotorStatus->Cells[14][0]="ServoOn";
+        sgMotorStatus->Cells[ 0][0]=LangT("Motor Name");
+        sgMotorStatus->Cells[ 1][0]=LangT("Target");
+        sgMotorStatus->Cells[ 2][0]=LangT("Position");
+        sgMotorStatus->Cells[ 3][0]=LangT("Encoder");
+        sgMotorStatus->Cells[ 4][0]=LangT("CW");
+        sgMotorStatus->Cells[ 5][0]=LangT("HOME");
+        sgMotorStatus->Cells[ 6][0]=LangT("CCW");
+        sgMotorStatus->Cells[ 7][0]=LangT("Emg");
+        sgMotorStatus->Cells[ 8][0]=LangT("Alarm");
+        sgMotorStatus->Cells[ 9][0]=LangT("SoftCW");
+        sgMotorStatus->Cells[10][0]=LangT("SoftCCW");
+        sgMotorStatus->Cells[11][0]=LangT("ServoAlarm");
+        sgMotorStatus->Cells[12][0]=LangT("InPos");
+        sgMotorStatus->Cells[13][0]=LangT("Z Phase");
+        sgMotorStatus->Cells[14][0]=LangT("ServoOn");
         sgMotorStatus->RowCount=HSys.iTotalMotor+2;
         for(int i=0; i<HSys.iTotalMotor; i++)
         {
@@ -1154,14 +1168,14 @@ void __fastcall TfMain::cb_WorkFileChange(TObject *Sender)
     if(cb_WorkFile->Text.Trim() == AnsiString(""))
     {
         cb_WorkFile->Text = CurrentRecipe;
-        ShowMyMessage("Recipe name cannot be empty.");
+        ShowMyMessage(LangT("Recipe name cannot be empty."));
         return;
     }
 
     if(HSys.Sys.SystemStart)
     {
         cb_WorkFile->Text = CurrentRecipe;
-        ShowMyMessage("Can not change recipe while machine is running.");
+        ShowMyMessage(LangT("Can not change recipe while machine is running."));
         return;
     }
 
@@ -1169,7 +1183,7 @@ void __fastcall TfMain::cb_WorkFileChange(TObject *Sender)
     if(!RecipeManager.RecipeExists(SelectedRecipe))
     {
         cb_WorkFile->Text = CurrentRecipe;
-        ShowMyMessage("Recipe does not exist.");
+        ShowMyMessage(LangT("Recipe does not exist."));
         return;
     }
 
@@ -1286,7 +1300,7 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         }
         if(UserRoleManager.Login(RoleLevel, sLoginID, sLoginPass)==false)
         {
-            ShowMyMessage("User ID or password is incorrect.");
+            ShowMyMessage(LangT("User ID or password is incorrect."));
             bUpdatingMainSelections = true;
             RefreshMainUserSelect();
             bUpdatingMainSelections = false;
@@ -1348,17 +1362,17 @@ void TfMain::LoadRunModePicture()
 
     if(HSys.LastSet.iRealDummy == REALLY)
     {
-        pnRealDummy->Caption = "Real";
+        pnRealDummy->Caption = LangT("Real");
         pnRealDummy->Font->Color = clRed;
     }
     else if(HSys.LastSet.iRealDummy == HAS_TRAY)
     {
-        pnRealDummy->Caption = "HasTray";
+        pnRealDummy->Caption = LangT("HasTray");
         pnRealDummy->Font->Color = clBlack;
     }
     else
     {
-        pnRealDummy->Caption = "Dummy";
+        pnRealDummy->Caption = LangT("Dummy");
         pnRealDummy->Font->Color = clRed;
     }
 }
@@ -1379,9 +1393,9 @@ void TfMain::LoadStartModePicture()
         return;
 
     if(HSys.LastSet.iStartMode == 0)
-        pnStartMode->Caption = "Initial";
+        pnStartMode->Caption = LangT("Initial");
     else
-        pnStartMode->Caption = "Continue";
+        pnStartMode->Caption = LangT("Continue");
     pnStartMode->Font->Color = clRed;
 }
 //---------------------------------------------------------------------------
@@ -1542,7 +1556,7 @@ void __fastcall TfMain::sbHome1Click(TObject *Sender)
     //  full-machine home (reuse Run_Home engine) and shows the Home monitor
     //  non-modally; the monitor auto-closes when homing finishes (see uHome).
 #ifndef SOFT_SIMULATE
-    int ret=ShowMyMessageBox_YES_NO("Confirm home?");
+    int ret=ShowMyMessageBox_YES_NO(LangT("Confirm home?"));
     if(ret==TMyMessageBox::msgrtnYES)
 #endif
     {
@@ -1563,13 +1577,13 @@ void __fastcall TfMain::sbOneCycle1Click(TObject *Sender)
     //  machine). Tell the operator why, and require the same lot/2D data as Start.
     if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
     {
-        ShowMyMessage("One Cycle is only allowed in Normal / Clean Out mode.");
+        ShowMyMessage(LangT("One Cycle is only allowed in Normal / Clean Out mode."));
         return;
     }
     AnsiString Reason;
     if(CheckLotDataReady(Reason)==false)
     {
-        ShowMyMessage(Reason);
+        ShowMyMessage(LangT(Reason));
         return;
     }
     RecordProcess("ONE CYCLE pressed");
@@ -1635,7 +1649,7 @@ void __fastcall TfMain::sbStoreHangupClick(TObject *Sender)
         }
     }
     else
-        ShowMyMessage("State Record snapshot failed (check 7-Zip / disk).");
+        ShowMyMessage(LangT("State Record snapshot failed (check 7-Zip / disk)."));
 }
 //---------------------------------------------------------------------------
 //AI(poka-yoke) 20260616 : shared start-precondition guard. Returns true when
@@ -1695,7 +1709,7 @@ void TfMain::Start()
     //never pops a dialog on a non-UI / receive-thread path.
     AnsiString Reason;
     if(MachineStart(trigOperator, Reason)==msRejNotReady)
-        ShowMyMessage(Reason);
+        ShowMyMessage(LangT(Reason));
 }
 //---------------------------------------------------------------------------
 //AI(machine-command-layer) 20260625 : the arm half of the old Start(). Called ONLY by
@@ -1799,7 +1813,7 @@ void TfMain::ScanPanelKeys()
         //handler stays prompt-free; only the panel key asks. SOFT_SIMULATE
         //skips the prompt (matches HT172).
         #ifndef SOFT_SIMULATE
-        if(ShowMyMessageBox_YES_NO("Confirm Clean Out?")==TMyMessageBox::msgrtnYES)
+        if(ShowMyMessageBox_YES_NO(LangT("Confirm Clean Out?"))==TMyMessageBox::msgrtnYES)
         #endif
             sbCleanOut1Click(this);
     }
@@ -1889,13 +1903,20 @@ void __fastcall TfMain::FormShow(TObject *Sender)
         const char *ZoneName[9]={"Loader","Empty","Color","Auto1","Auto2","Auto3","Auto4","Auto5","Auto6"};
         sgSimMaxTray->ColWidths[0]=110;
         sgSimMaxTray->ColWidths[1]=70;
-        sgSimMaxTray->Cells[0][0]="Zone";
-        sgSimMaxTray->Cells[1][0]="MaxTray";
+        sgSimMaxTray->Cells[0][0]=LangT("Zone");
+        sgSimMaxTray->Cells[1][0]=LangT("MaxTray");
         for(int i=0;i<9;i++)
         {
-            sgSimMaxTray->Cells[0][i+1]=ZoneName[i];
+            sgSimMaxTray->Cells[0][i+1]=LangT(ZoneName[i]);
             sgSimMaxTray->Cells[1][i+1]=IntToStr(GeneralSetting.iSimAmrMaxTray[i]);
         }
+    }
+
+    //AI(ht160s-language) 20260626 : load dictionary + apply persisted UI language.
+    if(fLan != NULL)
+    {
+        fLan->LoadDictionary();
+        fLan->ChangeLanguage(this);
     }
 }
 //---------------------------------------------------------------------------
@@ -1913,7 +1934,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
 
     if(GetLotListCount()==0)
     {
-        ShowMyMessage("Please add at least one Lot to the list !");
+        ShowMyMessage(LangT("Please add at least one Lot to the list !"));
         return;
     }
 
@@ -2181,9 +2202,9 @@ void __fastcall TfMain::SetupLotListGrid()
     sgLotList->ColWidths[2]=70;
     sgLotList->ColWidths[3]=80;
     sgLotList->Cells[0][0]="Lot No.";
-    sgLotList->Cells[1][0]="Src";
+    sgLotList->Cells[1][0]=LangT("Src");
     sgLotList->Cells[2][0]="2D";
-    sgLotList->Cells[3][0]="Sorted";
+    sgLotList->Cells[3][0]=LangT("Sorted");
 
     for(int RowIndex=1; RowIndex<sgLotList->RowCount; RowIndex++)
     {
@@ -2390,8 +2411,7 @@ void __fastcall TfMain::RestoreLastWorkOrder()
     {
         LotCnt=LotRegistry.GetLotCount();
         BindCnt=LotBinBinding.GetBindingCount();
-        Msg="Inherit last work order ? ("+IntToStr(LotCnt)+" lots, "+IntToStr(BindCnt)+
-            " bindings)   Yes = resume,  No = start fresh";
+        Msg=Format(LangT("Inherit last work order ? (%d lots, %d bindings)   Yes = resume,  No = start fresh"), ARRAYOFCONST((LotCnt, BindCnt)));
         if(ShowMyMessageBox_YES_NO(Msg)!=TMyMessageBox::msgrtnYES)
         {
             LotRegistry.Clear();
@@ -2421,7 +2441,7 @@ void __fastcall TfMain::btnAddLotClick(TObject *Sender)
     LotText=edLotNo->Text.Trim();
     if(LotText=="")
     {
-        ShowMyMessage("Please Enter LotID !");
+        ShowMyMessage(LangT("Please Enter LotID !"));
         return;
     }
 
@@ -2431,7 +2451,7 @@ void __fastcall TfMain::btnAddLotClick(TObject *Sender)
     LotIndex=LotRegistry.AddLot(LotText, HT160_LOT_SOURCE_OFFLINE, "", "");
     if(LotIndex<0)
     {
-        ShowMyMessage("Lot list is full !");
+        ShowMyMessage(LangT("Lot list is full !"));
         return;
     }
     RefreshLotListFromRegistry();
@@ -2456,7 +2476,7 @@ void __fastcall TfMain::btnEditLotClick(TObject *Sender)
     NewLot=edLotNo->Text.Trim();
     if(NewLot=="")
     {
-        ShowMyMessage("Please Enter LotID !");
+        ShowMyMessage(LangT("Please Enter LotID !"));
         return;
     }
     if(OldLot=="" || OldLot==NewLot)
@@ -2544,8 +2564,7 @@ void __fastcall TfMain::ShowLotDetail(AnsiString LotID)
         Count=LotRegistry.GetLotIcList(LotID, Lines);
         if(Count<=0)
         {
-            ShowMyMessage("Lot \""+LotID+"\" has no 2D data loaded yet.\n"
-                          "(Work-order JSON not downloaded for this Lot.)");
+            ShowMyMessage(Format(LangT("Lot \"%s\" has no 2D data loaded yet.\n(Work-order JSON not downloaded for this Lot.)"), ARRAYOFCONST((LotID))));
             return;
         }
 
@@ -2570,12 +2589,12 @@ void __fastcall TfMain::ShowLotDetail(AnsiString LotID)
             Grid->ColWidths[3]=55;
             Grid->ColWidths[4]=120;
             Grid->ColWidths[5]=100;
-            Grid->Cells[0][0]="2D Code";
+            Grid->Cells[0][0]=LangT("2D Code");
             Grid->Cells[1][0]="Bin";
             Grid->Cells[2][0]="HBin";
             Grid->Cells[3][0]="SBin";
-            Grid->Cells[4][0]="RetestCode";
-            Grid->Cells[5][0]="DiePass";
+            Grid->Cells[4][0]=LangT("RetestCode");
+            Grid->Cells[5][0]=LangT("DiePass");
 
             for(i=0; i<Count; i++)
             {

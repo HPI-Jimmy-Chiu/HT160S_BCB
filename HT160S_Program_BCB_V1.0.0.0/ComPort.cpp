@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 //---------------------------------------------------------------------------
 #include "ComPort.h"
 #include "database.h"
@@ -376,7 +377,7 @@ bool __fastcall TfComPort::RS232Init(bool bNotifyOperator)
         //it DecStopAllMotor()+ShowModal(); the unattended Spin() auto-open path
         //(bNotifyOperator=false) must not block or stop the machine at startup.
         if(bNotifyOperator)
-            ShowMyOKMessageNoStop("Pad COM "+cbPadComm->Text+" connect failed");
+            ShowMyOKMessageNoStop(Format(LangT("Pad COM %s connect failed"),ARRAYOFCONST((cbPadComm->Text))));
         return false;
     }
 

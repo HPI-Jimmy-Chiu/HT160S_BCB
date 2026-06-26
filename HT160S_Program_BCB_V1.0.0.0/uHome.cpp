@@ -10,6 +10,7 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 
 #include "uHome.h"
 #include "database.h"
@@ -442,9 +443,7 @@ bool TfHome::ProcessMotorHome()
 						RecordProcess(AnsiString("Home: servo alarm NOT cleared by motor power-cycle : ")+sStuck);
 						if(lstHomeMsg!=NULL)
 							lstHomeMsg->Items->Insert(0, AnsiString("Servo alarm NOT cleared : ")+sStuck+"- cycle MAIN power (breaker).");
-						ShowMyMessage(AnsiString("Servo alarm not cleared by motor power-cycle : ")+sStuck+
-						              ". The motor relay does not cut the drive control power, so HOME cannot clear it. "
-						              "Please cycle the machine MAIN power (breaker) to reset the drive, or remove the drive fault, then HOME again.");
+						ShowMyMessage(Format(LangT("Servo alarm not cleared by motor power-cycle : %s. The motor relay does not cut the drive control power, so HOME cannot clear it. Please cycle the machine MAIN power (breaker) to reset the drive, or remove the drive fault, then HOME again."), ARRAYOFCONST((sStuck))));
 						fAllMotorHome=false;
 						HSys.Sys.SystemStart=false;
 						iMotorHomeTask=1;
@@ -645,7 +644,7 @@ bool TfHome::ProcessMotorHome()
 				if(bLoaderL || bLoaderR)
 				{
 					RecordProcess("Home: Loader held tray -> prompt operator to remove all Loader trays, clear tray data");
-					ShowMyMessage("Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK.");
+					ShowMyMessage(LangT("Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK."));
 					if(HSys.VMot.MMLoaderY_1!=NULL)
 						HSys.VMot.MMLoaderY_1->ClearTray();
 					if(HSys.VMot.MMLoaderY_2!=NULL)

@@ -166,3 +166,65 @@ in the tool and §4 here.
 5. Walk the cascade (place -> discharge -> request -> deliver) to confirm the
    circular wait. Label FACT (read) vs INFER (derived).
 6. Propose fixes; do NOT edit motion handshake code without user sign-off.
+
+## 8. Alarm-code -> EventLog -> source (the code-grep recipe)
+
+When the customer ships an **EventLog** (`D:\HT160S_Log\EventLog\YYYY_MM\HT160S_*.csv`)
+plus a time, the fast path is: read the `AlarmCode` column at that time, then grep
+the source to land on the exact call site that popped the alarm. Three code spaces
+coexist; grep each differently.
+
+Every alarm funnels through `ShowNoteAlarm` (note.cpp). It writes `edtAlarmCode->Text`
+(operator screen), `g_EventLog.Log(Code,...)` (EventLog **AlarmCode** column, verbatim),
+`AlarmReport(Code,...)` (SECS S5F1 ALID), and after the operator clears it,
+`g_EventLog.LogRecovery(recovery, pauseSec, Code, Message)` (the **Recovery** +
+**PauseTime** columns - so a shipped log now shows SKIP/RETRY/... and how long the
+line paused).
+
+### Tier 1 - free-string alarms (`ShowMyError`)
+```
+rg -n 'ShowMyError\(' HT160S_Program_BCB_V1.0.0.0
+```
+- 3-arg `ShowMyError("WAR0475", "msg", KCode)` = code-aligned (1st arg is the 9045
+  code, the EventLog AlarmCode). **Grep the code verbatim** - it lands on the line.
+- 1-arg `ShowMyError("text", KCode)` = not yet migrated; the English sentence IS the
+  AlarmCode, so grep the sentence verbatim.
+- Parameterized Auto sites build the code inline, e.g.
+  `ShowMyError(AnsiString().sprintf("JAM%d11", 11+iFeedAuto), ...)` - a literal
+  `JAM1211` won't grep; grep the **format** `JAM%d11` / `MES%d20` instead, then the
+  station = leading-2-digits (Auto1=11, Auto2=12, Auto3=13).
+
+### Tier 2 - structured numeric families (auto-generated, leading digit = family)
+```
+rg -n 'sprintf\("%d%03d%1d"' HT160S_Program_BCB_V1.0.0.0/database.cpp
+```
+- Leading `4`=Cylinder (eCynAlarm), `5`=Motor (eMotorAlarm), `6`=Sucker (eSuckAlarm),
+  shape `<fam><3-digit index><1-digit err>`. Generated in `CreateSystemAlarmCode()`.
+  A literal like `41210` is NOT in source - decode index/err from the digits, or grep
+  the raising wrapper: `rg -n 'ShowCylinderError|ShowMotorError|ShowSuckError'`.
+
+### Tier 3 - table-registered named codes (`ShowSystemError(Name)`, bilingual)
+```
+rg -n 'ShowSystemError\(' HT160S_Program_BCB_V1.0.0.0
+rg -n 'mapNameToAlarm|mapAlarmCodeList' HT160S_Program_BCB_V1.0.0.0/database.cpp
+```
+- Registration is ONLY in `CreateSystemAlarmCode()` (database.cpp). The high-value
+  CCD/vision alarms are registered there with their 9045 codes
+  (`TopCCD_Connect`->WAR16120, `TopCCD_2D`->WAR0462, `ColorCCD_Connect`->WAR0930,
+  `ColorCCD_2D`->WAR0971) and render bilingual EN/ZH + remedy. The call sites pass the
+  **Name** (`ShowSystemError("TopCCD_2D", ...)`), so to go code->site: look the code up
+  in the registration block to get the Name, then grep the Name.
+
+### 9045 reuse cross-check
+The WAR/JAM/MES codes are reused from HT9045 so the customer recognizes them.
+Cross-check any code against `D:\HT9045\Error\AlarmCodeList.txt` (KEY=VALUE) - a code
+absent from that file is an HT160-native allocation (e.g. JAM1101/MES1120/MES1125 Auto
+band), not a 9045 reuse. The startup dump `system\AlarmList.csv` lists every code the
+machine can raise (the HT160 analog of 9045's AlarmCodeList.txt).
+
+### Collision guard
+`CreateSystemAlarmCode()` ends with an observe-only sweep: any all-digit map key
+beginning 4/5/6 that is not the canonical 5-char structured shape is flagged via
+`OutputDebugString("[ALARM-COLLISION] ...")` (viewable in DebugView). WAR/JAM/MES keys
+start with a letter, so 9045 reuse never trips it; only a bad future bare-numeric
+allocation does.

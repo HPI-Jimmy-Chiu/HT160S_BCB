@@ -94,6 +94,7 @@ private:
     bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
     int ReadTopCcdBin(int LoaderNo, int CellX, int CellY, bool &bOk);
     AnsiString ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, bool &bOk);
+    void BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor);   //AI(ht160s-ccd-manual2d) : operator manual Top CCD 2D bind loop
 
     bool DoFeedTray(int LoaderNo, int Flag);
     bool DoCcdCheck(int LoaderNo, int Flag);

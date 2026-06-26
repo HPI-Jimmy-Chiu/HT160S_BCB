@@ -18,7 +18,6 @@ private:
     HTimer TestDelay;
     bool bFrontHasTray;
     bool bRearHasTray;
-    bool bBottomHasTray;
     bool bReturnTray;
     bool bTrayXToEmptyFinish;
     bool bLotFinish;
@@ -46,7 +45,6 @@ public:
 
     bool IsFrontHasTray();
     bool IsRearHasTray();
-    bool IsBottomHasTray();
     bool IsReturnTrayRequested();
     void SetRearHasTray(bool bHasTray);
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm

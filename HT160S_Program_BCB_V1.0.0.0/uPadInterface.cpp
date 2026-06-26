@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 //---------------------------------------------------------------------------
 #include "uPadInterface.h"
 #include "database.h"
@@ -151,7 +152,7 @@ void TfPadInterface::BuildUI()
     TPanel *BottomPanel;
     TLabel *LabelPtr;
 
-    Caption="Pad Interface";
+    Caption=LangT("Pad Interface");
     Width=840;
     Height=610;
     Position=poDesigned;
@@ -162,12 +163,12 @@ void TfPadInterface::BuildUI()
     pn_PadInterfaceTitle->Parent=this;
     pn_PadInterfaceTitle->Align=alTop;
     pn_PadInterfaceTitle->Height=40;
-    pn_PadInterfaceTitle->Caption="Pad Interface";
+    pn_PadInterfaceTitle->Caption=LangT("Pad Interface");
     pn_PadInterfaceTitle->Font->Style=TFontStyles()<<fsBold;
 
     sb_PadInterface_Exit=new TButton(this);
     sb_PadInterface_Exit->Parent=pn_PadInterfaceTitle;
-    sb_PadInterface_Exit->Caption="Exit";
+    sb_PadInterface_Exit->Caption=LangT("Exit");
     sb_PadInterface_Exit->Width=80;
     sb_PadInterface_Exit->Height=26;
     sb_PadInterface_Exit->Left=pn_PadInterfaceTitle->Width-90;
@@ -183,7 +184,7 @@ void TfPadInterface::BuildUI()
 
     LabelPtr=new TLabel(this);
     LabelPtr->Parent=BottomPanel;
-    LabelPtr->Caption="Manual Send";
+    LabelPtr->Caption=LangT("Manual Send");
     LabelPtr->Left=8;
     LabelPtr->Top=10;
 
@@ -196,7 +197,7 @@ void TfPadInterface::BuildUI()
 
     sb_PadInterface_ManualSend=new TButton(this);
     sb_PadInterface_ManualSend->Parent=BottomPanel;
-    sb_PadInterface_ManualSend->Caption="Send";
+    sb_PadInterface_ManualSend->Caption=LangT("Send");
     sb_PadInterface_ManualSend->Left=330;
     sb_PadInterface_ManualSend->Top=5;
     sb_PadInterface_ManualSend->Width=70;
@@ -204,7 +205,7 @@ void TfPadInterface::BuildUI()
 
     btnResetCom=new TButton(this);
     btnResetCom->Parent=BottomPanel;
-    btnResetCom->Caption="Reset COM";
+    btnResetCom->Caption=LangT("Reset COM");
     btnResetCom->Left=408;
     btnResetCom->Top=5;
     btnResetCom->Width=82;
@@ -212,7 +213,7 @@ void TfPadInterface::BuildUI()
 
     btnClearLog=new TButton(this);
     btnClearLog->Parent=BottomPanel;
-    btnClearLog->Caption="Clear Log";
+    btnClearLog->Caption=LangT("Clear Log");
     btnClearLog->Left=498;
     btnClearLog->Top=5;
     btnClearLog->Width=82;
@@ -220,7 +221,7 @@ void TfPadInterface::BuildUI()
 
     cb_PadInterface_PadLedBling=new TCheckBox(this);
     cb_PadInterface_PadLedBling->Parent=BottomPanel;
-    cb_PadInterface_PadLedBling->Caption="Blink LED";
+    cb_PadInterface_PadLedBling->Caption=LangT("Blink LED");
     cb_PadInterface_PadLedBling->Left=590;
     cb_PadInterface_PadLedBling->Top=9;
     cb_PadInterface_PadLedBling->Width=100;
@@ -240,11 +241,11 @@ void TfPadInterface::BuildUI()
 
     tsPadFront=new TTabSheet(this);
     tsPadFront->PageControl=pc_PadInterface;
-    tsPadFront->Caption="Front Pad";
+    tsPadFront->Caption=LangT("Front Pad");
 
     tsPadRear=new TTabSheet(this);
     tsPadRear->PageControl=pc_PadInterface;
-    tsPadRear->Caption="Rear Pad";
+    tsPadRear->Caption=LangT("Rear Pad");
 
     pn_PadInterface_Front=new TPanel(this);
     pn_PadInterface_Front->Parent=tsPadFront;
@@ -312,7 +313,7 @@ void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col
     BtnPtr->Top=6;
     BtnPtr->Width=130;
     BtnPtr->Height=26;
-    BtnPtr->Caption=PadButtonDefs[Index].Caption;
+    BtnPtr->Caption=LangT(PadButtonDefs[Index].Caption);
     BtnPtr->Alias=PadButtonDefs[Index].PadName;
     BtnPtr->Tag=PadButtonDefs[Index].PanelTag;
     BtnPtr->FalseColor=clBtnFace;

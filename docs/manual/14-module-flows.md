@@ -289,7 +289,7 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 4. 共用 `DoClampTray`（SettleTicks=5）做雙缸夾盤：回 1（夾好）→ 繼續；回 2（推缸 Miss）→ `Empty Push Tray Miss`（K_RETRY）。
 5. `MoveEmptyY(EmptyCarDischargeTrayYPosition)` 移到放料位，設 `bFrontHasTray=false`。
 6. `C_Empty_PushTray.Pop()` → `C_Empty_LeanOnTray.Pop()`。
-7. 檢查底部感測 `SnEmpty_OutputBottomHasTray`／後段感測 `SnEmpty_OutputHasTray`，設 `bRearHasTray`/`bBottomHasTray`，返回完成。
+7. 檢查底部感測 `SnEmpty_OutputBottomHasTray`，設 `bRearHasTray`，返回完成。
 
 > ⚠️ 注意：`DoFeedTray` 開頭的 `Reset()` 只能做一次。註解明確警告：**勿在每次 `Push()` 前 `Reset()`**，否則會重啟非阻塞狀態機而卡住。
 

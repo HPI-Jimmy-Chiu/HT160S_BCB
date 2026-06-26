@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <IniFiles.hpp>
 #pragma hdrstop
+#include "language.h"
 
 #include "aLoader.h"
 #include "database.h"
@@ -207,7 +208,7 @@ bool TLoaderModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Loader Y motor will out of limit", Motor->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Loader Y motor will out of limit"), Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -308,7 +309,7 @@ bool TLoaderModule::MoveTopCcdX(int Position)
         return false;
     if(HSys.Mot.MTopCCDX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Top CCD X motor will out of limit", HSys.Mot.MTopCCDX->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Top CCD X motor will out of limit"), HSys.Mot.MTopCCDX->SoftLimitDetail(Position));
         return false;
     }
     return HSys.Mot.MTopCCDX->MotorMove(Position);
@@ -451,12 +452,6 @@ void TLoaderModule::RefreshRearState()
     if(IsSoftSimulate())
         return;
 
-    if(HSys.Sen.SnLoader_OutputHasTray.Enable==true)
-    {
-        bHasRearSensor=true;
-        if(HSys.Sen.SnLoader_OutputHasTray.IsOn())
-            bSensorState=true;
-    }
     if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true)
     {
         bHasRearSensor=true;
@@ -1087,7 +1082,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             }
             else
             {
-                Ret=ShowMyError("Loader Tray Empty", K_RETRY|K_TRAY_END|K_CLEAN_OUT);
+                Ret=ShowMyError("MES0920", "Loader Tray Empty", K_RETRY|K_TRAY_END|K_CLEAN_OUT);
                 if(Ret==K_RETRY)
                     State->FeedTask=1;
                 if(Ret==K_TRAY_END)
@@ -1203,7 +1198,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                        TopCcdSocket->IsTopCcdConnected()==false && CosFunction.bUseTopCcd &&
                        IsSoftSimulate()==false)
                     {
-                        Ret=ShowMyError("Top CCD Connect not ready", K_RETRY|K_SKIP);
+                        Ret=ShowSystemError("TopCCD_Connect", K_RETRY|K_SKIP);
                         if(Ret==K_SKIP)
                         {
                             TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_2D_SCAN_FAIL);
@@ -1224,7 +1219,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             }
             else
             {
-                Ret=ShowMyError("Top CCD API not ready", K_SKIP|K_RETRY|K_TRAY_END);
+                Ret=ShowMyError("WAR0330", "Top CCD API not ready", K_SKIP|K_RETRY|K_TRAY_END);
                 if(Ret==K_RETRY)
                     State->CcdTask=3000;
                 if(Ret==K_SKIP)
@@ -1277,7 +1272,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     }
                     else
                     {
-                        Ret=ShowMyError("2D code not found in any lot : "+sCode, K_RETRY|K_SKIP);
+                        Ret=ShowMyError("WAR0475", "2D code not found in any lot : "+sCode, K_RETRY|K_SKIP|K_MANUAL_2D);
                         if(Ret==K_RETRY)
                         {
                             if(TopCcdSocket!=NULL)
@@ -1285,6 +1280,8 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                             State->CcdDelay.SetMS(3000);
                             State->CcdDelay.On();
                         }
+                        else if(Ret==K_MANUAL_2D)
+                            BindManual2D(State, TrayMotor);
                         else
                         {
                             MachineRun.iUnknown2D++;
@@ -1300,7 +1297,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                 }
                 else if(State->CcdDelay.Off())
                 {
-                    Ret=ShowMyError("Top CCD 2D no response", K_RETRY|K_SKIP);
+                    Ret=ShowSystemError("TopCCD_2D", K_RETRY|K_SKIP|K_MANUAL_2D);
                     if(Ret==K_RETRY)
                     {
                         if(TopCcdSocket!=NULL)
@@ -1308,6 +1305,8 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         State->CcdDelay.SetMS(3000);
                         State->CcdDelay.On();
                     }
+                    else if(Ret==K_MANUAL_2D)
+                        BindManual2D(State, TrayMotor);
                     else
                     {
                         TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
@@ -1323,6 +1322,69 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             break;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
+{
+    //AI(ht160s-ccd-manual2d) : operator-supplied Top CCD 2D for one IC cell. Reuses the
+    //scan-success bind path (Bin/Lot resolve + ResolveAuto + OnSorted + EndShot) so a
+    //hand-entered code is treated like a real read, plus a Manual2D trace flag. On a
+    //still-unknown code the operator keeps getting the prompt (Retry re-scans, Skip
+    //routes the IC to Error) -- never silently dropped. This NEVER resumes the machine;
+    //the operator presses Start to run it (operator boundary). Bounded by iGuard so a
+    //stuck dialog can never spin forever -- every normal branch returns first.
+    int iGuard;
+    for(iGuard=0; iGuard<100; iGuard++)
+    {
+        AnsiString code=fNote->ManualText.Trim();
+        int Bin=0;
+        AnsiString HitLot;
+        int HitLotIndex=-1;
+        if(code!="" && LotRegistry.FindByCode2D(code, HitLot, Bin, HitLotIndex))
+        {
+            TrayMotor->SetTrayBin(State->CcdX, State->CcdY, Bin);
+            TrayMotor->SetTrayLot(State->CcdX, State->CcdY, HitLotIndex);
+            TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, code);
+            TrayMotor->SetTrayManual2D(State->CcdX, State->CcdY, true);
+            if(GeneralSetting.bUseLotBinSortMode)
+                LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+            LotRegistry.OnSorted(HitLotIndex, Bin);
+            MachineRun.iTotalSorted++;
+            if(TopCcdSocket!=NULL)
+                TopCcdSocket->TopCcdEndShot();
+            State->CcdTask=1;
+            return;
+        }
+        int Ret2=ShowMyError("WAR0475", "2D code not found in any lot : "+code, K_RETRY|K_SKIP|K_MANUAL_2D);
+        if(Ret2==K_RETRY)
+        {
+            if(TopCcdSocket!=NULL)
+                TopCcdSocket->TopCcdTriggerShot();
+            State->CcdDelay.SetMS(3000);
+            State->CcdDelay.On();
+            return;
+        }
+        if(Ret2==K_SKIP)
+        {
+            MachineRun.iUnknown2D++;
+            TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+            TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+            TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, code);
+            if(TopCcdSocket!=NULL)
+                TopCcdSocket->TopCcdEndShot();
+            State->CcdTask=1;
+            return;
+        }
+    }
+    //Safety backstop (operator chose manual >100x without resolving): route to Error so
+    //control always returns -- the loop can never run unbounded.
+    MachineRun.iUnknown2D++;
+    TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+    TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+    TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, fNote->ManualText.Trim());
+    if(TopCcdSocket!=NULL)
+        TopCcdSocket->TopCcdEndShot();
+    State->CcdTask=1;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)

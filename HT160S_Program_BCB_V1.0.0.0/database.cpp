@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #pragma hdrstop
+#include "language.h"
 #include "mymessbox.h"
 
 #include "database.h"
@@ -903,6 +904,56 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
         }
     }
 
+    //AI(HT160S-Maintainer) 20260626 : register the high-value CCD/vision alarms with their
+    //HT9045 code strings (WAR16120/WAR0462/WAR0930/WAR0971) so the operator sees the familiar
+    //code + a bilingual message/remedy, and they appear in system\AlarmList.csv. eOther class
+    //keeps them clear of the generated cylinder/motor/sucker numeric families. C_ fields are
+    //English for now (ASCII source rule); a later language pass fills Big5 Chinese.
+    {
+        AnsiString CcdDesc="[1] check CCD power/cable \\r\\n[2] check vision PC program \\r\\n[3] check COM/socket";
+        const char *CcdName[4]={"TopCCD_Connect","TopCCD_2D","ColorCCD_Connect","ColorCCD_2D"};
+        const char *CcdCode[4]={"WAR16120","WAR0462","WAR0930","WAR0971"};
+        const char *CcdEng [4]={
+            "Top CCD connect not ready (Loader Tray ID no respond)",
+            "Top CCD 2D no response (2DID communication time out)",
+            "Color CCD connect not ready (OCR vision program off)",
+            "Color CCD 2D no response (Tray ID exposure time out)"};
+        for(int ci=0; ci<4; ci++)
+        {
+            AnsiString cd=CcdCode[ci], eg=CcdEng[ci];
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, (int)eOther, eg, eg, CcdDesc, CcdDesc, "pn_System");
+            mapNameToAlarm[cd]=cd;
+            mapNameToAlarm[CcdName[ci]]=cd;
+        }
+    }
+
+    //AI(HT160S-Maintainer) 20260626 : alarm-code collision guard. Any all-digit map key
+    //beginning 4/5/6 must be a generated structured family code (Cyn=4/Mot=5/Suck=6) of the
+    //canonical 5-char "<fam><3-index><1-err>" shape; flag anything else as a hand-allocated
+    //code that has shadowed the structured numeric space. WAR/JAM/MES keys start with a
+    //letter and are skipped, so 9045 reuse never trips this. Observe-only (OutputDebugString).
+    {
+        std::map<AnsiString, AnsiString>::iterator itGuard;
+        for(itGuard=mapNameToAlarm.begin(); itGuard!=mapNameToAlarm.end(); ++itGuard)
+        {
+            AnsiString kk=itGuard->first;
+            if(kk.Length()<1)
+                continue;
+            char c0=kk[1];
+            if(c0!='4' && c0!='5' && c0!='6')
+                continue;
+            bool bAllDigit=true;
+            for(int p2=1; p2<=kk.Length(); p2++)
+                if(kk[p2]<'0' || kk[p2]>'9')
+                {
+                    bAllDigit=false;
+                    break;
+                }
+            if(bAllDigit==true && kk.Length()!=5)
+                OutputDebugString((AnsiString("[ALARM-COLLISION] non-canonical structured key: ")+kk+"\r\n").c_str());
+        }
+    }
+
     //AI(HT160S-Maintainer) 20260609 : ported from HT172 0420 CreateNewJamErrorTable.
     //Dump the complete alarm-code map to system\AlarmList.csv at startup so the
     //operator can see every alarm the machine can raise. Note: the PTI-only
@@ -947,55 +998,47 @@ void SYSTEM_MODULAR::InitialSensorName()
     Sen.SnEmpty_InputFullTray.Name="SnEmpty_InputFullTray";
     Sen.SnEmpty_TrayPos1.Name="SnEmpty_TrayPos1";
     Sen.SnEmpty_TrayPos2.Name="SnEmpty_TrayPos2";
-    Sen.SnEmpty_OutputHasTray.Name="SnEmpty_OutputHasTray";
     Sen.SnEmpty_OutputBottomHasTray.Name="SnEmpty_OutputBottomHasTray";
     Sen.SnEmpty_InputEnd.Name="SnEmpty_InputEnd";
     Sen.SnLoader_InputHasTray.Name="SnLoader_InputHasTray";
     Sen.SnLoader_InputFullTray.Name="SnLoader_InputFullTray";
     Sen.SnLoader_TrayPos1.Name="SnLoader_TrayPos1";
     Sen.SnLoader_TrayPos2.Name="SnLoader_TrayPos2";
-    Sen.SnLoader_OutputHasTray.Name="SnLoader_OutputHasTray";
     Sen.SnLoader_OutputBottomHasTray.Name="SnLoader_OutputBottomHasTray";
     Sen.SnLoader_Inputend.Name="SnLoader_Inputend";
     Sen.SnAuto1_InputHasTray.Name="SnAuto1_InputHasTray";
     Sen.SnAuto1_InputFullTray.Name="SnAuto1_InputFullTray";
     Sen.SnAuto1_InputEnd.Name="SnAuto1_InputEnd";
-    Sen.SnAuto1_OutputHasTray.Name="SnAuto1_OutputHasTray";
     Sen.SnAuto1_OutputBottomHasTray.Name="SnAuto1_OutputBottomHasTray";
     Sen.SnAuto1_TrayPos1.Name="SnAuto1_TrayPos1";
     Sen.SnAuto1_TrayPos2.Name="SnAuto1_TrayPos2";
     Sen.SnAuto2_InputHasTray.Name="SnAuto2_InputHasTray";
     Sen.SnAuto2_InputFullTray.Name="SnAuto2_InputFullTray";
     Sen.SnAuto2_InputEnd.Name="SnAuto2_InputEnd";
-    Sen.SnAuto2_OutputHasTray.Name="SnAuto2_OutputHasTray";
     Sen.SnAuto2_OutputBottomHasTray.Name="SnAuto2_OutputBottomHasTray";
     Sen.SnAuto2_TrayPos1.Name="SnAuto2_TrayPos1";
     Sen.SnAuto2_TrayPos2.Name="SnAuto2_TrayPos2";
     Sen.SnAuto3_InputHasTray.Name="SnAuto3_InputHasTray";
     Sen.SnAuto3_InputFullTray.Name="SnAuto3_InputFullTray";
     Sen.SnAuto3_InputEnd.Name="SnAuto3_InputEnd";
-    Sen.SnAuto3_OutputHasTray.Name="SnAuto3_OutputHasTray";
     Sen.SnAuto3_OutputBottomHasTray.Name="SnAuto3_OutputBottomHasTray";
     Sen.SnAuto3_TrayPos1.Name="SnAuto3_TrayPos1";
     Sen.SnAuto3_TrayPos2.Name="SnAuto3_TrayPos2";
     Sen.SnAuto4_InputHasTray.Name="SnAuto4_InputHasTray";
     Sen.SnAuto4_InputFullTray.Name="SnAuto4_InputFullTray";
     Sen.SnAuto4_InputEnd.Name="SnAuto4_InputEnd";
-    Sen.SnAuto4_OutputHasTray.Name="SnAuto4_OutputHasTray";
     Sen.SnAuto4_OutputBottomHasTray.Name="SnAuto4_OutputBottomHasTray";
     Sen.SnAuto4_TrayPos1.Name="SnAuto4_TrayPos1";
     Sen.SnAuto4_TrayPos2.Name="SnAuto4_TrayPos2";
     Sen.SnAuto5_InputHasTray.Name="SnAuto5_InputHasTray";
     Sen.SnAuto5_InputFullTray.Name="SnAuto5_InputFullTray";
     Sen.SnAuto5_InputEnd.Name="SnAuto5_InputEnd";
-    Sen.SnAuto5_OutputHasTray.Name="SnAuto5_OutputHasTray";
     Sen.SnAuto5_OutputBottomHasTray.Name="SnAuto5_OutputBottomHasTray";
     Sen.SnAuto5_TrayPos1.Name="SnAuto5_TrayPos1";
     Sen.SnAuto5_TrayPos2.Name="SnAuto5_TrayPos2";
     Sen.SnAuto6_InputHasTray.Name="SnAuto6_InputHasTray";
     Sen.SnAuto6_InputFullTray.Name="SnAuto6_InputFullTray";
     Sen.SnAuto6_InputEnd.Name="SnAuto6_InputEnd";
-    Sen.SnAuto6_OutputHasTray.Name="SnAuto6_OutputHasTray";
     Sen.SnAuto6_OutputBottomHasTray.Name="SnAuto6_OutputBottomHasTray";
     Sen.SnAuto6_TrayPos1.Name="SnAuto6_TrayPos1";
     Sen.SnAuto6_TrayPos2.Name="SnAuto6_TrayPos2";
@@ -1416,7 +1459,7 @@ void SYSTEM_MODULAR::LoadMotData()
     ClearMotTable();
     if(!FileExists(MotTablePath))
     {
-        Msg.sprintf("File %s is not exist!", MotTablePath);
+        Msg.sprintf(LangT("File %s is not exist!").c_str(), MotTablePath);
         ShowMyOKMessageNoStop(Msg);
         return;
     }
@@ -1427,7 +1470,7 @@ void SYSTEM_MODULAR::LoadMotData()
         StrList->LoadFromFile(MotTablePath);
         if(StrList->Count<=1)
         {
-            Msg.sprintf("File %s data is lose!", MotTablePath);
+            Msg.sprintf(LangT("File %s data is lose!").c_str(), MotTablePath);
             ShowMyOKMessageNoStop(Msg);
         }
         else
@@ -1442,7 +1485,7 @@ void SYSTEM_MODULAR::LoadMotData()
                     TMOTDATA *Data=new TMOTDATA(StrList->Strings[i]);
                     if(Data->Alias!=AnsiString("") && FindMotData(Data->Alias)!=NULL)
                     {
-                        Msg.sprintf("Motor %s alias is duplicated!", Data->Alias);
+                        Msg.sprintf(LangT("Motor %s alias is duplicated!").c_str(), Data->Alias);
                         ShowMyOKMessageNoStop(Msg);
                     }
                     MotTable->Add(Data);
@@ -1450,14 +1493,14 @@ void SYSTEM_MODULAR::LoadMotData()
             }
             else
             {
-                Msg.sprintf("File %s data is mistake! (%d)", MotTablePath, Result);
+                Msg.sprintf(LangT("File %s data is mistake! (%d)").c_str(), MotTablePath, Result);
                 ShowMyOKMessageNoStop(Msg);
             }
         }
     }
     catch(...)
     {
-        Msg.sprintf("File %s is opened by other software!", MotTablePath);
+        Msg.sprintf(LangT("File %s is opened by other software!").c_str(), MotTablePath);
         ShowMyOKMessageNoStop(Msg);
     }
     delete StrList;
@@ -1469,7 +1512,7 @@ void SYSTEM_MODULAR::LoadIoData()
     ClearIOTable();
     if(!FileExists(IoTablePath))
     {
-        Msg.sprintf("File %s is not exist!", IoTablePath);
+        Msg.sprintf(LangT("File %s is not exist!").c_str(), IoTablePath);
         ShowMyOKMessageNoStop(Msg);
         return;
     }
@@ -1480,7 +1523,7 @@ void SYSTEM_MODULAR::LoadIoData()
         StrList->LoadFromFile(IoTablePath);
         if(StrList->Count<=1)
         {
-            Msg.sprintf("File %s data is lose!", IoTablePath);
+            Msg.sprintf(LangT("File %s data is lose!").c_str(), IoTablePath);
             ShowMyOKMessageNoStop(Msg);
         }
         else
@@ -1496,7 +1539,7 @@ void SYSTEM_MODULAR::LoadIoData()
                     TIODATA *Data=new TIODATA(Line);
                     if(Data->Alias!=AnsiString("") && FindIOData(Data->Alias)!=NULL)
                     {
-                        Msg.sprintf("IO %s alias is duplicated!", Data->Alias);
+                        Msg.sprintf(LangT("IO %s alias is duplicated!").c_str(), Data->Alias);
                         ShowMyOKMessageNoStop(Msg);
                     }
                     IOTable->Add(Data);
@@ -1504,14 +1547,14 @@ void SYSTEM_MODULAR::LoadIoData()
             }
             else
             {
-                Msg.sprintf("File %s data is mistake! (%d)", IoTablePath, Result);
+                Msg.sprintf(LangT("File %s data is mistake! (%d)").c_str(), IoTablePath, Result);
                 ShowMyOKMessageNoStop(Msg);
             }
         }
     }
     catch(...)
     {
-        Msg.sprintf("File %s is opened by other software!", IoTablePath);
+        Msg.sprintf(LangT("File %s is opened by other software!").c_str(), IoTablePath);
         ShowMyOKMessageNoStop(Msg);
     }
     delete StrList;

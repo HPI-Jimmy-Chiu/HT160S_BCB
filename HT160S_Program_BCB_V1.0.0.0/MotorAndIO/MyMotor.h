@@ -63,6 +63,7 @@ public:
     //Production_Log Lot/2D columns survive the CCD->pick->place hand-off.
     int iLot[MAX_TRAY_X][MAX_TRAY_Y];
     AnsiString sCode2D[MAX_TRAY_X][MAX_TRAY_Y];
+    bool bManual2D[MAX_TRAY_X][MAX_TRAY_Y];   //AI(ht160s-ccd-manual2d) : per-cell flag, IC 2D was operator hand-entered
     AnsiString TrayID;
     eTrayKind Kind;   //AI(HT160S-Maintainer) 20260604 : tray role in stacking car
 
@@ -87,6 +88,8 @@ public:
     int  GetLot(int x, int y);
     void SetCode2D(int x, int y, AnsiString code);
     AnsiString GetCode2D(int x, int y);
+    void SetManual2D(int x, int y, bool b);
+    bool GetManual2D(int x, int y);
     //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
     void SetKind(eTrayKind kind);
     eTrayKind GetKind();
@@ -299,6 +302,8 @@ public:
     int  GetTrayLot(int x, int y);            //AI(ht160s-lotbin) 20260615 : read owning LotIndex for a cell
     void SetTrayCode2D(int x, int y, AnsiString code);  //AI(ht160s-lotbin) 20260615 : write IC 2D code for a cell
     AnsiString GetTrayCode2D(int x, int y);             //AI(ht160s-lotbin) 20260615 : read IC 2D code for a cell
+    void SetTrayManual2D(int x, int y, bool b);
+    bool GetTrayManual2D(int x, int y);
     void Refresh();
     void InitNewTray(int data);
     void InitEmptyTray();

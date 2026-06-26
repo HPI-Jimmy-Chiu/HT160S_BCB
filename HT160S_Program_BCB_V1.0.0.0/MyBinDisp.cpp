@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "MyBinDisp.h"
 #include "cCommLog.h"
@@ -492,7 +493,7 @@ bool TMyBinDispCtrl::StartComport(ICommPort *Comm,AnsiString port)
     }
     catch(...)
     {
-        ShowMyMessage("Error open com port");
+        ShowMyMessage(LangT("Error open com port"));
         if(Comm!=NULL)
             Str.sprintf("BinDisp, Start Comm NG!, %s", Comm->GetCommName());
         LogBinDisplay("OpenNG", Str, true);
@@ -524,7 +525,7 @@ bool TMyBinDispCtrl::StopComport(ICommPort *Comm,AnsiString port)
     }
     catch(...)
     {
-        ShowMyMessage("Error close com port");
+        ShowMyMessage(LangT("Error close com port"));
         if(Comm!=NULL)
             Str.sprintf("BinDisp, Stop Comm NG!, %s", Comm->GetCommName());
         LogBinDisplay("CloseNG", Str, true);

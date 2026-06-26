@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <IniFiles.hpp>
 #pragma hdrstop
+#include "language.h"
 
 #include "aSortArm.h"
 #include "aLoader.h"
@@ -126,6 +127,7 @@ void TSortArmModule::ClearSlot(int SlotIndex)
     Slot[SlotIndex].BinValue=0;
     Slot[SlotIndex].LotIndex=-1;       //AI(ht160s-lotbin) 20260615 : clear carried lot
     Slot[SlotIndex].Code2D="";         //AI(ht160s-lotbin) 20260615 : clear carried 2D code
+    Slot[SlotIndex].bManual2D=false;   //AI(ht160s-ccd-manual2d) : clear manual-2D flag
     if(Sucker!=NULL)
     {
         Sucker->Item=EMPTY_IC;
@@ -554,7 +556,7 @@ bool TSortArmModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Loader Y motor will out of limit", Motor->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Loader Y motor will out of limit"), Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -568,7 +570,7 @@ bool TSortArmModule::MoveAutoY(int AutoIndex, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Auto Y motor will out of limit", Motor->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Auto Y motor will out of limit"), Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -582,7 +584,7 @@ bool TSortArmModule::MovePitchToTrayPitch()
         return true;
     if(HSys.Mot.MPitchX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Pitch X motor will out of limit", HSys.Mot.MPitchX->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Pitch X motor will out of limit"), HSys.Mot.MPitchX->SoftLimitDetail(Position));
         return false;
     }
     return HSys.Mot.MPitchX->MotorMove(Position);
@@ -734,6 +736,7 @@ bool TSortArmModule::FindPickCells(int LoaderNo)
                 //routing and Production_Log; harmless in Normal mode (unused).
                 Slot[PickSlot].LotIndex=TrayMotor->GetTrayLot(XIndex, YIndex);
                 Slot[PickSlot].Code2D=TrayMotor->GetTrayCode2D(XIndex, YIndex);
+                Slot[PickSlot].bManual2D=TrayMotor->GetTrayManual2D(XIndex, YIndex);
                 return true;
             }
         }
@@ -1130,7 +1133,16 @@ void TSortArmModule::TransferPickDataFromLoader()
                 TLotRunInfo *Lot=LotRegistry.GetLot(Slot[SlotIndex].LotIndex);
                 if(Lot!=NULL)
                     sLotID=Lot->sLotID;
-                g_DeviceInfo.AddIcIdentity(SlotIndex, sLotID, Slot[SlotIndex].Code2D);
+                g_DeviceInfo.AddIcIdentity(SlotIndex, sLotID, Slot[SlotIndex].Code2D, Slot[SlotIndex].bManual2D);
+                //AI(ht160s-ccd-manual2d) 20260626 : revive TraceCode/ErrorType columns from the CCD
+                //scan outcome. Code2D empty = 2D never read (ScanFail 999); code present but no
+                //owning lot resolved = NoMap 1000. Normal reads leave trace 0 (columns blank).
+                int iTrace2D=0;
+                if(Slot[SlotIndex].Code2D=="")
+                    iTrace2D=999;
+                else if(Slot[SlotIndex].LotIndex<0)
+                    iTrace2D=1000;
+                g_DeviceInfo.AddTraceInfo(SlotIndex, iTrace2D);
             }
             Slot[SlotIndex].bHasIC=true;
             Slot[SlotIndex].bCanPick=false;

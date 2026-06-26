@@ -3,6 +3,7 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "aAuto1To6.h"
 #include "database.h"
@@ -257,20 +258,6 @@ TMySensor *TAutoModule::GetInputEndSensor(int Index)
     return NULL;
 }
 //---------------------------------------------------------------------------
-TMySensor *TAutoModule::GetOutputHasTray(int Index)
-{
-    switch(Index)
-    {
-        case 0: return &HSys.Sen.SnAuto1_OutputHasTray;
-        case 1: return &HSys.Sen.SnAuto2_OutputHasTray;
-        case 2: return &HSys.Sen.SnAuto3_OutputHasTray;
-        case 3: return &HSys.Sen.SnAuto4_OutputHasTray;
-        case 4: return &HSys.Sen.SnAuto5_OutputHasTray;
-        case 5: return &HSys.Sen.SnAuto6_OutputHasTray;
-    }
-    return NULL;
-}
-//---------------------------------------------------------------------------
 TMySensor *TAutoModule::GetOutputBottomHasTray(int Index)
 {
     switch(Index)
@@ -293,7 +280,7 @@ bool TAutoModule::MoveAutoY(int Index, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Auto Y motor will out of limit", Motor->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Auto Y motor will out of limit"), Motor->SoftLimitDetail(Position));
         return false;
     }
     return Motor->MotorMove(Position);
@@ -303,7 +290,6 @@ void TAutoModule::RefreshAutoState()
 {
     TMySensor *InputSensor=NULL;
     TMySensor *InputFullSensor=NULL;
-    TMySensor *OutputSensor=NULL;
     TMySensor *BottomSensor=NULL;
     TTrayMotor *TrayMotor=NULL;
     bool bHasRearSensor;
@@ -326,17 +312,10 @@ void TAutoModule::RefreshAutoState()
         if(InputFullSensor!=NULL && InputFullSensor->Enable==true && InputFullSensor->IsOn())
             State[Index].bFrontHasTray=true;
 
-        OutputSensor=GetOutputHasTray(Index);
         BottomSensor=GetOutputBottomHasTray(Index);
         bHasRearSensor=false;
         bRearState=false;
 
-        if(OutputSensor!=NULL && OutputSensor->Enable==true)
-        {
-            bHasRearSensor=true;
-            if(OutputSensor->IsOn())
-                bRearState=true;
-        }
         if(BottomSensor!=NULL && BottomSensor->Enable==true)
         {
             bHasRearSensor=true;
@@ -488,7 +467,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             else
             {
                 ErrorText.sprintf("Auto%d: rear tray data transferred but no-tray sensor. Remove any stranded tray; if no tray, check the rear tray sensor. Retry=recheck sensor, Skip=clear tray data", iFeedAuto+1);
-                Ret=ShowMyError(ErrorText, K_SKIP|K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d11", 11+iFeedAuto), ErrorText, K_SKIP|K_RETRY);
                 if(Ret==K_SKIP)
                 {
                     //AI(ht160s-tray-source) 20260625 : clear the staged rear data so the
@@ -518,7 +497,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             else
             {
                 ErrorText.sprintf("Auto%d Feed Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(ErrorText, K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d70", 11+iFeedAuto), ErrorText, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
@@ -556,7 +535,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             if(PushCylinder!=NULL && (PushCylinder->Pop() || IsSoftSimulate()))
             {
                 ErrorText.sprintf("Auto%d Push Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(ErrorText, K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d01", 11+iFeedAuto), ErrorText, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=5000;
             }
@@ -1207,7 +1186,7 @@ void TAutoModule::ServiceCarFull()
             ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
             do
             {
-                ShowMyError(ErrorText, K_RETRY);
+                ShowMyError(AnsiString().sprintf("MES%d20", 11+Index), ErrorText, K_RETRY);
                 FullSensor=GetInputFullTray(Index);
             }
             while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
@@ -1218,7 +1197,7 @@ void TAutoModule::ServiceCarFull()
         {
             AnsiString ErrorText;
             ErrorText.sprintf("Auto%d output car full (%d trays) - change car then confirm", Index+1, MAX_TRAY_PER_CAR);
-            ShowMyError(ErrorText, K_RETRY);
+            ShowMyError(AnsiString().sprintf("MES%d25", 11+Index), ErrorText, K_RETRY);
             Car[Index].Clear();
             InitAutoCarStack(Index);
         }

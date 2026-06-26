@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HT160S SECS/GEM 通訊範例與格式參考手冊</title>
+<style>
+  :root{ --red:#b00020; --ink:#2c3e50; --muted:#626262; --line:#d9d9d9; --bg:#fff; --code:#f5f5f7; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Segoe UI","Microsoft JhengHei",Arial,sans-serif; color:var(--ink);
+        max-width:1000px; margin:0 auto; padding:24px; line-height:1.65; background:var(--bg); }
+  header{ border-top:10px solid var(--red); border-bottom:1px solid var(--line); padding:16px 0 12px; margin-bottom:22px; }
+  .brand{ color:var(--red); font-weight:700; }
+  h1{ margin:6px 0 4px; }
+  .meta{ color:var(--muted); font-size:.9em; }
+  h2{ color:var(--ink); border-bottom:2px solid var(--red); padding-bottom:4px; margin-top:34px; }
+  h3{ color:var(--red); margin-top:24px; }
+  h4{ color:var(--ink); margin-top:18px; }
+  table{ border-collapse:collapse; width:100%; margin:12px 0; font-size:.93em; }
+  th,td{ border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th{ background:#f7eef0; }
+  code{ background:var(--code); padding:1px 5px; border-radius:4px; font-family:Consolas,"Courier New",monospace; font-size:.9em; }
+  pre{ background:var(--code); padding:12px 14px; border-radius:8px; overflow:auto; border:1px solid var(--line); }
+  pre code{ background:none; padding:0; }
+  blockquote{ background:#f7f9fb; border-left:4px solid var(--red); padding:8px 14px; margin:14px 0; border-radius:0 6px 6px 0; color:#3a4a5a; }
+  .mermaid{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; margin:16px 0; text-align:center; }
+  footer{ margin-top:40px; border-top:1px solid var(--line); padding-top:12px; color:var(--muted); font-size:.85em; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad:true, theme:"neutral", sequence:{ showSequenceNumbers:true } });</script>
+</head>
+<body>
+<header>
+  <div class="brand">HONTECH &middot; HT160S</div>
+  <div class="meta">SECS/GEM 通訊範例與格式參考手冊 &middot; 來源 Run: State Record 2026-06-26 00_01_18 &middot; 文件日期 2026-06-26</div>
+</header>
+<h1 id="ht160s-secsgem">HT160S SECS/GEM 通訊範例與格式參考手冊</h1>
+<blockquote>
+<p><strong>文件用途</strong>：本文件為 HT160S 與客戶端 Host/EAP（京元電子 KYEC）整合時的 <strong>SECS 通訊範例與格式參考</strong>。內容針對每一個 message family 結合「處理流程 + 實際 case log 節錄（逐字引用）+ 模擬輸入資料／格式 + 逐欄 FIELD TABLE（item / SECS-II type / 意義 / 範例值）」，供 host/EAP 整合工程師作為對接依據。本手冊可直接當作 <strong>介面合約（integration contract）</strong> 使用。</p>
+<p><strong>閱讀對象</strong>：本手冊假設讀者是 <strong>第一次接觸 HT160S</strong> 的 host/EAP 整合工程師。為了讓沒看過本機台的人也能讀懂，文中會在容易混淆處補充「<strong>為什麼</strong>」的背景說明（例如：為什麼設備是被動端、為什麼 START 與 START_AGV 要分開、為什麼 resume-START 回 HCACK=4、為什麼本 run 沒有 Color cycle）。</p>
+<p><strong>本文件定位</strong>：這是 <strong>通訊範例／格式參考</strong>，<strong>非</strong> 缺陷報告。所有回覆碼（含 HCACK=4、WinError 10038）都已驗證為「正常／設計行為」，文中會逐一解釋其用意。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>來源 Run</td>
+<td>State Record <code>2026-06-26 00_01_18</code>（已驗證的乾淨量產 lot run）</td>
+</tr>
+<tr>
+<td>時間窗</td>
+<td>Start Lot <code>2026/06/25 23:59:27</code> → Clean Out 結束 <code>00:01:11</code></td>
+</tr>
+<tr>
+<td>文件日期</td>
+<td>2026-06-26</td>
+</tr>
+<tr>
+<td>Conformance 結果</td>
+<td>50/50 checkpoints PASS，0 real defects</td>
+</tr>
+<tr>
+<td>Protocol Stack</td>
+<td>HSMS-SS (SEMI E37) over TCP + SECS-II (SEMI E5) + GEM (SEMI E30)</td>
+</tr>
+<tr>
+<td>裝置版本</td>
+<td>HT160S 1.0.0.0</td>
+</tr>
+<tr>
+<td>設備角色</td>
+<td>EQUIPMENT，PASSIVE（<code>ActiveMode=0</code>），等待 Host 連入</td>
+</tr>
+<tr>
+<td>Host 角色</td>
+<td>HOST/EAP（本範例為 SECS Host Simulator），ACTIVE，發出 Select.req</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>如何閱讀本手冊</strong>：
+- 想快速掌握全貌 → 先看 <strong>第 2 章</strong> 的 Mermaid 序列圖（一張圖看完整個 lot run 的訊息往返）。
+- 想對接某一類訊息 → 直接跳到 <strong>第 3 章</strong> 對應小節（每節都有「用途 / 格式 / 實際 log / 欄位 FIELD TABLE」四段式結構）。
+- 想查回覆碼 → 看 <strong>第 5 章</strong> 的 ACK/HCACK 速查表。
+- 想實際重現 → 看 <strong>第 7 章</strong> 的逐步操作。
+- 看到不懂的縮寫 → 查 <strong>附錄</strong> 的名詞對照表（所有縮寫第一次出現時也會就地展開）。</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 系統與通訊架構</h2>
+<p>本章先交代 HT160S 在通訊上的「身分」與「站位」：它說哪種協定、扮演什麼角色、跟誰連、log 寫在哪裡。理解這幾點後，後面每一則訊息的方向（誰送、誰收）就不會搞錯。</p>
+<h3 id="11-protocol-stack">1.1 Protocol Stack（協定堆疊）</h3>
+<p>HT160S 採用半導體業界標準的三層 SECS/GEM 堆疊。由下而上分別負責「怎麼傳」「怎麼編碼」「代表什麼意思」：</p>
+<ul>
+<li><strong>傳輸層</strong>：<strong>HSMS-SS</strong>（High-Speed SECS Message Services – Single Session，SEMI E37）over TCP/IP。負責建立並維持一條 TCP 連線通道。</li>
+<li><strong>編碼層</strong>：<strong>SECS-II</strong>（SEMI Equipment Communications Standard part 2，SEMI E5）。定義訊息（Stream/Function，如 S2F41）的位元組編碼格式。</li>
+<li><strong>語意層</strong>：<strong>GEM</strong>（Generic Equipment Model，SEMI E30）。定義設備行為的語意（事件上報、警報、Host Command 等）。</li>
+</ul>
+<blockquote>
+<p><strong>為什麼分三層？</strong> 對 host 整合而言，這三層各有對應的對接點：HSMS-SS 決定「連線怎麼建（誰 Active、誰 Passive、用哪個 port）」；SECS-II 決定「body 怎麼拆解」；GEM 決定「收到某個 CEID／RCMD 該怎麼反應」。本手冊第 3 章即按此分層逐一說明。</p>
+</blockquote>
+<h3 id="12-topology">1.2 連線拓撲（Topology）</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>裝置</th>
+<th>連線模式</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EQUIPMENT</td>
+<td>HT160S</td>
+<td><strong>PASSIVE</strong>（<code>ActiveMode=0</code>）</td>
+<td>監聽，等待 Host 連入；DeviceID=0</td>
+</tr>
+<tr>
+<td>HOST / EAP</td>
+<td>SECS Host Simulator</td>
+<td><strong>ACTIVE</strong></td>
+<td>主動送出 <code>Select.req</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Port</strong>：<code>5098</code></li>
+<li><strong>DeviceID</strong>：<code>0</code>（equipment 端）</li>
+<li><strong>連線方向</strong>：本範例中模擬器於 <code>127.0.0.1:5098</code> 監聽（device=1），由設備（equipment）主動撥入（dial in）。</li>
+</ul>
+<blockquote>
+<p><strong>為什麼設備是 PASSIVE（被動）？</strong> 在標準 GEM 模型中，設備（EQUIPMENT）被定位為「資源」，由 Host/EAP（廠端自動化系統，通常是工廠 MES 的派工端）主動發起連線與下命令；設備只負責回應與上報。因此在實際產線中，HT160S 開機後即進入 PASSIVE 監聽狀態、等待 Host 連入並送出 <code>Select.req</code>，<strong>不會</strong> 主動去連 Host。</p>
+<p><strong>本範例的特例</strong>：因為本範例改用 SECS Host Simulator 當對端來重現流程，模擬器設定成監聽方（device=1），由設備這端撥入，所以下方設備 log 會看到 <code>mode=active</code>。這只是「重現環境的連線方向」與正式產線相反；<strong>訊息層的角色（誰下命令、誰上報）完全相同</strong>，不影響本手冊任何範例的對接邏輯。</p>
+</blockquote>
+<h3 id="13-log">1.3 Log 檔案位置</h3>
+<p>整合對接時，兩端 log 是最重要的比對依據（可用 timestamp 與 sys 序號交叉核對）：</p>
+<table>
+<thead>
+<tr>
+<th>端</th>
+<th>路徑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>設備端（Equipment）</td>
+<td><code>D:\HT160S_Log\SECS_GEM\YYYY_MM_DD\SECSGEM_TextLog_HH.txt</code>（每小時一檔）</td>
+</tr>
+<tr>
+<td>Host 端（Simulator）</td>
+<td><code>secs_host_YYYYMMDD.log</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2">2. 通訊流程總覽</h2>
+<p>在逐則拆解訊息之前，先用一張圖看完整個故事。一個完整 lot run 的訊息走向，是一條清楚的時間線：</p>
+<p><strong>連線（connect）→ 設定 lot（set lot）→ 啟動生產（production）→ AGV 補料握手（AGV）→ 警報上報（alarm）→ 結束連線（teardown）</strong>。</p>
+<p>下圖即依此順序呈現 host ↔ equipment 的訊息序列，涵蓋：TCP+Select → SET_LOT_INFO → LOTSTART（含 WebAPI pull）→ START → 生產事件迴圈（S6F11；AGV 272→START_AGV→273→274→resume START）→ 警報 S5F1 → Separate。讀完此圖，再進第 3 章看每一步的 body 格式與實際 log，會更容易對位。</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant H as HOST / EAP (ACTIVE)
+    participant E as HT160S EQUIPMENT (PASSIVE)
+
+    Note over H,E: HSMS-SS 連線建立
+    E->>H: TCP connect (equipment dials in)
+    H->>E: Select.req
+    E->>H: Select.rsp (SELECTED)
+    loop ~ every 10s, 全程
+        H->>E: Linktest.req
+        E->>H: Linktest.rsp
+    end
+
+    Note over H,E: Lot 設定與啟動 (S2F41 trio)
+    H->>E: S2F41 SET_LOT_INFO (W=1)
+    E->>H: S2F42 HCACK=0
+    H->>E: S2F41 LOTSTART (W=1)
+    E-->>E: Lot WebAPI pull (2D/Bin reconcile, HTTP 200)
+    E->>H: S2F42 HCACK=0
+    H->>E: S2F41 START (W=1)
+    E->>H: S2F42 HCACK=0 (machine idle -> started)
+
+    Note over H,E: 生產事件上報
+    loop 生產 Auto 卸盤 events
+        E->>H: S6F11 EventReport CEID=136..142 (W=1)
+        H->>E: S6F12 ACKC6=0
+    end
+
+    Note over H,E: AGV/AMR 握手 (每站一輪)
+    E->>H: S6F11 CEID=272 AGVSupplement (target=Pn)
+    H->>E: S2F41 START_AGV(station)
+    E->>H: S2F42 HCACK=0
+    E->>H: S6F11 CEID=273 AGVLDUnLDStatus (Ready)
+    E->>H: S6F11 CEID=274 AGVLDUnLDFinish (Finish)
+    H->>E: S2F41 START (resume)
+    E->>H: S2F42 HCACK=4 (already running, honest interlock)
+
+    Note over H,E: 警報上報
+    E->>H: S5F1 Alarm ALCD=128 (SET)
+    H->>E: S5F2 ACKC5=0
+    E->>H: S5F1 Alarm ALCD=0 (CLEAR)
+    H->>E: S5F2 ACKC5=0
+
+    Note over H,E: 連線結束
+    H->>E: Separate.req (host-side teardown)
+</pre>
+<blockquote>
+<p><strong>看圖重點</strong>：
+- 連線是 <strong>設備撥入 → Host 送 Select.req</strong>（對應 1.2 的方向說明）。
+- Lot 設定是 <strong>三連發（trio）</strong>：SET_LOT_INFO → LOTSTART → START，三者各有分工（見 3.2）。
+- 每一輪 AGV 握手結尾的 resume <code>START</code> 回的是 <strong>HCACK=4 而非 0</strong>——這是 <strong>正常的誠實互鎖</strong>，不是錯誤（見 3.4）。
+- 結尾的 <code>Separate.req</code> 由 Host 端送出，且本範例中發生在設備已關閉之後（見 3.6）。</p>
+</blockquote>
+<hr />
+<h2 id="3">3. 逐訊息 範例與格式</h2>
+<p>本章是手冊的核心。每一小節對應一個 message family，並固定採用 <strong>四段式結構</strong>，方便對接時逐項查核：</p>
+<ol>
+<li><strong>用途</strong>：這類訊息在流程中扮演什麼角色。</li>
+<li><strong>格式／body 結構</strong>：依 SEMI E5 的 SECS-II 編碼，列出 body 的 L/A/B/U4 結構。</li>
+<li><strong>實際 case log 節錄</strong>：逐字引用來源 Run 的設備端與 Host 端 log。</li>
+<li><strong>FIELD TABLE（欄位說明）</strong>：逐欄列出 item／SECS-II type／意義／範例值，作為對接時的格式合約。</li>
+</ol>
+<blockquote>
+<p><strong>接地規則</strong>：以下所有 case log 節錄均逐字引用自來源 Run，未更動 timestamp、ALID、CEID、byte length 或 sys number。FIELD TABLE 的「範例值」一律取自本 run 的實際 log 或 evidence；非 evidence 涵蓋者於該欄註明。</p>
+<p><strong>SECS-II 型別速記（FIELD TABLE 用）</strong>：<code>L[n]</code> = List（n 個元素）；<code>A</code> = ASCII 字串；<code>B</code> = Binary（1 byte）；<code>U4</code> = 4-byte unsigned integer。</p>
+</blockquote>
+<h3 id="31-hsms-select-linktest-separate">3.1 HSMS 連線（Select / Linktest / Separate）</h3>
+<p><strong>用途</strong>：建立並維持 HSMS-SS 連線。這是所有後續 SECS-II 訊息的前提——沒有先 SELECTED，任何 S2F41／S6F11 都無從談起。設備為 PASSIVE，Host 為 ACTIVE 發起 <code>Select.req</code>；連線進入 SELECTED 後，雙方週期性 <code>Linktest</code> 確認鏈路仍活著；結束時送 <code>Separate.req</code>。</p>
+<blockquote>
+<p><strong>為什麼有 Linktest？</strong> TCP 連線可能在沒有訊息往來時悄悄斷掉（例如網路設備逾時）。<code>Linktest</code> 是 HSMS 層的「心跳」，週期性確認鏈路存活，避免在真正要送訊息時才發現連線早已失效。</p>
+</blockquote>
+<p><strong>HSMS 控制訊息（SType）</strong>：這些是 HSMS 層的控制訊息，不屬於 SECS-II 的 Stream/Function；以 SType 數字區分。<strong>注意：SType 是 HSMS header 內的單一 byte 欄位，本層訊息無 SECS-II body。</strong></p>
+<table>
+<thead>
+<tr>
+<th>控制訊息</th>
+<th>SType</th>
+<th>方向</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Select.req</td>
+<td>1</td>
+<td>Host → Equipment</td>
+<td>建立 session</td>
+</tr>
+<tr>
+<td>Select.rsp</td>
+<td>2</td>
+<td>Equipment → Host</td>
+<td>回應，進入 SELECTED</td>
+</tr>
+<tr>
+<td>Linktest.req</td>
+<td>5</td>
+<td>雙向</td>
+<td>鏈路存活測試</td>
+</tr>
+<tr>
+<td>Linktest.rsp</td>
+<td>6</td>
+<td>雙向</td>
+<td>回應</td>
+</tr>
+<tr>
+<td>Separate.req</td>
+<td>9</td>
+<td>任一端</td>
+<td>結束 session</td>
+</tr>
+</tbody>
+</table>
+<p><strong>實際 case log 節錄（設備端 Equipment）</strong>：</p>
+<pre><code>2026/06/25 23:59:08.603  [SECS] StartCommunication mode=active port=5098
+2026/06/25 23:59:08.603  [SECS] peer connected (TCP up, awaiting Select)
+2026/06/25 23:59:08.862  [SECS] Select.req -&gt; Select.rsp (SELECTED)
+</code></pre>
+<p><strong>實際 case log 節錄（Host 端 Simulator）</strong>：</p>
+<pre><code>[23:59:08] equipment connected: 127.0.0.1:50817
+[23:59:08] TX  Select.req
+[23:59:08] RX  Select.rsp
+[23:59:08] HSMS SELECTED
+[23:59:18] RX  Linktest.req -&gt; Linktest.rsp        (then ~every 10s, all answered, whole run)
+</code></pre>
+<p><strong>FIELD TABLE（HSMS header 關鍵欄位）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SType</code></td>
+<td>byte（HSMS header）</td>
+<td>控制訊息類型碼</td>
+<td><code>1</code>(Select.req) / <code>2</code>(Select.rsp) / <code>5</code>(Linktest.req) / <code>6</code>(Linktest.rsp) / <code>9</code>(Separate.req)</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td>log 欄位</td>
+<td>本範例連線模式（模擬器監聽、設備撥入）；正式產線設備為 PASSIVE</td>
+<td><code>active</code></td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>TCP</td>
+<td>HSMS 監聽埠</td>
+<td><code>5098</code></td>
+</tr>
+<tr>
+<td>連線狀態</td>
+<td>HSMS state</td>
+<td>完成 Select 交握後進入可傳輸狀態（此後才能送 SECS-II 訊息）</td>
+<td><code>SELECTED</code></td>
+</tr>
+<tr>
+<td>Linktest 週期</td>
+<td>—</td>
+<td>連線建立後約每 10 秒一次，全程皆有回應</td>
+<td><code>~every 10s, all answered</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="32-lot-s2f41-set_lot_info-lotstart-start-s2f42">3.2 Lot 設定與啟動（S2F41 SET_LOT_INFO / LOTSTART / START + S2F42）</h3>
+<p><strong>用途</strong>：這是 host 對設備下達 <strong>Host Command（S2F41）</strong> 的核心三連發（trio）。Host 透過 S2F41 依序設定 lot 清單、啟動 lot（觸發 WebAPI 2D/Bin 對帳）、最後啟動生產。設備一律以 <strong>S2F42</strong> 回覆，body 內含 <strong>HCACK</strong> 回覆碼。</p>
+<blockquote>
+<p><strong>為什麼分成三個命令、而且順序固定？</strong> 三者刻意分工、職責不重疊，host 可分階段控制與檢查：
+- <strong>SET_LOT_INFO</strong> = 「告訴設備這批要做哪些 lot」（純資料登錄，<strong>會清空並覆寫</strong> 既有 lot 清單）。
+- <strong>LOTSTART</strong> = 「叫設備去拉這些 lot 的 2D/Bin 對帳資料」（觸發 WebAPI pull，但<strong>不會讓機構動作</strong>）。
+- <strong>START</strong> = 「真正開始生產」（讓 motion 動起來）。</p>
+<p>把「登錄資料」「拉對帳資料」「啟動 motion」拆開，host 可以在 START 之前先確認 lot 清單與 WebAPI 對帳都成功，再決定是否啟動，降低誤啟動風險。</p>
+</blockquote>
+<p><strong>格式／body 結構（SEMI E5）</strong>：</p>
+<p>S2F41 通用結構（<strong>RCMD</strong> = Remote Command，命令名稱；<strong>CPNAME/CPVAL</strong> = 參數名稱/值）：</p>
+<pre><code>L[2]
+  A &quot;RCMD&quot;
+  L[n]
+    L[2]
+      A CPNAME
+      A CPVAL
+</code></pre>
+<p>回覆 S2F42（<strong>HCACK</strong> = Host Command Acknowledge，回覆碼）：</p>
+<pre><code>L[2]
+  B  HCACK
+  L[0]
+</code></pre>
+<p>各 RCMD body：</p>
+<table>
+<thead>
+<tr>
+<th>RCMD</th>
+<th>body 結構</th>
+<th>語意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SET_LOT_INFO</code></td>
+<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code></td>
+<td>lot 清單；<strong>CLEARS+overwrites</strong> LotRegistry（清空並覆寫，非附加）</td>
+</tr>
+<tr>
+<td><code>LOTSTART</code></td>
+<td><code>L[2]{ A "LOTSTART", L[n]{ A lotID } }</code></td>
+<td>additive（附加）；觸發 HT160 Lot WebAPI pull 做 2D/Bin reconcile；<strong>不啟動 motion</strong>（仍需 operator Start 才動作）</td>
+</tr>
+<tr>
+<td><code>START</code></td>
+<td><code>L[2]{ A "START", L[0] }</code></td>
+<td>start/resume 生產；與 START_AGV 刻意分開（原因見 3.4）；於 CEID 274 Finish 後送出</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>SET_LOT_INFO</code> 由 <code>ht160s_presets._set_lot_info</code> 建構，預設 5 個 lot <code>SIMU_LOT_A..E</code>；<code>LOTSTART</code> 由 <code>_lot_start</code> 建構；<code>START</code> 由 <code>_start</code> 建構。</p>
+</blockquote>
+<p><strong>實際 case log 節錄（設備端 Equipment）</strong>：</p>
+<pre><code>23:59:25.060  [SECS][RX] S2F41 decoded rc=1 items=22
+23:59:25.062  [SECS][TX] S2F42 W=0 len=21 (sent)
+23:59:25.062  [SECS] S2F42 cmd=SET_LOT_INFO HCACK=0 Lots=5
+23:59:26.059  [SECS][RX] S2F41 decoded rc=1 items=10
+23:59:26.077  [SECS] S2F42 cmd=LOTSTART HCACK=0 Lots=5
+23:59:27.543  [SECS][RX] S2F41 decoded rc=1 items=7
+23:59:27.598  [SECS] S2F42 cmd=START HCACK=0 Lots=5
+</code></pre>
+<p><strong>實際 case log 節錄（Host 端 Simulator）</strong>：</p>
+<pre><code>[23:59:25] TX  S2F41W  (S2F41 SET_LOT_INFO)   ;  [23:59:25] RX  S2F42  (sys=20558)
+[23:59:26] TX  S2F41W  (S2F41 LOTSTART)        ;  [23:59:26] RX  S2F42  (sys=20559)
+[23:59:27] TX  S2F41W  (S2F41 START)           ;  [23:59:27] RX  S2F42  (sys=20560)
+</code></pre>
+<p><strong>FIELD TABLE — S2F41 Host Command（送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RCMD</code></td>
+<td>A</td>
+<td>Host 命令名稱</td>
+<td><code>"SET_LOT_INFO"</code> / <code>"LOTSTART"</code> / <code>"START"</code></td>
+</tr>
+<tr>
+<td>lot list 元素</td>
+<td>A（於 <code>L[n]</code> 內）</td>
+<td>每個 lot ID（SET_LOT_INFO / LOTSTART 攜帶；START 為 <code>L[0]</code> 不帶）</td>
+<td><code>"SIMU_LOT_A"</code> … <code>"SIMU_LOT_E"</code>（共 5 筆）</td>
+</tr>
+<tr>
+<td><code>CPNAME</code></td>
+<td>A</td>
+<td>參數名稱（通用結構欄位；本 trio 以 lot ID 直填 <code>L[n]</code>）</td>
+<td>（SET_LOT_INFO/LOTSTART 不使用 CPNAME 形式）</td>
+</tr>
+<tr>
+<td><code>CPVAL</code></td>
+<td>A</td>
+<td>參數值</td>
+<td>（同上）</td>
+</tr>
+<tr>
+<td><code>W</code>-bit</td>
+<td>header</td>
+<td>要求回覆</td>
+<td><code>1</code>（S2F41W）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>FIELD TABLE — S2F42 回覆（收到）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HCACK</code></td>
+<td>B</td>
+<td>Host Command 回覆碼</td>
+<td><code>0</code>（SET_LOT_INFO / LOTSTART / START 全 OK；START 因機台 idle→started）</td>
+</tr>
+<tr>
+<td>第二元素</td>
+<td><code>L[0]</code></td>
+<td>空 list（無附加參數回覆）</td>
+<td><code>L[0]</code></td>
+</tr>
+<tr>
+<td><code>W</code>-bit</td>
+<td>header</td>
+<td>偶函數回覆，不再要求對方回覆</td>
+<td><code>0</code>（W=0，交易到此結束）</td>
+</tr>
+<tr>
+<td><code>len</code></td>
+<td>bytes</td>
+<td>S2F42 body 長度</td>
+<td><code>21</code></td>
+</tr>
+<tr>
+<td><code>sys</code></td>
+<td>header（模擬器交易序號）</td>
+<td>嚴格 +1，可核對無漏訊</td>
+<td><code>20558</code>→<code>20559</code>→<code>20560</code></td>
+</tr>
+<tr>
+<td><code>Lots</code></td>
+<td>log 欄位</td>
+<td>此時 LotRegistry 內 lot 數</td>
+<td><code>5</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="33-s6f11-s6f12-ceid-dataid">3.3 生產事件上報（S6F11 / S6F12 + CEID + DataID）</h3>
+<p><strong>用途</strong>：生產過程中，設備會主動把物料移動等事件以 <strong>S6F11 Event Report</strong> 上報給 host；host 收到後以 <strong>S6F12</strong> 回 ACK。這是設備「告知 host 現在發生了什麼」的主要管道。</p>
+<blockquote>
+<p><strong>為什麼是設備主動上報、而非 host 來問？</strong> 在 GEM 模型中，事件（Collection Event）由設備在事件發生的當下即時 push 給 host，host 不必輪詢。每個事件以 <strong>CEID（Collection Event ID，事件識別碼）</strong> 標明「發生了什麼事」。</p>
+</blockquote>
+<p><strong>格式／body 結構</strong>：</p>
+<p>S6F11（<strong>DataID</strong> = 資料識別；<strong>CEID</strong> = 事件識別碼）：</p>
+<pre><code>L[3]
+  U4 DataID
+  U4 CEID
+  L[reports]{ ... }
+</code></pre>
+<p>回覆 S6F12（<strong>ACKC6</strong> = Event Report ACK 回覆碼）：</p>
+<pre><code>B ACKC6
+</code></pre>
+<p>W-bit=1（要求回覆）。</p>
+<p><strong>實際 case log 節錄（設備端 Equipment）</strong>：</p>
+<pre><code>23:59:30.356  [SECS][TX] S6F11 EventReport DataID=1 CEID=136
+23:59:30.356  [SECS][TX] S6F11 W=1 len=30 (sent)
+23:59:30.361  [SECS][RX] S6F12 decoded rc=1 items=3
+23:59:30.361  [SECS][RX] S6F12 reply ignored          (&quot;reply ignored&quot; = S6F12 is the even-function ACK; nothing further to do)
+</code></pre>
+<p><strong>實際 case log 節錄（Host 端 Simulator）</strong>：</p>
+<pre><code>[23:59:30] RX  S6F11W  (sys=1)
+[23:59:30]     -&gt; auto S6F12 ACKC6=0
+</code></pre>
+<p><strong>「reply ignored」說明</strong>：<code>S6F12</code> 為偶函數（even-function）ACK，設備收到後<strong>無後續動作</strong>，僅標記為 reply ignored，屬正常行為，<strong>非錯誤</strong>。（凡 even-function 回覆都是一筆交易的結尾，收到即代表對方已確認，不需再回。）</p>
+<p><strong>FIELD TABLE — S6F11 Event Report（送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DataID</code></td>
+<td>U4</td>
+<td>資料識別；<strong>對 host 無語意</strong>，host 依 CEID 分派</td>
+<td><code>1</code>（生產／Auto CEID）／ <code>0</code>（AGV CEID）</td>
+</tr>
+<tr>
+<td><code>CEID</code></td>
+<td>U4</td>
+<td>事件識別碼</td>
+<td><code>136</code>（Auto 卸盤）／<code>272</code>（AGV）／<code>35</code>（car full）</td>
+</tr>
+<tr>
+<td><code>L[reports]</code></td>
+<td>L[n]</td>
+<td>report 串列；可為空（無 SV 註冊時 <code>L[0]</code>）</td>
+<td>空（136–142，len=30）／13 SV（CEID 35，len=144）</td>
+</tr>
+<tr>
+<td><code>W</code>-bit</td>
+<td>header</td>
+<td>要求回覆</td>
+<td><code>1</code>（S6F11W）</td>
+</tr>
+<tr>
+<td><code>len</code></td>
+<td>bytes</td>
+<td>S6F11 body 長度</td>
+<td><code>30</code>（EMPTY）／<code>86</code>（CEID 272）／<code>144</code>（CEID 35）</td>
+</tr>
+<tr>
+<td><code>sys</code></td>
+<td>header（模擬器序號）</td>
+<td>S6F11 上報序號池</td>
+<td><code>1</code>（本 run S6F11 sys 為 1..53）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>FIELD TABLE — S6F12 回覆（收到）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACKC6</code></td>
+<td>B</td>
+<td>Event Report ACK 回覆碼</td>
+<td><code>0</code>（事件已收到）</td>
+</tr>
+<tr>
+<td>設備端處理</td>
+<td>—</td>
+<td>偶函數 ACK，收到即標記 reply ignored（正常）</td>
+<td><code>reply ignored</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>DataID 說明</strong>：<strong>DataID 對 host 無語意</strong>——host 是依 <strong>CEID</strong> 來分派處理邏輯，不看 DataID。設備內部用 DataID 區分事件來源，本 run 中：</p>
+<ul>
+<li>AGV CEIDs（272/273/274）使用 <code>DataID=0</code></li>
+<li>生產／Auto CEIDs（136–142、35）使用 <code>DataID=1</code></li>
+</ul>
+<blockquote>
+<p><strong>整合提醒</strong>：host 端請以 CEID 作為唯一的事件分派依據，不要依賴 DataID 的數值。</p>
+</blockquote>
+<p><strong>本 run CEID 統計</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>CEID</th>
+<th>次數</th>
+<th>類別</th>
+<th>report body</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>136</td>
+<td>13</td>
+<td>Auto 卸盤（unload-tray / discharge）</td>
+<td><code>len=30</code>（EMPTY body）</td>
+<td>此 CEID 在設計上未綁定任何 SV（RPTID 註冊 0 個 SV），故 body 為空</td>
+</tr>
+<tr>
+<td>137</td>
+<td>7</td>
+<td>Auto 卸盤（unload-tray / discharge）</td>
+<td>EMPTY（<code>len=30</code>）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>138</td>
+<td>4</td>
+<td>Auto 卸盤（unload-tray / discharge）</td>
+<td>EMPTY（<code>len=30</code>）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>140</td>
+<td>4</td>
+<td>Auto 卸盤（unload-tray / discharge）</td>
+<td>EMPTY（<code>len=30</code>）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>141</td>
+<td>3</td>
+<td>Auto 卸盤（unload-tray / discharge）</td>
+<td>EMPTY（<code>len=30</code>）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>142</td>
+<td>3</td>
+<td>Auto 卸盤（unload-tray / discharge）</td>
+<td>EMPTY（<code>len=30</code>）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>272</td>
+<td>6</td>
+<td>AGV AGVSupplement</td>
+<td><code>len=86</code></td>
+<td>見 3.4</td>
+</tr>
+<tr>
+<td>273</td>
+<td>6</td>
+<td>AGV AGVLDUnLDStatus</td>
+<td>—</td>
+<td>見 3.4</td>
+</tr>
+<tr>
+<td>274</td>
+<td>6</td>
+<td>AGV AGVLDUnLDFinish</td>
+<td>—</td>
+<td>見 3.4</td>
+</tr>
+<tr>
+<td>35</td>
+<td>1</td>
+<td>Auto1 "car full" edge</td>
+<td><code>len=144</code></td>
+<td><code>AutoFullCeid[0]=35</code>，在 Report 1 註冊 13 個 SV</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>為什麼 136–142 的 report body 是空的（len=30）？</strong> 這 6 個 CEID 是 <strong>Auto 卸盤（unload-tray / discharge）事件</strong>——設備在 <code>aAuto1To6</code> 的 <code>DoDischargeTray</code> 流程以 <code>AutoCeid[6]={136,137,138,140,141,142}</code> 發出。它們在設計上 <strong>刻意不註冊任何 report SV</strong>（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位。host 只需依 CEID 認得「發生了哪個事件」即可，這是 by design，不是漏帶資料。</p>
+<p><strong>CEID 136–142 名稱</strong>：屬 Auto 卸盤（discharge）類事件，其完整名稱對照表存放於設備端 CEID registry（見 <code>HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp</code> 的 <code>AutoCeid</code> 陣列與 <code>EventReport</code> 呼叫處）。本文件不臆造個別事件名稱。</p>
+</blockquote>
+<hr />
+<h3 id="34-agv-amr-272-273-274-275-start_agv-resume-start">3.4 AGV / AMR 握手（272 / 273 / 274 / 275 + START_AGV + resume START）</h3>
+<p><strong>用途</strong>：當設備缺料或某個 Auto 工位車滿時，需要 <strong>AGV/AMR（Automated Guided Vehicle / Autonomous Mobile Robot，自動物料搬運車）</strong> 來補料或卸料。本小節描述設備與 host 之間完成一次 AGV 補給／卸載的完整事件握手：設備發出 CEID 事件，host 依預先設定的 swimlane（自動回應規則）回對應的 Host Command。</p>
+<blockquote>
+<p><strong>為什麼 AGV 要先 START_AGV、最後又要一個 resume START？這兩個 START 不一樣嗎？</strong> 兩者是<strong>刻意分開的不同命令</strong>，職責不同：
+- <strong>START_AGV(station)</strong> = 「授權 AGV 對某一站（station）執行搬運動作」——只針對該站的 AGV 交接，不影響整機生產狀態。
+- <strong>resume START</strong> = 「在 AGV 交接完成後，恢復整機生產」——對應 3.2 的同一個 START 命令。</p>
+<p>之所以分開，是因為 AGV 補料期間機台可能暫停某些動作等待交接，待 CEID 274（Finish）確認搬運完成後，host 才送 START 讓整機恢復生產。把「授權 AGV 動作」與「恢復整機生產」拆成兩個命令，host 才能精準控制兩件事的時序。</p>
+</blockquote>
+<p><strong>AGV CEID 定義</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>CEID</th>
+<th>名稱</th>
+<th>語意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>272</td>
+<td>AGVSupplement</td>
+<td>呼叫 AGV：缺料／Auto full。SVID <code>38219</code> bitmap 標記目標站</td>
+</tr>
+<tr>
+<td>273</td>
+<td>AGVLDUnLDStatus</td>
+<td>Ready：機構就位</td>
+</tr>
+<tr>
+<td>274</td>
+<td>AGVLDUnLDFinish</td>
+<td>Finish：sensor 確認 load/unload 完成</td>
+</tr>
+<tr>
+<td>275</td>
+<td>AGVLdID</td>
+<td>carrier ID</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>關於 CEID 275（AGVLdID）</strong>：275 是 AGV CEID 集合中定義的 carrier ID 事件，但<strong>本 run 並未發出 275</strong>——本範例的 6 個 AGV cycle 只出現 272／273／274，因此 275 <strong>沒有對應的 FIELD TABLE（沒有 evidence row 可引用）</strong>。這與 P3（Color）的缺席性質相同：屬本 run 未觸發的情境，並非漏列或失敗。host 端不應預期每個 run 都一定看到 275。</p>
+</blockquote>
+<p><strong>START_AGV body 結構</strong>：</p>
+<pre><code>L[2]
+  A &quot;START_AGV&quot;
+  L[n]
+    L[2]{ A station, A &quot;Action&quot; }
+    [, L[2]{ A &quot;LoaderTrayCount&quot;, A n }]
+</code></pre>
+<p><code>station</code> ∈ {Loader, Empty, Color, AUTO1..AUTO6}，由 <code>_start_agv</code> 建構。</p>
+<p><strong>站點對照（P-Map，PIndex = AutoNo + 3）</strong>：CEID 272 的 SVID <code>38219</code> 以 bitmap 標出目標站，站號 P1–P9 對照如下：</p>
+<table>
+<thead>
+<tr>
+<th>P</th>
+<th>站點</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>Loader</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>EmptyTray</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>ColorTray</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>AUTO1</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>AUTO2</td>
+</tr>
+<tr>
+<td>P6</td>
+<td>AUTO3</td>
+</tr>
+<tr>
+<td>P7</td>
+<td>AUTO4</td>
+</tr>
+<tr>
+<td>P8</td>
+<td>AUTO5</td>
+</tr>
+<tr>
+<td>P9</td>
+<td>AUTO6</td>
+</tr>
+</tbody>
+</table>
+<p><strong>bitmap payload（ASCII）</strong>：<code>"P1:0,P2:0,...,P4:1,...,P9:0"</code>。此為<strong>示意格式</strong>——bitmap 中被設為 <code>1</code> 的位置，<strong>就是當次握手的目標站</strong>（單一站 P=1，其餘皆 0）；這裡以 <code>P4=1</code>（一個 AUTO1 呼叫）為例說明格式。實際 <code>1</code> 落在哪一位，視該次的目標站而定（例如下方 CEID 272 FIELD TABLE 取 @00:00:13 的實際 cycle，目標站為 P1 Loader，故 <code>P1=1</code>）。</p>
+<p><strong>Auto-AGV Host swimlane（host 端自動回應規則）</strong>：</p>
+<ul>
+<li>收到 <code>272</code>（AGVSupplement）→ 自動送 <code>START_AGV(station)</code>（授權該站搬運）</li>
+<li>收到 <code>273</code>（Ready）→ 僅 log（等待機台 sensor 回報 Finish，不做動作）</li>
+<li>收到 <code>274</code>（Finish）→ 自動送 <code>START</code>（resume，恢復整機生產）</li>
+</ul>
+<p><strong>Color (P3) demand-gate（需求閘）</strong>：Color 站僅在真實需求（內部旗標 <code>bSupplyRequested</code> 成立）時才補給。</p>
+<blockquote>
+<p><strong>為什麼本 run 沒有出現 P3（Color）的 AGV cycle？</strong> 因為 Color 站採「<strong>按需供給（demand-gated）</strong>」：只有在機台真正提出需求時才呼叫 AGV。本範例是一段很短的 run，期間 Color 站並未產生供給需求，所以 <strong>完全沒有 P3 cycle</strong> 出現。這是 <strong>預期行為</strong>，不是漏掉或失敗——host 端不應預期每個 run 都一定看到 P3。</p>
+</blockquote>
+<p><strong>實際 case log 節錄 — 完整 AGV cycle，站 P1 Loader @ 00:00:13（設備端 Equipment）</strong>：</p>
+<pre><code>00:00:13.587  [SECS][TX] S6F11 EventReport DataID=0 CEID=272
+00:00:13.587  [SECS][TX] S6F11 W=1 len=86 (sent)
+00:00:13.596  [SECS][RX] S2F41 decoded rc=1 items=15
+00:00:13.596  [SECS][TX] S2F42 W=0 len=21 (sent)
+00:00:13.596  [SECS] S2F42 cmd=START_AGV HCACK=0 Lots=5
+00:00:14.597  [SECS][TX] S6F11 EventReport DataID=0 CEID=273
+00:00:15.593  [SECS][TX] S6F11 EventReport DataID=0 CEID=274
+00:00:15.600  [SECS][RX] S2F41 decoded rc=1 items=7
+00:00:15.601  [SECS] S2F42 cmd=START HCACK=4 Lots=5
+</code></pre>
+<p><strong>實際 case log 節錄（Host 端 Simulator）</strong>：</p>
+<pre><code>[00:00:13] RX  S6F11W  (sys=23)
+[00:00:13]     &gt;&gt; AGV AGVSupplement (CEID 272) target=P1 Loader
+[00:00:13] TX  S2F41W  (S2F41 START_AGV)
+[00:00:13]     &gt;&gt; auto START_AGV(Loader)
+[00:00:13] RX  S2F42  (sys=20563)
+[00:00:14] RX  S6F11W  (sys=24)
+[00:00:14]     &gt;&gt; AGV AGVLDUnLDStatus (CEID 273) target=P1 Loader
+[00:00:14]     &gt;&gt; AGV handoff at Loader; awaiting sensor Finish
+[00:00:15] RX  S6F11W  (sys=25)
+[00:00:15]     &gt;&gt; AGV AGVLDUnLDFinish (CEID 274) target=P1 Loader
+[00:00:15] TX  S2F41W  (S2F41 START)
+[00:00:15]     &gt;&gt; auto START (resume production)
+[00:00:15] RX  S2F42  (sys=20564)
+</code></pre>
+<blockquote>
+<p><strong>對照看圖</strong>：上面這段 log 即第 2 章 Mermaid 圖中「AGV/AMR 握手」那一輪的完整實況——272 → START_AGV(HCACK=0) → 273 → 274 → resume START(HCACK=4)。</p>
+</blockquote>
+<p><strong>FIELD TABLE — CEID 272 AGVSupplement（S6F11 送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DataID</code></td>
+<td>U4</td>
+<td>AGV 事件資料識別</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>CEID</code></td>
+<td>U4</td>
+<td>事件識別碼</td>
+<td><code>272</code></td>
+</tr>
+<tr>
+<td>SVID <code>38219</code></td>
+<td>（report SV）</td>
+<td>bitmap 標記目標站（被設為 <code>1</code> 的位置即目標站，其餘 0）</td>
+<td><code>"P1:1,P2:0,...,P9:0"</code>（<strong>依格式推得；非逐字 log 值</strong>——本 run @00:00:13 的 log 僅記錄 <code>target=P1 Loader</code>，未逐字記錄 bitmap 字串，此處依「單一站 P=1」格式推得 <code>P1=1</code>）</td>
+</tr>
+<tr>
+<td><code>len</code></td>
+<td>bytes</td>
+<td>S6F11 body 長度</td>
+<td><code>86</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>FIELD TABLE — START_AGV（S2F41 收到 / 由 host 送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RCMD</code></td>
+<td>A</td>
+<td>命令名稱</td>
+<td><code>"START_AGV"</code></td>
+</tr>
+<tr>
+<td><code>station</code></td>
+<td>A</td>
+<td>目標站（CPNAME 位置）</td>
+<td><code>"Loader"</code> / <code>"Empty"</code> / <code>"Color"</code> / <code>"AUTO1".."AUTO6"</code></td>
+</tr>
+<tr>
+<td><code>"Action"</code></td>
+<td>A</td>
+<td>station 對應的動作值（CPVAL 位置）</td>
+<td><code>"Action"</code></td>
+</tr>
+<tr>
+<td><code>"LoaderTrayCount"</code> / <code>n</code></td>
+<td>A / A</td>
+<td>選用第二參數對：盤數</td>
+<td>（選用；Loader 站可帶）</td>
+</tr>
+<tr>
+<td>回覆 <code>HCACK</code></td>
+<td>B（S2F42）</td>
+<td>接受</td>
+<td><code>0</code>（全部 6 次 START_AGV 皆 0）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>FIELD TABLE — CEID 273 / 274（S6F11 送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DataID</code></td>
+<td>U4</td>
+<td>AGV 事件資料識別</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>CEID</code></td>
+<td>U4</td>
+<td>273=Ready（機構就位）／274=Finish（sensor 確認完成）</td>
+<td><code>273</code> / <code>274</code></td>
+</tr>
+<tr>
+<td>target</td>
+<td>（log 標註）</td>
+<td>對應目標站</td>
+<td><code>P1 Loader</code>（本 cycle）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>本 run 的 6 個 AGV cycle（依目標站）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>時間</th>
+<th>目標站</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>23:59:47</td>
+<td>P2 Empty</td>
+</tr>
+<tr>
+<td>00:00:13</td>
+<td>P1 Loader</td>
+</tr>
+<tr>
+<td>00:00:18</td>
+<td>P2 Empty</td>
+</tr>
+<tr>
+<td>00:00:41</td>
+<td>P4 AUTO1</td>
+</tr>
+<tr>
+<td>00:00:46</td>
+<td>P1 Loader</td>
+</tr>
+<tr>
+<td>00:00:51</td>
+<td>P2 Empty</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CEID=35 雙重發送（與 272 同時 @ 00:00:41）</strong>：當 Auto1 工位「車滿（car full）」的邊緣事件觸發時，設備會在同一時刻同時送出 272（呼叫 AGV）與 35（car-full 事件）。兩者目的不同：272 是叫車、35 是上報車滿狀態（攜帶 13 個 SV，故 len=144）。</p>
+<pre><code>00:00:41.586  [SECS][TX] S6F11 EventReport DataID=0 CEID=272
+00:00:41.586  [SECS][TX] S6F11 W=1 len=86 (sent)
+00:00:41.586  [SECS][TX] S6F11 EventReport DataID=1 CEID=35
+00:00:41.586  [SECS][TX] S6F11 W=1 len=144 (sent)
+</code></pre>
+<p><strong>FIELD TABLE — CEID 35 Auto1 car-full（S6F11 送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DataID</code></td>
+<td>U4</td>
+<td>生產／Auto 事件資料識別</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td><code>CEID</code></td>
+<td>U4</td>
+<td>事件識別碼（<code>AutoFullCeid[0]=35</code>）</td>
+<td><code>35</code></td>
+</tr>
+<tr>
+<td><code>L[reports]</code></td>
+<td>L[n]</td>
+<td>Report 1 註冊 <strong>13 個 SV</strong>（與空 body 的 136–142 對比）</td>
+<td>13 SV</td>
+</tr>
+<tr>
+<td><code>len</code></td>
+<td>bytes</td>
+<td>S6F11 body 長度（13 SV → 144）</td>
+<td><code>144</code></td>
+</tr>
+<tr>
+<td>觸發時機</td>
+<td>—</td>
+<td>與 CEID 272 同時刻雙發（叫車 + 上報車滿）</td>
+<td><code>@00:00:41</code>（272 + 35 同一 timestamp）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>HCACK=0 vs HCACK=4 說明（關鍵，務必理解）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>HCACK</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>START_AGV</code>（全部 6 次）</td>
+<td><code>0</code></td>
+<td>OK，正常接受</td>
+</tr>
+<tr>
+<td>resume <code>START</code>（全部 6 次）</td>
+<td><code>4</code></td>
+<td><strong>By design</strong>。此時 <code>SystemStart</code> 已為 true → MachineStart() 回 <code>msRejBusy</code>，機台誠實回報「已在運行」（<code>uHGemHT160.cpp:826-832</code>，case <code>msRejBusy: HCACK=4</code>）。這 <strong>不是失敗</strong>，而是誠實互鎖（honest interlock），非假成功（not a fake-success）。</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>為什麼 resume START 回 HCACK=4（busy）而不是 0？這算失敗嗎？</strong> 不算失敗。HCACK=4 的定義是「busy（機台已在運行 <strong>或</strong> ICs 仍在機內）」。AGV 交接期間機台其實<strong>並未真正停機</strong>，整機生產狀態仍是運行中；因此當 host 在 274 之後送 resume START 時，機台「誠實地」回報「我本來就在跑了，這個 START 無需再啟動」（HCACK=4）。</p>
+<p>這正是所謂「<strong>誠實互鎖（honest interlock）</strong>」：機台寧可如實回 busy，也不會假裝「啟動成功（HCACK=0）」來討好 host。<strong>host 端收到 resume-START 的 HCACK=4 應視為正常結果</strong>，代表生產持續中，無需重試或告警。</p>
+<p><strong>文件修正提醒（給有看過舊文件的讀者）</strong>：模擬器舊版 <code>docs/SECS_MESSAGES.md</code> 仍寫「START_AGV/START not yet implemented → HCACK=1」，<strong>該文字為 STALE（過時）</strong>。實際設備兩者皆已實作，且本 run 的真實回覆碼為 <strong>START_AGV=0、resume-START=4</strong>（皆非 1）；請以本文件的實際行為為準。</p>
+</blockquote>
+<hr />
+<h3 id="35-s5f1-s5f2">3.5 警報上報（S5F1 / S5F2）</h3>
+<p><strong>用途</strong>：當設備發生需通報的狀況（如缺盤、清場）時，以 <strong>S5F1</strong> 上報警報的 SET（成立）／CLEAR（解除）；host 以 <strong>S5F2</strong> 回 ACK。每個警報的「成立」與「解除」會成對出現（先 SET、後 CLEAR）。</p>
+<p><strong>格式／body 結構</strong>：</p>
+<p>S5F1（<strong>ALCD</strong> = Alarm Code byte；<strong>ALID</strong> = Alarm ID；<strong>ALTX</strong> = 人類可讀 alarm 文字）：</p>
+<pre><code>L[3]
+  B  ALCD
+  U4 ALID
+  A  ALTX
+</code></pre>
+<p>回覆 S5F2（<strong>ACKC5</strong> = Alarm Report ACK 回覆碼）：</p>
+<pre><code>B ACKC5
+</code></pre>
+<p>W-bit=1。</p>
+<p><strong>ALCD（SEMI E5 標準）</strong>：以 byte 的 bit7 表示 SET/CLEAR：</p>
+<table>
+<thead>
+<tr>
+<th>ALCD</th>
+<th>值</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SET</td>
+<td><code>0x80</code> = <code>128</code>（bit7）</td>
+<td>警報成立</td>
+</tr>
+<tr>
+<td>CLEAR</td>
+<td><code>0x00</code> = <code>0</code></td>
+<td>警報解除</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ALID 推導</strong>：本機的 ALID 是以 alarm-code <strong>字串</strong> 做 31-poly rolling hash 算出的 U4（<code>alid = alid*31u + (unsigned char)byte</code>，<code>UsecegemMainFrom.cpp:150-152</code>）。此演算法 stateless／deterministic（同一字串永遠算出同一 ALID）；真正人類可讀的代碼承載於 <strong>ALTX</strong> 欄位。已驗證（python 重算 byte-for-byte 相符）：</p>
+<table>
+<thead>
+<tr>
+<th>ALTX（alarm code 字串）</th>
+<th>ALID（U4）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"Loader Tray Empty"</code></td>
+<td><code>4045923824</code></td>
+</tr>
+<tr>
+<td><code>"SnFKCleanOut"</code></td>
+<td><code>3891410149</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>ALTX 的內容範圍（重要）</strong>：實際 handler（<code>UsecegemMainFrom.cpp:154-156</code>）在 <strong>沒有附加 Message 時</strong> 設 <code>altx = Code</code>（即純 alarm code 字串），在 <strong>有 Message 時</strong> 設 <code>altx = Code + ' ' + Message</code>（即 code、一個空白、再接人類可讀訊息）。換言之，<strong>ALTX 不保證恆等於 alarm code</strong>——可能是 <code>code</code> 或 <code>code + 空白 + message</code>。本 run 觀察到的 ALTX 皆為純 alarm code（<code>"Loader Tray Empty"</code>／<code>"SnFKCleanOut"</code>，無附加 Message）。</p>
+<p><strong>整合建議</strong>：host 端若要以 ALTX 辨識警報，請 <strong>以開頭的 code token（第一個空白前的字串）作為比對鍵</strong>，而非整段 ALTX 字串，以免日後附加 Message 時比對失敗。</p>
+<p><strong>為什麼 ALID 用字串 hash、而不是固定編號？host 該以什麼為準？</strong> 因為 ALID 由字串確定性地算出，可避免維護一張人工編號表；但這也代表 <strong>ALID 本身對 host 不直觀</strong>。整合時建議 host 端 <strong>以 ALTX 的 leading code token 作為警報的辨識依據</strong>（ALID 用於去重／配對 SET↔CLEAR 即可），因為 code token 才是人類可讀、語意明確的代碼。</p>
+<p>另注：<code>AddAlarmList()</code> 目前為空 → 設備對 S5F5/F6 警報目錄查詢會回覆空 catalog（記錄為目前狀態）。</p>
+</blockquote>
+<p><strong>實際 case log 節錄（設備端 Equipment）</strong>：</p>
+<pre><code>00:01:00.388  [SECS][TX] S5F1 Alarm ALID=4045923824 ALCD=128   (SET   &quot;Loader Tray Empty&quot;)
+00:01:00.388  [SECS][TX] S5F1 W=1 len=62 (sent)
+00:01:00.431  [SECS][RX] S5F2 decoded rc=1 items=3
+00:01:04.499  [SECS][TX] S5F1 Alarm ALID=4045923824 ALCD=0     (CLEAR &quot;Loader Tray Empty&quot;)
+00:01:05.056  [SECS][TX] S5F1 Alarm ALID=3891410149 ALCD=128   (SET   &quot;SnFKCleanOut&quot;)
+00:01:11.861  [SECS][TX] S5F1 Alarm ALID=3891410149 ALCD=0     (CLEAR &quot;SnFKCleanOut&quot;)
+</code></pre>
+<p><strong>實際 case log 節錄（Host 端 Simulator）</strong>：</p>
+<pre><code>[00:01:00] RX  S5F1W (sys=54) -&gt; auto S5F2 ACKC5=0
+[00:01:04] RX  S5F1W (sys=55) -&gt; auto S5F2 ACKC5=0
+[00:01:05] RX  S5F1W (sys=56) -&gt; auto S5F2 ACKC5=0
+[00:01:11] RX  S5F1W (sys=57) -&gt; auto S5F2 ACKC5=0
+</code></pre>
+<blockquote>
+<p><strong>對照讀</strong>：上面 4 筆即兩個警報的 SET/CLEAR 配對——<code>Loader Tray Empty</code>（00:01:00 SET → 00:01:04 CLEAR）與 <code>SnFKCleanOut</code>（00:01:05 SET → 00:01:11 CLEAR）；後者 CLEAR 即本 run 的 clean out 結束點。</p>
+</blockquote>
+<p><strong>FIELD TABLE — S5F1 Alarm Report（送出）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ALCD</code></td>
+<td>B</td>
+<td>Alarm Code byte：bit7(0x80=128)=SET、0x00=CLEAR</td>
+<td><code>128</code>（SET）／<code>0</code>（CLEAR）</td>
+</tr>
+<tr>
+<td><code>ALID</code></td>
+<td>U4</td>
+<td>Alarm ID，由 ALTX 字串 31-poly hash 而來，deterministic</td>
+<td><code>4045923824</code>（Loader Tray Empty）／<code>3891410149</code>（SnFKCleanOut）</td>
+</tr>
+<tr>
+<td><code>ALTX</code></td>
+<td>A</td>
+<td>Alarm Text：<code>code</code>，或 <code>code + 空白 + message</code>（有附加訊息時）；本 run 皆為純 code</td>
+<td><code>"Loader Tray Empty"</code>／<code>"SnFKCleanOut"</code>（本 run 無附加 message；host 比對請取 leading code token）</td>
+</tr>
+<tr>
+<td><code>W</code>-bit</td>
+<td>header</td>
+<td>要求回覆</td>
+<td><code>1</code>（S5F1W）</td>
+</tr>
+<tr>
+<td><code>len</code></td>
+<td>bytes</td>
+<td>S5F1 body 長度</td>
+<td><code>62</code></td>
+</tr>
+<tr>
+<td><code>sys</code></td>
+<td>header（模擬器序號）</td>
+<td>與 S6F11 共用同一遞增序號池</td>
+<td><code>54</code>..<code>57</code>（本 run 4 筆警報）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>FIELD TABLE — S5F2 回覆（收到）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACKC5</code></td>
+<td>B</td>
+<td>Alarm Report ACK 回覆碼</td>
+<td><code>0</code>（警報已收到，本 run 4 筆皆 0）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="36-separate">3.6 連線結束（Separate）</h3>
+<p><strong>用途</strong>：結束 HSMS session。正常情況下由任一端送 <code>Separate.req</code> 即可拆除連線。</p>
+<p><strong>實際 case log 節錄（Host 端 Simulator；屬 cosmetic，約 run 窗後 ~4 分鐘）</strong>：</p>
+<pre><code>[00:05:09] connection closed
+[00:05:11] TX  Separate.req
+[00:05:11] send error: [WinError 10038] (socket no longer valid -- equipment app closed first)
+[00:05:11] disconnected
+</code></pre>
+<p><strong>說明</strong>：teardown 時的 <code>WinError 10038</code> 為 <strong>host-side cosmetic（host 端外觀層、無實質影響）</strong>：本範例中設備 app 先關閉、socket 已失效，模擬器才送 <code>Separate.req</code>，所以送出時報 10038（socket 已無效）。</p>
+<p><strong>FIELD TABLE — Separate / teardown</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>型別</th>
+<th>意義</th>
+<th>範例值（本 run）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Separate.req</code></td>
+<td>SType=9（HSMS header）</td>
+<td>結束 session（任一端可送）</td>
+<td>host 端送出 @00:05:11</td>
+</tr>
+<tr>
+<td><code>WinError 10038</code></td>
+<td>OS socket error</td>
+<td>host 端 cosmetic：設備先關、socket 已失效</td>
+<td><code>socket no longer valid -- equipment app closed first</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>為什麼這個 error 不是通訊缺陷？</strong> 因為它純粹是「關閉順序」造成的：設備先離線，host 才嘗試送 Separate，自然送不出去。連線本身在整個 run 期間運作正常（見第 6 章的完整性核對）。正式產線中若由 host 先送 Separate、設備再關閉，就不會出現此訊息。它不影響任何已完成的交易，屬正常收尾。</p>
+</blockquote>
+<hr />
+<h2 id="4">4. 模擬輸入資料</h2>
+<p>本章列出本範例中 host 端「餵給」設備的輸入資料，供 host/EAP 工程師理解資料格式並自行構造測試輸入。</p>
+<h3 id="41-host-lot">4.1 Host 宣告的 Lot 清單</h3>
+<p><code>ht160s_presets.DEFAULT_SIMU_LOTS</code>（即 SET_LOT_INFO 送出的預設 5 個 lot）：</p>
+<pre><code>SIMU_LOT_A, SIMU_LOT_B, SIMU_LOT_C, SIMU_LOT_D, SIMU_LOT_E
+</code></pre>
+<h3 id="42-lot-webapi-mock2dbin-reconcile">4.2 Lot WebAPI mock（2D/Bin reconcile）</h3>
+<p>當 host 送出 <strong>LOTSTART</strong> 時，設備會去 pull 這份資料做 2D/Bin 對帳（reconcile）。本範例以 mock 檔案模擬：</p>
+<p>檔案：<code>D:\AI_Area\Tool\HT160S_SECS_Simulator\code\lot_webapi_data.json</code></p>
+<ul>
+<li>Top-level key：<code>"2DIDHistory"</code></li>
+<li>每個 lot 欄位：<code>LOTID</code>、<code>Substage</code>、<code>ProductCode</code>、<code>ICIInfo[]{ QRCodeID, RetestCode, HBin, SBin, DiePass }</code></li>
+</ul>
+<p><strong>JSON 結構（shape）</strong>：</p>
+<pre><code>{
+  &quot;2DIDHistory&quot;: [
+    {
+      &quot;LOTID&quot;: &quot;SIMU_LOT_A&quot;,
+      &quot;Substage&quot;: &quot;BI1&quot;,
+      &quot;ProductCode&quot;: &quot;SIMU/DEVICE-A&quot;,
+      &quot;ICIInfo&quot;: [
+        { &quot;QRCodeID&quot;: &quot;...&quot;, &quot;RetestCode&quot;: &quot;R0&quot;, &quot;HBin&quot;: &quot;HBin1&quot;, &quot;SBin&quot;: &quot;SBin1&quot;, &quot;DiePass&quot;: &quot;DiePass1&quot; },
+        ...
+      ]
+    },
+    ...
+  ]
+}
+</code></pre>
+<p><strong>ICIInfo 欄位 FIELD TABLE</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>欄位</th>
+<th>型別</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QRCodeID</code></td>
+<td>string</td>
+<td>該顆 IC 的 2D/QR 碼 ID</td>
+</tr>
+<tr>
+<td><code>RetestCode</code></td>
+<td>string</td>
+<td>重測碼（如 R0 / R1）</td>
+</tr>
+<tr>
+<td><code>HBin</code></td>
+<td>string</td>
+<td>Hardware Bin</td>
+</tr>
+<tr>
+<td><code>SBin</code></td>
+<td>string</td>
+<td>Software Bin</td>
+</tr>
+<tr>
+<td><code>DiePass</code></td>
+<td>string</td>
+<td>Die 通過判定（DiePass0/1）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>範例 row（SIMU_LOT_A，Substage <code>BI1</code>，ProductCode <code>SIMU/DEVICE-A</code>）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>QRCodeID</th>
+<th>RetestCode</th>
+<th>HBin</th>
+<th>SBin</th>
+<th>DiePass</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SIMU_A_0001</td>
+<td>R0</td>
+<td>HBin1</td>
+<td>SBin1</td>
+<td>DiePass1</td>
+</tr>
+<tr>
+<td>SIMU_A_0002</td>
+<td>R0</td>
+<td>HBin1</td>
+<td>SBin1</td>
+<td>DiePass1</td>
+</tr>
+<tr>
+<td>SIMU_A_0003</td>
+<td>R0</td>
+<td>HBin2</td>
+<td>SBin2</td>
+<td>DiePass1</td>
+</tr>
+<tr>
+<td>SIMU_A_0004</td>
+<td>R1</td>
+<td>HBin3</td>
+<td>SBin3</td>
+<td>DiePass1</td>
+</tr>
+<tr>
+<td>SIMU_A_0005</td>
+<td>R0</td>
+<td>HBin4</td>
+<td>SBin5</td>
+<td>DiePass0</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>真實客戶格式 lot（real-customer-format）</strong>：此檔同時保留真實客戶格式 lot <code>A5921.RCS.TEST99</code> / <code>TEST88</code>（ProductCode <code>MT3781Q</code> / <code>ZAHJA32-ETTTT-H</code>，含長 QRCodeID 如 <code>MT3781Q-ZAHJA32-EMFMT-H_N8R124.LR_011</code>），供真實格式測試。host/EAP 對接時應同時驗證短格式（SIMU_*）與長格式（真實客戶）兩種 QRCodeID。</p>
+</blockquote>
+<h3 id="43-webapi-endpoint">4.3 WebAPI endpoint</h3>
+<p>設備於 LOTSTART 時對每個 lot 發出的 HTTP 請求形式：</p>
+<pre><code>GET http://127.0.0.1:8160/lot/&lt;LOTID&gt;  -&gt;  HTTP 200 JSON
+</code></pre>
+<p><strong>本 run 證據（回應大小）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>Lot</th>
+<th>bytes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>951</td>
+</tr>
+<tr>
+<td>B</td>
+<td>633</td>
+</tr>
+<tr>
+<td>C</td>
+<td>792</td>
+</tr>
+<tr>
+<td>D</td>
+<td>474</td>
+</tr>
+<tr>
+<td>E</td>
+<td>633</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>23:59:26 全 5 lot HTTP=200、ok=1（對帳成功）。</p>
+</blockquote>
+<h3 id="44-s2f41-builder-bodieshost">4.4 S2F41 builder bodies（host 輸入格式）</h3>
+<p>S2F41 body 由 <code>ht160s_presets.py</code> 的 builders 建構，可作為 host 端構造輸入時的參照格式：</p>
+<table>
+<thead>
+<tr>
+<th>Builder</th>
+<th>RCMD</th>
+<th>body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_set_lot_info</code></td>
+<td>SET_LOT_INFO</td>
+<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code></td>
+</tr>
+<tr>
+<td><code>_lot_start</code></td>
+<td>LOTSTART</td>
+<td><code>L[2]{ A "LOTSTART", L[n]{ A lotID } }</code></td>
+</tr>
+<tr>
+<td><code>_start_agv</code></td>
+<td>START_AGV</td>
+<td><code>L[2]{ A "START_AGV", L[n]{ L[2]{A station, A "Action"} [, L[2]{A "LoaderTrayCount", A n}] } }</code></td>
+</tr>
+<tr>
+<td><code>_start</code></td>
+<td>START</td>
+<td><code>L[2]{ A "START", L[0] }</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-ack-hcack">5. ACK / HCACK 代碼速查表</h2>
+<p>本章彙整本手冊出現的所有回覆碼，方便對接時快速查詢「某個回覆碼代表什麼」。</p>
+<p><strong>HCACK（S2F42，Host Command Acknowledge）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>值</th>
+<th>意義</th>
+<th>本 run 出現</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>OK</td>
+<td>SET_LOT_INFO、LOTSTART、initial START(23:59:27)、START_AGV(×6)</td>
+</tr>
+<tr>
+<td>1</td>
+<td>command does not exist</td>
+<td>（本 run 未出現；舊文件誤稱 START_AGV/START 回 1，已更正）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>cannot perform now / param</td>
+<td>（本 run 未出現）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>busy（machine already running <strong>OR</strong> ICs still inside）</td>
+<td>resume-START(×6)，by design honest interlock（見 3.4）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>其他 ACK 代碼</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>代碼</th>
+<th>訊息</th>
+<th>標準值域</th>
+<th>本 run 值</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ACKC5</td>
+<td>S5F2（Alarm ACK）</td>
+<td>0=accepted / &gt;0=error</td>
+<td>0</td>
+<td>警報已收到</td>
+</tr>
+<tr>
+<td>ACKC6</td>
+<td>S6F12（Event Report ACK）</td>
+<td>0=accepted / &gt;0=error</td>
+<td>0</td>
+<td>事件已收到</td>
+</tr>
+<tr>
+<td>COMMACK</td>
+<td>S1F14（Establish Communications Request Acknowledge / S1F13→S1F14）</td>
+<td>0=accepted / 1=denied</td>
+<td>—</td>
+<td>本文件來源 Run evidence 未涵蓋具體值，故僅列名不臆造</td>
+</tr>
+<tr>
+<td>EAC</td>
+<td>S2F38（Enable/Disable Event Report ACK，Equipment Acknowledge Code）</td>
+<td>0=accepted / 1=denied / 2=at least one CEID 不存在 / 3=at least one CEID 已 enabled</td>
+<td>—</td>
+<td>本文件來源 Run evidence 未涵蓋具體值，故僅列名不臆造</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>註：COMMACK / EAC 屬標準 GEM 代碼，其「標準值域」欄為 SEMI E5/E30 通用定義（供 host 對接參考）；但本來源 Run evidence 未提供其實際數值，依接地規則「本 run 值」不臆造。</p>
+</blockquote>
+<hr />
+<h2 id="6">6. 完整通訊時間軸</h2>
+<p>本章把整個 run（從 <code>23:59:08</code> 連線到 <code>00:01:11</code> clean out 結束）壓縮成一張時間軸，並附上 end-to-end 完整性核對——這正是整合驗收時「如何證明訊息沒有漏、沒有重複」的方法。</p>
+<table>
+<thead>
+<tr>
+<th>時間</th>
+<th>事件</th>
+<th>重點</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>23:59:08.603</td>
+<td>TCP up，awaiting Select</td>
+<td>設備撥入</td>
+</tr>
+<tr>
+<td>23:59:08.862</td>
+<td>Select.req → Select.rsp</td>
+<td>SELECTED</td>
+</tr>
+<tr>
+<td>23:59:18 起</td>
+<td>Linktest 週期</td>
+<td>約每 10s，全程皆答</td>
+</tr>
+<tr>
+<td>23:59:25</td>
+<td>S2F41 SET_LOT_INFO</td>
+<td>HCACK=0，Lots=5，sys=20558</td>
+</tr>
+<tr>
+<td>23:59:26</td>
+<td>S2F41 LOTSTART</td>
+<td>HCACK=0；WebAPI 5 lot HTTP=200 ok=1；sys=20559</td>
+</tr>
+<tr>
+<td>23:59:27</td>
+<td>S2F41 START</td>
+<td>HCACK=0（machine idle → started）；sys=20560</td>
+</tr>
+<tr>
+<td>23:59:30</td>
+<td>S6F11 CEID=136</td>
+<td>S6F12 ACKC6=0；sys=1</td>
+</tr>
+<tr>
+<td>23:59:47</td>
+<td>AGV cycle</td>
+<td>P2 Empty</td>
+</tr>
+<tr>
+<td>00:00:13</td>
+<td>AGV cycle</td>
+<td>P1 Loader（完整握手）；resume START HCACK=4</td>
+</tr>
+<tr>
+<td>00:00:18</td>
+<td>AGV cycle</td>
+<td>P2 Empty</td>
+</tr>
+<tr>
+<td>00:00:41</td>
+<td>AGV cycle + CEID 35</td>
+<td>P4 AUTO1；272(len=86)+35(len=144) 同時</td>
+</tr>
+<tr>
+<td>00:00:46</td>
+<td>AGV cycle</td>
+<td>P1 Loader</td>
+</tr>
+<tr>
+<td>00:00:51</td>
+<td>AGV cycle</td>
+<td>P2 Empty</td>
+</tr>
+<tr>
+<td>00:01:00</td>
+<td>S5F1 SET</td>
+<td>Loader Tray Empty，ALID=4045923824，ALCD=128</td>
+</tr>
+<tr>
+<td>00:01:04</td>
+<td>S5F1 CLEAR</td>
+<td>Loader Tray Empty，ALCD=0</td>
+</tr>
+<tr>
+<td>00:01:05</td>
+<td>S5F1 SET</td>
+<td>SnFKCleanOut，ALID=3891410149，ALCD=128</td>
+</tr>
+<tr>
+<td>00:01:11</td>
+<td>S5F1 CLEAR</td>
+<td>SnFKCleanOut，ALCD=0（clean out 結束）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>End-to-End 完整性（Integrity）</strong>：以下計數可在兩端 log 交叉核對，是整合驗收的關鍵證據——序號連續、TX/RX 對等，即代表通訊無漏訊、無重送。</p>
+<table>
+<thead>
+<tr>
+<th>維度</th>
+<th>計數 / 驗證</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S6F11（生產／AGV 事件）</td>
+<td>設備 TX <strong>53</strong> = 設備 RX S6F12 <strong>53</strong> = 模擬器 RX S6F11W sys <strong>1..53</strong>（連續，無 gap/dup）</td>
+</tr>
+<tr>
+<td>S6F11 CEID 內訳</td>
+<td>136×13 + 137×7 + 138×4 + 140×4 + 141×3 + 142×3（合計 34 Auto 卸盤）＋ 272×6 + 273×6 + 274×6（合計 18 AGV）＋ 35×1 = <strong>53</strong></td>
+</tr>
+<tr>
+<td>S2F41（RCMD 下達）</td>
+<td><strong>15</strong> RCMDs（3 trio + 6 START_AGV + 6 resume-START）</td>
+</tr>
+<tr>
+<td>S2F42（HCACK 回覆）</td>
+<td>sys <strong>20558..20572</strong> 嚴格 +1（共 15 筆，對應 15 個 RCMD）</td>
+</tr>
+<tr>
+<td>警報 S5F1</td>
+<td><strong>4</strong> 筆 S5F1 ↔ 模擬器 sys <strong>54..57</strong> ↔ EventLog（00:01:00 Loader Tray Empty / 00:01:05 SnFKCleanOut / 00:01:11 PAUSE+doors）</td>
+</tr>
+<tr>
+<td>S5F2（ACKC5 回覆）</td>
+<td>4 筆，全 <code>0</code></td>
+</tr>
+<tr>
+<td>WebAPI</td>
+<td>23:59:26 全 5 lot HTTP=200 ok=1（A=951 / B=633 / C=792 / D=474 / E=633 bytes）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>註</strong>：S6F11 與 S5F1 共用同一遞增序號池（<strong>1..57</strong>）：前 53 為 S6F11（53 筆生產／AGV 事件），54..57 為 S5F1（4 筆警報）。S2F42 另有獨立序號池 20558..20572。兩條序號鏈各自連續、無 gap/dup，是無漏訊的證據。整合驗收時，host 端只要核對：(1) S6F11 TX 數 = S6F12 RX 數；(2) sys 序號連續無跳號；(3) 每筆 S5F1 都有對應的 S5F2 ACKC5=0，即可判定通訊完整。</p>
+</blockquote>
+<hr />
+<h2 id="7-secs-host-simulator">7. 重現步驟（以 SECS Host Simulator 重現）</h2>
+<p>本章說明如何用 SECS Host Simulator 重現上述完整流程，供整合工程師在自己的環境中對接與驗證。步驟順序對應第 2 章的 Mermaid 圖。</p>
+<ol>
+<li><strong>啟動模擬器（PASSIVE listen）</strong>：模擬器於 <code>127.0.0.1:5098</code> 監聽（device=1），等待設備連入。<blockquote>
+<p>提醒：本重現環境刻意讓模擬器當監聽方、設備撥入（與正式產線方向相反，見 1.2）；訊息層角色不變。</p>
+</blockquote>
+</li>
+<li><strong>設備撥入</strong>：HT160S（EQUIPMENT，<code>ActiveMode=0</code>，DeviceID=0）連入 port 5098，完成 <code>Select.req → Select.rsp</code>（SELECTED）；之後約每 10s Linktest 維持鏈路。</li>
+<li><strong>送 Lot 設定 trio</strong>：依序送（順序不可顛倒，理由見 3.2）
+   - <code>S2F41 SET_LOT_INFO</code>（預設 <code>SIMU_LOT_A..E</code>）→ 期望 <code>S2F42 HCACK=0</code>
+   - <code>S2F41 LOTSTART</code> → 觸發 Lot WebAPI pull（<code>GET http://127.0.0.1:8160/lot/&lt;LOTID&gt;</code>，期望 HTTP=200、ok=1）→ <code>HCACK=0</code>
+   - <code>S2F41 START</code>（機台 idle）→ <code>HCACK=0</code></li>
+<li><strong>啟用 Auto-AGV swimlane</strong>：開啟模擬器的自動 AGV 回應規則：
+   - 收 <code>272</code> → 自動 <code>START_AGV(station)</code>（期望 <code>HCACK=0</code>）
+   - 收 <code>273</code> → 僅 log
+   - 收 <code>274</code> → 自動 <code>START</code> resume（期望 <code>HCACK=4</code>，因機台已在運行——這是正常的，見 3.4）</li>
+<li><strong>觀察並核對</strong>：
+   - S6F11 生產事件（CEID 136–142，Auto 卸盤）→ 自動 S6F12 ACKC6=0
+   - 完整 AGV cycle（272→START_AGV→273→274→resume START）
+   - CEID 35（Auto1 car full）與 272 同時刻雙發（len=144 + len=86）
+   - 警報 S5F1 SET/CLEAR（ALID hash、ALTX）→ 自動 S5F2 ACKC5=0</li>
+<li><strong>驗收完整性</strong>：比對設備端 <code>SECSGEM_TextLog_HH.txt</code> 與 host 端 <code>secs_host_YYYYMMDD.log</code>：
+   - S6F11 TX 數 = S6F12 RX 數（本 run 為 53）；
+   - sys 序號連續無跳號（S6F11+S5F1 池 1..57；S2F42 池 20558..20572）；
+   - 每筆 S5F1 都有對應 S5F2 ACKC5=0。
+   三者皆成立即代表通訊無漏訊（即第 6 章的完整性核對）。</li>
+</ol>
+<hr />
+<h2 id="_1">附錄：名詞 / 縮寫</h2>
+<table>
+<thead>
+<tr>
+<th>縮寫</th>
+<th>全稱 / 說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HSMS-SS</td>
+<td>High-Speed SECS Message Services – Single Session（SEMI E37）；over TCP，負責傳輸層</td>
+</tr>
+<tr>
+<td>SECS-II</td>
+<td>SEMI Equipment Communications Standard part 2（SEMI E5）；負責訊息編碼</td>
+</tr>
+<tr>
+<td>GEM</td>
+<td>Generic Equipment Model（SEMI E30）；定義設備行為語意</td>
+</tr>
+<tr>
+<td>EQUIPMENT / HOST</td>
+<td>設備端（此處為 HT160S）／主控端（廠端自動化系統 Host/EAP）</td>
+</tr>
+<tr>
+<td>ACTIVE / PASSIVE</td>
+<td>HSMS 連線角色：ACTIVE 主動發起 Select.req，PASSIVE 監聽等待連入</td>
+</tr>
+<tr>
+<td>SType</td>
+<td>HSMS 控制訊息類型碼（Select=1/2、Linktest=5/6、Separate=9）</td>
+</tr>
+<tr>
+<td>CEID</td>
+<td>Collection Event ID；事件識別碼（如 136、272、35）</td>
+</tr>
+<tr>
+<td>RPTID</td>
+<td>Report ID；report 定義識別碼</td>
+</tr>
+<tr>
+<td>SVID / SV</td>
+<td>Status Variable ID／Status Variable；狀態變數識別碼（如 38219）／狀態變數</td>
+</tr>
+<tr>
+<td>DataID</td>
+<td>Data ID（S6F11 欄位）；對 host 無語意，host 依 CEID 分派</td>
+</tr>
+<tr>
+<td>ALID</td>
+<td>Alarm ID；本機由 ALTX 字串 31-poly hash 而來的 U4</td>
+</tr>
+<tr>
+<td>ALCD</td>
+<td>Alarm Code byte；bit7(0x80=128)=SET、0x00=CLEAR</td>
+</tr>
+<tr>
+<td>ALTX</td>
+<td>Alarm Text；<code>code</code> 或 <code>code + 空白 + message</code>（有附加訊息時）；建議 host 以 leading code token 辨識警報</td>
+</tr>
+<tr>
+<td>HCACK</td>
+<td>Host Command Acknowledge（S2F42 回覆碼，0/1/2/4）</td>
+</tr>
+<tr>
+<td>ACKC5</td>
+<td>Alarm Report ACK（S5F2 回覆碼）</td>
+</tr>
+<tr>
+<td>ACKC6</td>
+<td>Event Report ACK（S6F12 回覆碼）</td>
+</tr>
+<tr>
+<td>COMMACK</td>
+<td>Establish Communications Request Acknowledge（S1F14 回覆碼；S1F13→S1F14，0=accepted/1=denied）</td>
+</tr>
+<tr>
+<td>EAC</td>
+<td>Equipment Acknowledge Code（S2F38 Enable/Disable Event Report ACK）</td>
+</tr>
+<tr>
+<td>RCMD</td>
+<td>Remote Command（S2F41 命令名稱，如 SET_LOT_INFO/LOTSTART/START/START_AGV）</td>
+</tr>
+<tr>
+<td>CPNAME / CPVAL</td>
+<td>Command Parameter Name / Value（S2F41 參數名稱／值）</td>
+</tr>
+<tr>
+<td>AGV / AMR</td>
+<td>Automated Guided Vehicle / Autonomous Mobile Robot；自動物料搬運車</td>
+</tr>
+<tr>
+<td>EAP</td>
+<td>Equipment Automation Program；客戶端 host 自動化程式</td>
+</tr>
+<tr>
+<td>W-bit</td>
+<td>Wait-bit；訊息要求對方回覆（W=1）或不要求（W=0，偶函數回覆）</td>
+</tr>
+<tr>
+<td>SECS-II 型別</td>
+<td><code>L[n]</code>=List；<code>A</code>=ASCII；<code>B</code>=Binary(1 byte)；<code>U4</code>=4-byte unsigned int</td>
+</tr>
+</tbody>
+</table>
+<footer>HONTECH HT160S 1.0.0.0 &middot; SECS/GEM Communication Example &amp; Format Reference &middot; 由 State Record 2026-06-26 00_01_18 之實機通訊 log 產生</footer>
+</body>
+</html>

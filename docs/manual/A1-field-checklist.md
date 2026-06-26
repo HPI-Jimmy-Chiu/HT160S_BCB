@@ -115,7 +115,7 @@
 - [ ] Loader: main 上 mtWorkArea/mtSortRecv (4x5) 與 mtLoaderLTrayWork/mtLoaderRTrayWork 的對應 (哪個顯示生產盤面、哪個顯示移動盤面) 需與 main.cpp 顯示綁定一併確認
 - [ ] Loader: Loader 2D Left/Right 與物理 Loader1/Loader2 (左/右) 的對應由 DFM 版面推得，程式未明示 LoaderNo 與左右文字標籤的綁定，需現場確認
 - [ ] Loader: ReadTopCcdBin 在實機 (UseCCD 開啟、非模擬) 直接 bOk=false 回 EMPTY_IC，未見實際向 CCD 取有無料的實作；實機是否另有 Bin 讀取來源或恆走 2D 路徑需確認
-- [ ] Loader: SnLoader_Inputend / SnLoader_OutputHasTray / SnLoader_OutputBottomHasTray 的實際 IO 點位與啟用狀態需依機台 IO_Table 現場確認
+- [ ] Loader: SnLoader_Inputend / SnLoader_OutputBottomHasTray 的實際 IO 點位與啟用狀態需依機台 IO_Table 現場確認
 - [ ] Loader: TrayMotor->fHasTray 作為『盤已夾緊』代理 (用於安全距離互鎖)，實機與夾盤完成時序是否一致需現場驗證
 - [ ] Loader/Empty/Color: DoFrontDestackDown 各 RiseTray/SeparateTray 氣缸的物理對應 (哪顆抬升/分離) 與固定延遲單位 (cycle 或 ms) 需現場確認
 - [ ] Color: 氣缸實體位址 / 感測器點位編號 (C_Color_FrontRiseTray_1/_2、FrontSeparateTray_1、RearRiseTray、LeanOnTray、PushTray 與 SnColor_InputHasTray/InputFullTray/InputEnd/OutputBottomHasTray/TrayPos1) 需查 IO_Table/機構表核對
@@ -124,7 +124,7 @@
 - [ ] Color: IsAcceptingIC() 固定回 false，是否為預留介面需確認
 - [ ] Color: DoClampTray SettleTicks=0 表示 Color 不做 push-on-sensor 確認，是否日後改為 >0 需確認
 - [ ] Color: ColorY/ColorX/ColorZ 三軸實際軸名映射 (MColorY、MTopCCDX_Color) 以外的 Z 軸是否存在於本模組控制範圍需確認
-- [ ] Empty: 實體感測器 SnEmpty_InputHasTray / OutputHasTray / OutputBottomHasTray / InputEnd 的中文標籤與 IO 表實際位址需查 sensor 定義確認
+- [ ] Empty: 實體感測器 SnEmpty_InputHasTray / OutputBottomHasTray / InputEnd 的中文標籤與 IO 表實際位址需查 sensor 定義確認
 - [ ] Empty: 氣缸 C_Empty_FrontRiseTray_1/_2、FrontSeparateTray_1、LeanOnTray、PushTray 的精確機構位置/方向與感測器配置 (OnSensor/OffSensor) 需查 cylinder 設定
 - [ ] Empty/Color: HTimer .Set(5) 與 DoClampTray SettleTicks=5 的『5』對應實際時間 (ticks 換算 ms) 取決於主迴圈週期 (約 1ms)，需確認實際秒數
 - [ ] Empty: bLotFinish 由何處設定/清除 (本模組僅讀取)，推測由外部批次結束流程設定，需查呼叫端

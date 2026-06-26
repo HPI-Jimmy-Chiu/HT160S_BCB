@@ -16,6 +16,7 @@
 #define K_TRAY_END   0x0008
 #define K_CLEAN_OUT  0x0010
 #define K_HOME       0x0020
+#define K_MANUAL_2D  0x0040
 //---------------------------------------------------------------------------
 class MyNoteStruct
 {
@@ -37,6 +38,7 @@ __published:
     TLabel *Label2;
     TEdit *edtAlarmCode;
     TEdit *edtAlarmMsg;
+    TEdit *edtManual2D;
     TPanel *Panel1;
     TPanel *PanelCommand;
     TPanel *BtnHome;
@@ -57,6 +59,7 @@ __published:
     void __fastcall BtnPauseClick(TObject *Sender);
     void __fastcall BtnOffBuzzerClick(TObject *Sender);
     void __fastcall BtnSkipClick(TObject *Sender);
+    void __fastcall edtManual2DKeyPress(TObject *Sender, char &Key);
 private:
     bool bMachineLayoutBuilt;
     bool bOffBuzzer;
@@ -77,6 +80,7 @@ public:
     int iBackMemo2Height;
     bool fMemoPos;
     AnsiString sObjName;
+    AnsiString ManualText;
     TPanel *FlushPanel;
     TColor FlushPanelColor;
     MyNoteStruct *SystemError;
@@ -159,6 +163,7 @@ int  ShowMagazineError(int iMagazine, int CodeType, int KCode);
 int  ShowSystemCommError(int CodeType, int KCode, AnsiString Note="");
 int  ShowCCDError(int CodeType, int KCode, AnsiString Note="");
 int  ShowMyError(AnsiString sMyError, int KCode);
+int  ShowMyError(AnsiString Code, AnsiString sMyError, int KCode);
 int  ShowTNTError(int CodeType, int KCode);
 void ShowErrorMessage(AnsiString Code);
 void RecordProcess(AnsiString S);

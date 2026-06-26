@@ -3,6 +3,7 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "aEmpty.h"
 #include "database.h"
@@ -30,7 +31,6 @@ void TEmptyModule::InitialFlag()
     GoUpTask=1;
     bFrontHasTray=false;
     bRearHasTray=false;
-    bBottomHasTray=false;
     bReturnTray=false;
     bTrayXToEmptyFinish=false;
     bLotFinish=false;
@@ -132,18 +132,10 @@ void TEmptyModule::RefreshStateFromSensors()
     if(HSys.Sen.SnEmpty_InputHasTray.Enable==true)
         bFrontHasTray=HSys.Sen.SnEmpty_InputHasTray.IsOn();
 
-    if(HSys.Sen.SnEmpty_OutputHasTray.Enable==true)
-    {
-        bHasRearSensor=true;
-        if(HSys.Sen.SnEmpty_OutputHasTray.IsOn())
-            bRearState=true;
-    }
-
     if(HSys.Sen.SnEmpty_OutputBottomHasTray.Enable==true)
     {
         bHasRearSensor=true;
-        bBottomHasTray=HSys.Sen.SnEmpty_OutputBottomHasTray.IsOn();
-        if(bBottomHasTray)
+        if(HSys.Sen.SnEmpty_OutputBottomHasTray.IsOn())
             bRearState=true;
     }
 
@@ -167,7 +159,7 @@ bool TEmptyModule::MoveEmptyY(int Position)
         return false;
     if(HSys.Mot.MEmptyY->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Empty Y motor will out of limit", HSys.Mot.MEmptyY->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Empty Y motor will out of limit"), HSys.Mot.MEmptyY->SoftLimitDetail(Position));
         return false;
     }
 
@@ -312,7 +304,7 @@ bool TEmptyModule::DoFeedTray(int Flag)
                 FeedTask=4000;
             else if(Clamp==2)
             {
-                Ret=ShowMyError("Empty Push Tray Miss", K_RETRY);
+                Ret=ShowMyError("JAM1007", "Empty Push Tray Miss", K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
@@ -342,47 +334,19 @@ bool TEmptyModule::DoFeedTray(int Flag)
                HSys.Sen.SnEmpty_OutputBottomHasTray.IsOff() &&
                HSys.LastSet.iRealDummy!=DUMMY)
             {
-                Ret=ShowMyError("Bottom Empty Tray Is Miss Error", K_SKIP|K_RETRY);
+                Ret=ShowMyError("MES1021", "Bottom Empty Tray Is Miss Error", K_SKIP|K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1;
                 if(Ret==K_SKIP)
                 {
                     bRearHasTray=false;
                     bFrontHasTray=false;
-                    FeedTask=8000;
+                    FeedTask=13000;
                 }
             }
             else
             {
                 bRearHasTray=true;
-                bBottomHasTray=true;
-                if(HSys.VMot.MMEmptyY!=NULL)
-                {
-                    HSys.VMot.MMEmptyY->Tray.MoveFrom(FrontSourceTray);   //AI(ht160s-tray-source) : hand off front-born grid to rear motor (rule #1)
-                    HSys.VMot.MMEmptyY->fHasTray=true;
-                    HSys.VMot.MMEmptyY->Refresh();
-                }
-                FeedTask=13000;
-            }
-            break;
-
-        case 8000:
-            FeedTask=12000;
-            break;
-
-        case 12000:
-            if(HSys.Sen.SnEmpty_OutputHasTray.Enable==true &&
-               HSys.Sen.SnEmpty_OutputHasTray.IsOff() &&
-               HSys.LastSet.iRealDummy!=DUMMY)
-            {
-                Ret=ShowMyError("Rear Empty Tray Is Miss Error", K_RETRY);
-                if(Ret==K_RETRY)
-                    FeedTask=1;
-            }
-            else
-            {
-                bRearHasTray=true;
-                bBottomHasTray=false;
                 if(HSys.VMot.MMEmptyY!=NULL)
                 {
                     HSys.VMot.MMEmptyY->Tray.MoveFrom(FrontSourceTray);   //AI(ht160s-tray-source) : hand off front-born grid to rear motor (rule #1)
@@ -514,7 +478,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
                HSys.LastSet.iRealDummy!=DUMMY)
             {
                 bFrontHasTray=false;
-                Ret=ShowMyError("Front Empty Tray Is Miss Error", K_RETRY);
+                Ret=ShowMyError("MES1024", "Front Empty Tray Is Miss Error", K_RETRY);
                 if(Ret==K_RETRY)
                     GoDownTask=1;
             }
@@ -639,7 +603,6 @@ bool TEmptyModule::DoGoUpTray(int Flag)
             {
                 bFrontHasTray=true;
                 bRearHasTray=false;
-                bBottomHasTray=false;
                 if(HSys.VMot.MMEmptyY!=NULL)
                 {
                     FrontSourceTray.CopyFrom(HSys.VMot.MMEmptyY->Tray);   //AI(ht160s-tray-source) : rear motor tray pulled back to front holder
@@ -821,12 +784,6 @@ bool TEmptyModule::IsRearHasTray()
     return bRearHasTray;
 }
 //---------------------------------------------------------------------------
-bool TEmptyModule::IsBottomHasTray()
-{
-    RefreshStateFromSensors();
-    return bBottomHasTray;
-}
-//---------------------------------------------------------------------------
 bool TEmptyModule::IsReturnTrayRequested()
 {
     return bReturnTray;
@@ -837,7 +794,6 @@ void TEmptyModule::SetRearHasTray(bool bHasTray)
     bRearHasTray=bHasTray;
     if(bHasTray==false)
     {
-        bBottomHasTray=false;
         if(HSys.VMot.MMEmptyY!=NULL)
             HSys.VMot.MMEmptyY->ClearTray();   //AI(ht160s-tray-source) : TrayArm took rear tray -> clear motor grid + hide
     }
@@ -862,8 +818,7 @@ AnsiString TEmptyModule::DescribeState()
     AnsiString s;
     s  = "[Empty]\r\n";
     s += "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0)
-       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
-       + "  bBottomHasTray=" + IntToStr(bBottomHasTray ? 1 : 0) + "\r\n";
+       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0) + "\r\n";
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
        + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
        + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)

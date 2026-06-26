@@ -3,6 +3,7 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "aColor.h"
 #include "database.h"
@@ -598,7 +599,7 @@ bool TColorModule::MoveColorY(int Position)
         return true;
     if(HSys.Mot.MColorY->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Color Y motor will out of limit", HSys.Mot.MColorY->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Color Y motor will out of limit"), HSys.Mot.MColorY->SoftLimitDetail(Position));
         return true;
     }
     return HSys.Mot.MColorY->MotorMove(Position);
@@ -672,7 +673,7 @@ bool TColorModule::DoSupplyTray(int Flag)
             if(HSys.Sen.SnColor_OutputBottomHasTray.Enable==true &&
                bOutputHasTray==false && HSys.LastSet.iRealDummy!=DUMMY)
             {
-                Ret=ShowMyError("Color supply tray is not ready", K_RETRY);
+                Ret=ShowMyError("MES1421", "Color supply tray is not ready", K_RETRY);
                 if(Ret==K_RETRY)
                     SupplyTask=1;
             }
@@ -752,7 +753,7 @@ bool TColorModule::DoReadColor2D(int Flag)
             }
             if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Teach.ColorRead2DXPosition)==false)
             {
-                ShowMyMessage("Color CCD X motor will out of limit", HSys.Mot.MTopCCDX_Color->SoftLimitDetail(Teach.ColorRead2DXPosition));
+                ShowMyMessage(LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color->SoftLimitDetail(Teach.ColorRead2DXPosition));
                 ScanTask=100;
                 break;
             }
@@ -763,7 +764,7 @@ bool TColorModule::DoReadColor2D(int Flag)
         case 100:
             if(ColorCcdSocket==NULL || ColorCcdSocket->IsColorCcdConnected()==false)
             {
-                Ret=ShowMyError("Color CCD connect not ready", K_RETRY|K_SKIP);
+                Ret=ShowSystemError("ColorCCD_Connect", K_RETRY|K_SKIP);
                 if(Ret==K_SKIP)
                 {
                     sTrayID2D="";
@@ -796,13 +797,20 @@ bool TColorModule::DoReadColor2D(int Flag)
                 {
                     if(ColorCcdSocket!=NULL)
                         ColorCcdSocket->ColorCcdEndShot();   //LOFF : end shot
-                    Ret=ShowMyError("Color CCD 2D no response", K_RETRY|K_SKIP);
+                    Ret=ShowSystemError("ColorCCD_2D", K_RETRY|K_SKIP|K_MANUAL_2D);
                     if(Ret==K_RETRY)
                     {
                         if(ColorCcdSocket!=NULL)
                             ColorCcdSocket->ColorCcdTriggerShot();
                         ScanDelay.SetMS(3000);
                         ScanDelay.On();
+                    }
+                    else if(Ret==K_MANUAL_2D)
+                    {
+                        //AI(ht160s-ccd-manual2d) : operator hand-entered the tray identity 2D.
+                        sTrayID2D=fNote->ManualText;
+                        BirthIdentityTray();
+                        return true;
                     }
                     else
                     {

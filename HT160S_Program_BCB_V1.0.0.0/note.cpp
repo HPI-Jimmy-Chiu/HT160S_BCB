@@ -89,6 +89,7 @@ __fastcall TfNote::TfNote(TComponent* Owner)
     iBackMemo2Height=0;
     fMemoPos=false;
     sObjName="";
+    ManualText="";
     FlushPanel=NULL;
     FlushPanelColor=MACHINE_NORMAL;
     SystemError=new MyNoteStruct;
@@ -347,6 +348,14 @@ void __fastcall TfNote::FormShow(TObject *Sender)
     bLampTrayFeed=((KeyCode & K_TRAY_FEED)!=0);
     bLampTrayEnd =((KeyCode & K_TRAY_END)!=0);
     bLampCleanOut=((KeyCode & K_CLEAN_OUT)!=0);
+    if((KeyCode & K_MANUAL_2D)!=0)
+    {
+        edtManual2D->Visible=true;
+        edtManual2D->Text="";
+        try { edtManual2D->SetFocus(); } catch(...) {}
+    }
+    else
+        edtManual2D->Visible=false;
 
     if(FlushPanel!=NULL)
         FlushPanelColor=FlushPanel->Color;
@@ -434,6 +443,24 @@ void __fastcall TfNote::UpdateButtonStatus(TObject *Sender)
 void __fastcall TfNote::BtnSkipClick(TObject *Sender)
 {
     UpdateButtonStatus(Sender);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfNote::edtManual2DKeyPress(TObject *Sender, char &Key)
+{
+    //AI(ht160s-ccd-manual2d) : operator hand-enters / handheld-scans the 2D code.
+    //A trailing CR (scanner terminator or Enter) commits: capture text, set the
+    //manual return code, log it, then close. Does NOT resume the machine -- only the
+    //Start button runs it (operator boundary).
+    if(Key==13)
+    {
+        Key=0;
+        if(edtManual2D->Text.Trim()=="")
+            return;
+        ManualText=edtManual2D->Text.Trim();
+        ReturnCode=K_MANUAL_2D;
+        RecordProcess(AnsiString("MANUAL 2D entered : ")+ManualText);
+        Close();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnStartClick(TObject *Sender)
@@ -675,6 +702,7 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
 
     fNote->Reset();
     fNote->KeyCode=KCode;
+    fNote->ManualText="";
     fNote->edtAlarmCode->Text=Code;
     fNote->edtAlarmMsg->Text=Message;
     fNote->Memo1->Clear();
@@ -688,8 +716,27 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
 
     fNote->ProcessErrMessage(Code, Message, 1);
     AlarmReport(Code, Message, true);    //AI(ht160s-secsgem) 20260625 : S5F1 alarm set
+    DWORD dwPauseStart=GetTickCount();   //AI(HT160S-Maintainer) 20260626 : measure operator pause
     fNote->ShowModal();
+    int iPauseSec=(int)((GetTickCount()-dwPauseStart)/1000);
     AlarmReport(Code, Message, false);   //AI(ht160s-secsgem) 20260625 : S5F1 alarm clear (operator handled)
+
+    //AI(HT160S-Maintainer) 20260626 : persist the operator recovery decision + pause time
+    //into the EventLog (Recovery/PauseTime columns) so a shipped log shows how each alarm
+    //was cleared, aligning post-mortem with HT172/HT9045. ReturnCode holds one K_ bit.
+    AnsiString sRecovery;
+    switch(fNote->ReturnCode)
+    {
+        case K_SKIP:      sRecovery="SKIP";      break;
+        case K_RETRY:     sRecovery="RETRY";     break;
+        case K_TRAY_FEED: sRecovery="TRAY_FEED"; break;
+        case K_TRAY_END:  sRecovery="TRAY_END";  break;
+        case K_CLEAN_OUT: sRecovery="CLEAN_OUT"; break;
+        case K_HOME:      sRecovery="HOME";      break;
+        case K_MANUAL_2D: sRecovery="MANUAL_2D"; break;
+        default:          sRecovery="START";     break;
+    }
+    g_EventLog.LogRecovery(sRecovery, iPauseSec, Code, Message);
     return fNote->ReturnCode;
 }
 //---------------------------------------------------------------------------
@@ -849,6 +896,15 @@ int ShowCCDError(int CodeType, int KCode, AnsiString Note)
 int ShowMyError(AnsiString sMyError, int KCode)
 {
     return ShowNoteAlarm(sMyError, sMyError, "", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260626 : code-carrying overload. Aligns the alarm to a
+//HT9045 code string (WAR/JAM/MES) shown to the operator and sent as the SECS AlarmID,
+//while sMyError keeps the human-readable detail. Legacy 1-arg form (string as both
+//code and message) is preserved for not-yet-migrated callers.
+int ShowMyError(AnsiString Code, AnsiString sMyError, int KCode)
+{
+    return ShowNoteAlarm(Code, sMyError, "", KCode, "pn_System");
 }
 //---------------------------------------------------------------------------
 int ShowTNTError(int CodeType, int KCode)

@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 
 #include "aTrayArm.h"
 #include "database.h"
@@ -122,7 +123,7 @@ bool TTrayArmModule::MoveTrayArmX(int Position)
         return false;
     if(HSys.Mot.MTrayArmX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Tray Arm X motor will out of limit", HSys.Mot.MTrayArmX->SoftLimitDetail(Position));
+        ShowMyMessage(LangT("Tray Arm X motor will out of limit"), HSys.Mot.MTrayArmX->SoftLimitDetail(Position));
         return false;
     }
     //AI(HT160S-Maintainer) 20260622 : Z-up lift interlock (single chokepoint via IsZUpAtPosition).
