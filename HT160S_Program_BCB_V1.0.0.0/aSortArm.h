@@ -43,12 +43,24 @@ private:
     bool   bResidueArmed;          //AI(ht160s-residue) 20260625 : residue check enabled only after nozzle lifted to top (place case 60)
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
     int iBaseSuckX;   //AI(ht160s-maintainer) 20260624 : 0-based datum sucker for absolute X (HT172 iBaseSuckX port); 1=suck2 (carriage-fixed nozzle), 0=legacy suck1
+    //AI(ht160s-pnp) 20260626 : PnP tuning (SortArm only). Pick/Place Z-down settle dwell plus the
+    //pre-lift blow-off dwell. dDestroyCheckTime drives the Task 1 blow dwell (default 0.3s=300ms);
+    //loaded per recipe via TfSetup [PnP]. Per-nozzle enable is NOT here - it stays machine-level in
+    //GeneralSetting.bSuckerEnabled[4]. bBlowSlot keeps blow ON through the lift; captured before ClearSlot.
+    double dPickDelaySec;          //settle dwell after pick Z-down (sec); default 0
+    double dPlaceDelaySec;         //settle dwell after place Z-down (sec); default 0
+    double dDestroyCheckTime;      //blow-off dwell before Z-up (sec); default 0.3
+    bool   bBlowSlot[4];           //placed slots that hold blow ON until the lift clears
+    HTimer BlowDwell;              //pre-lift blow dwell timer (vacuum must break before lifting the IC)
+    HTimer PnpSettle;              //pick/place Z-down settle dwell timer
 
     void ClearSlot(int SlotIndex);
     void ClearPickSelection();
     void ClearPlaceSelection();
     void UpdateKitSuckState();
     bool IsSoftSimulate();
+    void StartPnpSettle(double Sec);   //AI(ht160s-pnp) 20260626 : arm pick/place Z-down settle dwell (0ms in sim)
+    bool PnpSettleElapsed();           //AI(ht160s-pnp) 20260626 : true when the settle dwell completes
     bool IsPickableData(int Data);
 
     TTrayMotor *GetLoaderMotor(int LoaderNo);
@@ -108,6 +120,9 @@ private:
 public:
     TSortArmModule();
     void InitialFlag(bool bKeepMaterial=false);
+    void ApplyPnPDefaults();   //AI(ht160s-pnp) 20260626 : seed PnP scalar defaults (ctor only; recipe values survive re-home)
+    void SetPnPParameters(double PickDelaySec, double PlaceDelaySec, double DestroyCheckSec);   //AI(ht160s-pnp) 20260626 : push recipe [PnP] values into the runtime model
+    int  GetDestroyCheckMS();   //AI(ht160s-pnp) 20260626 : dDestroyCheckTime as ms for the blow dwell (floor 300 on <=0)
     bool AreAllSuckersHome();   //AI(HT160S-Maintainer) 20260622 : canonical SortArm-move suck-home interlock (live Led[iHomeLed])
     void DoSortArm(int &Task);
     bool HasHoldingIC();

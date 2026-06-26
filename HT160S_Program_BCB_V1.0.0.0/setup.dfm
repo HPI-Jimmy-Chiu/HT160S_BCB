@@ -74,6 +74,22 @@ object fSetup: TfSetup
       ParentFont = False
       OnClick = spbSetupMenuClick
     end
+    object spbSetupPnP: TSpeedButton
+      Left = 8
+      Top = 176
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'PnP'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbSetupMenuClick
+    end
     object spbSetupExit: TSpeedButton
       Left = 8
       Top = 372
@@ -14053,6 +14069,196 @@ object fSetup: TfSetup
                 'Auto5'
                 'Auto6')
             end
+          end
+        end
+      end
+      object tsSetupPnP: TTabSheet
+        Caption = 'PnP'
+        object pnlPnpHeader: TPanel
+          Left = 0
+          Top = 0
+          Width = 994
+          Height = 31
+          Align = alTop
+          BevelInner = bvLowered
+          Caption = 'Needle and PnP setting'
+          Color = clTeal
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWhite
+          Font.Height = -16
+          Font.Name = 'MS Sans Serif'
+          Font.Style = []
+          ParentFont = False
+          TabOrder = 0
+        end
+        object pnlPnpBody: TPanel
+          Left = 0
+          Top = 31
+          Width = 994
+          Height = 731
+          Align = alClient
+          BevelInner = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblPnpPickDelay: TLabel
+            Left = 32
+            Top = 56
+            Width = 160
+            Height = 16
+            Caption = 'Arm Pick Delay Time'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblPnpPickDelayUnit: TLabel
+            Left = 270
+            Top = 56
+            Width = 40
+            Height = 16
+            Caption = 'Sec'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblPnpPlaceDelay: TLabel
+            Left = 32
+            Top = 96
+            Width = 160
+            Height = 16
+            Caption = 'Arm Place Delay Time'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblPnpPlaceDelayUnit: TLabel
+            Left = 270
+            Top = 96
+            Width = 40
+            Height = 16
+            Caption = 'Sec'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblPnpDestroyCheckTime: TLabel
+            Left = 32
+            Top = 136
+            Width = 160
+            Height = 16
+            Caption = 'Destroy Check Time'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblPnpDestroyCheckTimeUnit: TLabel
+            Left = 270
+            Top = 136
+            Width = 40
+            Height = 16
+            Caption = 'Sec'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblSuckEnableTitle: TLabel
+            Left = 420
+            Top = 56
+            Width = 240
+            Height = 16
+            Caption = 'Sucker Enable (green = in use)'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object edPnpPickDelay: TEdit
+            Left = 200
+            Top = 53
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 0
+            Text = '0'
+          end
+          object edPnpPlaceDelay: TEdit
+            Left = 200
+            Top = 93
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 1
+            Text = '0'
+          end
+          object edtDestroyCheckTime: TEdit
+            Left = 200
+            Top = 133
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 2
+            Text = '0.3'
+          end
+          object rgPnpUseSuck: TRadioGroup
+            Left = 32
+            Top = 184
+            Width = 305
+            Height = 57
+            Caption = 'Use Suck'
+            Columns = 2
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ItemIndex = 0
+            ParentFont = False
+            TabOrder = 3
+            Items.Strings = (
+              'Use All'
+              'Use Select')
+          end
+          object grdSuckEnable: TTMyTray
+            Left = 420
+            Top = 88
+            Width = 110
+            Height = 360
+            XItem = 1
+            YItem = 4
           end
         end
       end

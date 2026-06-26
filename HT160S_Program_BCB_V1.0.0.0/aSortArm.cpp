@@ -59,7 +59,64 @@ TSortArmModule::TSortArmModule()
     //AI(ht160s-maintainer) 20260624 : datum sucker for absolute SortArm X (HT172 iBaseSuckX
     //port). Set once at construction - machine build attribute, not a per-run flag. suck2=1.
     iBaseSuckX=SORT_ARM_BASE_SUCKER_INDEX;
+    ApplyPnPDefaults();   //AI(ht160s-pnp) 20260626 : seed PnP scalars before any recipe load
     InitialFlag();
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::ApplyPnPDefaults()
+{
+    //AI(ht160s-pnp) 20260626 : safe defaults used at construction and whenever a recipe has no
+    //[PnP] section. dDestroyCheckTime defaults to 0.3s (=300ms) so the Task 1 pre-lift blow dwell
+    //is active out of the box; pick/place settle default to 0 (no behavior change until tuned).
+    dPickDelaySec=0.0;
+    dPlaceDelaySec=0.0;
+    dDestroyCheckTime=0.3;
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::SetPnPParameters(double PickDelaySec, double PlaceDelaySec, double DestroyCheckSec)
+{
+    //AI(ht160s-pnp) 20260626 : runtime push from TfSetup::ApplyPnPToSortArm. Clamp negatives.
+    if(PickDelaySec<0.0)
+        PickDelaySec=0.0;
+    if(PlaceDelaySec<0.0)
+        PlaceDelaySec=0.0;
+    if(DestroyCheckSec<0.0)
+        DestroyCheckSec=0.0;
+    dPickDelaySec=PickDelaySec;
+    dPlaceDelaySec=PlaceDelaySec;
+    dDestroyCheckTime=DestroyCheckSec;
+}
+//---------------------------------------------------------------------------
+int TSortArmModule::GetDestroyCheckMS()
+{
+    //AI(ht160s-pnp) 20260626 : seconds -> ms for the pre-lift blow dwell. A 0/negative recipe value
+    //falls back to 300ms so the safety dwell can never be disabled by a bad recipe.
+    int ms=(int)(dDestroyCheckTime*1000.0);
+    if(ms<=0)
+        ms=300;
+    return ms;
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::StartPnpSettle(double Sec)
+{
+    //AI(ht160s-pnp) 20260626 : arm the pick/place Z-down settle dwell. Sim uses 0ms so the sim
+    //cycle stays fast and deterministic (no physical settle to wait for).
+    int ms;
+
+    PnpSettle.Clear();
+    ms=(int)(Sec*1000.0);
+    if(ms<0)
+        ms=0;
+    if(IsSoftSimulate())
+        ms=0;
+    PnpSettle.SetMS(ms);
+    PnpSettle.On();
+}
+//---------------------------------------------------------------------------
+bool TSortArmModule::PnpSettleElapsed()
+{
+    //AI(ht160s-pnp) 20260626 : true once the settle dwell completes (HTimer::Off is true at 0ms).
+    return PnpSettle.Off();
 }
 //---------------------------------------------------------------------------
 void TSortArmModule::InitialFlag(bool bKeepMaterial)
@@ -80,7 +137,19 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
         bNeedResidueCheck[s]=false;
         ResidueTask[s]=1;
         ResidueDelay[s].Clear();
+        //AI(ht160s-pnp) 20260626 : an abort/home during the place hold-through-lift window (case50..70)
+        //leaves blow latched ON (ClearSlot->Reset() never touches OffSw). Physically clear it here, BEFORE
+        //dropping the flag, mirroring HT172's terminal Normal(). Real machine only; sucker must exist.
+        if(bBlowSlot[s] && IsSoftSimulate()==false)
+        {
+            TMySucker *BlowSucker=GetSucker(s);
+            if(BlowSucker!=NULL)
+                BlowSucker->OffDestroy();
+        }
+        bBlowSlot[s]=false;          //AI(ht160s-pnp) 20260626 : clear pending blow-off targets on home/init
     }
+    BlowDwell.Clear();               //AI(ht160s-pnp) 20260626 : reset pre-lift blow dwell
+    PnpSettle.Clear();               //AI(ht160s-pnp) 20260626 : reset pick/place settle dwell
     for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
     {
         //AI(HT160S-Maintainer) 20260612 : recoverable home with a sucked IC still on this
@@ -1233,6 +1302,14 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             if(IsResidueCheckBusy())                                     //AI(ht160s-residue) 20260624 : prior place re-suck must finish before pick suck
                 break;
             if(MovePickZDown())
+            {
+                StartPnpSettle(dPickDelaySec);                           //AI(ht160s-pnp) 20260626 : let the nozzle settle on the IC before suck
+                PickTask=47;
+            }
+            break;
+
+        case 47:
+            if(PnpSettleElapsed())                                       //AI(ht160s-pnp) 20260626 : pick settle dwell done -> suck
                 PickTask=50;
             break;
 
@@ -1347,6 +1424,14 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
 
         case 40:
             if(MovePlaceZDown())
+            {
+                StartPnpSettle(dPlaceDelaySec);                          //AI(ht160s-pnp) 20260626 : settle at the place position before releasing the IC
+                PlaceTask=45;
+            }
+            break;
+
+        case 45:
+            if(PnpSettleElapsed())                                       //AI(ht160s-pnp) 20260626 : place settle dwell done -> release
                 PlaceTask=50;
             break;
 
@@ -1357,19 +1442,68 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
                 iResidueAutoIndex=iActiveAutoIndex;       //AI(ht160s-residue) 20260624 : report to this Auto when bg check ends
                 if(AutoModule!=NULL)
                     AutoModule->SetPlaceResidueClear(iActiveAutoIndex, false);
+                //AI(ht160s-pnp) 20260626 : SAFETY (Task 1) - Destroy() turns blow OFF the instant it
+                //returns (OffDelayTime default 0). Capture the placed nozzles (BEFORE TransferPlaceDataToAuto
+                //clears bPlaceSelected), RE-ASSERT blow ON, dwell in case55 BEFORE the Z-up, and keep blow ON
+                //through the lift (off only in case70) so the seal is fully broken before the IC is lifted.
+                for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+                    bBlowSlot[s]=Slot[s].bPlaceSelected;
+                if(IsSoftSimulate()==false)
+                {
+                    for(int s2=0; s2<SORT_ARM_SUCKER_COUNT; s2++)
+                    {
+                        if(bBlowSlot[s2])
+                        {
+                            TMySucker *Sucker=GetSucker(s2);
+                            if(Sucker!=NULL)
+                                Sucker->OnDestroy();                     //blow ON (positive pressure); vacuum already OFF in Destroy()
+                        }
+                    }
+                    BlowDwell.Clear();
+                    BlowDwell.SetMS(GetDestroyCheckMS());
+                    BlowDwell.On();
+                }
                 TransferPlaceDataToAuto();
-                PlaceTask=60;
+                PlaceTask=55;
             }
+            break;
+
+        case 55:
+            //AI(ht160s-pnp) 20260626 : blow-on dwell. Vacuum is off, blow is on; wait so positive
+            //pressure fully breaks the IC-nozzle seal BEFORE the lift. Sim has no real air -> skip.
+            if(IsSoftSimulate()==false && BlowDwell.Off()==false)
+                break;
+            PlaceTask=60;
             break;
 
         case 60:
             if(SortArmZToSafePos())                                      //AI(ht160s-residue) 20260625 : nozzle reached top -> ARM residue check (never re-suck near tray); verify runs in background
+                PlaceTask=70;
+            break;
+
+        case 70:
             {
-                bResidueArmed=true;
+                //AI(ht160s-pnp) 20260626 : lift has cleared the place position. Only now turn blow OFF on
+                //the placed nozzles, then ARM the background residue check exactly as before and finish.
+                //(bResidueArmed moved here from old case60 so arming still happens on cycle completion.)
+                if(IsSoftSimulate()==false)
+                {
+                    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+                    {
+                        if(bBlowSlot[s])
+                        {
+                            TMySucker *Sucker=GetSucker(s);
+                            if(Sucker!=NULL)
+                                Sucker->OffDestroy();                    //blow OFF after the IC has cleared
+                        }
+                    }
+                }
+                for(int s2=0; s2<SORT_ARM_SUCKER_COUNT; s2++)
+                    bBlowSlot[s2]=false;
+                bResidueArmed=true;                                      //AI(ht160s-residue) 20260625 : nozzle at top -> arm residue check (bg verify)
                 PlaceTask=1;
                 return true;
             }
-            break;
 
         default:
             PlaceTask=1;
@@ -1574,9 +1708,12 @@ bool TSortArmModule::CanMoveSuckerToCell(int SlotIndex, int Target, int Col, int
         Err="Row out of tray range (1.."+IntToStr(GetTrayYCount())+")";
         return false;
     }
-    if((Col-SlotIndex)<0)
+    //AI(ht160s-maintainer) 20260626 : reach check must match GetSortArmCellX comb offset
+    //(Col-SlotIndex+iBaseSuckX). Datum sucker = suck2 (iBaseSuckX=1) reaches Col 0,
+    //e.g. suck2 -> Cell(1,1); legacy (Col-SlotIndex)<0 wrongly blocked it.
+    if((Col-SlotIndex+iBaseSuckX)<0)
     {
-        Err="Sucker cannot reach this column (Suck index > Column)";
+        Err="Sucker cannot reach this column";
         return false;
     }
     if(LoaderNo>0)

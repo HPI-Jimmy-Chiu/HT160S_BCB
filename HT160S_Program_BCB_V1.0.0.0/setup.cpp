@@ -6,6 +6,7 @@
 #include "setup.h"
 #include "CosFunction.h"
 #include "GeneralSetting.h"
+#include "aSortArm.h"   //AI(ht160s-pnp) 20260626 : SortArmModule global + SetPnPParameters for ApplyPnPToSortArm
 #include "database.h"
 #include "mymessbox.h"   //AI(general) 20260608 : ShowMyMessageBox_YES_NO instead of Application->MessageBox
 #include <Dialogs.hpp>
@@ -26,6 +27,8 @@ typedef struct
 //---------------------------------------------------------------------------
 static const char *SETUP_INI_GROUP="Setup";
 static const char *TRAY_FORM_INI_GROUP="TrayForm";
+static const char *PNP_INI_GROUP="PnP";   //AI(ht160s-pnp) 20260626 : SortArm pick/place tuning section in recipe setup.ini
+static const int SORT_ARM_SUCKER_COUNT=4;   //AI(ht160s-pnp) 20260626 : SortArm nozzle count (mirrors GeneralSetting.bSuckerEnabled[4]); keep in sync with aSortArm.cpp
 enum
 {
     BIN_GRID_COL_AREA=0,
@@ -45,6 +48,7 @@ __fastcall TfSetup::TfSetup(TComponent* Owner)
     LastClickButton=NULL;
     bLoadingTrayForm=false;
     bLoadingBinGrid=false;
+    bLoadingPnP=false;
 
     for(PageIndex=0; PageIndex<MAX_SETUP_MENU_COUNT; PageIndex++)
     {
@@ -58,6 +62,7 @@ __fastcall TfSetup::TfSetup(TComponent* Owner)
     LayoutSetupButtons();
     BindTrayFormEvents();
     BuildBinSettingUI();
+    BuildPnPUI();
     SelectSetupPage(0);
 }
 //---------------------------------------------------------------------------
@@ -71,6 +76,7 @@ void __fastcall TfSetup::OpenWorkFile()
     RecipeManager.LoadLastRecipeName();
     RecipeManager.EnsureCurrentRecipeDir();
     LoadTrayFormSettings(RecipeManager.GetCurrentRecipeName());
+    LoadPnPSettings(RecipeManager.GetCurrentRecipeName());   //AI(ht160s-pnp) 20260626 : seed runtime SortArm PnP scalars from the active recipe
     BinAreaMap.LoadDefault();
     LoadBinMapToGrid();
     RefreshRecipeList();
@@ -85,6 +91,7 @@ void __fastcall TfSetup::SaveWorkFile(AnsiString S)
     RecipeManager.EnsureCurrentRecipeDir();
     WriteRecipeSetupFile(RecipeManager.GetCurrentRecipeName());
     SaveTrayFormSettings(RecipeManager.GetCurrentRecipeName());
+    SavePnPSettings(RecipeManager.GetCurrentRecipeName());   //AI(ht160s-pnp) 20260626 : persist + re-apply SortArm PnP scalars
     SaveBinSettingMap(false);
     WriteRecipeManifest(RecipeManager.GetCurrentRecipeName(), AnsiString(""));
     RecipeManager.SaveLastRecipeName();
@@ -96,6 +103,7 @@ void __fastcall TfSetup::RegisterSetupPages()
         {tsSetupRecipe,    spbSetupRecipe,    suShowPage,  false},
         {tsSetupTrayForm,  spbSetupTrayForm,  suShowPage,  false},
         {tsSetupBinSetting,spbSetupBinSetting,suShowPage,  false},
+        {tsSetupPnP,       spbSetupPnP,       suShowPage,  false},
         {NULL,             spbSetupExit,      suCloseForm, true}
     };
     int PageIndex;
@@ -186,9 +194,9 @@ void __fastcall TfSetup::RefreshRecipeStatus()
     lblRecipeDirValue->Caption=RecipeManager.GetRecipeDirName();
     lblSetupFileValue->Caption=SetupFileName;
     lblBinAreaMapValue->Caption=BinAreaFileName;
-    lblSetupFileStatusValue->Caption=FileExists(SetupFileName)?AnsiString("Ready"):AnsiString("Not Created");
-    lblBinMapStatusValue->Caption=FileExists(BinAreaFileName)?AnsiString("Ready"):AnsiString("Not Created");
-    lblManifestValue->Caption=FileExists(ManifestFileName)?AnsiString("Ready"):AnsiString("Not Created");
+    lblSetupFileStatusValue->Caption=FileExists(SetupFileName)?AnsiString(LangT("Ready")):AnsiString(LangT("Not Created"));
+    lblBinMapStatusValue->Caption=FileExists(BinAreaFileName)?AnsiString(LangT("Ready")):AnsiString(LangT("Not Created"));
+    lblManifestValue->Caption=FileExists(ManifestFileName)?AnsiString(LangT("Ready")):AnsiString(LangT("Not Created"));
     RefreshBinSettingStatus();
 }
 //---------------------------------------------------------------------------
@@ -363,6 +371,208 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
     TrayForm.Load(Name);
 }
 //---------------------------------------------------------------------------
+void __fastcall TfSetup::BuildPnPUI()
+{
+    //AI(ht160s-pnp) 20260626 : one-time PnP tab wiring. Size the sucker-enable grid to the SortArm
+    //nozzle count (one column, N rows) and bind the grid-click + Use-Suck radio handlers in code so
+    //the .dfm carries no event bindings.
+    if(grdSuckEnable!=NULL)
+    {
+        grdSuckEnable->XItem=1;
+        grdSuckEnable->YItem=SORT_ARM_SUCKER_COUNT;
+        grdSuckEnable->OnMouseUp=grdSuckEnableMouseUp;
+    }
+    if(rgPnpUseSuck!=NULL)
+        rgPnpUseSuck->OnClick=rgPnpUseSuckClick;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::LoadPnPSettings(AnsiString RecipeName)
+{
+    //AI(ht160s-pnp) 20260626 : read the [PnP] scalar tuning from the recipe setup.ini into the edits,
+    //then push to the runtime model. Mirrors LoadTrayFormSettings (TIniFile + FileExists guard).
+    TIniFile *Ini;
+    AnsiString FileName;
+    AnsiString Name=RecipeManager.NormalizeRecipeName(RecipeName);
+
+    FileName=RecipeManager.GetRecipeFileName(Name, "setup.ini");
+    bLoadingPnP=true;
+    if(FileExists(FileName))
+    {
+        Ini=new TIniFile(FileName);
+        edPnpPickDelay->Text=FormatTrayDouble(Ini->ReadFloat(PNP_INI_GROUP, "PickDelaySec", 0.0));
+        edPnpPlaceDelay->Text=FormatTrayDouble(Ini->ReadFloat(PNP_INI_GROUP, "PlaceDelaySec", 0.0));
+        edtDestroyCheckTime->Text=FormatTrayDouble(Ini->ReadFloat(PNP_INI_GROUP, "DestroyCheckTime", 0.3));
+        delete Ini;
+    }
+    else
+    {
+        edPnpPickDelay->Text="0.000";
+        edPnpPlaceDelay->Text="0.000";
+        edtDestroyCheckTime->Text="0.300";
+    }
+    bLoadingPnP=false;
+    ApplyPnPToSortArm();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::SavePnPSettings(AnsiString RecipeName)
+{
+    //AI(ht160s-pnp) 20260626 : write the [PnP] scalar tuning back to the recipe setup.ini, then
+    //re-apply to the runtime model. Mirrors SaveTrayFormSettings (ForceDirectories + WriteFloat).
+    TIniFile *Ini;
+    AnsiString FileName;
+    AnsiString Name=RecipeManager.NormalizeRecipeName(RecipeName);
+
+    FileName=RecipeManager.GetRecipeFileName(Name, "setup.ini");
+    ForceDirectories(ExtractFilePath(FileName));
+    Ini=new TIniFile(FileName);
+    Ini->WriteFloat(PNP_INI_GROUP, "PickDelaySec", GetTrayEditDouble(edPnpPickDelay, 0.0));
+    Ini->WriteFloat(PNP_INI_GROUP, "PlaceDelaySec", GetTrayEditDouble(edPnpPlaceDelay, 0.0));
+    Ini->WriteFloat(PNP_INI_GROUP, "DestroyCheckTime", GetTrayEditDouble(edtDestroyCheckTime, 0.3));
+    delete Ini;
+
+    ApplyPnPToSortArm();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::ApplyPnPToSortArm()
+{
+    //AI(ht160s-pnp) 20260626 : push the [PnP] scalar tuning into the runtime SortArm model. Per-nozzle
+    //enable is NOT pushed here - it lives in GeneralSetting.bSuckerEnabled[4] and aSortArm reads it
+    //live each pick. SortArmModule can be NULL very early in startup; guard it.
+    if(SortArmModule==NULL)
+        return;
+    SortArmModule->SetPnPParameters(
+        GetTrayEditDouble(edPnpPickDelay, 0.0),
+        GetTrayEditDouble(edPnpPlaceDelay, 0.0),
+        GetTrayEditDouble(edtDestroyCheckTime, 0.3));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::LoadSuckEnable()
+{
+    //AI(ht160s-pnp) 20260626 : per-nozzle enable is machine-level (GeneralSetting / General.ini),
+    //already loaded at startup. Reflect it into the grid + the Use-Suck mode selector. All-enabled
+    //-> "Use All" (index 0, grid locked); otherwise "Use Select" (index 1, grid editable).
+    int s;
+    int iEnabledCount;
+
+    bLoadingPnP=true;
+    iEnabledCount=0;
+    for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        if(GeneralSetting.bSuckerEnabled[s])
+            iEnabledCount++;
+    if(rgPnpUseSuck!=NULL)
+        rgPnpUseSuck->ItemIndex=(iEnabledCount==SORT_ARM_SUCKER_COUNT)?0:1;
+    RefreshSuckGrid();
+    if(rgPnpUseSuck!=NULL && grdSuckEnable!=NULL)
+        grdSuckEnable->Enabled=(rgPnpUseSuck->ItemIndex==1);
+    bLoadingPnP=false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::SaveSuckEnable()
+{
+    //AI(ht160s-pnp) 20260626 : grid clicks already wrote GeneralSetting.bSuckerEnabled[]. Guarantee
+    //at least one nozzle stays enabled (mirrors the maintenance.cpp invariant), then persist to
+    //General.ini. aSortArm reads the array live, so no engine refresh is required.
+    int s;
+    int iEnabledCount;
+
+    iEnabledCount=0;
+    for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        if(GeneralSetting.bSuckerEnabled[s])
+            iEnabledCount++;
+    if(iEnabledCount==0)
+        GeneralSetting.bSuckerEnabled[0]=true;
+    GeneralSetting.Save();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::RefreshSuckGrid()
+{
+    //AI(ht160s-pnp) 20260626 : paint each nozzle cell green (enabled, color index 1) or white
+    //(disabled, color index 0) from GeneralSetting.bSuckerEnabled[]; label cells 1..N.
+    int s;
+
+    if(grdSuckEnable==NULL)
+        return;
+    grdSuckEnable->XItem=1;
+    grdSuckEnable->YItem=SORT_ARM_SUCKER_COUNT;
+    for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        grdSuckEnable->SetCellNumber(0, s, s+1);
+        grdSuckEnable->SetCellColorIndex(0, s, GeneralSetting.bSuckerEnabled[s]?1:0);
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::grdSuckEnableMouseUp(TObject *Sender,
+      TMouseButton Button, TShiftState Shift, int X, int Y)
+{
+    //AI(ht160s-pnp) 20260626 : map pixel (X,Y) to a nozzle cell via TTMyTray::ConvertIndexCells
+    //(returns 1 on hit, rewriting X/Y to cell indices). Grid is one column so the nozzle index is Y.
+    //Toggle GeneralSetting.bSuckerEnabled[] and recolor; never disable the last enabled nozzle.
+    int idx;
+    int s;
+    int iEnabledCount;
+
+    (void)Sender;
+    (void)Button;
+    (void)Shift;
+    if(grdSuckEnable==NULL)
+        return;
+    if(bLoadingPnP)
+        return;
+    if(rgPnpUseSuck!=NULL && rgPnpUseSuck->ItemIndex==0)
+        return;
+    if(grdSuckEnable->ConvertIndexCells(X, Y)!=1)
+        return;
+    idx=Y;
+    if(idx<0 || idx>=SORT_ARM_SUCKER_COUNT)
+        return;
+    if(GeneralSetting.bSuckerEnabled[idx])
+    {
+        iEnabledCount=0;
+        for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            if(GeneralSetting.bSuckerEnabled[s])
+                iEnabledCount++;
+        if(iEnabledCount<=1)
+        {
+            ShowMyOKMessageNoStop(LangT("At least one nozzle must stay enabled."));
+            return;
+        }
+        GeneralSetting.bSuckerEnabled[idx]=false;
+        grdSuckEnable->SetCellColorIndex(0, idx, 0);
+    }
+    else
+    {
+        GeneralSetting.bSuckerEnabled[idx]=true;
+        grdSuckEnable->SetCellColorIndex(0, idx, 1);
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::rgPnpUseSuckClick(TObject *Sender)
+{
+    //AI(ht160s-pnp) 20260626 : SortArm-only Use-Suck mode (the HT172 Mag Arm column is removed).
+    //Index 0 = Use All : force every nozzle enabled + green, lock the grid. Index 1 = Use Select :
+    //unlock the grid for per-nozzle clicking. bLoadingPnP suppresses the programmatic ItemIndex set.
+    int s;
+
+    (void)Sender;
+    if(bLoadingPnP)
+        return;
+    if(rgPnpUseSuck==NULL)
+        return;
+    if(rgPnpUseSuck->ItemIndex==1)
+    {
+        if(grdSuckEnable!=NULL)
+            grdSuckEnable->Enabled=true;
+    }
+    else
+    {
+        for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            GeneralSetting.bSuckerEnabled[s]=true;
+        RefreshSuckGrid();
+        if(grdSuckEnable!=NULL)
+            grdSuckEnable->Enabled=false;
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall TfSetup::WriteDefaultTrayFormSettings(AnsiString RecipeName)
 {
     TIniFile *Ini;
@@ -473,7 +683,7 @@ void __fastcall TfSetup::ConfigureBinSettingGrid()
     grdBinAreaMap->ColWidths[BIN_GRID_COL_STATUS]=100;
     grdBinAreaMap->ColWidths[BIN_GRID_COL_NOTE]=300;
     if(spbBinDefault!=NULL)
-        spbBinDefault->Caption=AnsiString("Default 1-")+IntToStr(GetBinGridAreaCount());
+        spbBinDefault->Caption=Format(LangT("Default 1-%d"),ARRAYOFCONST((GetBinGridAreaCount())));
     RefreshBinErrorAreaOptions();
 }
 //---------------------------------------------------------------------------
@@ -561,7 +771,7 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
         if(!ValidValue)
         {
             grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Invalid");
-            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Bin must be 0-999. Error code starts from 1000.";
+            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=LangT("Bin must be 0-999. Error code starts from 1000.");
             Result=false;
             continue;
         }
@@ -569,7 +779,7 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
         {
             if(Area==ErrorArea)
             {
-                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Error";
+                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Error");
                 grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Error bin collection.";
             }
             else
@@ -583,14 +793,14 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
         if(DuplicateArea!=eHT160BinAreaNotUse && DuplicateArea!=Area)
         {
             grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Duplicate");
-            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=AnsiString("Same bin as ")+BinAreaMap.GetAreaName(DuplicateArea)+AnsiString(".");
+            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=Format(LangT("Same bin as %s."),ARRAYOFCONST((BinAreaMap.GetAreaName(DuplicateArea))));
             Result=false;
             continue;
         }
         TempMap.SetBinByArea(Bin, Area);
         if(Area==ErrorArea)
         {
-            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="OK/Error";
+            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("OK/Error");
             grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Error bin collection.";
         }
         else
@@ -602,7 +812,7 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
     RefreshBinSettingStatus();
     if(ShowResultMessage)
     {
-        Message=Result?AnsiString("Bin map setting is OK."):AnsiString("Bin map setting has invalid rows.");
+        Message=Result?AnsiString(LangT("Bin map setting is OK.")):AnsiString(LangT("Bin map setting has invalid rows."));
         ShowMyOKMessageNoStop(LangT(Message));
     }
     return Result;
@@ -632,7 +842,7 @@ void __fastcall TfSetup::RefreshBinSettingStatus()
 
     CountText.sprintf("%d / %d", Count, GetBinGridAreaCount());
     if(lblBinMapStatusValue!=NULL)
-        lblBinMapStatusValue->Caption=(FileExists(FileName)?AnsiString("Ready "):AnsiString("Not Created "))+AnsiString("(")+CountText+AnsiString(")");
+        lblBinMapStatusValue->Caption=(FileExists(FileName)?AnsiString(LangT("Ready ")):AnsiString(LangT("Not Created ")))+AnsiString("(")+CountText+AnsiString(")");
     if(lblBinRecipeValue!=NULL)
         lblBinRecipeValue->Caption=RecipeManager.GetCurrentRecipeName();
     if(lblBinFileValue!=NULL)
@@ -640,7 +850,7 @@ void __fastcall TfSetup::RefreshBinSettingStatus()
     if(lblBinMappedValue!=NULL)
         lblBinMappedValue->Caption=CountText;
     if(lblBinColorValue!=NULL)
-        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
+        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString(LangT("Installed")):AnsiString(LangT("Not Installed"));
     if(cbbBinErrorArea!=NULL)
         SelectBinErrorArea(GetSelectedBinErrorArea());
 }
@@ -652,7 +862,7 @@ void __fastcall TfSetup::RefreshBinErrorAreaOptions()
     bool OldLoading;
 
     if(lblBinColorValue!=NULL)
-        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
+        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString(LangT("Installed")):AnsiString(LangT("Not Installed"));
     if(cbbBinErrorArea==NULL)
         return;
 
@@ -1045,6 +1255,7 @@ void __fastcall TfSetup::FormShow(TObject *Sender)
 {
     (void)Sender;
     OpenWorkFile();
+    LoadSuckEnable();   //AI(ht160s-pnp) 20260626 : reflect machine-level GeneralSetting.bSuckerEnabled[] into the PnP grid
     LayoutSetupButtons();
 }
 //---------------------------------------------------------------------------
@@ -1053,5 +1264,6 @@ void __fastcall TfSetup::FormClose(TObject *Sender, TCloseAction &Action)
     (void)Sender;
     (void)Action;
     SaveWorkFile(GetSetUpFileName());
+    SaveSuckEnable();   //AI(ht160s-pnp) 20260626 : enforce >=1 nozzle + persist GeneralSetting.bSuckerEnabled[] to General.ini
 }
 //---------------------------------------------------------------------------

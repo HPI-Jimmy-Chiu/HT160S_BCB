@@ -103,6 +103,22 @@ __published:
     TEdit *edXDivision;
     TEdit *edYDivision;
     TTMyTray *TMyTray1;
+    TTabSheet *tsSetupPnP;
+    TSpeedButton *spbSetupPnP;
+    TPanel *pnlPnpHeader;
+    TPanel *pnlPnpBody;
+    TLabel *lblPnpPickDelay;
+    TLabel *lblPnpPickDelayUnit;
+    TLabel *lblPnpPlaceDelay;
+    TLabel *lblPnpPlaceDelayUnit;
+    TLabel *lblPnpDestroyCheckTime;
+    TLabel *lblPnpDestroyCheckTimeUnit;
+    TLabel *lblSuckEnableTitle;
+    TEdit *edPnpPickDelay;
+    TEdit *edPnpPlaceDelay;
+    TEdit *edtDestroyCheckTime;
+    TRadioGroup *rgPnpUseSuck;
+    TTMyTray *grdSuckEnable;
     void __fastcall spbSetupMenuClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
@@ -122,6 +138,8 @@ __published:
     void __fastcall spbBinClearClick(TObject *Sender);
     void __fastcall spbBinDefaultClick(TObject *Sender);
     void __fastcall cbbBinErrorAreaChange(TObject *Sender);
+    void __fastcall grdSuckEnableMouseUp(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
+    void __fastcall rgPnpUseSuckClick(TObject *Sender);
 private:
     int iSetupMenuCount;
     TSpeedButton *MenuButtons[MAX_SETUP_MENU_COUNT];
@@ -131,6 +149,7 @@ private:
     TSpeedButton *LastClickButton;
     bool bLoadingTrayForm;
     bool bLoadingBinGrid;
+    bool bLoadingPnP;
 
     void __fastcall RegisterSetupPages();
     void __fastcall LayoutSetupButtons();
@@ -165,6 +184,13 @@ private:
     int __fastcall GetBinGridValue(int Row, bool &ValidValue);
     void __fastcall ResetBinGridRow(int Row);
     bool __fastcall IsSystemRunning();
+    void __fastcall BuildPnPUI();
+    void __fastcall LoadPnPSettings(AnsiString RecipeName);
+    void __fastcall SavePnPSettings(AnsiString RecipeName);
+    void __fastcall ApplyPnPToSortArm();
+    void __fastcall LoadSuckEnable();
+    void __fastcall SaveSuckEnable();
+    void __fastcall RefreshSuckGrid();
 public:
     __fastcall TfSetup(TComponent* Owner);
     AnsiString __fastcall GetSetUpFileName();
