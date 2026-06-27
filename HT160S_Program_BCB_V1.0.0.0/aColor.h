@@ -32,7 +32,6 @@ private:
     bool bFrontHasTray;       //AI(HT160S-Maintainer) 20260608 : one tray separated and staged at the front (post DoGoDownTray)
     bool bRearHasTray;
     bool bTrayReady;
-    bool bTrayPicked;
     bool bSupplyRequested;
     AnsiString sTrayID2D;     //AI(HT160S-Maintainer) 20260608 : 2D code read from the supplied identity tray
     TMyTray FrontSourceTray;  //AI(ht160s-color-align-empty) 20260627 : FRONT staging holder (mirror Empty); carried tray lives on HSys.VMot.MMColorY->Tray

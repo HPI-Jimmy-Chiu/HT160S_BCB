@@ -37,7 +37,6 @@ void TColorModule::InitialFlag()
     bInputFullTray=false;
     bRearHasTray=false;
     bTrayReady=false;
-    bTrayPicked=false;
     bSupplyRequested=false;
     bFrontHasTray=false;
     if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : hide Color grid on init
@@ -142,7 +141,6 @@ void TColorModule::RefreshStateFromSensors()
         bFrontHasTray=false;
         bRearHasTray=false;
         bTrayReady=false;
-        bTrayPicked=false;
         return;
     }
 
@@ -809,7 +807,6 @@ bool TColorModule::DoFeedTray(int Flag)
             else
             {
                 bTrayReady=true;
-                bTrayPicked=false;
                 bSupplyRequested=false;
                 bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : supply present -> end AMR wait (P4)
                 AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear AMR wait timer on success (P4)
@@ -1012,7 +1009,7 @@ bool TColorModule::IsSortBinMode()
 bool TColorModule::IsTrayReady()
 {
     RefreshStateFromSensors();
-    return IsInstalled() && IsTraySupplyMode() && bTrayReady && bTrayPicked==false;
+    return IsInstalled() && IsTraySupplyMode() && bTrayReady;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::IsAcceptingIC()
@@ -1033,7 +1030,6 @@ void TColorModule::NotifyTrayPicked()
     //DoFeedTray case 5000/6000, so just clear the rear-ready state + hide the grid; no separate
     //DoReleaseTray pass (that branch + case 1500 are removed from DoColor).
     bTrayReady=false;
-    bTrayPicked=false;
     bRearHasTray=false;
     if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();
 }
@@ -1241,12 +1237,11 @@ AnsiString TColorModule::DescribeState()
     //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state dump for
     //FeederDecision.txt. Reads latched members directly (does NOT call
     //RefreshStateFromSensors, which clobbers the sim/dummy latch). The
-    //bTrayReady/bTrayPicked/bSupplyRequested trio is first : a latched bTrayReady
+    //bTrayReady/bSupplyRequested are first : a latched bTrayReady
     //with no pick is the Normal-mode (no AMR demand) idle-spin signature.
     AnsiString s;
     s  = "[Color]\r\n";
     s += "  bTrayReady=" + IntToStr(bTrayReady ? 1 : 0)
-       + "  bTrayPicked=" + IntToStr(bTrayPicked ? 1 : 0)
        + "  bSupplyRequested=" + IntToStr(bSupplyRequested ? 1 : 0)
        + "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0) + "\r\n";
     //AI(ht160s-agv) 20260627 : Color source-dry AMR wait latch + AMR lock (P4 State Record).
