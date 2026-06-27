@@ -27,13 +27,13 @@ TColorModule::TColorModule()
 void TColorModule::InitialFlag()
 {
     bAmrLocked=false;
+    bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait (P4)
+    AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait timer (P4)
     RefillSimInfeed();
     FeedTask=1;
     FeedClampSub=0;
-    ReleaseTask=1;
     SortBinTask=1;
     iICCount=0;
-    bInputHasTray=false;
     bInputFullTray=false;
     bRearHasTray=false;
     bTrayReady=false;
@@ -52,7 +52,6 @@ void TColorModule::InitialFlag()
     GoUpDelay.Clear();
     sTrayID2D="";
     FeedDelay.Clear();
-    ReleaseDelay.Clear();
     GoDownDelay.Clear();
     ScanDelay.Clear();
     TestUpTask=1;
@@ -139,7 +138,6 @@ void TColorModule::RefreshStateFromSensors()
 
     if(IsInstalled()==false)
     {
-        bInputHasTray=false;
         bInputFullTray=false;
         bFrontHasTray=false;
         bRearHasTray=false;
@@ -151,22 +149,18 @@ void TColorModule::RefreshStateFromSensors()
     if(HSys.Sen.SnColor_InputHasTray.Enable==true)
     {
         bHasInputSensor=true;
-        bInputHasTray=HSys.Sen.SnColor_InputHasTray.IsOn();
         //AI(ht160s-color-align-empty) 20260627 : front-staged presence is SENSOR-driven,
         //mirroring TEmptyModule (bFrontHasTray=SnEmpty_InputHasTray.IsOn()). SnColor_InputHasTray
         //is the same hardware role as SnEmpty_InputHasTray, so bFrontHasTray tracks it directly
         //(was a logical-only latch -- the divergence from Empty).
-        bFrontHasTray=bInputHasTray;
+        bFrontHasTray=HSys.Sen.SnColor_InputHasTray.IsOn();
     }
 
     if(HSys.Sen.SnColor_InputFullTray.Enable==true)
     {
         bInputFullTray=HSys.Sen.SnColor_InputFullTray.IsOn();
         if(bInputFullTray)
-        {
-            bInputHasTray=true;
             bFrontHasTray=true;
-        }
     }
     else
         bInputFullTray=false;
@@ -199,10 +193,7 @@ void TColorModule::RefreshStateFromSensors()
     }
 
     if(bHasInputSensor==false && IsSoftSimulate())
-    {
-        bInputHasTray=true;
         bFrontHasTray=true;
-    }
 
     //AI(general) 20260609 : Removed the sensor-driven bTrayReady latch. It set
     //bTrayReady=true from any output-sensor read and never cleared it (only
@@ -687,14 +678,25 @@ bool TColorModule::DoFeedTray(int Flag)
             break;
 
         case 10:
-            //AI(ht160s-color-align-empty) 20260627 : mirror TEmptyModule::DoFeedTray case 10.
-            //bRearHasTray is Color's rear-occupied latch (Empty uses bRearHasTray). If a
-            //tray already sits at the rear/output (startup/recovery), read its 2D and present
-            //it (cases 900/950) without re-destacking; do NOT touch the front staging latch.
+            //AI(ht160s-color-align-empty) 20260627 : mirror TEmptyModule::DoFeedTray case 10 --
+            //if the rear handoff slot is occupied, do not feed. In the supply context bTrayReady
+            //is false here (DoColor idles on bTrayReady otherwise) and bReturnTray is false (the
+            //return branch ran first), so a true bRearHasTray means a LEFTOVER tray stranded at
+            //the rear on startup/recovery -- not pickable (pickup gate is bTrayReady) and not
+            //re-stageable. Require the operator to remove it; the rear sensor clears bRearHasTray
+            //when they do. Avoids the silent cold-start deadlock WITHOUT auto-presenting
+            //(bRearHasTray is shared by the return/recycle path, so a sensor-backed pickup would
+            //mis-fire). Once the sensor reads empty the normal supply proceeds.
             RefreshStateFromSensors();
             if(bRearHasTray)
             {
-                return true;
+                if(HSys.LastSet.iRealDummy!=DUMMY)
+                {
+                    ShowMyError("MES1425", LangT("Color rear has a leftover tray - please remove it"), K_RETRY);
+                    RefreshStateFromSensors();
+                }
+                if(bRearHasTray)
+                    return true;
             }
             FeedTask=1000;
             break;
@@ -782,6 +784,24 @@ bool TColorModule::DoFeedTray(int Flag)
                HSys.Sen.SnColor_OutputBottomHasTray.IsOff() &&
                HSys.LastSet.iRealDummy!=DUMMY)
             {
+                //AI(ht160s-agv) 20260627 : source-dry. In AMR mode wait iAmrFeedWaitSec for
+                //the AGV to refill the supply magazine before raising the operator modal;
+                //the happy path (refill in time) never reaches ShowMyError. Mirrors Empty/
+                //Loader source-dry template. Armed ONLY under bUseAMR.
+                if(GeneralSetting.bUseAMR)
+                {
+                    if(bWaitingAmrFeed==false)
+                    {
+                        AmrFeedWaitTimer.SetMS(GeneralSetting.iAmrFeedWaitSec*1000);
+                        AmrFeedWaitTimer.On();
+                        bWaitingAmrFeed=true;
+                        break;
+                    }
+                    if(AmrFeedWaitTimer.Off()==false)
+                        break;
+                    bWaitingAmrFeed=false;
+                    AmrFeedWaitTimer.Clear();
+                }
                 Ret=ShowMyError("MES1421", LangT("Color supply tray is not ready"), K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1;
@@ -791,6 +811,8 @@ bool TColorModule::DoFeedTray(int Flag)
                 bTrayReady=true;
                 bTrayPicked=false;
                 bSupplyRequested=false;
+                bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : supply present -> end AMR wait (P4)
+                AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear AMR wait timer on success (P4)
                 FeedTask=13000;
             }
             break;
@@ -948,60 +970,6 @@ TMyTray TColorModule::GetSourceTray()
     return empty;
 }
 //---------------------------------------------------------------------------
-bool TColorModule::DoReleaseTray(int Flag)
-{
-    if(Flag==0)
-    {
-        ReleaseTask=1;
-        ReleaseDelay.Clear();
-        return true;
-    }
-
-    switch(ReleaseTask)
-    {
-        case 1:
-            ReleaseTask=100;
-            break;
-
-        case 100:
-            if(PopCylinder(HSys.Cyn.C_Color_PushTray))
-                ReleaseTask=200;
-            break;
-
-        case 200:
-            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))
-                ReleaseTask=300;
-            break;
-
-        case 300:
-            if(PopCylinder(HSys.Cyn.C_Color_RearRiseTray))
-                ReleaseTask=400;
-            break;
-
-        case 400:
-            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
-                ReleaseTask=450;
-            break;
-
-        case 450:
-            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
-                ReleaseTask=500;
-            break;
-
-        case 500:
-            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
-            {
-                bTrayReady=false;
-                bTrayPicked=false;
-                bRearHasTray=false;
-                if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : released/picked -> hide grid
-                return true;
-            }
-            break;
-    }
-    return false;
-}
-//---------------------------------------------------------------------------
 bool TColorModule::DoSortBin(int Flag)
 {
     if(Flag==0)
@@ -1045,12 +1013,6 @@ bool TColorModule::IsTrayReady()
 {
     RefreshStateFromSensors();
     return IsInstalled() && IsTraySupplyMode() && bTrayReady && bTrayPicked==false;
-}
-//---------------------------------------------------------------------------
-bool TColorModule::IsInputHasTray()
-{
-    RefreshStateFromSensors();
-    return bInputHasTray;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::IsAcceptingIC()
@@ -1287,16 +1249,17 @@ AnsiString TColorModule::DescribeState()
        + "  bTrayPicked=" + IntToStr(bTrayPicked ? 1 : 0)
        + "  bSupplyRequested=" + IntToStr(bSupplyRequested ? 1 : 0)
        + "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0) + "\r\n";
+    //AI(ht160s-agv) 20260627 : Color source-dry AMR wait latch + AMR lock (P4 State Record).
+    s += "  bWaitingAmrFeed=" + IntToStr(bWaitingAmrFeed ? 1 : 0)
+       + "  bAmrLocked=" + IntToStr(bAmrLocked ? 1 : 0) + "\r\n";
     s += "  Installed=" + IntToStr(IsInstalled() ? 1 : 0)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)
        + "  Mode=" + AnsiString(IsTraySupplyMode() ? "TraySupply" : (IsSortBinMode() ? "SortBin" : "?")) + "\r\n";
-    s += "  bInputHasTray=" + IntToStr(bInputHasTray ? 1 : 0)
-       + "  bInputFullTray=" + IntToStr(bInputFullTray ? 1 : 0)
+    s += "  bInputFullTray=" + IntToStr(bInputFullTray ? 1 : 0)
        + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0) + "\r\n";
     s += "  FeedTask=" + IntToStr(FeedTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)
        + "  GoUpTask=" + IntToStr(GoUpTask)
-       + "  ReleaseTask=" + IntToStr(ReleaseTask)
        + "  ScanTask=" + IntToStr(ScanTask)
        + "  SortBinTask=" + IntToStr(SortBinTask) + "\r\n";
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)

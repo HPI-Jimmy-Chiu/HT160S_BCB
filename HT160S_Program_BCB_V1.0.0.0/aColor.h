@@ -19,7 +19,6 @@ class TColorModule
 private:
     int FeedTask;
     int FeedClampSub;       //AI(HT160S-Maintainer) 20260623 : DoClampTray sub-state for DoFeedTray
-    int ReleaseTask;
     int SortBinTask;
     int ScanTask;             //AI(HT160S-Maintainer) 20260608 : 2D CCD read sub-ladder state
     int GoDownTask;           //AI(HT160S-Maintainer) 20260608 : front-stack separate sub-ladder (mirrors Empty)
@@ -29,7 +28,6 @@ private:
     int iMode;
     int iSupplyThreshold;
     int iICCount;
-    bool bInputHasTray;
     bool bInputFullTray;
     bool bFrontHasTray;       //AI(HT160S-Maintainer) 20260608 : one tray separated and staged at the front (post DoGoDownTray)
     bool bRearHasTray;
@@ -39,11 +37,12 @@ private:
     AnsiString sTrayID2D;     //AI(HT160S-Maintainer) 20260608 : 2D code read from the supplied identity tray
     TMyTray FrontSourceTray;  //AI(ht160s-color-align-empty) 20260627 : FRONT staging holder (mirror Empty); carried tray lives on HSys.VMot.MMColorY->Tray
     HTimer FeedDelay;
-    HTimer ReleaseDelay;
     HTimer GoDownDelay;       //AI(HT160S-Maintainer) 20260608 : front separate settle delay
     HTimer ScanDelay;         //AI(HT160S-Maintainer) 20260608 : Color CCD shot response timeout
 
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
+    bool bWaitingAmrFeed;     //AI(ht160s-agv) 20260627 : Color source-dry AMR wait latch (P4)
+    HTimer AmrFeedWaitTimer;  //AI(ht160s-agv) 20260627 : Color source-dry AMR wait timer (P4)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
 
     //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow, ported near-verbatim
@@ -65,7 +64,6 @@ private:
     bool DoGoDownTray(int Flag);   //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack -> front staging (like Empty)
     bool DoGoUpTray(int Flag);     //AI(phase6-loader-recycle) 20260625 : stack a returned tray back onto the front supply car (mirrors TEmptyModule::DoGoUpTray)
     bool DoFeedTray(int Flag);
-    bool DoReleaseTray(int Flag);
     bool DoSortBin(int Flag);
     bool DoReadColor2D(int Flag);  //AI(HT160S-Maintainer) 20260608 : move CCD X, LON shot, read 2D, LOFF
     void BirthFrontTray();           //AI(ht160s-color-align-empty) 20260627 : identity tray born at GoDown front-confirm into FrontSourceTray (mirror Empty)
@@ -82,7 +80,6 @@ public:
     bool IsTraySupplyMode();
     bool IsSortBinMode();
     bool IsTrayReady();
-    bool IsInputHasTray();
     bool IsAcceptingIC();
     void RequestSupplyTray();
     void NotifyTrayPicked();
