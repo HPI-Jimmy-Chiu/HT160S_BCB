@@ -17,8 +17,8 @@ enum eHT160ColorMode
 class TColorModule
 {
 private:
-    int SupplyTask;
-    int SupplyClampSub;       //AI(HT160S-Maintainer) 20260623 : DoClampTray sub-state for DoSupplyTray
+    int FeedTask;
+    int FeedClampSub;       //AI(HT160S-Maintainer) 20260623 : DoClampTray sub-state for DoFeedTray
     int ReleaseTask;
     int SortBinTask;
     int ScanTask;             //AI(HT160S-Maintainer) 20260608 : 2D CCD read sub-ladder state
@@ -37,7 +37,8 @@ private:
     bool bTrayPicked;
     bool bSupplyRequested;
     AnsiString sTrayID2D;     //AI(HT160S-Maintainer) 20260608 : 2D code read from the supplied identity tray
-    HTimer SupplyDelay;
+    TMyTray FrontSourceTray;  //AI(ht160s-color-align-empty) 20260627 : FRONT staging holder (mirror Empty); carried tray lives on HSys.VMot.MMColorY->Tray
+    HTimer FeedDelay;
     HTimer ReleaseDelay;
     HTimer GoDownDelay;       //AI(HT160S-Maintainer) 20260608 : front separate settle delay
     HTimer ScanDelay;         //AI(HT160S-Maintainer) 20260608 : Color CCD shot response timeout
@@ -63,11 +64,12 @@ private:
     bool MoveColorY(int Position);   //AI(HT160S-Maintainer) 20260622 : move Color carriage in Y (front/back)
     bool DoGoDownTray(int Flag);   //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack -> front staging (like Empty)
     bool DoGoUpTray(int Flag);     //AI(phase6-loader-recycle) 20260625 : stack a returned tray back onto the front supply car (mirrors TEmptyModule::DoGoUpTray)
-    bool DoSupplyTray(int Flag);
+    bool DoFeedTray(int Flag);
     bool DoReleaseTray(int Flag);
     bool DoSortBin(int Flag);
     bool DoReadColor2D(int Flag);  //AI(HT160S-Maintainer) 20260608 : move CCD X, LON shot, read 2D, LOFF
-    void BirthIdentityTray();      //AI(ht160s-tray-source) : create identity-tray grid (Kind=Identity, TrayID=sTrayID2D)
+    void BirthFrontTray();           //AI(ht160s-color-align-empty) 20260627 : identity tray born at GoDown front-confirm into FrontSourceTray (mirror Empty)
+    void StampReadIdentity2D();      //AI(ht160s-color-align-empty) 20260627 : CCD read UPDATES the carried tray 2D TrayID (not a birth)
 
 public:
     TColorModule();
