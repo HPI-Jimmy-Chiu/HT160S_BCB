@@ -996,6 +996,98 @@ object fTeach: TfTeach
           object tsTrayArm: TTabSheet
             Caption = 'Tray Arm'
             ImageIndex = 2
+            object lblTaStatus: TLabel
+              Left = 16
+              Top = 176
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
+            end
+            object gbTaGrab: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 823
+              Height = 80
+              Align = alTop
+              Caption = 'TrayArm Grab Test (Empty / Color / Loader)'
+              TabOrder = 0
+              object lbTaGrab: TLabel
+                Left = 16
+                Top = 24
+                Width = 62
+                Height = 16
+                Caption = 'Grab From'
+              end
+              object cbTaGrabChannel: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'Empty'
+                Items.Strings = (
+                  'Empty'
+                  'Color'
+                  'Loader')
+              end
+              object btnTaGrab: TButton
+                Left = 192
+                Top = 38
+                Width = 185
+                Height = 33
+                Caption = 'GO (Grab Tray)'
+                TabOrder = 1
+                OnClick = btnTaGrabClick
+              end
+            end
+            object gbTaPlace: TGroupBox
+              Left = 0
+              Top = 80
+              Width = 823
+              Height = 80
+              Align = alTop
+              Caption = 'TrayArm Place Test (Auto1-6 / recycle Empty / Color)'
+              TabOrder = 1
+              object lbTaPlace: TLabel
+                Left = 16
+                Top = 24
+                Width = 49
+                Height = 16
+                Caption = 'Place To'
+              end
+              object cbTaPlaceChannel: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'Auto1'
+                Items.Strings = (
+                  'Auto1'
+                  'Auto2'
+                  'Auto3'
+                  'Auto4'
+                  'Auto5'
+                  'Auto6'
+                  'Empty'
+                  'Color')
+              end
+              object btnTaPlace: TButton
+                Left = 192
+                Top = 38
+                Width = 185
+                Height = 33
+                Caption = 'GO (Place Tray)'
+                TabOrder = 1
+                OnClick = btnTaPlaceClick
+              end
+            end
           end
         end
       end

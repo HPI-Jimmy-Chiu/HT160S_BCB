@@ -249,6 +249,15 @@ __published:
     TComboBox *cbAutoArea;
     TButton *btnAutoGoUp;
     TTabSheet *tsTrayArm;
+    TLabel *lblTaStatus;
+    TGroupBox *gbTaGrab;
+    TLabel *lbTaGrab;
+    TComboBox *cbTaGrabChannel;
+    TButton *btnTaGrab;
+    TGroupBox *gbTaPlace;
+    TLabel *lbTaPlace;
+    TComboBox *cbTaPlaceChannel;
+    TButton *btnTaPlace;
 
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
@@ -276,6 +285,8 @@ __published:
     void __fastcall btnSaGoClick(TObject *Sender);
     void __fastcall btnCarGoClick(TObject *Sender);
     void __fastcall btnAutoGoUpClick(TObject *Sender);
+    void __fastcall btnTaGrabClick(TObject *Sender);
+    void __fastcall btnTaPlaceClick(TObject *Sender);
 private:
     bool bUIBuilt;
     bool bTeachReady;
@@ -301,6 +312,11 @@ private:
     int iCarLoopDone;
     bool bAutoTestRunning;
     int iAutoIndex;
+
+    bool bTaTestRunning;
+    int iTaTask;
+    int iTaChannel;
+    bool bTaIsGrab;
 
     TLabel *lblStatus[iMotLedTotalCnt];
     TALed *ledStatus[iMotLedTotalCnt];
@@ -360,6 +376,12 @@ private:
     void RunAutoTest();
     void SetCarStatus(AnsiString Text);
     void SetAutoStatus(AnsiString Text);
+    void PopulateTrayArmCombos();
+    int ComboIndexToPlaceChannel(int Index);
+    bool CheckTrayArmTestReady();
+    void RunTrayArmTest();
+    void StopTrayArmTest();
+    void SetTaStatus(AnsiString Text);
 public:
     __fastcall TfTeach(TComponent* Owner);
     void __fastcall InitialTeachParameter();

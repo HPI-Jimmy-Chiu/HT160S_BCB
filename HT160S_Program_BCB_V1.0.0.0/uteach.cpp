@@ -68,6 +68,11 @@ __fastcall TfTeach::TfTeach(TComponent* Owner)
     bAutoTestRunning=false;
     iAutoIndex=0;
 
+    bTaTestRunning=false;
+    iTaTask=0;
+    iTaChannel=-1;
+    bTaIsGrab=false;
+
     // UI is fully defined in uteach.dfm; VCL auto-binds the __published members on
     // form streaming. Only the lblStatus[]/ledStatus[] arrays are non-published and
     // are mapped from the named DFM LEDs in BindDfmComponents (TfMotorTest pattern).
@@ -113,6 +118,7 @@ void __fastcall TfTeach::FormClose(TObject *Sender, TCloseAction &Action)
     StopActiveMotor();
     StopSortArmTest();
     StopCarTest();
+    StopTrayArmTest();
     MotorTaskLog("Teach", "", "SCREEN_CLOSE", "Teach closed");
     MotorTaskLogSetActive(false);
 }
@@ -135,6 +141,7 @@ void TfTeach::BuildUI()
 
     PopulateAdvancedCombos();
     PopulateChannelCombos();
+    PopulateTrayArmCombos();
 
     bUIBuilt=true;
 }
@@ -999,6 +1006,7 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
             StopActiveMotor();
             StopSortArmTest();
             StopCarTest();
+            StopTrayArmTest();
             SetMessage("Move abort: EMG");
         }
         UpdateMotorMonitor();
@@ -1039,6 +1047,7 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
     RunSortArmTest();
     RunCarTest();
     RunAutoTest();
+    RunTrayArmTest();
     UpdateMotorMonitor();
 }
 //---------------------------------------------------------------------------
@@ -1194,6 +1203,7 @@ void __fastcall TfTeach::btnStopClick(TObject *Sender)
     StopActiveMotor();
     StopSortArmTest();
     StopCarTest();
+    StopTrayArmTest();
     SetMessage("Stop");
 }
 //---------------------------------------------------------------------------
@@ -1602,5 +1612,189 @@ void __fastcall TfTeach::btnAutoGoUpClick(TObject *Sender)
         AutoModule->TestGoUpOnce(iAutoIndex, 0);
     bAutoTestRunning=true;
     SetAutoStatus(LangT("Auto GoUp once start"));
+}
+//---------------------------------------------------------------------------
+// Advanced page (Tray Arm) : TrayArm transport-arm grab/place test. Both groups
+// share one running flag (only one test at a time). Grab sources = Empty/Color/
+// Loader; place targets = Auto1-6 + recycle Empty/Color. The motion is the pure
+// dry-run TTrayArmModule::TestGrabFromChannel/TestPlaceToChannel (the SAME physical
+// primitives as production DoPick/DoPlace, with NO tray-tracking mutation), stepped
+// from tmrUpdate, same way bHomeRunning drives Home.
+void TfTeach::PopulateTrayArmCombos()
+{
+    if(cbTaGrabChannel!=NULL && cbTaGrabChannel->Items->Count>0 && cbTaGrabChannel->ItemIndex<0)
+        cbTaGrabChannel->ItemIndex=0;
+    if(cbTaPlaceChannel!=NULL && cbTaPlaceChannel->Items->Count>0 && cbTaPlaceChannel->ItemIndex<0)
+        cbTaPlaceChannel->ItemIndex=0;
+}
+//---------------------------------------------------------------------------
+// cbTaPlaceChannel index 0..5=Auto1..6, 6=Empty, 7=Color -> eTrayArmChannel id.
+// (Grab combo maps 1:1 : index 0/1/2 == TACH_EMPTY/COLOR/LOADER.) -1 = no selection.
+int TfTeach::ComboIndexToPlaceChannel(int Index)
+{
+    if(Index>=0 && Index<=5)
+        return TACH_AUTO1+Index;
+    if(Index==6)
+        return TACH_EMPTY;
+    if(Index==7)
+        return TACH_COLOR;
+    return -1;
+}
+//---------------------------------------------------------------------------
+bool TfTeach::CheckTrayArmTestReady()
+{
+    TTrayMotor *X=HSys.Mot.MTrayArmX;
+
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
+        SetTaStatus(LangT("Abort: system start"));
+        return false;
+    }
+    if(IsEMGPressed()>0)
+    {
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
+        SetTaStatus(LangT("Abort: EMG"));
+        return false;
+    }
+    if(X==NULL)
+    {
+        SetTaStatus(LangT("Abort: motor missing"));
+        return false;
+    }
+    X->ScanMotorStatus();
+    if(X->GetEnable()==false)
+    {
+        ShowMyOKMessageNoStop(LangT("TrayArm X must be enabled."));
+        SetTaStatus(LangT("Abort: motor disabled"));
+        return false;
+    }
+    if(X->Led[iAlarmLed] || X->Led[iServoalarmLed])
+    {
+        ShowMyOKMessageNoStop(LangT("Motor alarm is active."));
+        SetTaStatus(LangT("Abort: motor alarm"));
+        return false;
+    }
+    if(X->bHomeFlag==false)
+    {
+        ShowMyOKMessageNoStop(LangT("TrayArm X must be home."));
+        SetTaStatus(LangT("Abort: not home"));
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunTrayArmTest()
+{
+    bool bDone;
+
+    if(bTaTestRunning==false || TrayArmModule==NULL)
+        return;
+    if(bTaIsGrab)
+        bDone=TrayArmModule->TestGrabFromChannel(iTaChannel, iTaTask);
+    else
+        bDone=TrayArmModule->TestPlaceToChannel(iTaChannel, iTaTask);
+    if(bDone)
+    {
+        bTaTestRunning=false;
+        SetTaStatus(bTaIsGrab?LangT("TrayArm grab test finish"):LangT("TrayArm place test finish"));
+    }
+}
+//---------------------------------------------------------------------------
+void TfTeach::StopTrayArmTest()
+{
+    if(bTaTestRunning==false)
+        return;
+    bTaTestRunning=false;
+    iTaTask=0;
+    if(HSys.Mot.MTrayArmX!=NULL)
+        HSys.Mot.MTrayArmX->Stop();
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetTaStatus(AnsiString Text)
+{
+    if(lblTaStatus!=NULL)
+        lblTaStatus->Caption=Text;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnTaGrabClick(TObject *Sender)
+{
+    int Channel;
+    AnsiString Err;
+    (void)Sender;
+
+    if(TrayArmModule==NULL)
+    {
+        SetTaStatus(LangT("TrayArm module not ready"));
+        return;
+    }
+    if(cbTaGrabChannel==NULL)
+        return;
+    if(bTaTestRunning)
+    {
+        SetTaStatus(LangT("Test already running"));
+        return;
+    }
+    // Grab combo index maps 1:1 to the channel id (0=Empty, 1=Color, 2=Loader).
+    Channel=cbTaGrabChannel->ItemIndex;
+    if(Channel<0)
+    {
+        SetTaStatus(LangT("Select a grab source"));
+        return;
+    }
+    if(CheckTrayArmTestReady()==false)
+        return;
+    if(TrayArmModule->CanTestTrayArm(Channel, true, Err)==false)
+    {
+        ShowMyOKMessageNoStop(LangT(Err));
+        SetTaStatus(Err);
+        return;
+    }
+
+    iTaChannel=Channel;
+    bTaIsGrab=true;
+    iTaTask=1;
+    bTaTestRunning=true;
+    SetTaStatus(LangT("TrayArm grab test start"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnTaPlaceClick(TObject *Sender)
+{
+    int Channel;
+    AnsiString Err;
+    (void)Sender;
+
+    if(TrayArmModule==NULL)
+    {
+        SetTaStatus(LangT("TrayArm module not ready"));
+        return;
+    }
+    if(cbTaPlaceChannel==NULL)
+        return;
+    if(bTaTestRunning)
+    {
+        SetTaStatus(LangT("Test already running"));
+        return;
+    }
+    Channel=ComboIndexToPlaceChannel(cbTaPlaceChannel->ItemIndex);
+    if(Channel<0)
+    {
+        SetTaStatus(LangT("Select a place target"));
+        return;
+    }
+    if(CheckTrayArmTestReady()==false)
+        return;
+    if(TrayArmModule->CanTestTrayArm(Channel, false, Err)==false)
+    {
+        ShowMyOKMessageNoStop(LangT(Err));
+        SetTaStatus(Err);
+        return;
+    }
+
+    iTaChannel=Channel;
+    bTaIsGrab=false;
+    iTaTask=1;
+    bTaTestRunning=true;
+    SetTaStatus(LangT("TrayArm place test start"));
 }
 //---------------------------------------------------------------------------

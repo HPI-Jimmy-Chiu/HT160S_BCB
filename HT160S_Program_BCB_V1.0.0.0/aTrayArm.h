@@ -35,6 +35,25 @@ enum eTrayArmPlaceDest
     TAPLACE_COLOR,                     //AI(HT160S-Maintainer) 20260625 : return identity tray to Color (same contract as Empty)
 };
 //---------------------------------------------------------------------------
+//AI(ht160s-trayarm-teach-test) 20260627 : flat channel index for the Teach Advanced
+//TrayArm test tab. One id per TrayArm handoff station, so a single test function takes a
+//different index (grab sources Empty/Color/Loader; place targets Auto1-6 + recycle Empty/
+//Color). Maps to the Teach.TrayXArmTo*XPosition fields via GetChannelHandoffX. Auto ids are
+//contiguous so (Channel-TACH_AUTO1) is the 0-based Auto index for GetAutoX.
+enum eTrayArmChannel
+{
+    TACH_EMPTY=0,
+    TACH_COLOR,
+    TACH_LOADER,
+    TACH_AUTO1,
+    TACH_AUTO2,
+    TACH_AUTO3,
+    TACH_AUTO4,
+    TACH_AUTO5,
+    TACH_AUTO6,
+    TACH_COUNT,
+};
+//---------------------------------------------------------------------------
 class TTrayArmModule
 {
 private:
@@ -66,6 +85,14 @@ private:
     int GetAutoX(int Index);
     int GetColorX();                   //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup X
     bool IsPickFromColor();            //AI(HT160S-Maintainer) 20260605 : this job picks from Color (identity)
+    //AI(ht160s-trayarm-teach-test) 20260627 : shared physical motion primitives. Production
+    //(DoPick/DoPlace/DoPlaceToEmpty/DoPlaceToColor) AND the Teach Advanced test compose these,
+    //so the grab/release choreography lives in ONE place (single source of truth).
+    bool DoMoveToStationZSafe(int X, int &Task);   //Z-up then X to station (Task 1,10)
+    bool DoLowerClampRaise(bool bGrab, int &Task); //Z-down, push(grab)/pop(release) clamps+dwell, Z-up (Task 1000..3000)
+    int GetChannelHandoffX(int Channel);           //eTrayArmChannel -> Teach.TrayXArmTo*XPosition
+    bool ChannelPlaceClear(int Channel);           //place destination rear is clear (anti-clash gate)
+    AnsiString GetChannelName(int Channel);        //display name for status/alarm text
 
 public:
     TTrayArmModule();
@@ -79,6 +106,13 @@ public:
     //move/jog on the SAME Z-up interlock as production (mirrors public SortArm AreAllSuckersHome).
     //Pure sensor read, no side effects; returns true under SOFT_SIMULATE (dev build, no IO card).
     bool IsZUpAtPosition();            //canonical TrayArm X-move interlock (Z lift up-sensor lit)
+    //AI(ht160s-trayarm-teach-test) 20260627 : Teach Advanced TrayArm test entry points. Pure
+    //motion dry-run (NO peer-module tray-tracking mutation), task-stepped by the caller like
+    //SortArm MoveSuckerToCell : caller inits Task=1 then calls each tick until it returns true.
+    //They reuse the SAME DoMoveToStationZSafe/DoLowerClampRaise primitives as production.
+    bool TestGrabFromChannel(int Channel, int &Task);   //grab a tray from Empty/Color/Loader
+    bool TestPlaceToChannel(int Channel, int &Task);    //place a tray to Auto1-6 / recycle Empty/Color
+    bool CanTestTrayArm(int Channel, bool bGrab, AnsiString &Err);  //parametric ready/anti-clash gate
 };
 //---------------------------------------------------------------------------
 extern TTrayArmModule *TrayArmModule;

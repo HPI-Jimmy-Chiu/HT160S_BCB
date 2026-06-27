@@ -173,6 +173,71 @@ bool TTrayArmModule::DoZDown()
     return (HSys.Cyn.C_TrayArmZ_Down.Push() || IsSoftSimulate());
 }
 //---------------------------------------------------------------------------
+bool TTrayArmModule::DoMoveToStationZSafe(int X, int &Task)
+{
+    //AI(ht160s-trayarm-teach-test) 20260627 : shared "move the head to a station, Z safe"
+    //primitive. Z-up (anti-collision) then X traverse to the station X. Task 1->10; returns
+    //true once the arm is at X with the Z lift confirmed UP. The Z-up interlock and soft-limit
+    //guard stay inside MoveTrayArmX. Caller enters at Task=1.
+    switch(Task)
+    {
+        case 1:
+            if(DoZUp())
+                Task=10;
+            break;
+
+        case 10:
+            if(MoveTrayArmX(X))
+                return true;
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TTrayArmModule::DoLowerClampRaise(bool bGrab, int &Task)
+{
+    //AI(ht160s-trayarm-teach-test) 20260627 : shared "lower, actuate clamps, raise" primitive -
+    //the physical grab/release choreography. Z-down, then push (grab) or pop (release) BOTH edge
+    //clamps with the same 3-tick settle as before, then Z-up. Task 1000->2000->2100->3000; returns
+    //true once raised. This is the ONE copy of the clamp choreography (DoPick/DoPlace/DoPlaceTo*
+    //and the Teach test all call it), so a change here propagates everywhere. Caller enters at 1000.
+    //CONTRACT : every caller's outer switch MUST group the case labels 1000/2000/2100/3000 onto this
+    //helper (and 1/10 onto DoMoveToStationZSafe). Renumbering these internal Task values without
+    //updating the callers' grouped labels would let a Task value escape the switch and silently hang.
+    switch(Task)
+    {
+        case 1000:
+            if(DoZDown())
+                Task=2000;
+            break;
+
+        case 2000:
+        {
+            bool bClamp = bGrab
+                ? (HSys.Cyn.C_TrayArm_FrontClamp.Push() && HSys.Cyn.C_TrayArm_RearClamp.Push())
+                : (HSys.Cyn.C_TrayArm_FrontClamp.Pop()  && HSys.Cyn.C_TrayArm_RearClamp.Pop());
+            if(bClamp || IsSoftSimulate())
+            {
+                ArmDelay.Set(3);
+                ArmDelay.On();
+                Task=2100;
+            }
+            break;
+        }
+
+        case 2100:
+            if(ArmDelay.Off())
+                Task=3000;
+            break;
+
+        case 3000:
+            if(DoZUp())
+                return true;
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
 int TTrayArmModule::GetAutoX(int Index)
 {
     switch(Index)
@@ -305,6 +370,9 @@ bool TTrayArmModule::DoPick(int Flag)
     //AI(HT160S-Maintainer) 20260605 : pick an empty tray from the EmptyTray rear.
     //Z-safe before X, then Z-down, clamp the tray (front+rear clamps hold the same
     //tray on its front/rear edges), Z-up, then hand off the EmptyTray rear slot.
+    //AI(ht160s-trayarm-teach-test) 20260627 : the physical grab motion is now the shared
+    //DoMoveToStationZSafe + DoLowerClampRaise primitives (same as DoPlace and the Teach test);
+    //only the rear-slot handoff (case 4000) stays here. Task progression is unchanged.
     if(Flag==0)
     {
         PickTask=1;
@@ -315,37 +383,16 @@ bool TTrayArmModule::DoPick(int Flag)
     switch(PickTask)
     {
         case 1:
-            if(DoZUp())
-                PickTask=10;
-            break;
-
         case 10:
-            if(MoveTrayArmX(GetPickSourceX()))
+            if(DoMoveToStationZSafe(GetPickSourceX(), PickTask))
                 PickTask=1000;
             break;
 
         case 1000:
-            if(DoZDown())
-                PickTask=2000;
-            break;
-
         case 2000:
-            if((HSys.Cyn.C_TrayArm_FrontClamp.Push() &&
-                HSys.Cyn.C_TrayArm_RearClamp.Push()) || IsSoftSimulate())
-            {
-                ArmDelay.Set(3);
-                ArmDelay.On();
-                PickTask=2100;
-            }
-            break;
-
         case 2100:
-            if(ArmDelay.Off())
-                PickTask=3000;
-            break;
-
         case 3000:
-            if(DoZUp())
+            if(DoLowerClampRaise(true, PickTask))
                 PickTask=4000;
             break;
 
@@ -408,40 +455,22 @@ bool TTrayArmModule::DoPlace(int Flag)
     if(PlaceDest==TAPLACE_EMPTY)
         return DoPlaceToEmpty(Flag);
 
+    //AI(ht160s-trayarm-teach-test) 20260627 : the physical release motion is now the shared
+    //DoMoveToStationZSafe + DoLowerClampRaise primitives (same as DoPick and the Teach test);
+    //only the Auto rear staging/notify (case 4000) stays here. Task progression is unchanged.
     switch(PlaceTask)
     {
         case 1:
-            if(DoZUp())
-                PlaceTask=10;
-            break;
-
         case 10:
-            if(MoveTrayArmX(GetAutoX(iAutoTarget)))
+            if(DoMoveToStationZSafe(GetAutoX(iAutoTarget), PlaceTask))
                 PlaceTask=1000;
             break;
 
         case 1000:
-            if(DoZDown())
-                PlaceTask=2000;
-            break;
-
         case 2000:
-            if((HSys.Cyn.C_TrayArm_FrontClamp.Pop() &&
-                HSys.Cyn.C_TrayArm_RearClamp.Pop()) || IsSoftSimulate())
-            {
-                ArmDelay.Set(3);
-                ArmDelay.On();
-                PlaceTask=2100;
-            }
-            break;
-
         case 2100:
-            if(ArmDelay.Off())
-                PlaceTask=3000;
-            break;
-
         case 3000:
-            if(DoZUp())
+            if(DoLowerClampRaise(false, PlaceTask))
                 PlaceTask=4000;
             break;
 
@@ -542,50 +571,33 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
         return true;
     }
 
+    //AI(ht160s-trayarm-teach-test) 20260627 : physical motion via the shared primitives. The
+    //rear-clear wait stays HERE (case 500, between the X traverse and Z-down) - same order as
+    //before - so the recycle handshake is unchanged; only the lower/release/raise choreography
+    //is shared. Internal Task values renumbered (500 wait, 4000 notify) but behavior identical.
     switch(PlaceTask)
     {
         case 1:
-            if(DoZUp())
-                PlaceTask=10;
+        case 10:
+            if(DoMoveToStationZSafe(Teach.TrayXArmToEmptyXPosition, PlaceTask))
+                PlaceTask=500;
             break;
 
-        case 10:
-            if(MoveTrayArmX(Teach.TrayXArmToEmptyXPosition))
+        case 500:
+            //Wait until EmptyTray has raised and cleared its rear before depositing.
+            if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
                 PlaceTask=1000;
             break;
 
         case 1000:
-            //Wait until EmptyTray has raised and cleared its rear before depositing.
-            if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
-                PlaceTask=2000;
-            break;
-
         case 2000:
-            if(DoZDown())
-                PlaceTask=3000;
-            break;
-
+        case 2100:
         case 3000:
-            if((HSys.Cyn.C_TrayArm_FrontClamp.Pop() &&
-                HSys.Cyn.C_TrayArm_RearClamp.Pop()) || IsSoftSimulate())
-            {
-                ArmDelay.Set(3);
-                ArmDelay.On();
-                PlaceTask=3100;
-            }
-            break;
-
-        case 3100:
-            if(ArmDelay.Off())
+            if(DoLowerClampRaise(false, PlaceTask))
                 PlaceTask=4000;
             break;
 
         case 4000:
-            if(DoZUp())
-                PlaceTask=5000;
-            break;
-
-        case 5000:
             //Tell EmptyTray the returned tray is now parked at its rear (this also marks
             //the rear as having a tray, so it re-enters the supply pool).
             if(EmptyModule!=NULL)
@@ -617,53 +629,35 @@ bool TTrayArmModule::DoPlaceToColor(int Flag)
         return true;
     }
 
+    //AI(ht160s-trayarm-teach-test) 20260627 : physical motion via the shared primitives (mirrors
+    //DoPlaceToEmpty). The rear-clear wait stays HERE (case 500) - same order as before; only the
+    //lower/release/raise choreography is shared. Internal Task values renumbered, behavior identical.
     switch(PlaceTask)
     {
         case 1:
-            if(DoZUp())
-                PlaceTask=10;
-            break;
-
         case 10:
             //AI(ht160s-tray-source) : reuse the Color pickup X as the return deposit X (same Color
             //station). On-machine confirm whether a distinct deposit X is needed (tray-on-tray
             //clash); a separate teach point belongs with the uOffset teach rework, not Phase 6.
-            if(MoveTrayArmX(Teach.TrayXArmToColorXPosition))
+            if(DoMoveToStationZSafe(Teach.TrayXArmToColorXPosition, PlaceTask))
+                PlaceTask=500;
+            break;
+
+        case 500:
+            //Wait until Color has raised and cleared its rear before depositing.
+            if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
                 PlaceTask=1000;
             break;
 
         case 1000:
-            //Wait until Color has raised and cleared its rear before depositing.
-            if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
-                PlaceTask=2000;
-            break;
-
         case 2000:
-            if(DoZDown())
-                PlaceTask=3000;
-            break;
-
+        case 2100:
         case 3000:
-            if((HSys.Cyn.C_TrayArm_FrontClamp.Pop() &&
-                HSys.Cyn.C_TrayArm_RearClamp.Pop()) || IsSoftSimulate())
-            {
-                ArmDelay.Set(3);
-                ArmDelay.On();
-                PlaceTask=3100;
-            }
-            break;
-
-        case 3100:
-            if(ArmDelay.Off())
+            if(DoLowerClampRaise(false, PlaceTask))
                 PlaceTask=4000;
             break;
 
         case 4000:
-            if(DoZUp())
-                PlaceTask=5000;
-            break;
-
-        case 5000:
             //Tell Color the returned identity tray is now parked at its rear (this also
             //marks the rear as having a tray, so it re-enters the supply pool).
             if(ColorModule!=NULL)
@@ -746,6 +740,154 @@ void TTrayArmModule::DoTrayArm(int &Task)
             }
             break;
     }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-trayarm-teach-test) 20260627 : Teach Advanced TrayArm test support below.
+//Flat channel index (eTrayArmChannel) -> per-station handoff X teach point. Grab sources are
+//Empty/Color/Loader; place targets are Auto1-6 plus recycle Empty/Color. Auto ids reuse the
+//existing GetAutoX(0..5) resolver so the six Auto teach points are addressed by index.
+int TTrayArmModule::GetChannelHandoffX(int Channel)
+{
+    switch(Channel)
+    {
+        case TACH_EMPTY:  return Teach.TrayXArmToEmptyXPosition;
+        case TACH_COLOR:  return Teach.TrayXArmToColorXPosition;
+        case TACH_LOADER: return Teach.TrayXArmToLoaderXPosition;
+        case TACH_AUTO1:
+        case TACH_AUTO2:
+        case TACH_AUTO3:
+        case TACH_AUTO4:
+        case TACH_AUTO5:
+        case TACH_AUTO6:
+            return GetAutoX(Channel-TACH_AUTO1);
+    }
+    return Teach.TrayXArmToEmptyXPosition;
+}
+//---------------------------------------------------------------------------
+AnsiString TTrayArmModule::GetChannelName(int Channel)
+{
+    switch(Channel)
+    {
+        case TACH_EMPTY:  return "Empty";
+        case TACH_COLOR:  return "Color";
+        case TACH_LOADER: return "Loader";
+        case TACH_AUTO1:  return "Auto1";
+        case TACH_AUTO2:  return "Auto2";
+        case TACH_AUTO3:  return "Auto3";
+        case TACH_AUTO4:  return "Auto4";
+        case TACH_AUTO5:  return "Auto5";
+        case TACH_AUTO6:  return "Auto6";
+    }
+    return "?";
+}
+//---------------------------------------------------------------------------
+bool TTrayArmModule::ChannelPlaceClear(int Channel)
+{
+    //AI(ht160s-trayarm-teach-test) 20260627 : anti-clash gate - the place destination rear must
+    //be clear before lowering/releasing onto it. Empty/Color expose IsRearHasTray(); Auto exposes
+    //a per-index IsRearHasTray(Index), so block the place test when the target rear already holds a
+    //tray (would otherwise Z-down and Pop the clamps onto the existing tray = tray-on-tray clash).
+    switch(Channel)
+    {
+        case TACH_EMPTY:  return (EmptyModule==NULL || EmptyModule->IsRearHasTray()==false);
+        case TACH_COLOR:  return (ColorModule==NULL || ColorModule->IsRearHasTray()==false);
+        case TACH_AUTO1:
+        case TACH_AUTO2:
+        case TACH_AUTO3:
+        case TACH_AUTO4:
+        case TACH_AUTO5:
+        case TACH_AUTO6:
+            return (AutoModule==NULL || AutoModule->IsRearHasTray(Channel-TACH_AUTO1)==false);
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TTrayArmModule::CanTestTrayArm(int Channel, bool bGrab, AnsiString &Err)
+{
+    //AI(ht160s-trayarm-teach-test) 20260627 : parametric gate for the Teach TrayArm test. The
+    //hard Z-up-before-X interlock is enforced inside MoveTrayArmX on every move; require it true
+    //up front too so the test refuses to start with the head lowered. Grab is allowed on an empty
+    //source (pure dry-run); place is blocked when the destination rear already holds a tray.
+    Err="";
+    if(Channel<0 || Channel>=TACH_COUNT)
+    {
+        Err="Invalid channel index";
+        return false;
+    }
+    bool bAuto=(Channel>=TACH_AUTO1 && Channel<=TACH_AUTO6);
+    if(bGrab && bAuto)
+    {
+        Err="Auto stations are place targets, not grab sources";
+        return false;
+    }
+    if(bGrab==false && Channel==TACH_LOADER)
+    {
+        Err="Loader is a grab source only (TrayArm never places into the Loader)";
+        return false;
+    }
+    if(IsZUpAtPosition()==false)
+    {
+        Err="TrayArm Z lift is not at the UP position (Z-up interlock)";
+        return false;
+    }
+    if(bGrab==false && ChannelPlaceClear(Channel)==false)
+    {
+        Err=GetChannelName(Channel)+" rear already holds a tray (clear it first)";
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TTrayArmModule::TestGrabFromChannel(int Channel, int &Task)
+{
+    //AI(ht160s-trayarm-teach-test) 20260627 : pure-motion grab dry-run. Move to the channel
+    //handoff X, lower, clamp, raise - the SAME primitives production DoPick uses. Deliberately
+    //does NOT call the source module's pick notify (NotifyTrayPicked / SetRearHasTray /
+    //NotifyTrayArmPickRearTray) or transfer the tray grid, so it never mutates tray-tracking
+    //state and can be run repeatedly. Caller inits Task=1.
+    switch(Task)
+    {
+        case 1:
+        case 10:
+            if(DoMoveToStationZSafe(GetChannelHandoffX(Channel), Task))
+                Task=1000;
+            break;
+
+        case 1000:
+        case 2000:
+        case 2100:
+        case 3000:
+            if(DoLowerClampRaise(true, Task))
+                return true;
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TTrayArmModule::TestPlaceToChannel(int Channel, int &Task)
+{
+    //AI(ht160s-trayarm-teach-test) 20260627 : pure-motion place dry-run. Move to the channel
+    //handoff X, lower, release, raise - the SAME primitives production DoPlace uses. Deliberately
+    //does NOT call the destination module's deliver notify (StageRearGrid / NotifyTrayArm-
+    //Delivered / SetRearHasTrayFromTrayArm / NotifyTrayXToEmptyFinish) or the recycle rear-clear
+    //handshake, so it never mutates tray-tracking state and can be run repeatedly. Caller inits Task=1.
+    switch(Task)
+    {
+        case 1:
+        case 10:
+            if(DoMoveToStationZSafe(GetChannelHandoffX(Channel), Task))
+                Task=1000;
+            break;
+
+        case 1000:
+        case 2000:
+        case 2100:
+        case 3000:
+            if(DoLowerClampRaise(false, Task))
+                return true;
+            break;
+    }
+    return false;
 }
 //---------------------------------------------------------------------------
 void InitializeTrayArmModule()
