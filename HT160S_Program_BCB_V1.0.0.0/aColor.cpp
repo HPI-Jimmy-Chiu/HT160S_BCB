@@ -35,7 +35,7 @@ void TColorModule::InitialFlag()
     iICCount=0;
     bInputHasTray=false;
     bInputFullTray=false;
-    bOutputHasTray=false;
+    bRearHasTray=false;
     bTrayReady=false;
     bTrayPicked=false;
     bSupplyRequested=false;
@@ -142,7 +142,7 @@ void TColorModule::RefreshStateFromSensors()
         bInputHasTray=false;
         bInputFullTray=false;
         bFrontHasTray=false;
-        bOutputHasTray=false;
+        bRearHasTray=false;
         bTrayReady=false;
         bTrayPicked=false;
         return;
@@ -186,16 +186,16 @@ void TColorModule::RefreshStateFromSensors()
     }
 
     if(bHasOutputSensor)
-        bOutputHasTray=bOutputState;
+        bRearHasTray=bOutputState;
     else if(IsSoftSimulate())
     {
         //AI(phase6-loader-recycle) 20260625 : while a receive (return) is in progress
-        //bOutputHasTray is the rear-handoff LATCH owned by the receive ladder (set by
+        //bRearHasTray is the rear-handoff LATCH owned by the receive ladder (set by
         //NotifyTrayXToEmptyFinish, cleared by DoGoUpTray). Do NOT clobber it from the
         //sim bTrayReady fallback here, or the latch is wiped and the TrayArm deposit /
         //DoGoUpTray handshake breaks (Empty avoids this by returning early in sim).
         if(bReturnTray==false && bTrayXToEmptyFinish==false)
-            bOutputHasTray=bTrayReady;
+            bRearHasTray=bTrayReady;
     }
 
     if(bHasInputSensor==false && IsSoftSimulate())
@@ -342,7 +342,7 @@ void TColorModule::DoColor(int &Task)
             //AI(phase6-loader-recycle) 20260625 : Color receive ladder (mirrors
             //TEmptyModule::DoEmpty case 3000). Hold here until the TrayArm has finished
             //depositing the returned tray onto Color's rear (NotifyTrayXToEmptyFinish
-            //sets bTrayXToEmptyFinish + bOutputHasTray). Then DoGoUpTray stacks it back
+            //sets bTrayXToEmptyFinish + bRearHasTray). Then DoGoUpTray stacks it back
             //onto the front car. On completion the returned identity tray re-enters the
             //supply pool (iSimInfeedCount++); a later DoFeedTray -> DoReadColor2D ->
             //StampReadIdentity2D reproduces Kind=Identity + TrayID (no new code).
@@ -495,8 +495,8 @@ bool TColorModule::DoGoDownTray(int Flag)
 //destacker mechanism). Cylinder names C_Empty_*->C_Color_*, MoveEmptyY->MoveColorY,
 //Empty rear/front teach Y -> Color rear (ColorTrayArmPickYPosition) / front
 //(ColorReceiveTrayYPosition; ColorRead2DYPosition is now the middle CCD scan Y). The
-//rear-occupied latch is bOutputHasTray (Color has no
-//bRearHasTray; the output/read position is Color's rear handoff slot). The Color rear
+//rear-occupied latch is bRearHasTray (renamed from bOutputHasTray to match Empty; the
+//output/read position is Color's rear handoff slot). The Color rear
 //riser C_Color_RearRiseTray is intentionally NOT pushed here: its use as a receive
 //stacking cylinder is mechanism-unconfirmed (plan section 0 item 2). The front
 //destacker port is the working core; RearRiseTray is left out for now.
@@ -571,7 +571,7 @@ bool TColorModule::DoGoUpTray(int Flag)
 
         case 1000:
             RefreshStateFromSensors();
-            if(bOutputHasTray)
+            if(bRearHasTray)
                 GoUpTask=2000;
             else
                 GoUpTask=9000;
@@ -611,7 +611,7 @@ bool TColorModule::DoGoUpTray(int Flag)
             if(HSys.Cyn.C_Color_LeanOnTray.Pop() || IsSoftSimulate())
             {
                 bFrontHasTray=true;
-                bOutputHasTray=false;
+                bRearHasTray=false;
                 GoUpTask=8000;
             }
             break;
@@ -688,15 +688,13 @@ bool TColorModule::DoFeedTray(int Flag)
 
         case 10:
             //AI(ht160s-color-align-empty) 20260627 : mirror TEmptyModule::DoFeedTray case 10.
-            //bOutputHasTray is Color's rear-occupied latch (Empty uses bRearHasTray). If a
+            //bRearHasTray is Color's rear-occupied latch (Empty uses bRearHasTray). If a
             //tray already sits at the rear/output (startup/recovery), read its 2D and present
             //it (cases 900/950) without re-destacking; do NOT touch the front staging latch.
             RefreshStateFromSensors();
-            if(bOutputHasTray)
+            if(bRearHasTray)
             {
-                DoReadColor2D(0);
-                FeedTask=900;
-                break;
+                return true;
             }
             FeedTask=1000;
             break;
@@ -796,20 +794,6 @@ bool TColorModule::DoFeedTray(int Flag)
                 FeedTask=13000;
             }
             break;
-
-        //AI(ht160s-color-align-empty) 20260627 : recovery tail for a tray already resident at
-        //the rear/output on entry (case 10). Read 2D, drive to the rear pickup Y, then fall
-        //into the shared clamp-release + confirm/present tail (5000/6000/7000).
-        case 900:
-            if(DoReadColor2D(1))
-                FeedTask=950;
-            break;
-
-        case 950:
-            if(MoveColorY(Teach.ColorTrayArmPickYPosition))
-                FeedTask=5000;
-            break;
-
         case 13000:
             return true;
     }
@@ -1009,7 +993,7 @@ bool TColorModule::DoReleaseTray(int Flag)
             {
                 bTrayReady=false;
                 bTrayPicked=false;
-                bOutputHasTray=false;
+                bRearHasTray=false;
                 if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : released/picked -> hide grid
                 return true;
             }
@@ -1069,12 +1053,6 @@ bool TColorModule::IsInputHasTray()
     return bInputHasTray;
 }
 //---------------------------------------------------------------------------
-bool TColorModule::IsOutputHasTray()
-{
-    RefreshStateFromSensors();
-    return bOutputHasTray;
-}
-//---------------------------------------------------------------------------
 bool TColorModule::IsAcceptingIC()
 {
     return false;
@@ -1094,7 +1072,7 @@ void TColorModule::NotifyTrayPicked()
     //DoReleaseTray pass (that branch + case 1500 are removed from DoColor).
     bTrayReady=false;
     bTrayPicked=false;
-    bOutputHasTray=false;
+    bRearHasTray=false;
     if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();
 }
 //---------------------------------------------------------------------------
@@ -1107,13 +1085,13 @@ void TColorModule::RequestReturnTray()
     bTrayXToEmptyFinish=false;
 }
 //---------------------------------------------------------------------------
-//AI(phase6-loader-recycle) 20260625 : Color has no bRearHasTray; its rear handoff slot
-//is the output/read position (bOutputHasTray). TrayArm waits IsRearHasTray()==false
+//AI(ht160s-color-align-empty) 20260627 : Color's rear-occupied latch is bRearHasTray (the
+//output/read position = Color's rear handoff slot). TrayArm waits IsRearHasTray()==false
 //before depositing, exactly as it waits on Empty's rear.
 bool TColorModule::IsRearHasTray()
 {
     RefreshStateFromSensors();
-    return bOutputHasTray;
+    return bRearHasTray;
 }
 //---------------------------------------------------------------------------
 //AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing the returned tray onto
@@ -1123,7 +1101,7 @@ bool TColorModule::IsRearHasTray()
 void TColorModule::NotifyTrayXToEmptyFinish()
 {
     bTrayXToEmptyFinish=true;
-    bOutputHasTray=true;
+    bRearHasTray=true;
 }
 //---------------------------------------------------------------------------
 void TColorModule::NotifyICPlaced(int Count)
@@ -1314,7 +1292,7 @@ AnsiString TColorModule::DescribeState()
        + "  Mode=" + AnsiString(IsTraySupplyMode() ? "TraySupply" : (IsSortBinMode() ? "SortBin" : "?")) + "\r\n";
     s += "  bInputHasTray=" + IntToStr(bInputHasTray ? 1 : 0)
        + "  bInputFullTray=" + IntToStr(bInputFullTray ? 1 : 0)
-       + "  bOutputHasTray=" + IntToStr(bOutputHasTray ? 1 : 0) + "\r\n";
+       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0) + "\r\n";
     s += "  FeedTask=" + IntToStr(FeedTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)
        + "  GoUpTask=" + IntToStr(GoUpTask)

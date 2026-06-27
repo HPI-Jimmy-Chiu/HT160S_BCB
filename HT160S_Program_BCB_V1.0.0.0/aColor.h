@@ -32,7 +32,7 @@ private:
     bool bInputHasTray;
     bool bInputFullTray;
     bool bFrontHasTray;       //AI(HT160S-Maintainer) 20260608 : one tray separated and staged at the front (post DoGoDownTray)
-    bool bOutputHasTray;
+    bool bRearHasTray;
     bool bTrayReady;
     bool bTrayPicked;
     bool bSupplyRequested;
@@ -83,7 +83,6 @@ public:
     bool IsSortBinMode();
     bool IsTrayReady();
     bool IsInputHasTray();
-    bool IsOutputHasTray();
     bool IsAcceptingIC();
     void RequestSupplyTray();
     void NotifyTrayPicked();
