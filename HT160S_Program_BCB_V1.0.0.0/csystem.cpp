@@ -14,6 +14,8 @@
 #include "aAuto1To6.h"
 #include "aLoader.h"
 #include "aSortArm.h"
+#include "aColor.h"   //AI(ht160s-actuator-timer) 20260627 : ColorModule->PauseTimeoutTimers (ScanDelay freeze on pause)
+#include "aEmpty.h"   //AI(ht160s-actuator-timer) 20260627 : EmptyModule->PauseTimeoutTimers (AmrFeedWaitTimer freeze)
 #include "cprod.h"
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
@@ -1227,6 +1229,21 @@ static void PauseActuatorTimeoutTimers()
 	for(r=0; r<MAX_SUCKER_ROW; r++)
 		for(c=0; c<MAX_SUCKER_COL; c++)
 			HSys.Suck.SortArmSuck.Suck[r][c].Delay.Pause();
+	//AI(ht160s-actuator-timer) 20260627 : extend the freeze to the feeder/sort modules'
+	//own wall-clock timeout windows (Color ScanDelay+AmrFeed, Loader CcdDelay x2+FeedWait x2, SortArm
+	//ResidueDelay[], Empty AmrFeed, Auto AmrFull[]) so a mid-op pause is not charged
+	//budget either; each module owns its timer list behind a public accessor (add
+	//future timeout timers there, not here). NULL-guarded like every csystem->module call.
+	if(ColorModule!=NULL)
+		ColorModule->PauseTimeoutTimers();
+	if(LoaderModule!=NULL)
+		LoaderModule->PauseTimeoutTimers();
+	if(SortArmModule!=NULL)
+		SortArmModule->PauseTimeoutTimers();
+	if(EmptyModule!=NULL)
+		EmptyModule->PauseTimeoutTimers();
+	if(AutoModule!=NULL)
+		AutoModule->PauseTimeoutTimers();
 }
 //---------------------------------------------------------------------------
 static void ReStartActuatorTimeoutTimers()
@@ -1237,6 +1254,16 @@ static void ReStartActuatorTimeoutTimers()
 	for(r=0; r<MAX_SUCKER_ROW; r++)
 		for(c=0; c<MAX_SUCKER_COL; c++)
 			HSys.Suck.SortArmSuck.Suck[r][c].Delay.ReStart();
+	if(ColorModule!=NULL)
+		ColorModule->ReStartTimeoutTimers();
+	if(LoaderModule!=NULL)
+		LoaderModule->ReStartTimeoutTimers();
+	if(SortArmModule!=NULL)
+		SortArmModule->ReStartTimeoutTimers();
+	if(EmptyModule!=NULL)
+		EmptyModule->ReStartTimeoutTimers();
+	if(AutoModule!=NULL)
+		AutoModule->ReStartTimeoutTimers();
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260602 : ported HT172 0420 ProcessMotion lifecycle in

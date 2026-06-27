@@ -119,6 +119,23 @@ bool TSortArmModule::PnpSettleElapsed()
     return PnpSettle.Off();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw the per-slot residue-check wall-clock
+//timers (ResidueDelay[]) so a machine pause taken during a place residue re-suck wait is
+//not charged against the settle budget -- no false residue verdict on resume. Called from
+//csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart pause/
+//resume edges, alongside Cylinder[]/SortArmSuck.
+void TSortArmModule::PauseTimeoutTimers()
+{
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        ResidueDelay[s].Pause();
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::ReStartTimeoutTimers()
+{
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        ResidueDelay[s].ReStart();
+}
+//---------------------------------------------------------------------------
 void TSortArmModule::InitialFlag(bool bKeepMaterial)
 {
     PickTask=1;

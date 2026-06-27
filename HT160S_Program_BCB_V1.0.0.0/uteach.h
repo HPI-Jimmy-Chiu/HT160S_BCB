@@ -248,6 +248,7 @@ __published:
     TLabel *lblAutoStatus;
     TComboBox *cbAutoArea;
     TButton *btnAutoGoUp;
+    TTabSheet *tsTrayArm;
 
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);

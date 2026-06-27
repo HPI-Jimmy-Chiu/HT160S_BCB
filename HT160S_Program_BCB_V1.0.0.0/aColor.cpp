@@ -58,6 +58,24 @@ void TColorModule::InitialFlag()
     TestDelay.Clear();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw this module's wall-clock timeout
+//windows (ScanDelay CCD shot + AmrFeedWaitTimer source-dry AMR wait MES1421) so a machine pause taken mid-scan is not
+//charged against the timeout budget -- no false scan-timeout on resume. Called from
+//csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
+//pause/resume edges, alongside Cylinder[]/SortArmSuck. Add future Color timeout
+//timers here; csystem needs no change.
+void TColorModule::PauseTimeoutTimers()
+{
+    ScanDelay.Pause();
+    AmrFeedWaitTimer.Pause();
+}
+//---------------------------------------------------------------------------
+void TColorModule::ReStartTimeoutTimers()
+{
+    ScanDelay.ReStart();
+    AmrFeedWaitTimer.ReStart();
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : AMR P3 (ColorTray) handoff interface, mirrors TAutoModule.
 void TColorModule::SetAmrLock(bool bLock)
 {

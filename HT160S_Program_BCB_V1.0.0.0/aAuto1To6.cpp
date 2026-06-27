@@ -51,6 +51,24 @@ TAutoModule::TAutoModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw the per-station AMR full/source wait
+//timers (AmrFullWaitTimer[] -> AbortAutoHandshake + operator full-car modal on expiry) so
+//a machine pause taken during the AMR wait is not charged against the wait budget -- no
+//premature handshake abort / alarm on resume. Freezing only DEFERS the expiry; it never
+//fabricates one, so coordinator state (locks/handshake) is untouched (AgvCoord keeps its
+//own free-running watchdog). Called from csystem Pause/ReStartActuatorTimeoutTimers.
+void TAutoModule::PauseTimeoutTimers()
+{
+    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+        AmrFullWaitTimer[Index].Pause();
+}
+//---------------------------------------------------------------------------
+void TAutoModule::ReStartTimeoutTimers()
+{
+    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+        AmrFullWaitTimer[Index].ReStart();
+}
+//---------------------------------------------------------------------------
 void TAutoModule::InitialFlag(bool bKeepMaterial)
 {
     TTrayMotor *TrayMotor=NULL;

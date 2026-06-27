@@ -55,6 +55,21 @@ bool TEmptyModule::IsSoftSimulate()
     #endif
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw this module's source-dry AMR wait
+//timer (AmrFeedWaitTimer -> MES1022 on expiry) so a machine pause taken during the AMR
+//refill wait is not charged against the wait budget -- no premature timeout alarm on
+//resume. Called from csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on
+//the SystemStart pause/resume edges, alongside Cylinder[]/SortArmSuck (mirrors Color).
+void TEmptyModule::PauseTimeoutTimers()
+{
+    AmrFeedWaitTimer.Pause();
+}
+//---------------------------------------------------------------------------
+void TEmptyModule::ReStartTimeoutTimers()
+{
+    AmrFeedWaitTimer.ReStart();
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : AMR P2 (EmptyTray) handoff interface, mirrors TAutoModule.
 void TEmptyModule::SetAmrLock(bool bLock)
 {
@@ -428,6 +443,20 @@ TMyTray TEmptyModule::GetSourceTray()
     return empty;
 }
 //---------------------------------------------------------------------------
+bool TEmptyModule::PushCylinder(TMyCylinder &Cyn)
+{
+    if(IsSoftSimulate())  return true;
+    if(Cyn.Enable==false) return true;
+    return Cyn.Push();
+}
+//---------------------------------------------------------------------------
+bool TEmptyModule::PopCylinder(TMyCylinder &Cyn)
+{
+    if(IsSoftSimulate())  return true;
+    if(Cyn.Enable==false) return true;
+    return Cyn.Pop();
+}
+//---------------------------------------------------------------------------
 bool TEmptyModule::DoGoDownTray(int Flag)
 {
     int Ret;
@@ -446,74 +475,83 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             break;
 
         case 10:
+            //AI(ht160s-color-align-empty) 20260627 : align to TColorModule::DoGoDownTray --
+            //skip the destack if a front tray is already staged (idempotent re-entry).
+            RefreshStateFromSensors();
+            if(bFrontHasTray)
+                return true;
             GoDownTask=100;
             break;
 
         case 100:
-            GoDownTask=1000;
+            //AI(ht160s-color-align-empty) 20260627 : dual destacker via PushCylinder/PopCylinder
+            //(sim + Enable aware, alarm-on-timeout), replacing the old .On()/.IsOn()||sim ladder
+            //that never timed out and hung in DUMMY. Same physical order as before.
+            if(PushCylinder(HSys.Cyn.C_Empty_FrontRiseTray_1))
+                GoDownTask=150;
             break;
 
-        case 1000:
-            HSys.Cyn.C_Empty_FrontRiseTray_1.On();
-            GoDownTask=2000;
+        case 150:
+            if(PushCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2))
+                GoDownTask=200;
             break;
 
-        case 2000:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+        case 200:
+            //PRESERVED: Empty<->Loader front-separate interlock (Color is not in this pair).
+            if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
+                break;   // interlock: wait while Loader front-separate is out
+            if(PushCylinder(HSys.Cyn.C_Empty_FrontSeparateTray_1))
             {
-                HSys.Cyn.C_Empty_FrontRiseTray_2.On();
-                GoDownTask=3000;
-            }
-            break;
-
-        case 3000:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
-            {
-                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
-                    break;   // interlock: wait while Loader front-separate is out
-                HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
                 GoDownDelay.Set(5);
                 GoDownDelay.On();
-                GoDownTask=4000;
+                GoDownTask=300;
             }
             break;
 
-        case 4000:
+        case 300:
             if(GoDownDelay.Off())
             {
-                HSys.Cyn.C_Empty_FrontRiseTray_2.Off();
+                PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2);
                 GoDownDelay.Set(5);
                 GoDownDelay.On();
-                GoDownTask=4100;
+                GoDownTask=350;
             }
             break;
 
-        case 4100:
+        case 350:
             if(GoDownDelay.Off())
-                GoDownTask=5000;
+                GoDownTask=400;
             break;
 
-        case 5000:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+        case 400:
+            if(PopCylinder(HSys.Cyn.C_Empty_FrontSeparateTray_1))
             {
-                HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
                 GoDownDelay.Set(5);
                 GoDownDelay.On();
-                GoDownTask=6000;
+                GoDownTask=450;
             }
             break;
 
-        case 6000:
+        case 450:
             if(GoDownDelay.Off())
-                GoDownTask=6500;
+                GoDownTask=500;
             break;
 
-        case 6500:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_1.Pop() || IsSoftSimulate())
-                GoDownTask=7000;
+        case 500:
+            if(PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_1))
+            {
+                GoDownDelay.Set(5);
+                GoDownDelay.On();
+                GoDownTask=600;
+            }
             break;
 
-        case 7000:
+        case 600:
+            if(GoDownDelay.Off())
+                GoDownTask=700;
+            break;
+
+        case 700:
             if(HSys.Sen.SnEmpty_InputHasTray.Enable==true &&
                HSys.Sen.SnEmpty_InputHasTray.IsOff() &&
                HSys.LastSet.iRealDummy!=DUMMY)

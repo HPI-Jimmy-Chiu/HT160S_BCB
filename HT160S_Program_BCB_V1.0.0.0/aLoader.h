@@ -109,6 +109,8 @@ private:
 public:
     TLoaderModule();
     void InitialFlag();
+    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze per-side CcdDelay timeout on machine pause
+    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
     void DoLoader(int LoaderNo, int &Task);
     AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only per-side inner-state dump (FeederDecision.txt)
     bool IsRearHasTray();

@@ -6,6 +6,8 @@
 #include "HTimer.h"
 #include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) : TMyTray FrontSourceTray holder; rear tray on MEmptyY
 //---------------------------------------------------------------------------
+class TMyCylinder;   //AI(ht160s-color-align-empty) : fwd-decl for PushCylinder/PopCylinder helpers (mirror aColor.h)
+//---------------------------------------------------------------------------
 class TEmptyModule
 {
 private:
@@ -35,6 +37,8 @@ private:
     void BirthFrontTray();    //AI(ht160s-tray-source) : born at DoGoDownTray front confirm (rule #1)
     void BirthRearTray();     //AI(ht160s-tray-source) : direct rear birth for REALLY-mode startup/recovery re-latch
     bool MoveEmptyY(int Position);
+    bool PushCylinder(TMyCylinder &Cyn);   //AI(ht160s-color-align-empty) : sim/Enable-aware cylinder push (mirror aColor; alarm-on-timeout via Push())
+    bool PopCylinder(TMyCylinder &Cyn);    //AI(ht160s-color-align-empty) : sim/Enable-aware cylinder pop
     bool DoFeedTray(int Flag);
     bool DoGoDownTray(int Flag);
     bool DoGoUpTray(int Flag);
@@ -42,6 +46,8 @@ private:
 public:
     TEmptyModule();
     void InitialFlag();
+    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze AmrFeedWaitTimer (source-dry AMR wait) on machine pause
+    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw it on resume (csystem actuator-timer enrollment)
     void DoEmpty(int &Task);
     AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state dump (FeederDecision.txt)
 

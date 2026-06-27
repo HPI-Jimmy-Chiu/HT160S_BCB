@@ -751,9 +751,9 @@ object fTeach: TfTeach
           Top = 0
           Width = 831
           Height = 739
-          ActivePage = tsChannel
+          ActivePage = tsTrayArm
           Align = alClient
-          TabIndex = 1
+          TabIndex = 2
           TabOrder = 0
           object tsSortArm: TTabSheet
             Caption = 'Sort Arm'
@@ -992,6 +992,10 @@ object fTeach: TfTeach
                 OnClick = btnAutoGoUpClick
               end
             end
+          end
+          object tsTrayArm: TTabSheet
+            Caption = 'Tray Arm'
+            ImageIndex = 2
           end
         end
       end

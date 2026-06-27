@@ -314,3 +314,4 @@ Zone	跋办
 apply	甅ノ
 guard	ň臔
 Loader Tray Count Mismatch	Loader 絃计ぃ才
+Loader Tray Lost On Carriage	更礚絃 (絃框ア┪稰代竟钵盽)

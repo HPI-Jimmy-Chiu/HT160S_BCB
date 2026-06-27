@@ -97,6 +97,8 @@ private:
 public:
     TAutoModule();
     void InitialFlag(bool bKeepMaterial=false);
+    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze AmrFullWaitTimer[] (AMR full/source wait) on machine pause
+    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
     void DoAuto(int &Task);
     int FindEmptyRearForTrayArm();
     bool IsRearHasTray(int Index);

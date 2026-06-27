@@ -74,6 +74,27 @@ void TLoaderModule::InitialFlag()
     TestDelay.Clear();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw the per-side wall-clock timeout
+//windows (CcdDelay Top-CCD scan timeout + FeedWaitTimer source-dry AMR wait MES0920) so a machine pause taken mid-scan is not
+//charged against the timeout budget -- no false CCD-timeout on resume. Called from
+//csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
+//pause/resume edges, alongside Cylinder[]/SortArmSuck.
+void TLoaderModule::PauseTimeoutTimers()
+{
+    Side[0].CcdDelay.Pause();
+    Side[1].CcdDelay.Pause();
+    Side[0].FeedWaitTimer.Pause();
+    Side[1].FeedWaitTimer.Pause();
+}
+//---------------------------------------------------------------------------
+void TLoaderModule::ReStartTimeoutTimers()
+{
+    Side[0].CcdDelay.ReStart();
+    Side[1].CcdDelay.ReStart();
+    Side[0].FeedWaitTimer.ReStart();
+    Side[1].FeedWaitTimer.ReStart();
+}
+//---------------------------------------------------------------------------
 void TLoaderModule::ResetSide(TLoaderSideState *State)
 {
     if(State==NULL)
@@ -1033,7 +1054,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             if(MoveLoaderY(LoaderNo, GetLoaderFeedY(LoaderNo)))
             {
                 if(IsSoftSimulate())
-                    State->FeedTask=4000;
+                    State->FeedTask=3500;   //AI(ht160s-loader) 20260627 : sim also source-dry gated (case 3500)
                 else
                     State->FeedTask=2000;
             }
@@ -1046,7 +1067,30 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
 
         case 3000:
             if(LeanCylinder->Pop())
-                State->FeedTask=4000;
+                State->FeedTask=3500;   //AI(ht160s-loader) 20260627 : source-dry pre-gate before destack
+            break;
+
+        case 3500:
+            //AI(ht160s-loader) 20260627 : source-dry pre-gate BEFORE the front destacker
+            //fires (item 2). Test the supply-car stock sensor SnLoader_Inputend here so a
+            //dry source never wastes a godown cycle. HT160 has no HT172/HT9045 SelectHasTray;
+            //the established source-dry truth source is SnLoader_Inputend (same sensor the
+            //AMR shortage / MES0921 path uses). On 'has stock' proceed to the destack (4000);
+            //on 'dry' route to case 9000 to REUSE the single existing tray-empty handling
+            //(MES0920 + AMR feed-wait deferral) - no duplicated alarm. Enable gate: a disabled
+            //sensor is treated as present/non-blocking; sim/DUMMY uses chkLoadTray, not the
+            //real sensor (same idiom as the case-9000 Inputend gate).
+            if(IsSoftSimulate()
+                   ? IsContinuousFeed()
+                   : (HSys.Sen.SnLoader_Inputend.Enable==false
+                      || HSys.Sen.SnLoader_Inputend.IsOn()))
+            {
+                State->FeedTask=4000;   //source has stock -> destack one tray
+            }
+            else
+            {
+                State->FeedTask=9000;   //source dry -> reuse case 9000 tray-empty handling
+            }
             break;
 
         case 4000:
@@ -1112,24 +1156,11 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             {
                 State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : tray present (incl. AMR refill arriving during the deferral wait) - clear the wait
                 State->FeedWaitTimer.Clear();
-                TrayMotor->fHasTray=true;
-                PrepareTrayMap(LoaderNo);
-                //AI(ht160s-tray-source) 20260625 : Phase 6 A.3 - tag this fed tray's
-                //kind on the carriage Tray grid (born here, mirrors Color BirthIdentityTray).
-                //Identity trays get a sim TrayID; real machine leaves it blank (no 2D read at
-                //feed, D2) and Color re-reads/re-births the 2D on reuse.
-                iFeedSerial++;
-                {
-                    eTrayKind kFed=GetFedTrayKind(iFeedSerial, iCarTrayTotal);
-                    TrayMotor->Tray.SetKind(kFed);
-                    if(kFed==eTrayKindIdentity)
-                        TrayMotor->Tray.TrayID = IsSoftSimulate()
-                            ? (AnsiString("LOAD2D_")+Now().FormatString("hhnnsszzz"))
-                            : AnsiString("");
-                    else
-                        TrayMotor->Tray.TrayID = "";
-                }
-                State->FeedTask=10000;
+                //AI(ht160s-loader) 20260627 : tray reached the destacker (Inputend + push
+                //sensor). Confirm it actually landed on the LoaderY carriage in case 9500
+                //BEFORE minting the tray identity (HT172/HT9045 confirm-then-mint order) so a
+                //lost tray (SnLoader_InputHasTray OFF) leaves no phantom fHasTray / serial.
+                State->FeedTask=9500;
             }
             else
             {
@@ -1174,6 +1205,50 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     State->FeedTask=10000;
                 }
             }
+            break;
+
+        case 9500:
+            //AI(ht160s-loader) 20260627 : post-godown carriage confirm - first use of the
+            //previously-dead SnLoader_InputHasTray (item 3). Mirrors HT9045 DoLoadNewICTray
+            //case 400 (SnLoaderCarHasTray confirm after destack; JAM0913 K_RETRY|K_SKIP on the
+            //tray-to-carriage timeout) and HT172 Empty1 case 420. RealDummy tiers + Enable
+            //gate: sim/DUMMY and a disabled point pass through (never block the feed - same
+            //idiom as the case-9000 Inputend gate); only REAL/HAS_TRAY with Enable==true &&
+            //IsOff() raises the alarm. Tray identity is minted HERE (confirm-then-mint) so
+            //SKIP/RETRY need no rollback.
+            if(IsSoftSimulate()
+               || HSys.Sen.SnLoader_InputHasTray.Enable==false
+               || HSys.Sen.SnLoader_InputHasTray.IsOn())
+            {
+                TrayMotor->fHasTray=true;
+                PrepareTrayMap(LoaderNo);
+                //tag this fed tray's kind on the carriage Tray grid (born here, mirrors Color
+                //BirthIdentityTray). Identity trays get a sim TrayID; real machine leaves it
+                //blank (no 2D read at feed, D2) and Color re-reads/re-births the 2D on reuse.
+                iFeedSerial++;
+                {
+                    eTrayKind kFed=GetFedTrayKind(iFeedSerial, iCarTrayTotal);
+                    TrayMotor->Tray.SetKind(kFed);
+                    if(kFed==eTrayKindIdentity)
+                        TrayMotor->Tray.TrayID = IsSoftSimulate()
+                            ? (AnsiString("LOAD2D_")+Now().FormatString("hhnnsszzz"))
+                            : AnsiString("");
+                    else
+                        TrayMotor->Tray.TrayID = "";
+                }
+                State->FeedTask=10000;
+                break;
+            }
+            //SnLoader_InputHasTray OFF (Enable==true, not sim/dummy) after the godown => the
+            //destacked tray did not land on the carriage : tray lost or sensor fault. JAM0913
+            //mirrors HT9045 (carriage has-tray timeout). SKIP finishes this feed with no tray
+            //(nothing was minted); RETRY re-runs the whole feed (case 10 fHasTray short-circuit
+            //stays false because the mint never ran).
+            Ret=ShowMyError("JAM0913", LangT("Loader Tray Lost On Carriage"), K_SKIP|K_RETRY);
+            if(Ret==K_SKIP)
+                State->FeedTask=10000;
+            if(Ret==K_RETRY)
+                State->FeedTask=1;
             break;
 
         case 10000:

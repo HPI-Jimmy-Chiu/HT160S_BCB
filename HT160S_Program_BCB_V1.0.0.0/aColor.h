@@ -71,6 +71,8 @@ private:
 public:
     TColorModule();
     void InitialFlag();
+    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze ScanDelay timeout window on machine pause
+    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw it on resume (csystem actuator-timer enrollment)
     void DoColor(int &Task);
     AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state + latch dump (FeederDecision.txt)
 

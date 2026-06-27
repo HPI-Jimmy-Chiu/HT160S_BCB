@@ -120,6 +120,8 @@ private:
 public:
     TSortArmModule();
     void InitialFlag(bool bKeepMaterial=false);
+    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze ResidueDelay[] timers on machine pause
+    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
     void ApplyPnPDefaults();   //AI(ht160s-pnp) 20260626 : seed PnP scalar defaults (ctor only; recipe values survive re-home)
     void SetPnPParameters(double PickDelaySec, double PlaceDelaySec, double DestroyCheckSec);   //AI(ht160s-pnp) 20260626 : push recipe [PnP] values into the runtime model
     int  GetDestroyCheckMS();   //AI(ht160s-pnp) 20260626 : dDestroyCheckTime as ms for the blow dwell (floor 300 on <=0)
