@@ -174,7 +174,7 @@ void TfTeach::ConfigureTeachGrid(TStringGrid *Grid)
     // widths must be applied in code (a TStringGrid does not stream cell content).
     Grid->Options=Grid->Options << goRowSelect << goColSizing;
     Grid->Cells[0][0]=LangT("Teach Position");
-    Grid->Cells[1][0]="Motor";
+    Grid->Cells[1][0]=LangT("Motor");
     Grid->Cells[2][0]=LangT("Teach(mm)");
     Grid->Cells[3][0]=LangT("Now(mm)");
     Grid->Cells[4][0]=LangT("Soft Limit(mm)");
@@ -246,6 +246,7 @@ void __fastcall TfTeach::InitialTeachParameter()
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DXPosition", HSys.Mot.MTopCCDX_Color, &TeachBase.ColorRead2DXPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorRead2DYPosition", HSys.Mot.MColorY, &TeachBase.ColorRead2DYPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorTrayArmPickYPosition", HSys.Mot.MColorY, &TeachBase.ColorTrayArmPickYPosition);
+    AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "ColorReceiveTrayYPosition", HSys.Mot.MColorY, &TeachBase.ColorReceiveTrayYPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto1XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto1XPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto2XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto2XPosition);
     AddTeachItem(grdEmptyTray, "TeachEmptyAndTrayX", "TrayXArmToAuto3XPosition", HSys.Mot.MTrayArmX, &TeachBase.TrayXArmToAuto3XPosition);

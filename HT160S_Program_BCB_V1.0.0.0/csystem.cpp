@@ -650,14 +650,19 @@ void ScanSystemSenser()
 			HSys.Sys.SystemStart=false;
 			fAllMotorHome=false;
 		}
-		else if(IonFan>0 && HSys.LastSet.iRealDummy==REALLY)
+		//AI(home-realign) 20260626 : suppress ion-fan + air while the HOME monitor is shown,
+		//same rationale as the motor-power rungs (618/671) and HT172's fShow guard (HT172
+		//applies fShow only to motor-power). HT160 gates the home engine on SystemStart, so a
+		//false ion/air drop here freezes ProcessMotorHome. EMG/Safe-Door stay UNGUARDED (real
+		//fault must stop). Interim shim until Step-6 iHome decoupling (docs/plan/home-realign-rootcause-and-fix-plan.md).
+		else if(IonFan>0 && HSys.LastSet.iRealDummy==REALLY && (fHome==NULL || fHome->IsShown()==false))
 		{
 			HSys.DecStopAllMotor();
 			RecordProcess("MACHINE PAUSE by ion-fan-alarm");
 			ShowSystemError(AnsiString("Ion Fan Alarm"), K_RETRY);
 			HSys.Sys.SystemStart=false;
 		}
-		else if(IsAirCheck())
+		else if(IsAirCheck() && (fHome==NULL || fHome->IsShown()==false))
 		{
 			HSys.DecStopAllMotor();
 			RecordProcess("MACHINE PAUSE by air-pressure-low");
@@ -865,7 +870,7 @@ void DoSystem()
 	DoSystemMessage();
 	if(HSys.Sys.SystemStart==false)
 		CheckMotorPowerShutDown();
-	if(CountMotorPowerDelay()==false)
+	if(CountMotorPowerDelay()==false && (fHome==NULL || fHome->IsShown()==false))
 		HSys.Sys.SystemStart=false;
 	DoSystemMessage();
 	RecordSafeDoorStates();
@@ -1155,8 +1160,18 @@ void MachineHomeAbort(eMachineTrigger trig)
 //Timer1Timer run on the VCL main thread, so shared flags are touched cooperatively.
 static void ProcessHomeLifecycle()
 {
+	//AI(home-realign) 20260626 : transient-drop debounce. A single-cycle SystemStart drop
+	//is a now-suppressed settle/interlock transient (see the fHome->IsShown() guards on the
+	//ion/air rungs in ScanSystemSenser and the motor-power-settle drop in DoSystem), NOT an
+	//operator abort. Require the drop to persist >=2 consecutive home cycles before tearing
+	//the monitor down so a one-cycle transient never closes HOME. A real operator Pause
+	//closes fHome directly (uHome ScanKey -> Abort); a real persistent fault still aborts.
+	static int iAbortDebounce=0;
 	if(fHome==NULL || fHome->IsShown()==false)
+	{
+		iAbortDebounce=0;
 		return;
+	}
 
 	//ORDER IS LOAD-BEARING : check normal completion BEFORE the SystemStart-drop
 	//abort. On a HOME-button home the post-home SoftStop drives SystemStart=false,
@@ -1165,6 +1180,7 @@ static void ProcessHomeLifecycle()
 	//mis-aborted. Do NOT swap these two blocks.
 	if(fAllMotorHome)
 	{
+		iAbortDebounce=0;
 		fHome->RequestCloseFinished();
 		return;
 	}
@@ -1175,8 +1191,16 @@ static void ProcessHomeLifecycle()
 	//the single command layer, then ask the View to close.
 	if(fHome->SeenStart() && HSys.Sys.SystemStart==false && bHomePowerCycling==false)
 	{
-		MachineHomeAbort(trigHomeStop);
-		fHome->RequestClose();
+		if(++iAbortDebounce>=2)
+		{
+			iAbortDebounce=0;
+			MachineHomeAbort(trigHomeStop);
+			fHome->RequestClose();
+		}
+	}
+	else
+	{
+		iAbortDebounce=0;
 	}
 }
 //---------------------------------------------------------------------------

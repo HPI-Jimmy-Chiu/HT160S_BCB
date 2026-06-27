@@ -33,6 +33,8 @@ struct TLoaderSideState
     bool bCleanOutFinish;   //AI(HT160S-Maintainer) 20260605 : this side drained in CleanOut
     HTimer FeedDelay;
     HTimer CcdDelay;
+    bool bWaitingAmrFeed;     //AI(ht160s-agv) 20260626 : AMR feed deferral latch (per-side; HT9046 func-static illegal here, 2 sides share DoFeedTray)
+    HTimer FeedWaitTimer;     //AI(ht160s-agv) 20260626 : AMR feed deferral countdown (wait for AMR refill before MES0920)
 };
 //---------------------------------------------------------------------------
 class TLoaderModule
@@ -50,6 +52,8 @@ private:
     AnsiString CurrentLotNumber;
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
+    int iSecsCarTrayCount;    //AI(ht160s-agv) 20260627 : host-declared physical magazine total (SECS LoaderTrayCount = IC + cover + identity); 0 = host silent
+    int iCarTrayTotal;        //AI(ht160s-agv) 20260627 : fixed total for the current car (SECS count when AMR+nonzero, else iSimAmrMaxTray); drives kind tagging + count-vs-Inputend cross-check
     //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray hold (transfer-chain relay).
     //Kind is tagged on the carriage Tray grid at feed time; at discharge it is
     //transferred into this module-level hold before ClearTray releases the carriage.
@@ -131,6 +135,7 @@ public:
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
     void RefillSimInfeed();
+    void SetExpectedCarTrayCount(int n);   //AI(ht160s-agv) 20260627 : coordinator latches the SECS LoaderTrayCount on car arrival (before RefillSimInfeed)
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the shared supply car (PanelMain6 Motion View header)
     bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
 

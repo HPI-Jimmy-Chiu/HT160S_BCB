@@ -456,7 +456,7 @@ void __fastcall TfMaintenance::RefreshTopCcdStatus()
     else
     {
         if(lblTopCcdStatusConn!=NULL)
-            lblTopCcdStatusConn->Caption="Connected: -";
+            lblTopCcdStatusConn->Caption=LangT("Connected: -");
         if(lblTopCcdStatusError!=NULL)
             lblTopCcdStatusError->Caption=LangT("Last Error: not started");
     }
@@ -630,7 +630,7 @@ void __fastcall TfMaintenance::RefreshColorCcdStatus()
     else
     {
         if(lblColorCcdStatusConn!=NULL)
-            lblColorCcdStatusConn->Caption="Connected: -";
+            lblColorCcdStatusConn->Caption=LangT("Connected: -");
         if(lblColorCcdStatusError!=NULL)
             lblColorCcdStatusError->Caption=LangT("Last Error: not started");
     }
@@ -1158,7 +1158,7 @@ void __fastcall TfMaintenance::ApplyHardwareEditLock()
         if(bEnable)
             pnlHardwareHeader->Caption=LangT("Hardware install setup");
         else
-            pnlHardwareHeader->Caption="Hardware install setup (locked - lot running, end lot to edit)";
+            pnlHardwareHeader->Caption=LangT("Hardware install setup (locked - lot running, end lot to edit)");
     }
 }
 //---------------------------------------------------------------------------
@@ -1906,9 +1906,9 @@ void __fastcall TfMaintenance::edLoaderSafeDistanceClick(TObject *Sender)
     (void)Sender;
     if(edLoaderSafeDistance==NULL || fQwertyKey==NULL)
         return;
-    if(fQwertyKey->ShowQwertyKey(edLoaderSafeDistance, N_DOUBLE, 2, true, 325.0, 650.0, "Loader Safe Distance (mm)")==false)
+    if(fQwertyKey->ShowQwertyKey(edLoaderSafeDistance, N_DOUBLE, 2, true, 325.0, 650.0, LangT("Loader Safe Distance (mm)"))==false)
         return;
-    if(ShowMyMessageBox_YES_NO("Save Loader safe distance?")!=1)
+    if(ShowMyMessageBox_YES_NO(LangT("Save Loader safe distance?"))!=1)
     {
         S.sprintf("%.2f", (double)GeneralSetting.iLoaderYSafeDistance/100.0);
         edLoaderSafeDistance->Text=S;
@@ -1992,7 +1992,7 @@ void __fastcall TfMaintenance::BuildPasswordUI()
     btnPwAddUpdate=new TButton(this);
     btnPwAddUpdate->Parent=tsMaintPassword;
     btnPwAddUpdate->SetBounds(420, 240, 150, 40);
-    btnPwAddUpdate->Caption="Add / Update";
+    btnPwAddUpdate->Caption=LangT("Add / Update");
     btnPwAddUpdate->OnClick=PwAddUpdateClick;
 
     btnPwDelete=new TButton(this);
@@ -2032,9 +2032,9 @@ void __fastcall TfMaintenance::ShowPasswordPage()
     if(labPwHint!=NULL)
     {
         if(bCanEdit)
-            labPwHint->Caption="Accounts: ID / password / level 0-3. Stored in system\\login.txt.";
+            labPwHint->Caption=LangT("Accounts: ID / password / level 0-3. Stored in system\\login.txt.");
         else
-            labPwHint->Caption="View only. Engineer level (2) or above is required to edit.";
+            labPwHint->Caption=LangT("View only. Engineer level (2) or above is required to edit.");
     }
 }
 //---------------------------------------------------------------------------

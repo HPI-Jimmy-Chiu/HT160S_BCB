@@ -912,7 +912,7 @@ void Tfiosetview::SaveIoTableFromGrid()
         RefreshLegacyIOControls();
         RefreshLegacyIOMaps();
         if(BackupFile!=AnsiString(""))
-            ShowMyOKMessageNoStop(AnsiString("IO_Table.csv saved.\r\nBackup: ")+BackupFile);
+            ShowMyOKMessageNoStop(Format(LangT("IO_Table.csv saved.\r\nBackup: %s"),ARRAYOFCONST((BackupFile))));
         else
             ShowMyOKMessageNoStop(LangT("IO_Table.csv saved."));
     }
@@ -1483,7 +1483,7 @@ void Tfiosetview::SaveIOMap(bool InputSide)
         ForceDirectories(DirName);
     FileName=DirName+(InputSide?AnsiString("\\InputMap.csv"):AnsiString("\\OutputMap.csv"));
     SaveIOMapGrid(Grid, FileName);
-    ShowMyOKMessageNoStop(AnsiString("Saved ")+FileName);
+    ShowMyOKMessageNoStop(Format(LangT("Saved %s"),ARRAYOFCONST((FileName))));
 }
 //---------------------------------------------------------------------------
 bool Tfiosetview::ResolveLegacyLedState(AnsiString AliasName, bool *State)
@@ -2121,7 +2121,7 @@ void __fastcall Tfiosetview::btnModifyClick(TObject *Sender)
         return;
 
     Header=strngrdIoTable->Cells[iSelectCol][0];
-    Value=InputBox("Modify IO Table", Header, strngrdIoTable->Cells[iSelectCol][iSelectRow]);
+    Value=InputBox(LangT("Modify IO Table"), Header, strngrdIoTable->Cells[iSelectCol][iSelectRow]);
     strngrdIoTable->Cells[iSelectCol][iSelectRow]=Value;
 }
 //---------------------------------------------------------------------------
@@ -2192,7 +2192,7 @@ void __fastcall Tfiosetview::FormClose(TObject *Sender,
             ShowMyMessage(LangT("IO already change, will restore IO!!"));
             RestoreOutputData();
         }
-        else if(ShowMyMessageBox_YES_NO("IO already change, want to restore?")==TMyMessageBox::msgrtnYES)
+        else if(ShowMyMessageBox_YES_NO(LangT("IO already change, want to restore?"))==TMyMessageBox::msgrtnYES)
         {
             RestoreOutputData();
         }

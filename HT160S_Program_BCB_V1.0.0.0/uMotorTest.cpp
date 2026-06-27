@@ -482,7 +482,7 @@ void TfMotorTest::ConfigureOperateGrid()
     grdOperate->OnMouseDown=grdOperateMouseDown;
     grdOperate->Cells[eOperateColLoop][0]=LangT("Loop");
     grdOperate->Cells[eOperateColNo][0]=LangT("No");
-    grdOperate->Cells[eOperateColMotor][0]="Motor";
+    grdOperate->Cells[eOperateColMotor][0]=LangT("Motor");
     grdOperate->Cells[eOperateColCommand][0]=LangT("Command");
     grdOperate->Cells[eOperateColEncoder][0]=LangT("Encoder");
     grdOperate->Cells[eOperateColHome][0]=LangT("Home");

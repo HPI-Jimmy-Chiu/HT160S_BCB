@@ -84,6 +84,9 @@ public:
 	// Bin display COM port name (e.g. "COM5") and label hold time in seconds.
 	AnsiString sBinDispComPort;
 	int iBinDispDelaySec;
+	int iAmrFeedWaitSec;   //AI(ht160s-agv) 20260626 : seconds to wait for AMR magazine refill before Loader-empty alarm (HT9046 600s)
+	int iAmrFullWaitSec;   //AI(ht160s-agv) seconds to wait for AMR to take a full output car before the Auto-full operator alarm
+	int iAmrHandshakeWaitSec;   //AI(ht160s-agv) coordinator PREP/READY watchdog aging limit (seconds) before releasing the AMR lock
 	// Machine identity (status-bar panels 1-3). Persisted in General.ini
 	// [MachineIdentity]. sMachineModel defaults "HT160S". These are the HT160
 	// source of truth; UpdateMachineIdentity() copies them into the cmydef

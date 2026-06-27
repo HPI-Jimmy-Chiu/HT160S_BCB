@@ -32,7 +32,9 @@ TAgvCoordinator AgvCoord;
 // AMR lock forever (only HOME clears it) and freeze the feed loop. This is a
 // GENEROUS force-release dwell (ticks ~= seconds) so a real AGV in transit is
 // never aborted prematurely; it only catches a truly stuck handshake.
-#define AGV_HANDSHAKE_WATCHDOG_TICKS 240   // AI 20260625 : ~240s (~4 min) on the 1s tick (was 120; per request, longer than worst-case real AGV transit)
+// AI(ht160s-agv) 20260627 : the watchdog aging limit is now file-configurable via
+// GeneralSetting.iAmrHandshakeWaitSec ([AGV] AmrHandshakeWaitSec, default 240s,
+// clamped >=5 in GeneralSetting::Load). The old fixed #define was removed.
 
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : P1-P3 (Loader/Empty/Color) infeed handoff dispatch. Each
@@ -67,7 +69,16 @@ static void InfeedSetLock(int p, bool bLock)
 }
 static void InfeedRefill(int p)
 {
-    if(p==0 && LoaderModule!=NULL) LoaderModule->RefillSimInfeed();
+    if(p==0 && LoaderModule!=NULL)
+    {
+        //AI(ht160s-agv) 20260627 : latch the host-declared physical magazine total
+        //(SECS LoaderTrayCount = IC + cover + identity) that the preceding S2F41
+        //START_AGV captured into AgvCoord.TrayCount[0], so the Loader tags tray kind
+        //and runs the count-vs-Inputend cross-check against the REAL total. 0 = host
+        //silent -> the Loader falls back to iSimAmrMaxTray inside RefillSimInfeed.
+        LoaderModule->SetExpectedCarTrayCount(AgvCoord.TrayCount[0]);
+        LoaderModule->RefillSimInfeed();
+    }
     else if(p==1 && EmptyModule!=NULL) EmptyModule->RefillSimInfeed();
     else if(p==2 && ColorModule!=NULL) ColorModule->RefillSimInfeed();
 }
@@ -218,7 +229,10 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         }
 
         bool bFull = AutoModule->IsOutputCarFullForAmr(a);
-        if(bFull && Handshake[si]==AGV_IDLE)
+        // AI(ht160s-agv) 20260627 : do NOT re-CALL an Auto the operator is taking after a
+        // station-side full-wait timeout (AbortAutoHandshake set Handshake=AGV_IDLE);
+        // IsOperatorHolding is cleared by HOME/InitialFlag so re-CALL then resumes.
+        if(bFull && Handshake[si]==AGV_IDLE && AutoModule->IsOperatorHolding(a)==false)
         {
             AutoModule->SetAmrLock(a, true);
             SupplementBitmap = BuildBitmap(AgvStation[si].PIndex);
@@ -297,7 +311,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         // force-release the Auto lock so the feed loop is never latched forever.
         if((Handshake[si]==AGV_PREP || Handshake[si]==AGV_READY) && Handshake[si]==hsBefore)
         {
-            if(++ShortageDebounce[si] > AGV_HANDSHAKE_WATCHDOG_TICKS)
+            if(++ShortageDebounce[si] > GeneralSetting.iAmrHandshakeWaitSec)
             {
                 AutoModule->SetAmrLock(a, false);
                 Handshake[si]        = AGV_IDLE;
@@ -341,7 +355,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         // release the infeed lock so the WHOLE feed loop is never latched forever.
         if((Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY) && Handshake[p]==hsBefore)
         {
-            if(++ShortageDebounce[p] > AGV_HANDSHAKE_WATCHDOG_TICKS)
+            if(++ShortageDebounce[p] > GeneralSetting.iAmrHandshakeWaitSec)
             {
                 InfeedSetLock(p, false);
                 Handshake[p]        = AGV_IDLE;
@@ -371,6 +385,25 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
     else if(AgvStation[i].Kind!=ASK_AUTO && i < 3)
         InfeedSetLock(i, true);   //AI(ht160s-agv) 20260623 : P1-P3 freeze front destack for the handoff
     return true;
+}
+//---------------------------------------------------------------------------
+// AI(ht160s-agv) 20260627 : station-side timeout release for an Auto output car.
+// ServiceCarFull waited iAmrFullWaitSec for the AGV and timed out; the operator is
+// taking the full car manually. Drop THIS Auto's handshake (release the lock + reset
+// the handshake/aging state) so neither the watchdog (ServiceHandshake) nor the
+// re-CALL path (PollAndCall) touches it again until the next clean full edge -- the
+// re-CALL is additionally gated by IsOperatorHolding, cleared on HOME/InitialFlag.
+// Modeled on the link-down release in PollAndCall (SetAmrLock false + AGV_IDLE).
+void TAgvCoordinator::AbortAutoHandshake(int Index)
+{
+    if(Index < 0 || Index >= AGV_AUTO_COUNT)
+        return;
+    int si = Index + 3;
+    if(AutoModule!=NULL)
+        AutoModule->SetAmrLock(Index, false);
+    Handshake[si]        = AGV_IDLE;
+    ShortageLatch[si]    = 0;
+    ShortageDebounce[si] = 0;
 }
 //---------------------------------------------------------------------------
 // AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state. Used by

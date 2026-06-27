@@ -23,6 +23,10 @@ static const TColor ALARM_COLOR=clRed;
 static const TColor SELECT_COLOR=clRed;
 static const TColor COMMAND_NORMAL=(TColor)8404992;
 static const TColor COMMAND_SKIP=(TColor)8421440;
+//AI(ht160s-maintainer) 20260627 : Note recovery-lamp blink heartbeat (HT172 FlushFlag
+//analog). Toggled every Timer1 tick (250ms) while the modal Note is up; FlushLabel
+//blinks each OFFERED recovery key's panel LED on the ON phase, solid when SELECTED.
+static bool NoteBlinkPhase=false;
 //---------------------------------------------------------------------------
 static void EnsureNote()
 {
@@ -340,14 +344,11 @@ void __fastcall TfNote::FormShow(TObject *Sender)
             RecoveryButtons[Index]->Visible=((KeyCode & KeyComp[Index])!=0);
     }
 
-    //AI(ht160s-maintainer) 20260617 : light the front-panel recovery-button LEDs
-    //this prompt is offering, so the operator sees which keys are live (HT172
-    //note.cpp bLamp* port; DoPanelLamp pushes these onto SwFK*).
-    bLampSkip    =((KeyCode & K_SKIP)!=0);
-    bLampRetry   =((KeyCode & K_RETRY)!=0);
-    bLampTrayFeed=((KeyCode & K_TRAY_FEED)!=0);
-    bLampTrayEnd =((KeyCode & K_TRAY_END)!=0);
-    bLampCleanOut=((KeyCode & K_CLEAN_OUT)!=0);
+    //AI(ht160s-maintainer) 20260627 : do NOT set the recovery bLamp* here. While this
+    //Note is shown it is modal (ShowModal), so MainProc -> DoSystemMessage -> DoPanelLamp
+    //is suspended and a set-once here never reaches the Pad LEDs (that was the bug).
+    //FlushLabel(), pumped from Timer1Timer every 250ms tick, derives the lamps from the
+    //offered (Visible) / selected (Select[]) keys instead -- matches HT172 note.cpp.
     if((KeyCode & K_MANUAL_2D)!=0)
     {
         edtManual2D->Visible=true;
@@ -395,6 +396,16 @@ void __fastcall TfNote::Timer1Timer(TObject *Sender)
     ScanKey();
     if(fShow==false)
         return;
+
+    //AI(ht160s-maintainer) 20260627 : keep the front-panel recovery-key LEDs alive while
+    //this modal Note suspends MainProc (same reason as the FormShow PlayAlarmBuzzer kick).
+    //Toggle the blink heartbeat, recompute bLamp* from the offered/selected keys, then
+    //DoSystemMessage() pushes them to the Pad (it is the sole DoPanelLamp caller and also
+    //refreshes Start/Pause + tower light + buzzer). HT172 note.cpp Timer1 does the same
+    //(FlushLabel() then DoSystemMessage()).
+    NoteBlinkPhase=!NoteBlinkPhase;
+    FlushLabel();
+    DoSystemMessage();
 
     if(bOffBuzzer)
         CloseBuzzerOff();
@@ -537,6 +548,26 @@ void __fastcall TfNote::BtnOffBuzzerClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfNote::FlushLabel()
 {
+    //AI(ht160s-maintainer) 20260627 : HT172 note.cpp FlushLabel port (reduced to the 5
+    //recovery keys that have a physical SwFK* LED -- Home/Manual2D have no panel LED, so
+    //they are not listed, exactly as HT172 omits SwRKHome from DoPanelLamp). Index order
+    //matches FormShow KeyComp / UpdateButtonStatus Select[] {SKIP,RETRY,TRAY_FEED,TRAY_END,
+    //CLEAN_OUT}. A SELECTED key is solid; an OFFERED-but-not-selected (Visible) key blinks
+    //on the NoteBlinkPhase ON half. Pushed to the Pad by the DoSystemMessage()->DoPanelLamp()
+    //call that follows in Timer1Timer.
+    TPanel *Ptr[5]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut};
+    bool   *bPtr[5]={&bLampSkip, &bLampRetry, &bLampTrayFeed, &bLampTrayEnd, &bLampCleanOut};
+    int i;
+
+    for(i=0; i<5; i++)
+    {
+        if(Select[i])
+            *bPtr[i]=true;
+        else if(NoteBlinkPhase && Ptr[i]->Visible)
+            *bPtr[i]=true;
+        else
+            *bPtr[i]=false;
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::ScanKey()

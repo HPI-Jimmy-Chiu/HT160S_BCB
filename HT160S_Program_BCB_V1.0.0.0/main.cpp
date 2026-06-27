@@ -2201,7 +2201,7 @@ void __fastcall TfMain::SetupLotListGrid()
     sgLotList->ColWidths[1]=70;
     sgLotList->ColWidths[2]=70;
     sgLotList->ColWidths[3]=80;
-    sgLotList->Cells[0][0]="Lot No.";
+    sgLotList->Cells[0][0]=LangT("Lot No.");
     sgLotList->Cells[1][0]=LangT("Src");
     sgLotList->Cells[2][0]="2D";
     sgLotList->Cells[3][0]=LangT("Sorted");

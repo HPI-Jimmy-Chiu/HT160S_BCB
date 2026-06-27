@@ -11,6 +11,7 @@
 #include "mymessbox.h"
 #include "uteach.h"
 #include "SecsGem\uHGemEquipment.h"
+#include "SecsGem\uAgvStation.h"   //AI(ht160s-agv) 20260627 : AgvCoord.AbortAutoHandshake on Auto-full timeout
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
 #include "CosFunction.h"      //AI(ht160s-state-record-analysis) 20260616 : TrayForm recipe geometry for DescribeStation cell map
 #include "aSortArm.h"
@@ -74,6 +75,12 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : clear place-residue gate on home/init
         bCleanOutCheck[Index]=false;
         bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
+        //AI(ht160s-agv) 20260627 : reset the Auto-full AMR-wait safety net (before the
+        //bKeepMaterial early-out so a recoverable home also drops the wait/hold, otherwise
+        //re-CALL stays suppressed after HOME).
+        bWaitingAmrFull[Index]=false;
+        AmrFullWaitTimer[Index].Clear();
+        bOperatorHolding[Index]=false;
         //AI(HT160S-Maintainer) 20260612 : on a recoverable home keep the car stack + its
         //tray roles/2D identity so the Auto does not forget what it is holding. Only the
         //sensor-backed presence above and the cleanout transient flags are refreshed.
@@ -1014,6 +1021,16 @@ bool TAutoModule::IsAmrLocked(int Index)
     return bAmrLocked[Index];
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260627 : true after ServiceCarFull timed out waiting for the AGV and
+//  the operator is taking the full car. PollAndCall reads this to avoid re-CALLing the
+//  same Auto (re-CALL ping-pong). Cleared on HOME/InitialFlag.
+bool TAutoModule::IsOperatorHolding(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    return bOperatorHolding[Index];
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260615 : Ready (CEID273) condition. The Auto has stacked every tray
 //  into the car - no working tray, no rear tray (none in transit), nothing left to
 //  discharge. With the AMR lock on, TrayArm cannot feed it, so this state is stable.
@@ -1097,6 +1114,19 @@ AnsiString TAutoModule::DescribeStation(int Index)
        + "  AmrLocked="   + IntToStr(bAmrLocked[Index] ? 1 : 0)
        + "  WorkingKind=" + IntToStr(WorkingKind[Index]) + "\r\n";
 
+    //AI(ht160s-agv) 20260627 : Auto-full AMR safety-net dump (State Record gap analysis).
+    //Log the computed full verdict + raw InputFullTray sensor + the full-wait latch/hold
+    //so a hang at ServiceCarFull is diagnosable (full-but-stuck vs waiting vs operator-held).
+    {
+        TMySensor *FullSensor=GetInputFullTray(Index);
+        int iFullSn  = (FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn()) ? 1 : 0;
+        int iFullVer = IsOutputCarFullForAmr(Index) ? 1 : 0;
+        s += "  FullVerdict="  + IntToStr(iFullVer)
+           + "  InputFullSn="  + IntToStr(iFullSn)
+           + "  WaitingFull="  + IntToStr(bWaitingAmrFull[Index] ? 1 : 0)
+           + "  OperHolding="  + IntToStr(bOperatorHolding[Index] ? 1 : 0) + "\r\n";
+    }
+
     TTrayMotor *V=GetAutoVMotor(Index);
     if(V==NULL)
     {
@@ -1162,8 +1192,41 @@ void TAutoModule::ServiceCarFull()
         //(the CEID272/273/274 handshake clears it via ClearAmrCar) instead of popping the
         //operator full-car modal. While the host is disconnected this falls through to the
         //original modal + manual car change, so offline behavior is unchanged.
+        //AI(ht160s-agv) 20260627 : AGV handshake in flight. Defer the operator modal while
+        //the car is full AND the AMR lock is held; start the wait timer once. On expiry,
+        //abort THIS Auto's handshake (so PollAndCall does not re-CALL) and fall through to
+        //the existing held alarm below. Happy path (AGV takes the car before timeout) is
+        //unchanged: bFull/bLocked clears, we continue without ever raising the modal.
         if(HGem!=NULL && HGem->IsSelected())
-            continue;
+        {
+            bool bFull   = IsOutputCarFullForAmr(Index);
+            bool bLocked = IsAmrLocked(Index);
+            if(bFull && bLocked)
+            {
+                if(bWaitingAmrFull[Index]==false)
+                {
+                    AmrFullWaitTimer[Index].SetMS(GeneralSetting.iAmrFullWaitSec*1000);
+                    AmrFullWaitTimer[Index].On();
+                    bWaitingAmrFull[Index]=true;
+                    continue;
+                }
+                if(AmrFullWaitTimer[Index].Off()==false)
+                    continue;                       // still waiting for the AGV
+                // timed out : take this Auto out of the handshake, mark operator-holding,
+                // then fall through to the existing ShowMyError ladder below.
+                bWaitingAmrFull[Index]=false;
+                AmrFullWaitTimer[Index].Clear();
+                bOperatorHolding[Index]=true;
+                AgvCoord.AbortAutoHandshake(Index);   // releases lock + Handshake[si]=AGV_IDLE
+            }
+            else
+            {
+                // not (full & locked) : normal AGV path, no operator alarm needed.
+                bWaitingAmrFull[Index]=false;
+                AmrFullWaitTimer[Index].Clear();
+                continue;
+            }
+        }
 
         bool bLogicalFull=(Car[Index].iTrayCount>=MAX_TRAY_PER_CAR);
 

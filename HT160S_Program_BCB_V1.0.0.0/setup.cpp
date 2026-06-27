@@ -374,12 +374,12 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
 void __fastcall TfSetup::BuildPnPUI()
 {
     //AI(ht160s-pnp) 20260626 : one-time PnP tab wiring. Size the sucker-enable grid to the SortArm
-    //nozzle count (one column, N rows) and bind the grid-click + Use-Suck radio handlers in code so
+    //nozzle count (one row, N columns) and bind the grid-click + Use-Suck radio handlers in code so
     //the .dfm carries no event bindings.
     if(grdSuckEnable!=NULL)
     {
-        grdSuckEnable->XItem=1;
-        grdSuckEnable->YItem=SORT_ARM_SUCKER_COUNT;
+        grdSuckEnable->XItem=SORT_ARM_SUCKER_COUNT;
+        grdSuckEnable->YItem=1;
         grdSuckEnable->OnMouseUp=grdSuckEnableMouseUp;
     }
     if(rgPnpUseSuck!=NULL)
@@ -492,12 +492,12 @@ void __fastcall TfSetup::RefreshSuckGrid()
 
     if(grdSuckEnable==NULL)
         return;
-    grdSuckEnable->XItem=1;
-    grdSuckEnable->YItem=SORT_ARM_SUCKER_COUNT;
+    grdSuckEnable->XItem=SORT_ARM_SUCKER_COUNT;
+    grdSuckEnable->YItem=1;
     for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
     {
-        grdSuckEnable->SetCellNumber(0, s, s+1);
-        grdSuckEnable->SetCellColorIndex(0, s, GeneralSetting.bSuckerEnabled[s]?1:0);
+        grdSuckEnable->SetCellNumber(s, 0, s+1);
+        grdSuckEnable->SetCellColorIndex(s, 0, GeneralSetting.bSuckerEnabled[s]?1:0);
     }
 }
 //---------------------------------------------------------------------------
@@ -505,7 +505,7 @@ void __fastcall TfSetup::grdSuckEnableMouseUp(TObject *Sender,
       TMouseButton Button, TShiftState Shift, int X, int Y)
 {
     //AI(ht160s-pnp) 20260626 : map pixel (X,Y) to a nozzle cell via TTMyTray::ConvertIndexCells
-    //(returns 1 on hit, rewriting X/Y to cell indices). Grid is one column so the nozzle index is Y.
+    //(returns 1 on hit, rewriting X/Y to cell indices). Grid is one row so the nozzle index is X.
     //Toggle GeneralSetting.bSuckerEnabled[] and recolor; never disable the last enabled nozzle.
     int idx;
     int s;
@@ -522,7 +522,7 @@ void __fastcall TfSetup::grdSuckEnableMouseUp(TObject *Sender,
         return;
     if(grdSuckEnable->ConvertIndexCells(X, Y)!=1)
         return;
-    idx=Y;
+    idx=X;
     if(idx<0 || idx>=SORT_ARM_SUCKER_COUNT)
         return;
     if(GeneralSetting.bSuckerEnabled[idx])
@@ -537,12 +537,12 @@ void __fastcall TfSetup::grdSuckEnableMouseUp(TObject *Sender,
             return;
         }
         GeneralSetting.bSuckerEnabled[idx]=false;
-        grdSuckEnable->SetCellColorIndex(0, idx, 0);
+        grdSuckEnable->SetCellColorIndex(idx, 0, 0);
     }
     else
     {
         GeneralSetting.bSuckerEnabled[idx]=true;
-        grdSuckEnable->SetCellColorIndex(0, idx, 1);
+        grdSuckEnable->SetCellColorIndex(idx, 0, 1);
     }
 }
 //---------------------------------------------------------------------------

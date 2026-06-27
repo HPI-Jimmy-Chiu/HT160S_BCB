@@ -24,6 +24,8 @@ TEmptyModule::TEmptyModule()
 void TEmptyModule::InitialFlag()
 {
     bAmrLocked=false;
+    bWaitingAmrFeed=false;       //AI(ht160s-agv) Empty source-dry AMR wait latch
+    AmrFeedWaitTimer.Clear();   //AI(ht160s-agv) Empty source-dry AMR wait timer
     RefillSimInfeed();
     FeedTask=1;
     FeedClampSub=0;
@@ -214,6 +216,45 @@ void TEmptyModule::DoEmpty(int &Task)
                 DoGoDownTray(0);
                 Task=1000;
                 break;
+            }
+
+            //AI(ht160s-agv) source-dry : the supply magazine ran out (SnEmpty_InputEnd
+            //OFF). In AMR mode wait iAmrFeedWaitSec for the AGV to refill before alarming;
+            //the AGV refill is detected on a later cycle (IsInputHandoffFinishedForAmr).
+            //Anchored on IsInputShortageForAmr (NOT bFrontHasTray) per the InputEnd rule.
+            if(IsInputShortageForAmr())
+            {
+                if(GeneralSetting.bUseAMR)
+                {
+                    if(bWaitingAmrFeed==false)
+                    {
+                        AmrFeedWaitTimer.SetMS(GeneralSetting.iAmrFeedWaitSec*1000);
+                        AmrFeedWaitTimer.On();
+                        bWaitingAmrFeed=true;
+                        break;
+                    }
+                    if(AmrFeedWaitTimer.Off()==false)
+                        break;   //AI(ht160s-agv) still waiting for the AGV to refill
+                    bWaitingAmrFeed=false;
+                    AmrFeedWaitTimer.Clear();
+                }
+                //AI(ht160s-agv) decision (b) : NEW machine-local code MES1022 (NOT a reuse
+                //of MES1021). Distinct from Empty MES1021 (rear bottom-miss) and MES1024
+                //(front miss) so operator + cloud/host can tell source-dry apart.
+                //Registered in system/AlarmList.csv + language_phrases.txt (EN+ZH).
+                {
+                    int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), K_RETRY|K_CLEAN_OUT);
+                    if(Ret==K_RETRY)
+                        Task=1;   //AI(ht160s-agv) re-enter case 100; if AGV refilled, shortage clears
+                    //K_CLEAN_OUT : RunMode flips to Run_CleanOut elsewhere; DoEmpty top guards it.
+                }
+                break;
+            }
+            //AI(ht160s-agv) refill arrived (or sim) : drop the latch so the next dry edge re-arms.
+            if(bWaitingAmrFeed && IsInputShortageForAmr()==false)
+            {
+                bWaitingAmrFeed=false;
+                AmrFeedWaitTimer.Clear();
             }
 
             if(bRearHasTray==false && bLotFinish==false)
@@ -824,6 +865,9 @@ AnsiString TEmptyModule::DescribeState()
        + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)
        //AI(ht160s-state-record-analysis) 20260625 : AMR lock freezes DoEmpty case100 (no rear-tray feed) -> tray-supply-starve deadlock
        + "  bAmrLocked=" + IntToStr(bAmrLocked ? 1 : 0)
+       //AI(ht160s-agv) source-dry AMR wait : latch armed + whether the wait timer expired
+       + "  bWaitingAmrFeed=" + IntToStr(bWaitingAmrFeed ? 1 : 0)
+       + "  AmrFeedWaitExpired=" + IntToStr(AmrFeedWaitTimer.Off() ? 1 : 0)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
     s += "  FeedTask=" + IntToStr(FeedTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)

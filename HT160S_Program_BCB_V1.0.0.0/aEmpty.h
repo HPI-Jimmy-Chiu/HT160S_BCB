@@ -24,6 +24,8 @@ private:
     TMyTray FrontSourceTray;  //AI(ht160s-tray-source) : FRONT staging holder only (rule #1); REAR tray lives on HSys.Mot.MEmptyY->Tray (parity with Loader, drives MotionView)
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR P2 handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per GoDown)
+    bool bWaitingAmrFeed;     //AI(ht160s-agv) Empty source-dry AMR wait latch
+    HTimer AmrFeedWaitTimer;  //AI(ht160s-agv) Empty source-dry AMR wait timer
     HTimer FeedDelay;
     HTimer GoDownDelay;
     HTimer GoUpDelay;

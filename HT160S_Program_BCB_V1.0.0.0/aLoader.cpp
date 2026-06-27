@@ -54,6 +54,7 @@ static const int LOADER_Y_OWNER_TRAYARM=2;
 void TLoaderModule::InitialFlag()
 {
     bAmrLocked=false;
+    iSecsCarTrayCount=0;     //AI(ht160s-agv) 20260627 : no host count yet; RefillSimInfeed falls back to iSimAmrMaxTray
     RefillSimInfeed();
     ResetSide(&Side[0]);
     ResetSide(&Side[1]);
@@ -89,6 +90,8 @@ void TLoaderModule::ResetSide(TLoaderSideState *State)
     State->bCleanOutFinish=false;
     State->FeedDelay.Clear();
     State->CcdDelay.Clear();
+    State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : clear AMR feed deferral on side reset
+    State->FeedWaitTimer.Clear();
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsValidLoaderNo(int LoaderNo)
@@ -378,8 +381,23 @@ bool TLoaderModule::IsInputHandoffFinishedForAmr()
 //full magazine). Real machine ignores the count (sensor-driven).
 void TLoaderModule::RefillSimInfeed()
 {
-    iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[0];
+    //AI(ht160s-agv) 20260627 : latch the FIXED magazine total for this car. When AMR is
+    //on and the host declared a LoaderTrayCount (SECS S2F41 -> SetExpectedCarTrayCount),
+    //that physical total (IC + cover + identity) is the source of truth for tray-kind
+    //tagging and the count-vs-Inputend cross-check; otherwise fall back to the sim max.
+    iCarTrayTotal = (GeneralSetting.bUseAMR && iSecsCarTrayCount>0)
+                    ? iSecsCarTrayCount
+                    : GeneralSetting.iSimAmrMaxTray[0];
+    iSimInfeedCount=iCarTrayTotal;
     iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - new car => restart feed serial
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260627 : the AGV coordinator calls this on car arrival (CEID274
+//Finish) with the host-declared LoaderTrayCount captured from the preceding S2F41.
+//Stored so the next RefillSimInfeed latches it as the fixed car total. 0 = host silent.
+void TLoaderModule::SetExpectedCarTrayCount(int n)
+{
+    iSecsCarTrayCount = (n>0) ? n : 0;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - D2 stack-position convention.
@@ -969,6 +987,8 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
     {
         State->FeedTask=1;
         State->FeedDelay.Clear();
+        State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : fresh feed attempt re-arms AMR deferral
+        State->FeedWaitTimer.Clear();
         return true;
     }
     if(OtherState->Status==LS_FEEDING ||
@@ -1053,14 +1073,45 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 9000:
+            //AI(ht160s-agv) 20260627 : AMR-on tray-count vs Inputend cross-check. iCarTrayTotal
+            //is the FIXED physical magazine total (SECS LoaderTrayCount = IC + cover + identity,
+            //latched at car arrival). Once iFeedSerial has consumed the whole total the count
+            //says the car is drained; if SnLoader_Inputend still reads a tray the count and the
+            //hardware disagree -> abnormal, raise MES0921 rather than feed a tray the count says
+            //is not there. count==0 + Inputend OFF is the NORMAL source-dry case, left to the
+            //deferral/MES0920 else-branch below. Disabled sensor never false-fires (Enable gate).
+            if(GeneralSetting.bUseAMR
+               && iCarTrayTotal>0
+               && (iCarTrayTotal - iFeedSerial)<=0
+               && HSys.Sen.SnLoader_Inputend.Enable==true
+               && HSys.Sen.SnLoader_Inputend.IsOn())
+            {
+                Ret=ShowMyError("MES0921", LangT("Loader Tray Count Mismatch"), K_RETRY|K_CLEAN_OUT);
+                if(Ret==K_RETRY)
+                    State->FeedTask=1;
+                if(Ret==K_CLEAN_OUT)
+                {
+                    HSys.Sys.RunMode=Run_CleanOut;
+                    HSys.Sys.bCleanOut=true;
+                    State->FeedTask=10000;
+                }
+                break;
+            }
             //AI(HT160S-Maintainer) 20260609 : in simulate/DUMMY the chkLoadTray
             //checkbox decides : checked = treat the tray as present (feed forever),
-            //unchecked = fall through to the "Loader Tray Empty" alarm. Real mode is
-            //unchanged : the push-cylinder On sensor still governs tray presence.
+            //unchecked = fall through to the "Loader Tray Empty" alarm.
+            //AI(ht160s-agv) 20260627 : real presence now ANDs the supply-car InputEnd
+            //(SnLoader_Inputend ON = car still has stock - the source-dry truth the AGV-call
+            //path already uses) with the push-cylinder On sensor (a tray actually reached the
+            //destacker - kept as the physical-arrival interlock, do NOT lower it). A disabled
+            //sensor is treated as present so an uninstalled point never blocks the feed.
             if(IsSoftSimulate()
                    ? IsContinuousFeed()
-                   : (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn()))
+                   : ((HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOn())
+                      && (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn())))
             {
+                State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : tray present (incl. AMR refill arriving during the deferral wait) - clear the wait
+                State->FeedWaitTimer.Clear();
                 TrayMotor->fHasTray=true;
                 PrepareTrayMap(LoaderNo);
                 //AI(ht160s-tray-source) 20260625 : Phase 6 A.3 - tag this fed tray's
@@ -1069,7 +1120,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 //feed, D2) and Color re-reads/re-births the 2D on reuse.
                 iFeedSerial++;
                 {
-                    eTrayKind kFed=GetFedTrayKind(iFeedSerial, GetCarTrayCount());
+                    eTrayKind kFed=GetFedTrayKind(iFeedSerial, iCarTrayTotal);
                     TrayMotor->Tray.SetKind(kFed);
                     if(kFed==eTrayKindIdentity)
                         TrayMotor->Tray.TrayID = IsSoftSimulate()
@@ -1082,7 +1133,30 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             }
             else
             {
-                Ret=ShowMyError("MES0920", "Loader Tray Empty", K_RETRY|K_TRAY_END|K_CLEAN_OUT);
+                //AI(ht160s-agv) 20260626 : AMR-aware feed deferral (port of HT9046
+                //asendic_Loader.cpp:1943 600s wait). When AMR feeds the magazine, do
+                //NOT alarm the operator the instant the push cylinder reads empty :
+                //give the called AGV time to refill, and only fall through to MES0920
+                //on timeout. State is per-side (HT9046's func-static is illegal here -
+                //both Loader sides share this body). Tray arrival is handled by the
+                //if-branch above on a later cycle (real push-cylinder sensor), which is
+                //the ONLY valid cancel : IsInputHandoffFinishedForAmr is sim-true and
+                //would defeat the wait. bUseAMR off keeps today's immediate alarm.
+                if(GeneralSetting.bUseAMR)
+                {
+                    if(State->bWaitingAmrFeed==false)
+                    {
+                        State->FeedWaitTimer.SetMS(GeneralSetting.iAmrFeedWaitSec*1000);
+                        State->FeedWaitTimer.On();
+                        State->bWaitingAmrFeed=true;
+                        break;
+                    }
+                    if(State->FeedWaitTimer.Off()==false)
+                        break;
+                    State->bWaitingAmrFeed=false;
+                    State->FeedWaitTimer.Clear();
+                }
+                Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), K_RETRY|K_TRAY_END|K_CLEAN_OUT);
                 if(Ret==K_RETRY)
                     State->FeedTask=1;
                 if(Ret==K_TRAY_END)
@@ -1219,7 +1293,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             }
             else
             {
-                Ret=ShowMyError("WAR0330", "Top CCD API not ready", K_SKIP|K_RETRY|K_TRAY_END);
+                Ret=ShowMyError("WAR0330", LangT("Top CCD API not ready"), K_SKIP|K_RETRY|K_TRAY_END);
                 if(Ret==K_RETRY)
                     State->CcdTask=3000;
                 if(Ret==K_SKIP)
@@ -1272,7 +1346,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     }
                     else
                     {
-                        Ret=ShowMyError("WAR0475", "2D code not found in any lot : "+sCode, K_RETRY|K_SKIP|K_MANUAL_2D);
+                        Ret=ShowMyError("WAR0475", LangT("2D code not found in any lot : ")+sCode, K_RETRY|K_SKIP|K_MANUAL_2D);
                         if(Ret==K_RETRY)
                         {
                             if(TopCcdSocket!=NULL)
@@ -1355,7 +1429,7 @@ void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
             State->CcdTask=1;
             return;
         }
-        int Ret2=ShowMyError("WAR0475", "2D code not found in any lot : "+code, K_RETRY|K_SKIP|K_MANUAL_2D);
+        int Ret2=ShowMyError("WAR0475", LangT("2D code not found in any lot : ")+code, K_RETRY|K_SKIP|K_MANUAL_2D);
         if(Ret2==K_RETRY)
         {
             if(TopCcdSocket!=NULL)
@@ -1455,7 +1529,7 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
                    HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true &&
                    HSys.Sen.SnLoader_OutputBottomHasTray.IsOn()==false)
                 {
-                    int ret=ShowMyError("Loader Tray has IC,please remove", K_RETRY|K_SKIP);
+                    int ret=ShowMyError(LangT("Loader Tray has IC,please remove"), K_RETRY|K_SKIP);
                     if(ret==K_RETRY)
                     {
                         break;
@@ -1673,7 +1747,10 @@ AnsiString TLoaderModule::DescribeState()
     //AI(ht160s-tray-source) 20260625 : Phase 6 A.6 - rear-tray hold + feed serial.
     s += "  RearKind=" + IntToStr((int)RearKind)
        + "  RearTrayID=" + RearTrayID
-       + "  iFeedSerial=" + IntToStr(iFeedSerial) + "\r\n";
+       + "  iFeedSerial=" + IntToStr(iFeedSerial)
+       + "  iCarTrayTotal=" + IntToStr(iCarTrayTotal)
+       + "  iSecsCarTrayCount=" + IntToStr(iSecsCarTrayCount)
+       + "  Remain=" + IntToStr(iCarTrayTotal - iFeedSerial) + "\r\n";
     for(int n=1; n<=2; n++)
     {
         TLoaderSideState *St = GetSide(n);

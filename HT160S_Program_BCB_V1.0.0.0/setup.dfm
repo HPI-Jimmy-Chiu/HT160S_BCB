@@ -14255,10 +14255,10 @@ object fSetup: TfSetup
           object grdSuckEnable: TTMyTray
             Left = 420
             Top = 88
-            Width = 110
-            Height = 360
-            XItem = 1
-            YItem = 4
+            Width = 440
+            Height = 110
+            XItem = 4
+            YItem = 1
           end
         end
       end

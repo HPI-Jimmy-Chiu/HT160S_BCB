@@ -2,6 +2,7 @@
 ; format:  English <TAB> Traditional-Chinese   ; read by LangT() ; \n=newline
 . 	。 
 2D Code	2D 碼
+2D code not found in any lot : 	2D 碼於任一 Lot 找不到：
 ?	？
 Abort: EMG	中止：緊急停止
 Abort: Suck Z not home	中止：吸取 Z 未復歸
@@ -14,7 +15,9 @@ Abort: system start	中止：系統啟動
 Account ID	帳號 ID
 Account saved in memory. Press 'Save to File' to keep it.	帳號已儲存於記憶體中。請按「Save to File」以保留。
 Account table is full (max 30).	帳號表已滿（最多 30）。
+Accounts: ID / password / level 0-3. Stored in system\login.txt.	帳號：ID / 密碼 / 層級 0-3。儲存於 system\login.txt。
 Active motor is disabled.	作用中的馬達已停用。
+Add / Update	新增 / 更新
 Address	位址
 Alarm	警報
 Alarm Reset	警報重置
@@ -33,9 +36,11 @@ Bin map saved.	Bin map 已儲存。
 Bin map setting has invalid rows.	Bin map 設定有無效的列。
 Bin map setting is OK.	Bin map 設定正常。
 Bin map setting is invalid.	Bin map 設定無效。
+Bin must be 0-999. Error code starts from 1000.	Bin 必須為 0-999。錯誤碼從 1000 開始。
 Bit	位元
 Blink LED	LED 閃爍
 Board	板卡
+Bottom Empty Tray Is Miss Error	底部空盤遺失錯誤
 By Lot+Bin mode is ON but no binding is set. Set bindings first !	By Lot+Bin 模式已開啟，但未設定綁定。請先設定綁定 ！
 CCW	反轉
 CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away.	CCW (-) 極限已觸發。Jog - 已阻擋；請用 Jog + 移開。
@@ -52,11 +57,14 @@ Clear Log	清除紀錄
 Color	色盤
 Color CCD X motor will out of limit	色盤 CCD X 馬達將超出限位
 Color Y motor will out of limit	色盤 Y 馬達將超出限位
+Color supply tray is not ready	Color 供盤未就緒
 Command	命令
 Confirm Clean Out?	確認清機？
 Confirm home?	確認復歸?
+Connected: -	已連線：-
 Continue	繼續
 Create recipe failed or recipe already exists.	建立配方失敗或配方已存在。
+Default 1-%d	預設 1-%d
 Delay	延遲
 Delete	刪除
 Delete account: %s ?	刪除帳號：%s ？
@@ -72,9 +80,11 @@ EMG	緊急停止
 EMG is pressed.	EMG 已按下。
 Emg	急停
 Empty	空
+Empty Push Tray Miss	空盤推盤遺失
 Empty Y motor will out of limit	空盤 Y 馬達將超出限位
 Enable	啟用
 Encoder	編碼器
+Error	錯誤
 Error close com port	關閉 com 連接埠錯誤
 Error open com port	開啟 com 連接埠錯誤
 ErrorCode	錯誤碼
@@ -84,21 +94,25 @@ File %s data is mistake! (%d)	檔案 %s 資料錯誤！(%d)
 File %s is not exist!	檔案 %s 不存在！
 File %s is opened by other software!	檔案 %s 已被其他軟體開啟！
 Flush Panel	刷新面板
+Front Empty Tray Is Miss Error	前空盤遺失錯誤
 Front Enable	前側啟用
 Front Pad	前 Pad
 HOME	復歸
 HOMING..	復歸中..
 Hardware install setup	硬體安裝設定
+Hardware install setup (locked - lot running, end lot to edit)	硬體安裝設定 (鎖定 - Lot 執行中，結束 Lot 後可編輯)
 HasTray	有盤
 Home	復歸
 Home start	復歸開始
 IO %s alias is duplicated!	IO %s 別名重複！
+IO already change, want to restore?	IO 已變更，是否要還原？
 IO already change, will restore IO!!	IO 已變更，將復原 IO！！
 IO map grid not found.	找不到 IO 對應表格。
 IO table data invalid:	IO 表資料無效：
 IO_Table.csv backup failed. Save aborted.	IO_Table.csv 備份失敗。已中止儲存。
 IO_Table.csv save failed.	IO_Table.csv 儲存失敗。
 IO_Table.csv saved.	IO_Table.csv 已儲存。
+IO_Table.csv saved.\r\nBackup: %s	IO_Table.csv 已儲存。\r\n備份：%s
 ISA Base	ISA 基底
 InPos	到位
 InType	輸入類型
@@ -106,6 +120,7 @@ Inherit last work order ? (%d lots, %d bindings)   Yes = resume,  No = start fre
 Initial	初始
 Input an even hex register offset, for example 0x08.	請輸入偶數的十六進位暫存器偏移，例如 0x08。
 Input value is invalid.	輸入值無效。
+Installed	已安裝
 Invalid	無效
 IsServo	是否伺服
 Item	項目
@@ -117,11 +132,16 @@ Last Error: not started	最後錯誤：未啟動
 Legacy MC88X1 read-only offset	舊版 MC88X1 唯讀偏移
 Level	層級
 Loader	上料機構
+Loader Safe Distance (mm)	上料機構安全距離 (mm)
+Loader Tray Empty	Loader 盤空
+Empty supply magazine empty	Empty 供料匣缺盤
+Loader Tray has IC,please remove	Loader 盤有 IC，請移除
 Loader Y motor will out of limit	上料機構 Y 馬達將超出限位
 Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK.	Loader 仍夾持著盤。請手動移除 Loader L 與 R 上的所有盤，然後按 OK。
 Loader top-CCD X capture fine-tune	上料機構上視 CCD X 取像微調
 Loop	循環
 Lot "%s" has no 2D data loaded yet.\n(Work-order JSON not downloaded for this Lot.)	Lot "%s" 尚未載入 2D 資料。\n(此 Lot 的工單 JSON 尚未下載。)
+Lot No.	Lot 編號
 Lot list is full !	Lot 清單已滿 !
 Machine is running.	機台執行中。
 Main status badges exceed the grid (max 3 cols x 2 rows = 6). The extra badges are hidden.\nIncrease MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS in main.h and widen pnlFeatureStatus to make room.	主畫面狀態標章超過格線數量 (最多 3 欄 x 2 列 = 6)。多出的標章已隱藏。\n請在 main.h 增加 MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS 並加寬 pnlFeatureStatus 以挪出空間。
@@ -129,7 +149,9 @@ Manual Send	手動傳送
 Max(mm)	最大(mm)
 MaxTray	最大盤數
 Min(mm)	最小(mm)
+Modify IO Table	修改 IO 表
 ModuleType	模組類型
+Motor	馬達
 Motor %s alias is duplicated!	馬達 %s 別名重複！
 Motor %s home flag reset (servo alarm).	馬達 %s 復歸旗標已重置（伺服錯誤）。
 Motor Name	馬達名稱
@@ -152,10 +174,14 @@ NORMAL	正常
 No	否
 No 2D data : load lot 2D/Bin data before Start !	無 2D 資料：啟動前請載入 lot 2D/Bin 資料 ！
 No Lot data : add at least one Lot before Start !	無 Lot 資料：啟動前請至少新增一個 Lot ！
+Not Created	未建立
+Not Created 	未建立 
+Not Installed	未安裝
 Not assigned.	未指派。
 Note	備註
 Now(mm)	目前(mm)
 OFF	關
+OK/Error	OK/錯誤
 ON	開
 ONLINE	連線
 OffAlarmTime	關閉警報時間
@@ -189,6 +215,8 @@ Power On	開啟電源
 PowerState	電源狀態
 Re-alignment (bake)	重新對位 (寫入)
 Re-alignment done: offset folded into base teach.	重新校正完成：偏移已併入基準教導。
+Ready	就緒
+Ready 	就緒 
 Real	實機
 Rear Enable	後側啟用
 Rear Pad	後 Pad
@@ -206,12 +234,15 @@ RetestCode	複測碼
 Retry	重試
 Ring	環號
 Safe Lock	安全鎖
+Same bin as %s.	與 %s 相同的 Bin。
 Save As recipe failed.	另存配方失敗。
+Save Loader safe distance?	是否要儲存上料機構安全距離？
 Save or reload Mot_Table first before %s.	請先儲存或重新載入 Mot_Table 再 %s。
 Save or reload Mot_Table first.	請先儲存或重新載入 Mot_Table。
 Save or reload motor parameter first before %s.	請先儲存或重新載入馬達參數再 %s。
 Save or reload motor parameter first.	請先儲存或重新載入馬達參數。
 Save to File	儲存至檔案
+Saved %s	已儲存 %s
 Select a car area	請選擇車區
 Select a sucker	請選擇吸嘴
 Select a target area	請選擇目標區
@@ -262,6 +293,7 @@ Target over soft limit.	目標超過軟體極限。
 Teach Position	教導位置
 Teach(mm)	教導(mm)
 Test already running	測試執行中
+Top CCD API not ready	頂部 CCD API 未就緒
 Top CCD X motor will out of limit	頂部 CCD X 馬達將超出限位
 Tray Arm X motor will out of limit	載盤臂 X 馬達將超出限位
 Tray End	收盤
@@ -275,8 +307,10 @@ User ID or password is incorrect.	使用者帳號或密碼不正確。
 User accounts reloaded from system\login.txt.	已從 system\login.txt 重新載入使用者帳號。
 User accounts saved to system\login.txt.	使用者帳號已儲存至 system\login.txt。
 Value	數值
+View only. Engineer level (2) or above is required to edit.	僅供檢視。需工程師層級 (2) 以上才能編輯。
 Z Phase	Z 相
 Zone	區域
 \n\nSave motor parameter changes?	\n\n儲存馬達參數變更？
 apply	套用
 guard	防護
+Loader Tray Count Mismatch	Loader 盤數不符

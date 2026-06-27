@@ -41,6 +41,9 @@ void THT160GeneralSetting::SetDefault()
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
+	iAmrFeedWaitSec=600;
+	iAmrFullWaitSec=600;
+	iAmrHandshakeWaitSec=240;
 	sMachineModel="HT160S";
 	sHandlerID="";
 	sSerialNo="";
@@ -87,6 +90,9 @@ void THT160GeneralSetting::Load()
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
+	iAmrFeedWaitSec=Ini->ReadInteger("AGV", "AmrFeedWaitSec", 600);
+	iAmrFullWaitSec=Ini->ReadInteger("AGV", "AmrFullWaitSec", 600);
+	iAmrHandshakeWaitSec=Ini->ReadInteger("AGV", "AmrHandshakeWaitSec", 240);
 	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
 	sHandlerID=Ini->ReadString("MachineIdentity", "HandlerID", "");
 	sSerialNo=Ini->ReadString("MachineIdentity", "SerialNo", "");
@@ -101,6 +107,11 @@ void THT160GeneralSetting::Load()
 		sBinDispText[i]=Ini->ReadString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);
 		iBinDispColor[i]=Ini->ReadInteger("BinDisplay", "Color"+IntToStr(i), iBinDispColor[i]);
 	}
+	// AI(ht160s-agv) clamp : HTimer::Off() returns true at 0 (instant alarm) and wraps
+	// negative to ~49.7 days (never alarms). Force a positive lower bound on all AGV waits.
+	if(iAmrFeedWaitSec      < 5) iAmrFeedWaitSec      = 5;
+	if(iAmrFullWaitSec      < 5) iAmrFullWaitSec      = 5;
+	if(iAmrHandshakeWaitSec < 5) iAmrHandshakeWaitSec = 5;
 	delete Ini;
 }
 //---------------------------------------------------------------------------
@@ -127,6 +138,9 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);
+	Ini->WriteInteger("AGV", "AmrFeedWaitSec", iAmrFeedWaitSec);
+	Ini->WriteInteger("AGV", "AmrFullWaitSec", iAmrFullWaitSec);
+	Ini->WriteInteger("AGV", "AmrHandshakeWaitSec", iAmrHandshakeWaitSec);
 	Ini->WriteString("MachineIdentity", "Model", sMachineModel);
 	Ini->WriteString("MachineIdentity", "HandlerID", sHandlerID);
 	Ini->WriteString("MachineIdentity", "SerialNo", sSerialNo);

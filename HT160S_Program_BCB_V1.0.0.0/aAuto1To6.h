@@ -44,6 +44,14 @@ private:
     //operator full-car modal to the AGV handshake. Set when a full car is handed to the
     //AGV; cleared on AGV finish (ClearAmrCar) or a home/init.
     bool bAmrLocked[6];
+    //AI(ht160s-agv) 20260627 : per-Auto AMR output-car full-wait safety net. While a full
+    //car is locked to the AGV (bAmrLocked) ServiceCarFull arms AmrFullWaitTimer for
+    //iAmrFullWaitSec; on expiry it sets bOperatorHolding (suppress re-CALL) + calls
+    //AgvCoord.AbortAutoHandshake, then falls through to the existing operator full modal.
+    //All three are cleared on HOME/InitialFlag.
+    bool   bWaitingAmrFull[6];
+    bool   bOperatorHolding[6];
+    HTimer AmrFullWaitTimer[6];
     //AI(general) 20260608 : Stage0 fix for TrayArm back-and-forth. Latches a
     //TrayArm-delivered rear tray so RefreshAutoState() cannot erase the logical
     //handshake when the physical rear sensor reads OFF (offline / sim-data run).
@@ -119,6 +127,7 @@ public:
     //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
     void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer
     bool IsAmrLocked(int Index);
+    bool IsOperatorHolding(int Index);   //AI(ht160s-agv) 20260627 : operator took the full car after a full-wait timeout (PollAndCall re-CALL gate)
     bool IsDrainedForAmr(int Index);           // Ready : no working/rear/full tray left (all GoUp to car)
     bool IsAmrTaken(int Index);                // Finish : AGV removed the car (sim=true; real sensor TBD)
     void ClearAmrCar(int Index);               // AGV finish : empty the car + re-seed stack + unlock
