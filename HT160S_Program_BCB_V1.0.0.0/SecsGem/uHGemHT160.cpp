@@ -718,7 +718,11 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             // refresh that Simu / JSON / manual paths also use. SECS runs on the VCL
             // main thread (stNonBlocking OnClientRead), so this UI call is safe.
             if(HCACK==0 && fMain!=NULL)
+            {
                 fMain->RefreshLotListFromRegistry();
+                //AI(ht160s-2dbin-manual) 20260628 : persist the SECS-pushed lot list.
+                fMain->SaveWorkOrder();
+            }
         }
         else if(S.AnsiPos("PAUSE")==1)
         {
@@ -798,6 +802,10 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     {
                         fMain->edLotNo->Text = FirstLot;         // active lot backfill
                         fMain->RefreshLotListFromRegistry();
+                        //AI(ht160s-2dbin-manual) 20260628 : persist the SECS-registered lots
+                        //(the 2D items themselves arrive via the WebAPI pull below, which
+                        //also calls SaveWorkOrder in PollLotDataWebApi).
+                        fMain->SaveWorkOrder();
                         //AI(ht160s-lot-webapi) 20260612 : pull EVERY registered lot's
                         // 2D/Bin data (matches the manual LotStart path). Previously
                         // only the first lot was pulled, so SET_LOT_INFO/LOTSTART lots

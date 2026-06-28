@@ -4,6 +4,7 @@
 #pragma hdrstop
 
 #include <shellapi.h>   //AI(general) 20260608 : ShellExecute for Explorer /select on snapshot zip
+#include <Clipbrd.hpp>   //AI(ht160s-2dbin-manual) 20260628 : clipboard paste of 2D/Bin rows
 #include "main.h"
 #include "database.h"
 #include "cStateRecordHT160.h"
@@ -246,6 +247,7 @@ __fastcall TfMain::TfMain(TComponent* Owner)
         sbMotionView->Down = true;
 
     SetupLotListGrid();                                                         //AI(HT160S-Maintainer) 20260604 : init multi-lot manual list grid
+    Setup2DBinGrid();                                                           //AI(ht160s-2dbin-manual) 20260628 : init editable 2D/Bin grid
     if(sgLotList != NULL)
         sgLotList->OnDblClick = sgLotListDblClick;                              //AI(ht160s-lot-webapi) 20260612 : double-click a Lot row -> 2D detail viewer
 }
@@ -1967,7 +1969,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     StartLotWebApiPullAll();
     //AI(HT160S-Maintainer) 20260608 : need1 : persist the started work order so
     //the next power-on can restore it (see RestoreLastWorkOrder / FormShow).
-    SaveLastLotList();
+    SaveWorkOrder();
     RecordProcess("LOT START pressed");
 }
 //---------------------------------------------------------------------------
@@ -2097,6 +2099,7 @@ void __fastcall TfMain::PollLotDataWebApi()
         if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode))
         {
             RefreshLotListFromRegistry();
+            SaveWorkOrder();
             RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot);
             if(bDuplicate==true)
                 RecordProcess("Lot WebAPI duplicate 2D ignored: "+DupCode);
@@ -2147,6 +2150,10 @@ void __fastcall TfMain::PollLotDataWebApi()
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : forward decl : the WorkOrder.json path helper
+//is defined further down (near GetLastLotListFileName) but used here on Lot End.
+static AnsiString GetWorkOrderFileName();
+//---------------------------------------------------------------------------
 void __fastcall TfMain::btnLotEndClick(TObject *Sender)
 {
     //AI(HT160S-Maintainer) 20260604 : P1 stop the sort run (HT172 LotEnd analog).
@@ -2171,6 +2178,7 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     // (RefreshLotListFromRegistry blanks every row when the registry is empty),
     // and overwrite system\LastLotList.ini with the now-empty list so a restart
     // does NOT restore the finished lots.
+    ArchiveWorkOrderToLotStory();
     LotRegistry.Clear();
     //AI(ht160s-lotbin) 20260615 : drop all (Lot,Bin)->Auto bindings on Lot End so the
     //next work order starts with a clean dynamic table (also persisted empty).
@@ -2179,7 +2187,7 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     if(edLotNo!=NULL)
         edLotNo->Text="";
     RefreshLotListFromRegistry();
-    SaveLastLotList();
+    DeleteFile(GetWorkOrderFileName());
     RecordProcess("Lot data cleared (Lot End)");
 }
 //---------------------------------------------------------------------------
@@ -2240,6 +2248,82 @@ int __fastcall TfMain::GetLotListCount()
 static AnsiString GetLastLotListFileName()
 {
     return HSys.CurrentDir + AnsiString("\\system\\LastLotList.ini");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : unified work-order persistence. WorkOrder.json
+//is the single active in-execution work order (lots + their full 2D items in the
+//2DIDHistory schema). It supersedes the older system\LastLotList.ini, which is now
+//only a migration fallback (lots only, no 2D items) read when WorkOrder.json is
+//absent. Saved on every work-order mutation, archived to LotStory on Lot End.
+//---------------------------------------------------------------------------
+static AnsiString GetWorkOrderFileName()
+{
+    return HSys.CurrentDir + AnsiString("\\HT160S_LotInfo\\WorkOrder.json");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::SaveWorkOrder()
+{
+    AnsiString fn=GetWorkOrderFileName();
+    ForceDirectories(ExtractFilePath(fn));
+    LotRegistry.SaveToJsonFile(fn);
+}
+//---------------------------------------------------------------------------
+bool __fastcall TfMain::LoadWorkOrder()
+{
+    AnsiString fn=GetWorkOrderFileName();
+    if(!FileExists(fn))
+        return false;
+    bool dup=false;
+    AnsiString code="";
+    if(LotRegistry.LoadFromJsonFile(fn, dup, code))
+    {
+        RefreshLotListFromRegistry();
+        return (LotRegistry.GetLotCount()>0);
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : on Lot End, snapshot the finished work order
+//into the monthly LotStory archive before it is cleared. Folder layout mirrors
+//cCsvDailyLog exactly : HSys.LogRootDir\LotStory\<yyyy_mm> . File name is the
+//first non-blank lot id (filesystem-sanitized) + a yyyymmdd_hhnnss timestamp.
+void __fastcall TfMain::ArchiveWorkOrderToLotStory()
+{
+    if(LotRegistry.GetLotCount()<=0)
+        return;
+
+    AnsiString LotName="";
+    int SlotCount=LotRegistry.GetLotSlotCount();
+    for(int Index=0; Index<SlotCount; Index++)
+    {
+        TLotRunInfo *Lot=LotRegistry.GetLot(Index);
+        if(Lot!=NULL && Lot->sLotID.Trim()!=AnsiString(""))
+        {
+            LotName=Lot->sLotID.Trim();
+            break;
+        }
+    }
+    if(LotName==AnsiString(""))
+        return;
+
+    // Filesystem-safe lot name : replace any of  \ / : * ? " < > |  with '_'.
+    AnsiString SafeLot="";
+    for(int i=1;i<=LotName.Length();i++)
+    {
+        char c=LotName[i];
+        if(c=='\\' || c=='/' || c==':' || c=='*' || c=='?' ||
+           c=='"' || c=='<' || c=='>' || c=='|')
+            SafeLot+='_';
+        else
+            SafeLot+=c;
+    }
+
+    AnsiString Folder=HSys.LogRootDir + AnsiString("\\LotStory\\") +
+        FormatDateTime("yyyy_mm", Now());
+    ForceDirectories(Folder);
+    AnsiString File=Folder + AnsiString("\\") + SafeLot + AnsiString("_") +
+        FormatDateTime("yyyymmdd_hhnnss", Now()) + AnsiString(".json");
+    LotRegistry.SaveToJsonFile(File);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::SaveLastLotList()
@@ -2366,6 +2450,346 @@ void __fastcall TfMain::RefreshLotListFromRegistry()
         edLotNo->Text=FirstLotID;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : manual 2D/Bin editor (ts2DBinManual tab).
+//Operator edits the per-Lot 2D->Bin item list by hand : add/del/paste/import
+//rows then Commit into LotRegistry. Editing is locked while a lot is running
+//(Is2DEditLocked) so the live sort table is never mutated mid-run.
+//---------------------------------------------------------------------------
+void __fastcall TfMain::Setup2DBinGrid()
+{
+    if(sg2DBinEdit==NULL)
+        return;
+    sg2DBinEdit->ColCount=2;
+    sg2DBinEdit->FixedCols=0;
+    sg2DBinEdit->FixedRows=1;
+    sg2DBinEdit->ColWidths[0]=360;
+    sg2DBinEdit->ColWidths[1]=120;
+    sg2DBinEdit->Cells[0][0]=LangT("2D Code");
+    sg2DBinEdit->Cells[1][0]="Bin";
+    sg2DBinEdit->RowCount=2;
+    sg2DBinEdit->Cells[0][1]="";
+    sg2DBinEdit->Cells[1][1]="";
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::Refresh2DBinHeader()
+{
+    int DataCount=0;
+    if(sg2DBinEdit!=NULL)
+    {
+        for(int RowIndex=1; RowIndex<sg2DBinEdit->RowCount; RowIndex++)
+        {
+            if(sg2DBinEdit->Cells[0][RowIndex].Trim()!=AnsiString(""))
+                DataCount++;
+        }
+    }
+    AnsiString LotText=(edLotNo!=NULL)?edLotNo->Text:AnsiString("");
+    if(lblTargetLot2D!=NULL)
+        lblTargetLot2D->Caption=LangT("Target Lot:")+AnsiString(" ")+LotText;
+    if(lbl2DCount!=NULL)
+        lbl2DCount->Caption=LangT("Items:")+AnsiString(" ")+IntToStr(DataCount);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::Reload2DBinGridFromRegistry()
+{
+    AnsiString TargetLot;
+    int RecordCount;
+    if(sg2DBinEdit==NULL || edLotNo==NULL)
+        return;
+    TargetLot=edLotNo->Text.Trim();
+    TStringList *List=new TStringList;
+    try
+    {
+        RecordCount=LotRegistry.GetLotIcList(TargetLot, List);
+        int Rows=1+RecordCount;
+        if(Rows<2)
+            Rows=2;
+        sg2DBinEdit->RowCount=Rows;
+        // each List line : Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass
+        for(int Index=0; Index<RecordCount; Index++)
+        {
+            AnsiString Line=List->Strings[Index];
+            AnsiString Code2D="";
+            AnsiString BinStr="";
+            int Tab1=Line.Pos("\t");
+            if(Tab1>0)
+            {
+                Code2D=Line.SubString(1, Tab1-1);
+                AnsiString Rest=Line.SubString(Tab1+1, Line.Length()-Tab1);
+                int Tab2=Rest.Pos("\t");
+                if(Tab2>0)
+                    BinStr=Rest.SubString(1, Tab2-1);
+                else
+                    BinStr=Rest;
+            }
+            else
+            {
+                Code2D=Line;
+            }
+            sg2DBinEdit->Cells[0][1+Index]=Code2D;
+            sg2DBinEdit->Cells[1][1+Index]=BinStr;
+        }
+        for(int Blank=1+RecordCount; Blank<sg2DBinEdit->RowCount; Blank++)
+        {
+            sg2DBinEdit->Cells[0][Blank]="";
+            sg2DBinEdit->Cells[1][Blank]="";
+        }
+    }
+    __finally
+    {
+        delete List;
+    }
+    Refresh2DBinHeader();
+}
+//---------------------------------------------------------------------------
+bool __fastcall TfMain::Is2DEditLocked()
+{
+    if(MachineRun.bRunning)
+    {
+        ShowMyMessage(LangT("Locked: a lot is running. Edit 2D/Bin only when stopped."));
+        return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btn2DAddRowClick(TObject *Sender)
+{
+    (void)Sender;
+    if(Is2DEditLocked())
+        return;
+    if(sg2DBinEdit==NULL)
+        return;
+    sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
+    sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]="";
+    sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]="";
+    Refresh2DBinHeader();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btn2DDelRowClick(TObject *Sender)
+{
+    (void)Sender;
+    if(Is2DEditLocked())
+        return;
+    if(sg2DBinEdit==NULL)
+        return;
+    int Row=sg2DBinEdit->Row;
+    if(Row<1)
+        return;
+    AnsiString Code=sg2DBinEdit->Cells[0][Row].Trim();
+    if(Code!=AnsiString(""))
+    {
+        AnsiString Lot;
+        int Bin;
+        int Idx;
+        if(LotRegistry.FindByCode2D(Code, Lot, Bin, Idx))
+            LotRegistry.RemoveItem(Code);
+    }
+    // shift rows up to delete Row, keep RowCount>=2
+    for(int RowIndex=Row; RowIndex<sg2DBinEdit->RowCount-1; RowIndex++)
+    {
+        sg2DBinEdit->Cells[0][RowIndex]=sg2DBinEdit->Cells[0][RowIndex+1];
+        sg2DBinEdit->Cells[1][RowIndex]=sg2DBinEdit->Cells[1][RowIndex+1];
+    }
+    if(sg2DBinEdit->RowCount>2)
+        sg2DBinEdit->RowCount=sg2DBinEdit->RowCount-1;
+    else
+    {
+        sg2DBinEdit->Cells[0][1]="";
+        sg2DBinEdit->Cells[1][1]="";
+    }
+    RefreshLotListFromRegistry();
+    SaveWorkOrder();
+    Refresh2DBinHeader();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btn2DCommitClick(TObject *Sender)
+{
+    (void)Sender;
+    if(Is2DEditLocked())
+        return;
+    if(sg2DBinEdit==NULL || edLotNo==NULL)
+        return;
+    AnsiString TargetLot=edLotNo->Text.Trim();
+    if(TargetLot==AnsiString(""))
+    {
+        ShowMyMessage(LangT("Please select or enter a Lot first !"));
+        return;
+    }
+    int AddedCount=0;
+    int DupCount=0;
+    for(int Row=1; Row<sg2DBinEdit->RowCount; Row++)
+    {
+        AnsiString Code=sg2DBinEdit->Cells[0][Row].Trim();
+        if(Code==AnsiString(""))
+            continue;
+        int Bin=StrToIntDef(sg2DBinEdit->Cells[1][Row].Trim(), 0);
+        AnsiString ExistLot;
+        int ExistBin;
+        int ExistIdx;
+        if(LotRegistry.FindByCode2D(Code, ExistLot, ExistBin, ExistIdx))
+        {
+            if(ExistLot==TargetLot)
+            {
+                if(ExistBin!=Bin)
+                {
+                    LotRegistry.RemoveItem(Code);
+                    AnsiString DupLot;
+                    if(LotRegistry.AddItem(TargetLot, Code, Bin, DupLot))
+                        AddedCount++;
+                }
+            }
+            else
+            {
+                DupCount++;
+            }
+        }
+        else
+        {
+            AnsiString DupLot;
+            if(LotRegistry.AddItem(TargetLot, Code, Bin, DupLot))
+                AddedCount++;
+            else
+                DupCount++;
+        }
+    }
+    RefreshLotListFromRegistry();
+    Reload2DBinGridFromRegistry();
+    SaveWorkOrder();
+    ShowMyMessage(Format(LangT("Committed: %d added, %d duplicate skipped"), ARRAYOFCONST((AddedCount, DupCount))));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btn2DClearClick(TObject *Sender)
+{
+    (void)Sender;
+    if(Is2DEditLocked())
+        return;
+    if(edLotNo==NULL)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Clear ALL 2D data for this Lot ?"))!=TMyMessageBox::msgrtnYES)
+        return;
+    AnsiString TargetLot=edLotNo->Text.Trim();
+    TStringList *List=new TStringList;
+    try
+    {
+        LotRegistry.GetLotIcList(TargetLot, List);
+        for(int Index=0; Index<List->Count; Index++)
+        {
+            AnsiString Line=List->Strings[Index];
+            AnsiString Code;
+            int Tab1=Line.Pos("\t");
+            if(Tab1>0)
+                Code=Line.SubString(1, Tab1-1);
+            else
+                Code=Line;
+            Code=Code.Trim();
+            if(Code!=AnsiString(""))
+                LotRegistry.RemoveItem(Code);
+        }
+    }
+    __finally
+    {
+        delete List;
+    }
+    RefreshLotListFromRegistry();
+    Reload2DBinGridFromRegistry();
+    SaveWorkOrder();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : split one pasted/imported line into code+bin.
+//Accepts comma OR tab as the field separator. Staging only (operator reviews,
+//then Commit). Returns false for a blank line.
+static bool Split2DBinLine(AnsiString Line, AnsiString &Code, AnsiString &Bin)
+{
+    Line=Line.Trim();
+    if(Line==AnsiString(""))
+        return false;
+    int Sep=Line.Pos(",");
+    if(Sep<=0)
+        Sep=Line.Pos("\t");
+    if(Sep>0)
+    {
+        Code=Line.SubString(1, Sep-1).Trim();
+        Bin=Line.SubString(Sep+1, Line.Length()-Sep).Trim();
+    }
+    else
+    {
+        Code=Line;
+        Bin="";
+    }
+    return (Code!=AnsiString(""));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btn2DPasteClick(TObject *Sender)
+{
+    (void)Sender;
+    if(Is2DEditLocked())
+        return;
+    if(sg2DBinEdit==NULL)
+        return;
+    AnsiString Text=Clipboard()->AsText;
+    TStringList *Lines=new TStringList;
+    try
+    {
+        Lines->Text=Text;
+        for(int Index=0; Index<Lines->Count; Index++)
+        {
+            AnsiString Code;
+            AnsiString Bin;
+            if(!Split2DBinLine(Lines->Strings[Index], Code, Bin))
+                continue;
+            sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
+            sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]=Code;
+            sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]=Bin;
+        }
+    }
+    __finally
+    {
+        delete Lines;
+    }
+    Refresh2DBinHeader();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::btn2DImportClick(TObject *Sender)
+{
+    (void)Sender;
+    if(Is2DEditLocked())
+        return;
+    if(sg2DBinEdit==NULL)
+        return;
+    TOpenDialog *Dlg=new TOpenDialog(this);
+    TStringList *Lines=new TStringList;
+    try
+    {
+        Dlg->Filter="CSV/Text|*.csv;*.txt|All|*.*";
+        if(Dlg->Execute())
+        {
+            Lines->LoadFromFile(Dlg->FileName);
+            for(int Index=0; Index<Lines->Count; Index++)
+            {
+                AnsiString Code;
+                AnsiString Bin;
+                if(!Split2DBinLine(Lines->Strings[Index], Code, Bin))
+                    continue;
+                sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
+                sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]=Code;
+                sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]=Bin;
+            }
+        }
+    }
+    __finally
+    {
+        delete Lines;
+        delete Dlg;
+    }
+    Refresh2DBinHeader();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::pgcWorkOrderChange(TObject *Sender)
+{
+    (void)Sender;
+    if(pgcWorkOrder!=NULL && pgcWorkOrder->ActivePage==ts2DBinManual)
+        Reload2DBinGridFromRegistry();
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::RestoreLastWorkOrder()
 {
     bool bDuplicate;
@@ -2384,7 +2808,15 @@ void __fastcall TfMain::RestoreLastWorkOrder()
     bDuplicate=false;
     DupCode="";
     bLoaded=false;
-    if(LotRegistry.LoadLatest(bDuplicate, DupCode))
+    //AI(ht160s-2dbin-manual) 20260628 : unified store first. WorkOrder.json carries
+    //the full work order (lots + 2D items); if present it wins over LoadLatest and
+    //the LastLotList.ini migration fallback below.
+    if(LoadWorkOrder())
+    {
+        LotBinBinding.LoadFromIni();
+        bLoaded=true;
+    }
+    else if(LotRegistry.LoadLatest(bDuplicate, DupCode))
     {
         RefreshLotListFromRegistry();
         //AI(ht160s-lotbin) 20260615 : restore the dynamic (Lot,Bin)->Auto table after
@@ -2395,7 +2827,8 @@ void __fastcall TfMain::RestoreLastWorkOrder()
     }
     else
     {
-        //C) no JSON work order : restore the last manually-used Lot list.
+        //C) no JSON work order : restore the last manually-used Lot list (migration
+        //   fallback only : LastLotList.ini predates WorkOrder.json).
         LoadLastLotList();
         LotBinBinding.LoadFromIni();   //AI(ht160s-lotbin) 20260615 : restore dynamic bindings (see above)
         bLoaded=(LotRegistry.GetLotCount()>0 || LotBinBinding.GetBindingCount()>0);
@@ -2415,6 +2848,7 @@ void __fastcall TfMain::RestoreLastWorkOrder()
         if(ShowMyMessageBox_YES_NO(Msg)!=TMyMessageBox::msgrtnYES)
         {
             LotRegistry.Clear();
+            DeleteFile(GetWorkOrderFileName());
             LotBinBinding.Clear();
             LotBinBinding.SaveToIni();
             if(edLotNo!=NULL)
@@ -2455,6 +2889,7 @@ void __fastcall TfMain::btnAddLotClick(TObject *Sender)
         return;
     }
     RefreshLotListFromRegistry();
+    SaveWorkOrder();
     if(sgLotList!=NULL && (LotIndex+1)<sgLotList->RowCount)
         sgLotList->Row=LotIndex+1;
 }
@@ -2485,6 +2920,7 @@ void __fastcall TfMain::btnEditLotClick(TObject *Sender)
     //AI(general) 20260610 : rename in LotRegistry, then reproject the grid.
     LotRegistry.RenameLot(OldLot, NewLot);
     RefreshLotListFromRegistry();
+    SaveWorkOrder();
     if(SelectedRow<sgLotList->RowCount)
         sgLotList->Row=SelectedRow;
 }
@@ -2508,6 +2944,7 @@ void __fastcall TfMain::btnRemoveLotClick(TObject *Sender)
     //AI(general) 20260610 : remove from LotRegistry, then reproject the grid.
     LotRegistry.RemoveLot(LotText);
     RefreshLotListFromRegistry();
+    SaveWorkOrder();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sgLotListClick(TObject *Sender)
@@ -2522,7 +2959,10 @@ void __fastcall TfMain::sgLotListClick(TObject *Sender)
         return;
 
     if(sgLotList->Cells[0][SelectedRow].Trim()!="")
+    {
         edLotNo->Text=sgLotList->Cells[0][SelectedRow];
+        Reload2DBinGridFromRegistry();   //AI(ht160s-2dbin-manual) 20260628 : picking a lot refreshes the 2D grid
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : double-click a Lot row to view its 2D / Bin

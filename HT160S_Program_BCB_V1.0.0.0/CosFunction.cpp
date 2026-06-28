@@ -1083,6 +1083,144 @@ bool THT160LotRegistry::AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
 	return true;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : remove one 2D->Bin item by its unique
+// Code2D (manual editor delete). Both lists are keyed by the unique code, so no
+// reindex is needed after a delete. Decrements the owning lot's iPlanQty.
+bool THT160LotRegistry::RemoveItem(AnsiString Code2D)
+{
+	AnsiString Code=Code2D.Trim();
+	if(Code==AnsiString(""))
+		return false;
+
+	int InfoIdx=m_Code2DInfo->IndexOf(Code);
+	if(InfoIdx<0)
+		return false;
+	TLotIcInfo *Rec=(TLotIcInfo*)m_Code2DInfo->Objects[InfoIdx];
+	AnsiString SavedLotID="";
+	if(Rec!=NULL)
+	{
+		SavedLotID=Rec->sLotID;
+		delete Rec;
+	}
+	m_Code2DInfo->Delete(InfoIdx);
+
+	int RefIdx=m_Code2DIndex->IndexOf(Code);
+	if(RefIdx>=0)
+		m_Code2DIndex->Delete(RefIdx);
+
+	int LotIdx=FindLotIndex(SavedLotID);
+	if(LotIdx>=0 && LotIdx<m_LotCount && m_Lots[LotIdx].iPlanQty>0)
+		m_Lots[LotIdx].iPlanQty--;
+	return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : escape the two JSON-critical chars (the
+// backslash and the double-quote) so the emitted JSON parses back via cJSON.
+static AnsiString JsonEsc(AnsiString S)
+{
+	AnsiString Out="";
+	for(int i=1;i<=S.Length();i++)
+	{
+		char c=S[i];
+		if(c=='\\' || c=='"')
+			Out+='\\';
+		Out+=c;
+	}
+	return Out;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-manual) 20260628 : serialize ALL non-blank lots in the
+// 2DIDHistory schema that LoadFromJsonString already parses (round-trips). The
+// 2DIDHistory shape has no "Bin" field; LoadFromJsonString recomputes the
+// routing Bin from HBin/SBin per CosFunction.iSortBinSource. Manual items have
+// HBin=SBin=Bin so the round-trip is lossless; SECS items keep their real
+// HBin/SBin. NO trailing commas (cJSON rejects them).
+bool THT160LotRegistry::SaveToJsonFile(AnsiString FileName)
+{
+	TStringList *Out=new TStringList;
+	TStringList *IcList=new TStringList;
+	try
+	{
+		Out->Add("{");
+		Out->Add("  \"2DIDHistory\": [");
+
+		int SlotCount=GetLotSlotCount();
+		bool bFirstLot=true;
+		for(int Index=0;Index<SlotCount;Index++)
+		{
+			TLotRunInfo *Lot=GetLot(Index);
+			if(Lot==NULL || Lot->sLotID.Trim()==AnsiString(""))
+				continue;
+
+			if(!bFirstLot)
+				Out->Strings[Out->Count-1]=Out->Strings[Out->Count-1]+",";
+			bFirstLot=false;
+
+			Out->Add("    {");
+			Out->Add("      \"LOTID\": \""+JsonEsc(Lot->sLotID)+"\",");
+			Out->Add("      \"Substage\": \""+JsonEsc(Lot->sSubstage)+"\",");
+			Out->Add("      \"ProductCode\": \""+JsonEsc(Lot->sProductCode)+"\",");
+			Out->Add("      \"ICIInfo\": [");
+
+			IcList->Clear();
+			int IcCount=GetLotIcList(Lot->sLotID, IcList);
+			for(int j=0;j<IcCount;j++)
+			{
+				// One tab-separated line : Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass
+				AnsiString Line=IcList->Strings[j];
+				AnsiString F0="",F2="",F3="",F4="",F5="";
+				int Field=0;
+				AnsiString Cur="";
+				for(int k=1;k<=Line.Length()+1;k++)
+				{
+					char c=(k<=Line.Length()) ? Line[k] : '\t';
+					if(c=='\t')
+					{
+						if(Field==0) F0=Cur;
+						else if(Field==2) F2=Cur;
+						else if(Field==3) F3=Cur;
+						else if(Field==4) F4=Cur;
+						else if(Field==5) F5=Cur;
+						Field++;
+						Cur="";
+						if(Field>5)
+							break;
+					}
+					else
+						Cur+=c;
+				}
+
+				AnsiString Comma=(j<IcCount-1) ? AnsiString(",") : AnsiString("");
+				Out->Add("        {");
+				Out->Add("          \"QRCodeID\": \""+JsonEsc(F0)+"\",");
+				Out->Add("          \"HBin\": \""+JsonEsc(F2)+"\",");
+				Out->Add("          \"SBin\": \""+JsonEsc(F3)+"\",");
+				Out->Add("          \"RetestCode\": \""+JsonEsc(F4)+"\",");
+				Out->Add("          \"DiePass\": \""+JsonEsc(F5)+"\"");
+				Out->Add("        }"+Comma);
+			}
+
+			Out->Add("      ]");
+			Out->Add("    }");
+		}
+
+		Out->Add("  ]");
+		Out->Add("}");
+
+		ForceDirectories(ExtractFilePath(FileName));
+		Out->SaveToFile(FileName);
+	}
+	catch(...)
+	{
+		delete IcList;
+		delete Out;
+		return false;
+	}
+	delete IcList;
+	delete Out;
+	return true;
+}
+//---------------------------------------------------------------------------
 bool THT160LotRegistry::FindIcInfo(AnsiString Code2D, TLotIcInfo &Info)
 {
 	Info.sCode2D="";

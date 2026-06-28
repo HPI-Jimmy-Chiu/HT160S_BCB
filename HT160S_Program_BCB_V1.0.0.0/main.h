@@ -226,7 +226,7 @@ __published:	// IDE-managed Components
     TStringGrid *sgSimMaxTray;
     TButton *btnSaveSimMax;
     TTabSheet *tsOtherTool;
-    TPageControl *PageControl2;
+    TPageControl *pgcWorkOrder;
     TTabSheet *tsLotInfo;
     TLabel *lblLotNo;
     TGroupBox *grpLotManualEdit;
@@ -237,6 +237,15 @@ __published:	// IDE-managed Components
     TButton *btnRemoveLot;
     TButton *btnLotStart;
     TButton *btnLotEnd;
+    TLabel *lblTargetLot2D;
+    TLabel *lbl2DCount;
+    TStringGrid *sg2DBinEdit;
+    TButton *btn2DAddRow;
+    TButton *btn2DDelRow;
+    TButton *btn2DCommit;
+    TButton *btn2DClear;
+    TButton *btn2DPaste;
+    TButton *btn2DImport;
     TLabel *lblLotListHint;
     TPanel *plLotNumberAuto1;
     TPanel *plLotNumberAuto2;
@@ -361,6 +370,7 @@ __published:	// IDE-managed Components
     TLabel *lbCarTrayCount_Auto5;
     TLabel *lbCarTrayCount_Auto6;
     TStatusBar *stbMain;
+    TTabSheet *ts2DBinManual;
     void __fastcall sbLaguageClick(TObject *Sender);
     void __fastcall sbProductClick(TObject *Sender);
     void __fastcall sbMaintanceClick(TObject *Sender);
@@ -401,6 +411,13 @@ __published:	// IDE-managed Components
     void __fastcall btnEditLotClick(TObject *Sender);
     void __fastcall btnRemoveLotClick(TObject *Sender);
     void __fastcall sgLotListClick(TObject *Sender);
+    void __fastcall btn2DAddRowClick(TObject *Sender);
+    void __fastcall btn2DDelRowClick(TObject *Sender);
+    void __fastcall btn2DCommitClick(TObject *Sender);
+    void __fastcall btn2DClearClick(TObject *Sender);
+    void __fastcall btn2DPasteClick(TObject *Sender);
+    void __fastcall btn2DImportClick(TObject *Sender);
+    void __fastcall pgcWorkOrderChange(TObject *Sender);
     void __fastcall stbMainDrawPanel(TStatusBar *StatusBar, TStatusPanel *Panel, const TRect &Rect);
 private:	// User declarations
     TPanel *FeatureStatusPanels[MAIN_FEATURE_STATUS_COUNT];
@@ -422,6 +439,10 @@ private:	// User declarations
     void __fastcall InitSimulateScreenBinding();
     void __fastcall SyncMonitorTrayDivision();
     void __fastcall SetupLotListGrid();
+    void __fastcall Setup2DBinGrid();
+    void __fastcall Reload2DBinGridFromRegistry();
+    void __fastcall Refresh2DBinHeader();
+    bool __fastcall Is2DEditLocked();
     int  __fastcall GetLotListCount();
     void __fastcall sgLotListDblClick(TObject *Sender);
     void __fastcall ShowLotDetail(AnsiString LotID);
@@ -432,6 +453,9 @@ private:	// User declarations
 public:		// User declarations
     __fastcall TfMain(TComponent* Owner);
     void __fastcall RefreshLotListFromRegistry();
+    void __fastcall SaveWorkOrder();
+    bool __fastcall LoadWorkOrder();
+    void __fastcall ArchiveWorkOrderToLotStory();
     void __fastcall RequestLotDataFromWebApi(AnsiString LotID);
     void __fastcall PollLotDataWebApi();
     void __fastcall StartNextLotApiPull();

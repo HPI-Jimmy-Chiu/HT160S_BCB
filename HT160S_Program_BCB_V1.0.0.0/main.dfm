@@ -1747,15 +1747,16 @@ object fMain: TfMain
                     60)
                 end
               end
-              object PageControl2: TPageControl
+              object pgcWorkOrder: TPageControl
                 Left = 4
                 Top = 286
                 Width = 566
-                Height = 160
-                ActivePage = tsLotInfo
+                Height = 291
+                ActivePage = ts2DBinManual
                 Align = alTop
-                TabIndex = 0
+                TabIndex = 1
                 TabOrder = 2
+                OnChange = pgcWorkOrderChange
                 object tsLotInfo: TTabSheet
                   Caption = 'Lot'
                   object lblLotNo: TLabel
@@ -1790,7 +1791,7 @@ object fMain: TfMain
                     Left = 373
                     Top = 0
                     Width = 185
-                    Height = 132
+                    Height = 263
                     Align = alRight
                     Caption = 'Lot Manual Edit'
                     TabOrder = 0
@@ -1868,6 +1869,112 @@ object fMain: TfMain
                     Caption = 'Lot End'
                     TabOrder = 3
                     OnClick = btnLotEndClick
+                  end
+                end
+                object ts2DBinManual: TTabSheet
+                  Caption = '2DBin'
+                  ImageIndex = 1
+                  object lblTargetLot2D: TLabel
+                    Left = 4
+                    Top = 8
+                    Width = 300
+                    Height = 16
+                    AutoSize = False
+                    Caption = 'Target Lot:'
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clNavy
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentFont = False
+                  end
+                  object lbl2DCount: TLabel
+                    Left = 420
+                    Top = 8
+                    Width = 132
+                    Height = 16
+                    Alignment = taRightJustify
+                    AutoSize = False
+                    Caption = 'Items: 0'
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clGrayText
+                    Font.Height = -13
+                    Font.Name = 'Arial'
+                    Font.Style = []
+                    ParentFont = False
+                  end
+                  object sg2DBinEdit: TStringGrid
+                    Left = 4
+                    Top = 32
+                    Width = 548
+                    Height = 168
+                    ColCount = 2
+                    DefaultRowHeight = 18
+                    FixedCols = 0
+                    RowCount = 2
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clWindowText
+                    Font.Height = -11
+                    Font.Name = 'MS Sans Serif'
+                    Font.Style = []
+                    Options = [goVertLine, goHorzLine, goColSizing, goEditing, goTabs]
+                    ParentFont = False
+                    ScrollBars = ssVertical
+                    TabOrder = 0
+                  end
+                  object btn2DAddRow: TButton
+                    Left = 4
+                    Top = 206
+                    Width = 85
+                    Height = 25
+                    Caption = 'Add Row'
+                    TabOrder = 1
+                    OnClick = btn2DAddRowClick
+                  end
+                  object btn2DDelRow: TButton
+                    Left = 94
+                    Top = 206
+                    Width = 85
+                    Height = 25
+                    Caption = 'Del Row'
+                    TabOrder = 2
+                    OnClick = btn2DDelRowClick
+                  end
+                  object btn2DCommit: TButton
+                    Left = 184
+                    Top = 206
+                    Width = 85
+                    Height = 25
+                    Caption = 'Commit'
+                    TabOrder = 3
+                    OnClick = btn2DCommitClick
+                  end
+                  object btn2DClear: TButton
+                    Left = 274
+                    Top = 206
+                    Width = 85
+                    Height = 25
+                    Caption = 'Clear'
+                    TabOrder = 4
+                    OnClick = btn2DClearClick
+                  end
+                  object btn2DPaste: TButton
+                    Left = 364
+                    Top = 206
+                    Width = 85
+                    Height = 25
+                    Caption = 'Paste'
+                    TabOrder = 5
+                    OnClick = btn2DPasteClick
+                  end
+                  object btn2DImport: TButton
+                    Left = 454
+                    Top = 206
+                    Width = 85
+                    Height = 25
+                    Caption = 'Import'
+                    TabOrder = 6
+                    OnClick = btn2DImportClick
                   end
                 end
               end

@@ -275,6 +275,15 @@ public:
 		int HBin, int SBin, AnsiString RetestCode, AnsiString DiePass,
 		AnsiString &DupExistingLot);
 
+	// Remove one 2D->Bin item by its unique Code2D. Returns false if the code is
+	// not present. Decrements the owning lot's iPlanQty. Used by the manual 2D/Bin
+	// editor (delete a manually-entered IC).
+	bool RemoveItem(AnsiString Code2D);
+
+	// Serialize ALL non-blank lots to a JSON file in the 2DIDHistory schema that
+	// LoadFromJsonString parses (round-trips). Returns false on I/O exception.
+	bool SaveToJsonFile(AnsiString FileName);
+
 	// Backup lookup : fetch the full per-IC record by 2D code. Returns false if
 	// the code is unknown. Not on the hot sorting path.
 	bool FindIcInfo(AnsiString Code2D, TLotIcInfo &Info);
