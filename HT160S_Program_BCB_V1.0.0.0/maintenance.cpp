@@ -324,16 +324,6 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     }
 
     bLoadingHardwareSettings=false;
-    bPasswordUiBuilt=false;
-    lbPwUsers=NULL;
-    edPwId=NULL;
-    edPwPass=NULL;
-    cbbPwLevel=NULL;
-    btnPwAddUpdate=NULL;
-    btnPwDelete=NULL;
-    btnPwSave=NULL;
-    btnPwReload=NULL;
-    labPwHint=NULL;
     RegisterMaintenancePages();
     LayoutMaintenanceButtons();
     InitializeTowerLightPanels();
@@ -1035,8 +1025,9 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     }
     if(cbCommType!=NULL)
         cbCommType->Checked=GeneralSetting.bBinDispUseMyComm;
-    if(chkUseTrayDatumModel!=NULL)
-        chkUseTrayDatumModel->Checked=GeneralSetting.bUseTrayDatumModel;
+    //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired - GeneralSetting.bUseTrayDatumModel
+    //was removed (replaced by ini-only iSortArmXDatumBias/iSortArmYDatumBias). Remove the dead checkbox
+    //from the maintenance form when finishing the datum-bias refactor.
     if(chkUseLotBinMode!=NULL)
         chkUseLotBinMode->Checked=GeneralSetting.bUseLotBinSortMode;
     {
@@ -1075,6 +1066,16 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         edHandlerID->Text=GeneralSetting.sHandlerID;
     if(edSerialNo!=NULL)
         edSerialNo->Text=GeneralSetting.sSerialNo;
+    if(edSettle0!=NULL) edSettle0->Text=IntToStr(GeneralSetting.iEmptyDestackSettleMs);
+    if(edSettle1!=NULL) edSettle1->Text=IntToStr(GeneralSetting.iColorDestackSettleMs);
+    if(edSettle2!=NULL) edSettle2->Text=IntToStr(GeneralSetting.iLoaderDestackSettleMs);
+    if(edSettle3!=NULL) edSettle3->Text=IntToStr(GeneralSetting.iAutoPushConfirmSettleMs);
+    if(edSettle4!=NULL) edSettle4->Text=IntToStr(GeneralSetting.iAutoDischargePostYSettleMs);
+    if(edSettle5!=NULL) edSettle5->Text=IntToStr(GeneralSetting.iAutoFrontRiseDwellMs);
+    if(edSettle6!=NULL) edSettle6->Text=IntToStr(GeneralSetting.iAutoCleanOutRiseDwellMs);
+    if(edSettle7!=NULL) edSettle7->Text=IntToStr(GeneralSetting.iTrayArmClampSettleMs);
+    if(edSettle8!=NULL) edSettle8->Text=IntToStr(GeneralSetting.iEmptyFeedClampSettleMs);
+    if(edSettle9!=NULL) edSettle9->Text=IntToStr(GeneralSetting.iColorFeedClampSettleMs);
     bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
@@ -1094,8 +1095,7 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     }
     if(cbCommType!=NULL)
         GeneralSetting.bBinDispUseMyComm=cbCommType->Checked;
-    if(chkUseTrayDatumModel!=NULL)
-        GeneralSetting.bUseTrayDatumModel=chkUseTrayDatumModel->Checked;
+    //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired (bUseTrayDatumModel removed).
     if(chkUseLotBinMode!=NULL)
         GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
     {
@@ -1927,98 +1927,82 @@ void __fastcall TfMaintenance::edLoaderSafeDistanceClick(TObject *Sender)
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
-//---------------------------------------------------------------------------
-//AI(ht160s-password) 20260624 : tsMaintPassword account management UI. Built in
-// code (not the DFM) so the form designer cannot strip it and the OnClick
-// handlers stay private. Accounts live in THT160UserRoleManager;
-// SavePassword()/ReadPassword() persist system\login.txt.
-//---------------------------------------------------------------------------
-void __fastcall TfMaintenance::BuildPasswordUI()
+//AI(ht160s-settle-panel) 20260628 : map a settle-delay edit Tag to its GeneralSetting
+//member (single shared handler dispatches by Tag, mirrors chkAutoEnableClick).
+static int* SettleDelayValPtr(int Tag, AnsiString &title)
 {
-    int i;
-    TLabel *lab;
-
-    if(bPasswordUiBuilt || tsMaintPassword==NULL)
-        return;
-    bPasswordUiBuilt=true;
-
-    labPwHint=new TLabel(this);
-    labPwHint->Parent=tsMaintPassword;
-    labPwHint->SetBounds(16, 12, 720, 20);
-    labPwHint->Caption="Accounts: ID / password / level 0-3. Stored in system\\login.txt.";
-
-    lbPwUsers=new TListBox(this);
-    lbPwUsers->Parent=tsMaintPassword;
-    lbPwUsers->SetBounds(16, 44, 380, 320);
-    lbPwUsers->Font->Name="Courier New";
-    lbPwUsers->OnClick=PwListClick;
-
-    lab=new TLabel(this);
-    lab->Parent=tsMaintPassword;
-    lab->SetBounds(420, 50, 120, 20);
-    lab->Caption=LangT("Account ID");
-
-    edPwId=new TEdit(this);
-    edPwId->Parent=tsMaintPassword;
-    edPwId->SetBounds(420, 72, 240, 28);
-    edPwId->ReadOnly=true;
-    edPwId->OnClick=PwIdClick;
-
-    lab=new TLabel(this);
-    lab->Parent=tsMaintPassword;
-    lab->SetBounds(420, 110, 120, 20);
-    lab->Caption=LangT("Password");
-
-    edPwPass=new TEdit(this);
-    edPwPass->Parent=tsMaintPassword;
-    edPwPass->SetBounds(420, 132, 240, 28);
-    edPwPass->PasswordChar='*';
-    edPwPass->ReadOnly=true;
-    edPwPass->OnClick=PwPassClick;
-
-    lab=new TLabel(this);
-    lab->Parent=tsMaintPassword;
-    lab->SetBounds(420, 170, 120, 20);
-    lab->Caption=LangT("Level");
-
-    cbbPwLevel=new TComboBox(this);
-    cbbPwLevel->Parent=tsMaintPassword;
-    cbbPwLevel->SetBounds(420, 192, 240, 28);
-    cbbPwLevel->Style=csDropDownList;
-    for(i=ROLE_OPERATION; i<=ROLE_HONPREC; i++)
-        cbbPwLevel->Items->Add(IntToStr(i)+" - "+THT160UserRoleManager::GetLevelName(i));
-    cbbPwLevel->ItemIndex=ROLE_OPERATION;
-
-    btnPwAddUpdate=new TButton(this);
-    btnPwAddUpdate->Parent=tsMaintPassword;
-    btnPwAddUpdate->SetBounds(420, 240, 150, 40);
-    btnPwAddUpdate->Caption=LangT("Add / Update");
-    btnPwAddUpdate->OnClick=PwAddUpdateClick;
-
-    btnPwDelete=new TButton(this);
-    btnPwDelete->Parent=tsMaintPassword;
-    btnPwDelete->SetBounds(580, 240, 110, 40);
-    btnPwDelete->Caption=LangT("Delete");
-    btnPwDelete->OnClick=PwDeleteClick;
-
-    btnPwSave=new TButton(this);
-    btnPwSave->Parent=tsMaintPassword;
-    btnPwSave->SetBounds(420, 296, 150, 40);
-    btnPwSave->Caption=LangT("Save to File");
-    btnPwSave->OnClick=PwSaveClick;
-
-    btnPwReload=new TButton(this);
-    btnPwReload->Parent=tsMaintPassword;
-    btnPwReload->SetBounds(580, 296, 110, 40);
-    btnPwReload->Caption=LangT("Reload");
-    btnPwReload->OnClick=PwReloadClick;
+    switch(Tag)
+    {
+        case 0: title=LangT("Empty destack settle (ms)"); return &GeneralSetting.iEmptyDestackSettleMs;
+        case 1: title=LangT("Color destack settle (ms)"); return &GeneralSetting.iColorDestackSettleMs;
+        case 2: title=LangT("Loader destack settle (ms)"); return &GeneralSetting.iLoaderDestackSettleMs;
+        case 3: title=LangT("Auto push confirm settle (ms)"); return &GeneralSetting.iAutoPushConfirmSettleMs;
+        case 4: title=LangT("Auto discharge-Y settle (ms)"); return &GeneralSetting.iAutoDischargePostYSettleMs;
+        case 5: title=LangT("Auto front-rise dwell (ms)"); return &GeneralSetting.iAutoFrontRiseDwellMs;
+        case 6: title=LangT("Auto cleanout-rise dwell (ms)"); return &GeneralSetting.iAutoCleanOutRiseDwellMs;
+        case 7: title=LangT("TrayArm clamp settle (ms)"); return &GeneralSetting.iTrayArmClampSettleMs;
+        case 8: title=LangT("Empty feed-clamp settle (ms)"); return &GeneralSetting.iEmptyFeedClampSettleMs;
+        case 9: title=LangT("Color feed-clamp settle ms; 0=skip inline confirm"); return &GeneralSetting.iColorFeedClampSettleMs;
+    }
+    return NULL;
 }
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::edSettleDelayClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    TEdit *ed=(TEdit*)Sender;
+    AnsiString title;
+    int *pv=SettleDelayValPtr(ed->Tag, title);
+    if(pv==NULL)
+        return;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, 0.0, 5000.0, title)==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save settle time?"))!=1)
+    {
+        ed->Text=IntToStr(*pv);
+        return;
+    }
+    int v=ed->Text.ToIntDef(*pv);
+    if(v<0)
+        v=0;
+    if(v>5000)
+        v=5000;
+    *pv=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-password) 20260628 : tsMaintPassword child controls now live in the
+// DFM (designer-visible). This routine runs on every page open: it fills the
+// level combo once, applies all bilingual captions via LangT so they follow the
+// language toggle, sets the role-based edit lock, and refreshes the user list.
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::ShowPasswordPage()
 {
+    int i;
     bool bCanEdit;
 
-    BuildPasswordUI();
+    if(cbbPwLevel!=NULL && cbbPwLevel->Items->Count==0)
+    {
+        for(i=ROLE_OPERATION; i<=ROLE_HONPREC; i++)
+            cbbPwLevel->Items->Add(IntToStr(i)+" - "+THT160UserRoleManager::GetLevelName(i));
+        cbbPwLevel->ItemIndex=ROLE_OPERATION;
+    }
+
+    if(labPwIdCaption!=NULL)    labPwIdCaption->Caption=LangT("Account ID");
+    if(labPwPassCaption!=NULL)  labPwPassCaption->Caption=LangT("Password");
+    if(labPwLevelCaption!=NULL) labPwLevelCaption->Caption=LangT("Level");
+    if(btnPwAddUpdate!=NULL)    btnPwAddUpdate->Caption=LangT("Add / Update");
+    if(btnPwDelete!=NULL)       btnPwDelete->Caption=LangT("Delete");
+    if(btnPwSave!=NULL)         btnPwSave->Caption=LangT("Save to File");
+    if(btnPwReload!=NULL)       btnPwReload->Caption=LangT("Reload");
+
     RefreshPasswordGrid();
 
     bCanEdit=UserRoleManager.HasLevel(ROLE_ENGINEER);

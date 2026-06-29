@@ -751,9 +751,9 @@ object fTeach: TfTeach
           Top = 0
           Width = 831
           Height = 739
-          ActivePage = tsTrayArm
+          ActivePage = tsCCD
           Align = alClient
-          TabIndex = 2
+          TabIndex = 3
           TabOrder = 0
           object tsSortArm: TTabSheet
             Caption = 'Sort Arm'
@@ -839,6 +839,7 @@ object fTeach: TfTeach
                 Height = 24
                 TabOrder = 2
                 Text = '1'
+                OnClick = edSaColClick
               end
               object edSaRow: TEdit
                 Left = 432
@@ -847,6 +848,7 @@ object fTeach: TfTeach
                 Height = 24
                 TabOrder = 3
                 Text = '1'
+                OnClick = edSaRowClick
               end
               object chkSaZDown: TCheckBox
                 Left = 552
@@ -1014,7 +1016,7 @@ object fTeach: TfTeach
               object lbTaGrab: TLabel
                 Left = 16
                 Top = 24
-                Width = 62
+                Width = 64
                 Height = 16
                 Caption = 'Grab From'
               end
@@ -1054,7 +1056,7 @@ object fTeach: TfTeach
               object lbTaPlace: TLabel
                 Left = 16
                 Top = 24
-                Width = 49
+                Width = 55
                 Height = 16
                 Caption = 'Place To'
               end
@@ -1087,6 +1089,112 @@ object fTeach: TfTeach
                 TabOrder = 1
                 OnClick = btnTaPlaceClick
               end
+            end
+          end
+          object tsCCD: TTabSheet
+            Caption = 'CCD'
+            ImageIndex = 3
+            object lblCcdStatus: TLabel
+              Left = 16
+              Top = 120
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
+            end
+            object gbCcd: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 823
+              Height = 100
+              Align = alTop
+              Caption = 'CCD Move To Cell Test (LoaderR / LoaderL)'
+              TabOrder = 0
+              object lbCcdChannel: TLabel
+                Left = 16
+                Top = 24
+                Width = 53
+                Height = 16
+                Caption = 'CCD Area'
+              end
+              object lbCcdCol: TLabel
+                Left = 176
+                Top = 24
+                Width = 69
+                Height = 16
+                Caption = 'Column (1..)'
+              end
+              object lbCcdRow: TLabel
+                Left = 296
+                Top = 24
+                Width = 51
+                Height = 16
+                Caption = 'Row (1..)'
+              end
+              object cbCcdChannel: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'LoaderR'
+                Items.Strings = (
+                  'LoaderR'
+                  'LoaderL')
+              end
+              object edCcdCol: TEdit
+                Left = 176
+                Top = 40
+                Width = 105
+                Height = 24
+                TabOrder = 1
+                Text = '1'
+                OnClick = edCcdColClick
+              end
+              object edCcdRow: TEdit
+                Left = 296
+                Top = 40
+                Width = 105
+                Height = 24
+                TabOrder = 2
+                Text = '1'
+                OnClick = edCcdRowClick
+              end
+              object btnCcdGo: TButton
+                Left = 424
+                Top = 36
+                Width = 185
+                Height = 33
+                Caption = 'GO (Move CCD To Cell)'
+                TabOrder = 3
+                OnClick = btnCcdGoClick
+              end
+            end
+            object gbColorCcd: TGroupBox
+              Left = 0
+              Top = 144
+              Width = 823
+              Height = 100
+              Caption = 'Color CCD Photo Test (Identity Tray, move only)'
+              TabOrder = 1
+              object btnColorCcdGo: TButton
+                Left = 16
+                Top = 36
+                Width = 280
+                Height = 33
+                Caption = 'GO (Move Color CCD To Photo Position)'
+                TabOrder = 0
+                OnClick = btnColorCcdGoClick
+              end
+            end
+            object lblColorCcdStatus: TLabel
+              Left = 16
+              Top = 256
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
             end
           end
         end

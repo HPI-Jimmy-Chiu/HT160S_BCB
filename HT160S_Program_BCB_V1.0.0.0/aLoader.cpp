@@ -165,9 +165,6 @@ double TLoaderModule::GetTrayYPitch()
     return TrayForm.YPitch*100.0;   //AI(ht160s-maintainer) 20260624 : mm to 1/100mm, see GetTrayXPitch.
 }
 //---------------------------------------------------------------------------
-static const int LOADER_X_DATUM_BIAS=-1000;   //AI(ht160s-maintainer) 20260624 : P2 datum bias, mirrors aSortArm
-static const int LOADER_Y_DATUM_BIAS=-1000;
-//---------------------------------------------------------------------------
 double TLoaderModule::GetTrayXStart()
 {
     //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset X (mm->1/100mm), P2 HT172-align. Same TrayForm as SortArm => CCD shares origin.
@@ -341,18 +338,75 @@ bool TLoaderModule::MoveTopCcdX(int Position)
 //---------------------------------------------------------------------------
 bool TLoaderModule::MoveToCcdCell(int LoaderNo, int CellX, int CellY)
 {
-    double DatumX=0.0;
-    double DatumY=0.0;
-    if(GeneralSetting.bUseTrayDatumModel)
-    {
-        DatumX=(double)LOADER_X_DATUM_BIAS+GetTrayXStart();
-        DatumY=(double)LOADER_Y_DATUM_BIAS+GetTrayYStart();
-    }
-    int XPos=RoundPosition((double)GetTopCcdFirstX()+DatumX+((double)CellX)*GetTrayXPitch());
-    int YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+DatumY+((double)CellY)*GetTrayYPitch());
+    //AI(ht160s-maintainer) 20260627 : CCD scan no longer applies the tray-datum model
+    //(XStart/YStart bias). The TopCCD base teach (GetTopCcdFirstX/GetLoaderFirstCcdY) is
+    //the first-cell scan position directly: pos = base + cell*pitch.
+    int XPos=RoundPosition((double)GetTopCcdFirstX()+((double)CellX)*GetTrayXPitch());
+    int YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+((double)CellY)*GetTrayYPitch());
     bool bXFlag=MoveTopCcdX(XPos);
     bool bYFlag=MoveLoaderY(LoaderNo, YPos);
     return (bXFlag && bYFlag);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ccd-teach-test) 20260628 : Teach Advanced CCD move-to-cell test support. Mirrors
+//SortArm CanMoveSuckerToCell/MoveSuckerToCell. Drives the Top CCD over a chosen tray cell on
+//LoaderR(=2)/LoaderL(=1) so RD can verify CCD-to-cell alignment from the Teach screen. Reuses the
+//existing private MoveToCcdCell (commands+polls both axes and re-checks the shared-rail interlock
+//each tick). Cells are 0-based here; the uteach caller converts 1-based UI by -1.
+bool TLoaderModule::CanMoveCcdToCell(int LoaderNo, int CellX, int CellY, AnsiString &Err)
+{
+    int XPos;
+    int YPos;
+    TTrayMotor *Y;
+
+    Err="";
+    if(IsValidLoaderNo(LoaderNo)==false)
+    {
+        Err="Invalid Loader number";
+        return false;
+    }
+    if(CellX<0 || CellX>=GetTrayXCount())
+    {
+        Err="Column out of tray range (1.."+IntToStr(GetTrayXCount())+")";
+        return false;
+    }
+    if(CellY<0 || CellY>=GetTrayYCount())
+    {
+        Err="Row out of tray range (1.."+IntToStr(GetTrayYCount())+")";
+        return false;
+    }
+    XPos=RoundPosition((double)GetTopCcdFirstX()+((double)CellX)*GetTrayXPitch());
+    YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+((double)CellY)*GetTrayYPitch());
+    if(HSys.Mot.MTopCCDX==NULL || HSys.Mot.MTopCCDX->CheckSoftLimit(XPos)==false)
+    {
+        Err="Top CCD X target over soft limit";
+        return false;
+    }
+    Y=(LoaderNo==2) ? HSys.Mot.MLoaderY_2 : HSys.Mot.MLoaderY_1;
+    if(Y==NULL || Y->CheckSoftLimit(YPos)==false)
+    {
+        Err="Loader Y target over soft limit";
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TLoaderModule::MoveCcdToCell(int LoaderNo, int CellX, int CellY, int &Task)
+{
+    //AI(ht160s-ccd-teach-test) 20260628 : task-stepped wrapper. MoveToCcdCell commands then polls
+    //the Top CCD X + the chosen Loader Y to in-position and re-checks IsLoaderYMoveSafe every tick
+    //(waits, never fails hard, if the other carriage blocks the shared rail). Bad args -> Task=900,
+    //finish with no motion (mirror SortArm). Caller validates first via CanMoveCcdToCell.
+    if(IsValidLoaderNo(LoaderNo)==false ||
+       CellX<0 || CellX>=GetTrayXCount() ||
+       CellY<0 || CellY>=GetTrayYCount())
+    {
+        Task=900;
+        return true;
+    }
+    if(MoveToCcdCell(LoaderNo, CellX, CellY))
+        return true;
+    return false;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : AMR P1 (Loader) handoff interface, mirrors TAutoModule.
@@ -1747,7 +1801,7 @@ bool TLoaderModule::TestGoUpTray(int Flag)
                 if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
                     break;   // interlock: wait while Empty front-separate is out
                 HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
-                TestDelay.Set(10);
+                TestDelay.SetMS(GeneralSetting.iLoaderDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=300;
             }
@@ -1765,7 +1819,7 @@ bool TLoaderModule::TestGoUpTray(int Flag)
             if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
-                TestDelay.Set(10);
+                TestDelay.SetMS(GeneralSetting.iLoaderDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=500;
             }

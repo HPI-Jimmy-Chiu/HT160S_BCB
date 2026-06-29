@@ -861,6 +861,109 @@ object fMaintenance: TfMaintenance
       end
       object tsMaintPassword: TTabSheet
         Caption = 'Password'
+        object labPwHint: TLabel
+          Left = 16
+          Top = 12
+          Width = 720
+          Height = 20
+          AutoSize = False
+        end
+        object labPwIdCaption: TLabel
+          Left = 420
+          Top = 50
+          Width = 120
+          Height = 20
+          AutoSize = False
+        end
+        object labPwPassCaption: TLabel
+          Left = 420
+          Top = 110
+          Width = 120
+          Height = 20
+          AutoSize = False
+        end
+        object labPwLevelCaption: TLabel
+          Left = 420
+          Top = 170
+          Width = 120
+          Height = 20
+          AutoSize = False
+        end
+        object lbPwUsers: TListBox
+          Left = 16
+          Top = 44
+          Width = 380
+          Height = 320
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -13
+          Font.Name = 'Courier New'
+          Font.Style = []
+          ItemHeight = 16
+          ParentFont = False
+          TabOrder = 0
+          OnClick = PwListClick
+        end
+        object edPwId: TEdit
+          Left = 420
+          Top = 72
+          Width = 240
+          Height = 28
+          ReadOnly = True
+          TabOrder = 1
+          OnClick = PwIdClick
+        end
+        object edPwPass: TEdit
+          Left = 420
+          Top = 132
+          Width = 240
+          Height = 28
+          PasswordChar = '*'
+          ReadOnly = True
+          TabOrder = 2
+          OnClick = PwPassClick
+        end
+        object cbbPwLevel: TComboBox
+          Left = 420
+          Top = 192
+          Width = 240
+          Height = 28
+          Style = csDropDownList
+          ItemHeight = 20
+          TabOrder = 3
+        end
+        object btnPwAddUpdate: TButton
+          Left = 420
+          Top = 240
+          Width = 150
+          Height = 40
+          TabOrder = 4
+          OnClick = PwAddUpdateClick
+        end
+        object btnPwDelete: TButton
+          Left = 580
+          Top = 240
+          Width = 110
+          Height = 40
+          TabOrder = 5
+          OnClick = PwDeleteClick
+        end
+        object btnPwSave: TButton
+          Left = 420
+          Top = 296
+          Width = 150
+          Height = 40
+          TabOrder = 6
+          OnClick = PwSaveClick
+        end
+        object btnPwReload: TButton
+          Left = 580
+          Top = 296
+          Width = 110
+          Height = 40
+          TabOrder = 7
+          OnClick = PwReloadClick
+        end
       end
       object tsMaintSoftSimu: TTabSheet
         Caption = 'AMR'
@@ -1303,6 +1406,279 @@ object fMaintenance: TfMaintenance
                   Height = 24
                   TabOrder = 2
                   Text = ''
+                end
+              end
+              object pnlSettleDelay: TPanel
+                Left = 0
+                Top = 370
+                Width = 929
+                Height = 232
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 5
+                object lblSettleDelayTitle: TLabel
+                  Left = 20
+                  Top = 8
+                  Width = 880
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Mechanism Settle Times (ms) - default = original fixed values'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle0: TLabel
+                  Left = 20
+                  Top = 36
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Empty destack (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle0: TEdit
+                  Left = 240
+                  Top = 32
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Tag = 0
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle1: TLabel
+                  Left = 20
+                  Top = 72
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Color destack (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle1: TEdit
+                  Left = 240
+                  Top = 68
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 1
+                  Tag = 1
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle2: TLabel
+                  Left = 20
+                  Top = 108
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Loader destack (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle2: TEdit
+                  Left = 240
+                  Top = 104
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 2
+                  Tag = 2
+                  Text = '1000'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle3: TLabel
+                  Left = 20
+                  Top = 144
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto push confirm (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle3: TEdit
+                  Left = 240
+                  Top = 140
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 3
+                  Tag = 3
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle4: TLabel
+                  Left = 20
+                  Top = 180
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto discharge-Y (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle4: TEdit
+                  Left = 240
+                  Top = 176
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 4
+                  Tag = 4
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle5: TLabel
+                  Left = 480
+                  Top = 36
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto front-rise (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle5: TEdit
+                  Left = 700
+                  Top = 32
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 5
+                  Tag = 5
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle6: TLabel
+                  Left = 480
+                  Top = 72
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto cleanout-rise (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle6: TEdit
+                  Left = 700
+                  Top = 68
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 6
+                  Tag = 6
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle7: TLabel
+                  Left = 480
+                  Top = 108
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'TrayArm clamp (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle7: TEdit
+                  Left = 700
+                  Top = 104
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 7
+                  Tag = 7
+                  Text = '300'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle8: TLabel
+                  Left = 480
+                  Top = 144
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Empty feed-clamp (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle8: TEdit
+                  Left = 700
+                  Top = 140
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 8
+                  Tag = 8
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object lblSettle9: TLabel
+                  Left = 480
+                  Top = 180
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Color feed-clamp (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle9: TEdit
+                  Left = 700
+                  Top = 176
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 9
+                  Tag = 9
+                  Text = '500'
+                  OnClick = edSettleDelayClick
                 end
               end
             end

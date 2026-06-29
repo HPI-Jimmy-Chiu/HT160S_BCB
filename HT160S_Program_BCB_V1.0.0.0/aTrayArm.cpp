@@ -218,7 +218,7 @@ bool TTrayArmModule::DoLowerClampRaise(bool bGrab, int &Task)
                 : (HSys.Cyn.C_TrayArm_FrontClamp.Pop()  && HSys.Cyn.C_TrayArm_RearClamp.Pop());
             if(bClamp || IsSoftSimulate())
             {
-                ArmDelay.Set(3);
+                ArmDelay.SetMS(GeneralSetting.iTrayArmClampSettleMs);
                 ArmDelay.On();
                 Task=2100;
             }

@@ -35,8 +35,19 @@ void THT160GeneralSetting::SetDefault()
 	for(int s=0;s<4;s++)
 		bSuckerEnabled[s]=true;
 	bShowSortArmPlaceCheck=false;
-	bUseTrayDatumModel=true;
+	iSortArmXDatumBias=-1000;
+	iSortArmYDatumBias=-1000;
 	iLoaderYSafeDistance=10000;
+	iEmptyDestackSettleMs=500;
+	iColorDestackSettleMs=500;
+	iLoaderDestackSettleMs=1000;
+	iAutoPushConfirmSettleMs=500;
+	iAutoDischargePostYSettleMs=500;
+	iAutoFrontRiseDwellMs=500;
+	iAutoCleanOutRiseDwellMs=500;
+	iTrayArmClampSettleMs=300;
+	iEmptyFeedClampSettleMs=500;
+	iColorFeedClampSettleMs=500;
 	bFrontSeparateInterlock=true;
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
@@ -84,8 +95,19 @@ void THT160GeneralSetting::Load()
 	for(int s=0;s<4;s++)
 		bSuckerEnabled[s]=Ini->ReadBool("HardwareInstall", "SuckerEnabled"+IntToStr(s), true);
 	bShowSortArmPlaceCheck=Ini->ReadBool("Diagnostic", "ShowSortArmPlaceCheck", false);
-	bUseTrayDatumModel=Ini->ReadBool("HardwareInstall", "UseTrayDatumModel", true);
+	iSortArmXDatumBias=Ini->ReadInteger("SortArm", "XDatumBias", -1000);
+	iSortArmYDatumBias=Ini->ReadInteger("SortArm", "YDatumBias", -1000);
 	iLoaderYSafeDistance=Ini->ReadInteger("Safety", "LoaderYSafeDistance", 10000);
+	iEmptyDestackSettleMs=Ini->ReadInteger("SettleDelay", "EmptyDestackSettleMs", 500);
+	iColorDestackSettleMs=Ini->ReadInteger("SettleDelay", "ColorDestackSettleMs", 500);
+	iLoaderDestackSettleMs=Ini->ReadInteger("SettleDelay", "LoaderDestackSettleMs", 1000);
+	iAutoPushConfirmSettleMs=Ini->ReadInteger("SettleDelay", "AutoPushConfirmSettleMs", 500);
+	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
+	iAutoFrontRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoFrontRiseDwellMs", 500);
+	iAutoCleanOutRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoCleanOutRiseDwellMs", 500);
+	iTrayArmClampSettleMs=Ini->ReadInteger("SettleDelay", "TrayArmClampSettleMs", 300);
+	iEmptyFeedClampSettleMs=Ini->ReadInteger("SettleDelay", "EmptyFeedClampSettleMs", 500);
+	iColorFeedClampSettleMs=Ini->ReadInteger("SettleDelay", "ColorFeedClampSettleMs", 500);
 	bFrontSeparateInterlock=Ini->ReadBool("Safety", "FrontSeparateInterlock", true);
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
@@ -132,8 +154,19 @@ void THT160GeneralSetting::Save()
 	for(int s=0;s<4;s++)
 		Ini->WriteBool("HardwareInstall", "SuckerEnabled"+IntToStr(s), bSuckerEnabled[s]);
 	Ini->WriteBool("Diagnostic", "ShowSortArmPlaceCheck", bShowSortArmPlaceCheck);
-	Ini->WriteBool("HardwareInstall", "UseTrayDatumModel", bUseTrayDatumModel);
+	Ini->WriteInteger("SortArm", "XDatumBias", iSortArmXDatumBias);
+	Ini->WriteInteger("SortArm", "YDatumBias", iSortArmYDatumBias);
 	Ini->WriteInteger("Safety", "LoaderYSafeDistance", iLoaderYSafeDistance);
+	Ini->WriteInteger("SettleDelay", "EmptyDestackSettleMs", iEmptyDestackSettleMs);
+	Ini->WriteInteger("SettleDelay", "ColorDestackSettleMs", iColorDestackSettleMs);
+	Ini->WriteInteger("SettleDelay", "LoaderDestackSettleMs", iLoaderDestackSettleMs);
+	Ini->WriteInteger("SettleDelay", "AutoPushConfirmSettleMs", iAutoPushConfirmSettleMs);
+	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
+	Ini->WriteInteger("SettleDelay", "AutoFrontRiseDwellMs", iAutoFrontRiseDwellMs);
+	Ini->WriteInteger("SettleDelay", "AutoCleanOutRiseDwellMs", iAutoCleanOutRiseDwellMs);
+	Ini->WriteInteger("SettleDelay", "TrayArmClampSettleMs", iTrayArmClampSettleMs);
+	Ini->WriteInteger("SettleDelay", "EmptyFeedClampSettleMs", iEmptyFeedClampSettleMs);
+	Ini->WriteInteger("SettleDelay", "ColorFeedClampSettleMs", iColorFeedClampSettleMs);
 	Ini->WriteBool("Safety", "FrontSeparateInterlock", bFrontSeparateInterlock);
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);

@@ -420,7 +420,7 @@ bool TColorModule::DoGoDownTray(int Flag)
         case 200:
             if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=300;
             }
@@ -430,7 +430,7 @@ bool TColorModule::DoGoDownTray(int Flag)
             if(GoDownDelay.Off())
             {
                 PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2);
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=350;
             }
@@ -444,7 +444,7 @@ bool TColorModule::DoGoDownTray(int Flag)
         case 400:
             if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=450;
             }
@@ -458,7 +458,7 @@ bool TColorModule::DoGoDownTray(int Flag)
         case 500:
             if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=600;
             }
@@ -535,7 +535,7 @@ bool TColorModule::DoGoUpTray(int Flag)
             if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Color_FrontSeparateTray_1.On();
-                GoUpDelay.Set(5);
+                GoUpDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=300;
             }
@@ -553,7 +553,7 @@ bool TColorModule::DoGoUpTray(int Flag)
             if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
-                GoUpDelay.Set(5);
+                GoUpDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=500;
             }
@@ -668,6 +668,33 @@ bool TColorModule::MoveColorY(int Position)
     return HSys.Mot.MColorY->MotorMove(Position);
 }
 //---------------------------------------------------------------------------
+bool TColorModule::MoveColorCcdX(int Position)
+{
+    //AI(ht160s-color-ccd-xy) 20260628 : move the Color CCD reader (stepper, X axis) to a taught
+    //position. Mirrors TLoaderModule::MoveTopCcdX. Returns false on NULL / out-of-limit so the
+    //caller's ladder WAITS instead of advancing as if the move had completed.
+    if(HSys.Mot.MTopCCDX_Color==NULL)
+        return false;
+    if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Position)==false)
+    {
+        ShowMyMessage(LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color->SoftLimitDetail(Position));
+        return false;
+    }
+    return HSys.Mot.MTopCCDX_Color->MotorMove(Position);
+}
+//---------------------------------------------------------------------------
+bool TColorModule::MoveColorCcdToScan()
+{
+    //AI(ht160s-color-ccd-xy) 20260628 : move the carriage Y and the CCD reader X to the taught
+    //photo position TOGETHER (both commanded every call; returns true only when BOTH are in
+    //position). Mirrors TLoaderModule::MoveToCcdCell (parallel X+Y). Shared by production
+    //DoFeedTray case 3000 AND the Teach Advanced Color CCD photo test, so both move identically.
+    //MoveColorY keeps its soft-limit + (real-build) TrayArm anti-collision guard.
+    bool bYFlag=MoveColorY(Teach.ColorRead2DYPosition);
+    bool bXFlag=MoveColorCcdX(Teach.ColorRead2DXPosition);
+    return (bYFlag && bXFlag);
+}
+//---------------------------------------------------------------------------
 bool TColorModule::DoFeedTray(int Flag)
 {
     int Ret;
@@ -730,7 +757,7 @@ bool TColorModule::DoFeedTray(int Flag)
             //DoClampTray (lean-stop first, push last), shared with Empty. SettleTicks=0
             //keeps Color's behavior; the rear output sensor at case 7000 verifies the tray.
             int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray,
-                                  FeedClampSub, FeedDelay, IsSoftSimulate(), 0);
+                                  FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iColorFeedClampSettleMs);
             if(Clamp==1)
             {
                 //AI(ht160s-color-align-empty) 20260627 : carriage clamped the front-staged tray
@@ -744,6 +771,14 @@ bool TColorModule::DoFeedTray(int Flag)
                 }
                 FeedTask=3000;
             }
+            else if(Clamp==2)
+            {
+                //AI(ht160s-color-align-empty) 20260628 : push miss -- helper already Popped
+                //the push + reset FeedClampSub. Color-own code (NOT Empty JAM1030) + retry.
+                Ret=ShowMyError("MES1422", LangT("Color Push Tray Miss"), K_RETRY);
+                if(Ret==K_RETRY)
+                    FeedTask=1000;
+            }
             break;
         }
 
@@ -753,7 +788,10 @@ bool TColorModule::DoFeedTray(int Flag)
         //own ScanTask) that moves the CCD-X reader + LON/read/LOFF and births the identity
         //tray. Tune the interleave / scan position here if the optics layout changes.
         case 3000:
-            if(MoveColorY(Teach.ColorRead2DYPosition))
+            //AI(ht160s-color-ccd-xy) 20260628 : move carriage Y + CCD reader X TOGETHER via the
+            //shared MoveColorCcdToScan (mirrors Loader MoveToCcdCell). DoReadColor2D case 10 then
+            //re-asserts the CCD X position (a no-op once it is already there).
+            if(MoveColorCcdToScan())
             {
                 DoReadColor2D(0);
                 FeedTask=3100;
@@ -1139,7 +1177,7 @@ bool TColorModule::TestGoDownTray(int Flag)
             if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Color_FrontSeparateTray_1.On();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestDownTask=4000;
             }
@@ -1149,7 +1187,7 @@ bool TColorModule::TestGoDownTray(int Flag)
             if(TestDelay.Off())
             {
                 HSys.Cyn.C_Color_FrontRiseTray_2.Off();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestDownTask=4100;
             }
@@ -1164,7 +1202,7 @@ bool TColorModule::TestGoDownTray(int Flag)
             if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestDownTask=6000;
             }
@@ -1206,7 +1244,7 @@ bool TColorModule::TestGoUpTray(int Flag)
             if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Color_FrontSeparateTray_1.On();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=300;
             }
@@ -1224,7 +1262,7 @@ bool TColorModule::TestGoUpTray(int Flag)
             if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=500;
             }

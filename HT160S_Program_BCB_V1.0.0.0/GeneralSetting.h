@@ -60,13 +60,31 @@ public:
 	// comparing actual vs expected motor positions. Per-machine engineering check,
 	// default OFF. Toggle via [Diagnostic] ShowSortArmPlaceCheck in General.ini.
 	bool bShowSortArmPlaceCheck;
-	bool bUseTrayDatumModel;   //AI(ht160s-maintainer) 20260624 : P2 HT172-align gate, default ON (company calibration model); toggle in tsOption; ON=inject XStart/YStart+datum into cell positioning
+	// AI(ht160s-maintainer) 20260627 : SortArm tray-datum bias (1/100mm). The taught SortArm
+	// base is the calibration datum; the first cell = base + bias + XStart/YStart. These are
+	// per-machine commissioning offsets, edited directly in General.ini [SortArm]
+	// XDatumBias/YDatumBias (default -1000 = -10mm each). Replaces the old bUseTrayDatumModel
+	// gate (removed) and the compile-time SORT_ARM_X/Y_DATUM_BIAS constants. CCD scan no
+	// longer applies any datum.
+	int iSortArmXDatumBias;
+	int iSortArmYDatumBias;
 
 	// Safety : minimum encoder gap (motor counts) the two Loader-Y cars must keep
 	// from each other before either car is allowed to move, used only when the
 	// opposite car is clamping a tray. Larger = more conservative. Per-machine
 	// commissioning value. Set via [Safety] LoaderYSafeDistance in General.ini.
 	int iLoaderYSafeDistance;
+	// SettleDelay : operator-tunable mechanism settle dwells (ms). Default = old fixed values.
+	int iEmptyDestackSettleMs;
+	int iColorDestackSettleMs;
+	int iLoaderDestackSettleMs;
+	int iAutoPushConfirmSettleMs;
+	int iAutoDischargePostYSettleMs;
+	int iAutoFrontRiseDwellMs;
+	int iAutoCleanOutRiseDwellMs;
+	int iTrayArmClampSettleMs;
+	int iEmptyFeedClampSettleMs;
+	int iColorFeedClampSettleMs;
 
 	// Safety (short-term mechanical interlock) : the Empty and Loader front
 	// separate-tray cylinders (C_Empty_FrontSeparateTray_1 /

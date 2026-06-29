@@ -60,6 +60,7 @@ private:
     bool PushCylinder(TMyCylinder &Cyn);
     bool PopCylinder(TMyCylinder &Cyn);
     bool MoveColorY(int Position);   //AI(HT160S-Maintainer) 20260622 : move Color carriage in Y (front/back)
+    bool MoveColorCcdX(int Position);   //AI(ht160s-color-ccd-xy) 20260628 : move Color CCD reader X (shared by scan-move + DoReadColor2D)
     bool DoGoDownTray(int Flag);   //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack -> front staging (like Empty)
     bool DoGoUpTray(int Flag);     //AI(phase6-loader-recycle) 20260625 : stack a returned tray back onto the front supply car (mirrors TEmptyModule::DoGoUpTray)
     bool DoFeedTray(int Flag);
@@ -105,6 +106,7 @@ public:
 
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; Color has no production GoUp)
     bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, mirrors Empty)
+    bool MoveColorCcdToScan();       //AI(ht160s-color-ccd-xy) 20260628 : carriage Y + CCD reader X to photo pos together (prod case3000 + Teach test)
 };
 //---------------------------------------------------------------------------
 extern TColorModule *ColorModule;

@@ -423,7 +423,6 @@ fMaintenance	chkSuckEnable4	Nozzle4	吸嘴4
 fMaintenance	tsOption	Option	選項
 fMaintenance	lblBinPanelType	Bin Display Panel	Bin顯示面板
 fMaintenance	cbCommType	CommType	通訊類型
-fMaintenance	chkUseTrayDatumModel	Tray Datum (XStart/YStart)	料盤基準(XStart/YStart)
 fMaintenance	tsLotInfo	Lot Info	Lot資訊
 fMaintenance	lblLotBinModeHint	When ON, classify By Lot+Bin (each Lot+Bin pair binds to an Auto dynamically). When OFF, Normal mode (static Bin->Auto table). Changing this needs a software restart.	開啟時，依Lot+Bin分類(各Lot+Bin配對動態綁定至Auto)。關閉時為一般模式(固定Bin->Auto對照表)。變更後需重新啟動軟體。
 fMaintenance	chkUseLotBinMode	Sort By Lot+Bin	依Lot+Bin分類

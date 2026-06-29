@@ -37,7 +37,7 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
 //  simulating or the cylinder is disabled. SettleTicks>0 -> settle delay then
 //  confirm Push.OnSensor, Pop on miss. Display/alarm stays in the caller.
 int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
-                HTimer &Delay, bool bSoftSimulate, int SettleTicks)
+                HTimer &Delay, bool bSoftSimulate, int SettleMs)
 {
     switch(SubTask)
     {
@@ -49,12 +49,12 @@ int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
         case 10:  // push last
             if(bSoftSimulate || Push.Enable==false || Push.Push())
             {
-                if(SettleTicks<=0)
+                if(SettleMs<=0)
                 {
                     SubTask=0;
                     return 1;
                 }
-                Delay.Set(SettleTicks);
+                Delay.SetMS(SettleMs);
                 Delay.On();
                 SubTask=20;
             }

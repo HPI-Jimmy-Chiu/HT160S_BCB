@@ -74,8 +74,6 @@ private:
     bool ActiveTrayAllData(int LoaderNo, int Data);
     bool FindNextCcdCell(int LoaderNo, int &CellX, int &CellY);
 
-    int GetTrayXCount();
-    int GetTrayYCount();
     double GetTrayXPitch();
     double GetTrayYPitch();
     double GetTrayXStart();   //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset (P2 HT172-align)
@@ -143,6 +141,10 @@ public:
 
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; shared destacker, no LoaderNo)
     bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, extracted from DoFeedTray)
+    bool CanMoveCcdToCell(int LoaderNo, int CellX, int CellY, AnsiString &Err);  //AI(ht160s-ccd-teach-test) 20260628 : Teach CCD move-to-cell foolproof gate (mirror SortArm CanMoveSuckerToCell); 0-based cells
+    bool MoveCcdToCell(int LoaderNo, int CellX, int CellY, int &Task);           //AI(ht160s-ccd-teach-test) 20260628 : task-stepped CCD move to a tray cell (reuses private MoveToCcdCell)
+    int GetTrayXCount();   //AI(ht160s-ccd-teach-test) 20260628 : public for Teach numpad upper limit (tray-form columns)
+    int GetTrayYCount();   //AI(ht160s-ccd-teach-test) 20260628 : public for Teach numpad upper limit (tray-form rows)
 };
 //---------------------------------------------------------------------------
 extern TLoaderModule *LoaderModule;

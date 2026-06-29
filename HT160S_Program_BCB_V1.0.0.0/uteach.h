@@ -258,6 +258,19 @@ __published:
     TLabel *lbTaPlace;
     TComboBox *cbTaPlaceChannel;
     TButton *btnTaPlace;
+    TTabSheet *tsCCD;
+    TLabel *lblCcdStatus;
+    TGroupBox *gbCcd;
+    TLabel *lbCcdChannel;
+    TComboBox *cbCcdChannel;
+    TLabel *lbCcdCol;
+    TLabel *lbCcdRow;
+    TEdit *edCcdCol;
+    TEdit *edCcdRow;
+    TButton *btnCcdGo;
+    TGroupBox *gbColorCcd;
+    TButton *btnColorCcdGo;
+    TLabel *lblColorCcdStatus;
 
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
@@ -287,6 +300,12 @@ __published:
     void __fastcall btnAutoGoUpClick(TObject *Sender);
     void __fastcall btnTaGrabClick(TObject *Sender);
     void __fastcall btnTaPlaceClick(TObject *Sender);
+    void __fastcall btnCcdGoClick(TObject *Sender);
+    void __fastcall btnColorCcdGoClick(TObject *Sender);
+    void __fastcall edCcdColClick(TObject *Sender);
+    void __fastcall edCcdRowClick(TObject *Sender);
+    void __fastcall edSaColClick(TObject *Sender);
+    void __fastcall edSaRowClick(TObject *Sender);
 private:
     bool bUIBuilt;
     bool bTeachReady;
@@ -317,6 +336,14 @@ private:
     int iTaTask;
     int iTaChannel;
     bool bTaIsGrab;
+
+    bool bCcdTestRunning;
+    int iCcdTask;
+    int iCcdLoaderNo;
+    int iCcdCol;
+    int iCcdRow;
+
+    bool bColorCcdTestRunning;
 
     TLabel *lblStatus[iMotLedTotalCnt];
     TALed *ledStatus[iMotLedTotalCnt];
@@ -382,6 +409,18 @@ private:
     void RunTrayArmTest();
     void StopTrayArmTest();
     void SetTaStatus(AnsiString Text);
+    bool EditCellWithNumpad(TEdit *Edit, int MaxValue, AnsiString Caption);
+    void PopulateCcdCombos();
+    int ComboIndexToLoaderNo(int Index);
+    bool CheckCcdTestReady(int LoaderNo);
+    void RunCcdTest();
+    void StopCcdTest();
+    void SetCcdStatus(AnsiString Text);
+    bool CheckColorCcdTestReady();
+    void RunColorCcdTest();
+    void StopColorCcdTest();
+    void SetColorCcdStatus(AnsiString Text);
+    void StopAllAdvancedTests();
 public:
     __fastcall TfTeach(TComponent* Owner);
     void __fastcall InitialTeachParameter();

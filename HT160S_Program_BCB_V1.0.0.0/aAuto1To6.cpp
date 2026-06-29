@@ -538,7 +538,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             PushCylinder=GetPush(iFeedAuto);
             if(PushCylinder!=NULL && (PushCylinder->Push() || IsSoftSimulate()))
             {
-                FeedDelay.Set(5);
+                FeedDelay.SetMS(GeneralSetting.iAutoPushConfirmSettleMs);
                 FeedDelay.On();
                 FeedTask=5100;
             }
@@ -681,7 +681,7 @@ bool TAutoModule::DoDischargeTray(int Flag)
         case 5000:
             if(MoveAutoY(iDischargeAuto, GetAutoFeedY(iDischargeAuto)))
             {
-                DischargeDelay.Set(5);
+                DischargeDelay.SetMS(GeneralSetting.iAutoDischargePostYSettleMs);
                 DischargeDelay.On();
                 Task=6000;
             }
@@ -804,7 +804,7 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
             }
             if(AreAllFlagsOn(bCleanOutCheck))
             {
-                CleanOutDelay.Set(5);
+                CleanOutDelay.SetMS(GeneralSetting.iAutoCleanOutRiseDwellMs);
                 CleanOutDelay.On();
                 for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
                     bCleanOutCheck[Index]=false;
@@ -1371,7 +1371,7 @@ bool TAutoModule::DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay)
             Rise->On();
             if(IsCylinderOnReady(Rise, IsSoftSimulate()))
             {
-                Delay.Set(5);
+                Delay.SetMS(GeneralSetting.iAutoFrontRiseDwellMs);
                 Delay.On();
                 SubTask=2;
             }

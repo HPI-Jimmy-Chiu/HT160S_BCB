@@ -80,7 +80,7 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate);
 //  +Pop-on-miss; ==0 skips it. Returns 0=running, 1=clamped, 2=push miss.
 //  SubTask caller-owned (init 0); Delay caller-owned settle timer.
 int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
-                HTimer &Delay, bool bSoftSimulate, int SettleTicks);
+                HTimer &Delay, bool bSoftSimulate, int SettleMs);
 //AI(ht160s-maintainer) 20260625 : short-term mechanical interlock. The Empty and
 //  Loader front separate-tray cylinders clash if both extend at once. Returns true
 //  when MY side must wait because the OTHER side's output is commanded out. Gated by

@@ -73,6 +73,13 @@ __fastcall TfTeach::TfTeach(TComponent* Owner)
     iTaChannel=-1;
     bTaIsGrab=false;
 
+    bCcdTestRunning=false;
+    iCcdTask=0;
+    iCcdLoaderNo=-1;
+    iCcdCol=0;
+    iCcdRow=0;
+    bColorCcdTestRunning=false;
+
     // UI is fully defined in uteach.dfm; VCL auto-binds the __published members on
     // form streaming. Only the lblStatus[]/ledStatus[] arrays are non-published and
     // are mapped from the named DFM LEDs in BindDfmComponents (TfMotorTest pattern).
@@ -119,6 +126,8 @@ void __fastcall TfTeach::FormClose(TObject *Sender, TCloseAction &Action)
     StopSortArmTest();
     StopCarTest();
     StopTrayArmTest();
+    StopCcdTest();
+    StopColorCcdTest();
     MotorTaskLog("Teach", "", "SCREEN_CLOSE", "Teach closed");
     MotorTaskLogSetActive(false);
 }
@@ -142,6 +151,7 @@ void TfTeach::BuildUI()
     PopulateAdvancedCombos();
     PopulateChannelCombos();
     PopulateTrayArmCombos();
+    PopulateCcdCombos();
 
     bUIBuilt=true;
 }
@@ -1007,6 +1017,8 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
             StopSortArmTest();
             StopCarTest();
             StopTrayArmTest();
+            StopCcdTest();
+            StopColorCcdTest();
             SetMessage("Move abort: EMG");
         }
         UpdateMotorMonitor();
@@ -1048,6 +1060,8 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
     RunCarTest();
     RunAutoTest();
     RunTrayArmTest();
+    RunCcdTest();
+    RunColorCcdTest();
     UpdateMotorMonitor();
 }
 //---------------------------------------------------------------------------
@@ -1204,6 +1218,7 @@ void __fastcall TfTeach::btnStopClick(TObject *Sender)
     StopSortArmTest();
     StopCarTest();
     StopTrayArmTest();
+    StopCcdTest();
     SetMessage("Stop");
 }
 //---------------------------------------------------------------------------
@@ -1402,7 +1417,10 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
         return;
     if(SortArmModule->CanMoveSuckerToCell(Slot, Target, Col, Row, Err)==false)
     {
-        ShowMyOKMessageNoStop(LangT(Err));
+        //AI(ht160s-ccd-teach-test) 20260628 : foolproof violation - stop ALL Advanced tests, do
+        //NOT execute, then prompt (operator-chosen behavior; row/col out of tray-form range).
+        StopAllAdvancedTests();
+        ShowMyMessage(LangT(Err));
         SetSaStatus(Err);
         return;
     }
@@ -1796,5 +1814,317 @@ void __fastcall TfTeach::btnTaPlaceClick(TObject *Sender)
     iTaTask=1;
     bTaTestRunning=true;
     SetTaStatus(LangT("TrayArm place test start"));
+}
+//---------------------------------------------------------------------------
+// Shared on-screen numpad for an INTEGER cell index 1..MaxValue, range-enforced. MaxValue is the
+// live tray-form count (GetTrayXCount/GetTrayYCount). The numpad clamps into [1,MaxValue] and
+// writes the value back into Edit->Text; returns true on OK (caller reads Edit->Text only then).
+// Reused by the CCD test and the SortArm Col/Row edits (the user's numpad+limit retrofit).
+bool TfTeach::EditCellWithNumpad(TEdit *Edit, int MaxValue, AnsiString Caption)
+{
+    if(Edit==NULL)
+        return false;
+    if(MaxValue<1)
+        MaxValue=1;
+    if(fQwertyKey==NULL)
+        fQwertyKey=new TfQwertyKey(this);
+    return fQwertyKey->ShowQwertyKey(Edit, N_INTEGER, 0, true, 1.0, (double)MaxValue, Caption);
+}
+//---------------------------------------------------------------------------
+// Stop EVERY Advanced test (foolproof violation path : halt all motion, then do not execute).
+void TfTeach::StopAllAdvancedTests()
+{
+    StopSortArmTest();
+    StopCarTest();
+    StopTrayArmTest();
+    StopCcdTest();
+    StopColorCcdTest();
+}
+//---------------------------------------------------------------------------
+// Advanced page (CCD) : Top CCD move-to-cell test. Like SortArm, drive the CCD to a tray Cell
+// (Column/Row) on LoaderR / LoaderL. Col/Row use the shared numpad (EditCellWithNumpad) limited by
+// the tray-form counts; a foolproof check at GO stops all tests + prompts on any out-of-range value.
+// Color is NOT a cell channel (identity trays have no IC cell grid), so only LoaderR/LoaderL are
+// offered. Motion is the task-stepped LoaderModule->MoveCcdToCell, advanced each tick from tmrUpdate.
+void TfTeach::PopulateCcdCombos()
+{
+    if(cbCcdChannel!=NULL && cbCcdChannel->Items->Count>0 && cbCcdChannel->ItemIndex<0)
+        cbCcdChannel->ItemIndex=0;
+}
+//---------------------------------------------------------------------------
+// cbCcdChannel index 0=LoaderR (LoaderNo 2, MLoaderY_2 right), 1=LoaderL (LoaderNo 1, MLoaderY_1
+// left). -1 = no selection.
+int TfTeach::ComboIndexToLoaderNo(int Index)
+{
+    if(Index==0)
+        return 2;
+    if(Index==1)
+        return 1;
+    return -1;
+}
+//---------------------------------------------------------------------------
+bool TfTeach::CheckCcdTestReady(int LoaderNo)
+{
+    TTrayMotor *X=HSys.Mot.MTopCCDX;
+    TTrayMotor *Y=(LoaderNo==2) ? HSys.Mot.MLoaderY_2 : HSys.Mot.MLoaderY_1;
+
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
+        SetCcdStatus(LangT("Abort: system start"));
+        return false;
+    }
+    if(IsEMGPressed()>0)
+    {
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
+        SetCcdStatus(LangT("Abort: EMG"));
+        return false;
+    }
+    if(X==NULL || Y==NULL)
+    {
+        SetCcdStatus(LangT("Abort: motor missing"));
+        return false;
+    }
+    X->ScanMotorStatus();
+    Y->ScanMotorStatus();
+    if(X->GetEnable()==false || Y->GetEnable()==false)
+    {
+        ShowMyOKMessageNoStop(LangT("Top CCD X and Loader Y must be enabled."));
+        SetCcdStatus(LangT("Abort: motor disabled"));
+        return false;
+    }
+    if(X->Led[iAlarmLed] || X->Led[iServoalarmLed] ||
+       Y->Led[iAlarmLed] || Y->Led[iServoalarmLed])
+    {
+        ShowMyOKMessageNoStop(LangT("Motor alarm is active."));
+        SetCcdStatus(LangT("Abort: motor alarm"));
+        return false;
+    }
+    if(X->bHomeFlag==false || Y->bHomeFlag==false)
+    {
+        ShowMyOKMessageNoStop(LangT("Top CCD X and Loader Y must be home."));
+        SetCcdStatus(LangT("Abort: not home"));
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunCcdTest()
+{
+    if(bCcdTestRunning==false || LoaderModule==NULL)
+        return;
+    if(LoaderModule->MoveCcdToCell(iCcdLoaderNo, iCcdCol, iCcdRow, iCcdTask))
+    {
+        bCcdTestRunning=false;
+        SetCcdStatus(LangT("CCD move to cell finish"));
+    }
+}
+//---------------------------------------------------------------------------
+void TfTeach::StopCcdTest()
+{
+    if(bCcdTestRunning==false)
+        return;
+    bCcdTestRunning=false;
+    iCcdTask=0;
+    if(HSys.Mot.MTopCCDX!=NULL)
+        HSys.Mot.MTopCCDX->Stop();
+    if(HSys.Mot.MLoaderY_1!=NULL)
+        HSys.Mot.MLoaderY_1->Stop();
+    if(HSys.Mot.MLoaderY_2!=NULL)
+        HSys.Mot.MLoaderY_2->Stop();
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetCcdStatus(AnsiString Text)
+{
+    if(lblCcdStatus!=NULL)
+        lblCcdStatus->Caption=Text;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::edCcdColClick(TObject *Sender)
+{
+    (void)Sender;
+    if(LoaderModule==NULL)
+        return;
+    EditCellWithNumpad(edCcdCol, LoaderModule->GetTrayXCount(), LangT("Column"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::edCcdRowClick(TObject *Sender)
+{
+    (void)Sender;
+    if(LoaderModule==NULL)
+        return;
+    EditCellWithNumpad(edCcdRow, LoaderModule->GetTrayYCount(), LangT("Row"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::edSaColClick(TObject *Sender)
+{
+    (void)Sender;
+    if(SortArmModule==NULL)
+        return;
+    EditCellWithNumpad(edSaCol, SortArmModule->GetTrayXCount(), LangT("Column"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::edSaRowClick(TObject *Sender)
+{
+    (void)Sender;
+    if(SortArmModule==NULL)
+        return;
+    EditCellWithNumpad(edSaRow, SortArmModule->GetTrayYCount(), LangT("Row"));
+}
+//---------------------------------------------------------------------------
+bool TfTeach::CheckColorCcdTestReady()
+{
+    //AI(ht160s-color-ccd-test) 20260628 : Color CCD photo-position test ready-gate. Mirrors
+    //CheckCcdTestReady but checks the two Color axes : carriage MColorY + CCD reader
+    //MTopCCDX_Color. Identity trays have no IC cell grid, so there is no Loader/Column/Row here.
+    TTrayMotor *Y=HSys.Mot.MColorY;
+    TTrayMotor *X=HSys.Mot.MTopCCDX_Color;
+
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
+        SetColorCcdStatus(LangT("Abort: system start"));
+        return false;
+    }
+    if(IsEMGPressed()>0)
+    {
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
+        SetColorCcdStatus(LangT("Abort: EMG"));
+        return false;
+    }
+    if(X==NULL || Y==NULL)
+    {
+        SetColorCcdStatus(LangT("Abort: motor missing"));
+        return false;
+    }
+    X->ScanMotorStatus();
+    Y->ScanMotorStatus();
+    if(X->GetEnable()==false || Y->GetEnable()==false)
+    {
+        ShowMyOKMessageNoStop(LangT("Color CCD X and Color Y must be enabled."));
+        SetColorCcdStatus(LangT("Abort: motor disabled"));
+        return false;
+    }
+    if(X->Led[iAlarmLed] || X->Led[iServoalarmLed] ||
+       Y->Led[iAlarmLed] || Y->Led[iServoalarmLed])
+    {
+        ShowMyOKMessageNoStop(LangT("Motor alarm is active."));
+        SetColorCcdStatus(LangT("Abort: motor alarm"));
+        return false;
+    }
+    if(X->bHomeFlag==false || Y->bHomeFlag==false)
+    {
+        ShowMyOKMessageNoStop(LangT("Color CCD X and Color Y must be home."));
+        SetColorCcdStatus(LangT("Abort: not home"));
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunColorCcdTest()
+{
+    //AI(ht160s-color-ccd-test) 20260628 : driven each tick from tmrUpdate. MoveColorCcdToScan
+    //commands MColorY (-> ColorRead2DYPosition) and MTopCCDX_Color (-> ColorRead2DXPosition)
+    //TOGETHER and returns true only when BOTH are in position (the same XY-parallel motion used
+    //by production DoFeedTray case 3000). Move-only test : it positions the axes, it does NOT
+    //fire the CCD (mirrors the Loader move-to-cell test). Parks in place on finish.
+    if(bColorCcdTestRunning==false || ColorModule==NULL)
+        return;
+    if(ColorModule->MoveColorCcdToScan())
+    {
+        bColorCcdTestRunning=false;
+        SetColorCcdStatus(LangT("Color CCD move to photo position finish"));
+    }
+}
+//---------------------------------------------------------------------------
+void TfTeach::StopColorCcdTest()
+{
+    if(bColorCcdTestRunning==false)
+        return;
+    bColorCcdTestRunning=false;
+    if(HSys.Mot.MColorY!=NULL)
+        HSys.Mot.MColorY->Stop();
+    if(HSys.Mot.MTopCCDX_Color!=NULL)
+        HSys.Mot.MTopCCDX_Color->Stop();
+}
+//---------------------------------------------------------------------------
+void TfTeach::SetColorCcdStatus(AnsiString Text)
+{
+    if(lblColorCcdStatus!=NULL)
+        lblColorCcdStatus->Caption=Text;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnColorCcdGoClick(TObject *Sender)
+{
+    //AI(ht160s-color-ccd-test) 20260628 : start the Color CCD photo-position test. No channel /
+    //Column / Row (identity tray has no cell grid). Gate hardware-ready, then let tmrUpdate drive
+    //RunColorCcdTest to position MColorY + MTopCCDX_Color together. Park in place on finish.
+    (void)Sender;
+
+    if(ColorModule==NULL)
+    {
+        SetColorCcdStatus(LangT("Color module not ready"));
+        return;
+    }
+    if(bColorCcdTestRunning)
+    {
+        SetColorCcdStatus(LangT("Test already running"));
+        return;
+    }
+    if(CheckColorCcdTestReady()==false)
+        return;
+
+    bColorCcdTestRunning=true;
+    SetColorCcdStatus(LangT("Color CCD move to photo position start"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfTeach::btnCcdGoClick(TObject *Sender)
+{
+    int LoaderNo;
+    int Col;
+    int Row;
+    AnsiString Err;
+    (void)Sender;
+
+    if(LoaderModule==NULL)
+    {
+        SetCcdStatus(LangT("Loader module not ready"));
+        return;
+    }
+    if(cbCcdChannel==NULL)
+        return;
+    if(bCcdTestRunning)
+    {
+        SetCcdStatus(LangT("Test already running"));
+        return;
+    }
+    LoaderNo=ComboIndexToLoaderNo(cbCcdChannel->ItemIndex);
+    if(LoaderNo<0)
+    {
+        SetCcdStatus(LangT("Select a CCD area"));
+        return;
+    }
+    // UI Col/Row are 1-based; convert to 0-based tray index.
+    Col=GetEditInt(edCcdCol, 0)-1;
+    Row=GetEditInt(edCcdRow, 0)-1;
+
+    if(CheckCcdTestReady(LoaderNo)==false)
+        return;
+    if(LoaderModule->CanMoveCcdToCell(LoaderNo, Col, Row, Err)==false)
+    {
+        //AI(ht160s-ccd-teach-test) 20260628 : foolproof violation - stop ALL Advanced tests, do
+        //NOT execute, then prompt (operator-chosen behavior; row/col out of tray-form range).
+        StopAllAdvancedTests();
+        ShowMyMessage(LangT(Err));
+        SetCcdStatus(Err);
+        return;
+    }
+
+    iCcdLoaderNo=LoaderNo;
+    iCcdCol=Col;
+    iCcdRow=Row;
+    iCcdTask=1;
+    bCcdTestRunning=true;
+    SetCcdStatus(LangT("CCD move to cell start"));
 }
 //---------------------------------------------------------------------------

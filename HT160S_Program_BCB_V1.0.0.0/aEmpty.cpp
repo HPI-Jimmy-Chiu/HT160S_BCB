@@ -355,7 +355,7 @@ bool TEmptyModule::DoFeedTray(int Flag)
             //DoClampTray (lean-stop first, push last, settle+confirm). Alarm text
             //stays here so the display is module-specific.
             int Clamp=DoClampTray(HSys.Cyn.C_Empty_LeanOnTray, HSys.Cyn.C_Empty_PushTray,
-                                  FeedClampSub, FeedDelay, IsSoftSimulate(), 5);
+                                  FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iEmptyFeedClampSettleMs);
             if(Clamp==1)
                 FeedTask=4000;
             else if(Clamp==2)
@@ -502,7 +502,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
                 break;   // interlock: wait while Loader front-separate is out
             if(PushCylinder(HSys.Cyn.C_Empty_FrontSeparateTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=300;
             }
@@ -512,7 +512,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             if(GoDownDelay.Off())
             {
                 PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2);
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=350;
             }
@@ -526,7 +526,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
         case 400:
             if(PopCylinder(HSys.Cyn.C_Empty_FrontSeparateTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=450;
             }
@@ -540,7 +540,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
         case 500:
             if(PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=600;
             }
@@ -602,7 +602,7 @@ bool TEmptyModule::DoGoUpTray(int Flag)
                 if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
                     break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
-                GoUpDelay.Set(5);
+                GoUpDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=300;
             }
@@ -620,7 +620,7 @@ bool TEmptyModule::DoGoUpTray(int Flag)
             if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
-                GoUpDelay.Set(5);
+                GoUpDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=500;
             }
@@ -738,7 +738,7 @@ bool TEmptyModule::TestGoDownTray(int Flag)
                 if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
                     break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 TestDelay.On();
                 TestDownTask=4000;
             }
@@ -748,7 +748,7 @@ bool TEmptyModule::TestGoDownTray(int Flag)
             if(TestDelay.Off())
             {
                 HSys.Cyn.C_Empty_FrontRiseTray_2.Off();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 TestDelay.On();
                 TestDownTask=4100;
             }
@@ -763,7 +763,7 @@ bool TEmptyModule::TestGoDownTray(int Flag)
             if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 TestDelay.On();
                 TestDownTask=6000;
             }
@@ -807,7 +807,7 @@ bool TEmptyModule::TestGoUpTray(int Flag)
                 if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
                     break;   // interlock: wait while Loader front-separate is out
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=300;
             }
@@ -825,7 +825,7 @@ bool TEmptyModule::TestGoUpTray(int Flag)
             if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
             {
                 HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
-                TestDelay.Set(5);
+                TestDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=500;
             }

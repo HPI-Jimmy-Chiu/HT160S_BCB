@@ -70,8 +70,6 @@ private:
     TTrayMotor *GetSuckZMotor(int SlotIndex);
     TMySucker *GetSucker(int SlotIndex);
 
-    int GetTrayXCount();
-    int GetTrayYCount();
     double GetTrayXPitch();
     double GetTrayYPitch();
     int RoundPosition(double Value);
@@ -118,6 +116,8 @@ private:
     bool DoPlaceToAuto(int Flag);
 
 public:
+    int GetTrayXCount();   //AI(ht160s-ccd-teach-test) 20260628 : public for Teach numpad upper limit (tray-form columns)
+    int GetTrayYCount();   //AI(ht160s-ccd-teach-test) 20260628 : public for Teach numpad upper limit (tray-form rows)
     TSortArmModule();
     void InitialFlag(bool bKeepMaterial=false);
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze ResidueDelay[] timers on machine pause

@@ -31,11 +31,11 @@ static const int SORT_ARM_SUCKER_COUNT=4;
 //position does not move with tray pitch. This machine bolts suck2 to the X carriage => index
 //1. 0 reproduces the legacy suck1-datum behavior. Port of HT172 iBaseSuckX (1-based =1).
 static const int SORT_ARM_BASE_SUCKER_INDEX=1;
-//AI(ht160s-maintainer) 20260624 : P2 HT172-align datum bias = calibration base -> tray top-left
-//corner (10mm). HT172 uses -1000(X)/+1000(Y). User-confirmed 20260624: base->corner is X -10(left) Y -10(up,Y-down=+);
-//corner->first-cell is +XStart(right) +YStart(down) => X=base-1000+XStart, Y=base-1000+YStart (symmetric). Applied only when GeneralSetting.bUseTrayDatumModel.
-static const int SORT_ARM_X_DATUM_BIAS=-1000;
-static const int SORT_ARM_Y_DATUM_BIAS=-1000;
+//AI(ht160s-maintainer) 20260627 : P2 HT172-align datum bias = calibration base -> tray top-left
+//corner, then corner->first-cell (+XStart/+YStart): X=base+XBias+XStart, Y=base+YBias+YStart.
+//XBias/YBias are per-machine commissioning values in General.ini [SortArm] XDatumBias/YDatumBias
+//(default -1000/-1000, 1/100mm) read via GeneralSetting. Always applied; the old UseTrayDatumModel
+//gate and the compile-time SORT_ARM_X/Y_DATUM_BIAS constants were removed.
 static const int SORT_ARM_AUTO_COUNT=6;
 static const int iDestroyCheckMS=300;   //AI(ht160s-residue) 20260624 : re-suck settle (ms) for place residue check
 static const int SORT_ARM_SAFE_Z_POSITION=10;
@@ -403,9 +403,7 @@ int TSortArmModule::RoundPosition(double Value)
 //iBaseSuckX==0 reproduces the legacy formula; travel is still clamped by MoveSortArmX.
 int TSortArmModule::GetSortArmCellX(int BaseSortX, int ColMinusSlot)
 {
-    double Datum=0.0;
-    if(GeneralSetting.bUseTrayDatumModel)
-        Datum=(double)SORT_ARM_X_DATUM_BIAS+GetTrayXStart();
+    double Datum=(double)GeneralSetting.iSortArmXDatumBias+GetTrayXStart();
     return RoundPosition((double)BaseSortX+Datum+
         ((double)(ColMinusSlot+iBaseSuckX))*GetTrayXPitch());
 }
@@ -414,10 +412,8 @@ int TSortArmModule::GetSortArmCellY(int BaseSortY, int Row)
 {
     //AI(ht160s-maintainer) 20260624 : symmetric cell->arm Y helper (P1 of HT172-align).
     //Single source for SortArm Y so the former inline sites (pick/place/teach/debug) no
-    //longer drift. Behavior identical to the old inline form; Start/datum bias arrive in P2.
-    double Datum=0.0;
-    if(GeneralSetting.bUseTrayDatumModel)
-        Datum=(double)SORT_ARM_Y_DATUM_BIAS+GetTrayYStart();
+    //longer drift. Datum bias (General.ini [SortArm] YDatumBias) always applied.
+    double Datum=(double)GeneralSetting.iSortArmYDatumBias+GetTrayYStart();
     return RoundPosition((double)BaseSortY+Datum+((double)Row)*GetTrayYPitch());
 }
 //---------------------------------------------------------------------------
