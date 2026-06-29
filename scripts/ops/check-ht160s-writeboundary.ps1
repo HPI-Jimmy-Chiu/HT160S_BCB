@@ -19,6 +19,16 @@ $baseRoots = @("D:\HT160S_BCB")
 if ($env:USERPROFILE) { $baseRoots += (Join-Path $env:USERPROFILE ".claude") }
 if ($env:TEMP) { $baseRoots += $env:TEMP }
 if ($env:TMP)  { $baseRoots += $env:TMP }
+# Normalize: when several roots are passed on one command line via -File, they may
+# arrive as a single comma/semicolon-joined string instead of a real array. Split
+# them back out so each root is matched individually (Windows paths never contain
+# ',' or ';', so this split is safe).
+if ($AllowedRoots) {
+    $AllowedRoots = @($AllowedRoots |
+        ForEach-Object { $_ -split '[;,]' } |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ })
+}
 if ($AllowedRoots -and $AllowedRoots.Count -gt 0) {
     $AllowedRoots = $baseRoots + $AllowedRoots
 }
