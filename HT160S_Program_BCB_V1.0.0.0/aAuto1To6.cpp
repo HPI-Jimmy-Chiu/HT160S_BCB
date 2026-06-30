@@ -1196,11 +1196,11 @@ AnsiString TAutoModule::DescribeStation(int Index)
 //    data after the operator confirms.
 //  - Last line of defense : the physical InputFullTray sensor. While it reads ON keep
 //    alarming until the operator physically clears the stack (sensor OFF).
-//Scoped to AMR + Run_Normal so Normal/CleanOut behavior is unchanged.
+//Run_Normal in BOTH AMR and Normal(manual-transport, bUseAMR=0) : no AGV exists in
+//Normal mode, so the InputFullTray sensor (last line) / logical-full fallback raise
+//the SAME operator full modal directly, with no AGV wait.
 void TAutoModule::ServiceCarFull()
 {
-    if(GeneralSetting.bUseAMR==false)
-        return;
     if(HSys.Sys.RunMode!=Run_Normal)
         return;
 
@@ -1215,7 +1215,9 @@ void TAutoModule::ServiceCarFull()
         //abort THIS Auto's handshake (so PollAndCall does not re-CALL) and fall through to
         //the existing held alarm below. Happy path (AGV takes the car before timeout) is
         //unchanged: bFull/bLocked clears, we continue without ever raising the modal.
-        if(HGem!=NULL && HGem->IsSelected())
+        //AI(ht160s-amr0) 20260630 : AGV handoff is AMR-only; in Normal mode skip the
+        //wait/defer and fall straight to the sensor / logical-full operator modal below.
+        if(GeneralSetting.bUseAMR && HGem!=NULL && HGem->IsSelected())
         {
             bool bFull   = IsOutputCarFullForAmr(Index);
             bool bLocked = IsAmrLocked(Index);
