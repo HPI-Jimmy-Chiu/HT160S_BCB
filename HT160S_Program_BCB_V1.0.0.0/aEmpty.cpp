@@ -256,7 +256,7 @@ void TEmptyModule::DoEmpty(int &Task)
                 //AI(ht160s-agv) decision (b) : NEW machine-local code MES1022 (NOT a reuse
                 //of MES1021). Distinct from Empty MES1021 (rear bottom-miss) and MES1024
                 //(front miss) so operator + cloud/host can tell source-dry apart.
-                //Registered in system/AlarmList.csv + language_phrases.txt (EN+ZH).
+                //Registered in system/AlarmList.csv via CreateSystemAlarmCode (database.cpp); language pass pending.
                 {
                     int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), K_RETRY|K_CLEAN_OUT);
                     if(Ret==K_RETRY)

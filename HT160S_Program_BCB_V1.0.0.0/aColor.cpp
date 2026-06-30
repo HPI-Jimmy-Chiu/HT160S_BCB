@@ -735,7 +735,7 @@ bool TColorModule::DoFeedTray(int Flag)
             {
                 if(HSys.LastSet.iRealDummy!=DUMMY)
                 {
-                    ShowMyError("MES1425", LangT("Color rear has a leftover tray - please remove it"), K_RETRY);
+                    ShowMyError("MES1426", LangT("Color rear has a leftover tray - please remove it"), K_RETRY);
                     RefreshStateFromSensors();
                 }
                 if(bRearHasTray)

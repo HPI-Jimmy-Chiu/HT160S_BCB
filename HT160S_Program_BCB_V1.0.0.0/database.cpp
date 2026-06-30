@@ -927,6 +927,43 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
         }
     }
 
+    //AI(ht160s-alarm-registry) 20260630 : register the feed-shortage / output-full / feed
+    //handling free-string Notes (previously raised but absent from AlarmList.csv) so the
+    //operator catalog and (later slice) the SECS alarm list become complete. eMessageErr=MES,
+    //eJamErr=JAM, eOther=WAR. Auto sprintf families use the same 11+Index loop the aAuto1To6
+    //call sites use; the literal 6 mirrors AUTO_STATION_COUNT (aAuto1To6.cpp) and must track
+    //it (the build-gate alarm-registry guard flags drift).
+    {
+        const char *SeedCode[14]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
+                                  "MES1021","MES1022","MES1024","JAM1030",
+                                  "MES1421","MES1422","MES1424","MES1426","WAR0154"};
+        const int   SeedType[14]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
+                                  eMessageErr,eMessageErr,eMessageErr,eJamErr,
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther};
+        const char *SeedMsg[14]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
+                                 "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
+                                 "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Sorting Arm X motor will out of limit"};
+        for(int si=0; si<14; si++)
+        {
+            AnsiString cd=SeedCode[si], mg=SeedMsg[si];
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        const char *FamFmt[5]={"MES%d20","MES%d25","JAM%d11","WAR%d30","JAM%d02"};
+        const int   FamType[5]={eMessageErr,eMessageErr,eJamErr,eOther,eJamErr};
+        const char *FamMsg[5]={"Auto output stack full (sensor)","Auto output car full","Auto rear tray data but no-tray sensor","Auto feed tray miss","Auto push tray miss"};
+        for(int ai=0; ai<6; ai++)
+        {
+            for(int fi=0; fi<5; fi++)
+            {
+                AnsiString cd=AnsiString().sprintf(FamFmt[fi], 11+ai);
+                AnsiString mg=AnsiString().sprintf("Auto%d : %s", ai+1, FamMsg[fi]);
+                mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, FamType[fi], mg, mg, "", "", "pn_System");
+                mapNameToAlarm[cd]=cd;
+            }
+        }
+    }
+
     //AI(HT160S-Maintainer) 20260626 : alarm-code collision guard. Any all-digit map key
     //beginning 4/5/6 must be a generated structured family code (Cyn=4/Mot=5/Suck=6) of the
     //canonical 5-char "<fam><3-index><1-err>" shape; flag anything else as a hand-allocated
