@@ -2206,7 +2206,7 @@ void __fastcall TfMain::SetupLotListGrid()
     sgLotList->FixedRows=1;
     if(sgLotList->RowCount<2)
         sgLotList->RowCount=2;
-    sgLotList->ColWidths[0]=300;
+    sgLotList->ColWidths[0]=150;
     sgLotList->ColWidths[1]=70;
     sgLotList->ColWidths[2]=70;
     sgLotList->ColWidths[3]=80;
