@@ -191,6 +191,10 @@ void TfOffset::AddOffsetItem(TStringGrid *Grid, AnsiString GroupName, AnsiString
     OffsetPara[Index].iMin=iMin;
     OffsetPara[Index].Grid=Grid;
     OffsetPara[Index].Row=Row;
+    //AI 20260701 : seed the caption cell NOW (mirror uteach.cpp AddTeachItem:237).
+    //The next AddOffsetItem tests Cells[0][1]!="" to decide a new row; without this
+    //seed every item collapsed onto Row 1 and RowCount never grew (blank grids).
+    Grid->Cells[0][Row]=Caption;
     OffsetItemCount++;
 }
 //---------------------------------------------------------------------------
