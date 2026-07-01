@@ -229,7 +229,7 @@ bool TLoaderModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Loader Y motor will out of limit"), Motor->SoftLimitDetail(Position));
+        ShowMotorLimitError(Motor->AlarmName[eMotOverLimitErr], LangT("Loader Y motor will out of limit"), Motor, Position);
         return false;
     }
     return Motor->MotorMove(Position);
@@ -330,7 +330,7 @@ bool TLoaderModule::MoveTopCcdX(int Position)
         return false;
     if(HSys.Mot.MTopCCDX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Top CCD X motor will out of limit"), HSys.Mot.MTopCCDX->SoftLimitDetail(Position));
+        ShowMotorLimitError(HSys.Mot.MTopCCDX->AlarmName[eMotOverLimitErr], LangT("Top CCD X motor will out of limit"), HSys.Mot.MTopCCDX, Position);
         return false;
     }
     return HSys.Mot.MTopCCDX->MotorMove(Position);
@@ -1241,7 +1241,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     State->bWaitingAmrFeed=false;
                     State->FeedWaitTimer.Clear();
                 }
-                Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), K_RETRY|K_TRAY_END|K_CLEAN_OUT);
+                Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), &HSys.Sen.SnLoader_Inputend, true, K_RETRY|K_TRAY_END|K_CLEAN_OUT);
                 if(Ret==K_RETRY)
                     State->FeedTask=1;
                 if(Ret==K_TRAY_END)
@@ -1298,7 +1298,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             //mirrors HT9045 (carriage has-tray timeout). SKIP finishes this feed with no tray
             //(nothing was minted); RETRY re-runs the whole feed (case 10 fHasTray short-circuit
             //stays false because the mint never ran).
-            Ret=ShowMyError("JAM0913", LangT("Loader Tray Lost On Carriage"), K_SKIP|K_RETRY);
+            Ret=ShowMyError("JAM0913", LangT("Loader Tray Lost On Carriage"), &HSys.Sen.SnLoader_InputHasTray, true, K_SKIP|K_RETRY);
             if(Ret==K_SKIP)
                 State->FeedTask=10000;
             if(Ret==K_RETRY)

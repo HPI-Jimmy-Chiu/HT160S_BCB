@@ -6,6 +6,7 @@
 
 #include "mycylin.h"
 #include "GeneralSetting.h"
+#include "cStepTrace.h"            //AI(ht160s-alarm-trace) 20260630 : GetProcStep breadcrumb
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -99,12 +100,24 @@ static void SetCylinderAlarm(int AlarmCode, AnsiString sFrom="")
     //caller Func/Case context, shown later in the note remark field via HSys.mapAlarmContext.
     if(AlarmCode==0)
         return;
+    //AI(ht160s-alarm-trace) 20260630 : append the live process breadcrumb (which action +
+    //Task case was driving this cylinder) so the alarm context names the FLOW, not just the
+    //cylinder. Captured HERE while the driver is live; the queued ProcessAlarm display is one
+    //cycle later with the driving stack already unwound.
+    AnsiString sStep=GetProcStep();
+    if(sStep!="")
+        sFrom=sFrom+" | Step="+sStep;
     if(Alarm==NULL)
     {
         //fallback: central object not created yet -> show directly (same behavior as before)
         ShowSystemError(AnsiString(AlarmCode), K_RETRY, 0, sFrom);
         return;
     }
+    //AI(ht160s-alarm-trace) 20260630 : timestamped raise line into the EventLog at the moment
+    //of raise so the shipped log carries an ordered "...module steps... -> ALARM raised" trail
+    //for post-mortem without breakpoints. GetStat guards double-logging while already queued.
+    if(Alarm->GetStat(AlarmCode)==false)
+        RecordProcess(AnsiString().sprintf("ALARM raised %d : %s", AlarmCode, sFrom.c_str()));
     HSys.mapAlarmContext[AlarmCode]=sFrom;
     Alarm->Set(AlarmCode);
 }

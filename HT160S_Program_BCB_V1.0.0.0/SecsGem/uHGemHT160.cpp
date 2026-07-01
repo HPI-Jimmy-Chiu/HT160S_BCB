@@ -679,6 +679,15 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                 {
                     HCACK = 2;                                   // exceeds capacity -> param error
                 }
+                else if(fMain!=NULL && fMain->ArchiveDiscardedWorkOrder("SECS_SETLOT")==false)
+                {
+                    //AI(ht160s-workorder-backup) 20260630 : prior work order could not be
+                    //archived (real data + disk/log-path failure). Refuse rather than
+                    //destroy it untraceably; host can retry once storage recovers. A
+                    //first-ever load (nothing to archive) returns true and is NOT refused.
+                    HCACK = 4;
+                    RecordProcess("SECS SET_LOT_INFO refused : work-order backup failed");
+                }
                 else
                 {
                     LotRegistry.Clear();                         // D1 overwrite

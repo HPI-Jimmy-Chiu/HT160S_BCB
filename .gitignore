@@ -12,10 +12,13 @@ EXE/
 
 # BCB/IDE temporary and backup files
 *.~*
-*.bak
-*.bak_*
+*.bak*
 *.ddp
 *.dsk
+
+# Local scratch / one-off temp files
+scratch_*.txt
+_tmp_*
 
 # Logs and generated diagnostics
 logs/
@@ -24,6 +27,9 @@ ProductReport/
 *.log
 build_*.txt
 result.json
+
+# Runtime Lot state (live WorkOrder store written by the machine; not shared)
+HT160S_LotInfo/
 
 # Local archives and backup workspaces
 *.7z
@@ -36,5 +42,11 @@ HT160S_Program_BCB_V1.0.0.0_frank/
 # Local AI/session notes
 memories/
 
+# CodeGraph local index (per-project knowledge graph DB; rebuilt by `codegraph init`)
+.codegraph/
+
 # Large vendor manual kept locally (53MB; not version-controlled)
 docs/panasonicA6/panasonicA6_document.pdf
+
+# KYEC CONFIDENTIAL training material (not version-controlled)
+docs/kyec-training/

@@ -78,6 +78,7 @@ void TDataModule1::DoAllProcess()
                 HSys.DecStopAllMotor();
                 break;
             }
+            SetProcStep(UserMotion->Actions[ActionIndex]->Name, UserMotion->Actions[ActionIndex]->Tag);
             UserMotion->Actions[ActionIndex]->Execute();
         }
     }
@@ -90,6 +91,7 @@ void TDataModule1::DoAllProcess()
 
     //AI(general) 20260601 : numeric step trace (no FSM). Records the 7 module
     //Task values per cycle when D:\HT160S_Log\steptrace.on exists. No-op off.
+    SetProcStep("", 0);   //AI(ht160s-alarm-trace) 20260630 : clear breadcrumb (outside module dispatch)
     StepTraceTick();
 
     //AI(general) 20260608 : State Record task-history sampling (no FSM).

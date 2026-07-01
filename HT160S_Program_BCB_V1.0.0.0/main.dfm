@@ -1752,9 +1752,9 @@ object fMain: TfMain
                 Top = 286
                 Width = 566
                 Height = 291
-                ActivePage = ts2DBinManual
+                ActivePage = tsLotInfo
                 Align = alTop
-                TabIndex = 1
+                TabIndex = 0
                 TabOrder = 2
                 OnChange = pgcWorkOrderChange
                 object tsLotInfo: TTabSheet

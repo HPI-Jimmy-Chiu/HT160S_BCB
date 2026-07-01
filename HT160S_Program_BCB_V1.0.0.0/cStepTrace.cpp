@@ -25,6 +25,25 @@ static int    s_LastRunMode = -1;
 static int    s_LastTags[16];
 static int    s_LastCount    = -1;
 //---------------------------------------------------------------------------
+// Process breadcrumb : "<action Name> task=<Tag>" of whatever module action is
+// currently being dispatched. Set by DoAllProcess before each Execute, read by
+// the cylinder alarm-raise path. Runs on the single MainProc/VCL thread, so a
+// plain static AnsiString is safe (no lock needed).
+static AnsiString s_ProcStep = "";
+//---------------------------------------------------------------------------
+void SetProcStep(const AnsiString& Name, int Task)
+{
+    if(Name == AnsiString(""))
+        s_ProcStep = "";
+    else
+        s_ProcStep = Name + " task=" + IntToStr(Task);
+}
+//---------------------------------------------------------------------------
+AnsiString GetProcStep()
+{
+    return s_ProcStep;
+}
+//---------------------------------------------------------------------------
 static AnsiString RunModeName(int Mode)
 {
     switch(Mode)

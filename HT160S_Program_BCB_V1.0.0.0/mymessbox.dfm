@@ -48,8 +48,8 @@ object MyMessageBox: TMyMessageBox
       ParentFont = False
     end
     object Label2: TLabel
-      Left = 8
-      Top = 86
+      Left = 0
+      Top = 102
       Width = 441
       Height = 33
       Alignment = taCenter

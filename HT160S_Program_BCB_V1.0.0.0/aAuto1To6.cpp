@@ -305,7 +305,7 @@ bool TAutoModule::MoveAutoY(int Index, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Auto Y motor will out of limit"), Motor->SoftLimitDetail(Position));
+        ShowMotorLimitError(Motor->AlarmName[eMotOverLimitErr], LangT("Auto Y motor will out of limit"), Motor, Position);
         return false;
     }
     return Motor->MotorMove(Position);
@@ -492,7 +492,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             else
             {
                 ErrorText.sprintf("Auto%d: rear tray data transferred but no-tray sensor. Remove any stranded tray; if no tray, check the rear tray sensor. Retry=recheck sensor, Skip=clear tray data", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("JAM%d11", 11+iFeedAuto), ErrorText, K_SKIP|K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d11", 11+iFeedAuto), ErrorText, GetOutputBottomHasTray(iFeedAuto), true, K_SKIP|K_RETRY);
                 if(Ret==K_SKIP)
                 {
                     //AI(ht160s-tray-source) 20260625 : clear the staged rear data so the
@@ -522,7 +522,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             else
             {
                 ErrorText.sprintf("Auto%d Feed Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("WAR%d30", 11+iFeedAuto), ErrorText, K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("WAR%d30", 11+iFeedAuto), ErrorText, BottomSensor, true, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
@@ -560,7 +560,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             if(PushCylinder!=NULL && (PushCylinder->Pop() || IsSoftSimulate()))
             {
                 ErrorText.sprintf("Auto%d Push Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("JAM%d02", 11+iFeedAuto), ErrorText, K_RETRY);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d02", 11+iFeedAuto), ErrorText, &PushCylinder->OnSensor, true, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=5000;
             }
@@ -1269,7 +1269,7 @@ void TAutoModule::ServiceCarFull()
             ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
             do
             {
-                ShowMyError(AnsiString().sprintf("MES%d20", 11+Index), ErrorText, K_RETRY);
+                ShowMyError(AnsiString().sprintf("MES%d20", 11+Index), ErrorText, FullSensor, false, K_RETRY);
                 FullSensor=GetInputFullTray(Index);
             }
             while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());

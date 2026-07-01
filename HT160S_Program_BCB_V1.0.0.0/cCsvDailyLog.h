@@ -54,6 +54,12 @@ public:
     // everything. Call once after InitLog().
     void SetRetentionDays(int nDays);
 
+    // Prune yyyy_mm / yyyymmdd sub-folders under any base dir entirely older
+    // than nRetentionDays. Reused by callers that manage their own files (e.g.
+    // the LotStory Discarded work-order backups) but want the same folder-aging
+    // policy. nDays<=0 keeps everything; safe no-op if the base dir is absent.
+    static void PruneFolderTree(const AnsiString& sBaseDir, int nRetentionDays);
+
     // Append one preformatted line (thread-safe; writes header on first call).
     void AppendLine(const AnsiString& sLine);
 

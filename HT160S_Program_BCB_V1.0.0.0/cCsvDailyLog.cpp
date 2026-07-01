@@ -218,11 +218,22 @@ void cCsvDailyLog::PruneOldFolders()
 {
     if (m_nRetentionDays <= 0 || m_sBaseDir.IsEmpty())
         return;
+    PruneFolderTree(m_sBaseDir, m_nRetentionDays);
+}
 
-    TDateTime dtCutoff = Date() - m_nRetentionDays;
+//---------------------------------------------------------------------------
+// Static reuse of the folder-aging policy for any base dir (e.g. the LotStory
+// Discarded work-order backups, which write their own JSON files but want the
+// same yyyy_mm folder retention). Unrecognized folder names are left untouched.
+void cCsvDailyLog::PruneFolderTree(const AnsiString& sBaseDir, int nRetentionDays)
+{
+    if (nRetentionDays <= 0 || sBaseDir.IsEmpty())
+        return;
+
+    TDateTime dtCutoff = Date() - nRetentionDays;
 
     TSearchRec sr;
-    if (FindFirst(m_sBaseDir + "\\*", faDirectory, sr) != 0)
+    if (FindFirst(sBaseDir + "\\*", faDirectory, sr) != 0)
         return;
     do
     {
@@ -236,7 +247,7 @@ void cCsvDailyLog::PruneOldFolders()
             continue;   // unrecognized name -> never delete (safety)
 
         if (dtFolderEnd < dtCutoff)
-            DeleteFolderRecursive(m_sBaseDir + "\\" + sr.Name);
+            DeleteFolderRecursive(sBaseDir + "\\" + sr.Name);
     }
     while (FindNext(sr) == 0);
     FindClose(sr);

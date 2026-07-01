@@ -11,6 +11,10 @@
 TMyMessageBox *MyMessageBox=NULL;
 //---------------------------------------------------------------------------
 static bool bCanShow=true;
+//AI(HT160S-Maintainer) 20260629 : button-row Top, recomputed by FitMessageBox so the
+//button row follows the (possibly grown) Panel1 height. LayoutMessageButtons reads it
+//instead of the old hard-coded 178 so wrapped/taller messages do not overlap the buttons.
+static int gButtonRowTop=178;
 //---------------------------------------------------------------------------
 static void EnsureMyMessageBox()
 {
@@ -254,7 +258,7 @@ static void LayoutMessageButtons()
 
     int Margin=12;
     int Gap=16;
-    int RowTop=178;
+    int RowTop=gButtonRowTop;
     int RowHeight=33;
     int Avail=MyMessageBox->ClientWidth-2*Margin-(N-1)*Gap;
     if(Avail<N)
@@ -272,18 +276,151 @@ static void LayoutMessageButtons()
     }
 }
 //---------------------------------------------------------------------------
-void __fastcall TMyMessageBox::FormShow(TObject *Sender)
+//AI(HT160S-Maintainer) 20260629 : measure the wrapped pixel height of S when drawn into a
+//Width-wide rect with the given font. Uses Win32 DrawText DT_CALCRECT+DT_WORDBREAK so it
+//matches how a WordWrap TLabel lays the same text out. Returns 0 for empty text/zero width.
+//---------------------------------------------------------------------------
+static int MeasureWrapHeight(TCanvas *Cv, TFont *Fnt, AnsiString S, int Width)
 {
-    if(fMain!=NULL)
+    RECT R;
+
+    if(S=="" || Width<=0)
+        return 0;
+    Cv->Font->Assign(Fnt);
+    R.left=0;
+    R.top=0;
+    R.right=Width;
+    R.bottom=0;
+    DrawText(Cv->Handle, S.c_str(), -1, &R, DT_CALCRECT|DT_WORDBREAK|DT_LEFT);
+    return R.bottom-R.top;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260629 : auto-fit the message box to its content. The DFM
+//Label1/Label2 are fixed 441px, single-line, centered labels, so a long caption (e.g. the
+//startup "Inherit last work order ? ..." YES/NO prompt) overflowed and got clipped on BOTH
+//ends. Here we measure the caption(s) with the label font and grow the form Width to fit, up
+//to a screen-bounded cap. If even the cap is too narrow, we switch the labels to WordWrap and
+//grow the height instead, vertically centering the text block inside Panel1. The button-row
+//Top (gButtonRowTop) and the form ClientHeight follow the panel, so LayoutMessageButtons and
+//the FormShow centering both adapt with no caller changes. Runs every FormShow;
+//PrepareNormalMessage resets Width/Height first, so each show recomputes from a clean
+//baseline (no drift across reuses of the singleton box).
+//---------------------------------------------------------------------------
+static void FitMessageBox()
+{
+    TMyMessageBox *M;
+    TCanvas *Cv;
+    AnsiString S1;
+    AnsiString S2;
+    bool Has2;
+    int W1;
+    int W2;
+    int TextW;
+    int PanelW;
+    int LabelW;
+    int H1;
+    int H2;
+    int ContentH;
+    int PanelH;
+    int BlockTop;
+    int DesiredClient;
+    int MaxClient;
+    bool Wrap;
+
+    const int LabelPad=30;     // breathing room added to the measured text width
+    const int LabelInset=16;   // label sits 8px in from each panel edge
+    const int PanelInset=16;   // panel sits 8px in from each client edge
+    const int MinClient=474;   // original ClientWidth baseline
+    const int LineGap=12;      // vertical gap between Label1 and Label2 blocks
+    const int PanelTop=8;
+    const int RowGap=17;       // gap between Panel1 bottom and the button row
+    const int RowHeight=33;
+    const int BottomMargin=38;
+    const int MinPanelH=153;   // original Panel1 height baseline
+
+    if(MyMessageBox==NULL)
+        return;
+    M=MyMessageBox;
+    Cv=M->Canvas;
+    S1=M->Label1->Caption;
+    Has2=(M->Label2->Visible && M->Label2->Caption!="");
+    S2=Has2 ? M->Label2->Caption : AnsiString("");
+
+    Cv->Font->Assign(M->Label1->Font);
+    W1=Cv->TextWidth(S1);
+    Cv->Font->Assign(M->Label2->Font);
+    W2=Has2 ? Cv->TextWidth(S2) : 0;
+    TextW=(W1>W2) ? W1 : W2;
+
+    MaxClient=Screen->WorkAreaWidth-40;
+    if(MaxClient>900)
+        MaxClient=900;
+    if(MaxClient<MinClient)
+        MaxClient=MinClient;
+
+    DesiredClient=TextW+LabelPad+LabelInset+PanelInset;
+    if(DesiredClient<MinClient)
+        DesiredClient=MinClient;
+
+    Wrap=false;
+    if(DesiredClient>MaxClient)
     {
-        Left=fMain->Left+(fMain->Width-Width)/2;
-        Top=fMain->Top+(fMain->Height-Height)/2;
-    }
-    else
-    {
-        Position=poScreenCenter;
+        DesiredClient=MaxClient;
+        Wrap=true;
     }
 
+    M->ClientWidth=DesiredClient;
+    PanelW=DesiredClient-PanelInset;
+    LabelW=PanelW-LabelInset;
+    M->Panel1->Left=8;
+    M->Panel1->Width=PanelW;
+    M->Label1->Left=8;
+    M->Label1->Width=LabelW;
+    M->Label2->Left=8;
+    M->Label2->Width=LabelW;
+    M->Label1->WordWrap=Wrap;
+    M->Label2->WordWrap=Wrap;
+
+    H1=33;
+    H2=Has2 ? 33 : 0;
+    if(Wrap)
+    {
+        H1=MeasureWrapHeight(Cv, M->Label1->Font, S1, LabelW)+4;
+        if(H1<33)
+            H1=33;
+        if(Has2)
+        {
+            H2=MeasureWrapHeight(Cv, M->Label2->Font, S2, LabelW)+4;
+            if(H2<33)
+                H2=33;
+        }
+    }
+
+    ContentH=H1+(Has2 ? (LineGap+H2) : 0);
+    PanelH=ContentH+80;
+    if(PanelH<MinPanelH)
+        PanelH=MinPanelH;
+
+    BlockTop=(PanelH-ContentH)/2;
+    if(BlockTop<8)
+        BlockTop=8;
+
+    M->Panel1->Top=PanelTop;
+    M->Panel1->Height=PanelH;
+    M->Label1->Top=BlockTop;
+    M->Label1->Height=H1;
+    if(Has2)
+    {
+        M->Label2->Top=BlockTop+H1+LineGap;
+        M->Label2->Height=H2;
+    }
+
+    gButtonRowTop=PanelTop+PanelH+RowGap;
+    M->ClientHeight=gButtonRowTop+RowHeight+BottomMargin;
+}
+//---------------------------------------------------------------------------
+void __fastcall TMyMessageBox::FormShow(TObject *Sender)
+{
     if(bFormShowNoStop==false)
     {
         HSys.DecStopAllMotor();
@@ -295,9 +432,26 @@ void __fastcall TMyMessageBox::FormShow(TObject *Sender)
     fBuzzerOff=false;
     fShow=true;
 
+    //AI(HT160S-Maintainer) 20260629 : auto-fit the box to its caption (grow Width, or
+    //WordWrap+grow Height for very long text) BEFORE centering and the button reflow, so the
+    //final Width/Height drive both. Fixes long captions being clipped on both ends.
+    FitMessageBox();
+
     //AI(HT160S-Maintainer) 20260624 : with the visible set now finalized (PrepareNormalMessage
     //or the YES/NO path ran before ShowModal/Show), lay the live buttons into an equal-width row.
     LayoutMessageButtons();
+
+    //AI(HT160S-Maintainer) 20260629 : center using the post-fit Width/Height (was the first
+    //thing FormShow did, but FitMessageBox now changes the size, so center afterwards).
+    if(fMain!=NULL)
+    {
+        Left=fMain->Left+(fMain->Width-Width)/2;
+        Top=fMain->Top+(fMain->Height-Height)/2;
+    }
+    else
+    {
+        Position=poScreenCenter;
+    }
 
     //AI(HT160S-Maintainer) 20260622 : a modal message box suspends MainProc, so the per-scan
     //DoSystemMessage LED_Message buzzer driver never runs while it is up -> the message had no

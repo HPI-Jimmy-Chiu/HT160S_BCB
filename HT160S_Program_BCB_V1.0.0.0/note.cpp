@@ -803,6 +803,19 @@ int ShowMotorLimitError(AnsiString Code, AnsiString Message, AnsiString Detail)
     return ShowNoteAlarm(Code, Message, Detail, K_RETRY, "pn_System");
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : motor-aware overload. Builds the Note Detail from
+//the motor NumberAlias ("[M0x] <Alias>", the Motor-view token) plus SoftLimitDetail
+//(target/now/limit), so a soft-limit alarm names the axis to open on the Motor view.
+//Caller passes the per-motor registered over-limit code pMot->AlarmName[eMotOverLimitErr].
+//NULL pMot -> empty Detail. ASCII; no C++11; AnsiString flows.
+int ShowMotorLimitError(AnsiString Code, AnsiString Message, TMyMotor *pMot, int p)
+{
+    AnsiString Detail;
+    if(pMot!=NULL)
+        Detail=pMot->NumberAlias+AnsiString("  ")+pMot->SoftLimitDetail(p);
+    return ShowNoteAlarm(Code, Message, Detail, K_RETRY, "pn_System");
+}
+//---------------------------------------------------------------------------
 int ShowSuckError(TMySucker &Ptr, int CodeType, int KCode, AnsiString HappenRegion)
 {
     AnsiString Code;
@@ -936,6 +949,57 @@ int ShowMyError(AnsiString sMyError, int KCode)
 int ShowMyError(AnsiString Code, AnsiString sMyError, int KCode)
 {
     return ShowNoteAlarm(Code, sMyError, "", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : Detail-carrying overload. Same as the
+//Code+message form but forwards a Detail string (e.g. a TriggerLine IO token)
+//to ShowNoteAlarm instead of hard-coding "". Code stays byte-stable (SECS ALID
+//is hashed from Code only); the IO context rides in Detail.
+int ShowMyError(AnsiString Code, AnsiString sMyError, AnsiString Detail, int KCode)
+{
+    return ShowNoteAlarm(Code, sMyError, Detail, KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : device-typed trigger-line token. Turns a sensor
+//into a canonical string naming its IOsetview Alias (TMySensor.Name), its address
+//(Card/Lane/IP/Port/Bit via the bound TMyIo) and expected-vs-actual state, so an
+//alarm Detail can point the operator straight at the IO point. NULL Input prints
+//addr(unbound). ASCII-only; no C++11; AnsiString flows. Non-const ref because
+//IsOn()/GetLane() etc are non-const members.
+AnsiString TriggerLine(TMySensor &Sn, bool bExpectedOn)
+{
+    AnsiString Addr;
+    if(Sn.Input==NULL)
+        Addr="addr(unbound)";
+    else
+        Addr=AnsiString().sprintf("addr(Card=%d Lane=%d IP=%d Port=%d Bit=%d)",
+                                  Sn.Input->GetCard(), Sn.Input->GetLane(),
+                                  Sn.Input->GetIP(), Sn.Input->GetPort(),
+                                  Sn.Input->GetBit());
+    AnsiString Expect;
+    if(bExpectedOn)
+        Expect="ON";
+    else
+        Expect="OFF";
+    AnsiString Actual;
+    if(Sn.IsOn())
+        Actual="ON";
+    else
+        Actual="OFF";
+    return Sn.Name + " expect=" + Expect + " actual=" + Actual + " " + Addr;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : sensor-aware overload. Injects a SHORT IO tag
+//[IO=<Alias>] into the persisted Message (EventLog + SECS ALTX) AND the FULL
+//TriggerLine into the on-screen Detail, from one TMySensor pointer. NULL pSn ->
+//no tag (safe for accessor-returned pointers). Code unchanged -> SECS ALID stable.
+int ShowMyError(AnsiString Code, AnsiString Msg, TMySensor *pSn, bool bExpectedOn, int KCode)
+{
+    if(pSn==NULL)
+        return ShowMyError(Code, Msg, KCode);
+    AnsiString Full=TriggerLine(*pSn, bExpectedOn);
+    AnsiString Msg2=Msg+" [IO="+pSn->Name+"]";
+    return ShowMyError(Code, Msg2, Full, KCode);
 }
 //---------------------------------------------------------------------------
 int ShowTNTError(int CodeType, int KCode)

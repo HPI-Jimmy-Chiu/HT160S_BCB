@@ -11,6 +11,7 @@
 #include "cmydef.h"
 #include "CosFunction.h"
 #include "GeneralSetting.h"   //AI(ht160s-agv) 20260615 : GeneralSetting.bUseAMR for the AMR status badge
+#include "cCsvDailyLog.h"   //AI(ht160s-workorder-backup) 20260630 : PruneFolderTree for LotStory Discarded
 #include "cprod.h"
 #include "aAuto1To6.h"   //AI(ht160s-motion-view) 20260618 : AutoModule->GetWorkingTrayID for Unload Auto info
 #include "UserRoleManager.h"
@@ -2326,6 +2327,61 @@ void __fastcall TfMain::ArchiveWorkOrderToLotStory()
     LotRegistry.SaveToJsonFile(File);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-workorder-backup) 20260630 : back up the current work order to a
+//dedicated LotStory Discarded subfolder BEFORE a NON-Lot-End path clears it
+//(startup fresh-start, SECS SET_LOT_INFO overwrite, manual Remove Lot). Mirrors
+//ArchiveWorkOrderToLotStory but tags the file with a reason so a mis-click or host
+//overwrite never loses the in-progress 2D/Bin trace.
+//Return value = "safe for the caller to destroy" : true if the work order was
+//archived OR there was nothing to archive; false ONLY when a real snapshot write
+//failed while data existed (caller must then NOT destroy). LotBinBinding bindings
+//are derived, recoverable runtime state (not persisted trace), out of scope here.
+bool __fastcall TfMain::ArchiveDiscardedWorkOrder(AnsiString Reason)
+{
+    if(LotRegistry.GetLotCount()<=0)
+        return true;                 // nothing to archive : nothing to lose
+
+    AnsiString LotName="";
+    int SlotCount=LotRegistry.GetLotSlotCount();
+    for(int Index=0; Index<SlotCount; Index++)
+    {
+        TLotRunInfo *Lot=LotRegistry.GetLot(Index);
+        if(Lot!=NULL && Lot->sLotID.Trim()!=AnsiString(""))
+        {
+            LotName=Lot->sLotID.Trim();
+            break;
+        }
+    }
+    if(LotName==AnsiString(""))
+        return true;                 // no identifiable lot : nothing to lose
+
+    // Filesystem-safe lot name : replace any of  \ / : * ? " < > |  with '_'.
+    AnsiString SafeLot="";
+    for(int i=1;i<=LotName.Length();i++)
+    {
+        char c=LotName[i];
+        if(c=='\\' || c=='/' || c==':' || c=='*' || c=='?' ||
+           c=='"' || c=='<' || c=='>' || c=='|')
+            SafeLot+='_';
+        else
+            SafeLot+=c;
+    }
+
+    AnsiString Tag="";
+    if(Reason.Trim()!=AnsiString(""))
+        Tag=AnsiString("_")+Reason.Trim();
+    //AI(ht160s-workorder-backup) 20260630 : bucket Discarded backups by month
+    //(yyyy_mm), mirroring ArchiveWorkOrderToLotStory and the cCsvDailyLog log
+    //folders, so the folder no longer grows unbounded and PruneFolderTree can
+    //age whole months out.
+    AnsiString Folder=HSys.LogRootDir + AnsiString("\\LotStory\\Discarded\\") +
+        FormatDateTime("yyyy_mm", Now());
+    ForceDirectories(Folder);
+    AnsiString File=Folder + AnsiString("\\") + SafeLot + AnsiString("_") +
+        FormatDateTime("yyyymmdd_hhnnsszzz", Now()) + Tag + AnsiString(".json");
+    return LotRegistry.SaveToJsonFile(File);
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::SaveLastLotList()
 {
     TIniFile *Ini;
@@ -2803,6 +2859,14 @@ void __fastcall TfMain::RestoreLastWorkOrder()
     //   cumulative production stats and are KEPT even on a fresh start (user choice).
     ReadLastDataIni();
 
+    //AI(ht160s-workorder-backup) 20260630 : prune aged LotStory Discarded backups
+    //once per startup. Retention from General.ini [LogRetention] DiscardedDays
+    //(0 = keep forever). Only the Discarded safety backups are aged out here; the
+    //LotStory monthly production archive is traceability data and is NOT pruned.
+    cCsvDailyLog::PruneFolderTree(
+        HSys.LogRootDir + AnsiString("\\LotStory\\Discarded"),
+        GeneralSetting.iLogRetentionDiscardedDays);
+
     //B) auto-load today's newest delivered work order (2D->Bin JSON). When a
     //   fresh lot table exists, drive the Lot list display from the registry.
     bDuplicate=false;
@@ -2847,15 +2911,23 @@ void __fastcall TfMain::RestoreLastWorkOrder()
         Msg=Format(LangT("Inherit last work order ? (%d lots, %d bindings)   Yes = resume,  No = start fresh"), ARRAYOFCONST((LotCnt, BindCnt)));
         if(ShowMyMessageBox_YES_NO(Msg)!=TMyMessageBox::msgrtnYES)
         {
+            //AI(ht160s-workorder-backup) 20260630 : archive the work order BEFORE
+            //clearing, so a mis-click never loses the in-progress trace. Only delete
+            //WorkOrder.json if the snapshot was written; on archive failure keep the
+            //on-disk file so the next boot re-prompts instead of losing data.
+            bool bArchived=ArchiveDiscardedWorkOrder("STARTUP_FRESH");
             LotRegistry.Clear();
-            DeleteFile(GetWorkOrderFileName());
+            if(bArchived)
+                DeleteFile(GetWorkOrderFileName());
             LotBinBinding.Clear();
             LotBinBinding.SaveToIni();
             if(edLotNo!=NULL)
                 edLotNo->Text="";
             RefreshLotListFromRegistry();
             SaveLastLotList();
-            RecordProcess("Startup: operator chose fresh start, last work order cleared");
+            RecordProcess(bArchived
+                ? "Startup: fresh start; last work order archived to LotStory Discarded then cleared"
+                : "Startup: fresh start; ARCHIVE FAILED, WorkOrder.json kept, registry cleared");
         }
         else
         {
@@ -2942,6 +3014,19 @@ void __fastcall TfMain::btnRemoveLotClick(TObject *Sender)
         return;
 
     //AI(general) 20260610 : remove from LotRegistry, then reproject the grid.
+    //AI(ht160s-workorder-backup) 20260630 : Remove Lot had NO confirm and NO archive
+    //- a single mis-click dropped a whole lot's 2D/Bin trace. Confirm first, then
+    //snapshot the whole work order (captures the lot being removed) before the drop.
+    if(ShowMyMessageBox_YES_NO(LangT("Remove this Lot from the work order ?"))!=TMyMessageBox::msgrtnYES)
+        return;
+    //AI(ht160s-workorder-backup) 20260630 : abort the removal if the snapshot did not
+    //write (real data + disk/log-path failure), so the lot's trace is never lost.
+    if(ArchiveDiscardedWorkOrder("REMOVE_LOT")==false)
+    {
+        ShowMyMessage(LangT("Backup failed : Lot NOT removed. Check disk / log path."));
+        RecordProcess("Remove Lot aborted : work-order backup failed");
+        return;
+    }
     LotRegistry.RemoveLot(LotText);
     RefreshLotListFromRegistry();
     SaveWorkOrder();

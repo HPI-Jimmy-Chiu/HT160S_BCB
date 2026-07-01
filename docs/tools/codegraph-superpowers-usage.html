@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeGraph + 移植版 Superpowers — 安裝後操作手冊（白話詳細版）</title>
+<style>
+  :root{ --ink:#1a2330; --muted:#5b6675; --line:#d6dde6; --accent:#16708a; --warn:#b4480b;
+         --bg:#f7f9fb; --good:#1f7a4d; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif; color:var(--ink);
+        max-width:980px; margin:24px auto; padding:0 20px; line-height:1.7; background:#fff; }
+  h1{ font-size:1.55rem; border-bottom:3px solid var(--accent); padding-bottom:.4rem; }
+  h2{ font-size:1.22rem; margin-top:2.2rem; color:var(--accent); border-left:5px solid var(--accent);
+      padding-left:.5rem; }
+  h3{ font-size:1.04rem; margin-top:1.3rem; }
+  p,li,td,th{ font-size:.94rem; }
+  blockquote{ background:var(--bg); border-left:4px solid var(--line); margin:1rem 0; padding:.6rem 1rem;
+              color:var(--muted); font-size:.9rem; }
+  blockquote.tldr{ border-left:5px solid var(--good); color:var(--ink); background:#eef8f1; font-size:.95rem; }
+  blockquote.warn{ border-left:5px solid var(--warn); color:#5a2604; background:#fdf1e7; }
+  table{ border-collapse:collapse; width:100%; margin:1rem 0; font-size:.88rem; }
+  th,td{ border:1px solid var(--line); padding:.5rem .65rem; text-align:left; vertical-align:top; }
+  th{ background:var(--accent); color:#fff; }
+  tr:nth-child(even) td{ background:var(--bg); }
+  code{ font-family:"Consolas","DejaVu Sans Mono",monospace; background:#eef1f4; padding:.05rem .35rem;
+        border-radius:4px; font-size:.86em; }
+  pre{ background:#10212b; color:#dfe7ec; border-radius:8px; padding:.9rem 1.1rem; overflow-x:auto;
+       font-family:"Consolas","DejaVu Sans Mono",monospace; font-size:.83rem; line-height:1.55; }
+  pre code{ background:none; color:inherit; padding:0; }
+  .ok{ color:var(--good); font-weight:700; }
+  .star{ color:#b8860b; }
+  ol,ul{ padding-left:1.4rem; } li{ margin:.3rem 0; }
+  hr{ border:none; border-top:1px solid var(--line); margin:2rem 0; }
+  .note{ font-size:.84rem; color:var(--muted); }
+  @media print{ body{ margin:0; } h2{ break-after:avoid; } table,blockquote,pre{ break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<h1>CodeGraph + 移植版 Superpowers 技能 — 安裝後操作手冊</h1>
+<blockquote>
+日期：2026-06-29　對象：HT160S_BCB + 你未來的其他專案。<br>
+這份是「已經幫你裝好之後要怎麼用」。評估與取捨見同資料夾 <code>codegraph-superpowers-evaluation.html</code>。
+</blockquote>
+
+<h2>0. 這次幫你裝了什麼？（現況）</h2>
+<table>
+  <tr><th>項目</th><th>狀態</th><th>位置</th><th>範圍</th></tr>
+  <tr><td>CodeGraph CLI（<code>codegraph</code> 指令）</td><td class="ok">✅ v1.1.2</td><td>全機（npm 全域）</td><td>所有專案都能用</td></tr>
+  <tr><td>CodeGraph MCP 接線</td><td class="ok">✅ 已寫入</td><td><code>D:\HT160S_BCB\.mcp.json</code></td><td><b>只有 160</b>（其他專案各自加）</td></tr>
+  <tr><td>CodeGraph 索引（程式碼地圖）</td><td class="ok">✅ 已建好</td><td><code>D:\HT160S_BCB\.codegraph\</code></td><td><b>只有 160</b>（每專案各自 init）</td></tr>
+  <tr><td><code>.gitignore</code> 排除 <code>.codegraph/</code></td><td class="ok">✅ 已加</td><td><code>.gitignore</code></td><td>160</td></tr>
+  <tr><td>移植版 Superpowers 技能 ×3</td><td class="ok">✅ 已建</td><td><code>C:\Users\jimmychiu\.claude\skills\</code></td><td><b>全機所有專案通用</b></td></tr>
+</table>
+<p><b>160 索引實測：</b>267 檔、11,455 符號、24,977 關係；C++ 210 檔、.dfm 表單 33 檔都正確解析（4,596 methods / 909 functions / 244 classes）。<span class="ok">結論：CodeGraph 對 BCB6 解析品質良好，可放心用。</span></p>
+
+<blockquote class="warn">
+<b>⚠ 兩件「要重開 Claude Code 才生效」的事</b>
+<ol>
+  <li><b>CodeGraph 的 MCP 工具</b>——啟動時才載入。重開後會問你是否信任 <code>.mcp.json</code> 的 codegraph server，按<b>同意</b>。</li>
+  <li><b>3 個全域技能</b>——同樣重開後才會被發現。</li>
+</ol>
+重開前也能用：<code>codegraph</code> 指令在終端機<b>現在就能用</b>，我也能直接在終端機幫你跑。
+</blockquote>
+
+<h2>1. CodeGraph 是做什麼的（複習）</h2>
+<p>把整個專案先建成「誰呼叫誰」的地圖存在本機。<b>改程式前先問它「動這裡會影響哪些地方」</b>，不用一個一個檔翻。100% 本機、不外傳。</p>
+
+<h2>2. 在 160 怎麼用 CodeGraph（含真實範例）</h2>
+<h3>用法 A：自己在終端機下指令（PowerShell）</h3>
+<p>先 <code>cd D:\HT160S_BCB</code>（或每個指令加 <code>--path "D:\HT160S_BCB"</code>）。</p>
+<p><b>最常用：改某函式前，先看會波及哪裡</b></p>
+<pre><code>codegraph impact DoFeedTray</code></pre>
+<p>這是剛剛實際在 160 跑出來的結果（節錄）：</p>
+<pre><code>Impact of changing "DoFeedTray" — 13 affected symbols:
+  aAuto1To6.cpp   DoFeedTray:444   DoAuto:1288
+  database.cpp    actAuto1to6Execute / actColorExecute / actEmptyExecute
+                  actLoader1Execute / actLoader2Execute
+  aColor.cpp      DoFeedTray:698   DoColor:240
+  aEmpty.cpp      DoFeedTray:317   DoEmpty:197
+  aLoader.cpp     DoFeedTray:1050  DoLoader:909</code></pre>
+<p>👉 白話：它馬上告訴你「<code>DoFeedTray</code> 在 Color/Empty/Loader/Auto 四個模組各有一份，改了會牽動 <code>database.cpp</code> 的 5 個 <code>act*Execute</code> 派發器」。這正是你最怕的「改一個壞一片」回歸——<b>動手前就先看到。</b></p>
+
+<p><b>其他常用指令</b></p>
+<table>
+  <tr><th>想做的事</th><th>指令</th><th>白話</th></tr>
+  <tr><td>找一個符號在哪</td><td><code>codegraph query DoFeedTray</code></td><td>用名字搜尋，列出所有定義位置</td></tr>
+  <tr><td>看誰呼叫它</td><td><code>codegraph callers MoveColorY</code></td><td>往上游：哪些函式會叫它</td></tr>
+  <tr><td>看它呼叫誰</td><td><code>codegraph callees DoColor</code></td><td>往下游：它內部又叫了哪些</td></tr>
+  <tr><td>改某函式的影響面</td><td><code>codegraph impact &lt;符號&gt;</code></td><td><span class="star">⭐</span> blast radius，最常用</td></tr>
+  <tr><td>一次看懂一塊區域</td><td><code>codegraph explore "tray feed flow"</code></td><td>給一句話，回傳相關符號＋原始碼＋呼叫路徑</td></tr>
+  <tr><td>看單一符號來龍去脈</td><td><code>codegraph node DoFeedTray</code></td><td>該符號原始碼 + 上下游呼叫鏈</td></tr>
+  <tr><td>看索引統計</td><td><code>codegraph status</code></td><td>檔數/符號數/是否最新</td></tr>
+  <tr><td>看檔案結構</td><td><code>codegraph files</code></td><td>從索引列出專案檔案樹</td></tr>
+</table>
+
+<h3>用法 B：讓 Claude（我）自動用（重開 Claude Code 後）</h3>
+<p>重開並同意 MCP 後，你<b>不用記任何指令</b>，正常叫我做事即可，例如：</p>
+<ul>
+  <li>「我要改 <code>DoFeedTray</code>，先幫我看會影響哪些地方再動手」</li>
+  <li>「<code>DoColor</code> 的供料流程幫我理一下」</li>
+</ul>
+<p>我會自動透過 codegraph MCP 查地圖，而不是逐檔開——更快、更省 token、更不漏相依。</p>
+
+<h3>索引會自動更新嗎？</h3>
+<p>會。CodeGraph 背景監看，改檔後自動增量同步。覺得不同步時手動補：</p>
+<pre><code>codegraph sync       # 增量更新
+codegraph index      # 整個重建（大改/換分支後保險用）</code></pre>
+
+<h2>3. 3 個全域技能怎麼用（移植自 Superpowers）</h2>
+<p>放在 <code>C:\Users\jimmychiu\.claude\skills\</code>，<b>所有專案通用</b>，重開後生效。都寫了「遵守該專案 CLAUDE.md 的建置/驗證規則」，<b>不會跟 160 的 build-gate / 上機驗證 / Big5 打架</b>。</p>
+<table>
+  <tr><th>技能</th><th>何時自動出動</th><th>逼我做什麼</th></tr>
+  <tr><td><code>systematic-debugging</code></td><td>你說「當機 / hang / 壞掉 / 變慢 / 之前好好的」</td><td>4 階段找根因（重現→縮小→根因→驗證），先讀 log/State Record，禁止「猜了就補 try/catch」</td></tr>
+  <tr><td><code>brainstorming</code></td><td>要做較大/需求不清的功能前</td><td>先複述目標、問關鍵問題、給 2–3 做法＋建議、列設計再動手</td></tr>
+  <tr><td><code>writing-plans</code></td><td>多檔、跨 session 的大工程（移植、重構）</td><td>切小步、每步寫清楚「怎麼驗」、存成計畫文件、逐步勾完</td></tr>
+</table>
+<p><b>怎麼觸發？</b>描述任務時自然帶出，也可明講「用 systematic-debugging 查這個 hang」。</p>
+<blockquote>為什麼不直接裝 Superpowers 外掛？它整套含 TDD 與 git-worktree，會在 160 強迫「沒測試就刪扣」「開多工作目錄平行改」，跟你的工控 build-gate、上機驗證、designer 存檔陷阱衝突。所以只挑 3 個安全通用的觀念移植成你的個人技能。</blockquote>
+
+<h2>4. 維護 / 移除（隨時可逆）</h2>
+<pre><code>codegraph upgrade                          # 升級到最新版
+codegraph uninit "D:\HT160S_BCB"           # 只刪 160 的索引
+codegraph uninstall                        # 從 Claude Code 移除 MCP 接線
+npm uninstall -g @colbymchenry/codegraph   # 整個移除 CLI</code></pre>
+<p>移除 3 個全域技能：刪 <code>C:\Users\jimmychiu\.claude\skills\</code> 底下那 3 個資料夾即可。</p>
+
+<h2>5. 🚀 未來在「其他專案」怎麼用（重點）</h2>
+<blockquote class="tldr"><b>一句話：</b>CLI 與全域技能裝一次到處有效；但 CodeGraph 的「索引」是每個專案各自一份。</blockquote>
+
+<h3>5-1. 任何新專案，啟用 CodeGraph 只要 2 步</h3>
+<pre><code>cd D:\你的新專案
+codegraph init .            # 建立該專案的索引（各自獨立）</code></pre>
+<p>然後在該專案根目錄放一個 <code>.mcp.json</code>（內容跟 160 一樣）：</p>
+<pre><code>{
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": ["serve", "--mcp"]
+    }
+  }
+}</code></pre>
+<p>重開 Claude Code、同意一次即可用。記得把 <code>.codegraph/</code> 加進那專案的 <code>.gitignore</code>。</p>
+
+<h3>5-2. 想「一次設定、全部專案都自動有 MCP」？（建議）</h3>
+<p>不想每個專案放 <code>.mcp.json</code>，可把 MCP 接成<b>全機全域</b>。這次因 Claude Code 執行中鎖住設定檔而失敗，才改用專案層級。要全域，請在<b>完全關閉 Claude Code 後</b>，開一般 PowerShell 跑：</p>
+<pre><code>codegraph install --target claude --location global --yes</code></pre>
+<p>成功後，之後任何專案只要 <code>codegraph init</code> 就能用 MCP，不必再放 <code>.mcp.json</code>。</p>
+<p class="note">驗證：<code>codegraph install --print-config claude</code> 會印出它要寫進 <code>C:\Users\jimmychiu\.claude.json</code> 的設定。</p>
+
+<h3>5-3. 3 個全域技能：什麼都不用做</h3>
+<p>已在 <code>~/.claude/skills/</code>，<b>對你開的每一個專案都自動生效</b>，不必複製、不必重裝。</p>
+
+<h2>6. 一頁速查</h2>
+<pre><code># 改程式前先看影響
+codegraph impact &lt;函式名&gt;
+
+# 理解一塊流程
+codegraph explore "你想懂的東西，一句話"
+
+# 找符號 / 看上下游
+codegraph query &lt;名字&gt;
+codegraph callers &lt;名字&gt;      # 誰呼叫它
+codegraph callees &lt;名字&gt;      # 它呼叫誰
+
+# 維護
+codegraph status              # 看索引狀態
+codegraph sync                # 手動同步
+codegraph upgrade             # 升級
+
+# 新專案啟用（2 步）
+cd &lt;專案&gt;; codegraph init .   # + 放 .mcp.json + 加 .gitignore .codegraph/</code></pre>
+<blockquote class="warn"><b>別忘了：改完 CodeGraph 設定或新增技能後，要重開 Claude Code 才生效。</b></blockquote>
+
+</body>
+</html>

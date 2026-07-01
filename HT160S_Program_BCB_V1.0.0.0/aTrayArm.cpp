@@ -123,7 +123,7 @@ bool TTrayArmModule::MoveTrayArmX(int Position)
         return false;
     if(HSys.Mot.MTrayArmX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Tray Arm X motor will out of limit"), HSys.Mot.MTrayArmX->SoftLimitDetail(Position));
+        ShowMotorLimitError(HSys.Mot.MTrayArmX->AlarmName[eMotOverLimitErr], LangT("Tray Arm X motor will out of limit"), HSys.Mot.MTrayArmX, Position);
         return false;
     }
     //AI(HT160S-Maintainer) 20260622 : Z-up lift interlock (single chokepoint via IsZUpAtPosition).

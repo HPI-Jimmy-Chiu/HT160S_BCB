@@ -162,6 +162,16 @@ void TColorModule::RefreshStateFromSensors()
         return;
     }
 
+    //AI(ht160s-color-align-empty) 20260629 : MIRROR Empty RefreshStateFromSensors sim early-out.
+    //In SOFT_SIMULATE / real-machine DUMMY there is no IO card, so InType=0 (active-low) HasTray
+    //inputs all read present and clobber bRearHasTray=true; the DoFeedTray case 10 leftover-tray
+    //guard then silently aborts every supply (MES1425 suppressed under DUMMY), so Color never
+    //presents an identity tray and the AMR TrayArm/SortArm hang. In sim/dummy tray state is a
+    //LATCH owned by the action ladders (DoGoDownTray->bFrontHasTray, DoFeedTray case7000->
+    //bTrayReady, receive path->bRearHasTray).
+    if(IsSoftSimulate())
+        return;
+
     if(HSys.Sen.SnColor_InputHasTray.Enable==true)
     {
         bHasInputSensor=true;
@@ -481,7 +491,7 @@ bool TColorModule::DoGoDownTray(int Flag)
                HSys.LastSet.iRealDummy!=DUMMY)
             {
                 bFrontHasTray=false;
-                Ret=ShowMyError("MES1424", LangT("Color front supply tray is missing"), K_RETRY);
+                Ret=ShowMyError("MES1424", LangT("Color front supply tray is missing"), &HSys.Sen.SnColor_InputHasTray, true, K_RETRY);
                 if(Ret==K_RETRY)
                     GoDownTask=1;
             }
@@ -647,7 +657,7 @@ bool TColorModule::MoveColorY(int Position)
         return false;
     if(HSys.Mot.MColorY->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Color Y motor will out of limit"), HSys.Mot.MColorY->SoftLimitDetail(Position));
+        ShowMotorLimitError(HSys.Mot.MColorY->AlarmName[eMotOverLimitErr], LangT("Color Y motor will out of limit"), HSys.Mot.MColorY, Position);
         return false;
     }
 
@@ -677,7 +687,7 @@ bool TColorModule::MoveColorCcdX(int Position)
         return false;
     if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color->SoftLimitDetail(Position));
+        ShowMotorLimitError(HSys.Mot.MTopCCDX_Color->AlarmName[eMotOverLimitErr], LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color, Position);
         return false;
     }
     return HSys.Mot.MTopCCDX_Color->MotorMove(Position);
@@ -775,7 +785,7 @@ bool TColorModule::DoFeedTray(int Flag)
             {
                 //AI(ht160s-color-align-empty) 20260628 : push miss -- helper already Popped
                 //the push + reset FeedClampSub. Color-own code (NOT Empty JAM1030) + retry.
-                Ret=ShowMyError("MES1422", LangT("Color Push Tray Miss"), K_RETRY);
+                Ret=ShowMyError("MES1422", LangT("Color Push Tray Miss"), &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
@@ -856,7 +866,7 @@ bool TColorModule::DoFeedTray(int Flag)
                     bWaitingAmrFeed=false;
                     AmrFeedWaitTimer.Clear();
                 }
-                Ret=ShowMyError("MES1421", LangT("Color supply tray is not ready"), K_RETRY);
+                Ret=ShowMyError("MES1421", LangT("Color supply tray is not ready"), &HSys.Sen.SnColor_OutputBottomHasTray, true, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1;
             }
@@ -917,7 +927,7 @@ bool TColorModule::DoReadColor2D(int Flag)
             }
             if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Teach.ColorRead2DXPosition)==false)
             {
-                ShowMyMessage(LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color->SoftLimitDetail(Teach.ColorRead2DXPosition));
+                ShowMotorLimitError(HSys.Mot.MTopCCDX_Color->AlarmName[eMotOverLimitErr], LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color, Teach.ColorRead2DXPosition);
                 ScanTask=100;
                 break;
             }

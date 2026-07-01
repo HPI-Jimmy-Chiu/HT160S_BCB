@@ -435,7 +435,20 @@ void TfComPort::Spin()
     if(fPadInterface!=NULL)
         fPadInterface->Main232();
     if(HSys.BinDisCtrl!=NULL)
-        HSys.BinDisCtrl->Spin();
+    {
+        //AI(ht160s-bindisplay) 20260629 : pause the bin-display comm spin while an
+        //alarm modal (Note / MyMessageBox) is on screen. Its ShowModal() nested loop
+        //keeps pumping this 100ms timer; the bin display's optional TMyComm backend
+        //uses a blocking SyncReceive + reentrant TX that, during a comm storm, can
+        //starve the main thread's WM_PAINT and hang the whole UI (ref HT172
+        //CASE-PTI-20260629). Gate ONLY the bin call - the Pad pump above must keep
+        //draining so operator recovery keys still work during the alarm. Idiom
+        //mirrors the modal guards at main.cpp ScanPanelKeys / csystem.cpp buzzer.
+        bool bModalUp=(fNote!=NULL && fNote->fShow) ||
+                      (MyMessageBox!=NULL && MyMessageBox->fShow);
+        if(bModalUp==false)
+            HSys.BinDisCtrl->Spin();
+    }
 }
 //---------------------------------------------------------------------------
 void TfComPort::MemoAddString(TMemo *Memo, AnsiString Title, AnsiString Text)

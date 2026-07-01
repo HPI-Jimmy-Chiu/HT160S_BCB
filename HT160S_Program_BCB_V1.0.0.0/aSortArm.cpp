@@ -638,7 +638,7 @@ bool TSortArmModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Loader Y motor will out of limit"), Motor->SoftLimitDetail(Position));
+        ShowMotorLimitError(Motor->AlarmName[eMotOverLimitErr], LangT("Loader Y motor will out of limit"), Motor, Position);
         return false;
     }
     return Motor->MotorMove(Position);
@@ -652,7 +652,7 @@ bool TSortArmModule::MoveAutoY(int AutoIndex, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Auto Y motor will out of limit"), Motor->SoftLimitDetail(Position));
+        ShowMotorLimitError(Motor->AlarmName[eMotOverLimitErr], LangT("Auto Y motor will out of limit"), Motor, Position);
         return false;
     }
     return Motor->MotorMove(Position);
@@ -666,7 +666,7 @@ bool TSortArmModule::MovePitchToTrayPitch()
         return true;
     if(HSys.Mot.MPitchX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Pitch X motor will out of limit"), HSys.Mot.MPitchX->SoftLimitDetail(Position));
+        ShowMotorLimitError(HSys.Mot.MPitchX->AlarmName[eMotOverLimitErr], LangT("Pitch X motor will out of limit"), HSys.Mot.MPitchX, Position);
         return false;
     }
     return HSys.Mot.MPitchX->MotorMove(Position);

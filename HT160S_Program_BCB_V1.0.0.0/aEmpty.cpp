@@ -176,7 +176,7 @@ bool TEmptyModule::MoveEmptyY(int Position)
         return false;
     if(HSys.Mot.MEmptyY->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage(LangT("Empty Y motor will out of limit"), HSys.Mot.MEmptyY->SoftLimitDetail(Position));
+        ShowMotorLimitError(HSys.Mot.MEmptyY->AlarmName[eMotOverLimitErr], LangT("Empty Y motor will out of limit"), HSys.Mot.MEmptyY, Position);
         return false;
     }
 
@@ -258,7 +258,7 @@ void TEmptyModule::DoEmpty(int &Task)
                 //(front miss) so operator + cloud/host can tell source-dry apart.
                 //Registered in system/AlarmList.csv via CreateSystemAlarmCode (database.cpp); language pass pending.
                 {
-                    int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), K_RETRY|K_CLEAN_OUT);
+                    int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), &HSys.Sen.SnEmpty_InputEnd, true, K_RETRY|K_CLEAN_OUT);
                     if(Ret==K_RETRY)
                         Task=1;   //AI(ht160s-agv) re-enter case 100; if AGV refilled, shortage clears
                     //K_CLEAN_OUT : RunMode flips to Run_CleanOut elsewhere; DoEmpty top guards it.
@@ -360,7 +360,7 @@ bool TEmptyModule::DoFeedTray(int Flag)
                 FeedTask=4000;
             else if(Clamp==2)
             {
-                Ret=ShowMyError("JAM1030", LangT("Empty Push Tray Miss"), K_RETRY);
+                Ret=ShowMyError("JAM1030", LangT("Empty Push Tray Miss"), &HSys.Cyn.C_Empty_PushTray.OnSensor, true, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1000;
             }
@@ -390,7 +390,7 @@ bool TEmptyModule::DoFeedTray(int Flag)
                HSys.Sen.SnEmpty_OutputBottomHasTray.IsOff() &&
                HSys.LastSet.iRealDummy!=DUMMY)
             {
-                Ret=ShowMyError("MES1021", LangT("Bottom Empty Tray Is Miss Error"), K_SKIP|K_RETRY);
+                Ret=ShowMyError("MES1021", LangT("Bottom Empty Tray Is Miss Error"), &HSys.Sen.SnEmpty_OutputBottomHasTray, true, K_SKIP|K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1;
                 if(Ret==K_SKIP)
@@ -557,7 +557,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
                HSys.LastSet.iRealDummy!=DUMMY)
             {
                 bFrontHasTray=false;
-                Ret=ShowMyError("MES1024", LangT("Front Empty Tray Is Miss Error"), K_RETRY);
+                Ret=ShowMyError("MES1024", LangT("Front Empty Tray Is Miss Error"), &HSys.Sen.SnEmpty_InputHasTray, true, K_RETRY);
                 if(Ret==K_RETRY)
                     GoDownTask=1;
             }

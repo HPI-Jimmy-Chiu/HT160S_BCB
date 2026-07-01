@@ -134,6 +134,8 @@ public:
 	// General.ini [LogRetention]. See cCsvDailyLog::SetRetentionDays.
 	int iLogRetentionEventDays;   // EventLog, WebAPI
 	int iLogRetentionCommDays;    // BindisplayLog, PadLog, MotorTaskLog
+	//AI(ht160s-workorder-backup) 20260630 : LotStory Discarded safety backups.
+	int iLogRetentionDiscardedDays; // LotStory Discarded (work-order backups)
 
 	// Per-unit fixed label text + color, old-160 style. Index order (P0 lock):
 	// 0=Empty 1=Loader 2..7=Auto1..6 8=Color. Text is one char: digit/letter/blank.

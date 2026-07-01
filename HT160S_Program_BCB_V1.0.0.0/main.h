@@ -456,6 +456,7 @@ public:		// User declarations
     void __fastcall SaveWorkOrder();
     bool __fastcall LoadWorkOrder();
     void __fastcall ArchiveWorkOrderToLotStory();
+    bool __fastcall ArchiveDiscardedWorkOrder(AnsiString Reason);
     void __fastcall RequestLotDataFromWebApi(AnsiString LotID);
     void __fastcall PollLotDataWebApi();
     void __fastcall StartNextLotApiPull();
