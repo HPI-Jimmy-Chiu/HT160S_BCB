@@ -1695,13 +1695,12 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
             return false;
         }
     }
-    //AI(poka-yoke) 20260616 : By Lot+Bin mode needs at least one (Lot,Bin)->Auto
-    // binding, otherwise nothing can be routed. Block start until bindings exist.
-    if(GeneralSetting.bUseLotBinSortMode && LotBinBinding.GetBindingCount()<=0)
-    {
-        Reason="By Lot+Bin mode is ON but no binding is set. Set bindings first !";
-        return false;
-    }
+    //AI(ht160s-lotbin) 20260701 : By Lot+Bin binds (Lot,Bin)->Auto dynamically at Top
+    // CCD scan time (ResolveAuto in aLoader), so a fresh work order legitimately starts
+    // with ZERO bindings and self-binds first-come-first-served as ICs scan. The old
+    // poka-yoke that blocked Start on GetBindingCount()<=0 contradicted this model (a
+    // fresh order could never satisfy it -- binds are only made while running) and is
+    // removed; the lot/2D-data gates above already guarantee routable data before Start.
     return true;
 }
 //---------------------------------------------------------------------------
