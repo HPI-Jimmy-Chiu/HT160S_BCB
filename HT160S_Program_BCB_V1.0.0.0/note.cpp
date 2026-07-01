@@ -568,6 +568,30 @@ void __fastcall TfNote::FlushLabel()
         else
             *bPtr[i]=false;
     }
+
+    //AI(HT160S-Maintainer) 20260701 : HT172 note.cpp FlushLabel Start/Pause "invitation
+    //blink" (HT172 lines 298-317). Once the operator has selected an offered recovery key,
+    //or when the alarm offers no recovery keys at all (KeyCode==0, pure acknowledge), blink
+    //the physical Start AND Pause LEDs on the NoteBlinkPhase ON half to cue "press Start to
+    //resume". DoSystemMessage yields bLampStart/bLampPause to this while fNote->fShow (see
+    //csystem.cpp), so these values reach the Pad via the DoPanelLamp() call that follows in
+    //Timer1Timer. HT160 buttons are TPanel (no on-screen FalseColor blink) -- panel LED only.
+    bool bAnySelected=false;
+    for(i=0; i<6; i++)
+    {
+        if(Select[i])
+            bAnySelected=true;
+    }
+    if((bAnySelected || KeyCode==0) && NoteBlinkPhase)
+    {
+        bLampStart=true;
+        bLampPause=true;
+    }
+    else
+    {
+        bLampStart=false;
+        bLampPause=false;
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::ScanKey()
@@ -605,7 +629,15 @@ void __fastcall TfNote::ScanKey()
     for(int i=0; i<6; i++)
     {
         if(Ptr[i]->Visible && bKey[i])
+        {
             UpdateButtonStatus(Ptr[i]);
+            //AI(HT160S-Maintainer) 20260701 : selecting any offered recovery key from the
+            //physical panel also acknowledges the alarm buzzer, matching HT172 note.cpp:211
+            //and HT9045 note.cpp:1422 (both clear bAlarmBuzzer in this same key loop). The
+            //next Timer1 DoSystemMessage() then keeps LED_ErrJam muted; FormClose resets
+            //bOffBuzzer so the next alarm sounds again. Touch-screen selection is unchanged.
+            bOffBuzzer=true;
+        }
     }
 
     bool bStart=HSys.Sen.SnFKStart.IsOn()      || HSys.Sen.SnRKStart.IsOn();
@@ -651,6 +683,13 @@ void __fastcall TfNote::ScanKey()
     {
         RecordProcess("ALARM RESET pressed");
         EventReport(SECS_EVENT.PressAlarmReset);
+        //AI(HT160S-Maintainer) 20260701 : latch the OFF BUZZER acknowledge (HT172
+        //note.cpp bAlarmBuzzer=false / HT9045 note AlarmReset parity) so the per-scan
+        //DoSystemMessage LED_ErrJam driver stays muted. Without this latch the Timer1
+        //DoSystemMessage() call that runs right after ScanKey() re-drove the buzzer the
+        //same 250ms tick, so the physical ALARM RESET key appeared to do nothing. The
+        //on-screen Off Buzzer button already worked because it sets bOffBuzzer=true.
+        bOffBuzzer=true;
         CloseBuzzerOff();
     }
 

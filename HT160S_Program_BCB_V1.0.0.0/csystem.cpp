@@ -837,15 +837,24 @@ void DoSystemMessage()
 	//AI(ht160s-maintainer) 20260617 : derive Start/Pause panel-lamp state from the
 	//run flag (mirrors HT172 ShowRunLed), then push all panel lamps. HT160 has no
 	//ShowRunLed, so this lives here, the sole per-scan system-message hook.
-	if(HSys.Sys.SystemStart)
+	//AI(HT160S-Maintainer) 20260701 : while an alarm Note is up, TfNote::FlushLabel owns
+	//the Start/Pause panel lamps (HT172 invitation-blink: after the operator selects a
+	//recovery key -- or on a KeyCode==0 info alarm -- it blinks Start/Pause to cue "press
+	//Start to resume"). Do NOT overwrite them here during a Note. During a modal Note only
+	//note.cpp Timer1 calls DoSystemMessage (MainProc is suspended); outside an alarm derive
+	//Start/Pause from the run flag as before.
+	if(fNote==NULL || fNote->fShow==false)
 	{
-		bLampStart=true;
-		bLampPause=false;
-	}
-	else
-	{
-		bLampStart=false;
-		bLampPause=true;
+		if(HSys.Sys.SystemStart)
+		{
+			bLampStart=true;
+			bLampPause=false;
+		}
+		else
+		{
+			bLampStart=false;
+			bLampPause=true;
+		}
 	}
 	DoPanelLamp();
 }
