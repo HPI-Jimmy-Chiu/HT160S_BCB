@@ -78,10 +78,26 @@ int TTrayArmModule::GetStatus()
 //---------------------------------------------------------------------------
 bool TTrayArmModule::IsCleanOutFinish()
 {
-    //AI(HT160S-Maintainer) 20260605 : TrayArm only transports EMPTY trays, it never
-    //holds IC, so it can never block an IC drain-out. CleanOut finish is always true
-    //for this module.
-    return bCleanOutFinish;
+    //AI(cleanout) 20260701 : real CleanOut finish gate (was: always true). TrayArm still has
+    //work while it is recovering empty trays off the Loader rear and recycling them to Empty/
+    //Color, so it must NOT report finished until the upstream (Loader + Auto) has drained AND
+    //the arm is empty (it has placed its tray to Empty/Color) AND the Z lift is up. Empty/Color
+    //gate their own CleanOut drain+finish on this, so it is the cascade hinge (Loader -> SortArm
+    //-> Auto -> TrayArm -> Empty/Color). Computed live (not a latch) so a fresh tray appearing at
+    //the Loader rear correctly un-finishes it. Outside CleanOut the value is unused.
+    if(HSys.Sys.RunMode!=Run_CleanOut)
+        return bCleanOutFinish;
+    if(LoaderModule==NULL || LoaderModule->IsAllCleanOutFinish()==false)
+        return false;
+    if(AutoModule==NULL || AutoModule->IsAllCleanOutFinish()==false)
+        return false;
+    if(HasTray())
+        return false;              //arm still carries a tray to deliver/recycle
+    if(Job!=TAJOB_NONE)
+        return false;              //a delivery job is still in flight
+    if(IsZUpAtPosition()==false)
+        return false;              //Z lift not confirmed up
+    return true;
 }
 //---------------------------------------------------------------------------
 bool TTrayArmModule::IsTrayFeedFinish()
@@ -385,7 +401,30 @@ bool TTrayArmModule::DoPick(int Flag)
         case 1:
         case 10:
             if(DoMoveToStationZSafe(GetPickSourceX(), PickTask))
+            {
+                if(Job==TAJOB_EMPTYTRAY_TO_AUTO)
+                {
+                    //AI(ht160s-trayarm-empty-handoff) 20260701 : wait here (Z still UP) until the
+                    //Empty rear tray is present AND not being returned by the carrier. Producer-owned
+                    //readiness predicate replaces the magic-70000 encoder threshold. Deadlock-safe vs
+                    //the MoveEmptyY symmetric guard because we hold Z-UP (that guard only blocks EmptyY
+                    //while TrayArm Z is DOWN at the Empty X).
+                    if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
+                        break;
+                }
+                if(Job==TAJOB_LOADER_RECOVERY)
+                {
+                    //AI(ht160s-trayarm-empty-handoff) 20260701 : same Z-UP-wait gate for the Loader
+                    //rear pick. bRearHasTray latches at DoDischargeTray case 2000 while the discharge
+                    //carriage is still at discharge Y and clamps are releasing; IsRearReadyForPick()
+                    //holds until the carriage has retreated to feed (case 4000). MoveLoaderY has NO
+                    //TrayArm anti-collision guard, so this cannot mutually deadlock (source Y is never
+                    //blocked by the waiting arm).
+                    if(LoaderModule!=NULL && LoaderModule->IsRearReadyForPick()==false)
+                        break;
+                }
                 PickTask=1000;
+            }
             break;
 
         case 1000:

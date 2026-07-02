@@ -12,6 +12,7 @@
 #include "GeneralSetting.h"
 #include "uteach.h"
 #include "ColorCcdSocket.h"
+#include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() gates the Color CleanOut drain/finish
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -296,6 +297,22 @@ void TColorModule::DoColor(int &Task)
                 Task=1700;
                 break;
             }
+            //AI(cleanout) 20260701 : CleanOut drain phase. Once TrayArm has finished, Color stops
+            //supplying/destacking and GoUp-drains every tray back to the car (reuses the receive
+            //ladder at case 1700). Owns case 100 while draining so no GoDown/feed runs. Before
+            //TrayArm finishes (produce phase) Color supplies normally; outside CleanOut it is a no-op.
+            if(HSys.Sys.RunMode==Run_CleanOut &&
+               TrayArmModule!=NULL && TrayArmModule->IsCleanOutFinish())
+            {
+                if(bFrontHasTray || bRearHasTray)
+                {
+                    DoGoUpTray(0);
+                    Task=1700;
+                }
+                else
+                    Task=1;
+                break;
+            }
             //AI(ht160s-color-align-empty) 20260627 : pickup release is now single-step in
             //NotifyTrayPicked (mirrors TEmptyModule SetRearHasTray(false)); no separate
             //DoReleaseTray pass. While a tray is presented at the rear, idle until it is picked.
@@ -437,12 +454,20 @@ bool TColorModule::DoGoDownTray(int Flag)
             break;
 
         case 300:
+            //AI(HT160S-Maintainer) 20260701 : gate on PopCylinder's own confirm (sensor +
+            //alarm/timeout via TMyCylinder::Pop) instead of discarding its return and relying
+            //solely on the fixed settle timer below. The old code advanced to case 350/400
+            //(separation claw release) even if FrontRiseTray_2 never physically confirmed down --
+            //a slow/marginal cylinder let the claw open before the stack was actually caught,
+            //dropping the whole stack (mirrors the Empty godown noise report; identical pattern).
             if(GoDownDelay.Off())
             {
-                PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2);
-                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
-                GoDownDelay.On();
-                GoDownTask=350;
+                if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                {
+                    GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                    GoDownDelay.On();
+                    GoDownTask=350;
+                }
             }
             break;
 
@@ -1116,6 +1141,26 @@ bool TColorModule::IsRearHasTray()
 {
     RefreshStateFromSensors();
     return bRearHasTray;
+}
+//---------------------------------------------------------------------------
+bool TColorModule::IsCleanOutFinish()
+{
+    //AI(cleanout) 20260701 : Color participates in CleanOut (was: no participation). Not installed
+    //-> trivially finished. Otherwise it finishes only after TrayArm has finished (no more returns),
+    //its flow path is clear (no front/rear tray) and the front rise/separate cylinders are all home
+    //(IsReadyForAmrHandoff; sim-true). Until then DoColor case 100 GoUp-drains every tray to the car.
+    if(IsInstalled()==false)
+        return true;
+    if(HSys.Sys.RunMode!=Run_CleanOut)
+        return true;
+    if(TrayArmModule==NULL || TrayArmModule->IsCleanOutFinish()==false)
+        return false;
+    RefreshStateFromSensors();
+    if(bFrontHasTray || bRearHasTray)
+        return false;
+    if(IsReadyForAmrHandoff()==false)
+        return false;
+    return true;
 }
 //---------------------------------------------------------------------------
 //AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing the returned tray onto

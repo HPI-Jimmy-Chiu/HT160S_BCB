@@ -59,6 +59,7 @@ void TLoaderModule::InitialFlag()
     ResetSide(&Side[0]);
     ResetSide(&Side[1]);
     bRearHasTray=false;
+    bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no discharge settling in flight at init
     iFrontOwner=0;
     iTopCcdCount=0;
     iYOwner[0]=LOADER_Y_OWNER_NONE;
@@ -232,6 +233,21 @@ bool TLoaderModule::MoveLoaderY(int LoaderNo, int Position)
         ShowMotorLimitError(Motor->AlarmName[eMotOverLimitErr], LangT("Loader Y motor will out of limit"), Motor, Position);
         return false;
     }
+    #ifndef SOFT_SIMULATE
+    //AI(ht160s-trayarm-empty-handoff) 20260701 : TrayArm anti-collision, ported verbatim from
+    //MoveEmptyY/MoveColorY (Loader was the only source lacking it). If the TrayArm is NOT raised
+    //(Z-up off) and its X is at/near the Loader pickup X, block EITHER car's Y move so a shared-rail
+    //carriage cannot slam into the lowered arm. Z-gated, so a Z-UP wait never blocks Loader Y (no
+    //mutual deadlock). One MoveLoaderY serves LoaderNo 1/2, so this covers both cars.
+    int TrayArmPos=0;
+    if(HSys.Mot.MTrayArmX!=NULL)
+        TrayArmPos=HSys.Mot.MTrayArmX->ReadEncoderPos();
+    if(HSys.Cyn.C_TrayArmZ_Up.IsOn()==false &&
+       (TrayArmPos+500)>=Teach.TrayXArmToLoaderXPosition)
+    {
+        return false;
+    }
+    #endif
     return Motor->MotorMove(Position);
 }
 //---------------------------------------------------------------------------
@@ -567,6 +583,18 @@ bool TLoaderModule::IsRearHasTray()
     return IsRearOccupied();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-trayarm-empty-handoff) 20260701 : "safe for TrayArm to grab" predicate. bRearHasTray
+//latches at DoDischargeTray case 2000, BEFORE the Lean clamp release (case 3000) and the carriage
+//retreat to feed Y (case 4000) -- a raw bRearHasTray would let TrayArm lower onto the rear slot
+//while the discharge carriage is still adjacent / clamps still moving. bRearDischargeInProgress
+//brackets that window (set case 2000, cleared case 4000). Model-independent : no encoder/clamp peek.
+//Kept software-latched, NOT recomputed from the rear sensor (which reads present the instant the
+//tray lands and gives no protection against the still-retreating carriage).
+bool TLoaderModule::IsRearReadyForPick()
+{
+    return (IsRearOccupied() && bRearDischargeInProgress==false);
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::IsLoaderReadyForSort(int LoaderNo)
 {
     TLoaderSideState *State=GetSide(LoaderNo);
@@ -657,7 +685,28 @@ bool TLoaderModule::IsSortOwnerHeld(int LoaderNo)
 bool TLoaderModule::IsAllCleanOutFinish()
 {
     //AI(HT160S-Maintainer) 20260605 : both Loader sides have drained in CleanOut.
-    return (Side[0].bCleanOutFinish && Side[1].bCleanOutFinish);
+    if(Side[0].bCleanOutFinish==false || Side[1].bCleanOutFinish==false)
+        return false;
+    //AI(cleanout) 20260701 : physical residual + supply-car gate. The old check trusted
+    //only the per-side software carriage flag and could finish with a tray still parked at
+    //the shared front feed position / rear output / supply car (on-machine 2026-07-01 : a
+    //Loader empty tray was left behind). REALLY mode now requires the shared front, rear and
+    //supply-car sensors all clear so no tray is left in the pipeline; SOFT_SIMULATE/DUMMY has
+    //no IO card (InType=0 inputs read present), so it trusts the action latches there and
+    //skips the raw sensor read (mirrors RefreshStateFromSensors early-out). Enable-gated so an
+    //uninstalled point never blocks. Rear (bRearHasTray) is cleared by TrayArm recovery.
+    if(IsSoftSimulate()==false)
+    {
+        if(HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+            return false;   //residual tray on the front feed position
+        if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable && HSys.Sen.SnLoader_OutputBottomHasTray.IsOn())
+            return false;   //residual tray at the rear output position
+        if(HSys.Sen.SnLoader_Inputend.Enable && HSys.Sen.SnLoader_Inputend.IsOn())
+            return false;   //supply car still has stock (drain it before finishing)
+    }
+    if(bRearHasTray)
+        return false;       //rear latch still set : TrayArm has not recovered it yet
+    return true;
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::NotifyTrayArmPickRearTray()
@@ -921,24 +970,45 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
     if(TrayMotor==NULL)
         return;
 
-    //AI(HT160S-Maintainer) 20260610 : evaluate CleanOut finish EVERY cycle, not
-    //only at the transient case 10. During CleanOut DoFeedTray is blocked, so a
-    //side that was mid-feed (Task 1000) or waiting on the other side (Task 100)
-    //never loops back to case 10 and the old check could never fire : CleanOut
-    //hung forever (state record 2026-06-10 09_21_52 : Loader1=1000, Loader2=100
-    //both frozen ~2 min). A side with no tray (and not owned by SortArm) has
-    //nothing left to drain : declare it finished regardless of Task. A side still
-    //holding a tray (fHasTray==true) keeps its normal sort/discharge flow and
-    //finishes on a later cycle once the tray has drained. bTrayEmpty sides also
-    //finish here because they have no tray to drain.
+    //AI(cleanout) 20260701 : both sides drained but the shared FRONT feed sensor still sees a
+    //tray the software cannot auto-discharge (untracked residual) -> ask the operator to remove
+    //it. A REAR residual is auto-recovered by TrayArm, so it is NOT alarmed here. ShowMyError is
+    //modal (freezes MainProc), so this does not re-spam per cycle; it re-checks on Retry. Run for
+    //LoaderNo==1 only (single shared front sensor). Placed before the per-side guard so it is not
+    //shadowed by the guard's early return once a side is already finished.
+#ifndef SOFT_SIMULATE
+    if(HSys.Sys.RunMode==Run_CleanOut && LoaderNo==1 &&
+       Side[0].bCleanOutFinish && Side[1].bCleanOutFinish &&
+       HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+    {
+        ShowMyError("MES0922", LangT("Loader front residual tray, please remove"), &HSys.Sen.SnLoader_InputHasTray, true, K_RETRY);
+        return;
+    }
+#endif
+    //AI(cleanout) 20260701 : phase-aware CleanOut finish. The old guard retired a side the
+    //instant its carriage flag was empty, ignoring the shared front/rear sensors and the supply
+    //car -> CleanOut could finish with trays still in the pipeline and never drained the supply
+    //car. User-confirmed semantics: keep feeding + sorting the remaining supply car until it is
+    //DRY, THEN empty the pipeline. So a side is "finished feeding" only when the shared supply
+    //car is dry (SnLoader_Inputend OFF) AND its carriage is empty AND it does not own the sort Y.
+    //If the car still has stock, fall through to the normal feed/sort/discharge flow so it drains
+    //(source-dry no longer alarms MES0920/MES0921 in CleanOut - see DoFeedTray case 9000).
+    //Sim/DUMMY has no InputEnd card, so chkLoadTray (IsContinuousFeed) stands in for car stock.
     if(HSys.Sys.RunMode==Run_CleanOut &&
-       TrayMotor->fHasTray==false &&
        iYOwner[GetSideIndex(LoaderNo)]==LOADER_Y_OWNER_NONE)
     {
-        State->bCleanOutFinish=true;
-        State->Status=LS_IDLE;
-        Task=1;
-        return;
+        bool bSupplyCarDry = IsSoftSimulate()
+            ? (IsContinuousFeed()==false)
+            : (HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOff());
+        if(TrayMotor->fHasTray==false && bSupplyCarDry)
+        {
+            State->bCleanOutFinish=true;
+            State->Status=LS_IDLE;
+            Task=1;
+            return;
+        }
+        //supply car still has stock (or carriage still loaded) : do NOT finish; the switch
+        //below re-runs the normal feed/sort/discharge flow so the car drains first.
     }
 
     if(State->bTrayEmpty)
@@ -1069,8 +1139,11 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
     if(OtherState->Status==LS_FEEDING ||
        OtherState->Status==LS_CCD_SCAN)
         return false;
-    if(HSys.Sys.RunMode==Run_CleanOut)
-        return false;
+    //AI(cleanout) 20260701 : feeding is NO LONGER blocked in CleanOut (was: return false
+    //here). User-confirmed semantics: drain the supply car by feeding + sorting the remaining
+    //trays until SnLoader_Inputend is dry, then empty the pipeline. Source-dry is CleanOut-aware
+    //in case 9000 (no MES0920/MES0921 alarm) and the DoLoader finish guard retires the side once
+    //the car is dry + carriage empty.
     if(LoaderNo==1)
     {
         PushCylinder=&HSys.Cyn.C_Loader1_PushTray;
@@ -1184,6 +1257,10 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                && HSys.Sen.SnLoader_Inputend.Enable==true
                && HSys.Sen.SnLoader_Inputend.IsOn())
             {
+                //AI(cleanout) 20260701 : draining the supply car in CleanOut - do NOT raise the
+                //count-mismatch alarm; break and let the DoLoader finish guard retire the side.
+                if(HSys.Sys.RunMode==Run_CleanOut)
+                    break;
                 Ret=ShowMyError("MES0921", LangT("Loader Tray Count Mismatch"), K_RETRY|K_CLEAN_OUT);
                 if(Ret==K_RETRY)
                     State->FeedTask=1;
@@ -1218,6 +1295,11 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             }
             else
             {
+                //AI(cleanout) 20260701 : supply car drained in CleanOut - do NOT raise the
+                //MES0920 "Loader Tray Empty" alarm. Break so DoFeedTray idles at case 9000 and
+                //the DoLoader phase-aware finish guard (car dry + carriage empty) retires the side.
+                if(HSys.Sys.RunMode==Run_CleanOut)
+                    break;
                 //AI(ht160s-agv) 20260626 : AMR-aware feed deferral (port of HT9046
                 //asendic_Loader.cpp:1943 600s wait). When AMR feeds the magazine, do
                 //NOT alarm the operator the instant the push cylinder reads empty :
@@ -1673,6 +1755,7 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
             if(PushCylinder->Pop() || IsSoftSimulate())
             {
                 bRearHasTray=true;
+                bRearDischargeInProgress=true;   //AI(ht160s-trayarm-empty-handoff) 20260701 : carriage still at discharge Y, Lean release (case 3000) + retreat (case 4000) pending; block TrayArm pick
                 Task=3000;
             }
             break;
@@ -1694,6 +1777,7 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 4000:
             if(MoveLoaderY(LoaderNo, GetLoaderFeedY(LoaderNo)))
             {
+                bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : carriage retreated to feed Y; rear tray now settled + safe for TrayArm to pick
                 Task=5000;
                 return true;
             }

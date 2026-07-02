@@ -21,6 +21,7 @@ private:
     bool bFrontHasTray;
     bool bRearHasTray;
     bool bReturnTray;
+    bool bRearReturnInProgress;   //AI(ht160s-trayarm-empty-handoff) 20260701 : DoGoUpTray active (carrier re-clamping/returning the rear tray); rear NOT pickable even if bRearHasTray still true
     bool bTrayXToEmptyFinish;
     bool bLotFinish;
     TMyTray FrontSourceTray;  //AI(ht160s-tray-source) : FRONT staging holder only (rule #1); REAR tray lives on HSys.Mot.MEmptyY->Tray (parity with Loader, drives MotionView)
@@ -53,6 +54,8 @@ public:
 
     bool IsFrontHasTray();
     bool IsRearHasTray();
+    bool IsCleanOutFinish();   //AI(cleanout) 20260701 : Empty CleanOut-drain finish (TrayArm done + flow clear + rise cylinders home)
+    bool IsRearReadyForPick();   //AI(ht160s-trayarm-empty-handoff) 20260701 : present AND not being returned; model-independent successor to the TrayArm magic-position gate
     bool IsReturnTrayRequested();
     void SetRearHasTray(bool bHasTray);
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm

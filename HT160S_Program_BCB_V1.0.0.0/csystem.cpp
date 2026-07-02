@@ -16,6 +16,7 @@
 #include "aSortArm.h"
 #include "aColor.h"   //AI(ht160s-actuator-timer) 20260627 : ColorModule->PauseTimeoutTimers (ScanDelay freeze on pause)
 #include "aEmpty.h"   //AI(ht160s-actuator-timer) 20260627 : EmptyModule->PauseTimeoutTimers (AmrFeedWaitTimer freeze)
+#include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() in CheckCleanOutFinish
 #include "cprod.h"
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
@@ -1442,11 +1443,21 @@ bool CheckCleanOutFinish()
 	//AI(HT160S-Maintainer) 20260602 : CleanOut done = Auto stations cleaned AND no
 	//IC left under the machine. Aggregates real module state so the RunMode revert
 	//never fires instantly at CleanOut start (was a stub returning true).
+	//AI(cleanout) 20260701 : full cascade Loader -> SortArm -> Auto -> TrayArm -> Empty/Color.
+	//TrayArm/Empty/Color now participate (TrayArm empties its hand + Z-up; Empty/Color GoUp all
+	//trays back to their car). Loader now also requires the front/rear/supply-car sensors clear
+	//(on-machine 2026-07-01 : a Loader empty tray was left behind by the old carriage-flag-only check).
 	if(LoaderModule!=NULL && LoaderModule->IsAllCleanOutFinish()==false)
 		return false;
 	if(SortArmModule!=NULL && SortArmModule->IsCleanOutFinish()==false)
 		return false;
 	if(AutoModule!=NULL && AutoModule->IsAllCleanOutFinish()==false)
+		return false;
+	if(TrayArmModule!=NULL && TrayArmModule->IsCleanOutFinish()==false)
+		return false;
+	if(EmptyModule!=NULL && EmptyModule->IsCleanOutFinish()==false)
+		return false;
+	if(ColorModule!=NULL && ColorModule->IsCleanOutFinish()==false)
 		return false;
 	if(HasICUnderMachineForCleanOut())
 		return false;

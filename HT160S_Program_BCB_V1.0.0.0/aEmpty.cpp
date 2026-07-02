@@ -11,6 +11,7 @@
 #include "cmydef.h"
 #include "mymessbox.h"
 #include "uteach.h"
+#include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() gates the Empty CleanOut drain/finish
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ void TEmptyModule::InitialFlag()
     bFrontHasTray=false;
     bRearHasTray=false;
     bReturnTray=false;
+    bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no rear-return in flight at init
     bTrayXToEmptyFinish=false;
     bLotFinish=false;
     FrontSourceTray.Clear();   //AI(ht160s-tray-source) : no stale front grid across init/lot
@@ -215,6 +217,13 @@ void TEmptyModule::DoEmpty(int &Task)
             //to keep moving an already-staged front tray to the rear so downstream is
             //not starved. Mirrors Loader's narrow lock (aLoader.cpp case 100).
             RefreshStateFromSensors();
+            //AI(cleanout) 20260701 : CleanOut drain phase. Once TrayArm has finished (Loader +
+            //Auto drained, nothing more to recover/supply), stop feeding and GoUp every tray back
+            //to the car via the existing bLotFinish drain path (it also gates off GoDown/feed
+            //below). Before TrayArm finishes (produce phase) bLotFinish stays false so Empty keeps
+            //supplying Autos normally; outside CleanOut it is always false.
+            bLotFinish = (HSys.Sys.RunMode==Run_CleanOut &&
+                          TrayArmModule!=NULL && TrayArmModule->IsCleanOutFinish());
             if(bReturnTray)
             {
                 if(bAmrLocked)
@@ -237,7 +246,7 @@ void TEmptyModule::DoEmpty(int &Task)
             //OFF). In AMR mode wait iAmrFeedWaitSec for the AGV to refill before alarming;
             //the AGV refill is detected on a later cycle (IsInputHandoffFinishedForAmr).
             //Anchored on IsInputShortageForAmr (NOT bFrontHasTray) per the InputEnd rule.
-            if(IsInputShortageForAmr())
+            if(IsInputShortageForAmr() && HSys.Sys.RunMode!=Run_CleanOut)   //AI(cleanout) 20260701 : no Empty source-dry alarm during CleanOut
             {
                 if(GeneralSetting.bUseAMR)
                 {
@@ -257,11 +266,24 @@ void TEmptyModule::DoEmpty(int &Task)
                 //of MES1021). Distinct from Empty MES1021 (rear bottom-miss) and MES1024
                 //(front miss) so operator + cloud/host can tell source-dry apart.
                 //Registered in system/AlarmList.csv via CreateSystemAlarmCode (database.cpp); language pass pending.
+                //AI(ht160s-maintainer) 20260701 : CLEAN OUT dropped from this alarm's
+                //recovery set. Clean-out only applies when Loader itself is out of trays
+                //(aLoader.cpp MES0920/MES0921); Empty source-dry is cleared by an
+                //AGV/operator reload, not by draining the pipeline -- offering it here
+                //previously did nothing on select (Ret was never checked for it).
                 {
-                    int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), &HSys.Sen.SnEmpty_InputEnd, true, K_RETRY|K_CLEAN_OUT);
+                    int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), &HSys.Sen.SnEmpty_InputEnd, true, K_RETRY);
                     if(Ret==K_RETRY)
+                    {
+                        //AI(ht160s-maintainer) 20260701 : no real magazine to reload in
+                        //SOFT_SIMULATE/DUMMY, so a bare Retry would just re-hit this same
+                        //shortage and loop the alarm forever. Refill the virtual car so
+                        //the retried pass finds stock again, mirroring a real AGV/operator
+                        //reload. Real hardware is untouched (IsSoftSimulate()==false there).
+                        if(IsSoftSimulate())
+                            RefillSimInfeed();
                         Task=1;   //AI(ht160s-agv) re-enter case 100; if AGV refilled, shortage clears
-                    //K_CLEAN_OUT : RunMode flips to Run_CleanOut elsewhere; DoEmpty top guards it.
+                    }
                 }
                 break;
             }
@@ -279,7 +301,7 @@ void TEmptyModule::DoEmpty(int &Task)
                 break;
             }
 
-            if(bLotFinish && bFrontHasTray)
+            if(bLotFinish && (bFrontHasTray || bRearHasTray))   //AI(cleanout) 20260701 : drain rear too, not only front
             {
                 if(bAmrLocked)
                     break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
@@ -305,6 +327,7 @@ void TEmptyModule::DoEmpty(int &Task)
         case 3000:
             if(DoGoUpTray(1))
             {
+                bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-return finished (tray back at front, rear cleared); lift the pick block
                 if(bReturnTray && bTrayXToEmptyFinish==false)
                     return;
                 bReturnTray=false;
@@ -509,12 +532,20 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             break;
 
         case 300:
+            //AI(HT160S-Maintainer) 20260701 : gate on PopCylinder's own confirm (sensor +
+            //alarm/timeout via TMyCylinder::Pop) instead of discarding its return and relying
+            //solely on the fixed settle timer below. The old code advanced to case 350/400
+            //(separation claw release) even if FrontRiseTray_2 never physically confirmed down --
+            //a slow/marginal cylinder let the claw open before the stack was actually caught,
+            //dropping the whole stack (reported noise on Empty godown).
             if(GoDownDelay.Off())
             {
-                PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2);
-                GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
-                GoDownDelay.On();
-                GoDownTask=350;
+                if(PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2))
+                {
+                    GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
+                    GoDownDelay.On();
+                    GoDownTask=350;
+                }
             }
             break;
 
@@ -576,6 +607,7 @@ bool TEmptyModule::DoGoUpTray(int Flag)
 {
     if(Flag==0)
     {
+        bRearReturnInProgress=true;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear tray about to be re-clamped and hauled back to front; block TrayArm pick until this return completes
         GoUpTask=1;
         GoUpDelay.Clear();
         return true;
@@ -861,6 +893,37 @@ bool TEmptyModule::IsRearHasTray()
 {
     RefreshStateFromSensors();
     return bRearHasTray;
+}
+//---------------------------------------------------------------------------
+bool TEmptyModule::IsCleanOutFinish()
+{
+    //AI(cleanout) 20260701 : Empty participates in CleanOut (was: no participation). It finishes
+    //only after TrayArm has finished (so no more trays are recycled back to it), its flow path is
+    //clear (no front/rear tray) and the front rise/separate cylinders are all home
+    //(IsReadyForAmrHandoff checks exactly those out-bits; sim-true). Until then DoEmpty case 100
+    //GoUp-drains every tray back to the car. Not consulted outside CleanOut -> return true there.
+    if(HSys.Sys.RunMode!=Run_CleanOut)
+        return true;
+    if(TrayArmModule==NULL || TrayArmModule->IsCleanOutFinish()==false)
+        return false;
+    RefreshStateFromSensors();
+    if(bFrontHasTray || bRearHasTray)
+        return false;
+    if(IsReadyForAmrHandoff()==false)
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-trayarm-empty-handoff) 20260701 : "safe for TrayArm to grab" predicate.
+//IsRearHasTray() only means "a tray exists at the rear" -- ALSO true during the return-to-front
+//DoGoUpTray window (the carrier re-clamps the rear tray and hauls it back). A pick is safe only
+//when a tray is present AND the carrier is not currently returning it. Model-independent : reads
+//no EmptyY position and no shared transport clamp (which change meaning if the carrier ever
+//pre-stages at the front), so it replaces the TrayArm-side magic-70000 encoder gate.
+bool TEmptyModule::IsRearReadyForPick()
+{
+    RefreshStateFromSensors();
+    return (bRearHasTray && bRearReturnInProgress==false);
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::IsReturnTrayRequested()

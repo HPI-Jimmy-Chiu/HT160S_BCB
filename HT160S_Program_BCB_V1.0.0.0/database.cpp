@@ -936,16 +936,18 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
     //call sites use; the literal 6 mirrors AUTO_STATION_COUNT (aAuto1To6.cpp) and must track
     //it (the build-gate alarm-registry guard flags drift).
     {
-        const char *SeedCode[14]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
+        //AI(cleanout) 20260701 : MES0922 = CleanOut front-residual operator alarm (aLoader.cpp
+        //DoLoader). Registered here so the alarm-registry drift guard passes and AlarmList.csv stays complete.
+        const char *SeedCode[15]={"MES0920","MES0921","MES0922","JAM0913","WAR0330","WAR0475",
                                   "MES1021","MES1022","MES1024","JAM1030",
                                   "MES1421","MES1422","MES1424","MES1426","WAR0154"};
-        const int   SeedType[14]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
+        const int   SeedType[15]={eMessageErr,eMessageErr,eMessageErr,eJamErr,eOther,eOther,
                                   eMessageErr,eMessageErr,eMessageErr,eJamErr,
                                   eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther};
-        const char *SeedMsg[14]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
+        const char *SeedMsg[15]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader front residual tray, please remove","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
                                  "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
                                  "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Sorting Arm X motor will out of limit"};
-        for(int si=0; si<14; si++)
+        for(int si=0; si<15; si++)
         {
             AnsiString cd=SeedCode[si], mg=SeedMsg[si];
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");

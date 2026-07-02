@@ -42,6 +42,7 @@ class TLoaderModule
 private:
     TLoaderSideState Side[2];
     bool bRearHasTray;
+    bool bRearDischargeInProgress;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-deposit not yet settled -- carriage still at discharge Y + clamps releasing (DoDischargeTray case 2000..4000); rear NOT pickable yet even though bRearHasTray is set
     int iFrontOwner;
     int iTopCcdCount;
     int iYOwner[2];
@@ -112,6 +113,7 @@ public:
     void DoLoader(int LoaderNo, int &Task);
     AnsiString DescribeState();   //AI(ht160s-state-record-analysis) 20260622 : read-only per-side inner-state dump (FeederDecision.txt)
     bool IsRearHasTray();
+    bool IsRearReadyForPick();   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear tray present AND discharge fully settled (carriage retreated); model-independent TrayArm pick gate (mirrors Empty)
     //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray accessors (return-by-value,
     //mirror Empty/Color GetSourceTray). TrayArm reads these at pickup to route by Kind.
     eTrayKind GetRearTrayKind();

@@ -87,6 +87,7 @@ public:
     void NotifyTrayPicked();
     void RequestReturnTray();        //AI(phase6-loader-recycle) 20260625 : TrayArm asks Color to accept a returned identity tray (same contract name as Empty)
     bool IsRearHasTray();            //AI(phase6-loader-recycle) 20260625 : Color rear handoff position occupied (same contract name as Empty)
+    bool IsCleanOutFinish();         //AI(cleanout) 20260701 : Color CleanOut-drain finish (installed? + TrayArm done + flow clear + rise cylinders home)
     void NotifyTrayXToEmptyFinish(); //AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing onto Color's rear (same contract name as Empty)
     void NotifyICPlaced(int Count);
     void SetSupplyThreshold(int Count);
