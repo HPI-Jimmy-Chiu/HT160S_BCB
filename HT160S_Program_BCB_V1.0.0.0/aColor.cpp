@@ -1151,6 +1151,11 @@ bool TColorModule::IsCleanOutFinish()
     //(IsReadyForAmrHandoff; sim-true). Until then DoColor case 100 GoUp-drains every tray to the car.
     if(IsInstalled()==false)
         return true;
+    //AI(cleanout) 20260701 : the CleanOut drain (GoUp of front/rear trays) lives in DoColor case
+    //100, which is UNREACHABLE in SortBin mode (case 10 branches to DoSortBin). A SortBin-mode
+    //Color must not gate CleanOut on a tray it will never drain -> treat it as trivially finished.
+    if(IsTraySupplyMode()==false)
+        return true;
     if(HSys.Sys.RunMode!=Run_CleanOut)
         return true;
     if(TrayArmModule==NULL || TrayArmModule->IsCleanOutFinish()==false)

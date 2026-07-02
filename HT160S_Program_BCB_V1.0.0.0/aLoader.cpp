@@ -977,7 +977,12 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
     //LoaderNo==1 only (single shared front sensor). Placed before the per-side guard so it is not
     //shadowed by the guard's early return once a side is already finished.
 #ifndef SOFT_SIMULATE
-    if(HSys.Sys.RunMode==Run_CleanOut && LoaderNo==1 &&
+    //AI(cleanout) 20260701 : the compile-time #ifndef only excludes the SOFT_SIMULATE dev build; a
+    //REAL build in DUMMY mode still runs here and would read the phantom-present InType=0
+    //SnLoader_InputHasTray and false-alarm an unremovable MES0922. Gate on the runtime
+    //IsSoftSimulate() (true in DUMMY) too, mirroring IsAllCleanOutFinish / the finish guard.
+    if(IsSoftSimulate()==false &&
+       HSys.Sys.RunMode==Run_CleanOut && LoaderNo==1 &&
        Side[0].bCleanOutFinish && Side[1].bCleanOutFinish &&
        HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
     {
@@ -1000,7 +1005,13 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         bool bSupplyCarDry = IsSoftSimulate()
             ? (IsContinuousFeed()==false)
             : (HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOff());
-        if(TrayMotor->fHasTray==false && bSupplyCarDry)
+        //AI(cleanout) 20260701 : do NOT retire a side while its last tray's rear discharge is still
+        //in flight. DoDischargeTray clears the carriage (fHasTray=false) at case 3000 but only
+        //retreats the carriage + clears bRearDischargeInProgress at case 4000. Retiring here (Task=1;
+        //return) between 3000 and 4000 would abandon the discharge, leaving bRearDischargeInProgress
+        //latched true forever -> IsRearReadyForPick() never true -> TrayArm can never recover the
+        //rear tray -> bRearHasTray never clears -> IsAllCleanOutFinish hangs. Let the discharge finish.
+        if(TrayMotor->fHasTray==false && bSupplyCarDry && bRearDischargeInProgress==false)
         {
             State->bCleanOutFinish=true;
             State->Status=LS_IDLE;

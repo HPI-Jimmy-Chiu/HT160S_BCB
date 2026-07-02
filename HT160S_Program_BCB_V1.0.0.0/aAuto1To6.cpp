@@ -934,6 +934,12 @@ int TAutoModule::GetTrayRequest(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return eTrayReqNone;
+    //AI(cleanout) 20260701 : once Clean Out has drained the Loader (SortArm finished), the Autos
+    //are about to / already running their physical clean-out discharge - stop requesting trays so
+    //TrayArm never delivers an empty tray onto an Auto that has latched bCleanOutFinish (which
+    //would strand the tray on the rear and let Clean Out complete with a tray left behind).
+    if(HSys.Sys.RunMode==Run_CleanOut && SortArmModule!=NULL && SortArmModule->IsCleanOutFinish())
+        return eTrayReqNone;
     //AI(ht160s-agv) 20260615 : while a full car is being handed to the AGV, refuse new
     //trays so TrayArm stops feeding this Auto until the handoff finishes (ClearAmrCar).
     if(bAmrLocked[Index])
