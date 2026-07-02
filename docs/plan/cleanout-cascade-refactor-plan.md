@@ -212,3 +212,51 @@ no Big5 on edited lines (or use `scripts/ops/bcb6-bytesafe-edit.ps1`).
 3. Front untracked residual: Note alarm fires; clears after operator removes tray.
 4. Color uninstalled: Clean Out still completes (Color trivially finished).
 ```
+
+## Adversarial review (2026-07-01, 9-lens red-team + per-finding verify)
+
+FIXED (commit after the checkpoint):
+- CRITICAL: DoLoader finish guard preempted an in-flight rear discharge -
+  `TrayMotor->fHasTray` is cleared at DoDischargeTray case 3000 but
+  `bRearDischargeInProgress` only clears at case 4000. Retiring the side in that
+  window stranded the flag true -> `IsRearReadyForPick()` never true -> TrayArm
+  never recovers the rear tray -> Clean Out hangs with a tray at the Loader rear.
+  Fix: finish guard also requires `bRearDischargeInProgress==false`. (Near-certain
+  end-game trigger, so this was the most important fix.)
+- HIGH: TrayArm could deliver an empty tray onto an Auto that already latched
+  `bCleanOutFinish` (produce->drain boundary) -> tray stranded on the Auto rear
+  and `Auto::IsAllCleanOutFinish()` (checks only `bCleanOutFinish`) still true, so
+  Clean Out completes with a tray left. Fix: `GetTrayRequest` returns none once
+  `SortArm.IsCleanOutFinish()` (drain phase) so no Auto requests a tray then.
+- HIGH: MES0922 front-residual alarm was gated only by compile-time
+  `#ifndef SOFT_SIMULATE`; a REAL build in DUMMY read the phantom InType=0 sensor
+  and false-alarmed. Fix: also gate on runtime `IsSoftSimulate()==false`.
+- MEDIUM: `Color::IsCleanOutFinish()` could hang in SortBin mode (drain lives in
+  DoColor case 100, unreachable in SortBin). Fix: SortBin Color trivially finishes.
+
+DEFERRED / accepted (follow-ups, not blocking):
+- MEDIUM: a Color/Empty REAR tray that GoUp cannot physically clear (stuck-ON
+  sensor, cylinders cycling fine) loops the drain forever with no timeout alarm.
+  Add a drain-attempt watchdog -> operator alarm. (A stuck cylinder already
+  self-alarms via Push/Pop timeout; only a stuck sensor loops silently.)
+- MEDIUM (pre-existing, not introduced here): a recoverable full-machine HOME
+  taken mid-Clean-Out reverts RunMode to Normal while `bCleanOut` stays latched,
+  so the machine resumes NORMAL production instead of continuing the clean-out.
+  Needs a product decision (resume Clean Out after the home?).
+- LOW: BUG-2 residual - a tray TrayArm already committed to an Auto during the
+  produce phase can still be delivered in the drain window (the GetTrayRequest
+  gate only stops NEW requests). Narrow window; a delivery re-check at DoPlace
+  case 4000 would fully close it.
+- LOW: `SnLoader_Inputend` disabled -> guard treats car as dry (finish) so
+  Clean Out drains the pipeline only, not the (unsensable) supply car. And
+  Enabled-but-card-unbound (Input==NULL) makes IsOff()/IsOn() both false ->
+  never dry -> hang. Both are misconfigurations; add an explicit handling if seen.
+- LOW: Color drain reuses case-1700 so `iSimInfeedCount++/iReturnedCount++` fire
+  per drained tray - arguably correct (trays return to the car) but inflates the
+  returned-count. Cosmetic.
+- LOW: Empty/Color `IsCleanOutFinish` do not explicitly check `bTrayReady` (a tray
+  presented at the Color output); `bRearHasTray` should cover it - confirm on-machine.
+
+Build after fixes: sim -Clean + real -Full both EXIT 0. Commits: 8548420
+(cascade checkpoint) + 321dae9 (review-edge fixes).
+```
