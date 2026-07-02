@@ -11,6 +11,7 @@
 #include "aAuto1To6.h"
 #include "aColor.h"            //AI(HT160S-Maintainer) 20260605 : AMR identity-tray source
 #include "aLoader.h"           //AI(HT160S-Maintainer) 20260606 : Loader rear empty-tray recovery source
+#include "aSortArm.h"          //AI(cleanout) 20260701 : SortArmModule->IsCleanOutFinish() = drain-boundary signal for the DoPlace in-flight divert
 #include "GeneralSetting.h"    //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -501,6 +502,39 @@ bool TTrayArmModule::DoPlace(int Flag)
     {
         case 1:
         case 10:
+            //AI(cleanout) 20260701 : in-flight divert at the drain boundary. The Auto-side
+            //GetTrayRequest drain gate only stops NEW dispatches; a delivery already committed
+            //by DecideJob before SortArm finished would still land on an Auto that is switching
+            //to (or has finished) its clean-out discharge - the physical tray would be stranded
+            //on the Auto rear shelf (rear->car pull no longer runs after clean-out). Re-check
+            //the same boundary signal (SortArm.IsCleanOutFinish, the exact gate GetTrayRequest
+            //uses) on every tick while the tray is still IN HAND (PlaceTask 1/10 : Z up, clamps
+            //closed, before the deposit ladder). On divert, reroute the carried tray to the
+            //recycle destination with the same contract as DecidePlaceDestAfterPick (identity ->
+            //Color, cover/normal -> Empty; RequestReturnTray first so the rear is freed). No
+            //Auto-side cleanup is needed : bRearHasTray/bRearDeliveredPending/RearGrid are only
+            //written at case 4000, which we have not reached. Once DoLowerClampRaise starts the
+            //tray is being set down - that residual is caught by the DoAllAutoCleanOut case-7000
+            //backstop alarm instead.
+            if(HSys.Sys.RunMode==Run_CleanOut &&
+               SortArmModule!=NULL && SortArmModule->IsCleanOutFinish())
+            {
+                if(iDeliverKind==eTrayKindIdentity)
+                {
+                    PlaceDest=TAPLACE_COLOR;
+                    if(ColorModule!=NULL)
+                        ColorModule->RequestReturnTray();
+                }
+                else
+                {
+                    PlaceDest=TAPLACE_EMPTY;
+                    if(EmptyModule!=NULL)
+                        EmptyModule->RequestReturnTray();
+                }
+                iAutoTarget=-1;
+                PlaceTask=1;
+                break;
+            }
             if(DoMoveToStationZSafe(GetAutoX(iAutoTarget), PlaceTask))
                 PlaceTask=1000;
             break;

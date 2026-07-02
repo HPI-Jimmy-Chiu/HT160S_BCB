@@ -245,10 +245,18 @@ DEFERRED / accepted (follow-ups, not blocking):
   latched (bHomeByStart still wins for a Start-triggered home), mirroring the
   OneCycle-during-CleanOut resume. InitialAllTask(true) reset the finish flags so
   the cascade re-evaluates and finishes fast if already empty.
-- LOW: BUG-2 residual - a tray TrayArm already committed to an Auto during the
-  produce phase can still be delivered in the drain window (the GetTrayRequest
-  gate only stops NEW requests). Narrow window; a delivery re-check at DoPlace
-  case 4000 would fully close it.
+- ~~LOW: BUG-2 residual - a tray TrayArm already committed to an Auto during the
+  produce phase can still be delivered in the drain window.~~ FIXED (two layers):
+  (1) DoPlace case 1/10 in-flight divert - re-checks the drain boundary
+  (SortArm.IsCleanOutFinish, same signal as the GetTrayRequest gate) on every
+  tick while the tray is still in hand, and reroutes to the recycle destination
+  (identity->Color, else Empty) via the DecidePlaceDestAfterPick contract; no
+  Auto-side cleanup needed (rear flags are only written at case 4000).
+  (2) DoAllAutoCleanOut case-7000 backstop - if any station still shows
+  bRearHasTray/bRearDeliveredPending at the wipe (a deposit that was already
+  mid-ladder at the boundary, or a delivered-not-yet-pulled rear tray), raise
+  MES0923 (registered) so the operator removes the physical tray before the
+  flags are wiped. Real machine only (runtime IsSoftSimulate gate).
 - LOW: `SnLoader_Inputend` disabled -> guard treats car as dry (finish) so
   Clean Out drains the pipeline only, not the (unsensable) supply car. And
   Enabled-but-card-unbound (Input==NULL) makes IsOff()/IsOn() both false ->

@@ -835,6 +835,24 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
             break;
 
         case 7000:
+            //AI(cleanout) 20260701 : residual-delivery backstop. A TrayArm delivery that
+            //slipped past the DoPlace divert (deposit ladder already running at the drain
+            //boundary), or a rear tray delivered-but-not-yet-pulled when the boundary hit,
+            //leaves a PHYSICAL tray on an Auto rear shelf that nothing moves after clean-out
+            //(the rear->car pull loop no longer runs). The rear flags below are the last
+            //software knowledge of that tray, so alarm the operator to remove it BEFORE the
+            //wipe. Modal ShowMyError blocks until confirmed. Real machine only : sim/DUMMY
+            //trays are virtual and InType=0 phantom reads must not false-alarm (mirrors the
+            //MES0922 runtime IsSoftSimulate gate in DoLoader).
+            if(IsSoftSimulate()==false)
+            {
+                AnsiString sResidual="";
+                for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+                    if(State[Index].bRearHasTray || bRearDeliveredPending[Index])
+                        sResidual+=AnsiString(" Auto")+IntToStr(Index+1);
+                if(sResidual!="")
+                    ShowMyError("MES0923", LangT("Auto rear residual tray, please remove :")+sResidual, K_RETRY);
+            }
             for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
             {
                 State[Index].bCarHasTray=false;
