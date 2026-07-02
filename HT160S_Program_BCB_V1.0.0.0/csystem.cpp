@@ -1343,12 +1343,29 @@ void ProcessMotion()
             //resumes on next Start) without dropping or misrouting material.
             InitialAllTask(true);
             fAllMotorHome=true;
-            ChangeRunMode(Run_Normal);                                          //20120102 Daver add
-            SetMotorSpeed(true);                                                //AI(HT160S-Maintainer) 20260602 : re-apply working speed after home (HT172 0420 csystem/uhome port)
+            //AI(cleanout) 20260701 : pick the post-home run mode. A Start-triggered home
+            //(bHomeByStart) resumes production. A home taken mid-Clean-Out (bCleanOut latched)
+            //resumes Clean Out - mirroring the OneCycle-during-CleanOut resume in
+            //CheckOneCycleFinish below - so the drain is carried to completion instead of
+            //silently reverting to a Normal production run (was: unconditional Run_Normal).
+            //InitialAllTask(true) reset the per-module clean-out finish flags, so the cascade
+            //re-evaluates and finishes fast if the pipeline is already empty.
             if(bHomeByStart)
+            {
+                ChangeRunMode(Run_Normal);                                      //20120102 Daver add
                 bHomeByStart=false;
-            else
+            }
+            else if(HSys.Sys.bCleanOut)
+            {
+                ChangeRunMode(Run_CleanOut);
                 SoftStop=true;
+            }
+            else
+            {
+                ChangeRunMode(Run_Normal);
+                SoftStop=true;
+            }
+            SetMotorSpeed(true);                                                //AI(HT160S-Maintainer) 20260602 : re-apply working speed after home (HT172 0420 csystem/uhome port)
         }
 		return;
 	}

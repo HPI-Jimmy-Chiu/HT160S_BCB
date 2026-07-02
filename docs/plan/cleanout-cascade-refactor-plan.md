@@ -239,10 +239,12 @@ DEFERRED / accepted (follow-ups, not blocking):
   sensor, cylinders cycling fine) loops the drain forever with no timeout alarm.
   Add a drain-attempt watchdog -> operator alarm. (A stuck cylinder already
   self-alarms via Push/Pop timeout; only a stuck sensor loops silently.)
-- MEDIUM (pre-existing, not introduced here): a recoverable full-machine HOME
-  taken mid-Clean-Out reverts RunMode to Normal while `bCleanOut` stays latched,
-  so the machine resumes NORMAL production instead of continuing the clean-out.
-  Needs a product decision (resume Clean Out after the home?).
+- ~~MEDIUM: recoverable full-machine HOME mid-Clean-Out reverted to Normal while
+  `bCleanOut` stayed latched -> resumed NORMAL production.~~ FIXED: the post-home
+  run-mode pick in ProcessMotion now resumes `Run_CleanOut` when `bCleanOut` is
+  latched (bHomeByStart still wins for a Start-triggered home), mirroring the
+  OneCycle-during-CleanOut resume. InitialAllTask(true) reset the finish flags so
+  the cascade re-evaluates and finishes fast if already empty.
 - LOW: BUG-2 residual - a tray TrayArm already committed to an Auto during the
   produce phase can still be delivered in the drain window (the GetTrayRequest
   gate only stops NEW requests). Narrow window; a delivery re-check at DoPlace
