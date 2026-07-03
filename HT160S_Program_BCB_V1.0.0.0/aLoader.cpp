@@ -587,12 +587,30 @@ bool TLoaderModule::IsRearHasTray()
 //latches at DoDischargeTray case 2000, BEFORE the Lean clamp release (case 3000) and the carriage
 //retreat to feed Y (case 4000) -- a raw bRearHasTray would let TrayArm lower onto the rear slot
 //while the discharge carriage is still adjacent / clamps still moving. bRearDischargeInProgress
-//brackets that window (set case 2000, cleared case 4000). Model-independent : no encoder/clamp peek.
-//Kept software-latched, NOT recomputed from the rear sensor (which reads present the instant the
-//tray lands and gives no protection against the still-retreating carriage).
+//brackets that window (set case 2000, cleared case 4000).
+//AI(cleanout) 20260703 : ON-MACHINE INTERFERENCE FIX (mirrors Empty commit 564154c). The latch
+//pair alone was NOT enough : on REALLY, RefreshRearState re-latches bRearHasTray from the raw
+//SnLoader_OutputBottomHasTray, which lights the moment the carriage LANDS the tray at the rear
+//(DoDischargeTray case 1000, both clamps still ON) while bRearDischargeInProgress is only set
+//at case 2000 -- a whole-case-1000 window where TrayArm clamped a tray the carriage still owned
+//(the user-reported interference). Add the ladder-state layer : block while EITHER side has
+//DischargeTask inside 1000..4000 (carriage moving to / releasing at / retreating from the
+//rear; window constant must track the DoDischargeTray case numbering). Clamp release is
+//embedded in that window : TMyCylinder::Pop does not advance the ladder until the Off sensor
+//confirms on a REALLY machine. Deliberately NO blanket clamp out-bit check : the same
+//Push/Lean clamps legitimately hold the tray on the carriage at the FRONT all through
+//feed/CCD/sort (a parked dry side keeps them commanded ON), so an unconditional out-bit test
+//would deadlock TrayArm. Sim crosses 1000..4000 in a few ticks -- no lasting block.
 bool TLoaderModule::IsRearReadyForPick()
 {
-    return (IsRearOccupied() && bRearDischargeInProgress==false);
+    if(IsRearOccupied()==false || bRearDischargeInProgress)
+        return false;
+    for(int n=0; n<2; n++)
+    {
+        if(Side[n].DischargeTask>=1000 && Side[n].DischargeTask<=4000)
+            return false;   //a carriage is delivering to / retreating from the rear
+    }
+    return true;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsLoaderReadyForSort(int LoaderNo)
@@ -1961,6 +1979,13 @@ AnsiString TLoaderModule::DescribeState()
     AnsiString s;
     s  = "[Loader]\r\n";
     s += "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
+       + "  bRearDischargeInProgress=" + IntToStr(bRearDischargeInProgress ? 1 : 0)
+       //AI(cleanout) 20260703 : latched-only computed rear-pick verdict (house rule : log the
+       //verdict, not just raw inputs). Do NOT call IsRearReadyForPick() here -- it would
+       //refresh sensors inside the state-record dump path.
+       + "  RearPickReady=" + IntToStr((bRearHasTray && bRearDischargeInProgress==false
+              && (Side[0].DischargeTask<1000 || Side[0].DischargeTask>4000)
+              && (Side[1].DischargeTask<1000 || Side[1].DischargeTask>4000)) ? 1 : 0)
        + "  iFrontOwner=" + IntToStr(iFrontOwner)
        + "  iYOwner=[" + IntToStr(iYOwner[0]) + "," + IntToStr(iYOwner[1]) + "]"
        + "  iTopCcdCount=" + IntToStr(iTopCcdCount)
