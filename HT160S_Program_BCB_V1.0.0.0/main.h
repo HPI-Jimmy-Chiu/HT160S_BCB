@@ -348,7 +348,7 @@ __published:	// IDE-managed Components
     TListBox *lbTaskRecord;
     TTabSheet *TabOther;
     TPanel *Panel13;
-    TPageControl *PageControl3;
+    TPageControl *pgcDiagnostic;
     TTabSheet *TabSheet2;
     TStringGrid *StringGridLockInfo;
     TTabSheet *TabSheet13;
@@ -360,6 +360,8 @@ __published:	// IDE-managed Components
     TMemo *memoIOStatus;
     TTabSheet *TabSuckStatus;
     TMemo *memoSuckStatus;
+    TTabSheet *tsModuleStatus;
+    TStringGrid *sgModuleStatus;
     TLabel *lbCarTrayCount_Loader;
     TLabel *lbCarTrayCount_Empty;
     TLabel *lbCarTrayCount_Color;
@@ -468,6 +470,7 @@ public:		// User declarations
     void __fastcall ShowMotorInfo();
     void __fastcall ShowUnloadAutoInfo();   //AI(ht160s-motion-view) 20260618 : fill Unload Auto1~6 Bin/Lot/ID/Cnt panels
     void __fastcall ShowCarTrayCount();      //AI(ht160s-agv) 20260624 : PanelMain6 header per-zone trays-on-AMR-car count
+    void __fastcall RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status diagnostic sheet pump (throttled; called from DoSystemMessage)
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);
     void LoadRunModePicture();
     void LoadStartModePicture();

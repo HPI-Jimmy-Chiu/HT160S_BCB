@@ -32,6 +32,8 @@
 #include "aLoader.h"
 #include "aEmpty.h"    //AI(ht160s-agv) 20260624 : EmptyModule->GetCarTrayCount for PanelMain6 header
 #include "aColor.h"    //AI(ht160s-agv) 20260624 : ColorModule->GetCarTrayCount for PanelMain6 header
+#include "aSortArm.h"  //AI(ht160s-status) 20260703 : SortArmModule->GetStatus for the Module Status sheet
+#include "aTrayArm.h"  //AI(ht160s-status) 20260703 : TrayArmModule->GetStatus for the Module Status sheet
 #include "LotWebApiClient.h"   //AI(ht160s-lot-webapi) 20260612 : Stage 4 : machine-flow Lot data pull
 #include "SecsGem/UsecegemMainFrom.h"
 #include "SecsGem/uHGemHT160.h"
@@ -3154,3 +3156,73 @@ void __fastcall TfMain::ShowLotDetail(AnsiString LotID)
 }
 //---------------------------------------------------------------------------
 
+//---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : Module Status diagnostic sheet (pgcDiagnostic /
+//tsModuleStatus). One row per module showing the unified-status name (approved design,
+//docs/plan/module-status-enum-design-20260703.md). Called on every DoSystemMessage
+//pass; throttled to ~300ms and skipped while the sheet is not the active diagnostic
+//page, so the machine spin never pays for a hidden grid.
+void __fastcall TfMain::RefreshModuleStatusGrid()
+{
+    static DWORD dwLast=0;
+    static const char *SasName[4]={"IDLE","PICKING","PLACING","RECOVERY"};
+    static const char *TasName[4]={"IDLE","PICKING","CARRYING","PLACING"};
+    static const char *LsName[6]={"IDLE","FEEDING","CCD_SCAN","READY_SORT","SORTING","TO_REAR"};
+    static const char *EsName[5]={"IDLE","DESTACK","FEEDING","REAR_READY","RETURNING"};
+    static const char *CsName[5]={"IDLE","DESTACK","FEEDING","REAR_READY","RETURNING"};
+    static const char *AsName[7]={"IDLE","REAR_STAGED","LOADING","SORTING","FULL","DISCHARGING","CLEANOUT_DONE"};
+    DWORD dwNow;
+    int St;
+    int Row;
+
+    if(sgModuleStatus==NULL || pgcDiagnostic==NULL || tsModuleStatus==NULL)
+        return;
+    if(pgcDiagnostic->ActivePage!=tsModuleStatus)
+        return;
+    dwNow=GetTickCount();
+    if(dwLast!=0 && (int)(dwNow-dwLast)<300)
+        return;
+    dwLast=dwNow;
+
+    sgModuleStatus->Cells[0][0]="Module";
+    sgModuleStatus->Cells[1][0]="Status";
+    sgModuleStatus->Cells[2][0]="Note";
+
+    Row=1;
+    St=(SortArmModule!=NULL) ? SortArmModule->GetStatus() : 0;
+    sgModuleStatus->Cells[0][Row]="SortArm";
+    sgModuleStatus->Cells[1][Row]=(St>=0 && St<4) ? SasName[St] : "?";
+    sgModuleStatus->Cells[2][Row]=(SortArmModule!=NULL && SortArmModule->HasHoldingIC()) ? "holding IC" : "";
+    Row++;
+    St=(TrayArmModule!=NULL) ? TrayArmModule->GetStatus() : 0;
+    sgModuleStatus->Cells[0][Row]="TrayArm";
+    sgModuleStatus->Cells[1][Row]=(St>=0 && St<4) ? TasName[St] : "?";
+    sgModuleStatus->Cells[2][Row]=(TrayArmModule!=NULL && TrayArmModule->HasTray()) ? "tray in hand" : "";
+    Row++;
+    for(int n=1; n<=2; n++)
+    {
+        St=(LoaderModule!=NULL) ? LoaderModule->GetLoaderStatus(n) : 0;
+        sgModuleStatus->Cells[0][Row]=AnsiString("Loader")+IntToStr(n);
+        sgModuleStatus->Cells[1][Row]=(St>=0 && St<6) ? LsName[St] : "?";
+        sgModuleStatus->Cells[2][Row]="";
+        Row++;
+    }
+    St=(EmptyModule!=NULL) ? EmptyModule->GetStatus() : 0;
+    sgModuleStatus->Cells[0][Row]="Empty";
+    sgModuleStatus->Cells[1][Row]=(St>=0 && St<5) ? EsName[St] : "?";
+    sgModuleStatus->Cells[2][Row]="";
+    Row++;
+    St=(ColorModule!=NULL) ? ColorModule->GetStatus() : 0;
+    sgModuleStatus->Cells[0][Row]="Color";
+    sgModuleStatus->Cells[1][Row]=(St>=0 && St<5) ? CsName[St] : "?";
+    sgModuleStatus->Cells[2][Row]="";
+    Row++;
+    for(int n=0; n<6; n++)
+    {
+        St=(AutoModule!=NULL) ? AutoModule->GetStationStatus(n) : 0;
+        sgModuleStatus->Cells[0][Row]=AnsiString("Auto")+IntToStr(n+1);
+        sgModuleStatus->Cells[1][Row]=(St>=0 && St<7) ? AsName[St] : "?";
+        sgModuleStatus->Cells[2][Row]="";
+        Row++;
+    }
+}

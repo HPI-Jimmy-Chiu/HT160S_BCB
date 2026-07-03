@@ -857,6 +857,8 @@ void DoSystemMessage()
 			bLampPause=true;
 		}
 	}
+	if(fMain!=NULL)
+		fMain->RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status sheet (throttled + visibility-gated inside)
 	DoPanelLamp();
 }
 //---------------------------------------------------------------------------

@@ -5848,7 +5848,7 @@ object fMain: TfMain
               BevelInner = bvLowered
               Color = 12761254
               TabOrder = 0
-              object PageControl3: TPageControl
+              object pgcDiagnostic: TPageControl
                 Left = 2
                 Top = 2
                 Width = 1096
@@ -5934,6 +5934,24 @@ object fMain: TfMain
                     Align = alClient
                     Color = 14670284
                     ScrollBars = ssBoth
+                    TabOrder = 0
+                  end
+                end
+                object tsModuleStatus: TTabSheet
+                  Caption = 'Module Status'
+                  ImageIndex = 4
+                  object sgModuleStatus: TStringGrid
+                    Left = 0
+                    Top = 0
+                    Width = 1088
+                    Height = 812
+                    Align = alClient
+                    Color = 14670284
+                    ColCount = 3
+                    DefaultColWidth = 260
+                    DefaultRowHeight = 24
+                    FixedCols = 0
+                    RowCount = 13
                     TabOrder = 0
                   end
                 end
