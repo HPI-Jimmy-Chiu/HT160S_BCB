@@ -58,6 +58,8 @@ __fastcall TfTeach::TfTeach(TComponent* Owner)
     iSaCol=0;
     iSaRow=0;
     bSaZDown=true;
+    bSaZRecovering=false;
+    bSaAllZUpRunning=false;
 
     bCarTestRunning=false;
     iCarArea=0;
@@ -1056,6 +1058,28 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
             SetMessage(Err);
         }
     }
+    //AI(ht160s-sortarm) 20260703 (Req2) : systematic mid-motion fault halt. Every Advanced-page
+    //test is a Timer-polled state machine; a servo alarm that ARISES after a test started was
+    //never re-checked before, so the polling timer kept re-driving motion and the machine "could
+    //not stop" for troubleshooting. ONE central guard covers every current AND future teach
+    //motion : while any advanced test / All-Z-up runs, a real (off-limit) servo alarm stops them
+    //ALL, then notifies. A new test is protected automatically once its running flag is listed in
+    //AnyAdvancedTestRunning() and its Stop is in StopAllAdvancedTests() (both existing conventions).
+    //Flags are cleared (StopAllAdvancedTests) BEFORE the modal so the timer cannot re-enter and
+    //re-drive motion while the operator reads the message.
+    if(AnyAdvancedTestRunning())
+    {
+        AnsiString FaultWhy;
+        if(HasRealServoAlarm(FaultWhy))
+        {
+            StopAllAdvancedTests();
+            SetMessage(FaultWhy);
+            ShowMyOKMessageNoStop(FaultWhy);
+            UpdateMotorMonitor();
+            return;
+        }
+    }
+    RunSaAllZUp();
     RunSortArmTest();
     RunCarTest();
     RunAutoTest();
@@ -1326,12 +1350,11 @@ bool TfTeach::CheckSortArmTestReady(int SlotIndex, int Target)
         SetSaStatus(LangT("Abort: not home"));
         return false;
     }
-    if(CheckSortArmZHome()==false)
-    {
-        ShowMyOKMessageNoStop(LangT("All Suck Z must be home before X move."));
-        SetSaStatus(LangT("Abort: Suck Z not home"));
-        return false;
-    }
+    //AI(ht160s-sortarm) 20260703 (Req4) : suck-Z Home is NO LONGER a hard gate here. If a nozzle
+    //is off its Home sensor the test starts in recovery (btnSaGoClick sets bSaZRecovering) and
+    //RunSortArmTest lifts all suck-Z to the safe position, then re-verifies Home; only a genuine
+    //failure (still not home after the lift) alarms + stops there. X/Y Home and all motor-alarm
+    //checks above still hard-gate the start. CheckSortArmZHome() is retained for other callers.
     return true;
 }
 //---------------------------------------------------------------------------
@@ -1339,6 +1362,29 @@ void TfTeach::RunSortArmTest()
 {
     if(bSaTestRunning==false || SortArmModule==NULL)
         return;
+    //AI(ht160s-sortarm) 20260703 (Req4) : recovery phase. The suckers were not on Home at GO;
+    //lift all suck-Z to the safe position, then re-verify the live Home sensor. Home now lit ->
+    //resume the normal pick/place. Still not lit after reaching safe -> genuine fault : stop the
+    //test (so the polling timer stops re-driving motion) and notify. SortArmZToSafePos() is
+    //poll-to-done (re-called each tick, no command spam; true only when every suck-Z has arrived).
+    if(bSaZRecovering)
+    {
+        if(SortArmModule->SortArmZToSafePos())
+        {
+            if(SortArmModule->AreAllSuckersHome())
+            {
+                bSaZRecovering=false;
+                SetSaStatus(LangT("Suckers back home : continue"));
+            }
+            else
+            {
+                StopSortArmTest();
+                SetSaStatus(LangT("Abort: Suck Z not home after safe move"));
+                ShowMyOKMessageNoStop(LangT("Suck Z did not return Home after moving to the safe position."));
+            }
+        }
+        return;
+    }
     if(SortArmModule->MoveSuckerToCell(iSaSlot, iSaTarget, iSaCol, iSaRow, bSaZDown, iSaTask))
     {
         bSaTestRunning=false;
@@ -1350,9 +1396,13 @@ void TfTeach::StopSortArmTest()
 {
     TTrayMotor *Y;
 
-    if(bSaTestRunning==false)
+    //AI(ht160s-sortarm) 20260703 : also stops the standalone All-Z-up lift and clears the
+    //not-home recovery flag, so the central fault guard (and EMG) halts either path here.
+    if(bSaTestRunning==false && bSaAllZUpRunning==false)
         return;
     bSaTestRunning=false;
+    bSaAllZUpRunning=false;
+    bSaZRecovering=false;
     iSaTask=0;
     if(HSys.Mot.MSortingArmX!=NULL)
         HSys.Mot.MSortingArmX->Stop();
@@ -1375,6 +1425,87 @@ void TfTeach::SetSaStatus(AnsiString Text)
         lblSaStatus->Caption=Text;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-sortarm) 20260703 (Req3) : "All Z Up" button. Lift every suck-Z to the safe
+//position at the motor's normal working speed (Z up is always collision-free). One-shot arm :
+//gate here, then RunSaAllZUp (driven from tmrUpdate) polls SortArmZToSafePos() to completion.
+//Counted as an advanced motion (AnyAdvancedTestRunning), so the central servo-alarm guard
+//stops it too. MoveTo is poll-to-done, so the poll re-issues safely without command spam.
+void __fastcall TfTeach::btnSaAllZUpClick(TObject *Sender)
+{
+    (void)Sender;
+    if(SortArmModule==NULL)
+    {
+        SetSaStatus(LangT("SortArm module not ready"));
+        return;
+    }
+    if(bSaTestRunning || bSaAllZUpRunning)
+    {
+        SetSaStatus("Test already running");
+        return;
+    }
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyOKMessageNoStop(LangT("Machine is running."));
+        return;
+    }
+    if(IsEMGPressed()>0)
+    {
+        ShowMyOKMessageNoStop(LangT("EMG is pressed."));
+        return;
+    }
+    bSaAllZUpRunning=true;
+    SetSaStatus(LangT("All Z up : lifting to safe Z..."));
+}
+//---------------------------------------------------------------------------
+void TfTeach::RunSaAllZUp()
+{
+    if(bSaAllZUpRunning==false || SortArmModule==NULL)
+        return;
+    if(SortArmModule->SortArmZToSafePos())
+    {
+        bSaAllZUpRunning=false;
+        SetSaStatus(LangT("All Z at safe position"));
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-sortarm) 20260703 (Req2) : single OR-list of every Advanced-page motion flag.
+//ADD A NEW TEST'S RUNNING FLAG HERE so the central mid-motion fault guard protects it too.
+bool TfTeach::AnyAdvancedTestRunning()
+{
+    return bSaTestRunning || bSaAllZUpRunning || bCarTestRunning || bAutoTestRunning ||
+           bTaTestRunning || bCcdTestRunning || bColorCcdTestRunning;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-sortarm) 20260703 (Req2) : mirror csystem.cpp ScanAllMotorStatus - a real
+//(off-limit) servo alarm on any ENABLED motor is the hard fault. A bare CW/CCW limit latches
+//iAlarmLed but is recoverable, so it is skipped (avoids nuisance stops on a parked limit).
+//SOFT_SIMULATE has no card and never alarms, so the scan is compiled out there (same as
+//production ScanAllMotorStatus). Why carries the axis name for the operator popup.
+bool TfTeach::HasRealServoAlarm(AnsiString &Why)
+{
+    Why="";
+#ifdef SOFT_SIMULATE
+    return false;
+#else
+    if(HSys.MotPtr==NULL)
+        return false;
+    for(int i=0; i<HSys.iTotalMotor; i++)
+    {
+        TTrayMotor *M=HSys.MotPtr[i];
+        if(M==NULL || M->GetEnable()==false)
+            continue;
+        M->ScanMotorStatus();
+        if(M->Led[iAlarmLed] && M->ReadServoAlarmOn() &&
+           !(M->Led[iCwLed] || M->Led[iCcwLed]))
+        {
+            Why=AnsiString("Test stopped : servo alarm on ")+M->NumberAlias;
+            return true;
+        }
+    }
+    return false;
+#endif
+}
+//---------------------------------------------------------------------------
 void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
 {
     int Slot;
@@ -1391,7 +1522,7 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
     }
     if(cbSuckUse==NULL || cbToArea==NULL)
         return;
-    if(bSaTestRunning)
+    if(bSaTestRunning || bSaAllZUpRunning)
     {
         SetSaStatus("Test already running");
         return;
@@ -1430,9 +1561,13 @@ void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
     iSaCol=Col;
     iSaRow=Row;
     bSaZDown=(chkSaZDown!=NULL && chkSaZDown->Checked);
+    //AI(ht160s-sortarm) 20260703 (Req4) : if the suckers are NOT on their Home sensor, do NOT
+    //abort at the gate. Start the test in RECOVERY : RunSortArmTest first lifts all suck-Z to the
+    //safe position, then re-reads the Home sensor. Only if it STILL is not lit do we alarm + stop.
+    bSaZRecovering=(SortArmModule->AreAllSuckersHome()==false);
     iSaTask=0;
     bSaTestRunning=true;
-    SetSaStatus(LangT("Sort arm test start"));
+    SetSaStatus(bSaZRecovering ? LangT("Suckers not home : lifting to safe Z...") : LangT("Sort arm test start"));
 }
 //---------------------------------------------------------------------------
 // Advanced page (Channel) : stacking-car destacker tests. Two groups.

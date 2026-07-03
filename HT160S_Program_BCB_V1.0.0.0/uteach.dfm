@@ -751,9 +751,9 @@ object fTeach: TfTeach
           Top = 0
           Width = 831
           Height = 739
-          ActivePage = tsCCD
+          ActivePage = tsSortArm
           Align = alClient
-          TabIndex = 3
+          TabIndex = 0
           TabOrder = 0
           object tsSortArm: TTabSheet
             Caption = 'Sort Arm'
@@ -868,6 +868,15 @@ object fTeach: TfTeach
                 Caption = 'GO (Move Suck To Cell)'
                 TabOrder = 5
                 OnClick = btnSaGoClick
+              end
+              object btnSaAllZUp: TButton
+                Left = 544
+                Top = 82
+                Width = 177
+                Height = 28
+                Caption = 'All Z Up (to Safe Z)'
+                TabOrder = 6
+                OnClick = btnSaAllZUpClick
               end
             end
           end
@@ -1101,6 +1110,13 @@ object fTeach: TfTeach
               Height = 16
               Caption = 'Ready'
             end
+            object lblColorCcdStatus: TLabel
+              Left = 16
+              Top = 256
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
+            end
             object gbCcd: TGroupBox
               Left = 0
               Top = 0
@@ -1112,7 +1128,7 @@ object fTeach: TfTeach
               object lbCcdChannel: TLabel
                 Left = 16
                 Top = 24
-                Width = 53
+                Width = 60
                 Height = 16
                 Caption = 'CCD Area'
               end
@@ -1188,13 +1204,6 @@ object fTeach: TfTeach
                 TabOrder = 0
                 OnClick = btnColorCcdGoClick
               end
-            end
-            object lblColorCcdStatus: TLabel
-              Left = 16
-              Top = 256
-              Width = 41
-              Height = 16
-              Caption = 'Ready'
             end
           end
         end

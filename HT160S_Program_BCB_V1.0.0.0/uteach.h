@@ -234,6 +234,7 @@ __published:
     TEdit *edSaRow;
     TCheckBox *chkSaZDown;
     TButton *btnSaGo;
+    TButton *btnSaAllZUp;
     TTabSheet *tsChannel;
     TGroupBox *gbCarGoUpGoDonw;
     TLabel *lbCarArea;
@@ -296,6 +297,7 @@ __published:
     void __fastcall btnStopClick(TObject *Sender);
     void __fastcall btnRefreshClick(TObject *Sender);
     void __fastcall btnSaGoClick(TObject *Sender);
+    void __fastcall btnSaAllZUpClick(TObject *Sender);
     void __fastcall btnCarGoClick(TObject *Sender);
     void __fastcall btnAutoGoUpClick(TObject *Sender);
     void __fastcall btnTaGrabClick(TObject *Sender);
@@ -322,6 +324,8 @@ private:
     int iSaCol;
     int iSaRow;
     bool bSaZDown;
+    bool bSaZRecovering;
+    bool bSaAllZUpRunning;
 
     bool bCarTestRunning;
     int iCarArea;
@@ -393,6 +397,9 @@ private:
     void RunSortArmTest();
     void StopSortArmTest();
     void SetSaStatus(AnsiString Text);
+    void RunSaAllZUp();
+    bool AnyAdvancedTestRunning();
+    bool HasRealServoAlarm(AnsiString &Why);
     void PopulateChannelCombos();
     bool CheckCarTestReady();
     bool CallCarGoUp(int Area, int Flag);

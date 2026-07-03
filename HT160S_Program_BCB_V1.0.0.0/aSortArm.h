@@ -105,7 +105,6 @@ private:
     bool MoveLoaderY(int LoaderNo, int Position);
     bool MoveAutoY(int AutoIndex, int Position);
     bool MovePitchToTrayPitch();
-    bool SortArmZToSafePos();
     bool MoveToLoaderPick();
     bool MoveToAutoPlace();
     bool MovePickZDown();
@@ -144,6 +143,7 @@ public:
     void SetPnPParameters(double PickDelaySec, double PlaceDelaySec, double DestroyCheckSec);   //AI(ht160s-pnp) 20260626 : push recipe [PnP] values into the runtime model
     int  GetDestroyCheckMS();   //AI(ht160s-pnp) 20260626 : dDestroyCheckTime as ms for the blow dwell (floor 300 on <=0)
     bool AreAllSuckersHome();   //AI(HT160S-Maintainer) 20260622 : canonical SortArm-move suck-home interlock (live Led[iHomeLed])
+    bool SortArmZToSafePos();   //AI(ht160s-sortarm) 20260703 : public for Teach All-Z-up button + not-home recovery (lift all suck-Z to SORT_ARM_SAFE_Z_POSITION)
     void DoSortArm(int &Task);
     bool HasHoldingIC();
     int GetStatus();   //AI(ht160s-status) 20260703 : eSortArmStatus with SAS_RECOVERY overlay
