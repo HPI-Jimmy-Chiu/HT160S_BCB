@@ -43,6 +43,7 @@ private:
     TLoaderSideState Side[2];
     bool bRearHasTray;
     bool bRearDischargeInProgress;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-deposit not yet settled -- carriage still at discharge Y + clamps releasing (DoDischargeTray case 2000..4000); rear NOT pickable yet even though bRearHasTray is set
+    bool bRearReadyForPick;          //AI(ht160s-rearready-state) 20260703 : producer-published rear pickable latch. Set ONLY at DoDischargeTray case 4000 success; cleared on pick / re-armed at discharge start. IsRearReadyForPick() reads THIS, not Side[].DischargeTask (removes step-range coupling + the <=4000 terminal off-by-one strand).
     int iFrontOwner;
     int iTopCcdCount;
     int iYOwner[2];
