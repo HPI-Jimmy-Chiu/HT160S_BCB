@@ -134,7 +134,6 @@ Level	層級
 Loader	上料機構
 Loader Safe Distance (mm)	上料機構安全距離 (mm)
 Loader Tray Empty	Loader 盤空
-Empty supply magazine empty	Empty 供料匣缺盤
 Loader Tray has IC,please remove	Loader 盤有 IC，請移除
 Loader Y motor will out of limit	上料機構 Y 馬達將超出限位
 Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK.	Loader 仍夾持著盤。請手動移除 Loader L 與 R 上的所有盤，然後按 OK。
@@ -313,5 +312,3 @@ Zone	區域
 \n\nSave motor parameter changes?	\n\n儲存馬達參數變更？
 apply	套用
 guard	防護
-Loader Tray Count Mismatch	Loader 盤數不符
-Loader Tray Lost On Carriage	載台無料盤 (盤遺失或感測器異常)

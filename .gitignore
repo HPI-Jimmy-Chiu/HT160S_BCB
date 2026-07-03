@@ -31,6 +31,11 @@ result.json
 # Runtime Lot state (live WorkOrder store written by the machine; not shared)
 HT160S_LotInfo/
 
+# Runtime auto-generated table backups (timestamped IO_Table/Mot_Table snapshots the
+# machine writes on every save; local churn, not shared config)
+system/backup/
+system/backupMotor/
+
 # Local archives and backup workspaces
 *.7z
 *.zip
