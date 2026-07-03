@@ -25,17 +25,24 @@
 
 ---
 
-## 2. CleanOut 完成串接（收斂設計）
+## 2. CleanOut 完成串接（✅ 使用者已確認 2026-07-03 — 未來開發以此為基準）
 
 ```
-Loader (源 Inputend 乾)
-  └► SortArm   (Loader 完成 + 手上無 IC + idle)
-        └► Auto  (SortArm 放完 IC + 軌道盤全 GoUp 出車 + idle)
-              └► TrayArm (Loader+Auto 完成 + 送完手上盤 + Z 回上 + idle)
-                    └► Empty / Color (TrayArm 完成 + 盤全 GoUp + idle)
+1. Loader (L+R 兩側：源 Inputend 乾 + IC 全被吸走 + 無虛擬盤
+           + 前/後 sensor 熄 + 後盤已被 TrayArm 收 + 兩側 Idle)
+  └► 2. SortArm   (Loader 完成 + 手上無 IC + Pick/Place 停格
+                   + 無重吸/吸錯待處理 + ★吸嘴全部在上方 Home)
+        └► 3. Auto ×6 (SortArm 完成 + 後方殘盤自收進 working
+                       + 軌道盤全 GoUp 出堆疊車 + Idle) ⚠Full 閘
+              └► 4. TrayArm (Loader＋Auto 完成 + 手上盤送達有效目的地
+                             + Z 回上方 + 無在途工作 + Idle)
+                    └► 5. Empty / Color (TrayArm 完成 + 盤全 GoUp 回供料車
+                                         + 前/後皆空 + 前缸回 Home + Idle) ⚠Full 閘
 ```
 
-**通則**：完成 ＝ ①需求/上游已完成 ＋ ②自己物料清空到定位 ＋ ③自己 Idle（手上工作做完、非停半途）。
+**通則**：完成 ＝ ①需求/上游已完成 ＋ ②自己物料清空到定位 ＋ ③自己 Idle（手上工作做完、非停半途）。全部**即時運算**——盤中途再出現會自動取消完成再收一次。
+**★ 使用者補充 (2026-07-03)**：SortArm 的 Idle 明確包含「所有啟用吸嘴 Z 在上方 Home sensor」（`AreAllSuckersHome()`，sim-true）——已實作進 `IsCleanOutFinish()`。
+**⚠ Full 閘**：Auto 輸出車×6 / Empty 供料車 / Color 供料車（Loader 依裁決不加）；Full 亮→暫停 GoUp+modal 通知清空，熄才續跑/完成。
 
 ---
 

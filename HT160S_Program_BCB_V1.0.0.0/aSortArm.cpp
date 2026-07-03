@@ -1668,6 +1668,11 @@ bool TSortArmModule::IsCleanOutFinish()
         return false;
     if(IsResidueCheckBusy() || HasPickSuckError())
         return false;
+    //AI(cleanout) 20260703 : user-confirmed cascade condition - SortArm idle INCLUDES every
+    //enabled suck-Z nozzle parked UP on its Home sensor (live read; sim-true). A nozzle left
+    //down is not idle even with all sub-machines parked.
+    if(AreAllSuckersHome()==false)
+        return false;
     return true;
 }
 //---------------------------------------------------------------------------
