@@ -1856,6 +1856,7 @@ void TSortArmModule::DoSortArm(int &Task)
             break;
 
         default:
+            LogLadderFault("SortArm.DoSortArm", Task);   //AI(ht160s-ladder-guard) 20260703
             Task=1;
             break;
     }
@@ -1953,8 +1954,7 @@ bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Ro
 
     if(SlotIndex<0 || SlotIndex>=SORT_ARM_SUCKER_COUNT)
     {
-        Task=900;
-        return true;
+        return true;   //AI(ht160s-ladder-guard) 20260703 : bad args, abort (was dead Task=900)
     }
     if(Target==1 || Target==2)
         LoaderNo=Target;
@@ -1962,8 +1962,7 @@ bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Ro
         AutoIndex=Target-11;
     else
     {
-        Task=900;
-        return true;
+        return true;   //AI(ht160s-ladder-guard) 20260703 : bad args, abort (was dead Task=900)
     }
 
     switch(Task)
@@ -2020,7 +2019,7 @@ bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Ro
             return true;
 
         default:
-            Task=900;
+            LogLadderFault("SortArm.MoveSuckerToCell", Task);   //AI(ht160s-ladder-guard) 20260703 (was dead Task=900)
             return true;
     }
     return false;

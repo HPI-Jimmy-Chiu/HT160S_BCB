@@ -1454,6 +1454,13 @@ void TAutoModule::DoAuto(int &Task)
             if(DoAllAutoCleanOut(1))
                 Task=1;
             break;
+        default:
+            //AI(ht160s-ladder-guard) 20260703 : a state number with no matching case
+            //(the 'number but no action' trap). Log it so a future dead-jump is a
+            //diagnosable EventLog event, not a silent stall, and restart the ladder.
+            LogLadderFault("Auto.DoAuto", Task);
+            Task=1;
+            break;
     }
 }
 //---------------------------------------------------------------------------

@@ -54,3 +54,12 @@ void cEventLog::LogRecovery(const AnsiString& sRecovery,
     AppendLine(sLine);
 }
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+void LogLadderFault(const AnsiString& sLadder, int iState)
+{
+    //AI(ht160s-ladder-guard) 20260703 : a state cursor reached a value with no matching
+    //case. Record it (WAR_LADDER) so the silent 'number with no action' stall becomes a
+    //diagnosable EventLog line; the caller's default resets the cursor to restart.
+    g_EventLog.Log("WAR_LADDER",
+                   AnsiString("Unexpected ladder state ")+sLadder+" Task="+IntToStr(iState), "");
+}

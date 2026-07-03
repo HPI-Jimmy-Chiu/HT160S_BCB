@@ -26,4 +26,9 @@ public:
 //---------------------------------------------------------------------------
 extern cEventLog g_EventLog;
 //---------------------------------------------------------------------------
+//AI(ht160s-ladder-guard) 20260703 : log a switch(Task) ladder that reached a state
+//number with no matching case (a 'number but no action' dead-jump). Free function so
+//every module's Do* default can call it without a class dependency.
+void LogLadderFault(const AnsiString& sLadder, int iState);
+//---------------------------------------------------------------------------
 #endif

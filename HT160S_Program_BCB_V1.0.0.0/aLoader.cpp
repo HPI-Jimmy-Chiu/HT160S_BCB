@@ -417,8 +417,7 @@ bool TLoaderModule::MoveCcdToCell(int LoaderNo, int CellX, int CellY, int &Task)
        CellX<0 || CellX>=GetTrayXCount() ||
        CellY<0 || CellY>=GetTrayYCount())
     {
-        Task=900;
-        return true;
+        return true;   //AI(ht160s-ladder-guard) 20260703 : bad args, abort (was dead Task=900)
     }
     if(MoveToCcdCell(LoaderNo, CellX, CellY))
         return true;
@@ -1128,6 +1127,13 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
                 Task=1;
             }
             break;
+        default:
+            //AI(ht160s-ladder-guard) 20260703 : a state number with no matching case
+            //(the 'number but no action' trap). Log it so a future dead-jump is a
+            //diagnosable EventLog event, not a silent stall, and restart the ladder.
+            LogLadderFault("Loader.DoLoader", Task);
+            Task=1;
+            break;
     }
 }
 //---------------------------------------------------------------------------
@@ -1804,7 +1810,6 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
             if(MoveLoaderY(LoaderNo, GetLoaderFeedY(LoaderNo)))
             {
                 bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : carriage retreated to feed Y; rear tray now settled + safe for TrayArm to pick
-                Task=5000;
                 return true;
             }
             break;
