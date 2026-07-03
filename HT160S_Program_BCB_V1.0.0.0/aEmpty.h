@@ -60,6 +60,7 @@ public:
     void SetRearHasTray(bool bHasTray);
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm
     void RequestReturnTray();
+    void CancelReturnTray();   //AI(ht160s-divert) 20260703 : TrayArm diverted the in-flight return to an Auto - release the case-3000 wait
     void NotifyTrayXToEmptyFinish();
 
     //AI(ht160s-agv) 20260623 : AMR P2 (EmptyTray) handoff interface (mirrors TAutoModule).

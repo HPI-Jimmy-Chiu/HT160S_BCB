@@ -1000,6 +1000,16 @@ void TEmptyModule::RequestReturnTray()
     bTrayXToEmptyFinish=false;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-divert) 20260703 : TrayArm diverted an in-flight Empty return to an Auto (mid-
+//flight divert). Drop the return reservation so DoEmpty case 3000 stops parking for a
+//deposit that will never come (its wait is bReturnTray && !bTrayXToEmptyFinish) and the
+//case-100 destack/feed branches un-skip. bRearReturnInProgress is NOT touched : it is
+//owned by DoGoUpTray and self-clears when that ladder completes.
+void TEmptyModule::CancelReturnTray()
+{
+    bReturnTray=false;
+}
+//---------------------------------------------------------------------------
 void TEmptyModule::NotifyTrayXToEmptyFinish()
 {
     bTrayXToEmptyFinish=true;

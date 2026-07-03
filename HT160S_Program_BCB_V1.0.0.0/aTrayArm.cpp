@@ -615,6 +615,39 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-divert) 20260703 : mid-flight divert (user efficiency request). While the arm
+//is still CARRYING a recovered tray toward the Empty rear (X traverse case 1/10 or the
+//case-500 wait; Z up, clamps closed), re-check the live Auto demand every tick : if an
+//Auto now requests a plain Normal tray, deliver it there FIRST instead of parking it at
+//Empty and re-picking it later. Mirrors the CleanOut drain-boundary divert shape (DoPlace
+//case 1/10) in the opposite direction. FindTrayRequestAuto embeds the producer-side no-go
+//gates (CleanOut drain boundary, AMR lock, pending latch, rear occupied); the guards here
+//keep the divert out of CleanOut entirely and out of AMR mode (AMR stacks are built only
+//by the dedicated supply job), and identity trays never reach this path (routed to Color
+//at DecidePlaceDestAfterPick). On success the Empty return reservation is released via
+//CancelReturnTray and the DoPlace dispatch re-enters the Auto ladder at case 1.
+bool TTrayArmModule::TryDivertCarriedTrayToAuto()
+{
+    if(HSys.Sys.RunMode==Run_CleanOut)
+        return false;
+    if(GeneralSetting.bUseAMR)
+        return false;
+    if(iDeliverKind==eTrayKindIdentity)
+        return false;
+    if(AutoModule==NULL)
+        return false;
+    int kind=eTrayReqNone;
+    int idx=AutoModule->FindTrayRequestAuto(kind);
+    if(idx<0 || kind!=eTrayKindNormal)
+        return false;
+    if(EmptyModule!=NULL)
+        EmptyModule->CancelReturnTray();
+    iAutoTarget=idx;
+    PlaceDest=TAPLACE_AUTO;
+    PlaceTask=1;
+    return true;
+}
+//---------------------------------------------------------------------------
 bool TTrayArmModule::DoPlaceToEmpty(int Flag)
 {
     //AI(HT160S-Maintainer) 20260606 : recycle the carried empty tray back to the
@@ -641,11 +674,15 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
     {
         case 1:
         case 10:
+            if(TryDivertCarriedTrayToAuto())   //AI(ht160s-divert) 20260703 : retarget while traversing (Z up, clamps closed)
+                break;
             if(DoMoveToStationZSafe(Teach.TrayXArmToEmptyXPosition, PlaceTask))
                 PlaceTask=500;
             break;
 
         case 500:
+            if(TryDivertCarriedTrayToAuto())   //AI(ht160s-divert) 20260703 : retarget during the (possibly long) rear-clear wait
+                break;
             //Wait until EmptyTray has raised and cleared its rear before depositing.
             if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
                 PlaceTask=1000;
