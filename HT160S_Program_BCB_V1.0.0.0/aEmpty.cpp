@@ -28,6 +28,7 @@ void TEmptyModule::InitialFlag()
     bWaitingAmrFeed=false;       //AI(ht160s-agv) Empty source-dry AMR wait latch
     AmrFeedWaitTimer.Clear();   //AI(ht160s-agv) Empty source-dry AMR wait timer
     RefillSimInfeed();
+    Status=ES_IDLE;   //AI(ht160s-status) 20260703 : ladder-owned status reset
     FeedTask=1;
     FeedClampSub=0;
     GoDownTask=1;
@@ -238,6 +239,7 @@ void TEmptyModule::DoEmpty(int &Task)
             {
                 if(bAmrLocked)
                     break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
+                Status=ES_RETURNING;   //AI(ht160s-status) 20260703
                 DoGoUpTray(0);
                 Task=3000;
                 break;
@@ -247,6 +249,7 @@ void TEmptyModule::DoEmpty(int &Task)
             {
                 if(bAmrLocked)
                     break;   //AI(ht160s-agv) front GoDown suspended during AMR handoff
+                Status=ES_DESTACK;   //AI(ht160s-status) 20260703
                 DoGoDownTray(0);
                 Task=1000;
                 break;
@@ -306,6 +309,7 @@ void TEmptyModule::DoEmpty(int &Task)
 
             if(bRearHasTray==false && bLotFinish==false)
             {
+                Status=ES_FEEDING;   //AI(ht160s-status) 20260703 : carrier will own the rear
                 DoFeedTray(0);   //AI(ht160s-agv) rear feed RUNS while AMR-locked (anti-starve)
                 Task=2000;
                 break;
@@ -327,6 +331,7 @@ void TEmptyModule::DoEmpty(int &Task)
                     }
                     while(HSys.Sen.SnEmpty_InputFullTray.Enable==true && HSys.Sen.SnEmpty_InputFullTray.IsOn());
                 }
+                Status=ES_RETURNING;   //AI(ht160s-status) 20260703 : CleanOut drain GoUp
                 DoGoUpTray(0);
                 Task=3000;
             }
@@ -337,6 +342,7 @@ void TEmptyModule::DoEmpty(int &Task)
             {
                 if(IsSoftSimulate() && iSimInfeedCount>0)
                     iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/GoDown
+                Status=(bRearHasTray ? ES_REAR_READY : ES_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;
             }
             break;
@@ -353,6 +359,7 @@ void TEmptyModule::DoEmpty(int &Task)
                 if(bReturnTray && bTrayXToEmptyFinish==false)
                     return;
                 bReturnTray=false;
+                Status=(bRearHasTray ? ES_REAR_READY : ES_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;
             }
             break;
@@ -442,12 +449,14 @@ bool TEmptyModule::DoFeedTray(int Flag)
                 {
                     bRearHasTray=false;
                     bFrontHasTray=false;
+                    Status=ES_IDLE;   //AI(ht160s-status) 20260703 : feed aborted, nothing at rear
                     FeedTask=13000;
                 }
             }
             else
             {
                 bRearHasTray=true;
+                Status=ES_REAR_READY;   //AI(ht160s-status) 20260703 : clamps popped (case5000/6000) + sensor confirmed
                 if(HSys.VMot.MMEmptyY!=NULL)
                 {
                     HSys.VMot.MMEmptyY->Tray.MoveFrom(FrontSourceTray);   //AI(ht160s-tray-source) : hand off front-born grid to rear motor (rule #1)
@@ -943,6 +952,8 @@ bool TEmptyModule::IsCleanOutFinish()
         return false;
     if(bReturnTray || bRearReturnInProgress)
         return false;
+    if(Status==ES_FEEDING || Status==ES_RETURNING || Status==ES_DESTACK)
+        return false;   //AI(ht160s-status) 20260703 : status busy belt beside the cursor gate
     if(HSys.VMot.MMEmptyY->fHasTray)
         return false;
     //AI(cleanout) 20260703 : Full gate - do not report finished while the supply stack is
@@ -970,6 +981,13 @@ bool TEmptyModule::IsCleanOutFinish()
 bool TEmptyModule::IsRearReadyForPick()
 {
     RefreshStateFromSensors();
+    //AI(ht160s-status) 20260703 : status BUSY gate. Deliberately negative-form (block while
+    //a ladder actively owns the rear), NOT a positive Status==ES_REAR_READY requirement :
+    //after a HOME the sensor re-latches a physically-present rear tray while InitialFlag
+    //reset Status to ES_IDLE - requiring the positive state would strand that tray forever.
+    //Positive readiness stays with the legacy 3 layers below (kept as safety belts).
+    if(Status==ES_FEEDING || Status==ES_RETURNING)
+        return false;
     if(bRearHasTray==false || bRearReturnInProgress)
         return false;
     if(FeedTask!=1 && FeedTask!=13000)
@@ -987,6 +1005,8 @@ bool TEmptyModule::IsReturnTrayRequested()
 void TEmptyModule::SetRearHasTray(bool bHasTray)
 {
     bRearHasTray=bHasTray;
+    if(bHasTray==false && Status==ES_REAR_READY)
+        Status=ES_IDLE;   //AI(ht160s-status) 20260703 : TrayArm took the presented tray (only rectify the READY state, never a mid-ladder one)
     if(bHasTray==false)
     {
         if(HSys.VMot.MMEmptyY!=NULL)
@@ -1014,6 +1034,26 @@ void TEmptyModule::NotifyTrayXToEmptyFinish()
 {
     bTrayXToEmptyFinish=true;
     bRearHasTray=true;
+    Status=ES_REAR_READY;   //AI(ht160s-status) 20260703 : returned tray parked at rear (re-enters supply pool); case-3000 completion re-confirms
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : eEmptyStatus display name (DescribeState / stbMain).
+static const char *EmptyStatusName(int St)
+{
+    switch(St)
+    {
+        case ES_IDLE:       return "IDLE";
+        case ES_DESTACK:    return "DESTACK";
+        case ES_FEEDING:    return "FEEDING";
+        case ES_REAR_READY: return "REAR_READY";
+        case ES_RETURNING:  return "RETURNING";
+    }
+    return "?";
+}
+//---------------------------------------------------------------------------
+int TEmptyModule::GetStatus()
+{
+    return Status;
 }
 //---------------------------------------------------------------------------
 AnsiString TEmptyModule::DescribeState()
@@ -1022,6 +1062,7 @@ AnsiString TEmptyModule::DescribeState()
     //FeederDecision.txt (latched members only; no RefreshStateFromSensors).
     AnsiString s;
     s  = "[Empty]\r\n";
+    s += "  Status=" + AnsiString(EmptyStatusName(Status)) + "\r\n";
     s += "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0)
        + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0) + "\r\n";
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)

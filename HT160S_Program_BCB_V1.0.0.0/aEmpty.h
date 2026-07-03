@@ -8,9 +8,24 @@
 //---------------------------------------------------------------------------
 class TMyCylinder;   //AI(ht160s-color-align-empty) : fwd-decl for PushCylinder/PopCylinder helpers (mirror aColor.h)
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : explicit module status (approved unified-status design,
+//docs/plan/module-status-enum-design-20260703.md). Set ONLY by the Do* ladders at
+//physically-correct moments; RefreshStateFromSensors NEVER writes it. Used as a
+//busy-negative gate + operator display; the positive readiness stays with the legacy
+//latch layers (kept permanently as safety belts per user decision).
+enum eEmptyStatus
+{
+    ES_IDLE=0,
+    ES_DESTACK,       //front destacker separating one tray to the staging holder
+    ES_FEEDING,       //DoFeedTray active : carrier owns the rear (NOT pickable)
+    ES_REAR_READY,    //rear tray presented, ladder parked, clamps released
+    ES_RETURNING,     //DoGoUpTray active (rear return / CleanOut drain)
+};
+//---------------------------------------------------------------------------
 class TEmptyModule
 {
 private:
+    int Status;         //AI(ht160s-status) 20260703 : eEmptyStatus, ladder-owned (see enum note)
     int FeedTask;
     int FeedClampSub;   //AI(HT160S-Maintainer) 20260623 : DoClampTray sub-state for DoFeedTray
     int GoDownTask;
@@ -61,6 +76,7 @@ public:
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm
     void RequestReturnTray();
     void CancelReturnTray();   //AI(ht160s-divert) 20260703 : TrayArm diverted the in-flight return to an Auto - release the case-3000 wait
+    int  GetStatus();          //AI(ht160s-status) 20260703 : eEmptyStatus for stbMain display / peers
     void NotifyTrayXToEmptyFinish();
 
     //AI(ht160s-agv) 20260623 : AMR P2 (EmptyTray) handoff interface (mirrors TAutoModule).
