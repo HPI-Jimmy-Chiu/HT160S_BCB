@@ -68,6 +68,7 @@ public:
     bool IsReadyForAmrHandoff();
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
+    bool IsOutputCarFullForAmr();   //AI(cleanout) 20260703 : SnEmpty_InputFullTray verdict (sim-false) - CleanOut GoUp/finish Full gate
     void RefillSimInfeed();
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the supply car (PanelMain6 Motion View header)
 

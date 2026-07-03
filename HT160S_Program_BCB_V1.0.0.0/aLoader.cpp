@@ -970,26 +970,11 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
     if(TrayMotor==NULL)
         return;
 
-    //AI(cleanout) 20260701 : both sides drained but the shared FRONT feed sensor still sees a
-    //tray the software cannot auto-discharge (untracked residual) -> ask the operator to remove
-    //it. A REAR residual is auto-recovered by TrayArm, so it is NOT alarmed here. ShowMyError is
-    //modal (freezes MainProc), so this does not re-spam per cycle; it re-checks on Retry. Run for
-    //LoaderNo==1 only (single shared front sensor). Placed before the per-side guard so it is not
-    //shadowed by the guard's early return once a side is already finished.
-#ifndef SOFT_SIMULATE
-    //AI(cleanout) 20260701 : the compile-time #ifndef only excludes the SOFT_SIMULATE dev build; a
-    //REAL build in DUMMY mode still runs here and would read the phantom-present InType=0
-    //SnLoader_InputHasTray and false-alarm an unremovable MES0922. Gate on the runtime
-    //IsSoftSimulate() (true in DUMMY) too, mirroring IsAllCleanOutFinish / the finish guard.
-    if(IsSoftSimulate()==false &&
-       HSys.Sys.RunMode==Run_CleanOut && LoaderNo==1 &&
-       Side[0].bCleanOutFinish && Side[1].bCleanOutFinish &&
-       HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
-    {
-        ShowMyError("MES0922", LangT("Loader front residual tray, please remove"), &HSys.Sen.SnLoader_InputHasTray, true, K_RETRY);
-        return;
-    }
-#endif
+    //AI(cleanout) 20260703 : the MES0922 front-residual manual-removal alarm that lived here is
+    //GONE (user design : the machine collects every tray itself). A front tray stranded after
+    //the supply car went dry is now self-collected by the DoFeedTray case-9000 CleanOut branch
+    //(-> case 9500 confirm-then-mint), and IsAllCleanOutFinish keeps the side unfinished while
+    //SnLoader_InputHasTray still reads a tray, so nothing retires early.
     //AI(cleanout) 20260701 : phase-aware CleanOut finish. The old guard retired a side the
     //instant its carriage flag was empty, ignoring the shared front/rear sensors and the supply
     //car -> CleanOut could finish with trays still in the pipeline and never drained the supply
@@ -1309,8 +1294,20 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 //AI(cleanout) 20260701 : supply car drained in CleanOut - do NOT raise the
                 //MES0920 "Loader Tray Empty" alarm. Break so DoFeedTray idles at case 9000 and
                 //the DoLoader phase-aware finish guard (car dry + carriage empty) retires the side.
+                //AI(cleanout) 20260703 : self-collect a stranded FRONT tray (user design : the
+                //machine collects every tray itself; the MES0922 manual-removal alarm is gone).
+                //If the real front sensor still sees a tray while the carriage is empty, route
+                //to case 9500 : the confirm-then-mint path gives it an identity so the normal
+                //feed -> CCD -> SortArm suck -> discharge -> TrayArm chain drains it. REAL only :
+                //the sim/DUMMY InType=0 phantom-present read would mint ghost trays forever
+                //(this exact bug lived in the on-site copy's version of this branch).
                 if(HSys.Sys.RunMode==Run_CleanOut)
+                {
+                    if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
+                       HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+                        State->FeedTask=9500;
                     break;
+                }
                 //AI(ht160s-agv) 20260626 : AMR-aware feed deferral (port of HT9046
                 //asendic_Loader.cpp:1943 600s wait). When AMR feeds the magazine, do
                 //NOT alarm the operator the instant the push cylinder reads empty :

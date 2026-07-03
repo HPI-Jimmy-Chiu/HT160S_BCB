@@ -100,6 +100,7 @@ public:
     bool IsReadyForAmrHandoff();
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
+    bool IsInputFullForAmr();   //AI(cleanout) 20260703 : SnColor_InputFullTray verdict (sim-false) - CleanOut GoUp/finish Full gate
     void RefillSimInfeed();
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the supply car (PanelMain6 Motion View header)
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting

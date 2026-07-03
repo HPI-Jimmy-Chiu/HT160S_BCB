@@ -93,6 +93,12 @@ Loader (源 Inputend 乾)
 
 ---
 
+## 4b. 使用者補充待辦（2026-07-03，排在 part2 之後）
+
+1. **統一 Status enum**：所有模組（Auto 流道、SortArm、TrayArm、Empty、Color）比照 Loader `LS_*` 建立明確 status 狀態；完成判定與互鎖改讀 status，取代「sub-task 全==1」的拼湊 idle。
+2. **TrayArm↔Loader 夾盤干涉 bug（實機回報）**：TrayArm 於 Loader 後方夾盤時，Loader 載台（MotorY）前後夾缸尚未釋放 → 干涉。需加互鎖：夾缸確認釋放後 TrayArm 才可夾走（查 C_Loader* clamp out-bit；可能落點 IsRearReadyForPick 或 DoPick TAJOB_LOADER_RECOVERY 閘）。
+3. **TrayArm 順路補 Auto（效率）**：TrayArm 夾空盤往 Empty 途中、放到 Empty rear 之前，若 Auto 有盤需求 → 直接轉送 Auto，不放下重夾。實作形狀鏡射 aTrayArm.cpp:505 的 drain-boundary divert（方向相反 Empty→Auto），僅限 Auto 可收的盤種。
+
 ## 5. 待使用者確認（(a) 精修提問）
 1. **Auto 上游依賴**：Auto 真正要等的是 **SortArm 放完 IC**（SortArm 已依賴 Loader），比「等 Loader」精確。採「Auto ← SortArm ← Loader」？
 2. **Auto 物料語意**：Auto 不吸 IC、是收集端，「清空自己」＝**整盤(含IC) GoUp 出到堆疊車**。確認？

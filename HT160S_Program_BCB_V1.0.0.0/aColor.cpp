@@ -111,6 +111,17 @@ bool TColorModule::IsInputShortageForAmr()
     return (HSys.Sen.SnColor_InputEnd.Enable==true && HSys.Sen.SnColor_InputEnd.IsOff());
 }
 //---------------------------------------------------------------------------
+//AI(cleanout) 20260703 : supply-stack Full verdict for the CleanOut GoUp/finish gate.
+//Real machine reads SnColor_InputFullTray; sim returns false (NOT the iSimInfeedCount
+//threshold : the clean-out GoUp increments that count, so keying sim-Full off it could
+//latch Full mid-drain and dead-lock a laptop CleanOut).
+bool TColorModule::IsInputFullForAmr()
+{
+    if(IsSoftSimulate())
+        return false;
+    return (HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn());
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
 //real waits for SnColor_InputEnd to read a tray present (ON).
 bool TColorModule::IsInputHandoffFinishedForAmr()
@@ -306,6 +317,17 @@ void TColorModule::DoColor(int &Task)
             {
                 if(bFrontHasTray || bRearHasTray)
                 {
+                    //AI(cleanout) 20260703 : Full gate (user design, mirrors Empty). Hold
+                    //the drain and ask the operator to empty the stack; the modal repeats
+                    //until the Full sensor goes OFF. IsInputFullForAmr is sim-false.
+                    if(IsInputFullForAmr())
+                    {
+                        do
+                        {
+                            ShowMyError("MES1427", "Color supply stack FULL (sensor) - remove stacked trays", &HSys.Sen.SnColor_InputFullTray, false, K_RETRY);
+                        }
+                        while(HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn());
+                    }
                     DoGoUpTray(0);
                     Task=1700;
                 }
@@ -1174,6 +1196,10 @@ bool TColorModule::IsCleanOutFinish()
     if(bReturnTray)
         return false;
     if(HSys.VMot.MMColorY->fHasTray)
+        return false;
+    //AI(cleanout) 20260703 : Full gate - do not report finished while the supply stack is
+    //full (a drain GoUp is still owed but paused for the operator to empty). Sim-false.
+    if(IsInputFullForAmr())
         return false;
     return true;
 }

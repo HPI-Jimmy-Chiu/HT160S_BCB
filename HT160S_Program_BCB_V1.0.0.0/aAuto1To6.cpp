@@ -723,7 +723,31 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
     switch(CleanOutTask)
     {
         case 1:
-            CleanOutTask=100;
+            CleanOutTask=500;
+            break;
+
+        //AI(cleanout) 20260703 : REAR-COLLECT phase (user design : no manual residual
+        //removal). A tray TrayArm delivered to an Auto rear that was never pulled in must be
+        //collected by the Auto itself : reuse the normal DoFeedTray rear->working pull
+        //(FindFeedAuto finds exactly the delivered-but-unconsumed stations : rear latch +
+        //delivered latch + working empty). Loop one station at a time until none is left,
+        //then run the GoUp ladder below, which stacks every working tray onto this Auto's
+        //own output car.
+        case 500:
+            DoFeedTray(0);
+            CleanOutTask=600;
+            break;
+
+        case 600:
+            if(DoFeedTray(1))
+            {
+                if(FindFeedAuto()>=0)
+                {
+                    DoFeedTray(0);   //another delivered rear tray : pull it in too
+                    break;
+                }
+                CleanOutTask=100;
+            }
             break;
 
         case 100:
@@ -796,6 +820,26 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                     Cylinder=GetFrontRise(Index);
                     if(Cylinder!=NULL)
                     {
+                        //AI(cleanout) 20260703 : Full gate (user design). Never GoUp into a
+                        //full output stack : hold this station and ask the operator to empty
+                        //it (AMR=0 machine -> operator; the modal repeats until the Full
+                        //sensor goes OFF, mirroring ServiceCarFull). Real machine only : the
+                        //sim Car-count verdict is not driven by the clean-out GoUp and the
+                        //modal re-reads the physical sensor, so sim skips this gate.
+                        if(IsSoftSimulate()==false && IsOutputCarFullForAmr(Index))
+                        {
+                            TMySensor *FullSensor=GetInputFullTray(Index);
+                            AnsiString ErrorText;
+                            ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
+                            do
+                            {
+                                ShowMyError(AnsiString().sprintf("MES%d20", 11+Index), ErrorText, FullSensor, false, K_RETRY);
+                                FullSensor=GetInputFullTray(Index);
+                            }
+                            while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
+                            Car[Index].Clear();
+                            InitAutoCarStack(Index);
+                        }
                         Cylinder->On();
                         if(IsCylinderOnReady(Cylinder, IsSoftSimulate()))
                             bCleanOutCheck[Index]=true;
@@ -835,23 +879,16 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
             break;
 
         case 7000:
-            //AI(cleanout) 20260701 : residual-delivery backstop. A TrayArm delivery that
-            //slipped past the DoPlace divert (deposit ladder already running at the drain
-            //boundary), or a rear tray delivered-but-not-yet-pulled when the boundary hit,
-            //leaves a PHYSICAL tray on an Auto rear shelf that nothing moves after clean-out
-            //(the rear->car pull loop no longer runs). The rear flags below are the last
-            //software knowledge of that tray, so alarm the operator to remove it BEFORE the
-            //wipe. Modal ShowMyError blocks until confirmed. Real machine only : sim/DUMMY
-            //trays are virtual and InType=0 phantom reads must not false-alarm (mirrors the
-            //MES0922 runtime IsSoftSimulate gate in DoLoader).
-            if(IsSoftSimulate()==false)
+            //AI(cleanout) 20260703 : late-delivery re-collect (replaces the MES0923 manual-
+            //removal alarm; user design : the machine collects every tray itself). A TrayArm
+            //delivery that landed AFTER the rear-collect phase (deposit ladder already
+            //running at the drain boundary) is pulled in and stacked by looping back to the
+            //collect phase. GetTrayRequest stops NEW dispatches once SortArm finished, so at
+            //most one in-flight tray exists and the loop terminates.
+            if(FindFeedAuto()>=0)
             {
-                AnsiString sResidual="";
-                for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
-                    if(State[Index].bRearHasTray || bRearDeliveredPending[Index])
-                        sResidual+=AnsiString(" Auto")+IntToStr(Index+1);
-                if(sResidual!="")
-                    ShowMyError("MES0923", LangT("Auto rear residual tray, please remove :")+sResidual, K_RETRY);
+                CleanOutTask=500;
+                break;
             }
             for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
             {

@@ -107,6 +107,16 @@ bool TEmptyModule::IsInputShortageForAmr()
     return (HSys.Sen.SnEmpty_InputEnd.Enable==true && HSys.Sen.SnEmpty_InputEnd.IsOff());
 }
 //---------------------------------------------------------------------------
+//AI(cleanout) 20260703 : supply-stack Full verdict for the CleanOut GoUp/finish gate.
+//Real machine reads SnEmpty_InputFullTray; sim returns false so a laptop CleanOut can
+//never dead-lock on the InType=0 phantom-present read (no MN200 card).
+bool TEmptyModule::IsOutputCarFullForAmr()
+{
+    if(IsSoftSimulate())
+        return false;
+    return (HSys.Sen.SnEmpty_InputFullTray.Enable==true && HSys.Sen.SnEmpty_InputFullTray.IsOn());
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
 //real waits for SnEmpty_InputEnd to read a tray present (ON).
 bool TEmptyModule::IsInputHandoffFinishedForAmr()
@@ -305,6 +315,18 @@ void TEmptyModule::DoEmpty(int &Task)
             {
                 if(bAmrLocked)
                     break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
+                //AI(cleanout) 20260703 : Full gate (user design). Never GoUp into a full
+                //supply stack : hold the drain and ask the operator to empty it (AMR=0 ->
+                //operator; the modal repeats until the Full sensor goes OFF, mirroring Auto
+                //ServiceCarFull). IsOutputCarFullForAmr is sim-false, so this never blocks sim.
+                if(IsOutputCarFullForAmr())
+                {
+                    do
+                    {
+                        ShowMyError("MES1023", "Empty supply stack FULL (sensor) - remove stacked trays", &HSys.Sen.SnEmpty_InputFullTray, false, K_RETRY);
+                    }
+                    while(HSys.Sen.SnEmpty_InputFullTray.Enable==true && HSys.Sen.SnEmpty_InputFullTray.IsOn());
+                }
                 DoGoUpTray(0);
                 Task=3000;
             }
@@ -922,6 +944,10 @@ bool TEmptyModule::IsCleanOutFinish()
     if(bReturnTray || bRearReturnInProgress)
         return false;
     if(HSys.VMot.MMEmptyY->fHasTray)
+        return false;
+    //AI(cleanout) 20260703 : Full gate - do not report finished while the supply stack is
+    //full (a drain GoUp is still owed but paused for the operator to empty). Sim-false.
+    if(IsOutputCarFullForAmr())
         return false;
     return true;
 }

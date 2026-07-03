@@ -936,19 +936,20 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
     //call sites use; the literal 6 mirrors AUTO_STATION_COUNT (aAuto1To6.cpp) and must track
     //it (the build-gate alarm-registry guard flags drift).
     {
-        //AI(cleanout) 20260701 : MES0922 = CleanOut front-residual operator alarm (aLoader.cpp
-        //DoLoader); MES0923 = CleanOut Auto-rear residual-tray backstop (aAuto1To6.cpp
-        //DoAllAutoCleanOut case 7000). Registered here so the alarm-registry drift guard passes
-        //and AlarmList.csv stays complete.
-        const char *SeedCode[16]={"MES0920","MES0921","MES0922","MES0923","JAM0913","WAR0330","WAR0475",
-                                  "MES1021","MES1022","MES1024","JAM1030",
-                                  "MES1421","MES1422","MES1424","MES1426","WAR0154"};
-        const int   SeedType[16]={eMessageErr,eMessageErr,eMessageErr,eMessageErr,eJamErr,eOther,eOther,
-                                  eMessageErr,eMessageErr,eMessageErr,eJamErr,
-                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther};
-        const char *SeedMsg[16]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader front residual tray, please remove","Auto rear residual tray, please remove","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
-                                 "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
-                                 "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Sorting Arm X motor will out of limit"};
+        //AI(cleanout) 20260703 : MES0922/MES0923 residual-removal alarms are RETIRED (user
+        //design : the machine collects every tray itself - Loader self-collects via the
+        //case-9500 mint path, Auto rear-collects via DoAllAutoCleanOut case 500). In their
+        //place : MES1023/MES1427 = Empty/Color supply-stack-FULL holds during the CleanOut
+        //drain (GoUp paused until the operator empties the stack; Full sensor gates finish).
+        const char *SeedCode[16]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
+                                  "MES1021","MES1022","MES1023","MES1024","JAM1030",
+                                  "MES1421","MES1422","MES1424","MES1426","MES1427","WAR0154"};
+        const int   SeedType[16]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eJamErr,
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther};
+        const char *SeedMsg[16]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
+                                 "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Empty supply stack full (sensor)","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
+                                 "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Color supply stack full (sensor)","Sorting Arm X motor will out of limit"};
         for(int si=0; si<16; si++)
         {
             AnsiString cd=SeedCode[si], mg=SeedMsg[si];
