@@ -1165,6 +1165,16 @@ bool TColorModule::IsCleanOutFinish()
         return false;
     if(IsReadyForAmrHandoff()==false)
         return false;
+    //AI(cleanout) 20260703 : idle gate (mirrors Empty). Do NOT report finished while a drain
+    //sub-ladder is still stepping (Feed/GoDown/GoUp mid-flight) or a return is in progress, and
+    //only once the software identity grid on MMColorY is cleared. Prevents Color reading
+    //"finished" mid-GoUp, which stranded TrayArm's diverted in-hand tray.
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1)
+        return false;
+    if(bReturnTray)
+        return false;
+    if(HSys.VMot.MMColorY->fHasTray)
+        return false;
     return true;
 }
 //---------------------------------------------------------------------------

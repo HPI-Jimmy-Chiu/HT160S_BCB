@@ -67,7 +67,6 @@ private:
     AnsiString iDeliverTrayID;         //AI(HT160S-Maintainer) 20260608 : 2D TrayID carried from Color for the identity tray
     int PlaceDest;                     //AI(HT160S-Maintainer) 20260606 : eTrayArmPlaceDest for the current carry
     bool bCleanOutFinish;
-    bool bTrayFeedFinish;
     HTimer ArmDelay;
     unsigned int dwZUpLostStart;       //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce (GetTickCount of first loss; 0=clear)
 
@@ -101,7 +100,6 @@ public:
     bool HasTray();
     int GetStatus();
     bool IsCleanOutFinish();
-    bool IsTrayFeedFinish();
     //AI(HT160S-Maintainer) 20260624 : public so Motor Test / Teach manual screens can gate TrayArm X
     //move/jog on the SAME Z-up interlock as production (mirrors public SortArm AreAllSuckersHome).
     //Pure sensor read, no side effects; returns true under SOFT_SIMULATE (dev build, no IO card).

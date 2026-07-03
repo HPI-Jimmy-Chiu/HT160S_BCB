@@ -911,6 +911,18 @@ bool TEmptyModule::IsCleanOutFinish()
         return false;
     if(IsReadyForAmrHandoff()==false)
         return false;
+    //AI(cleanout) 20260703 : idle gate. Do NOT report finished while a drain sub-ladder is still
+    //stepping (Feed/GoDown/GoUp mid-flight) or a rear return is in progress, and only once the
+    //software rear grid is cleared. Without this the predicate could go true the instant the
+    //bFront/bRearHasTray latches read false while a GoUp was still running, so TrayArm's
+    //drain-boundary divert saw Empty "finished" and its in-hand tray stranded (the reported
+    //"TrayArm stops halfway" symptom).
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1)
+        return false;
+    if(bReturnTray || bRearReturnInProgress)
+        return false;
+    if(HSys.VMot.MMEmptyY->fHasTray)
+        return false;
     return true;
 }
 //---------------------------------------------------------------------------

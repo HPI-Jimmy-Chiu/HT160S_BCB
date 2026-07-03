@@ -1653,7 +1653,22 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
 //---------------------------------------------------------------------------
 bool TSortArmModule::IsCleanOutFinish()
 {
-    return bCleanOutFinish;
+    //AI(cleanout) 20260703 : live-computed (was: return the one-shot bCleanOutFinish latch set in
+    //DoSortArm case 1, which could read stale-true if a late Loader IC or a background residue
+    //re-suck re-committed the arm AFTER the latch was set). During CleanOut, SortArm is finished
+    //only when Loader (both L+R) is fully cleaned, it holds no IC, both sub-machines are parked,
+    //and no residue/pick-error recovery is pending. Outside CleanOut the flag is returned as-is.
+    if(HSys.Sys.RunMode!=Run_CleanOut)
+        return bCleanOutFinish;
+    if(LoaderModule==NULL || LoaderModule->IsAllCleanOutFinish()==false)
+        return false;
+    if(HasHoldingIC())
+        return false;
+    if(PickTask!=1 || PlaceTask!=1)
+        return false;
+    if(IsResidueCheckBusy() || HasPickSuckError())
+        return false;
+    return true;
 }
 //---------------------------------------------------------------------------
 bool TSortArmModule::IsOneCycleFinish()

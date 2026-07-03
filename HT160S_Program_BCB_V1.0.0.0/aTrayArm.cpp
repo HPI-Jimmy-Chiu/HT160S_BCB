@@ -30,7 +30,6 @@ TTrayArmModule::TTrayArmModule()
     iDeliverKind=eTrayKindNormal;
     PlaceDest=TAPLACE_AUTO;
     bCleanOutFinish=true;
-    bTrayFeedFinish=true;
     InitialFlag();
 }
 //---------------------------------------------------------------------------
@@ -42,7 +41,6 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     PickTask=1;
     PlaceTask=1;
     bCleanOutFinish=true;
-    bTrayFeedFinish=true;
     ArmDelay.Clear();
     dwZUpLostStart=0;
     //AI(HT160S-Maintainer) 20260612 : recoverable home while a tray is in hand. Keep the
@@ -99,15 +97,6 @@ bool TTrayArmModule::IsCleanOutFinish()
     if(IsZUpAtPosition()==false)
         return false;              //Z lift not confirmed up
     return true;
-}
-//---------------------------------------------------------------------------
-bool TTrayArmModule::IsTrayFeedFinish()
-{
-    //AI(HT160S-Maintainer) 20260605 : TrayFeed empty-tray evacuation needs Loader/
-    //EmptyTray recovery handshakes that do not exist yet (see DecideJob TODO). Report
-    //finished so this incomplete path never gates the run-mode revert. Wire real state
-    //here once the recovery flow is implemented.
-    return bTrayFeedFinish;
 }
 //---------------------------------------------------------------------------
 bool TTrayArmModule::IsSoftSimulate()
