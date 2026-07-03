@@ -1,6 +1,6 @@
-# 統一模組 Status Enum — 設計提案（待審）
+# 統一模組 Status Enum — 設計提案（✅ 已核准 2026-07-03）
 
-- 日期：2026-07-03　狀態：**設計待使用者核准**（未動工）
+- 日期：2026-07-03　狀態：**已核准，實作中**。裁決：①Auto 接盤=整個 discharge 完（AS_IDLE@case6100）②SAS_RECOVERY 做第 4 態 ③舊 latch 永久保留當安全防線（status 為主、DescribeState 印不一致警示）④status 順帶上 stbMain 顯示
 - 依據：使用者補充「所有流道、SortArm、TrayArm 等都要和 Loader 一樣有明確 status 狀態」
 - 鐵律（Empty 干涉教訓 2026-07-03）：**status 只能由各模組自己的梯形在「物理正確時刻」設定；`RefreshStateFromSensors` 永遠不寫 status**（sensor 只做確認，不做狀態來源）
 
