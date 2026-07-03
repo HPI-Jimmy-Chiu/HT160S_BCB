@@ -55,6 +55,7 @@ private:
     int    iResidueAutoIndex;      //AI(ht160s-residue) 20260624 : Auto to report residue-clear to when bg check completes (-1 idle)
     bool   bResidueArmed;          //AI(ht160s-residue) 20260625 : residue check enabled only after nozzle lifted to top (place case 60)
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
+    bool bMoveAborted;   //AI(ht160s-sortarm) 20260703 : teach abort of an in-flight MoveSuckerToCell (bail before the next axis move; no stray Y after a fault modal raised mid-case-30). Cleared at case 0 / InitialFlag.
     int  iPickRetryCount;   //AI(ht160s-pick-retry) 20260702 : failed pick strokes on the current cell (HT172 iRetryCT port)
     bool bPickSuckErr[4];   //AI(ht160s-pick-retry) 20260702 : per-slot latched pick suck error (nozzle parked until retry/skip)
     int iBaseSuckX;   //AI(ht160s-maintainer) 20260624 : 0-based datum sucker for absolute X (HT172 iBaseSuckX port); 1=suck2 (carriage-fixed nozzle), 0=legacy suck1
@@ -144,6 +145,7 @@ public:
     int  GetDestroyCheckMS();   //AI(ht160s-pnp) 20260626 : dDestroyCheckTime as ms for the blow dwell (floor 300 on <=0)
     bool AreAllSuckersHome();   //AI(HT160S-Maintainer) 20260622 : canonical SortArm-move suck-home interlock (live Led[iHomeLed])
     bool SortArmZToSafePos();   //AI(ht160s-sortarm) 20260703 : public for Teach All-Z-up button + not-home recovery (lift all suck-Z to SORT_ARM_SAFE_Z_POSITION)
+    void AbortCurrentMove();   //AI(ht160s-sortarm) 20260703 : set abort flag so an in-flight MoveSuckerToCell bails before issuing the next axis move (teach StopSortArmTest)
     void DoSortArm(int &Task);
     bool HasHoldingIC();
     int GetStatus();   //AI(ht160s-status) 20260703 : eSortArmStatus with SAS_RECOVERY overlay

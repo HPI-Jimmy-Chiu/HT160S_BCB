@@ -148,6 +148,7 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     bCleanOutFinish=false;
     bOneCycleFinish=false;
     dwSuckHomeLostStart=0;
+    bMoveAborted=false;   //AI(ht160s-sortarm) 20260703 : no pending in-flight move abort on home/init
     iPickRetryCount=0;   //AI(ht160s-pick-retry) 20260702 : fresh pick-retry budget on home/init
     iResidueAutoIndex=-1;   //AI(ht160s-residue) 20260624 : no pending residue report
     bResidueArmed=false;   //AI(ht160s-residue) 20260625 : disarm; armed at place case 60
@@ -686,6 +687,15 @@ bool TSortArmModule::SortArmZToSafePos()
             bAllDone=false;
     }
     return bAllDone;
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::AbortCurrentMove()
+{
+    //AI(ht160s-sortarm) 20260703 : mark the in-flight MoveSuckerToCell to bail. Set by the teach
+    //StopSortArmTest (incl. the central fault guard / EMG). MoveSuckerToCell case 30 checks this
+    //AFTER the X move, so a fault modal raised inside MoveSortArmX does not fall through to the Y
+    //move once the operator dismisses it. Cleared at case 0 (fresh run) and InitialFlag.
+    bMoveAborted=true;
 }
 //---------------------------------------------------------------------------
 bool TSortArmModule::MoveToLoaderPick()
@@ -1968,6 +1978,7 @@ bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Ro
     switch(Task)
     {
         case 0:
+            bMoveAborted=false;   //AI(ht160s-sortarm) 20260703 : fresh run - clear any stale abort from a prior stopped test
             Task=10;
             break;
 
@@ -1995,6 +2006,8 @@ bool TSortArmModule::MoveSuckerToCell(int SlotIndex, int Target, int Col, int Ro
             XPosition=GetSortArmCellX(BaseSortX, Col-SlotIndex);
             YPosition=GetSortArmCellY(FirstSortY, Row);
             bXDone=MoveSortArmX(XPosition);
+            if(bMoveAborted)   //AI(ht160s-sortarm) 20260703 : a fault modal was raised inside MoveSortArmX and the timer guard stopped the test mid-modal; bail BEFORE the Y move (no stray motion after the operator acknowledges the alarm)
+                return false;
             if(LoaderNo>0)
                 bYDone=MoveLoaderY(LoaderNo, YPosition);
             else

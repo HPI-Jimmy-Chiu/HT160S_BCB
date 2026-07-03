@@ -400,6 +400,7 @@ private:
     void RunSaAllZUp();
     bool AnyAdvancedTestRunning();
     bool HasRealServoAlarm(AnsiString &Why);
+    bool IsFaultPopupShowing();
     void PopulateChannelCombos();
     bool CheckCarTestReady();
     bool CallCarGoUp(int Area, int Flag);

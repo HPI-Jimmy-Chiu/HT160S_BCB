@@ -5,6 +5,7 @@
 #pragma hdrstop
 #include "language.h"
 #include "mymessbox.h"
+#include "note.h"   //AI(ht160s-sortarm) 20260703 : fNote visibility for the fault-popup test-halt trigger
 
 #include <IniFiles.hpp>
 #include <SysUtils.hpp>
@@ -1058,18 +1059,29 @@ void __fastcall TfTeach::tmrUpdateTimer(TObject *Sender)
             SetMessage(Err);
         }
     }
-    //AI(ht160s-sortarm) 20260703 (Req2) : systematic mid-motion fault halt. Every Advanced-page
-    //test is a Timer-polled state machine; a servo alarm that ARISES after a test started was
-    //never re-checked before, so the polling timer kept re-driving motion and the machine "could
-    //not stop" for troubleshooting. ONE central guard covers every current AND future teach
-    //motion : while any advanced test / All-Z-up runs, a real (off-limit) servo alarm stops them
-    //ALL, then notifies. A new test is protected automatically once its running flag is listed in
-    //AnyAdvancedTestRunning() and its Stop is in StopAllAdvancedTests() (both existing conventions).
-    //Flags are cleared (StopAllAdvancedTests) BEFORE the modal so the timer cannot re-enter and
-    //re-drive motion while the operator reads the message.
+    //AI(ht160s-sortarm) 20260703 (Req2) : systematic mid-motion fault halt with TWO triggers, so
+    //every current AND future teach motion stops the moment something goes wrong (a new test is
+    //covered once its flag is in AnyAdvancedTestRunning() and its Stop in StopAllAdvancedTests()).
+    //Flags are cleared (StopAllAdvancedTests) BEFORE any modal, so the timer - which keeps firing
+    //under a ShowModal - cannot re-enter and re-drive motion / re-spam the popup.
+    //(A) A fault popup (TfNote / TMyMessageBox) is on screen : by project convention every
+    //    operator-facing fault surfaces through these two singleton modal forms, so their
+    //    visibility is a high-coverage "something abnormal was raised" signal (covers limit /
+    //    interlock errors that are NOT servo alarms). Stop SILENTLY - the fault popup already
+    //    informs the operator; adding our own would double-popup.
+    //(B) A real (off-limit) servo alarm with NO popup : in Teach (SystemStart==false)
+    //    ScanAllMotorStatus raises no popup, so a mid-motion servo alarm is silent and the poll
+    //    loop would hang. Stop and notify (this is the only path that raises a popup here).
     if(AnyAdvancedTestRunning())
     {
         AnsiString FaultWhy;
+        if(IsFaultPopupShowing())
+        {
+            StopAllAdvancedTests();
+            SetMessage(LangT("Test stopped : alarm / message shown"));
+            UpdateMotorMonitor();
+            return;
+        }
         if(HasRealServoAlarm(FaultWhy))
         {
             StopAllAdvancedTests();
@@ -1404,6 +1416,12 @@ void TfTeach::StopSortArmTest()
     bSaAllZUpRunning=false;
     bSaZRecovering=false;
     iSaTask=0;
+    //AI(ht160s-sortarm) 20260703 : abort any in-flight MoveSuckerToCell so it bails before the next
+    //axis move. Guards the case where this stop fires from the timer fault-guard while a fault modal
+    //raised INSIDE MoveSortArmX (case 30) is on screen : without this, dismissing the modal lets the
+    //outer frame fall through to the Y move (one stray motion after the operator acknowledges).
+    if(SortArmModule!=NULL)
+        SortArmModule->AbortCurrentMove();
     if(HSys.Mot.MSortingArmX!=NULL)
         HSys.Mot.MSortingArmX->Stop();
     if(HSys.Mot.MSuckZ_1!=NULL)
@@ -1504,6 +1522,16 @@ bool TfTeach::HasRealServoAlarm(AnsiString &Why)
     }
     return false;
 #endif
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-sortarm) 20260703 (Req2) : true while a fault popup is on screen. Every operator-facing
+//fault routes through these two singleton modal forms (project convention : never VCL MessageDlg),
+//so their visibility is a high-coverage "something abnormal was raised" signal for the central
+//test-halt guard. NULL-safe : the globals are auto-created VCL forms but guard anyway.
+bool TfTeach::IsFaultPopupShowing()
+{
+    return (fNote!=NULL && fNote->Visible) ||
+           (MyMessageBox!=NULL && MyMessageBox->Visible);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfTeach::btnSaGoClick(TObject *Sender)
