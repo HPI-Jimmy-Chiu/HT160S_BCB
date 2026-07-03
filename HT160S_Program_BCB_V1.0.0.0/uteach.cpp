@@ -2002,6 +2002,17 @@ void TfTeach::StopAllAdvancedTests()
     StopTrayArmTest();
     StopCcdTest();
     StopColorCcdTest();
+    //AI(ht160s-sortarm) 20260703 : on any full stop (alarm/message halt, EMG, foolproof), initialize
+    //EVERY Advanced-page test's task/step/progress to its start value - unconditionally, even for a
+    //test that was not running (whose StopXxxTest early-returns). This guarantees nothing can resume
+    //mid-sequence after a halt; the operator must re-start from the beginning. ADD A NEW TEST'S TASK
+    //VAR HERE so it is initialized too. (ColorCcd has no step variable - simple move-to-position.)
+    iSaTask=0;
+    bSaZRecovering=false;
+    iCarPhase=0;
+    iCarLoopDone=0;
+    iTaTask=0;
+    iCcdTask=0;
 }
 //---------------------------------------------------------------------------
 // Advanced page (CCD) : Top CCD move-to-cell test. Like SortArm, drive the CCD to a tray Cell
