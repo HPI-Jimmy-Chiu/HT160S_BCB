@@ -69,6 +69,12 @@ public:
 	int iSortArmXDatumBias;
 	int iSortArmYDatumBias;
 
+	// AI(ht160s-pick-retry) 20260702 : SortArm pick suck-fail automatic retries before the
+	// operator alarm. Each retry lifts Z to safe and re-approaches the SAME tray cell
+	// (HT172 DoPickFromLoader hardcodes 3; here tunable). 0 = alarm on the first failure.
+	// Stored in General.ini [SortArm] PickRetryCount.
+	int iSortArmPickRetryCount;
+
 	// Safety : minimum encoder gap (motor counts) the two Loader-Y cars must keep
 	// from each other before either car is allowed to move, used only when the
 	// opposite car is clamping a tray. Larger = more conservative. Per-machine

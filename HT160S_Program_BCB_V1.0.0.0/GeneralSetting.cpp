@@ -37,6 +37,7 @@ void THT160GeneralSetting::SetDefault()
 	bShowSortArmPlaceCheck=false;
 	iSortArmXDatumBias=-1000;
 	iSortArmYDatumBias=-1000;
+	iSortArmPickRetryCount=3;
 	iLoaderYSafeDistance=10000;
 	iEmptyDestackSettleMs=500;
 	iColorDestackSettleMs=500;
@@ -98,6 +99,9 @@ void THT160GeneralSetting::Load()
 	bShowSortArmPlaceCheck=Ini->ReadBool("Diagnostic", "ShowSortArmPlaceCheck", false);
 	iSortArmXDatumBias=Ini->ReadInteger("SortArm", "XDatumBias", -1000);
 	iSortArmYDatumBias=Ini->ReadInteger("SortArm", "YDatumBias", -1000);
+	iSortArmPickRetryCount=Ini->ReadInteger("SortArm", "PickRetryCount", 3);
+	if(iSortArmPickRetryCount<0)
+		iSortArmPickRetryCount=0;
 	iLoaderYSafeDistance=Ini->ReadInteger("Safety", "LoaderYSafeDistance", 10000);
 	iEmptyDestackSettleMs=Ini->ReadInteger("SettleDelay", "EmptyDestackSettleMs", 500);
 	iColorDestackSettleMs=Ini->ReadInteger("SettleDelay", "ColorDestackSettleMs", 500);
@@ -158,6 +162,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("Diagnostic", "ShowSortArmPlaceCheck", bShowSortArmPlaceCheck);
 	Ini->WriteInteger("SortArm", "XDatumBias", iSortArmXDatumBias);
 	Ini->WriteInteger("SortArm", "YDatumBias", iSortArmYDatumBias);
+	Ini->WriteInteger("SortArm", "PickRetryCount", iSortArmPickRetryCount);
 	Ini->WriteInteger("Safety", "LoaderYSafeDistance", iLoaderYSafeDistance);
 	Ini->WriteInteger("SettleDelay", "EmptyDestackSettleMs", iEmptyDestackSettleMs);
 	Ini->WriteInteger("SettleDelay", "ColorDestackSettleMs", iColorDestackSettleMs);

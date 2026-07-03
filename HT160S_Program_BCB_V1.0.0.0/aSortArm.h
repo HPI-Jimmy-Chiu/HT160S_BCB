@@ -42,6 +42,8 @@ private:
     int    iResidueAutoIndex;      //AI(ht160s-residue) 20260624 : Auto to report residue-clear to when bg check completes (-1 idle)
     bool   bResidueArmed;          //AI(ht160s-residue) 20260625 : residue check enabled only after nozzle lifted to top (place case 60)
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
+    int  iPickRetryCount;   //AI(ht160s-pick-retry) 20260702 : failed pick strokes on the current cell (HT172 iRetryCT port)
+    bool bPickSuckErr[4];   //AI(ht160s-pick-retry) 20260702 : per-slot latched pick suck error (nozzle parked until retry/skip)
     int iBaseSuckX;   //AI(ht160s-maintainer) 20260624 : 0-based datum sucker for absolute X (HT172 iBaseSuckX port); 1=suck2 (carriage-fixed nozzle), 0=legacy suck1
     //AI(ht160s-pnp) 20260626 : PnP tuning (SortArm only). Pick/Place Z-down settle dwell plus the
     //pre-lift blow-off dwell. dDestroyCheckTime drives the Task 1 blow dwell (default 0.3s=300ms);
@@ -105,6 +107,9 @@ private:
     bool CanPlaceSlotToAuto(int SlotIndex, int AutoIndex);
 
     bool SuckSelectedSlots();
+    bool HasPickSuckError();      //AI(ht160s-pick-retry) 20260702 : any slot latched a pick suck error
+    void ClearPickSuckErrors();   //AI(ht160s-pick-retry) 20260702 : clear latches + sucker Error for a fresh retry round
+    void SkipErroredPickCells();  //AI(ht160s-pick-retry) 20260702 : K_SKIP - write failed cells off (EMPTY_IC) and drop them
     void MarkResidueTargets();    //AI(ht160s-residue) 20260624 : tag this place's slots before ClearSlot
     bool CheckPlaceResidue();     //AI(ht160s-residue) 20260624 : HT172 re-suck residue verify (REALLY only)
     bool IsResidueCheckBusy();    //AI(ht160s-residue) 20260624 : pick gate - true while any nozzle re-suck pending

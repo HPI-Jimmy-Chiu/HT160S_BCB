@@ -147,6 +147,7 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     bCleanOutFinish=false;
     bOneCycleFinish=false;
     dwSuckHomeLostStart=0;
+    iPickRetryCount=0;   //AI(ht160s-pick-retry) 20260702 : fresh pick-retry budget on home/init
     iResidueAutoIndex=-1;   //AI(ht160s-residue) 20260624 : no pending residue report
     bResidueArmed=false;   //AI(ht160s-residue) 20260625 : disarm; armed at place case 60
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)   //AI(ht160s-residue) 20260624 : reset residue-check state on home/init
@@ -164,6 +165,7 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
                 BlowSucker->OffDestroy();
         }
         bBlowSlot[s]=false;          //AI(ht160s-pnp) 20260626 : clear pending blow-off targets on home/init
+        bPickSuckErr[s]=false;       //AI(ht160s-pick-retry) 20260702 : drop pick-error latches on home/init
     }
     BlowDwell.Clear();               //AI(ht160s-pnp) 20260626 : reset pre-lift blow dwell
     PnpSettle.Clear();               //AI(ht160s-pnp) 20260626 : reset pick/place settle dwell
@@ -1021,6 +1023,11 @@ bool TSortArmModule::SelectPlaceAuto()
 //---------------------------------------------------------------------------
 bool TSortArmModule::SuckSelectedSlots()
 {
+    //AI(ht160s-pick-retry) 20260702 : suck failure no longer alarms here with the nozzle
+    //pressed on the IC. A failed slot is LATCHED (bPickSuckErr) and parked; once every
+    //selected slot has finished (success or latched error) the function reports done and
+    //DoPickFromLoader case 50/52/54 lifts Z to safe, auto-retries the same cell
+    //(HT172 aSortArm case 300->500 shape) and only then raises the operator alarm.
     bool bAllDone=true;
 
     if(IsSoftSimulate())
@@ -1028,7 +1035,7 @@ bool TSortArmModule::SuckSelectedSlots()
 
     for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT; SlotIndex++)
     {
-        if(Slot[SlotIndex].bCanPick)
+        if(Slot[SlotIndex].bCanPick && bPickSuckErr[SlotIndex]==false)
         {
             TMySucker *Sucker=GetSucker(SlotIndex);
             if(Sucker==NULL)
@@ -1037,16 +1044,68 @@ bool TSortArmModule::SuckSelectedSlots()
             }
             else if(Sucker->Suck()==false)
             {
-                bAllDone=false;
                 if(Sucker->Error)
                 {
-                    ShowSuckError(*Sucker, 1, K_RETRY|K_SKIP, "SortArm Pick");
+                    bPickSuckErr[SlotIndex]=true;
                     Sucker->Reset();
+                }
+                else
+                {
+                    bAllDone=false;
                 }
             }
         }
     }
     return bAllDone;
+}
+//---------------------------------------------------------------------------
+bool TSortArmModule::HasPickSuckError()
+{
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(bPickSuckErr[s])
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::ClearPickSuckErrors()
+{
+    //AI(ht160s-pick-retry) 20260702 : arm a fresh suck round on the latched slots. The pick
+    //selection (bCanPick/PickX/PickY) is kept so the retry re-approaches the SAME tray cell.
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(bPickSuckErr[s])
+        {
+            TMySucker *Sucker=GetSucker(s);
+            bPickSuckErr[s]=false;
+            if(Sucker!=NULL)
+            {
+                Sucker->Error=false;
+                Sucker->Reset();
+            }
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::SkipErroredPickCells()
+{
+    //AI(ht160s-pick-retry) 20260702 : operator chose SKIP. Write each failed cell off as
+    //EMPTY_IC (HT172 case 350 K_SKIP marks it NULL_IC): the IC physically stays in the tray
+    //but FindPickCells never re-finds it. ClearSlot drops bCanPick so the follow-up
+    //TransferPickDataFromLoader ignores the slot; successfully-held slots are untouched.
+    TTrayMotor *TrayMotor=GetLoaderVMotor(iActiveLoaderNo);
+
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(bPickSuckErr[s])
+        {
+            if(TrayMotor!=NULL && Slot[s].bCanPick)
+                TrayMotor->SetTraySingleData(Slot[s].PickX, Slot[s].PickY, EMPTY_IC);
+            ClearSlot(s);
+            bPickSuckErr[s]=false;
+        }
+    }
 }
 //---------------------------------------------------------------------------
 void TSortArmModule::MarkResidueTargets()
@@ -1329,10 +1388,75 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
         case 50:
             if(SuckSelectedSlots())
             {
+                if(HasPickSuckError())
+                {
+                    //AI(ht160s-pick-retry) 20260702 : count the failed stroke and lift Z to
+                    //safe FIRST - both the silent auto-retry and the operator alarm happen
+                    //with the nozzle parked up, never pressed on the IC (HT172 case 500/350).
+                    iPickRetryCount++;
+                    PickTask=52;
+                }
+                else
+                {
+                    TransferPickDataFromLoader();
+                    iPickRetryCount=0;
+                    PickTask=60;
+                }
+            }
+            break;
+
+        case 52:
+            //AI(ht160s-pick-retry) 20260702 : Z up to safe, then a silent auto-retry of the
+            //SAME cell while budget lasts ([SortArm] PickRetryCount, default 3 = HT172's
+            //hardcoded iRetryCT>3). Re-entering case 40 re-validates Loader-Y ownership and
+            //position before Z goes down again. Loader-Y ownership is kept for the retry.
+            if(SortArmZToSafePos())
+            {
+                if(iPickRetryCount<=GeneralSetting.iSortArmPickRetryCount)
+                {
+                    ClearPickSuckErrors();
+                    PickTask=40;
+                }
+                else
+                {
+                    PickTask=54;
+                }
+            }
+            break;
+
+        case 54:
+        {
+            //AI(ht160s-pick-retry) 20260702 : retries exhausted - modal alarm with Z parked
+            //at safe. RETRY grants a fresh retry round on the same cell (HT172 rezeroes
+            //iRetryCT); SKIP writes the failed cells off and carries on with whatever the
+            //other nozzles picked. The operator key is finally honored (it used to be
+            //discarded, making SKIP behave like RETRY).
+            int iKey=K_RETRY;
+
+            for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            {
+                if(bPickSuckErr[s])
+                {
+                    TMySucker *Sucker=GetSucker(s);
+                    if(Sucker!=NULL)
+                        iKey=ShowSuckError(*Sucker, 1, K_RETRY|K_SKIP, "SortArm Pick");
+                    break;
+                }
+            }
+            iPickRetryCount=0;
+            if(iKey==K_SKIP)
+            {
+                SkipErroredPickCells();
                 TransferPickDataFromLoader();
                 PickTask=60;
             }
+            else
+            {
+                ClearPickSuckErrors();
+                PickTask=40;
+            }
             break;
+        }
 
         case 60:
             if(SortArmZToSafePos())
@@ -1348,6 +1472,8 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             if(SortArmZToSafePos())
             {
                 LoaderModule->ReleaseSortOwner(iActiveLoaderNo);
+                ClearPickSuckErrors();   //AI(ht160s-pick-retry) 20260702 : drop latches with the abandoned selection
+                iPickRetryCount=0;
                 ClearPickSelection();
                 PickTask=1;
                 return true;
