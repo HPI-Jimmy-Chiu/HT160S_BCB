@@ -404,6 +404,21 @@ bool TTrayArmModule::DoPick(int Flag)
                     if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
                         break;
                 }
+                if(Job==TAJOB_AMR_SUPPLY && IsPickFromColor()==false)
+                {
+                    //AI(ht160s-trayarm-empty-handoff) 20260703 : AMR-mode cover/normal trays are
+                    //also picked from the Empty rear (GetPickSourceX returns TrayXArmToEmptyXPosition
+                    //whenever IsPickFromColor()==false), so they need the SAME Z-UP-wait gate as the
+                    //TAJOB_EMPTYTRAY_TO_AUTO path above. Without it the AMR supply job dispatched only
+                    //on the RAW IsRearHasTray() latch (DecideJob) and dove onto the Empty rear while
+                    //the carrier was still delivering / the transport clamps were still engaged - the
+                    //same collision class as the onsite issue-C that IsRearReadyForPick() fixed on the
+                    //AMR=0 path. Identity trays come from Color (IsPickFromColor()==true) and are
+                    //excluded here : their readiness is Color's own bTrayReady latch. Deadlock-safe :
+                    //we hold Z-UP and MoveEmptyY only blocks EmptyY while TrayArm Z is DOWN at Empty X.
+                    if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
+                        break;
+                }
                 if(Job==TAJOB_LOADER_RECOVERY)
                 {
                     //AI(ht160s-trayarm-empty-handoff) 20260701 : same Z-UP-wait gate for the Loader
