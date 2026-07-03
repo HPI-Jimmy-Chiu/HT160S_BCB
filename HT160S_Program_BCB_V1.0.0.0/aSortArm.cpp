@@ -1695,6 +1695,19 @@ AnsiString TSortArmModule::DescribeHolding()
             HoldCount++;
     s += "HoldingIC=" + IntToStr(HoldCount) + " / " + IntToStr(SORT_ARM_SUCKER_COUNT) + "\r\n";
 
+    //AI(ht160s-pick-retry) 20260703 : surface the suck-retry state so a hang parked at
+    //PickTask=52 (auto-retry) or 54 (modal) shows WHICH slot latched and HOW MANY retries
+    //were burned against the budget - PickTask alone cannot explain the stall offline.
+    {
+        AnsiString errSlots;
+        for(int e=0; e<SORT_ARM_SUCKER_COUNT; e++)
+            if(bPickSuckErr[e])
+                errSlots += (errSlots.IsEmpty() ? AnsiString("") : AnsiString(",")) + IntToStr(e);
+        s += "PickRetry=" + IntToStr(iPickRetryCount)
+           + " / " + IntToStr(GeneralSetting.iSortArmPickRetryCount)
+           + "  PickSuckErrSlots=" + (errSlots.IsEmpty() ? AnsiString("none") : errSlots) + "\r\n";
+    }
+
     for(int i=0; i<SORT_ARM_SUCKER_COUNT; i++)
     {
         s += "  Slot" + IntToStr(i) + ": hasIC=" + IntToStr(Slot[i].bHasIC ? 1 : 0);
