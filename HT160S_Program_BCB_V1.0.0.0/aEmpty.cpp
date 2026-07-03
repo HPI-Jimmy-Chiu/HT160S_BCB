@@ -954,14 +954,29 @@ bool TEmptyModule::IsCleanOutFinish()
 //---------------------------------------------------------------------------
 //AI(ht160s-trayarm-empty-handoff) 20260701 : "safe for TrayArm to grab" predicate.
 //IsRearHasTray() only means "a tray exists at the rear" -- ALSO true during the return-to-front
-//DoGoUpTray window (the carrier re-clamps the rear tray and hauls it back). A pick is safe only
-//when a tray is present AND the carrier is not currently returning it. Model-independent : reads
-//no EmptyY position and no shared transport clamp (which change meaning if the carrier ever
-//pre-stages at the front), so it replaces the TrayArm-side magic-70000 encoder gate.
+//DoGoUpTray window (the carrier re-clamps the rear tray and hauls it back).
+//AI(cleanout) 20260703 : ON-MACHINE FAILURE FIX (verified interference at KYEC). The 20260701
+//latch-only version reported ready too early : RefreshStateFromSensors follows the RAW rear
+//sensor, which lights the moment the carrier ARRIVES at the discharge position (DoFeedTray
+//case 4000) - while the transport clamps are still engaged and the carrier still owns the
+//tray (cases 5000/6000 not yet run). TrayArm dove in during that window and collided. Sim
+//never showed it (RefreshStateFromSensors early-outs; the latch is set at the correct step,
+//case 7000). Fix = state-based readiness, three layers, no magic encoder numbers :
+//  1) tray present and not being returned (existing latches),
+//  2) the feed ladder is NOT mid-handoff (FeedTask parked at 1=idle or 13000=done),
+//  3) both transport clamps are physically RELEASED (out-bits off).
+//This replaces the on-site emptypos>70000 encoder workaround with the same protection
+//expressed in states + cylinder confirmation.
 bool TEmptyModule::IsRearReadyForPick()
 {
     RefreshStateFromSensors();
-    return (bRearHasTray && bRearReturnInProgress==false);
+    if(bRearHasTray==false || bRearReturnInProgress)
+        return false;
+    if(FeedTask!=1 && FeedTask!=13000)
+        return false;   //feed ladder mid-handoff : carrier still delivering the rear tray
+    if(HSys.Cyn.C_Empty_LeanOnTray.GetOutBit() || HSys.Cyn.C_Empty_PushTray.GetOutBit())
+        return false;   //transport clamps still actuated : the carrier still owns the tray
+    return true;
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::IsReturnTrayRequested()
