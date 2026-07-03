@@ -31,6 +31,7 @@ void TColorModule::InitialFlag()
     bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait (P4)
     AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait timer (P4)
     RefillSimInfeed();
+    Status=CS_IDLE;   //AI(ht160s-status) 20260703 : ladder-owned status reset
     FeedTask=1;
     FeedClampSub=0;
     SortBinTask=1;
@@ -304,6 +305,7 @@ void TColorModule::DoColor(int &Task)
                     Task=1;
                     break;
                 }
+                Status=CS_RETURNING;   //AI(ht160s-status) 20260703
                 DoGoUpTray(0);
                 Task=1700;
                 break;
@@ -328,6 +330,7 @@ void TColorModule::DoColor(int &Task)
                         }
                         while(HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn());
                     }
+                    Status=CS_RETURNING;   //AI(ht160s-status) 20260703 : CleanOut drain GoUp
                     DoGoUpTray(0);
                     Task=1700;
                 }
@@ -367,12 +370,14 @@ void TColorModule::DoColor(int &Task)
                 //by DoReadColor2D (real scan, or COLOR2D_ when CCD-off/HAS_TRAY/sim); a
                 //truly empty real magazine is caught downstream by the output-sensor
                 //MES1421 at DoFeedTray case 7000, so producing here can never silently hang.
+                Status=CS_DESTACK;   //AI(ht160s-status) 20260703
                 DoGoDownTray(0);
                 Task=1200;
                 break;
             }
             if(bSupplyRequested && bReturnTray==false)
             {
+                Status=CS_FEEDING;   //AI(ht160s-status) 20260703 : carrier will own the rear
                 DoFeedTray(0);
                 Task=1000;
             }
@@ -390,6 +395,7 @@ void TColorModule::DoColor(int &Task)
             {
                 if(IsSoftSimulate() && iSimInfeedCount>0)
                     iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/GoDown
+                Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;
             }
             break;
@@ -409,6 +415,7 @@ void TColorModule::DoColor(int &Task)
                 bReturnTray=false;
                 iReturnedCount++;
                 iSimInfeedCount++;
+                Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;
             }
             break;
@@ -920,6 +927,7 @@ bool TColorModule::DoFeedTray(int Flag)
             else
             {
                 bTrayReady=true;
+                Status=CS_REAR_READY;   //AI(ht160s-status) 20260703 : clamps popped (case5000/6000) + presented
                 bSupplyRequested=false;
                 bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : supply present -> end AMR wait (P4)
                 AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear AMR wait timer on success (P4)
@@ -1144,6 +1152,8 @@ void TColorModule::NotifyTrayPicked()
     //DoReleaseTray pass (that branch + case 1500 are removed from DoColor).
     bTrayReady=false;
     bRearHasTray=false;
+    if(Status==CS_REAR_READY)
+        Status=CS_IDLE;   //AI(ht160s-status) 20260703 : TrayArm took the presented tray
     if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();
 }
 //---------------------------------------------------------------------------
@@ -1195,6 +1205,8 @@ bool TColorModule::IsCleanOutFinish()
         return false;
     if(bReturnTray)
         return false;
+    if(Status==CS_FEEDING || Status==CS_RETURNING || Status==CS_DESTACK)
+        return false;   //AI(ht160s-status) 20260703 : status busy belt beside the cursor gate
     if(HSys.VMot.MMColorY->fHasTray)
         return false;
     //AI(cleanout) 20260703 : Full gate - do not report finished while the supply stack is
@@ -1384,6 +1396,25 @@ bool TColorModule::TestGoUpTray(int Flag)
     return false;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : eColorStatus display name (DescribeState / stbMain).
+static const char *ColorStatusName(int St)
+{
+    switch(St)
+    {
+        case CS_IDLE:       return "IDLE";
+        case CS_DESTACK:    return "DESTACK";
+        case CS_FEEDING:    return "FEEDING";
+        case CS_REAR_READY: return "REAR_READY";
+        case CS_RETURNING:  return "RETURNING";
+    }
+    return "?";
+}
+//---------------------------------------------------------------------------
+int TColorModule::GetStatus()
+{
+    return Status;
+}
+//---------------------------------------------------------------------------
 AnsiString TColorModule::DescribeState()
 {
     //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state dump for
@@ -1393,6 +1424,7 @@ AnsiString TColorModule::DescribeState()
     //with no pick is the Normal-mode (no AMR demand) idle-spin signature.
     AnsiString s;
     s  = "[Color]\r\n";
+    s += "  Status=" + AnsiString(ColorStatusName(Status)) + "\r\n";
     s += "  bTrayReady=" + IntToStr(bTrayReady ? 1 : 0)
        + "  bSupplyRequested=" + IntToStr(bSupplyRequested ? 1 : 0)
        + "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0) + "\r\n";

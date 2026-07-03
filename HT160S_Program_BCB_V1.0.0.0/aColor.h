@@ -14,9 +14,22 @@ enum eHT160ColorMode
     eHT160ColorModeTraySupply=1
 };
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : explicit module status (approved unified-status design,
+//docs/plan/module-status-enum-design-20260703.md). Ladder-owned; sensors never write it.
+//Frozen at CS_IDLE for the whole SortBin mode (peers never handshake Color there).
+enum eColorStatus
+{
+    CS_IDLE=0,
+    CS_DESTACK,       //front destacker separating one identity tray to staging
+    CS_FEEDING,       //DoFeedTray active incl. CCD scan : carrier owns the rear
+    CS_REAR_READY,    //identity tray presented at rear (bTrayReady moment)
+    CS_RETURNING,     //receive/return ladder active (case 1700 / CleanOut drain)
+};
+//---------------------------------------------------------------------------
 class TColorModule
 {
 private:
+    int Status;             //AI(ht160s-status) 20260703 : eColorStatus, ladder-owned (see enum note)
     int FeedTask;
     int FeedClampSub;       //AI(HT160S-Maintainer) 20260623 : DoClampTray sub-state for DoFeedTray
     int SortBinTask;
@@ -101,6 +114,7 @@ public:
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
     bool IsInputFullForAmr();   //AI(cleanout) 20260703 : SnColor_InputFullTray verdict (sim-false) - CleanOut GoUp/finish Full gate
+    int  GetStatus();           //AI(ht160s-status) 20260703 : eColorStatus for stbMain display / peers
     void RefillSimInfeed();
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the supply car (PanelMain6 Motion View header)
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting
