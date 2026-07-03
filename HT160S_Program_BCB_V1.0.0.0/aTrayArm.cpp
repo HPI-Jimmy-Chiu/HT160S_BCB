@@ -94,6 +94,8 @@ bool TTrayArmModule::IsCleanOutFinish()
         return false;              //arm still carries a tray to deliver/recycle
     if(Job!=TAJOB_NONE)
         return false;              //a delivery job is still in flight
+    if(Status!=TAS_IDLE)
+        return false;              //AI(ht160s-status) 20260703 : status says the arm is still working (belt beside Job)
     if(IsZUpAtPosition()==false)
         return false;              //Z lift not confirmed up
     return true;
@@ -525,7 +527,10 @@ bool TTrayArmModule::DoPlace(int Flag)
                 break;
             }
             if(DoMoveToStationZSafe(GetAutoX(iAutoTarget), PlaceTask))
+            {
+                Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts (Z will lower)
                 PlaceTask=1000;
+            }
             break;
 
         case 1000:
@@ -685,7 +690,10 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
                 break;
             //Wait until EmptyTray has raised and cleared its rear before depositing.
             if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
+            {
+                Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts
                 PlaceTask=1000;
+            }
             break;
 
         case 1000:
@@ -745,7 +753,10 @@ bool TTrayArmModule::DoPlaceToColor(int Flag)
         case 500:
             //Wait until Color has raised and cleared its rear before depositing.
             if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
+            {
+                Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts
                 PlaceTask=1000;
+            }
             break;
 
         case 1000:
