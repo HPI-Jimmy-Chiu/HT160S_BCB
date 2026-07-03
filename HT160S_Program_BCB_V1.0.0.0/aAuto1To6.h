@@ -15,8 +15,25 @@ class TMySensor;
 //that GetNextTrayKindForAuto already returns when a car is full.
 #define eTrayReqNone (-1)
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : explicit per-station status (approved unified-status
+//design, docs/plan/module-status-enum-design-20260703.md). Ladder-owned; SHADOW phase
+//5a : written everywhere, read only by logging/UI until the flag readers are flipped
+//one-per-commit after on-machine soak (5b). AS_IDLE is only set after the FULL
+//discharge tail (case 6100, user decision) - stricter than the legacy flag clears.
+enum eAutoStatus
+{
+    AS_IDLE=0,
+    AS_REAR_STAGED,    //TrayArm delivered to the rear shelf; awaiting pull-in
+    AS_LOADING,        //this station is iFeedAuto with DoFeedTray in flight
+    AS_SORTING,        //working tray at sort position accepting IC
+    AS_FULL,           //working tray full (or identity/cover in AMR); wants discharge
+    AS_DISCHARGING,    //this station is iDischargeAuto with DoDischargeTray in flight
+    AS_CLEANOUT_DONE,  //station drained + latched finished in CleanOut
+};
+//---------------------------------------------------------------------------
 struct TAutoStationState
 {
+    int  Status;       //AI(ht160s-status) 20260703 : eAutoStatus (see enum note)
     bool bCarHasTray;
     bool bRearHasTray;
     bool bRearCanUse;
@@ -126,6 +143,7 @@ public:
     //requesting Auto and sets OutKind, or -1 when no Auto currently wants a tray.
     int GetTrayRequest(int Index);
     int FindTrayRequestAuto(int &OutKind);
+    int GetStationStatus(int Index);   //AI(ht160s-status) 20260703 : eAutoStatus for stbMain display / peers
     //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
     void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer
     bool IsAmrLocked(int Index);

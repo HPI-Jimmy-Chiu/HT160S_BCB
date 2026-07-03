@@ -89,6 +89,7 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
     {
         TrayMotor=GetAutoVMotor(Index);
         State[Index].bCarHasTray=(TrayMotor!=NULL && TrayMotor->fHasTray);
+        State[Index].Status=(State[Index].bCarHasTray ? AS_SORTING : AS_IDLE);   //AI(ht160s-status) 20260703 : re-derive from held material (bKeepMaterial-safe)
         State[Index].bCleanOutFinish=false;
         State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : clear place-residue gate on home/init
         bCleanOutCheck[Index]=false;
@@ -373,7 +374,10 @@ void TAutoModule::CheckAutoTray()
         if(TrayMotor->fHasTray)
             State[Index].bCarHasTray=true;
         if(State[Index].bCarHasTray && TrayMotor->FullThisIC(HAS_OK_IC))
+        {
             State[Index].bFullIC=true;
+            State[Index].Status=AS_FULL;   //AI(ht160s-status) 20260703 : working tray full, wants discharge
+        }
     }
 }
 //---------------------------------------------------------------------------
@@ -439,6 +443,10 @@ void TAutoModule::SetRearHasTrayFromTrayArm(int Index, bool bHasTray)
     State[Index].bRearHasTray=bHasTray;
     State[Index].bRearCanUse=bHasTray;
     bRearDeliveredPending[Index]=bHasTray;  //AI(general) 20260608 : Stage0 latch
+    if(bHasTray)
+        State[Index].Status=AS_REAR_STAGED;  //AI(ht160s-status) 20260703 : Normal-mode delivery
+    else if(State[Index].Status==AS_REAR_STAGED)
+        State[Index].Status=AS_IDLE;         //AI(ht160s-status) 20260703 : staged latch withdrawn
 }
 //---------------------------------------------------------------------------
 bool TAutoModule::DoFeedTray(int Flag)
@@ -468,6 +476,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             iFeedAuto=FindFeedAuto();
             if(iFeedAuto<0)
                 return true;
+            State[iFeedAuto].Status=AS_LOADING;   //AI(ht160s-status) 20260703 : ladder owns this station before any Y motion
             FeedTask=200;
             break;
 
@@ -504,6 +513,7 @@ bool TAutoModule::DoFeedTray(int Flag)
                     RearGrid[iFeedAuto].Clear();
                     RearKind[iFeedAuto]=eTrayKindNormal;
                     RearTrayID[iFeedAuto]="";
+                    State[iFeedAuto].Status=AS_IDLE;   //AI(ht160s-status) 20260703 : feed aborted, nothing staged
                     return true;
                 }
                 //K_RETRY (or any other) : stay in case 200 and re-read next cycle.
@@ -588,6 +598,7 @@ bool TAutoModule::DoFeedTray(int Flag)
             State[iFeedAuto].bRearCanUse=false;
             State[iFeedAuto].bFullIC=false;
             bRearDeliveredPending[iFeedAuto]=false;  //AI(general) 20260608 : Stage0 rear tray consumed
+            State[iFeedAuto].Status=AS_SORTING;   //AI(ht160s-status) 20260703 : rear promoted to working
             //AI(HT160S-Maintainer) 20260605 : AMR stack-order bookkeeping. Record the tray
             //pulled up to the working position into the output car. If it is an identity or
             //cover tray (cannot hold IC) flag it full immediately so it discharges to the
@@ -608,7 +619,10 @@ bool TAutoModule::DoFeedTray(int Flag)
                     Car[iFeedAuto].iTrayCount=n+1;
                 }
                 if(WorkingKind[iFeedAuto]!=eTrayKindNormal)
+                {
                     State[iFeedAuto].bFullIC=true;
+                    State[iFeedAuto].Status=AS_FULL;   //AI(ht160s-status) 20260703 : identity/cover discharges without SortArm
+                }
             }
             else
                 WorkingKind[iFeedAuto]=eTrayKindNormal;
@@ -642,6 +656,7 @@ bool TAutoModule::DoDischargeTray(int Flag)
             iDischargeAuto=FindDischargeAuto();
             if(iDischargeAuto<0)
                 return true;
+            State[iDischargeAuto].Status=AS_DISCHARGING;   //AI(ht160s-status) 20260703
             Task=1000;
             break;
 
@@ -700,7 +715,13 @@ bool TAutoModule::DoDischargeTray(int Flag)
 
         case 6100:
             if(DoFrontRiseOnce(iDischargeAuto, DischargeSubTask, DischargeDelay))
+            {
+                //AI(ht160s-status) 20260703 : user decision - the station reads IDLE only
+                //after the FULL discharge tail (Y retreated + FrontRise pumped), later
+                //than the legacy flag clears at case 1000. Readers flip in phase 5b.
+                State[iDischargeAuto].Status=AS_IDLE;
                 return true;
+            }
             break;
     }
     return false;
@@ -900,6 +921,7 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                 State[Index].bFrontHasTray=false;
                 State[Index].bFullIC=false;
                 State[Index].bCleanOutFinish=true;
+                State[Index].Status=AS_CLEANOUT_DONE;   //AI(ht160s-status) 20260703
                 TrayMotor=GetAutoVMotor(Index);
                 if(TrayMotor!=NULL)
                 {
@@ -1040,6 +1062,7 @@ void TAutoModule::NotifyTrayArmDelivered(int Index, int Kind, AnsiString TrayID)
     State[Index].bRearHasTray=true;
     State[Index].bRearCanUse=true;
     bRearDeliveredPending[Index]=true;  //AI(general) 20260608 : Stage0 latch
+    State[Index].Status=AS_REAR_STAGED;  //AI(ht160s-status) 20260703 : single producer of the staged state
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-tray-source) : TrayArm hands the carried grid to the Auto rear staging slot.
@@ -1177,6 +1200,29 @@ int TAutoModule::GetStationCount()
     return AUTO_STATION_COUNT;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : eAutoStatus display name (DescribeStation / stbMain).
+static const char *AutoStatusName(int St)
+{
+    switch(St)
+    {
+        case AS_IDLE:          return "IDLE";
+        case AS_REAR_STAGED:   return "REAR_STAGED";
+        case AS_LOADING:       return "LOADING";
+        case AS_SORTING:       return "SORTING";
+        case AS_FULL:          return "FULL";
+        case AS_DISCHARGING:   return "DISCHARGING";
+        case AS_CLEANOUT_DONE: return "CLEANOUT_DONE";
+    }
+    return "?";
+}
+//---------------------------------------------------------------------------
+int TAutoModule::GetStationStatus(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return AS_IDLE;
+    return State[Index].Status;
+}
+//---------------------------------------------------------------------------
 AnsiString TAutoModule::DescribeStation(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
@@ -1186,6 +1232,7 @@ AnsiString TAutoModule::DescribeStation(int Index)
 
     AnsiString s;
     s  = "[Auto" + IntToStr(Index+1) + "]\r\n";
+    s += "  Status=" + AnsiString(AutoStatusName(State[Index].Status)) + "\r\n";
     s += "  CarHasTray="  + IntToStr(State[Index].bCarHasTray ? 1 : 0)
        + "  RearHasTray=" + IntToStr(State[Index].bRearHasTray ? 1 : 0)
        + "  FullIC="      + IntToStr(State[Index].bFullIC ? 1 : 0)
