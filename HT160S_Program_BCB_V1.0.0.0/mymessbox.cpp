@@ -295,6 +295,35 @@ static int MeasureWrapHeight(TCanvas *Cv, TFont *Fnt, AnsiString S, int Width)
     return R.bottom-R.top;
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260701 : widest single visual line of S, in pixels, for the given
+//font. Cv->TextWidth() measures a whole string as one run, so an explicit multi-line caption
+//(built by a caller joining lines with "\r\n", e.g. the motor-parameter-change preview list)
+//returned the SUM of all lines' widths instead of the widest one, oversizing the box. Split on
+//CRLF/LF first and take the max per-line width instead.
+//---------------------------------------------------------------------------
+static int MeasureMaxLineWidth(TCanvas *Cv, TFont *Fnt, AnsiString S)
+{
+    TStringList *Lines;
+    int MaxW;
+    int LineW;
+    int Index;
+
+    if(S=="")
+        return 0;
+    Cv->Font->Assign(Fnt);
+    Lines=new TStringList();
+    Lines->Text=S;
+    MaxW=0;
+    for(Index=0; Index<Lines->Count; Index++)
+    {
+        LineW=Cv->TextWidth(Lines->Strings[Index]);
+        if(LineW>MaxW)
+            MaxW=LineW;
+    }
+    delete Lines;
+    return MaxW;
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260629 : auto-fit the message box to its content. The DFM
 //Label1/Label2 are fixed 441px, single-line, centered labels, so a long caption (e.g. the
 //startup "Inherit last work order ? ..." YES/NO prompt) overflowed and got clipped on BOTH
@@ -305,6 +334,13 @@ static int MeasureWrapHeight(TCanvas *Cv, TFont *Fnt, AnsiString S, int Width)
 //the FormShow centering both adapt with no caller changes. Runs every FormShow;
 //PrepareNormalMessage resets Width/Height first, so each show recomputes from a clean
 //baseline (no drift across reuses of the singleton box).
+//AI(HT160S-Maintainer) 20260701 : height is now ALWAYS measured via MeasureWrapHeight
+//(DrawText DT_CALCRECT), never hard-coded to the single-line 33px. The old code only measured
+//when the caption was wide enough to force auto-wrap; a caller-built explicit multi-line
+//caption (e.g. "Motor parameter changes: N\r\n<line>...") is short per-line so it never hit
+//that path, leaving H1=33 while the label actually rendered 2+ lines -- clipping every line
+//past the first. WordWrap is likewise always turned on; DrawText/TLabel honor embedded
+//"\r\n" regardless, and turning it on is a no-op when no line needs wrapping.
 //---------------------------------------------------------------------------
 static void FitMessageBox()
 {
@@ -325,7 +361,6 @@ static void FitMessageBox()
     int BlockTop;
     int DesiredClient;
     int MaxClient;
-    bool Wrap;
 
     const int LabelPad=30;     // breathing room added to the measured text width
     const int LabelInset=16;   // label sits 8px in from each panel edge
@@ -346,10 +381,8 @@ static void FitMessageBox()
     Has2=(M->Label2->Visible && M->Label2->Caption!="");
     S2=Has2 ? M->Label2->Caption : AnsiString("");
 
-    Cv->Font->Assign(M->Label1->Font);
-    W1=Cv->TextWidth(S1);
-    Cv->Font->Assign(M->Label2->Font);
-    W2=Has2 ? Cv->TextWidth(S2) : 0;
+    W1=MeasureMaxLineWidth(Cv, M->Label1->Font, S1);
+    W2=Has2 ? MeasureMaxLineWidth(Cv, M->Label2->Font, S2) : 0;
     TextW=(W1>W2) ? W1 : W2;
 
     MaxClient=Screen->WorkAreaWidth-40;
@@ -362,12 +395,8 @@ static void FitMessageBox()
     if(DesiredClient<MinClient)
         DesiredClient=MinClient;
 
-    Wrap=false;
     if(DesiredClient>MaxClient)
-    {
         DesiredClient=MaxClient;
-        Wrap=true;
-    }
 
     M->ClientWidth=DesiredClient;
     PanelW=DesiredClient-PanelInset;
@@ -378,22 +407,18 @@ static void FitMessageBox()
     M->Label1->Width=LabelW;
     M->Label2->Left=8;
     M->Label2->Width=LabelW;
-    M->Label1->WordWrap=Wrap;
-    M->Label2->WordWrap=Wrap;
+    M->Label1->WordWrap=true;
+    M->Label2->WordWrap=true;
 
-    H1=33;
-    H2=Has2 ? 33 : 0;
-    if(Wrap)
+    H1=MeasureWrapHeight(Cv, M->Label1->Font, S1, LabelW)+4;
+    if(H1<33)
+        H1=33;
+    H2=0;
+    if(Has2)
     {
-        H1=MeasureWrapHeight(Cv, M->Label1->Font, S1, LabelW)+4;
-        if(H1<33)
-            H1=33;
-        if(Has2)
-        {
-            H2=MeasureWrapHeight(Cv, M->Label2->Font, S2, LabelW)+4;
-            if(H2<33)
-                H2=33;
-        }
+        H2=MeasureWrapHeight(Cv, M->Label2->Font, S2, LabelW)+4;
+        if(H2<33)
+            H2=33;
     }
 
     ContentH=H1+(Has2 ? (LineGap+H2) : 0);
