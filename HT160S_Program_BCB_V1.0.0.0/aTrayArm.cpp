@@ -688,6 +688,13 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
         case 500:
             if(TryDivertCarriedTrayToAuto())   //AI(ht160s-divert) 20260703 : retarget during the (possibly long) rear-clear wait
                 break;
+            //AI(ht160s-status) 20260703 : anti-collision (on-site status==1 intent, concern B).
+            //Do NOT lower onto the Empty rear while its carrier is actively FEEDING a tray there
+            //- during the feed motion bRearHasTray has not latched yet (set at DoFeedTray case
+            //7000), so the IsRearHasTray()==false gate below alone would let TrayArm dive into
+            //the arriving carrier. Real-machine only; ES_FEEDING clears when the feed completes.
+            if(IsSoftSimulate()==false && EmptyModule!=NULL && EmptyModule->GetStatus()==ES_FEEDING)
+                break;
             //Wait until EmptyTray has raised and cleared its rear before depositing.
             if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
             {
@@ -751,6 +758,9 @@ bool TTrayArmModule::DoPlaceToColor(int Flag)
             break;
 
         case 500:
+            //AI(ht160s-status) 20260703 : anti-collision (mirrors Empty concern B).
+            if(IsSoftSimulate()==false && ColorModule!=NULL && ColorModule->GetStatus()==CS_FEEDING)
+                break;
             //Wait until Color has raised and cleared its rear before depositing.
             if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
             {
