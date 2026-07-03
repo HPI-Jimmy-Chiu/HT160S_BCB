@@ -138,6 +138,7 @@ void TSortArmModule::ReStartTimeoutTimers()
 //---------------------------------------------------------------------------
 void TSortArmModule::InitialFlag(bool bKeepMaterial)
 {
+    Status=SAS_IDLE;   //AI(ht160s-status) 20260703 : held ICs (bKeepMaterial) re-commit to SAS_PLACING on the next DoSortArm tick
     PickTask=1;
     PlaceTask=1;
     iActiveLoaderNo=0;
@@ -1069,6 +1070,15 @@ bool TSortArmModule::HasPickSuckError()
     return false;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : eSortArmStatus with the SAS_RECOVERY overlay derived
+//from the live recovery predicates (user decision : recovery is a 4th state).
+int TSortArmModule::GetStatus()
+{
+    if(IsResidueCheckBusy() || HasPickSuckError())
+        return SAS_RECOVERY;
+    return Status;
+}
+//---------------------------------------------------------------------------
 void TSortArmModule::ClearPickSuckErrors()
 {
     //AI(ht160s-pick-retry) 20260702 : arm a fresh suck round on the latched slots. The pick
@@ -1668,6 +1678,8 @@ bool TSortArmModule::IsCleanOutFinish()
         return false;
     if(IsResidueCheckBusy() || HasPickSuckError())
         return false;
+    if(Status!=SAS_IDLE)
+        return false;   //AI(ht160s-status) 20260703 : status busy belt beside the cursor checks
     //AI(cleanout) 20260703 : user-confirmed cascade condition - SortArm idle INCLUDES every
     //enabled suck-Z nozzle parked UP on its Home sensor (live read; sim-true). A nozzle left
     //down is not idle even with all sub-machines parked.
@@ -1759,8 +1771,10 @@ void TSortArmModule::DoSortArm(int &Task)
     switch(Task)
     {
         case 1:
+            Status=SAS_IDLE;   //AI(ht160s-status) 20260703 : decision hub; re-committed below when there is work
             if(HasHoldingIC())
             {
+                Status=SAS_PLACING;
                 PlaceTask=1;
                 Task=200;
                 break;
@@ -1800,6 +1814,7 @@ void TSortArmModule::DoSortArm(int &Task)
             }
             if(iActiveLoaderNo>0)
             {
+                Status=SAS_PICKING;   //AI(ht160s-status) 20260703
                 PickTask=1;
                 Task=100;
                 break;
@@ -1815,6 +1830,7 @@ void TSortArmModule::DoSortArm(int &Task)
         case 100:
             if(DoPickFromLoader(1))
             {
+                Status=SAS_PLACING;   //AI(ht160s-status) 20260703 : batch picked, go place
                 PlaceTask=1;
                 Task=200;
             }
@@ -1823,12 +1839,19 @@ void TSortArmModule::DoSortArm(int &Task)
         case 200:
             if(HasHoldingIC()==false && PlaceTask<=1)   // no holding IC and place is idle : nothing to place, leave case 200
             {
+                Status=SAS_IDLE;   //AI(ht160s-status) 20260703
                 Task=1;
                 break;
             }
             if(DoPlaceToAuto(1))
             {
-                Task=HasHoldingIC()?200:1;
+                if(HasHoldingIC())
+                    Task=200;
+                else
+                {
+                    Status=SAS_IDLE;   //AI(ht160s-status) 20260703 : all held ICs placed
+                    Task=1;
+                }
             }
             break;
 

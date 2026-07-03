@@ -24,9 +24,22 @@ struct TSortArmSlotState
 class TTrayMotor;
 class TMySucker;
 //---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : explicit module status (approved unified-status design,
+//docs/plan/module-status-enum-design-20260703.md). Ladder-owned. SAS_RECOVERY is a
+//DERIVED overlay (residue re-suck busy / pick-suck-error latched) computed in
+//GetStatus(); the stored member only holds the sequential IDLE/PICKING/PLACING.
+enum eSortArmStatus
+{
+    SAS_IDLE=0,
+    SAS_PICKING,      //committed to a Loader side, DoPickFromLoader active
+    SAS_PLACING,      //holding IC and/or DoPlaceToAuto active
+    SAS_RECOVERY,     //residue re-suck / pick-suck-error recovery pending (derived)
+};
+//---------------------------------------------------------------------------
 class TSortArmModule
 {
 private:
+    int Status;   //AI(ht160s-status) 20260703 : eSortArmStatus (sequential part; see enum note)
     int PickTask;
     int PlaceTask;
     int iActiveLoaderNo;
@@ -133,6 +146,7 @@ public:
     bool AreAllSuckersHome();   //AI(HT160S-Maintainer) 20260622 : canonical SortArm-move suck-home interlock (live Led[iHomeLed])
     void DoSortArm(int &Task);
     bool HasHoldingIC();
+    int GetStatus();   //AI(ht160s-status) 20260703 : eSortArmStatus with SAS_RECOVERY overlay
     bool IsCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm CleanOut finish
     bool IsOneCycleFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm OneCycle finish
     int  GetPickTask();        //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
