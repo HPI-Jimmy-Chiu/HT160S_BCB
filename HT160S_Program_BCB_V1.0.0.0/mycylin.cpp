@@ -204,7 +204,7 @@ bool TMyCylinder::Push()
 
     Switch.On();
     ClearCylinderAlarm(OnAlarmCode);
-    if(Task==1 || Task==2)
+    if(Task==1)
     {
         //AI(HT160S-Maintainer) 20260624 : DUMMY skips the cylinder in-position confirm +
         //timeout alarm so the dry-run can flow (user 2026-06-24). Switch.On() is still
@@ -306,7 +306,7 @@ bool TMyCylinder::Pop()
 
     Switch.Off();
     ClearCylinderAlarm(OffAlarmCode);
-    if(Task==1 || Task==2)
+    if(Task==1)
     {
         //AI(HT160S-Maintainer) 20260624 : DUMMY skips the cylinder in-position confirm +
         //timeout alarm so the dry-run can flow (user 2026-06-24). Switch.Off() is still

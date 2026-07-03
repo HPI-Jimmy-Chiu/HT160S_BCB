@@ -22,6 +22,7 @@ $makeFile = Join-Path $projectRoot "ht160s.mak"
 $encodingCheck = Join-Path $PSScriptRoot "check-ht160s-source-encoding.ps1"
 $formLint = Join-Path $PSScriptRoot "check-bcb-form-published.ps1"
 $alarmCheck = Join-Path $PSScriptRoot "check-ht160s-alarm-registry.ps1"
+$ladderCheck = Join-Path $PSScriptRoot "check-ladder-consistency.py"
 $bpr2mak = Join-Path $BCBRoot "Bin\bpr2mak.exe"
 $make = Join-Path $BCBRoot "Bin\make.exe"
 $brcc32 = Join-Path $BCBRoot "Bin\brcc32.exe"
@@ -111,6 +112,21 @@ try {
     & $alarmCheck -ProjectRoot $projectRoot -FailOnViolation
     if ($LASTEXITCODE -ne 0) {
         throw "HT160S alarm-registry check failed (register the codes listed above in database.cpp CreateSystemAlarmCode)."
+    }
+
+    # AI(ht160s-ladder-guard) 20260703 : static "number but no action" gate. Fails the build
+    # on a switch(Task) state cursor jumping to a value with no matching case AND no default:
+    # (a silent dead-jump). python-based; if python is absent (some on-machine build boxes)
+    # the gate is skipped with a warning so it never blocks a build that could otherwise run.
+    $python = (Get-Command python -ErrorAction SilentlyContinue)
+    if ($null -eq $python) { $python = (Get-Command py -ErrorAction SilentlyContinue) }
+    if ($null -ne $python) {
+        & $python.Source $ladderCheck
+        if ($LASTEXITCODE -ne 0) {
+            throw "HT160S ladder-consistency check failed (a state number with no matching case + no default; fix or add a default: LogLadderFault guard)."
+        }
+    } else {
+        Write-Warning "python not found - skipping ladder-consistency gate (run scripts/ops/check-ladder-consistency.py manually)."
     }
 
     $objRoot = Join-Path $repoRoot "Obj"
