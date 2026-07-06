@@ -116,6 +116,31 @@ void ClearLastSet()
     tRunData.Clear();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-lot-reset) 20260706 : reset only the per-run production counters for a
+//new work order. Called by the manual Lot Start button and the SECS LOTSTART
+//handler. Leaves configured quantities (iAutoQuantity/iMagQuantity), the lifetime
+//ejection-pin counter and run-state fields (bRunning/iActiveLotCount) to callers.
+//bFirstRun is re-armed so the next production cycle re-stamps StartTime and clears
+//the UPH pause accumulator (see csystem DoAllProcess bFirstRun block).
+void ResetPerLotProductionCounters()
+{
+    MachineRun.iTotalScanned=0;
+    MachineRun.iTotalSorted=0;
+    MachineRun.iUnknown2D=0;
+    for(int AreaIndex=0; AreaIndex<eTrayCount; AreaIndex++)
+        MachineRun.iAreaCount[AreaIndex]=0;
+
+    ZeroMemory(tRunData.TrayICCnt, sizeof(tRunData.TrayICCnt));
+    ZeroMemory(tRunData.BinICCnt, sizeof(tRunData.BinICCnt));
+    tRunData.TotalIC=0;
+    tRunData.UPH=0;
+    tRunData.LoaderIC=0;
+    tRunData.JamCount=0;
+    tRunData.StartTime=Now();
+
+    bFirstRun=true;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-password) 20260624 : the password book is now a notepad-openable
 // text file (system\login.txt, one "ID,Password,Level" line per account)
 // owned by THT160UserRoleManager. The former binary login.dat / PASS_WORD

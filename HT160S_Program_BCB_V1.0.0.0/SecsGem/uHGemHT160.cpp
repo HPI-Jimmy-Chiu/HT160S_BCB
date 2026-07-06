@@ -809,6 +809,10 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     }
                     if(HCACK==0 && FirstLot!="" && fMain!=NULL)
                     {
+                        //AI(ht160s-lot-reset) 20260706 : SECS LOTSTART is the host-side
+                        //equivalent of pressing Lot Start, so zero the per-run production
+                        //counters too (gated idle : SystemStart==false and no IC inside).
+                        ResetPerLotProductionCounters();
                         fMain->edLotNo->Text = FirstLot;         // active lot backfill
                         fMain->RefreshLotListFromRegistry();
                         //AI(ht160s-2dbin-manual) 20260628 : persist the SECS-registered lots

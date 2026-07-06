@@ -202,5 +202,10 @@ void UpdateAllParameter();
 void CustomerFunctionSelect();
 AnsiString GetTotalQuantityAutoPercent();
 AnsiString GetTotalQuantityMagPercent();
+//AI(ht160s-lot-reset) 20260706 : zero the per-run production counters at the start
+//of a new work order (manual Lot Start button + SECS LOTSTART). Machine-total
+//cumulative fields are left alone; only the per-lot display / throughput counts
+//reset so the Auto Cnt display, UPH and SECS Scanned/Sorted represent THIS lot.
+void ResetPerLotProductionCounters();
 //---------------------------------------------------------------------------
 #endif

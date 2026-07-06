@@ -1325,6 +1325,10 @@ void TSortArmModule::TransferPlaceDataToAuto()
         if(Slot[SlotIndex].bPlaceSelected)
         {
             TrayMotor->SetTraySingleData(Slot[SlotIndex].PlaceX, Slot[SlotIndex].PlaceY, HAS_OK_IC);
+            //AI(ht160s-lot-reset) 20260706 : count each placed OK IC as one processed
+            //unit so tRunData.TotalIC (SECS SVID 1120/66020) and the derived UPH are
+            //non-zero (previously TotalIC had NO increment site anywhere -> read 0).
+            tRunData.TotalIC++;
             //AI(ht160s-motion-view) 20260618 : per-Auto output IC count for the Unload
             //palAutoXXCnt display (HT172 ShowBinCount used tRunData.TrayICCnt). eAuto1=index 1.
             if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)

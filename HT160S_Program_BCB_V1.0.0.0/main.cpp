@@ -1961,6 +1961,12 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     LotBinBinding.Clear();
     LotBinBinding.SaveToIni();
 
+    //AI(ht160s-lot-reset) 20260706 : a fresh Lot Start zeroes the per-run production
+    //counters (Auto Cnt display, UPH, SECS Scanned/Sorted/TotalIC) so they represent
+    //THIS work order instead of accumulating across lots. Machine-total cumulative
+    //fields are untouched. Must run before bRunning/iActiveLotCount are set below.
+    ResetPerLotProductionCounters();
+
     MachineRun.bRunning=true;
     MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
 
