@@ -465,6 +465,9 @@ void __fastcall TfSetup::LoadSuckEnable()
     RefreshSuckGrid();
     if(rgPnpUseSuck!=NULL && grdSuckEnable!=NULL)
         grdSuckEnable->Enabled=(rgPnpUseSuck->ItemIndex==1);
+    //AI(ht160s-pick-retry) 20260706 : reflect machine-level [SortArm] PickRetryCount into the edit.
+    if(edSortArmPickRetry!=NULL)
+        edSortArmPickRetry->Text=IntToStr(GeneralSetting.iSortArmPickRetryCount);
     bLoadingPnP=false;
 }
 //---------------------------------------------------------------------------
@@ -482,6 +485,10 @@ void __fastcall TfSetup::SaveSuckEnable()
             iEnabledCount++;
     if(iEnabledCount==0)
         GeneralSetting.bSuckerEnabled[0]=true;
+    //AI(ht160s-pick-retry) 20260706 : persist the pick-retry budget (0..10; 0 = alarm on first fail).
+    //aSortArm reads GeneralSetting.iSortArmPickRetryCount live, so no engine refresh is required.
+    if(edSortArmPickRetry!=NULL)
+        GeneralSetting.iSortArmPickRetryCount=GetTrayEditInt(edSortArmPickRetry, 3, 0, 10);
     GeneralSetting.Save();
 }
 //---------------------------------------------------------------------------

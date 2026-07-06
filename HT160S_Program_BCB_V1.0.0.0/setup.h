@@ -119,6 +119,9 @@ __published:
     TEdit *edtDestroyCheckTime;
     TRadioGroup *rgPnpUseSuck;
     TTMyTray *grdSuckEnable;
+    TLabel *lblSortArmPickRetry;
+    TLabel *lblSortArmPickRetryHint;
+    TEdit *edSortArmPickRetry;
     void __fastcall spbSetupMenuClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);

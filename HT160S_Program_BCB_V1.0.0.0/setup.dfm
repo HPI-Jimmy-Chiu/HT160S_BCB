@@ -14260,6 +14260,46 @@ object fSetup: TfSetup
             XItem = 4
             YItem = 1
           end
+          object lblSortArmPickRetry: TLabel
+            Left = 420
+            Top = 216
+            Width = 170
+            Height = 16
+            Caption = 'Pick Retry Count'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblSortArmPickRetryHint: TLabel
+            Left = 420
+            Top = 244
+            Width = 470
+            Height = 16
+            Caption = '(retries after 1st fail; 0 = alarm immediately)'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object edSortArmPickRetry: TEdit
+            Left = 600
+            Top = 213
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 4
+            Text = '3'
+          end
         end
       end
     end
