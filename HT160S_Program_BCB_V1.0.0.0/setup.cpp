@@ -9,6 +9,7 @@
 #include "aSortArm.h"   //AI(ht160s-pnp) 20260626 : SortArmModule global + SetPnPParameters for ApplyPnPToSortArm
 #include "database.h"
 #include "mymessbox.h"   //AI(general) 20260608 : ShowMyMessageBox_YES_NO instead of Application->MessageBox
+#include "ComPort.h"   //AI(ht160s-bindisplay) 20260706 : fComPort + EnsureComPortCreated to repaint the bin panel on Save Map
 #include <Dialogs.hpp>
 #include <IniFiles.hpp>
 //---------------------------------------------------------------------------
@@ -740,6 +741,16 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     }
     BinAreaMap.SetErrorBinArea(GetSelectedBinErrorArea());
     BinAreaMap.SaveDefault();
+    //AI(ht160s-bindisplay) 20260706 : the Error Bin area just changed in the live
+    //global BinAreaMap. Sort routing reads it live, but the physical bin display
+    //color is only repainted by ApplyBinDisplayConfig (via ConfigureBinDisplay at
+    //startup / maintenance Apply), so without this the panel red-Auto stayed stale
+    //until restart. Re-push per-unit color now so the panel matches the saved map.
+    //Lighter than ConfigureBinDisplay (no COM teardown); safe no-op when the
+    //controller is absent (ApplyBinDisplayConfig early-returns on BinDisCtrl==NULL).
+    EnsureComPortCreated(Application);
+    if(fComPort!=NULL)
+        fComPort->ApplyBinDisplayConfig();
     RefreshBinSettingStatus();
     RefreshRecipeStatus();
     if(ShowResultMessage)
