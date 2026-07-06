@@ -1985,10 +1985,16 @@ bool TLoaderModule::DoFrontDestackDown(int &SubTask, HTimer &Delay)
             break;
 
         case 6:
-            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Pop())   // retract Separate (confirmed)
+            //AI(ht160s-feeder-unify) 20260706 : PRESERVED safety gate from the original case 5 -
+            //do not release the separator claw unless Rise_1 still holds the stack (else the remaining
+            //stack could drop). This Loader-specific gate has no GoDown/GoUp analog; keep it verbatim.
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
-                SubTask=7;
+                if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Pop())   // retract Separate (confirmed)
+                {
+                    HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+                    SubTask=7;
+                }
             }
             break;
 
