@@ -13,12 +13,15 @@
 #include "aLoader.h"           //AI(HT160S-Maintainer) 20260606 : Loader rear empty-tray recovery source
 #include "aSortArm.h"          //AI(cleanout) 20260701 : SortArmModule->IsCleanOutFinish() = drain-boundary signal for the DoPlace in-flight divert
 #include "GeneralSetting.h"    //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
+#include "cStateRecordHT160.h" //AI(ht160s-rearready-p0) 20260705 : gStateRecord->TriggerSnapshot on blocked-pick watchdog expiry
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 TTrayArmModule *TrayArmModule=NULL;
 //---------------------------------------------------------------------------
 static const int TRAYARM_ZUP_LOST_MS=100;   //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce window (ms); time-based, not cycle-count
+static const int TRAYARM_PICK_GATE_SCAN_GAP_MS=1500;   //AI(ht160s-rearready-p0) 20260705 : blocked-poll continuity gap (mirrors ION_FAN_SCAN_GAP_MS) -- a larger gap means the wall-clock span was NOT blocked run-time (modal Note froze MainProc, IO Set View open, machine stopped) and must re-arm, not charge, the watchdog window
+static const int TRAYARM_PICK_GATE_ALARM_MS=60000;   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog window (ms). A normal rear handoff (Empty feed / Loader discharge remainder) finishes well under 30s; a full silent minute at the DoPick 1/10 gate means the readiness latch is stuck -- notify (report P1), never wait silently
 //---------------------------------------------------------------------------
 TTrayArmModule::TTrayArmModule()
 {
@@ -42,6 +45,9 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     PlaceTask=1;
     bCleanOutFinish=true;
     ArmDelay.Clear();
+    PickWaitTimer.Clear();   //AI(ht160s-rearready-p0) 20260705 : per-wait transient; also resets a Paused timer (HTimer trap)
+    bPickWaitArmed=false;
+    dwPickGateLastPollTick=0;
     dwZUpLostStart=0;
     //AI(HT160S-Maintainer) 20260612 : recoverable home while a tray is in hand. Keep the
     //delivery job + destination (Auto target, AMR kind, 2D TrayID, place dest) so the arm
@@ -73,6 +79,135 @@ bool TTrayArmModule::HasTray()
 int TTrayArmModule::GetStatus()
 {
     return Status;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-rearready-p0) 20260705 : sub-task readouts for MotionDetail.ini (SortArm
+//GetPickTask precedent) -- the top-level DoTrayArm Task is only 1/10/100/1000/2000,
+//so the pick-gate wait (PickTask 1/10) was invisible in a State Record.
+int TTrayArmModule::GetPickTask()
+{
+    return PickTask;
+}
+//---------------------------------------------------------------------------
+int TTrayArmModule::GetPlaceTask()
+{
+    return PlaceTask;
+}
+//---------------------------------------------------------------------------
+int TTrayArmModule::GetJob()
+{
+    return Job;
+}
+//---------------------------------------------------------------------------
+void TTrayArmModule::PauseTimeoutTimers()
+{
+    //AI(ht160s-rearready-p0) 20260705 : freeze the blocked-pick watchdog across a machine
+    //pause so the paused span is not charged against the window (csystem
+    //PauseActuatorTimeoutTimers edge; mirrors Loader FeedWaitTimer). ArmDelay is
+    //deliberately NOT here : it is a short clamp-settle dwell re-armed via SetMS+On
+    //WITHOUT Clear, and HTimer::On() does not reset Paused -- pausing it could leave
+    //the production/Teach-test dwell Paused-stuck.
+    PickWaitTimer.Pause();
+}
+//---------------------------------------------------------------------------
+void TTrayArmModule::ReStartTimeoutTimers()
+{
+    PickWaitTimer.ReStart();
+}
+//---------------------------------------------------------------------------
+static AnsiString SR_TrayArmStatusText(int St)
+{
+    switch(St)
+    {
+        case TAS_IDLE:     return "IDLE";
+        case TAS_PICKING:  return "PICKING";
+        case TAS_CARRYING: return "CARRYING";
+        case TAS_PLACING:  return "PLACING";
+    }
+    return "?" + IntToStr(St);
+}
+//---------------------------------------------------------------------------
+static AnsiString SR_TrayArmJobText(int J)
+{
+    switch(J)
+    {
+        case TAJOB_NONE:              return "NONE";
+        case TAJOB_EMPTYTRAY_TO_AUTO: return "EMPTY_TO_AUTO";
+        case TAJOB_LOADER_RECOVERY:   return "LOADER_RECOVERY";
+        case TAJOB_AMR_SUPPLY:        return "AMR_SUPPLY";
+    }
+    return "?" + IntToStr(J);
+}
+//---------------------------------------------------------------------------
+AnsiString TTrayArmModule::DescribeState()
+{
+    //AI(ht160s-rearready-p0) 20260705 : read-only latched-state dump for FeederDecision.txt
+    //(report 5.2 : the arm was invisible in a State Record -- a rear-ready gate wait could
+    //not be told apart from an idle arm). Latched members only; no sensor refresh here.
+    AnsiString s;
+    s  = "[TrayArm]\r\n";
+    s += "  Status=" + SR_TrayArmStatusText(Status)
+       + "  Job=" + SR_TrayArmJobText(Job)
+       + "  PickTask=" + IntToStr(PickTask)
+       + "  PlaceTask=" + IntToStr(PlaceTask) + "\r\n";
+    s += "  bHasTray=" + IntToStr(bHasTray ? 1 : 0)
+       + "  PlaceDest=" + IntToStr(PlaceDest)
+       + "  iDeliverKind=" + IntToStr(iDeliverKind)
+       + "  iDeliverTrayID=" + iDeliverTrayID
+       + "  iAutoTarget=" + IntToStr(iAutoTarget) + "\r\n";
+    s += "  PickWaitArmed=" + IntToStr(bPickWaitArmed ? 1 : 0)
+       + "  bCleanOutFinish=" + IntToStr(bCleanOutFinish ? 1 : 0)
+       + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
+    return s;
+}
+//---------------------------------------------------------------------------
+void TTrayArmModule::OnPickGateBlocked(AnsiString Source)
+{
+    //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog (report P1; silent-stop-
+    //must-notify). The DoPick 1/10 readiness gates wait unbounded and silently -- the
+    //"machine looks healthy but does nothing" posture that made the field distrust the
+    //predicate and hand-revert it. MES0920 pattern : arm a wall-clock window on the
+    //first blocked cycle; if a full window elapses still blocked, snapshot the State
+    //Record FIRST (FeederDecision.txt carries every gate input + this arm's posture),
+    //then raise a Note naming the source module. The window re-arms only AFTER the
+    //alarm, so the Note repeats at most once per window, never every cycle. Cleared on
+    //gate pass / job reset (DoPick Flag==0) / InitialFlag; frozen across machine pause
+    //via PauseTimeoutTimers.
+    //AI(ht160s-rearready-p0) 20260705 : poll-continuity guard (ion-fan ION_FAN_SCAN_GAP_MS
+    //precedent). This is polled once per MainProc pass while blocked; a gap larger than
+    //the scan gap means the span was NOT blocked run-time -- a modal Note (possibly from
+    //the very module causing the block) froze MainProc, IO Set View suspended it, or the
+    //machine was stopped. Charging that span would pop a false MES1721 the moment the
+    //operator restarts. Re-arm instead : the alarm can only ever fire late, never early.
+    //(Makes the csystem Pause/ReStart freeze redundant-but-harmless for this timer.)
+    unsigned int uNow=GetTickCount();
+    bool bPollGap = (dwPickGateLastPollTick!=0 &&
+                     (uNow-dwPickGateLastPollTick)>(unsigned int)TRAYARM_PICK_GATE_SCAN_GAP_MS);
+    dwPickGateLastPollTick=uNow;
+    if(bPickWaitArmed==false || bPollGap)
+    {
+        PickWaitTimer.Clear();   //HTimer trap : On() does not reset Paused -- Clear() first
+        PickWaitTimer.SetMS(TRAYARM_PICK_GATE_ALARM_MS);
+        PickWaitTimer.On();
+        bPickWaitArmed=true;
+        return;
+    }
+    if(PickWaitTimer.Off()==false)
+        return;
+    bPickWaitArmed=false;
+    PickWaitTimer.Clear();
+    dwPickGateLastPollTick=0;
+    //AI(ht160s-rearready-p0) 20260705 : STOP FIRST, then snapshot. TriggerSnapshot does
+    //multi-second synchronous IO on this control thread (config-tree copy + SECS day log
+    //+ 7z, worst case ~60s in CompressFolder's WaitForSingleObject) -- running motors
+    //would be unsupervised for that whole span. Everything the snapshot captures is
+    //latched module state a decel stop does not disturb. ShowNoteAlarm repeats the stop
+    //(idempotent).
+    HSys.DecStopAllMotor();
+    HSys.Sys.SystemStart=false;
+    if(gStateRecord!=NULL)
+        gStateRecord->TriggerSnapshot("TrayArmPickBlocked_" + Source);
+    ShowMyError("MES1721", LangT("TrayArm pick blocked - rear source not ready") + " (" + Source + ")", K_RETRY);
 }
 //---------------------------------------------------------------------------
 bool TTrayArmModule::IsCleanOutFinish()
@@ -385,6 +520,9 @@ bool TTrayArmModule::DoPick(int Flag)
     {
         PickTask=1;
         ArmDelay.Clear();
+        PickWaitTimer.Clear();   //AI(ht160s-rearready-p0) 20260705 : new job = new watchdog window
+        bPickWaitArmed=false;
+        dwPickGateLastPollTick=0;
         return true;
     }
 
@@ -402,7 +540,10 @@ bool TTrayArmModule::DoPick(int Flag)
                     //the MoveEmptyY symmetric guard because we hold Z-UP (that guard only blocks EmptyY
                     //while TrayArm Z is DOWN at the Empty X).
                     if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
+                    {
+                        OnPickGateBlocked("Empty");   //AI(ht160s-rearready-p0) 20260705 : watchdog tick while blocked
                         break;
+                    }
                 }
                 if(Job==TAJOB_AMR_SUPPLY && IsPickFromColor()==false)
                 {
@@ -417,7 +558,10 @@ bool TTrayArmModule::DoPick(int Flag)
                     //excluded here : their readiness is Color's own bTrayReady latch. Deadlock-safe :
                     //we hold Z-UP and MoveEmptyY only blocks EmptyY while TrayArm Z is DOWN at Empty X.
                     if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
+                    {
+                        OnPickGateBlocked("Empty");   //AI(ht160s-rearready-p0) 20260705 : watchdog tick while blocked
                         break;
+                    }
                 }
                 if(Job==TAJOB_LOADER_RECOVERY)
                 {
@@ -429,8 +573,14 @@ bool TTrayArmModule::DoPick(int Flag)
                     //TrayArm Z is DOWN at the Loader X -- and this wait holds Z-UP, so the source Y
                     //is never blocked by the waiting arm.
                     if(LoaderModule!=NULL && LoaderModule->IsRearReadyForPick()==false)
+                    {
+                        OnPickGateBlocked("Loader");   //AI(ht160s-rearready-p0) 20260705 : watchdog tick while blocked
                         break;
+                    }
                 }
+                PickWaitTimer.Clear();   //AI(ht160s-rearready-p0) 20260705 : gate passed -- close the watchdog window
+                bPickWaitArmed=false;
+                dwPickGateLastPollTick=0;
                 PickTask=1000;
             }
             break;
@@ -874,6 +1024,9 @@ void TTrayArmModule::DoTrayArm(int &Task)
             if(Job==TAJOB_LOADER_RECOVERY && PickTask<1000 &&
                LoaderModule!=NULL && LoaderModule->IsRearHasTray()==false)
             {
+                PickWaitTimer.Clear();   //AI(ht160s-rearready-p0) 20260705 : abandoned wait -- disarm so a State Record never shows an armed watchdog on an idle arm (next dispatch's DoPick(0) would reset it anyway)
+                bPickWaitArmed=false;
+                dwPickGateLastPollTick=0;
                 Status=TAS_IDLE;
                 Job=TAJOB_NONE;
                 Task=100;

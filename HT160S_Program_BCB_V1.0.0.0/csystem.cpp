@@ -1256,6 +1256,8 @@ static void PauseActuatorTimeoutTimers()
 		EmptyModule->PauseTimeoutTimers();
 	if(AutoModule!=NULL)
 		AutoModule->PauseTimeoutTimers();
+	if(TrayArmModule!=NULL)
+		TrayArmModule->PauseTimeoutTimers();   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog window
 }
 //---------------------------------------------------------------------------
 static void ReStartActuatorTimeoutTimers()
@@ -1276,6 +1278,8 @@ static void ReStartActuatorTimeoutTimers()
 		EmptyModule->ReStartTimeoutTimers();
 	if(AutoModule!=NULL)
 		AutoModule->ReStartTimeoutTimers();
+	if(TrayArmModule!=NULL)
+		TrayArmModule->ReStartTimeoutTimers();   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog window
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260602 : ported HT172 0420 ProcessMotion lifecycle in

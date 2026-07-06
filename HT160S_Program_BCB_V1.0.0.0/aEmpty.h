@@ -37,6 +37,7 @@ private:
     bool bRearHasTray;
     bool bReturnTray;
     bool bRearReturnInProgress;   //AI(ht160s-trayarm-empty-handoff) 20260701 : DoGoUpTray active (carrier re-clamping/returning the rear tray); rear NOT pickable even if bRearHasTray still true
+    bool ComputeRearPickReadyNoRefresh();   //AI(ht160s-rearready-p0) 20260705 : the 4 pick-readiness gates WITHOUT sensor refresh -- single source of truth for IsRearReadyForPick() (refreshes first) and DescribeState() (must not refresh). Production code calls IsRearReadyForPick(), never this
     bool bTrayXToEmptyFinish;
     bool bLotFinish;
     TMyTray FrontSourceTray;  //AI(ht160s-tray-source) : FRONT staging holder only (rule #1); REAR tray lives on HSys.Mot.MEmptyY->Tray (parity with Loader, drives MotionView)

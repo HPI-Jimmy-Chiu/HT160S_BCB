@@ -15,6 +15,7 @@
 #include "aColor.h"           //AI(ht160s-state-record-analysis) 20260622 : ColorModule->DescribeState()
 #include "aEmpty.h"           //AI(ht160s-state-record-analysis) 20260622 : EmptyModule->DescribeState()
 #include "aLoader.h"          //AI(ht160s-state-record-analysis) 20260622 : LoaderModule->DescribeState()
+#include "aTrayArm.h"         //AI(ht160s-rearready-p0) 20260705 : TrayArmModule->DescribeState() + PickTask/Job export
 #include "uHGemEquipment.h"   //AI(ht160s-secsgem) 20260611 : HGem->FlushSecsLogToFile()
 #include "uAgvStation.h"      //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState() for the AMR handshake block in FeederDecision.txt
 #pragma package(smart_init)
@@ -625,6 +626,16 @@ void cStateRecordHT160::WriteMotionDetailIni(AnsiString Path)
     }
     Ini->WriteInteger("SortArm", "SafeZ", 10);   // SORT_ARM_SAFE_Z_POSITION (aSortArm.cpp)
 
+    // ---- [TrayArm] : sub-task readout (ht160s-rearready-p0 20260705; top-level
+    // DoTrayArm Task is only 1/10/100/1000/2000 -- the rear-ready gate wait lives in
+    // PickTask 1/10 and was invisible) ----
+    if(TrayArmModule!=NULL)
+    {
+        Ini->WriteInteger("TrayArm", "PickTask",  TrayArmModule->GetPickTask());
+        Ini->WriteInteger("TrayArm", "PlaceTask", TrayArmModule->GetPlaceTask());
+        Ini->WriteInteger("TrayArm", "Job",       TrayArmModule->GetJob());
+    }
+
     TTrayMotor *Zmot[4];
     Zmot[0]=HSys.Mot.MSuckZ_1; Zmot[1]=HSys.Mot.MSuckZ_2;
     Zmot[2]=HSys.Mot.MSuckZ_3; Zmot[3]=HSys.Mot.MSuckZ_4;
@@ -752,6 +763,16 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
         Out += LoaderModule->DescribeState();
     else
         Out += "[Loader] (module NULL)\r\n";
+    Out += "------------------------------------------------------------\r\n";
+
+    //AI(ht160s-rearready-p0) 20260705 : TrayArm block (report 5.2) -- the consumer of
+    //every rear-ready gate above. PickTask 1/10 + Job here, against the producer
+    //latches above, is what arbitrates "arm waiting on a gate" vs "arm idle / never
+    //dispatched" offline.
+    if(TrayArmModule!=NULL)
+        Out += TrayArmModule->DescribeState();
+    else
+        Out += "[TrayArm] (module NULL)\r\n";
 
     //AI(ht160s-agv) 20260625 : AMR coordinator handshake block. Lets offline analysis
     //distinguish a PREP-stall vs a READY-stall vs a link drop (per-station lock +

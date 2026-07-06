@@ -31,8 +31,8 @@
 |---|---|---|---|---|---|---|
 | A | **Empty/Color CleanOut 完成判定**：即時運算 vs 旗標鎖存 | `IsCleanOutFinish()` 整段註解、改 `return bCleanOutFinish`（在 DoEmpty/DoColor 內鎖存） | 每次即時運算：TrayArm 完成 + 感測器無盤 + AMR 交接就緒 | **合併**（保留感測器/交接把關，OR 進 TrayArm-finish 鎖存）；不盲抄不盲棄 | 高 | 實機 CleanOut 是否曾「跑不完/收不了尾」？（懷疑 `RefreshStateFromSensors`/`IsReadyForAmrHandoff` 在 KYEC 機恆為 false） |
 | B | **TrayArm↔進料防撞** (`status` 互鎖) | 進料中(`status==1`)時 TrayArm place case500 先 `break` 等待 | 無此互鎖 | **採用（需整清）**：這是真的防「盤疊盤」新硬化 | 中 | 實機是否出現過 TrayArm 在 Empty/Color 抬盤/進料時就下手放盤而撞盤？ |
-| C | **TrayArm 取 Empty 後盤就緒判定**：退回 magic-70000 | 改回 `emptypos>70000 && (LeanOn||Push).IsOn()`，`IsRearReadyForPick()` 註解 | `IsRearReadyForPick()`（producer 擁有的就緒述詞，`8548420` 導入） | **需你裁決**（優先釐清）：若述詞在實機誤判就採現場 | 高 | 實機 `IsRearReadyForPick()` 是否讓 TrayArm「太早取/不等」？ |
-| D | **TrayArm 取 Loader 後盤**：加 `LS_ToRear` 閘 | Loader 側正移往後(`LS_ToRear`)時 TrayArm 先 `break` | 只有 `IsRearReadyForPick()` | **採用**：加成式互鎖，可對現行 repo 編譯 | 低-中 | （確認即可，屬合理硬化） |
+| C | **TrayArm 取 Empty 後盤就緒判定**：退回 magic-70000 | 改回 `emptypos>70000 && (LeanOn||Push).IsOn()`，`IsRearReadyForPick()` 註解 | `IsRearReadyForPick()`（producer 擁有的就緒述詞，`8548420` 導入） | **已結案（2026-07-05，root-caused + superseded）**：誤判屬實，但誤判的是舊 `8548420` 版（`RefreshStateFromSensors` raw re-latch，車落位夾缸未放即回報 ready）；已由 `564154c`/`e7c0966`/`038d5bc`/`403e8e3`/`eec9ca9` 以狀態閘+latch 生命週期重寫修復。現場 magic-70000 手改**不採**（回程 pos≤70000 完全不擋、AMR 路徑無閘、re-teach 失效、reed 卡死無聲停機）。詳 `docs/plan/isrearready-itemc-deep-analysis-20260705.md` | 高→已收斂 | 上機驗證（分析報告 §6 八步清單） |
+| D | **TrayArm 取 Loader 後盤**：加 `LS_ToRear` 閘 | Loader 側正移往後(`LS_ToRear`)時 TrayArm 先 `break` | `IsRearReadyForPick()`（`038d5bc` 起讀發佈式 `bRearReadyForPick` latch） | **否決（2026-07-05 於 HEAD 再驗證，維持 e7c0966 結論）**：`ReleaseSortOwner` 在 discharge 未 armed 前即設 `LS_ToRear`，排空側會停在 `LS_ToRear` 等 TrayArm 清後方——現場閘擋掉的正是唯一解鎖者→互等死結；其防撞意圖已由 latch（case100 re-arm→case4000 發佈）完整承接。**勿再移植此閘** | — | （結案，勿採） |
 | E | **Loader CleanOut 收尾/缺料 + MES0922** | ① 關掉 MES0922「前殘料」告警 ② finish 加 `bLoaderhastray==false` ③ CleanOut 缺料改走 `FeedTask=9500` | `321dae9`/`8bb7e63` 的殘料告警 + phase-aware finish | **需你裁決**：MES0922 疑似實機誤報；②③可能才是正解 | 高 | 實機 MES0922 是否在沒有殘料時誤跳、擋住 CleanOut？ |
 | F | **TrayArm `bCleanOutFinish` 初值** true→false | 初值改 false，但**全檔沒有任何地方再設回 true**（只有註解 TODO） | 初值 true | **暫留 repo**（現場此項未完成） | 中 | 實機開機是否曾出現「一開機就報 cleanout 已完成」的假象？ |
 | — | `MachineType.h` `SOFT_SIMULATE` | 實機關閉 | 開發開啟 | **不整併**（刻意差異） | — | — |
@@ -61,12 +61,16 @@
 - **建議**：`採用但整清`——把 `status` 語意統一為「進料進行中」旗標、修 NULL 檢查順序、Empty/Color/TrayArm 一起改。
 
 ### 議題 C — TrayArm 取 Empty 就緒判定退回 magic-70000（`aTrayArm`）
+
+> **狀態更新 2026-07-05：已結案。** 深度分析（`docs/plan/isrearready-itemc-deep-analysis-20260705.md`）以 git 三重證據確認：現場撞機時跑的是舊 `8548420` 版述詞（`RefreshStateFromSensors` raw re-latch），KYEC 機**從未跑過** 07-03 之後的狀態閘重寫版；現行 repo 版在所有可達狀態嚴格優於現場 magic-70000 閘（該閘在 pos≤70000 回程運送段完全不擋）。P0 兩洞（Loader post-reset 死結、stale-TRUE latch）已於 `eec9ca9` 修復。以下原始分析保留作歷史紀錄。
 - **現場做了什麼**：`DoPick` case1/10、`Job==TAJOB_EMPTYTRAY_TO_AUTO` 分支，把 `if(EmptyModule->IsRearReadyForPick()==false) break;` **註解掉**，改回 `if(emptypos>70000 && (C_Empty_LeanOnTray.IsOn()||C_Empty_PushTray.IsOn())) break;`。
 - **意義**：這是**直接退回 `8548420`**。現場八成發現 `IsRearReadyForPick()` 在實機誤判（TrayArm 太早取 / 不等），退回已知可動的具體 encoder+缸況判斷。
 - **注意**：`IsRearReadyForPick()` 現在是跨模組的就緒「契約」（Loader 側 recovery 也用它），只在 Empty 這條退回會造成兩套判定並存不一致。
 - **建議**：`需裁決（優先）`。請先釐清 `IsRearReadyForPick()` 在實機的實際誤判情形——若屬實，應把述詞本身修對（或在 Empty 這條採現場判斷並同步檢視 Loader 側）。
 
 ### 議題 D — TrayArm 取 Loader 加 `LS_ToRear` 閘（`aTrayArm`）
+
+> **狀態更新 2026-07-05：否決（勿採）。** e7c0966 的否決理由在 HEAD 重新驗證仍成立：`ReleaseSortOwner` 於任何批次釋放時設 `LS_ToRear`（aLoader.cpp:681 附近），`DoLoader` case 3000 讓排空側在後方被佔時停在 `LS_ToRear` 等 TrayArm 清後方——現場加的閘擋掉的正是唯一能解鎖它的 actor，形成互等死結。其防撞意圖已由 `bRearReadyForPick` latch（case 100 re-arm → case 4000 發佈，`038d5bc`/`eec9ca9`）完整承接。下方原「建議採用」文字作廢，保留作歷史紀錄。
 - **現場做了什麼**：`Job==TAJOB_LOADER_RECOVERY` 分支，在 `IsRearReadyForPick()` 之後**再加** `if(LoaderModule->GetLoaderStatus(0)==LS_ToRear || GetLoaderStatus(1)==LS_ToRear) break;`。
 - **意義**：加成式互鎖——Loader 某側正移往後時，TrayArm 不要去取 Loader 後盤，防對撞/早取。`GetLoaderStatus`/`LS_ToRear` 於現行 repo `aLoader.cpp` 已存在，**可直接編譯**。
 - **建議**：`採用`（低-中風險，合理硬化）。

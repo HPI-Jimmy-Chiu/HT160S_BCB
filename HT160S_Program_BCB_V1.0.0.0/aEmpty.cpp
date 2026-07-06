@@ -985,9 +985,12 @@ bool TEmptyModule::IsCleanOutFinish()
 //  3) both transport clamps are physically RELEASED (out-bits off).
 //This replaces the on-site emptypos>70000 encoder workaround with the same protection
 //expressed in states + cylinder confirmation.
-bool TEmptyModule::IsRearReadyForPick()
+//AI(ht160s-rearready-p0) 20260705 : the 4 readiness gates WITHOUT the sensor refresh --
+//the single source of truth shared by IsRearReadyForPick() (which refreshes first) and
+//DescribeState() (dump path must not refresh). Edit gates HERE ONLY : a hand-inlined
+//copy in the dump already drifted from this predicate once this week -- never again.
+bool TEmptyModule::ComputeRearPickReadyNoRefresh()
 {
-    RefreshStateFromSensors();
     //AI(ht160s-status) 20260703 : status BUSY gate. Deliberately negative-form (block while
     //a ladder actively owns the rear), NOT a positive Status==ES_REAR_READY requirement :
     //after a HOME the sensor re-latches a physically-present rear tray while InitialFlag
@@ -1002,6 +1005,12 @@ bool TEmptyModule::IsRearReadyForPick()
     if(HSys.Cyn.C_Empty_LeanOnTray.GetOutBit() || HSys.Cyn.C_Empty_PushTray.GetOutBit())
         return false;   //transport clamps still actuated : the carrier still owns the tray
     return true;
+}
+//---------------------------------------------------------------------------
+bool TEmptyModule::IsRearReadyForPick()
+{
+    RefreshStateFromSensors();
+    return ComputeRearPickReadyNoRefresh();
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::IsReturnTrayRequested()
@@ -1084,6 +1093,16 @@ AnsiString TEmptyModule::DescribeState()
     s += "  FeedTask=" + IntToStr(FeedTask)
        + "  GoDownTask=" + IntToStr(GoDownTask)
        + "  GoUpTask=" + IntToStr(GoUpTask) + "\r\n";
+    //AI(ht160s-rearready-p0) 20260705 : rear-pick observability (report 5.2). Latched
+    //members + commanded out-bits only -- do NOT call IsRearReadyForPick() here (it
+    //refreshes sensors inside the dump path). RearPickReady comes from the SAME
+    //no-refresh helper the predicate uses (single source of truth, no silent drift), so
+    //a State Record can arbitrate "early pick" vs "stale block" and show WHICH gate
+    //input disagreed (the diagnosability gap behind the onsite hand-revert).
+    s += "  bRearReturnInProgress=" + IntToStr(bRearReturnInProgress ? 1 : 0)
+       + "  RearLeanOut=" + IntToStr(HSys.Cyn.C_Empty_LeanOnTray.GetOutBit() ? 1 : 0)
+       + "  RearPushOut=" + IntToStr(HSys.Cyn.C_Empty_PushTray.GetOutBit() ? 1 : 0)
+       + "  RearPickReady=" + IntToStr(ComputeRearPickReadyNoRefresh() ? 1 : 0) + "\r\n";
     //AI(ht160s-agv) 20260625 : expose the CEID273 READY gate so a State Record shows
     //whether the AMR handoff can ever clear the lock (ReadyForAmr) and the raw front
     //destack cylinder out-bits that gate it (real-machine path).

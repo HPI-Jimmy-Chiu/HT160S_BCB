@@ -68,6 +68,9 @@ private:
     int PlaceDest;                     //AI(HT160S-Maintainer) 20260606 : eTrayArmPlaceDest for the current carry
     bool bCleanOutFinish;
     HTimer ArmDelay;
+    HTimer PickWaitTimer;              //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog window (DoPick gate 1/10). NOT ArmDelay -- that is the clamp-settle dwell, re-armed mid-job via SetMS+On without Clear
+    bool bPickWaitArmed;               //AI(ht160s-rearready-p0) 20260705 : watchdog armed latch (MES0920-style : at most one Note per full window)
+    unsigned int dwPickGateLastPollTick;   //AI(ht160s-rearready-p0) 20260705 : GetTickCount of the last blocked poll; a gap > scan-gap means MainProc was suspended (modal Note / IO Set View) or the machine was stopped -- re-arm the window instead of charging that span (ion-fan precedent)
     unsigned int dwZUpLostStart;       //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce (GetTickCount of first loss; 0=clear)
 
     bool IsSoftSimulate();
@@ -85,6 +88,7 @@ private:
     int GetAutoX(int Index);
     int GetColorX();                   //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup X
     bool IsPickFromColor();            //AI(HT160S-Maintainer) 20260605 : this job picks from Color (identity)
+    void OnPickGateBlocked(AnsiString Source);   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog tick (arm window / raise MES1721 on expiry)
     //AI(ht160s-trayarm-teach-test) 20260627 : shared physical motion primitives. Production
     //(DoPick/DoPlace/DoPlaceToEmpty/DoPlaceToColor) AND the Teach Advanced test compose these,
     //so the grab/release choreography lives in ONE place (single source of truth).
@@ -105,6 +109,16 @@ public:
     //move/jog on the SAME Z-up interlock as production (mirrors public SortArm AreAllSuckersHome).
     //Pure sensor read, no side effects; returns true under SOFT_SIMULATE (dev build, no IO card).
     bool IsZUpAtPosition();            //canonical TrayArm X-move interlock (Z lift up-sensor lit)
+    //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog freeze/thaw (csystem
+    //Pause/ReStartActuatorTimeoutTimers edges) + state-record exports for
+    //FeederDecision.txt / MotionDetail.ini (Loader DescribeState / SortArm GetPickTask
+    //precedents) -- the arm was previously invisible in a State Record.
+    void PauseTimeoutTimers();
+    void ReStartTimeoutTimers();
+    AnsiString DescribeState();
+    int GetPickTask();
+    int GetPlaceTask();
+    int GetJob();
     //AI(ht160s-trayarm-teach-test) 20260627 : Teach Advanced TrayArm test entry points. Pure
     //motion dry-run (NO peer-module tray-tracking mutation), task-stepped by the caller like
     //SortArm MoveSuckerToCell : caller inits Task=1 then calls each tick until it returns true.
