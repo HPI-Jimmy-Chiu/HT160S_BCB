@@ -38,6 +38,14 @@ static int ClampIntValue(int Value, int MinValue, int MaxValue)
 //---------------------------------------------------------------------------
 TLoaderModule::TLoaderModule()
 {
+    //AI(ht160s-rearready-p0) 20260705 : hard-zero the rear hold BEFORE InitialFlag --
+    //InitialFlag now preserves a sensor-confirmed settled rear tray across runtime
+    //resets, and must never "preserve" uninitialized ctor garbage on this first call.
+    bRearHasTray=false;
+    bRearDischargeInProgress=false;
+    bRearReadyForPick=false;
+    bRearResidualAlarmed=false;
+    RearKind=eTrayKindNormal;
     InitialFlag();
 }
 //---------------------------------------------------------------------------
@@ -58,18 +66,36 @@ void TLoaderModule::InitialFlag()
     RefillSimInfeed();
     ResetSide(&Side[0]);
     ResetSide(&Side[1]);
-    bRearHasTray=false;
-    bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no discharge settling in flight at init
-    bRearReadyForPick=false;          //AI(ht160s-rearready-state) 20260703 : rear not pickable until a discharge completes at case 4000
+    //AI(ht160s-rearready-p0) 20260705 : PRESERVE a settled rear tray across a runtime
+    //reset (InitialAllTask on HOME / OneCycle finish / recovery). Wiping the published
+    //latch while the tray physically stayed parked let the rear sensor re-latch
+    //bRearHasTray with NO path back to bRearReadyForPick=true (its only setter is
+    //DoDischargeTray case 4000, and a new discharge cannot start while the rear is
+    //occupied) -> TAJOB_LOADER_RECOVERY pinned the TrayArm forever with no alarm.
+    //Keep the whole rear hold (latch + Kind/ID/grid) when the settled tray is still
+    //physically confirmed. A mid-discharge abort (latch still false) deliberately does
+    //NOT preserve : that leftover is not known-safe to auto-pick, so it goes to the
+    //MES0924 residual Note in DoLoader instead (operator removes it).
+    bool bKeepRear = bRearReadyForPick && IsOutputBottomOccupied();
+    if(bKeepRear==false)
+    {
+        bRearHasTray=false;
+        bRearReadyForPick=false;      //AI(ht160s-rearready-state) 20260703 : rear not pickable until a discharge completes at case 4000
+        RearKind=eTrayKindNormal;
+        RearTrayID="";
+        RearSourceTray.Clear();
+    }
+    bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no discharge settling in flight at init (all ladders reset to 1)
+    bRearResidualAlarmed=false;       //AI(ht160s-rearready-p0) 20260705 : a new stranded episode after a reset may alarm again
     iFrontOwner=0;
     iTopCcdCount=0;
     iYOwner[0]=LOADER_Y_OWNER_NONE;
     iYOwner[1]=LOADER_Y_OWNER_NONE;
     SimuCcdCycleIndex=0;
     iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - reset feed counter
-    RearKind=eTrayKindNormal;
-    RearTrayID="";
-    RearSourceTray.Clear();
+    //AI(ht160s-rearready-p0) 20260705 : RearKind/RearTrayID/RearSourceTray moved into
+    //the bKeepRear guard above -- wiping them while the tray stays parked would
+    //misroute a preserved cover/identity tray as Normal.
     CurrentLotNumber="";
     TestUpTask=1;
     TestDownTask=1;
@@ -569,7 +595,21 @@ void TLoaderModule::RefreshRearState()
     }
 
     if(bHasRearSensor)
+    {
         bRearHasTray=bSensorState;
+        if(bSensorState==false)
+        {
+            //AI(ht160s-rearready-p0) 20260705 : no tray = not pickable, ever. Clears a
+            //stale TRUE latch left by a hand-removed tray (NotifyTrayArmPickRearTray
+            //never ran) so the published state always matches the physical rear -- a
+            //stale TRUE would otherwise satisfy IsRearReadyForPick through the NEXT
+            //discharge's landing window (case 1000, clamps still ON). The case-100
+            //re-arm in DoDischargeTray is the primary guard; this is the belt. The
+            //empty rear also re-arms the MES0924 residual Note for a fresh episode.
+            bRearReadyForPick=false;
+            bRearResidualAlarmed=false;
+        }
+    }
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsRearOccupied()
@@ -983,6 +1023,30 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         TrayMotor=HSys.VMot.MMLoaderY_2;
     if(TrayMotor==NULL)
         return;
+
+    //AI(ht160s-rearready-p0) 20260705 : rear-leftover watchdog (Loader mirror of Color
+    //MES1426). A rear tray with NO published readiness and NO discharge in flight can
+    //never become pickable -- bRearReadyForPick's only setter is DoDischargeTray case
+    //4000 and a new discharge cannot start while the rear is occupied -- yet the rear
+    //sensor keeps re-latching bRearHasTray, so TAJOB_LOADER_RECOVERY pins the TrayArm
+    //with no alarm (silent starvation). Reached only when InitialFlag could NOT
+    //preserve the rear hold (cold start over a leftover tray / mid-discharge abort) :
+    //the tray's Kind/ID are unknown then, so auto-collecting risks misrouting a
+    //cover/identity tray into the normal pool -- require operator removal (unlike the
+    //RETIRED front MES0922, which has the case-9500 self-collect path). Sensor-aware
+    //overload prints the IO name; fires once per episode (bRearResidualAlarmed),
+    //re-armed on the sensor-empty edge / reset. LoaderNo==1 = evaluate once per cycle.
+    if(LoaderNo==1 &&
+       HSys.LastSet.iRealDummy!=DUMMY &&
+       bRearResidualAlarmed==false &&
+       bRearDischargeInProgress==false &&
+       bRearReadyForPick==false &&
+       IsRearOccupied())
+    {
+        bRearResidualAlarmed=true;
+        ShowMyError("MES0924", LangT("Loader rear has a leftover tray - please remove it"),
+                    &HSys.Sen.SnLoader_OutputBottomHasTray, false, K_RETRY);
+    }
 
     //AI(cleanout) 20260703 : the MES0922 front-residual manual-removal alarm that lived here is
     //GONE (user design : the machine collects every tray itself). A front tray stranded after
@@ -1759,6 +1823,18 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 100:
             if(IsRearOccupied())
                 return false;
+            //AI(ht160s-rearready-p0) 20260705 : commit point -- the carriage is about to
+            //move rear-ward with the tray. Arm the in-flight flag and kill any stale
+            //ready latch HERE, not at case 2000 : on a REALLY machine the rear sensor
+            //re-latches bRearHasTray the moment the carriage LANDS at case 1000 --
+            //BEFORE case 2000 runs -- so a latch left TRUE (hand-removed tray, Notify
+            //never ran) would satisfy IsRearReadyForPick through the landing window
+            //(clamps still ON = the on-machine early-pick interference class). Arming
+            //bRearDischargeInProgress here also lets the DoLoader rear-residual check
+            //tell "discharge in flight" from "stranded leftover" without peeking at
+            //DischargeTask step numbers.
+            bRearDischargeInProgress=true;
+            bRearReadyForPick=false;
             Task=1000;
             break;
 
@@ -1783,9 +1859,7 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 2000:
             if(PushCylinder->Pop() || IsSoftSimulate())
             {
-                bRearHasTray=true;
-                bRearDischargeInProgress=true;   //AI(ht160s-trayarm-empty-handoff) 20260701 : carriage still at discharge Y, Lean release (case 3000) + retreat (case 4000) pending; block TrayArm pick
-                bRearReadyForPick=false;   //AI(ht160s-rearready-state) 20260703 : discharge started -- rear not pickable until case 4000 success
+                bRearHasTray=true;   //AI(ht160s-rearready-p0) 20260705 : landing latch for sim/DUMMY (a REALLY machine re-latches this from the rear sensor at case-1000 landing); the in-flight + ready flags are armed earlier, at the case-100 commit
                 Task=3000;
             }
             break;
@@ -1985,6 +2059,7 @@ AnsiString TLoaderModule::DescribeState()
     s += "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
        + "  bRearDischargeInProgress=" + IntToStr(bRearDischargeInProgress ? 1 : 0)
        + "  bRearReadyForPick=" + IntToStr(bRearReadyForPick ? 1 : 0)
+       + "  bRearResidualAlarmed=" + IntToStr(bRearResidualAlarmed ? 1 : 0)   //AI(ht160s-rearready-p0) 20260705 : MES0924 once-latch
        //AI(ht160s-rearready-state) 20260703 : verdict now reads the published latch (single source
        //of truth with IsRearReadyForPick). Do NOT call IsRearReadyForPick() here -- it would refresh
        //sensors inside the state-record dump path; bRearHasTray && bRearReadyForPick mirrors it.

@@ -42,8 +42,9 @@ class TLoaderModule
 private:
     TLoaderSideState Side[2];
     bool bRearHasTray;
-    bool bRearDischargeInProgress;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-deposit not yet settled -- carriage still at discharge Y + clamps releasing (DoDischargeTray case 2000..4000); rear NOT pickable yet even though bRearHasTray is set
-    bool bRearReadyForPick;          //AI(ht160s-rearready-state) 20260703 : producer-published rear pickable latch. Set ONLY at DoDischargeTray case 4000 success; cleared on pick / re-armed at discharge start. IsRearReadyForPick() reads THIS, not Side[].DischargeTask (removes step-range coupling + the <=4000 terminal off-by-one strand).
+    bool bRearDischargeInProgress;   //AI(ht160s-trayarm-empty-handoff) 20260701 : discharge in flight -- carriage committed rear-ward / at discharge Y + clamps releasing (DoDischargeTray case 100..4000; armed at the case-100 commit since 20260705); rear NOT pickable yet even though bRearHasTray may already be set
+    bool bRearReadyForPick;          //AI(ht160s-rearready-state) 20260703 : producer-published rear pickable latch. Set ONLY at DoDischargeTray case 4000 success; cleared on pick / re-armed at the case-100 discharge commit / force-cleared on the rear-sensor-empty edge (RefreshRearState); PRESERVED across InitialFlag when sensor-confirmed settled (ht160s-rearready-p0 20260705). IsRearReadyForPick() reads THIS, not Side[].DischargeTask (removes step-range coupling + the <=4000 terminal off-by-one strand).
+    bool bRearResidualAlarmed;       //AI(ht160s-rearready-p0) 20260705 : once-per-episode latch for the MES0924 rear-leftover Note (DoLoader); re-armed when the rear sensor reads empty (RefreshRearState) or on reset
     int iFrontOwner;
     int iTopCcdCount;
     int iYOwner[2];

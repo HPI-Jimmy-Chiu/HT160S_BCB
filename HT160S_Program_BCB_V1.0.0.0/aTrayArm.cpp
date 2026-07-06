@@ -422,11 +422,12 @@ bool TTrayArmModule::DoPick(int Flag)
                 if(Job==TAJOB_LOADER_RECOVERY)
                 {
                     //AI(ht160s-trayarm-empty-handoff) 20260701 : same Z-UP-wait gate for the Loader
-                    //rear pick. bRearHasTray latches at DoDischargeTray case 2000 while the discharge
-                    //carriage is still at discharge Y and clamps are releasing; IsRearReadyForPick()
-                    //holds until the carriage has retreated to feed (case 4000). MoveLoaderY has NO
-                    //TrayArm anti-collision guard, so this cannot mutually deadlock (source Y is never
-                    //blocked by the waiting arm).
+                    //rear pick. bRearHasTray latches while the discharge carriage is still at
+                    //discharge Y and clamps are releasing; IsRearReadyForPick() holds until the
+                    //carriage has retreated to feed (case 4000). Deadlock-safe : MoveLoaderY's
+                    //TrayArm guard (added 20260701) is Z-gated -- it only blocks Loader Y while the
+                    //TrayArm Z is DOWN at the Loader X -- and this wait holds Z-UP, so the source Y
+                    //is never blocked by the waiting arm.
                     if(LoaderModule!=NULL && LoaderModule->IsRearReadyForPick()==false)
                         break;
                 }
@@ -452,6 +453,13 @@ bool TTrayArmModule::DoPick(int Flag)
                 {
                     if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.CopyFrom(LoaderModule->GetRearSourceTray());
                     iDeliverTrayID=LoaderModule->GetRearTrayID();
+                    //AI(ht160s-rearready-p0) 20260705 : re-read the KIND at pick time too.
+                    //DecideJob latched iDeliverKind at dispatch; a job pinned at the pick
+                    //gate can resume on a LATER discharged tray (e.g. after the MES0924
+                    //leftover was removed and production continued), and routing that
+                    //tray by the stale kind would send an identity tray to Empty/Auto
+                    //instead of back to Color.
+                    iDeliverKind=(int)LoaderModule->GetRearTrayKind();
                     LoaderModule->NotifyTrayArmPickRearTray();
                 }
             }
@@ -851,6 +859,26 @@ void TTrayArmModule::DoTrayArm(int &Task)
             break;
 
         case 1000:
+            //AI(ht160s-rearready-p0) 20260705 : abandon a Loader-recovery job whose
+            //source was emptied while the arm still waits at the pick gate (PickTask
+            //1/10, Z-UP, nothing grabbed yet). This is the MES0924 remedy path : the
+            //operator removed the un-preservable leftover, so there is nothing to
+            //recover -- without this the job stays latched (DecideJob is only re-run
+            //from Task 100), the arm stays pinned here until the NEXT discharge, and
+            //in Run_CleanOut (no next discharge ever comes) the cascade hangs silently
+            //until a full HOME. Gate on PickTask<1000 : once the physical grab ladder
+            //started, the tray leaves the rear through case 4000's own handoff, so a
+            //sensor-empty read past that point is the pick itself, not a removal. A
+            //transient sensor flicker only churns : DecideJob re-reads the sensor next
+            //tick and re-dispatches, and DoPick re-enters through the same Z-safe move.
+            if(Job==TAJOB_LOADER_RECOVERY && PickTask<1000 &&
+               LoaderModule!=NULL && LoaderModule->IsRearHasTray()==false)
+            {
+                Status=TAS_IDLE;
+                Job=TAJOB_NONE;
+                Task=100;
+                break;
+            }
             if(DoPick(1))
             {
                 Status=TAS_CARRYING;

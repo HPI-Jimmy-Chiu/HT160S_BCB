@@ -49,8 +49,11 @@ void TDataModule1::InitialAllTask(bool bKeepMaterial)
         EmptyModule->InitialFlag();
     //AI(HT160S-Maintainer) 20260612 : on a recoverable full-machine home (bKeepMaterial)
     //the arms that physically still hold material keep their material memory so production
-    //can resume without dropping/misrouting. Loader/Empty/Color hold no in-hand IC/tray
-    //identity that would be lost, so they always do a full reset.
+    //can resume without dropping/misrouting. Loader/Empty/Color take no bKeepMaterial
+    //flag; but note Loader's own InitialFlag preserves a sensor-confirmed settled rear
+    //tray (latch + Kind/ID) independent of bKeepMaterial (gated only on its own
+    //bRearReadyForPick + rear sensor) -- see aLoader.cpp (ht160s-rearready-p0); wiping
+    //it stranded the tray with no path back to pickable (TrayArm pinned, no alarm).
     if(AutoModule!=NULL)
         AutoModule->InitialFlag(bKeepMaterial);
     if(TrayArmModule!=NULL)
@@ -941,16 +944,23 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
         //case-9500 mint path, Auto rear-collects via DoAllAutoCleanOut case 500). In their
         //place : MES1023/MES1427 = Empty/Color supply-stack-FULL holds during the CleanOut
         //drain (GoUp paused until the operator empties the stack; Full sensor gates finish).
-        const char *SeedCode[16]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
+        //AI(ht160s-rearready-p0) 20260705 : MES0924 = Loader REAR leftover (mirror of Color
+        //MES1426). Unlike the retired front MES0922 there is NO self-collect path : the
+        //tray's Kind/ID are unknown after a cold start / mid-discharge abort, so auto-
+        //collecting could misroute a cover/identity tray; the operator removes it instead.
+        const char *SeedCode[17]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
                                   "MES1021","MES1022","MES1023","MES1024","JAM1030",
-                                  "MES1421","MES1422","MES1424","MES1426","MES1427","WAR0154"};
-        const int   SeedType[16]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
+                                  "MES1421","MES1422","MES1424","MES1426","MES1427","WAR0154",
+                                  "MES0924"};
+        const int   SeedType[17]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
                                   eMessageErr,eMessageErr,eMessageErr,eMessageErr,eJamErr,
-                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther};
-        const char *SeedMsg[16]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther,
+                                  eMessageErr};
+        const char *SeedMsg[17]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
                                  "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Empty supply stack full (sensor)","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
-                                 "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Color supply stack full (sensor)","Sorting Arm X motor will out of limit"};
-        for(int si=0; si<16; si++)
+                                 "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Color supply stack full (sensor)","Sorting Arm X motor will out of limit",
+                                 "Loader rear has a leftover tray"};
+        for(int si=0; si<17; si++)
         {
             AnsiString cd=SeedCode[si], mg=SeedMsg[si];
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");
