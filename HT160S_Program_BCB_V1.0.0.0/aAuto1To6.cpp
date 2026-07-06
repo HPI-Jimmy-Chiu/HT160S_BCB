@@ -93,6 +93,7 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         State[Index].bCleanOutFinish=false;
         State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : clear place-residue gate on home/init
         bCleanOutCheck[Index]=false;
+        bCleanOutResidualLogged[Index]=false;   //AI(cleanout) 20260706 : new episode, allow one residual log again
         bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
         //AI(ht160s-agv) 20260627 : reset the Auto-full AMR-wait safety net (before the
         //bKeepMaterial early-out so a recoverable home also drops the wait/hold, otherwise
@@ -443,6 +444,17 @@ void TAutoModule::SetRearHasTrayFromTrayArm(int Index, bool bHasTray)
     State[Index].bRearHasTray=bHasTray;
     State[Index].bRearCanUse=bHasTray;
     bRearDeliveredPending[Index]=bHasTray;  //AI(general) 20260608 : Stage0 latch
+    //AI(cleanout) 20260706 : late-delivery self-heal. A tray delivered to this Auto rear AFTER
+    //the station latched drain-done (Auto pumps before TrayArm, so a place can land one tick
+    //after DoAllAutoCleanOut case 7000) would wedge IsAllCleanOutFinish() forever (it blocks on
+    //bRearHasTray / bRearDeliveredPending) while DoAuto short-circuits on the latch, so the
+    //case-7000 re-collect never re-runs. Drop this station's drain latch so the drain ladder
+    //re-collects the late tray (self-heal) - also covers the rear-sensor-disabled silent case.
+    if(bHasTray && HSys.Sys.RunMode==Run_CleanOut)
+    {
+        State[Index].bCleanOutFinish=false;
+        bCleanOutResidualLogged[Index]=false;
+    }
     if(bHasTray)
         State[Index].Status=AS_REAR_STAGED;  //AI(ht160s-status) 20260703 : Normal-mode delivery
     else if(State[Index].Status==AS_REAR_STAGED)
@@ -933,12 +945,100 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
     return false;
 }
 //---------------------------------------------------------------------------
-bool TAutoModule::IsAllCleanOutFinish()
+//AI(cleanout) 20260706 : pure per-station drain latch. bCleanOutFinish is set in
+//DoAllAutoCleanOut case 7000 (the drain ladder ran to completion). Used ONLY as the DoAuto
+//stop-gate : once every station has drained, stop pumping the GoUp ladder. Kept latch-based
+//on purpose so a lingering/flickering rear sensor cannot restart the whole ladder (thrash) -
+//a physically stuck tray is handled by the residual watchdog + the live finish predicate.
+bool TAutoModule::AllStationsDrainLatched()
 {
     for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
         if(State[Index].bCleanOutFinish==false)
             return false;
     return true;
+}
+//---------------------------------------------------------------------------
+//AI(cleanout) 20260706 : LIVE clean-out finish predicate (was : return the pure latch loop,
+//which could report finished with a tray still physically on a station because case 7000
+//clears the software flags and latches true in the SAME block, with no sensor re-check).
+//This is what csystem CheckCleanOutFinish + TrayArm consult; it re-computes every call so a
+//tray that reappears mid-cleanout cancels finish. Conditions (cheap/upstream first) :
+//  (1) upstream SortArm live-finished (Auto <- SortArm <- Loader ; no cycle) - was only
+//      gated at DoAuto case 100 ENTRY, never re-checked once the latch was set.
+//  (2) the drain ladder actually reached case 7000 (AllStationsDrainLatched).
+//  (3) per-station : no software/virtual residual (both sim + real, mirrors Loader).
+//  (4) per-station REAL-machine sensor re-check + Full gate (sim early-out mirrors
+//      RefreshAutoState so a laptop with InType=0 phantom-present sensors still completes).
+//NOTE : NO FeedTask/DischargeTask/CleanOutTask idle-gate here. Unlike Empty/Color, Auto's
+//drain is a SEPARATE ladder (CleanOutTask) whose cursors legitimately rest at non-1 values
+//after completion (CleanOutTask stays 7000 ; the rear-collect leaves FeedTask at 100/7000 -
+//DoFeedTray only resets to 1 via Flag==0 at the NEXT cycle start). AllStationsDrainLatched
+//is the correct "drain fully ran" proof for Auto; a FeedTask==1 gate would false-block forever.
+bool TAutoModule::IsAllCleanOutFinish()
+{
+    if(HSys.Sys.RunMode!=Run_CleanOut)
+        return AllStationsDrainLatched();
+    if(SortArmModule==NULL || SortArmModule->IsCleanOutFinish()==false)
+        return false;
+    if(AllStationsDrainLatched()==false)
+        return false;
+    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+    {
+        if(State[Index].bRearHasTray || State[Index].bRearCanUse || bRearDeliveredPending[Index])
+            return false;
+        if(State[Index].bCarHasTray || State[Index].bFrontHasTray || State[Index].bFullIC)
+            return false;
+        TTrayMotor *VMot=GetAutoVMotor(Index);
+        if(VMot!=NULL && VMot->fHasTray)
+            return false;
+        if(IsSoftSimulate()==false)
+        {
+            TMySensor *Front=GetInputHasTray(Index);
+            if(Front!=NULL && Front->Enable==true && Front->IsOn())
+                return false;   //residual tray at this Auto front feed position
+            TMySensor *Full=GetInputFullTray(Index);
+            if(Full!=NULL && Full->Enable==true && Full->IsOn())
+                return false;   //output stack still holds trays
+            TMySensor *Rear=GetOutputBottomHasTray(Index);
+            if(Rear!=NULL && Rear->Enable==true && Rear->IsOn())
+                return false;   //residual tray at this Auto rear staging
+            if(IsOutputCarFullForAmr(Index))
+                return false;   //Full gate (mirrors Empty/Color) : a drain GoUp is still owed
+        }
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(cleanout) 20260706 : EventLog-only residual watchdog (user chose the lightweight variant :
+//no modal, no timer, no GeneralSetting field). Called each tick from DoAuto ONLY while the
+//drain ladder is latched-done. On the REAL machine, if a station still shows a physical tray
+//(front / full / rear sensor ON) after the drain completed, log ONE line per episode (the
+//bCleanOutResidualLogged latch, cleared in InitialFlag) tagged MES1123..MES1623 so it is
+//per-station identifiable in D:\HT160S_Log\EventLog. Sim early-outs (sensors not read), so a
+//laptop clean-out still completes without a phantom log.
+void TAutoModule::ServiceCleanOutResidualWatchdog()
+{
+    if(IsSoftSimulate())
+        return;
+    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
+    {
+        if(bCleanOutResidualLogged[Index])
+            continue;
+        TMySensor *Front=GetInputHasTray(Index);
+        TMySensor *Full =GetInputFullTray(Index);
+        TMySensor *Rear =GetOutputBottomHasTray(Index);
+        bool bFrontOn=(Front!=NULL && Front->Enable==true && Front->IsOn());
+        bool bFullOn =(Full !=NULL && Full->Enable==true  && Full->IsOn());
+        bool bRearOn =(Rear !=NULL && Rear->Enable==true  && Rear->IsOn());
+        if(bFrontOn==false && bFullOn==false && bRearOn==false)
+            continue;
+        AnsiString Where;
+        Where.sprintf("front=%d full=%d rear=%d", bFrontOn?1:0, bFullOn?1:0, bRearOn?1:0);
+        g_EventLog.Log(AnsiString().sprintf("MES%d23", 11+Index),
+                       AnsiString().sprintf("Auto%d clean-out residual tray after drain - remove it", Index+1),
+                       Where);
+        bCleanOutResidualLogged[Index]=true;
+    }
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : stacking-car accessors for Auto1~6.
@@ -1062,6 +1162,13 @@ void TAutoModule::NotifyTrayArmDelivered(int Index, int Kind, AnsiString TrayID)
     State[Index].bRearHasTray=true;
     State[Index].bRearCanUse=true;
     bRearDeliveredPending[Index]=true;  //AI(general) 20260608 : Stage0 latch
+    //AI(cleanout) 20260706 : late-delivery self-heal (see SetRearHasTrayFromTrayArm for the full
+    //note) - re-open this station's drain so case-7000 re-collects a tray delivered after latch.
+    if(HSys.Sys.RunMode==Run_CleanOut)
+    {
+        State[Index].bCleanOutFinish=false;
+        bCleanOutResidualLogged[Index]=false;
+    }
     State[Index].Status=AS_REAR_STAGED;  //AI(ht160s-status) 20260703 : single producer of the staged state
 }
 //---------------------------------------------------------------------------
@@ -1253,6 +1360,27 @@ AnsiString TAutoModule::DescribeStation(int Index)
            + "  OperHolding="  + IntToStr(bOperatorHolding[Index] ? 1 : 0) + "\r\n";
     }
 
+    //AI(cleanout) 20260706 : clean-out diagnostic (State Record observability). Log the drain
+    //latch + raw front/rear sensors + the computed "this station blocks finish" verdict so a
+    //clean-out that will not complete is diagnosable per station (log-computed-verdict rule).
+    {
+        TMySensor *FrontSn=GetInputHasTray(Index);
+        TMySensor *RearSn =GetOutputBottomHasTray(Index);
+        TTrayMotor *Vc=GetAutoVMotor(Index);
+        int iFrontSn=(FrontSn!=NULL && FrontSn->Enable==true && FrontSn->IsOn()) ? 1 : 0;
+        int iRearSn =(RearSn !=NULL && RearSn->Enable==true  && RearSn->IsOn())  ? 1 : 0;
+        bool bBlocks = State[Index].bRearHasTray || State[Index].bRearCanUse || bRearDeliveredPending[Index]
+                    || State[Index].bCarHasTray || State[Index].bFrontHasTray || State[Index].bFullIC
+                    || (Vc!=NULL && Vc->fHasTray);
+        if(IsSoftSimulate()==false && (iFrontSn || iRearSn))
+            bBlocks=true;
+        s += "  CleanOut: DrainLatch=" + IntToStr(State[Index].bCleanOutFinish ? 1 : 0)
+           + "  FrontSn=" + IntToStr(iFrontSn)
+           + "  RearSn="  + IntToStr(iRearSn)
+           + "  ResidualLogged=" + IntToStr(bCleanOutResidualLogged[Index] ? 1 : 0)
+           + "  BlocksFinish=" + IntToStr(bBlocks ? 1 : 0) + "\r\n";
+    }
+
     TTrayMotor *V=GetAutoVMotor(Index);
     if(V==NULL)
     {
@@ -1397,8 +1525,16 @@ void TAutoModule::ServiceCarFull()
 //---------------------------------------------------------------------------
 void TAutoModule::DoAuto(int &Task)
 {
-    if(HSys.Sys.RunMode==Run_CleanOut && IsAllCleanOutFinish())
+    if(HSys.Sys.RunMode==Run_CleanOut && AllStationsDrainLatched())
+    {
+        //AI(cleanout) 20260706 : drain ladder is done (stop pumping). Keep the STOP gate on
+        //the pure latch so a lingering sensor cannot restart the whole GoUp ladder (thrash).
+        //The residual watchdog logs (EventLog-only) if a station still shows a physical tray,
+        //so a stuck-tray hang is diagnosable, not silent. The live IsAllCleanOutFinish()
+        //(sensor + SortArm re-checked) is what csystem / TrayArm consult for true completion.
+        ServiceCleanOutResidualWatchdog();
         return;
+    }
 
     switch(Task)
     {

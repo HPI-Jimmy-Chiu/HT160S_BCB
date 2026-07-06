@@ -56,6 +56,9 @@ private:
     int iFeedAuto;
     int iDischargeAuto;
     bool bCleanOutCheck[6];
+    //AI(cleanout) 20260706 : per-episode log-once latch for the EventLog-only residual
+    //watchdog (drain latched but a station still shows a physical tray). Reset in InitialFlag.
+    bool bCleanOutResidualLogged[6];
     //AI(ht160s-agv) 20260615 : per-Auto AMR/AGV handoff lock. While set, GetTrayRequest
     //refuses new trays (TrayArm stops feeding this Auto) and ServiceCarFull defers the
     //operator full-car modal to the AGV handshake. Set when a full car is handed to the
@@ -105,6 +108,8 @@ private:
     bool DoFeedTray(int Flag);
     bool DoDischargeTray(int Flag);
     bool DoAllAutoCleanOut(int Flag);
+    bool AllStationsDrainLatched();                 //AI(cleanout) 20260706 : pure per-station drain latch (DoAuto stop-gate)
+    void ServiceCleanOutResidualWatchdog();         //AI(cleanout) 20260706 : EventLog-only residual notice (log-once per episode)
     bool DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared single-cylinder FrontRise On->settle->Off
     //AI(HT160S-Maintainer) 20260612 : AMR output-car full service. Sim auto-clears
     //the full car; real machine alarms + operator confirm then clears; physical

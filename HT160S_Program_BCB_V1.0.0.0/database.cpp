@@ -970,12 +970,15 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
-        const char *FamFmt[5]={"MES%d20","MES%d25","JAM%d11","WAR%d30","JAM%d02"};
-        const int   FamType[5]={eMessageErr,eMessageErr,eJamErr,eOther,eJamErr};
-        const char *FamMsg[5]={"Auto output stack full (sensor)","Auto output car full","Auto rear tray data but no-tray sensor","Auto feed tray miss","Auto push tray miss"};
+        //AI(cleanout) 20260706 : 6th family member MES%d23 = per-Auto clean-out residual
+        //watchdog (EventLog-only). Suffix 23 chosen because 27 (the first pick) collides with
+        //the Color seed MES1427 "Color supply stack full"; 23 is free across MES1123..MES1623.
+        const char *FamFmt[6]={"MES%d20","MES%d25","JAM%d11","WAR%d30","JAM%d02","MES%d23"};
+        const int   FamType[6]={eMessageErr,eMessageErr,eJamErr,eOther,eJamErr,eMessageErr};
+        const char *FamMsg[6]={"Auto output stack full (sensor)","Auto output car full","Auto rear tray data but no-tray sensor","Auto feed tray miss","Auto push tray miss","Auto clean-out residual tray after drain"};
         for(int ai=0; ai<6; ai++)
         {
-            for(int fi=0; fi<5; fi++)
+            for(int fi=0; fi<6; fi++)
             {
                 AnsiString cd=AnsiString().sprintf(FamFmt[fi], 11+ai);
                 AnsiString mg=AnsiString().sprintf("Auto%d : %s", ai+1, FamMsg[fi]);
