@@ -399,7 +399,10 @@ bool TEmptyModule::DoFeedTray(int Flag)
         case 10:
             RefreshStateFromSensors();
             if(bRearHasTray)
-                return true;
+            {
+                FeedTask=13000;   //AI(ht160s-feeder-unify) 20260706 : idempotent re-entry -> single DONE terminal (case 13000)
+                break;
+            }
             FeedTask=1000;
             break;
 
@@ -475,6 +478,9 @@ bool TEmptyModule::DoFeedTray(int Flag)
             break;
 
         case 13000:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - FeedTask returns to idle(1) HERE so
+            //IsCleanOutFinish's "FeedTask==1" idle gate reads a completed feed as finished.
+            FeedTask=1;
             return true;
     }
     return false;
@@ -540,7 +546,11 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             //skip the destack if a front tray is already staged (idempotent re-entry).
             RefreshStateFromSensors();
             if(bFrontHasTray)
-                return true;
+            {
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : idempotent re-entry -> single DONE terminal (Task returns to 1 there)
+                break;
+            }
+            HSys.Cyn.C_Empty_FrontRiseTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 100 Push
             GoDownTask=100;
             break;
 
@@ -549,12 +559,18 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             //(sim + Enable aware, alarm-on-timeout), replacing the old .On()/.IsOn()||sim ladder
             //that never timed out and hung in DUMMY. Same physical order as before.
             if(PushCylinder(HSys.Cyn.C_Empty_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_2.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 150 Push
                 GoDownTask=150;
+            }
             break;
 
         case 150:
             if(PushCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2))
+            {
+                HSys.Cyn.C_Empty_FrontSeparateTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 200 Push
                 GoDownTask=200;
+            }
             break;
 
         case 200:
@@ -565,6 +581,7 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             {
                 GoDownDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoDownDelay.On();
+                HSys.Cyn.C_Empty_FrontRiseTray_2.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Rise_2 for its Pop at case 300
                 GoDownTask=300;
             }
             break;
@@ -589,7 +606,10 @@ bool TEmptyModule::DoGoDownTray(int Flag)
 
         case 350:
             if(GoDownDelay.Off())
+            {
+                HSys.Cyn.C_Empty_FrontSeparateTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Separate for its Pop at case 400
                 GoDownTask=400;
+            }
             break;
 
         case 400:
@@ -603,7 +623,10 @@ bool TEmptyModule::DoGoDownTray(int Flag)
 
         case 450:
             if(GoDownDelay.Off())
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Rise_1 for its Pop at case 500
                 GoDownTask=500;
+            }
             break;
 
         case 500:
@@ -634,9 +657,15 @@ bool TEmptyModule::DoGoDownTray(int Flag)
             {
                 bFrontHasTray=true;
                 BirthFrontTray();   //AI(ht160s-tray-source) : born at front confirm (rule #1)
-                return true;
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : route to single DONE terminal
             }
             break;
+
+        case 99999:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - Task returns to idle(1) HERE so
+            //IsCleanOutFinish's "GoDownTask==1" idle gate reads a completed drain as finished.
+            GoDownTask=1;
+            return true;
     }
     return false;
 }
@@ -653,6 +682,11 @@ bool TEmptyModule::DoGoUpTray(int Flag)
 
     switch(GoUpTask)
     {
+        //AI(ht160s-feeder-unify) 20260706 : GoUp converted from the old .On()/.IsOn()||sim and
+        //.Pop()||sim idiom to PushCylinder/PopCylinder (sim + Enable aware, in-position confirm +
+        //alarm-on-timeout), with a one-shot .Reset() re-arm before each poll and GoUpDelay settle -
+        //mirrors DoGoDownTray so GoUp is no longer "too fast / not smooth". Physical order and the
+        //Empty<->Loader front-separate interlock are unchanged.
         case 1:
             GoUpTask=10;
             break;
@@ -662,16 +696,26 @@ bool TEmptyModule::DoGoUpTray(int Flag)
             break;
 
         case 100:
-            HSys.Cyn.C_Empty_FrontRiseTray_1.On();
-            GoUpTask=200;
+            HSys.Cyn.C_Empty_FrontRiseTray_1.Reset();   //one-shot re-arm before Push
+            GoUpTask=110;
+            break;
+
+        case 110:
+            if(PushCylinder(HSys.Cyn.C_Empty_FrontRiseTray_1))   //extend Rise_1 (confirmed)
+                GoUpTask=200;
             break;
 
         case 200:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            //PRESERVED: Empty<->Loader front-separate interlock.
+            if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
+                break;   // interlock: wait while Loader front-separate is out
+            HSys.Cyn.C_Empty_FrontSeparateTray_1.Reset();
+            GoUpTask=210;
+            break;
+
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Empty_FrontSeparateTray_1))   //extend Separate (confirmed)
             {
-                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Loader_FrontSeparateTray_1))
-                    break;   // interlock: wait while Loader front-separate is out
-                HSys.Cyn.C_Empty_FrontSeparateTray_1.On();
                 GoUpDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=300;
@@ -681,15 +725,24 @@ bool TEmptyModule::DoGoUpTray(int Flag)
         case 300:
             if(GoUpDelay.Off())
             {
-                HSys.Cyn.C_Empty_FrontRiseTray_2.On();
-                GoUpTask=400;
+                HSys.Cyn.C_Empty_FrontRiseTray_2.Reset();
+                GoUpTask=310;
             }
             break;
 
+        case 310:
+            if(PushCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2))   //extend Rise_2 (confirmed)
+                GoUpTask=400;
+            break;
+
         case 400:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            HSys.Cyn.C_Empty_FrontSeparateTray_1.Reset();
+            GoUpTask=410;
+            break;
+
+        case 410:
+            if(PopCylinder(HSys.Cyn.C_Empty_FrontSeparateTray_1))   //retract Separate (confirmed)
             {
-                HSys.Cyn.C_Empty_FrontSeparateTray_1.Off();
                 GoUpDelay.SetMS(GeneralSetting.iEmptyDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=500;
@@ -699,14 +752,21 @@ bool TEmptyModule::DoGoUpTray(int Flag)
         case 500:
             if(GoUpDelay.Off())
             {
-                HSys.Cyn.C_Empty_FrontRiseTray_2.Off();
-                if(HSys.Cyn.C_Empty_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-                    GoUpTask=600;
+                HSys.Cyn.C_Empty_FrontRiseTray_2.Reset();
+                GoUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_2))   //retract Rise_2 (confirmed)
+            {
+                HSys.Cyn.C_Empty_FrontRiseTray_1.Reset();
+                GoUpTask=600;
             }
             break;
 
         case 600:
-            if(HSys.Cyn.C_Empty_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Empty_FrontRiseTray_1))   //retract Rise_1 (confirmed)
             {
                 bFrontHasTray=false;
                 FrontSourceTray.Clear();   //AI(ht160s-tray-source) : front carrier pushed back to stack
@@ -724,31 +784,43 @@ bool TEmptyModule::DoGoUpTray(int Flag)
 
         case 2000:
             if(MoveEmptyY(Teach.EmptyCarDischargeTrayYPosition))
+            {
+                HSys.Cyn.C_Empty_LeanOnTray.Reset();
                 GoUpTask=3000;
+            }
             break;
 
         case 3000:
-            if(HSys.Cyn.C_Empty_LeanOnTray.Push() || IsSoftSimulate())
+            if(PushCylinder(HSys.Cyn.C_Empty_LeanOnTray))
+            {
+                HSys.Cyn.C_Empty_PushTray.Reset();
                 GoUpTask=4000;
+            }
             break;
 
         case 4000:
-            if(HSys.Cyn.C_Empty_PushTray.Push() || IsSoftSimulate())
+            if(PushCylinder(HSys.Cyn.C_Empty_PushTray))
                 GoUpTask=5000;
             break;
 
         case 5000:
             if(MoveEmptyY(Teach.EmptyCarFeedTrayYPosition))
+            {
+                HSys.Cyn.C_Empty_PushTray.Reset();
                 GoUpTask=6000;
+            }
             break;
 
         case 6000:
-            if(HSys.Cyn.C_Empty_PushTray.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Empty_PushTray))
+            {
+                HSys.Cyn.C_Empty_LeanOnTray.Reset();
                 GoUpTask=7000;
+            }
             break;
 
         case 7000:
-            if(HSys.Cyn.C_Empty_LeanOnTray.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Empty_LeanOnTray))
             {
                 bFrontHasTray=true;
                 bRearHasTray=false;
@@ -770,6 +842,9 @@ bool TEmptyModule::DoGoUpTray(int Flag)
             break;
 
         case 10000:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - GoUpTask returns to idle(1) HERE so
+            //IsCleanOutFinish's "GoUpTask==1" idle gate reads a completed GoUp drain as finished.
+            GoUpTask=1;
             return true;
     }
     return false;

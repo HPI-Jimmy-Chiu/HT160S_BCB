@@ -455,29 +455,42 @@ bool TColorModule::DoGoDownTray(int Flag)
     {
         case 1:
             if(IsTraySupplyMode()==false)
-                return true;
+            {
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : not tray-supply mode -> single DONE terminal
+                break;
+            }
             GoDownTask=10;
             break;
 
         case 10:
             RefreshStateFromSensors();
             if(bFrontHasTray)
-                return true;
+            {
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : idempotent re-entry -> single DONE terminal
+                break;
+            }
             //AI(ht160s-color-align-empty) 20260626 : no bInputHasTray pre-abort here
             //(mirrors TEmptyModule::DoGoDownTray case 10) - always destack; identity is
             //supplied by DoReadColor2D and a missing real tray is caught by MES1421.
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 100 Push
             GoDownTask=100;
             break;
 
         case 100:
             //AI(HT160S-Maintainer) 20260608 : dual destacker, mirror Empty. Rise_1 up.
             if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 150 Push
                 GoDownTask=150;
+            }
             break;
 
         case 150:
             if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 200 Push
                 GoDownTask=200;
+            }
             break;
 
         case 200:
@@ -485,6 +498,7 @@ bool TColorModule::DoGoDownTray(int Flag)
             {
                 GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Rise_2 for its Pop at case 300
                 GoDownTask=300;
             }
             break;
@@ -509,7 +523,10 @@ bool TColorModule::DoGoDownTray(int Flag)
 
         case 350:
             if(GoDownDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Separate for its Pop at case 400
                 GoDownTask=400;
+            }
             break;
 
         case 400:
@@ -523,7 +540,10 @@ bool TColorModule::DoGoDownTray(int Flag)
 
         case 450:
             if(GoDownDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Rise_1 for its Pop at case 500
                 GoDownTask=500;
+            }
             break;
 
         case 500:
@@ -560,9 +580,15 @@ bool TColorModule::DoGoDownTray(int Flag)
             {
                 bFrontHasTray=true;
                 BirthFrontTray();   //AI(ht160s-color-align-empty) : identity tray born at front (empty 2D; CCD updates later), mirror Empty
-                return true;
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : route to single DONE terminal
             }
             break;
+
+        case 99999:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - Task returns to idle(1) HERE so
+            //IsCleanOutFinish's "GoDownTask==1" idle gate reads a completed drain as finished.
+            GoDownTask=1;
+            return true;
     }
     return false;
 }
@@ -589,6 +615,10 @@ bool TColorModule::DoGoUpTray(int Flag)
 
     switch(GoUpTask)
     {
+        //AI(ht160s-feeder-unify) 20260706 : GoUp converted from .On()/.IsOn()||sim and .Pop()||sim
+        //to PushCylinder/PopCylinder (sim + Enable aware, in-position confirm + alarm-on-timeout),
+        //with a one-shot .Reset() re-arm before each poll and GoUpDelay settle - mirrors
+        //DoGoDownTray so GoUp is no longer "too fast / not smooth". Physical order unchanged.
         case 1:
             GoUpTask=10;
             break;
@@ -598,14 +628,23 @@ bool TColorModule::DoGoUpTray(int Flag)
             break;
 
         case 100:
-            HSys.Cyn.C_Color_FrontRiseTray_1.On();
-            GoUpTask=200;
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();   //one-shot re-arm before Push
+            GoUpTask=110;
+            break;
+
+        case 110:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))   //extend Rise_1 (confirmed)
+                GoUpTask=200;
             break;
 
         case 200:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            GoUpTask=210;
+            break;
+
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))   //extend Separate (confirmed)
             {
-                HSys.Cyn.C_Color_FrontSeparateTray_1.On();
                 GoUpDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=300;
@@ -615,15 +654,24 @@ bool TColorModule::DoGoUpTray(int Flag)
         case 300:
             if(GoUpDelay.Off())
             {
-                HSys.Cyn.C_Color_FrontRiseTray_2.On();
-                GoUpTask=400;
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                GoUpTask=310;
             }
             break;
 
+        case 310:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))   //extend Rise_2 (confirmed)
+                GoUpTask=400;
+            break;
+
         case 400:
-            if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            GoUpTask=410;
+            break;
+
+        case 410:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))   //retract Separate (confirmed)
             {
-                HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
                 GoUpDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoUpDelay.On();
                 GoUpTask=500;
@@ -633,14 +681,21 @@ bool TColorModule::DoGoUpTray(int Flag)
         case 500:
             if(GoUpDelay.Off())
             {
-                HSys.Cyn.C_Color_FrontRiseTray_2.Off();
-                if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-                    GoUpTask=600;
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                GoUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))   //retract Rise_2 (confirmed)
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                GoUpTask=600;
             }
             break;
 
         case 600:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))   //retract Rise_1 (confirmed)
             {
                 bFrontHasTray=false;
                 GoUpTask=1000;
@@ -659,16 +714,22 @@ bool TColorModule::DoGoUpTray(int Flag)
             //AI(phase6-loader-recycle) 20260625 : carry the rear/output tray to the rear
             //pickup Y (Color's rear handoff Y) before leaning/pushing it onto the car.
             if(MoveColorY(Teach.ColorTrayArmPickYPosition))
+            {
+                HSys.Cyn.C_Color_LeanOnTray.Reset();
                 GoUpTask=3000;
+            }
             break;
 
         case 3000:
-            if(HSys.Cyn.C_Color_LeanOnTray.Push() || IsSoftSimulate())
+            if(PushCylinder(HSys.Cyn.C_Color_LeanOnTray))
+            {
+                HSys.Cyn.C_Color_PushTray.Reset();
                 GoUpTask=4000;
+            }
             break;
 
         case 4000:
-            if(HSys.Cyn.C_Color_PushTray.Push() || IsSoftSimulate())
+            if(PushCylinder(HSys.Cyn.C_Color_PushTray))
                 GoUpTask=5000;
             break;
 
@@ -677,16 +738,22 @@ bool TColorModule::DoGoUpTray(int Flag)
             //"front car" = the RECEIVE position (Teach.ColorReceiveTrayYPosition), not the
             //CCD scan Y. ColorRead2DYPosition was repurposed to the middle scan station.
             if(MoveColorY(Teach.ColorReceiveTrayYPosition))
+            {
+                HSys.Cyn.C_Color_PushTray.Reset();
                 GoUpTask=6000;
+            }
             break;
 
         case 6000:
-            if(HSys.Cyn.C_Color_PushTray.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Color_PushTray))
+            {
+                HSys.Cyn.C_Color_LeanOnTray.Reset();
                 GoUpTask=7000;
+            }
             break;
 
         case 7000:
-            if(HSys.Cyn.C_Color_LeanOnTray.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))
             {
                 bFrontHasTray=true;
                 bRearHasTray=false;
@@ -703,6 +770,9 @@ bool TColorModule::DoGoUpTray(int Flag)
             break;
 
         case 10000:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - GoUpTask returns to idle(1) HERE so
+            //IsCleanOutFinish's "GoUpTask==1" idle gate reads a completed GoUp drain as finished.
+            GoUpTask=1;
             return true;
     }
     return false;
@@ -787,7 +857,10 @@ bool TColorModule::DoFeedTray(int Flag)
     {
         case 1:
             if(IsTraySupplyMode()==false)
-                return true;
+            {
+                FeedTask=13000;   //AI(ht160s-feeder-unify) 20260706 : not tray-supply mode -> single DONE terminal (case 13000)
+                break;
+            }
             FeedTask=10;
             break;
 
@@ -810,7 +883,10 @@ bool TColorModule::DoFeedTray(int Flag)
                     RefreshStateFromSensors();
                 }
                 if(bRearHasTray)
-                    return true;
+                {
+                    FeedTask=13000;   //AI(ht160s-feeder-unify) 20260706 : leftover rear tray -> single DONE terminal
+                    break;
+                }
             }
             FeedTask=1000;
             break;
@@ -942,6 +1018,9 @@ bool TColorModule::DoFeedTray(int Flag)
             }
             break;
         case 13000:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - FeedTask returns to idle(1) HERE so
+            //IsCleanOutFinish's "FeedTask==1" idle gate reads a completed feed as finished.
+            FeedTask=1;
             return true;
     }
     return false;
@@ -972,6 +1051,7 @@ bool TColorModule::DoReadColor2D(int Flag)
             {
                 sTrayID2D=AnsiString("COLOR2D_")+Now().FormatString("hhnnsszzz");
                 StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (sim/disabled identity)
+                ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                 return true;
             }
             EnsureColorCcdSocketCreated();
@@ -1005,6 +1085,7 @@ bool TColorModule::DoReadColor2D(int Flag)
                 {
                     sTrayID2D="";
                     StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (skip; identity tray, empty 2D)
+                    ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                     return true;
                 }
                 EnsureColorCcdSocketCreated();
@@ -1027,6 +1108,7 @@ bool TColorModule::DoReadColor2D(int Flag)
                     if(ColorCcdSocket!=NULL)
                         ColorCcdSocket->ColorCcdEndShot();   //LOFF : end shot
                     StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (real 2D read)
+                    ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                     return true;
                 }
                 else if(ScanDelay.Off())
@@ -1046,12 +1128,14 @@ bool TColorModule::DoReadColor2D(int Flag)
                         //AI(ht160s-ccd-manual2d) : operator hand-entered the tray identity 2D.
                         sTrayID2D=fNote->ManualText;
                         StampReadIdentity2D();
+                        ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                         return true;
                     }
                     else
                     {
                         sTrayID2D="";
                         StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (skip; identity tray, empty 2D)
+                        ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                         return true;
                     }
                 }
@@ -1106,6 +1190,7 @@ bool TColorModule::DoSortBin(int Flag)
     switch(SortBinTask)
     {
         case 1:
+            SortBinTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> keep task at idle(1)
             return true;
     }
     return false;
