@@ -66,6 +66,7 @@ void THT160GeneralSetting::SetDefault()
 	iLogRetentionEventDays=365;   // EventLog, WebAPI : audit value, keep ~1 year
 	iLogRetentionCommDays=90;     // comm/diagnostic logs : high volume, keep 90d
 	iLogRetentionDiscardedDays=90; // LotStory Discarded work-order backups, keep 90d
+	iLogRetentionUPHLogDays=180;   // UPHLog per-lot folders, keep ~6 months
 	// Defaults mirror old-160: Empty=E, Loader=L, Auto1..6=1..6, Color=C.
 	{
 		const char *DefText[9]={"E","L","1","2","3","4","5","6","C"};
@@ -130,6 +131,7 @@ void THT160GeneralSetting::Load()
 	iLogRetentionEventDays=Ini->ReadInteger("LogRetention", "EventDays", 365);
 	iLogRetentionCommDays=Ini->ReadInteger("LogRetention", "CommDays", 90);
 	iLogRetentionDiscardedDays=Ini->ReadInteger("LogRetention", "DiscardedDays", 90);
+	iLogRetentionUPHLogDays=Ini->ReadInteger("LogRetention", "UPHLogDays", 180);
 	for(int i=0;i<9;i++)
 	{
 		sBinDispText[i]=Ini->ReadString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);
@@ -191,6 +193,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("LogRetention", "EventDays", iLogRetentionEventDays);
 	Ini->WriteInteger("LogRetention", "CommDays", iLogRetentionCommDays);
 	Ini->WriteInteger("LogRetention", "DiscardedDays", iLogRetentionDiscardedDays);
+	Ini->WriteInteger("LogRetention", "UPHLogDays", iLogRetentionUPHLogDays);
 	for(int i=0;i<9;i++)
 	{
 		Ini->WriteString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);

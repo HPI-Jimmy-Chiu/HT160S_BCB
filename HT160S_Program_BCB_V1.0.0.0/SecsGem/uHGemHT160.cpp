@@ -744,6 +744,23 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             MachinePause(trigSecsRemote);
             HCACK = 0;
         }
+        else if(S.AnsiPos("CLEARCOUNT")==1)
+        {
+            //AI(ht160s-lot-reset) 20260706 : CLEARCOUNT host command (HT172 SECS
+            // ClearCount parity). Zero the per-run production counters and persist to
+            // lastdata. Refused while producing so a running total is never wiped.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(HSys.Sys.SystemStart==true)
+            {
+                HCACK = 4;                                       // producing -> busy
+            }
+            else
+            {
+                ResetPerLotProductionCounters();
+                WriteLastDataIni();
+                HCACK = 0;
+            }
+        }
         else if(S.AnsiPos("ONLINE_REMOTE")==1 || S=="ONLINE")
         {
             //AI(ht160s-secsgem) 20260611 : ONLINE (remote) host command. Consume the
@@ -813,6 +830,8 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         //equivalent of pressing Lot Start, so zero the per-run production
                         //counters too (gated idle : SystemStart==false and no IC inside).
                         ResetPerLotProductionCounters();
+                        //AI(ht160s-uph) 20260706 : open the per-tray/lot UPH log folder.
+                        TrayUphLog_OnLotStart(FirstLot);
                         fMain->edLotNo->Text = FirstLot;         // active lot backfill
                         fMain->RefreshLotListFromRegistry();
                         //AI(ht160s-2dbin-manual) 20260628 : persist the SECS-registered lots

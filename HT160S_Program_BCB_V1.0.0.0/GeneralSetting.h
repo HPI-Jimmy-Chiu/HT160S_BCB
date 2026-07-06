@@ -142,6 +142,8 @@ public:
 	int iLogRetentionCommDays;    // BindisplayLog, PadLog, MotorTaskLog
 	//AI(ht160s-workorder-backup) 20260630 : LotStory Discarded safety backups.
 	int iLogRetentionDiscardedDays; // LotStory Discarded (work-order backups)
+	//AI(ht160s-uph) 20260706 : per-tray/lot UPH logs under UPHLog (month buckets).
+	int iLogRetentionUPHLogDays;    // UPHLog per-lot folders
 
 	// Per-unit fixed label text + color, old-160 style. Index order (P0 lock):
 	// 0=Empty 1=Loader 2..7=Auto1..6 8=Color. Text is one char: digit/letter/blank.

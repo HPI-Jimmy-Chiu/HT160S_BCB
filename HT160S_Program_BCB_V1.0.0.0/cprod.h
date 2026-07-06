@@ -207,5 +207,14 @@ AnsiString GetTotalQuantityMagPercent();
 //cumulative fields are left alone; only the per-lot display / throughput counts
 //reset so the Auto Cnt display, UPH and SECS Scanned/Sorted represent THIS lot.
 void ResetPerLotProductionCounters();
+//AI(ht160s-uph) 20260706 : per-tray + per-lot UPH logging. Non-invasive observer
+//(reads the public TAutoModule station status) + CSV under
+//<LogRoot>\UPHLog\YYYY_MM\<LotID>__<ts>\. Total UPH uses the HT172 aggregate
+//(GetCalculateUPH); per-tray UPH is diagnostic. See
+//docs/plan/uph-suite-persistence-biniccnt-plan-20260706.md.
+void TrayUphLog_OnLotStart(AnsiString LotID);
+void TrayUphLog_Tick();
+void TrayUphLog_OnLotEnd(AnsiString LotID, int TotalIC, int LotUPH);
+void TrayUphLog_PruneOld();
 //---------------------------------------------------------------------------
 #endif

@@ -1643,6 +1643,11 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         if(GeneralSetting.bUseLotBinSortMode)
                             LotBinBinding.ResolveAuto(HitLotIndex, Bin);
                         LotRegistry.OnSorted(HitLotIndex, Bin);
+                        //AI(ht160s-lot-reset) 20260706 : global per-Bin production count
+                        //(HT172 parity: aSortArm/aMagArm bump BinICCnt[Bin] on sort). HT160
+                        //resolves Bin here at scan (like iTotalSorted), so count it here.
+                        if(Bin>=0 && Bin<TEST_MAX_BIN)
+                            tRunData.BinICCnt[Bin]++;
                         MachineRun.iTotalSorted++;
                         if(TopCcdSocket!=NULL)
                             TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
@@ -1727,6 +1732,9 @@ void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
             if(GeneralSetting.bUseLotBinSortMode)
                 LotBinBinding.ResolveAuto(HitLotIndex, Bin);
             LotRegistry.OnSorted(HitLotIndex, Bin);
+            //AI(ht160s-lot-reset) 20260706 : per-Bin count on manual-2D sort too.
+            if(Bin>=0 && Bin<TEST_MAX_BIN)
+                tRunData.BinICCnt[Bin]++;
             MachineRun.iTotalSorted++;
             if(TopCcdSocket!=NULL)
                 TopCcdSocket->TopCcdEndShot();

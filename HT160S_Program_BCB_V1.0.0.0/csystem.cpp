@@ -176,6 +176,9 @@ void MainProc()
 	if(fMain!=NULL)
 		fMain->PollLotDataWebApi();
 
+	//AI(ht160s-uph) 20260706 : advance the per-tray UPH observer (reads Auto status).
+	TrayUphLog_Tick();
+
 	if(bProgramStart==false)
 		bProgramStart=DoInitialProgramStart();
 	else

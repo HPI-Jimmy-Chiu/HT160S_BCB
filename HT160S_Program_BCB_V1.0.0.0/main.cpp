@@ -615,6 +615,10 @@ void __fastcall TfMain::sbExitClick(TObject *Sender)
 //Synchronize(MainProc) can never complete and WaitFor would deadlock.
 void __fastcall TfMain::FormClose(TObject *Sender, TCloseAction &Action)
 {
+    //AI(ht160s-lot-reset) 20260706 : persist production counters on shutdown (HT172
+    //main.cpp:578 parity) so a power cycle mid-lot resumes the count, not loses it.
+    WriteLastDataIni();
+
     if(MyThread != NULL)
     {
         MyThread->Terminate();
@@ -1966,6 +1970,8 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     //THIS work order instead of accumulating across lots. Machine-total cumulative
     //fields are untouched. Must run before bRunning/iActiveLotCount are set below.
     ResetPerLotProductionCounters();
+    //AI(ht160s-uph) 20260706 : open this work order's per-tray/lot UPH log folder.
+    TrayUphLog_OnLotStart(FirstLot);
 
     MachineRun.bRunning=true;
     MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
@@ -2173,6 +2179,15 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     }
     SoftStop=true;
     MachineRun.bRunning=false;
+
+    //AI(ht160s-uph) 20260706 : record this lot's total UPH (HT172 parity : aggregate
+    //TotalIC / productive-hours) to the EventLog + per-lot UPH summary before the work
+    //order is cleared, then persist the final counts (item 7 lastdata).
+    tRunData.LotEndTime=Now();
+    tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
+    RecordProcess("End of Lot: Lot="+edLotNo->Text+", TotalIC="+IntToStr(tRunData.TotalIC)+", UPH="+IntToStr(tRunData.UPH));
+    TrayUphLog_OnLotEnd(edLotNo->Text, tRunData.TotalIC, tRunData.UPH);
+    WriteLastDataIni();
 
     //AI(ht160s-lot-webapi) 20260612 : stop any in-flight "pull all lots" sweep so
     // it does not walk the registry we are about to clear.
@@ -2873,6 +2888,8 @@ void __fastcall TfMain::RestoreLastWorkOrder()
     cCsvDailyLog::PruneFolderTree(
         HSys.LogRootDir + AnsiString("\\LotStory\\Discarded"),
         GeneralSetting.iLogRetentionDiscardedDays);
+    //AI(ht160s-uph) 20260706 : age out old per-lot UPH log folders (same policy).
+    TrayUphLog_PruneOld();
 
     //B) auto-load today's newest delivered work order (2D->Bin JSON). When a
     //   fresh lot table exists, drive the Lot list display from the registry.
