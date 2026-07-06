@@ -1358,27 +1358,38 @@ bool TColorModule::TestGoDownTray(int Flag)
         return true;
     }
 
+    //AI(ht160s-feeder-unify) 20260706 : idiom aligned to production DoGoDownTray -
+    //PushCylinder/PopCylinder (confirm + alarm) + one-shot .Reset() re-arm; settle profile
+    //unchanged. Color has no front-separate interlock. Teach-only (Advanced test tab).
     switch(TestDownTask)
     {
         case 1:
-            HSys.Cyn.C_Color_FrontRiseTray_1.On();
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
             TestDownTask=2000;
             break;
 
         case 2000:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
-                HSys.Cyn.C_Color_FrontRiseTray_2.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
                 TestDownTask=3000;
             }
             break;
 
         case 3000:
-            if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
             {
-                HSys.Cyn.C_Color_FrontSeparateTray_1.On();
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                TestDownTask=3600;
+            }
+            break;
+
+        case 3600:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
                 TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
                 TestDownTask=4000;
             }
             break;
@@ -1386,24 +1397,29 @@ bool TColorModule::TestGoDownTray(int Flag)
         case 4000:
             if(TestDelay.Off())
             {
-                HSys.Cyn.C_Color_FrontRiseTray_2.Off();
-                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
-                TestDelay.On();
-                TestDownTask=4100;
+                if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                {
+                    TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                    TestDelay.On();
+                    TestDownTask=4100;
+                }
             }
             break;
 
         case 4100:
             if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
                 TestDownTask=5000;
+            }
             break;
 
         case 5000:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
             {
-                HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
                 TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
                 TestDownTask=6000;
             }
             break;
@@ -1414,7 +1430,7 @@ bool TColorModule::TestGoDownTray(int Flag)
             break;
 
         case 6500:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
                 TestDownTask=1;
                 return true;
@@ -1433,17 +1449,27 @@ bool TColorModule::TestGoUpTray(int Flag)
         return true;
     }
 
+    //AI(ht160s-feeder-unify) 20260706 : idiom aligned to production DoGoUpTray -
+    //PushCylinder/PopCylinder (confirm + alarm) + one-shot .Reset() re-arm; settle profile
+    //unchanged. Color has no front-separate interlock. Teach-only (Advanced test tab).
     switch(TestUpTask)
     {
         case 1:
-            HSys.Cyn.C_Color_FrontRiseTray_1.On();
-            TestUpTask=200;
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+            TestUpTask=100;
             break;
 
-        case 200:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+        case 100:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
-                HSys.Cyn.C_Color_FrontSeparateTray_1.On();
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                TestUpTask=210;
+            }
+            break;
+
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
                 TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=300;
@@ -1453,15 +1479,24 @@ bool TColorModule::TestGoUpTray(int Flag)
         case 300:
             if(TestDelay.Off())
             {
-                HSys.Cyn.C_Color_FrontRiseTray_2.On();
-                TestUpTask=400;
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                TestUpTask=310;
             }
             break;
 
+        case 310:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                TestUpTask=400;
+            break;
+
         case 400:
-            if(HSys.Cyn.C_Color_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            TestUpTask=410;
+            break;
+
+        case 410:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
             {
-                HSys.Cyn.C_Color_FrontSeparateTray_1.Off();
                 TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=500;
@@ -1471,14 +1506,21 @@ bool TColorModule::TestGoUpTray(int Flag)
         case 500:
             if(TestDelay.Off())
             {
-                HSys.Cyn.C_Color_FrontRiseTray_2.Off();
-                if(HSys.Cyn.C_Color_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-                    TestUpTask=600;
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                TestUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                TestUpTask=600;
             }
             break;
 
         case 600:
-            if(HSys.Cyn.C_Color_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
                 TestUpTask=1;
                 return true;

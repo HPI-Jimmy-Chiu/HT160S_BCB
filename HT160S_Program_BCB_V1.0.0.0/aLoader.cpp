@@ -1930,53 +1930,71 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
 //sides so no LoaderNo. Caller owns the SubTask + settle Delay. Returns true when done.
 bool TLoaderModule::DoFrontDestackDown(int &SubTask, HTimer &Delay)
 {
+    //AI(ht160s-feeder-unify) 20260706 : converted from .On()/.IsOn()||sim + .Off()/.Pop() to the
+    //cylinder's own confirmed .Push()/.Pop() (in-position confirm + alarm-on-timeout) with a
+    //one-shot .Reset() re-arm before each poll - mirrors Empty/Color DoGoDownTray. TLoaderModule
+    //has no PushCylinder wrapper (that name is a local TMyCylinder* here), so .Push()/.Pop() are
+    //called directly (they are sim-safe via #ifdef and Enable-aware internally). SHARED by the
+    //production DoFeedTray (case 3500) AND the Teach TestGoDownTray. Physical order, the single
+    //Delay.Set(10) settle after Separate extend, and the Loader<->Empty interlock are unchanged.
     switch(SubTask)
     {
         case 1:
-            HSys.Cyn.C_Loader_FrontRiseTray_1.On();
+            HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
             SubTask=2;
             break;
 
         case 2:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Push())   // extend Rise_1 (confirmed)
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.On();
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
                 SubTask=3;
             }
             break;
 
         case 3:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.Push())   // extend Rise_2 (confirmed)
             {
-                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
-                    break;   // interlock: wait while Empty front-separate is out
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
-                Delay.Set(10);
-                Delay.On();
+                HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
                 SubTask=4;
             }
             break;
 
         case 4:
-            if(Delay.Off())
+            //PRESERVED: Loader<->Empty front-separate interlock.
+            if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
+                break;   // interlock: wait while Empty front-separate is out
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Push())   // extend Separate (confirmed)
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.Off();
+                Delay.Set(10);
+                Delay.On();
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
                 SubTask=5;
             }
             break;
 
         case 5:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            if(Delay.Off())
             {
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
-                SubTask=6;
+                if(HSys.Cyn.C_Loader_FrontRiseTray_2.Pop())   // retract Rise_2 (confirmed)
+                {
+                    HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+                    SubTask=6;
+                }
             }
             break;
 
         case 6:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Pop())   // retract Separate (confirmed)
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_1.Off();
+                HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+                SubTask=7;
+            }
+            break;
+
+        case 7:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())   // retract Rise_1 (confirmed)
+            {
                 SubTask=1;
                 return true;
             }
@@ -2009,19 +2027,31 @@ bool TLoaderModule::TestGoUpTray(int Flag)
         return true;
     }
 
+    //AI(ht160s-feeder-unify) 20260706 : idiom aligned to DoFrontDestackDown - the cylinder's own
+    //confirmed .Push()/.Pop() (TLoaderModule has no PushCylinder wrapper) + one-shot .Reset()
+    //re-arm; settle profile and the Loader<->Empty interlock unchanged. Teach-only.
     switch(TestUpTask)
     {
         case 1:
-            HSys.Cyn.C_Loader_FrontRiseTray_1.On();
-            TestUpTask=200;
+            HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+            TestUpTask=100;
+            break;
+
+        case 100:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Push())
+                TestUpTask=200;
             break;
 
         case 200:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
+                break;   // interlock: wait while Empty front-separate is out
+            HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+            TestUpTask=210;
+            break;
+
+        case 210:
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Push())
             {
-                if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
-                    break;   // interlock: wait while Empty front-separate is out
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
                 TestDelay.SetMS(GeneralSetting.iLoaderDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=300;
@@ -2031,15 +2061,24 @@ bool TLoaderModule::TestGoUpTray(int Flag)
         case 300:
             if(TestDelay.Off())
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.On();
-                TestUpTask=400;
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
+                TestUpTask=310;
             }
             break;
 
+        case 310:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.Push())
+                TestUpTask=400;
+            break;
+
         case 400:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
+            HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+            TestUpTask=410;
+            break;
+
+        case 410:
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Pop())
             {
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
                 TestDelay.SetMS(GeneralSetting.iLoaderDestackSettleMs);
                 TestDelay.On();
                 TestUpTask=500;
@@ -2049,16 +2088,22 @@ bool TLoaderModule::TestGoUpTray(int Flag)
         case 500:
             if(TestDelay.Off())
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.Off();
-                if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-                    TestUpTask=600;
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
+                TestUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.Pop())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+                TestUpTask=600;
             }
             break;
 
         case 600:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop() || IsSoftSimulate())
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())
             {
-                HSys.Cyn.C_Loader_FrontRiseTray_1.Off();
                 TestUpTask=1;
                 return true;
             }
