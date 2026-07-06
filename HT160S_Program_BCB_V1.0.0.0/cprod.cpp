@@ -16,6 +16,11 @@
 //---------------------------------------------------------------------------
 TRunData tRunData;
 TLatchCycleTime lctLoader;
+//AI(ht160s-uph) 20260707 : rolling per-tray UPH history ring (newest at [0]) rendered
+// by TfMain::ShowTrayUphHistory. Reset on lot start, pushed on each completed tray.
+TTrayUphRow g_UphRecentRows[UPH_ROW_MAX];
+int         g_UphRecentCount = 0;
+bool        g_UphRowsDirty   = true;
 TFunction tFunction;
 TSimulationData tSimuData;
 TMotionnetIO tMotionnetIO;
@@ -338,6 +343,8 @@ void TrayUphLog_OnLotStart(AnsiString LotID)
     g_UphLotFolder=UphRootDir()+"\\"+sMonth+"\\"+UphSanitizeName(LotID)+"__"+sStamp;
     ForceDirectories(g_UphLotFolder);
     g_UphLotTrayCount=0;
+    g_UphRecentCount=0;   //AI(ht160s-uph) 20260707 : clear on-screen rolling history for the new lot
+    g_UphRowsDirty=true;
     for(i=0; i<UPH_MAX_AUTO; i++)
     {
         g_UphPrevStatus[i]=-1;
@@ -347,6 +354,20 @@ void TrayUphLog_OnLotStart(AnsiString LotID)
         g_UphTrayID[i]="";
     }
     g_UphActive=true;
+}
+//---------------------------------------------------------------------------
+static void UphPushRow(AnsiString sStart, AnsiString sEnd, AnsiString sPause, int iUph)
+{
+    int k;
+    for(k=UPH_ROW_MAX-1; k>0; k--)
+        g_UphRecentRows[k]=g_UphRecentRows[k-1];
+    g_UphRecentRows[0].sStart=sStart;
+    g_UphRecentRows[0].sEnd  =sEnd;
+    g_UphRecentRows[0].sPause=sPause;
+    g_UphRecentRows[0].iUph  =iUph;
+    if(g_UphRecentCount<UPH_ROW_MAX)
+        g_UphRecentCount++;
+    g_UphRowsDirty=true;
 }
 //---------------------------------------------------------------------------
 void TrayUphLog_Tick()
@@ -403,6 +424,12 @@ void TrayUphLog_Tick()
                       IntToStr(trayUPH);
                 UphAppendCsv(sPath, sHeader, sLine);
                 g_UphLotTrayCount++;
+                //AI(ht160s-uph) 20260707 : also surface this tray on the main-screen
+                // rolling UPH grid. Pause is this tray's share of the pause accumulator.
+                UphPushRow(FormatDateTime("hh:nn:ss", g_UphTrayStart[i]),
+                           FormatDateTime("hh:nn:ss", tEnd),
+                           TDateTime(dPause>0.0?dPause:0.0).FormatString("hh:nn:ss"),
+                           trayUPH);
             }
         }
         g_UphPrevStatus[i]=cur;

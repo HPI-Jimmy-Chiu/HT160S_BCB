@@ -58,6 +58,22 @@ struct TRunData
     int GetTotalQuantity(){return iAutoQuantity+iMagQuantity;}
 };
 extern TRunData tRunData;
+
+//AI(ht160s-uph) 20260707 : on-screen rolling per-tray UPH history feed. cprod owns the
+// data (reuses TrayUphLog per-tray detection); main.cpp renders it into UPH_StringGrid.
+// Newest row at index 0. Data/render split keeps cprod free of any fMain coupling.
+#define UPH_ROW_MAX 10
+struct TTrayUphRow
+{
+    AnsiString sStart;
+    AnsiString sEnd;
+    AnsiString sPause;
+    int        iUph;
+};
+extern TTrayUphRow g_UphRecentRows[UPH_ROW_MAX];
+extern int         g_UphRecentCount;
+extern bool        g_UphRowsDirty;
+
 extern int GetJamRateDenom();
 //---------------------------------------------------------------------------
 class TLatchCycleTime

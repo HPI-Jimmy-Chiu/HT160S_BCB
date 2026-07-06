@@ -759,6 +759,88 @@ static AnsiString FmtCarKinds(int t, int id0, int cv0)
 //only and NULL-guarded; reads module accessors, never writes machine state. In real
 //mode the input counts are sensor-driven and not maintained (they show the configured
 //max); the Auto output counts are book-keeping and valid in both sim and real.
+//AI(ht160s-uph) 20260707 : sgProductInfo row indices (mirror HT172 IncludeAllHeader
+// e-enum: Lot Start / Lot End / Alarm Time / Pause Time / UPH). File-scope enum
+// (this is a .cpp, not the form class body).
+enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH };
+//---------------------------------------------------------------------------
+// AI(ht160s-uph) 20260707 : live production-info panel (HT172 TfMain::ShowProductInfo
+// parity). One-time header, then per-cycle fill of Lot Start/End/Alarm/Pause and a
+// LIVE cumulative UPH (TotalIC / productive-hours, pause excluded) written to
+// tRunData.UPH so the screen AND SECS SVID 1021 track running UPH. The frozen
+// end-of-lot value is still (re)computed at Clean Out finish and End of Lot.
+void __fastcall TfMain::ShowProductInfo()
+{
+    if(sgProductInfo==NULL)
+        return;
+    static bool bProdHdr=false;
+    if(bProdHdr==false)
+    {
+        bProdHdr=true;
+        sgProductInfo->Cells[0][PI_LotStart ]="Lot Start :";
+        sgProductInfo->Cells[0][PI_LotEnd   ]="Lot End :";
+        sgProductInfo->Cells[0][PI_AlarmTime]="Alarm Time :";
+        sgProductInfo->Cells[0][PI_PauseTime]="Pause Time :";
+        sgProductInfo->Cells[0][PI_UPH      ]="UPH :";
+        sgProductInfo->Cells[2][PI_UPH      ]="Unit / Hr";
+    }
+    sgProductInfo->Cells[1][PI_LotStart ]=FormatDateTime("hh:nn:ss", tRunData.StartTime);
+    sgProductInfo->Cells[1][PI_LotEnd   ]=FormatDateTime("hh:nn:ss", tRunData.LotEndTime);
+    sgProductInfo->Cells[1][PI_AlarmTime]=FormatDateTime("hh:nn:ss", tRunData.AlarmTime);
+    sgProductInfo->Cells[1][PI_PauseTime]=tUPH_PauseTime.FormatString("hh:nn:ss");
+    if(HSys.Sys.SystemStart && bFirstRun==false && tRunData.TotalIC>0)
+    {
+        tRunData.UPH=GetCalculateUPH(Now());
+        sgProductInfo->Cells[1][PI_UPH]=IntToStr(tRunData.UPH);
+    }
+}
+//---------------------------------------------------------------------------
+// AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172
+// MySortArmParameter::CalculateUPH / UPH_StringGrid parity). Renders the cprod ring
+// (newest at row 1) only when a tray completed (g_UphRowsDirty), so it is cheap.
+void __fastcall TfMain::ShowTrayUphHistory()
+{
+    if(UPH_StringGrid==NULL)
+        return;
+    static bool bUphHdr=false;
+    if(bUphHdr==false)
+    {
+        bUphHdr=true;
+        UPH_StringGrid->Cells[0][0]="Start Time";
+        UPH_StringGrid->Cells[1][0]="End Time";
+        UPH_StringGrid->Cells[2][0]="Pause Time";
+        UPH_StringGrid->Cells[3][0]="UPH";
+        g_UphRowsDirty=true;
+    }
+    if(g_UphRowsDirty==false)
+        return;
+    g_UphRowsDirty=false;
+
+    int i, iTotalUph=0, iCnt=0;
+    for(i=0; i<UPH_ROW_MAX; i++)
+    {
+        int r=i+1;   // grid data rows 1..10, newest first
+        if(i<g_UphRecentCount)
+        {
+            UPH_StringGrid->Cells[0][r]=g_UphRecentRows[i].sStart;
+            UPH_StringGrid->Cells[1][r]=g_UphRecentRows[i].sEnd;
+            UPH_StringGrid->Cells[2][r]=g_UphRecentRows[i].sPause;
+            UPH_StringGrid->Cells[3][r]=IntToStr(g_UphRecentRows[i].iUph);
+            iTotalUph+=g_UphRecentRows[i].iUph;
+            iCnt++;
+        }
+        else
+        {
+            UPH_StringGrid->Cells[0][r]="";
+            UPH_StringGrid->Cells[1][r]="";
+            UPH_StringGrid->Cells[2][r]="";
+            UPH_StringGrid->Cells[3][r]="";
+        }
+    }
+    UPH_StringGrid->Cells[2][12]="Avg UPH :";
+    UPH_StringGrid->Cells[3][12]=IntToStr((iCnt>0)?(iTotalUph/iCnt):0);
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::ShowCarTrayCount()
 {
     if(LoaderModule!=NULL && lbCarTrayCount_Loader!=NULL)

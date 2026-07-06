@@ -169,6 +169,10 @@ void MainProc()
 
 	if(fMain!=NULL)
 		fMain->ShowUnloadAutoInfo();   //AI(ht160s-motion-view) 20260618 : Unload Auto1~6 Bin/Lot/ID/Cnt
+	if(fMain!=NULL)
+		fMain->ShowProductInfo();      //AI(ht160s-uph) 20260707 : live Lot/UPH product-info grid + live UPH cell
+	if(fMain!=NULL)
+		fMain->ShowTrayUphHistory();   //AI(ht160s-uph) 20260707 : rolling per-tray UPH history grid
 
 	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive any in-flight Lot WebAPI pull.
 	// MainProc runs on the VCL main thread (TRunControl::Synchronize), so this is a
