@@ -1432,18 +1432,13 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     State->bWaitingAmrFeed=false;
                     State->FeedWaitTimer.Clear();
                 }
-                Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), &HSys.Sen.SnLoader_Inputend, true, K_RETRY|K_TRAY_END|K_CLEAN_OUT);
+                Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), &HSys.Sen.SnLoader_Inputend, true, K_RETRY|K_CLEAN_OUT);
                 if(Ret==K_RETRY)
                     //AI(ht160s-loader) 20260706 : resume at carriage-confirm (9500), NOT case 1.
                     //Restarting the feed re-drives DoFrontDestackDown (rise1+rise2) on a tray already
                     //separated below -> clamps/cuts it + scatters IC. 9500 confirms the existing tray
                     //(SnLoader_InputHasTray) and carries it on; JAM0913 there is a safe stop.
                     State->FeedTask=9500;
-                if(Ret==K_TRAY_END)
-                {
-                    State->bTrayEmpty=true;
-                    State->FeedTask=10000;
-                }
                 if(Ret==K_CLEAN_OUT)
                 {
                     //AI(HT160S-Maintainer) 20260605 : operator chose CleanOut at the
