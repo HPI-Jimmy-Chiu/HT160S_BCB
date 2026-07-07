@@ -457,6 +457,10 @@ void __fastcall TMyMessageBox::FormShow(TObject *Sender)
     fBuzzerOff=false;
     fShow=true;
 
+    //AI(ht160s-panel-sensitivity) 20260706 : pump the physical-panel key scan + buzzer/lamp
+    //keepalive while this modal box suspends MainProc (HT172 mymessbox Timer1, 10ms).
+    Timer1->Enabled=true;
+
     //AI(HT160S-Maintainer) 20260629 : auto-fit the box to its caption (grow Width, or
     //WordWrap+grow Height for very long text) BEFORE centering and the button reflow, so the
     //final Width/Height drive both. Fixes long captions being clipped on both ends.
@@ -488,6 +492,7 @@ void __fastcall TMyMessageBox::FormShow(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TMyMessageBox::FormClose(TObject *Sender, TCloseAction &Action)
 {
+    Timer1->Enabled=false;
     CloseBuzzerOff();
     fShow=false;
     fScanPanel=false;
@@ -501,5 +506,61 @@ void __fastcall TMyMessageBox::btnOffBuzzerClick(TObject *Sender)
     //overwritten next tick). HT172 mymessbox.cpp Button2Click bOffBuzzer parity.
     fBuzzerOff=true;
     CloseBuzzerOff();
+}
+//---------------------------------------------------------------------------
+void __fastcall TMyMessageBox::Timer1Timer(TObject *Sender)
+{
+    //AI(ht160s-panel-sensitivity) 20260706 : self-pump so the physical operator panel works
+    //while this modal box suspends MainProc (HT172 mymessbox.cpp Timer1Timer port). Reentry-
+    //guarded. Key scan runs only for alarm/info boxes (fScanPanel); YES/NO + OK stay touch-
+    //only (fScanPanel=false), matching HT172 bDisableKeypad. DoSystemMessage() keeps the
+    //LED_Message buzzer + panel lamps alive; fBuzzerOff is honored by both.
+    static bool bMessageTimer1Check=false;
+
+    if(bMessageTimer1Check)
+        return;
+    bMessageTimer1Check=true;
+
+    if(fShow==false)
+    {
+        bMessageTimer1Check=false;
+        return;
+    }
+
+    if(fScanPanel)
+        ScanKey();
+
+    if(fBuzzerOff)
+        CloseBuzzerOff();
+    DoSystemMessage();
+
+    bMessageTimer1Check=false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TMyMessageBox::ScanKey()
+{
+    //AI(ht160s-panel-sensitivity) 20260706 : HT160 sensors carry no Tag, so read SnFK*||SnRK*
+    //directly and rising-edge latch so a held key fires once (note.cpp/main ScanKey idiom).
+    //Physical PAUSE closes the box (ret=PAUSE); physical ALARM RESET latches the buzzer mute.
+    //Only reached for fScanPanel boxes -> YES/NO stays touch-only (HT172 parity).
+    static bool bWasPause=false;
+    static bool bWasReset=false;
+
+    bool bPause=HSys.Sen.SnFKPause.IsOn()      || HSys.Sen.SnRKPause.IsOn();
+    bool bReset=HSys.Sen.SnFKAlarmReset.IsOn() || HSys.Sen.SnRKAlarmReset.IsOn();
+
+    if(bPause && bWasPause==false)
+    {
+        ret=msgrtnPAUSE;
+        Close();
+    }
+    else if(bReset && bWasReset==false)
+    {
+        fBuzzerOff=true;
+        CloseBuzzerOff();
+    }
+
+    bWasPause=bPause;
+    bWasReset=bReset;
 }
 //---------------------------------------------------------------------------

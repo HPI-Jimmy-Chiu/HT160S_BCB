@@ -18,15 +18,18 @@ __published:
     TPanel *palYes;
     TPanel *palNo;
     TButton *btnOffBuzzer;
+    TTimer *Timer1;
     void __fastcall palPauseClick(TObject *Sender);
     void __fastcall palYesClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall btnOffBuzzerClick(TObject *Sender);
+    void __fastcall Timer1Timer(TObject *Sender);
 private:
     int Status;
 public:
     __fastcall TMyMessageBox(TComponent* Owner);
+    void __fastcall ScanKey();
     int ret;
     bool flushState;
     int flushCT;

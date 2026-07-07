@@ -133,4 +133,11 @@ object MyMessageBox: TMyMessageBox
     Visible = False
     OnClick = palYesClick
   end
+  object Timer1: TTimer
+    Enabled = False
+    Interval = 10
+    OnTimer = Timer1Timer
+    Left = 8
+    Top = 8
+  end
 end

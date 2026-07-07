@@ -303,7 +303,7 @@ object fNote: TfNote
     end
   end
   object Timer1: TTimer
-    Interval = 250
+    Interval = 10
     OnTimer = Timer1Timer
     Left = 112
     Top = 472

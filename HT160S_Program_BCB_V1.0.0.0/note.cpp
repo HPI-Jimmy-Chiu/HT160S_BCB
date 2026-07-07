@@ -386,6 +386,13 @@ void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
 void __fastcall TfNote::Timer1Timer(TObject *Sender)
 {
     static bool Blink=false;
+    //AI(ht160s-panel-sensitivity) 20260706 : Timer1 lowered 250ms->10ms (note.dfm) so
+    //physical operator-panel keys are scanned responsively while this modal Note
+    //suspends MainProc (HT172 note Timer1 is 1ms). ScanKey/FlushLabel/DoSystemMessage
+    //are per-scan idempotent (normal MainProc runs them far more often than 10ms), but
+    //the recovery-key + FlushPanel blink must stay ~2 Hz, so advance the blink phase
+    //only every 25 ticks (25 x 10ms = 250ms, the original cadence).
+    static int iBlinkDiv=0;
 
     if(fShow==false)
         return;
@@ -403,7 +410,16 @@ void __fastcall TfNote::Timer1Timer(TObject *Sender)
     //DoSystemMessage() pushes them to the Pad (it is the sole DoPanelLamp caller and also
     //refreshes Start/Pause + tower light + buzzer). HT172 note.cpp Timer1 does the same
     //(FlushLabel() then DoSystemMessage()).
-    NoteBlinkPhase=!NoteBlinkPhase;
+    //AI(ht160s-panel-sensitivity) 20260706 : ~250ms blink heartbeat, decoupled from
+    //the 10ms scan tick (advance both blink phases together every 25 ticks).
+    iBlinkDiv++;
+    if(iBlinkDiv>=25)
+    {
+        iBlinkDiv=0;
+        NoteBlinkPhase=!NoteBlinkPhase;
+        Blink=!Blink;
+    }
+
     FlushLabel();
     DoSystemMessage();
 
@@ -412,7 +428,6 @@ void __fastcall TfNote::Timer1Timer(TObject *Sender)
     if(FlushPanel==NULL)
         return;
 
-    Blink=!Blink;
     if(Blink)
         FlushPanel->Color=ALARM_COLOR;
     else
