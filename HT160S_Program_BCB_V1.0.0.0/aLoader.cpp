@@ -312,6 +312,33 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
         OtherTray=HSys.VMot.MMLoaderY_2;
     }
 
+    //AI(ht160s-loader) 20260707 (Option B, on-site) : a tray deposited on the rear REST
+    //(awaiting TrayArm pickup) has NO carriage/encoder, so the two-car checks below are
+    //blind to it. A loaded car SORTING at the top rows comes within SafeDist of that parked
+    //tray (rest ~= discharge Y vs the top sort row) and the two overhanging trays clash.
+    //Keep a loaded mover SafeDist away from the rest whenever the rear is occupied. Exempt
+    //the discharging car itself (Status==LS_ToRear : it is the one placing at the rest and
+    //its own retreat runs empty) else it would block its own landing. IsRearOccupied() is
+    //the physical-presence truth (sim: bRearHasTray latch; real: SnLoader_OutputBottomHasTray),
+    //cleared by NotifyTrayArmPickRearTray when the TrayArm takes it -> the mover then proceeds.
+    {
+        TTrayMotor *ThisTrayRear=(LoaderNo==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
+        TLoaderSideState *ThisSideRear=GetSide(LoaderNo);
+        bool bThisDischarging=(ThisSideRear!=NULL && ThisSideRear->Status==LS_ToRear);
+        if(ThisTrayRear!=NULL && ThisTrayRear->fHasTray && bThisDischarging==false &&
+           GeneralSetting.iLoaderYSafeDistance>0 && IsRearOccupied())
+        {
+            int RestAbs=GetLoaderDischargeY(LoaderNo);
+            if(RestAbs<0) RestAbs=-RestAbs;
+            int TgtAbsRear=Position;
+            if(TgtAbsRear<0) TgtAbsRear=-TgtAbsRear;
+            int Diff=TgtAbsRear-RestAbs;
+            if(Diff<0) Diff=-Diff;
+            if(Diff<GeneralSetting.iLoaderYSafeDistance)
+                return false;
+        }
+    }
+
     if(OtherMotor==NULL || OtherTray==NULL)
         return true;
 
