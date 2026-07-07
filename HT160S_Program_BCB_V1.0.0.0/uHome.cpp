@@ -478,10 +478,24 @@ bool TfHome::ProcessMotorHome()
 			//so the head+tray clears any tray below before X moves : opening the clamps is
 			//only needed to release an empty/unknown head. The held tray is then placed on
 			//resume (see TTrayArmModule::InitialFlag bKeepMaterial / DoTrayArm case 100).
-			if(TrayArmModule==NULL || TrayArmModule->HasTray()==false)
 			{
-				HSys.Cyn.C_TrayArm_FrontClamp.Off();
-				HSys.Cyn.C_TrayArm_RearClamp.Off();
+				//AI(ht160s-home) 20260707 : on-site -- an alarm mid-handoff can desync the fHasTray
+				//software latch (HasTray()) from the physical grip, so HOME opened the TrayArm clamps
+				//and DROPPED a held tray. Also honor the physical clamp On sensors (both On = tray
+				//clamped, operator-confirmed 20260707) : open ONLY when neither the software latch NOR
+				//the physical clamp sensors say a tray is held. Real-machine only (sim keeps latch-only:
+				//no physical desync, and the sim OnSensor mirrors the command).
+				bool bTrayArmClampHeld=false;
+#ifndef SOFT_SIMULATE
+				if(HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable && HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn() &&
+				   HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable  && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn())
+					bTrayArmClampHeld=true;
+#endif
+				if((TrayArmModule==NULL || TrayArmModule->HasTray()==false) && bTrayArmClampHeld==false)
+				{
+					HSys.Cyn.C_TrayArm_FrontClamp.Off();
+					HSys.Cyn.C_TrayArm_RearClamp.Off();
+				}
 			}
 #ifdef SOFT_SIMULATE
 			if(bSimNewStep)
