@@ -318,7 +318,19 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
     //AI(HT160S-Maintainer) 20260610 : "opposite-side tray clamped" condition.
     //fHasTray is the logical tray-held state set true after the Push/Lean clamp
     //completes in DoFeedTray, so it is the available proxy for a clamped tray.
-    if(OtherTray->fHasTray==false)
+    //AI(ht160s-loader) 20260707 : the comment above is optimistic -- fHasTray is actually
+    //minted LATE, at DoFeedTray case 9500 (confirm-then-mint), yet the tray is physically
+    //destacked onto the carriage at case 4100 and clamped at 8200/8300. Through that
+    //4100..9500 window the feeding car overhangs a tray while fHasTray is still false, so a
+    //loaded OTHER car read "empty" here and was allowed to close in -> the two overhanging
+    //trays clash (on-site 20260707 : LD1 clamp timing, LD2 hits LD1). Also treat a car that
+    //is mid-FEED (Status==LS_FEEDING) as occupied so the collision backstop protects it for
+    //the WHOLE feed, not only after the late mint. fHasTray still minted at 9500 (confirm-
+    //then-mint invariant intact); the feeding car is stationary at its feed Y and completes
+    //independently, so a blocked mover can never deadlock it.
+    TLoaderSideState *OtherSide=GetOtherSide(LoaderNo);
+    bool bOtherFeeding=(OtherSide!=NULL && OtherSide->Status==LS_FEEDING);
+    if(OtherTray->fHasTray==false && bOtherFeeding==false)
         return true;
 
     //AI(ht160s-sortarm) 20260624 : collision happens ONLY when BOTH cars carry a tray
