@@ -30,6 +30,7 @@ void THT160GeneralSetting::SetDefault()
 	for(int z=0;z<9;z++)
 		iSimAmrMaxTray[z]=10;
 	bUseLotBinSortMode=false;
+	bUsePredictiveAutoSupply=false;
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=true;
 	for(int s=0;s<4;s++)
@@ -93,6 +94,7 @@ void THT160GeneralSetting::Load()
 	for(int z=0;z<9;z++)
 		iSimAmrMaxTray[z]=Ini->ReadInteger("SimAMR", "MaxTray"+IntToStr(z), 10);
 	bUseLotBinSortMode=Ini->ReadBool("SortMode", "UseLotBinMode", false);
+	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
 	for(int s=0;s<4;s++)
@@ -157,6 +159,7 @@ void THT160GeneralSetting::Save()
 	for(int z=0;z<9;z++)
 		Ini->WriteInteger("SimAMR", "MaxTray"+IntToStr(z), iSimAmrMaxTray[z]);
 	Ini->WriteBool("SortMode", "UseLotBinMode", bUseLotBinSortMode);
+	Ini->WriteBool("SortMode", "UsePredictiveAutoSupply", bUsePredictiveAutoSupply);
 	for(int a=0;a<6;a++)
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);
 	for(int s=0;s<4;s++)

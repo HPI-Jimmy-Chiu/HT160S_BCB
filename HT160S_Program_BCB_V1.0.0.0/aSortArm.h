@@ -154,6 +154,7 @@ public:
     int  GetPickTask();        //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
     int  GetPlaceTask();       //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
     AnsiString DescribeHolding();   //AI(ht160s-state-record-analysis) 20260616 : read-only held-IC + routing dump for SortArmDecision.txt
+    int GetHeldTargetAutos(int *OutAutoList, int MaxCount);   //AI(ht160s-predictive-supply) 20260707 : held fixed-route target Autos in place-priority order (Sucker1..4); read-only, no AutoModule callback
     bool MoveSuckerToCell(int SlotIndex, int Target, int Col, int Row, bool bZDown, int &Task);   //AI(ht160s-sortarm-flow) 20260617 : Teach Advanced single-nozzle point test (Target 1=Loader1,2=Loader2,11..16=Auto1..6; Col/Row 0-based)
     bool CanMoveSuckerToCell(int SlotIndex, int Target, int Col, int Row, AnsiString &Err);        //AI(ht160s-sortarm-flow) 20260617 : pre-move validation for the point test
 };

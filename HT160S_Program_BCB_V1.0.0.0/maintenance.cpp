@@ -1030,6 +1030,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     //from the maintenance form when finishing the datum-bias refactor.
     if(chkUseLotBinMode!=NULL)
         chkUseLotBinMode->Checked=GeneralSetting.bUseLotBinSortMode;
+    if(chkUsePredictiveAutoSupply!=NULL)
+        chkUsePredictiveAutoSupply->Checked=GeneralSetting.bUsePredictiveAutoSupply;
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1098,6 +1100,8 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired (bUseTrayDatumModel removed).
     if(chkUseLotBinMode!=NULL)
         GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
+    if(chkUsePredictiveAutoSupply!=NULL)
+        GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1824,6 +1828,16 @@ void __fastcall TfMaintenance::chkUseLotBinModeClick(TObject *Sender)
     RefreshHardwareSettingsStatus();
     ShowMyMessage("Sort mode changed. Please restart the software so the new "
                   "classification mode takes effect cleanly.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkUsePredictiveAutoSupplyClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkUsePredictiveAutoSupply!=NULL)
+        GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
+    RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lotbin) 20260615 : Per-Auto enable (By Lot+Bin mode only). Disabled

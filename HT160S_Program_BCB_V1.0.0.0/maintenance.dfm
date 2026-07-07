@@ -1023,6 +1023,44 @@ object fMaintenance: TfMaintenance
             TabOrder = 0
             object tsFunctionGeneral: TTabSheet
               Caption = 'G[General]'
+              object pnlPredictiveSupplyBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblPredictiveSupplyHint: TLabel
+                  Left = 320
+                  Top = 12
+                  Width = 600
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'When ON, supply the Auto SortArm is waiting for first; OFF = lowest-numbered Auto.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkUsePredictiveAutoSupply: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 300
+                  Height = 20
+                  Caption = 'Predictive Auto tray supply'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkUsePredictiveAutoSupplyClick
+                end
+              end
             end
             object tsNetwork: TTabSheet
               Caption = 'N[Network]'

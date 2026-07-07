@@ -921,6 +921,31 @@ bool TSortArmModule::CanPlaceSlotToAuto(int SlotIndex, int AutoIndex)
     return (bFixedArea==false);
 }
 //---------------------------------------------------------------------------
+int TSortArmModule::GetHeldTargetAutos(int *OutAutoList, int MaxCount)
+{
+    //AI(ht160s-predictive-supply) 20260707 : list the Auto indices the currently-held ICs
+    //are routed to, in the SAME order SelectPlaceAuto serves them (sucker 0..3, fixed-route
+    //ICs only). Lets TrayArm feed the empty Auto SortArm needs next FIRST, so a held IC does
+    //not stall place. Pure read-only : reuses GetMappedAutoIndex/GetSlotRoutingBin, no
+    //AutoModule callback, never changes routing. May list one Auto twice (two suckers, one
+    //Auto); the caller takes the first entry whose Auto currently wants a tray. Returns count.
+    int Count=0;
+
+    if(OutAutoList==NULL || MaxCount<=0)
+        return 0;
+
+    for(int SlotIndex=0; SlotIndex<SORT_ARM_SUCKER_COUNT && Count<MaxCount; SlotIndex++)
+    {
+        if(Slot[SlotIndex].bHasIC==false)
+            continue;
+        bool bFixedArea=false;
+        int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, bFixedArea);
+        if(AutoIndex>=0)
+            OutAutoList[Count++]=AutoIndex;
+    }
+    return Count;
+}
+//---------------------------------------------------------------------------
 bool TSortArmModule::FindPlaceCells(int AutoIndex)
 {
     //AI(HT160S-Maintainer) 20260605 : AMR gate. In AMR mode the first two trays of each

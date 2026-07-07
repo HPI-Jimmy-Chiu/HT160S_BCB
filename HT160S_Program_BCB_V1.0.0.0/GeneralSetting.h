@@ -40,6 +40,15 @@ public:
 	// Stored in General.ini [SortMode] UseLotBinMode.
 	bool bUseLotBinSortMode;
 
+	// AI(ht160s-predictive-supply) 20260707 : demand-aware TrayArm replenish order.
+	// When true, FindTrayRequestAuto first serves an Auto that SortArm is currently
+	// holding a fixed-route IC for (mirrors SortArm sucker 1..4 place order), so the
+	// Auto SortArm needs next gets its empty tray before the plain lowest-index scan.
+	// Only reorders Autos GetTrayRequest already approves; never changes IC routing or
+	// the AMR tray kind. Off (default) = legacy lowest-index-first. Stored in General.ini
+	// [SortMode] UsePredictiveAutoSupply.
+	bool bUsePredictiveAutoSupply;
+
 	// Per-Auto enable (By Lot+Bin mode only). When bAutoEnabled[i]==false, Auto(i+1)
 	// is skipped by THT160LotBinBinding::ResolveAuto so no new (LotID,Bin) pair binds
 	// to it; existing bindings still resolve. Index 0..5 = Auto1..Auto6. Default all

@@ -1138,6 +1138,30 @@ int TAutoModule::GetTrayRequest(int Index)
 int TAutoModule::FindTrayRequestAuto(int &OutKind)
 {
     OutKind=eTrayReqNone;
+    //AI(ht160s-predictive-supply) 20260707 : Phase 1 (opt-in). Prefer an Auto that SortArm
+    //is CURRENTLY holding a fixed-route IC for and that still wants a tray, so the Auto on
+    //SortArm's critical path gets its empty tray before the plain lowest-index scan and the
+    //held IC does not stall (silent SelectPlaceAuto / PlaceTask=1 freeze). We only REORDER
+    //the set GetTrayRequest already approves : each candidate is re-checked with GetTrayRequest
+    //(so occupied / pending / AMR-locked / CleanOut Autos are still refused) and OutKind
+    //carries the Auto's OWN requested kind (never overridden), so AMR stack order stays
+    //intact. Iteration order = SortArm sucker 0..3 = its own place order (SelectPlaceAuto).
+    //Falls through to the unchanged lowest-index scan when off or when SortArm holds nothing
+    //that maps to a requesting Auto.
+    if(GeneralSetting.bUsePredictiveAutoSupply && SortArmModule!=NULL)
+    {
+        int Targets[4];   //max SortArm suckers (SORT_ARM_SUCKER_COUNT)
+        int nTargets=SortArmModule->GetHeldTargetAutos(Targets, 4);
+        for(int t=0; t<nTargets; t++)
+        {
+            int Req=GetTrayRequest(Targets[t]);
+            if(Req!=eTrayReqNone)
+            {
+                OutKind=Req;
+                return Targets[t];
+            }
+        }
+    }
     for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
     {
         int Req=GetTrayRequest(Index);

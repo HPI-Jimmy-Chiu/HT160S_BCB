@@ -137,6 +137,9 @@ __published:
     TPanel *pnlFunctionDefBody;
     TPageControl *pgcFunctionDef;
     TTabSheet *tsFunctionGeneral;
+    TPanel *pnlPredictiveSupplyBox;
+    TCheckBox *chkUsePredictiveAutoSupply;
+    TLabel *lblPredictiveSupplyHint;
     TTabSheet *tsMaintTeach;
     TTabSheet *tsMaintMotor;
     TTabSheet *tsMaintIO;
@@ -361,6 +364,7 @@ __published:
     void __fastcall chkHardwareColorBinAreaClick(TObject *Sender);
     void __fastcall chkUseAMRClick(TObject *Sender);
     void __fastcall chkUseLotBinModeClick(TObject *Sender);
+    void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
     void __fastcall edLoaderSafeDistanceClick(TObject *Sender);
