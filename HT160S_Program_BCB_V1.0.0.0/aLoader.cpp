@@ -577,6 +577,14 @@ void TLoaderModule::SetExpectedCarTrayCount(int n)
 //Single source of truth for the kind-by-position rule.
 eTrayKind TLoaderModule::GetFedTrayKind(int feedSerial, int total)
 {
+    //AI(ht160s-amr0-fix) 20260708 : identity/cover stack ordering is an AMR-supply
+    //concept only. Under manual production (bUseAMR==false) iFeedSerial is not bounded
+    //by a real magazine total (it resets only at init / via the AGV coordinator, which
+    //is inert when AMR is off), so once it passes iSimAmrMaxTray[0] every fed tray would
+    //be spuriously tagged Identity and misrouted back to Color in DecidePlaceDestAfterPick.
+    //Force Normal so recovered empties recycle to the Empty pool / requesting Autos.
+    if(GeneralSetting.bUseAMR==false)
+        return eTrayKindNormal;
     if(feedSerial>=total)
         return eTrayKindIdentity;
     if(feedSerial==total-1)
