@@ -278,7 +278,7 @@ bool TLoaderModule::MoveLoaderY(int LoaderNo, int Position)
     return Motor->MotorMove(Position);
 }
 //---------------------------------------------------------------------------
-bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
+bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position, AnsiString *WhyBlocked)
 {
     //AI(HT160S-Maintainer) 20260610 : framework for option C (opposite-side tray
     //clamped + minimum distance). The two Loader-Y cars share the same physical
@@ -318,15 +318,18 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
     //tray (rest ~= discharge Y vs the top sort row) and the two overhanging trays clash.
     //Keep a loaded mover SafeDist away from the rest whenever the rear is occupied. Exempt
     //the discharging car itself (Status==LS_ToRear : it is the one placing at the rest and
-    //its own retreat runs empty) else it would block its own landing. IsRearOccupied() is
-    //the physical-presence truth (sim: bRearHasTray latch; real: SnLoader_OutputBottomHasTray),
-    //cleared by NotifyTrayArmPickRearTray when the TrayArm takes it -> the mover then proceeds.
+    //its own retreat runs empty) else it would block its own landing. PeekRearOccupied() is
+    //the NON-MUTATING physical-presence truth (sim: bRearHasTray latch, cleared by
+    //NotifyTrayArmPickRearTray; real: live SnLoader_OutputBottomHasTray going OFF once the
+    //TrayArm lifts the tray clear, latch fallback when the sensor is disabled).
+    //RefreshRearState is deliberately NOT called here so the per-tick interlock and the
+    //DescribeState state-record dump stay read-only (no latch writes from this path).
     {
         TTrayMotor *ThisTrayRear=(LoaderNo==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
         TLoaderSideState *ThisSideRear=GetSide(LoaderNo);
         bool bThisDischarging=(ThisSideRear!=NULL && ThisSideRear->Status==LS_ToRear);
         if(ThisTrayRear!=NULL && ThisTrayRear->fHasTray && bThisDischarging==false &&
-           GeneralSetting.iLoaderYSafeDistance>0 && IsRearOccupied())
+           GeneralSetting.iLoaderYSafeDistance>0 && PeekRearOccupied())
         {
             int RestAbs=GetLoaderDischargeY(LoaderNo);
             if(RestAbs<0) RestAbs=-RestAbs;
@@ -335,7 +338,11 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
             int Diff=TgtAbsRear-RestAbs;
             if(Diff<0) Diff=-Diff;
             if(Diff<GeneralSetting.iLoaderYSafeDistance)
+            {
+                if(WhyBlocked!=NULL)
+                    *WhyBlocked="rear-rest";
                 return false;
+            }
         }
     }
 
@@ -398,11 +405,15 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
         //this car leads : stay at least SafeDist ahead (forward moves always pass)
         if(Tgt>=OtherPos+GeneralSetting.iLoaderYSafeDistance)
             return true;
+        if(WhyBlocked!=NULL)
+            *WhyBlocked=(OtherTray->fHasTray==false) ? AnsiString("gap:other-feeding") : AnsiString("gap:both-loaded");
         return false;
     }
     //this car trails : stay at least SafeDist behind
     if(Tgt<=OtherPos-GeneralSetting.iLoaderYSafeDistance)
         return true;
+    if(WhyBlocked!=NULL)
+        *WhyBlocked=(OtherTray->fHasTray==false) ? AnsiString("gap:other-feeding") : AnsiString("gap:both-loaded");
     return false;
 }
 //---------------------------------------------------------------------------
@@ -626,6 +637,25 @@ bool TLoaderModule::IsOutputBottomOccupied()
     else if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true)
         return HSys.Sen.SnLoader_OutputBottomHasTray.IsOn();
     return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-loader) 20260708 : NON-MUTATING value-identical twin of IsRearOccupied().
+//IsRearOccupied() calls RefreshRearState() first, which reads the rear sensor and can
+//WRITE bRearHasTray / clear bRearReadyForPick+bRearResidualAlarmed -- side effects that
+//must not run from the IsLoaderYMoveSafe interlock (polled every Loader/SortArm Y-move
+//tick) nor from the DescribeState state-record dump (documented read-only; Empty's
+//ComputeRearPickReadyNoRefresh is the same pattern). Value-equivalence per config :
+//sim -> bRearHasTray latch (RefreshRearState is a sim no-op, so IsRearOccupied returns
+//the latch too); real+sensor-enabled -> live sensor (exactly what the refresh would
+//latch); real+sensor-disabled -> refresh leaves the latch unchanged -> latch here too.
+//Keep in lockstep with RefreshRearState if its semantics ever change.
+bool TLoaderModule::PeekRearOccupied()
+{
+    if(IsSoftSimulate())
+        return bRearHasTray;
+    if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true)
+        return HSys.Sen.SnLoader_OutputBottomHasTray.IsOn();
+    return bRearHasTray;
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::RefreshRearState()
@@ -2234,10 +2264,17 @@ AnsiString TLoaderModule::DescribeState()
             int fy = GetLoaderFeedY(k);
             int dy = GetLoaderDischargeY(k);
             int sy = (k==1) ? Teach.Loader1CarFirstSortYPosition : Teach.Loader2CarFirstSortYPosition;   //AI(ht160s-state-record-analysis) 20260625 : first sort row Y (diagnostic only)
+            //AI(ht160s-loader) 20260708 : log the computed verdict WITH the refusing rule
+            //(rear-rest / gap:*) -- a bare BLOCK was three-way ambiguous in a hang snapshot.
+            //Same six IsLoaderYMoveSafe calls as before (now side-effect-free via Peek).
+            AnsiString wf="", wd="", ws="";
+            bool okF=IsLoaderYMoveSafe(k, fy, &wf);
+            bool okD=IsLoaderYMoveSafe(k, dy, &wd);
+            bool okS=IsLoaderYMoveSafe(k, sy, &ws);
             s += "  Side" + IntToStr(k)
-               + " ->feed(" + IntToStr(fy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, fy) ? "OK" : "BLOCK")
-               + "  ->disc(" + IntToStr(dy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, dy) ? "OK" : "BLOCK")
-               + "  ->sort(" + IntToStr(sy) + ")=" + AnsiString(IsLoaderYMoveSafe(k, sy) ? "OK" : "BLOCK")
+               + " ->feed(" + IntToStr(fy) + ")=" + (okF ? AnsiString("OK") : AnsiString("BLOCK(")+wf+AnsiString(")"))
+               + "  ->disc(" + IntToStr(dy) + ")=" + (okD ? AnsiString("OK") : AnsiString("BLOCK(")+wd+AnsiString(")"))
+               + "  ->sort(" + IntToStr(sy) + ")=" + (okS ? AnsiString("OK") : AnsiString("BLOCK(")+ws+AnsiString(")"))
                + "\r\n";
         }
     }

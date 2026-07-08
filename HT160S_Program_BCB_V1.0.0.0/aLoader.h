@@ -92,6 +92,7 @@ private:
     bool MoveToCcdCell(int LoaderNo, int CellX, int CellY);
     bool IsOutputBottomOccupied();
     bool IsRearOccupied();
+    bool PeekRearOccupied();   //AI(ht160s-loader) 20260708 : non-mutating value-identical twin of IsRearOccupied() (no RefreshRearState) for the interlock + DescribeState dump paths (Empty ComputeRearPickReadyNoRefresh precedent)
     void RefreshRearState();
     bool AcquireFrontOwner(int LoaderNo);
     void ReleaseFrontOwner(int LoaderNo);
@@ -125,7 +126,10 @@ public:
     void SetCurrentLotNumber(AnsiString Lot);
     bool IsLoaderReadyForSort(int LoaderNo);
     bool HasPickableIC(int LoaderNo);                     //AI(ht160s-sortarm) 20260625 : tray-content "still has pickable ICs" predicate (LS_ToRear-transient-safe) for DoSortArm sticky-side commit
-    bool IsLoaderYMoveSafe(int LoaderNo, int Position);   //AI(ht160s-sortarm) 20260624 : public so SortArm's shared-rail Loader-Y move reuses this canonical cross-side gap interlock (was private)
+    //AI(ht160s-loader) 20260708 : optional WhyBlocked out-param (default arg ONLY here, not at
+    //the definition) tags the refusing rule for the DescribeState dump : "rear-rest" /
+    //"gap:other-feeding" / "gap:both-loaded". Production callers pass nothing.
+    bool IsLoaderYMoveSafe(int LoaderNo, int Position, AnsiString *WhyBlocked=NULL);   //AI(ht160s-sortarm) 20260624 : public so SortArm's shared-rail Loader-Y move reuses this canonical cross-side gap interlock (was private)
     int GetSortingLoaderNo();
     int GetLoaderStatus(int LoaderNo);
     bool AcquireSortOwner(int LoaderNo);
