@@ -33,6 +33,7 @@ TTrayArmModule::TTrayArmModule()
     iDeliverKind=eTrayKindNormal;
     PlaceDest=TAPLACE_AUTO;
     bCleanOutFinish=true;
+    bResiduePendingNotify=false;
     InitialFlag();
 }
 //---------------------------------------------------------------------------
@@ -41,6 +42,31 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     bHasTray=false;
     if(HSys.VMot.MMTrayArmX!=NULL)
         bHasTray=HSys.VMot.MMTrayArmX->fHasTray;
+    //AI(ht160s-home-residue) 20260708 : C1 follow-up to 05bc5c9. HOME now keeps the clamps
+    //CLOSED when the physical clamp On sensors read held while the fHasTray latch desynced
+    //to false (alarm inside the pick window between the clamp-close at DoLowerClampRaise
+    //case 2000 and the latch set at DoPick case 4000). Without this block InitialFlag would
+    //declare the arm empty and DoTrayArm would dispatch a fresh pick that Z-downs CLOSED-
+    //JAWED onto an occupied source rear (double-stack jam). Adopt the sensor-held tray as
+    //RESIDUE instead : fHasTray=true so the existing DoTrayArm case-100 residue guard idles
+    //the arm, and force the non-keep branch below (a mid-pick job has a stale destination /
+    //uncopied grid, so it must NOT resume as a valid carry). Both-On = high-certainty held
+    //(operator-confirmed 20260707); DUMMY tier skipped (no material by definition, same gate
+    //as the DoLoader rear-leftover watchdog). Un-adopt lives in DoTrayArm case 100.
+    bool bAdoptedResidue=false;
+#ifndef SOFT_SIMULATE
+    if(bHasTray==false &&
+       HSys.LastSet.iRealDummy!=DUMMY &&
+       HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable && HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn() &&
+       HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable  && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn())
+    {
+        bHasTray=true;
+        if(HSys.VMot.MMTrayArmX!=NULL)
+            HSys.VMot.MMTrayArmX->fHasTray=true;
+        bAdoptedResidue=true;
+        bResiduePendingNotify=true;
+    }
+#endif
     PickTask=1;
     PlaceTask=1;
     bCleanOutFinish=true;
@@ -55,7 +81,7 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     //clamps are kept closed during the home (see uHome ProcessMotorHome) so the tray rides
     //up with the head and is never dropped. Only the transient pick/place sub-tasks above
     //are restarted.
-    if(bKeepMaterial && bHasTray)
+    if(bKeepMaterial && bHasTray && bAdoptedResidue==false)
     {
         Status=TAS_CARRYING;
         return;
@@ -994,6 +1020,33 @@ void TTrayArmModule::DoTrayArm(int &Task)
                     Task=2000;
                     break;
                 }
+#ifndef SOFT_SIMULATE
+                //AI(ht160s-home-residue) 20260708 : residue recovery. (1) Un-adopt : once the
+                //operator opened the clamps and removed the tray (an enabled clamp On sensor
+                //exists and none reads On), release the fHasTray latch so production resumes
+                //WITHOUT an application restart -- covers both a sensor-adopted residue and a
+                //legacy abort residue removed via Teach. (2) One-shot notify for the adopted
+                //residue (silent-stop rule : an arm pinned holding an unidentified tray must
+                //tell the operator; unknown Kind/ID means operator removal, MES0924 rationale).
+                {
+                    bool bFrontEn=HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable;
+                    bool bRearEn =HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable;
+                    bool bAnyOn  =(bFrontEn && HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn()) ||
+                                  (bRearEn  && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn());
+                    if((bFrontEn || bRearEn) && bAnyOn==false)
+                    {
+                        if(HSys.VMot.MMTrayArmX!=NULL)
+                            HSys.VMot.MMTrayArmX->fHasTray=false;
+                        bHasTray=false;
+                        bResiduePendingNotify=false;
+                    }
+                    else if(bResiduePendingNotify)
+                    {
+                        bResiduePendingNotify=false;
+                        ShowMyError("MES1722", LangT("TrayArm holds an unidentified tray - open the clamps in Teach and remove it"), K_RETRY);
+                    }
+                }
+#endif
                 Status=TAS_IDLE;
                 break;
             }

@@ -952,19 +952,22 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
         //prefix after Auto6's 16xx; xx21 = the "supply not ready" slot, cf. MES1021/MES1421).
         //Caveat : if AUTO_STATION_COUNT ever grows to 7 the generated Auto family would
         //also want 17xx -- re-home the TrayArm family (e.g. 18xx) in that case.
-        const char *SeedCode[18]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
+        //AI(ht160s-home-residue) 20260708 : MES1722 = TrayArm sensor-adopted residue tray
+        //(clamps physically held a tray through HOME while fHasTray was desynced) --
+        //operator removes it (same unknown-Kind/ID rationale as MES0924).
+        const char *SeedCode[19]={"MES0920","MES0921","JAM0913","WAR0330","WAR0475",
                                   "MES1021","MES1022","MES1023","MES1024","JAM1030",
                                   "MES1421","MES1422","MES1424","MES1426","MES1427","WAR0154",
-                                  "MES0924","MES1721"};
-        const int   SeedType[18]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
+                                  "MES0924","MES1721","MES1722"};
+        const int   SeedType[19]={eMessageErr,eMessageErr,eJamErr,eOther,eOther,
                                   eMessageErr,eMessageErr,eMessageErr,eMessageErr,eJamErr,
                                   eMessageErr,eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther,
-                                  eMessageErr,eMessageErr};
-        const char *SeedMsg[18]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
+                                  eMessageErr,eMessageErr,eMessageErr};
+        const char *SeedMsg[19]={"Loader Tray Empty","Loader Tray Count Mismatch","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
                                  "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Empty supply stack full (sensor)","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
                                  "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Color supply stack full (sensor)","Sorting Arm X motor will out of limit",
-                                 "Loader rear has a leftover tray","TrayArm pick blocked - rear source not ready"};
-        for(int si=0; si<18; si++)
+                                 "Loader rear has a leftover tray","TrayArm pick blocked - rear source not ready","TrayArm holds an unidentified tray"};
+        for(int si=0; si<19; si++)
         {
             AnsiString cd=SeedCode[si], mg=SeedMsg[si];
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");

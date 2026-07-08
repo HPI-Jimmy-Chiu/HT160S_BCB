@@ -72,6 +72,7 @@ private:
     bool bPickWaitArmed;               //AI(ht160s-rearready-p0) 20260705 : watchdog armed latch (MES0920-style : at most one Note per full window)
     unsigned int dwPickGateLastPollTick;   //AI(ht160s-rearready-p0) 20260705 : GetTickCount of the last blocked poll; a gap > scan-gap means MainProc was suspended (modal Note / IO Set View) or the machine was stopped -- re-arm the window instead of charging that span (ion-fan precedent)
     unsigned int dwZUpLostStart;       //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce (GetTickCount of first loss; 0=clear)
+    bool bResiduePendingNotify;        //AI(ht160s-home-residue) 20260708 : one-shot operator notify pending for a sensor-adopted held tray (set at InitialFlag adopt, fired/cleared in DoTrayArm case 100)
 
     bool IsSoftSimulate();
     bool MoveTrayArmX(int Position);

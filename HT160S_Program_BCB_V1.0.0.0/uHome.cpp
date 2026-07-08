@@ -481,14 +481,17 @@ bool TfHome::ProcessMotorHome()
 			{
 				//AI(ht160s-home) 20260707 : on-site -- an alarm mid-handoff can desync the fHasTray
 				//software latch (HasTray()) from the physical grip, so HOME opened the TrayArm clamps
-				//and DROPPED a held tray. Also honor the physical clamp On sensors (both On = tray
-				//clamped, operator-confirmed 20260707) : open ONLY when neither the software latch NOR
-				//the physical clamp sensors say a tray is held. Real-machine only (sim keeps latch-only:
-				//no physical desync, and the sim OnSensor mirrors the command).
+				//and DROPPED a held tray. Also honor the physical clamp On sensors : keep the clamps
+				//CLOSED when EITHER enabled clamp On sensor reads On (conservative never-drop : the
+				//clamps actuate only as a lockstep pair, aTrayArm DoLowerClampRaise, so a single
+				//dead-off reed must not defeat this guard; the both-On AND form stays the high-
+				//certainty signal used by the InitialFlag residue adopt -- two predicates on purpose).
+				//Open ONLY when neither the software latch NOR any enabled sensor says held.
+				//Real-machine only (sim keeps latch-only : no physical desync there).
 				bool bTrayArmClampHeld=false;
 #ifndef SOFT_SIMULATE
-				if(HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable && HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn() &&
-				   HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable  && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn())
+				if((HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable && HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn()) ||
+				   (HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable  && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn()))
 					bTrayArmClampHeld=true;
 #endif
 				if((TrayArmModule==NULL || TrayArmModule->HasTray()==false) && bTrayArmClampHeld==false)
