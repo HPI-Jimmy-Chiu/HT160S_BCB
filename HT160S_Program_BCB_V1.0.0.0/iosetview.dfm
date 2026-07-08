@@ -1648,22 +1648,6 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnEmpty_OutputBottomHasTray'
             end
-            object mlSnEmpty_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnEmpty_TrayPos1'
-            end
-            object mlSnEmpty_TrayPos2: TMyLed
-              Left = 455
-              Top = 136
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnEmpty_TrayPos2'
-            end
             object mlSnEmpty_InputEnd: TMyLed
               Left = 6
               Top = 61

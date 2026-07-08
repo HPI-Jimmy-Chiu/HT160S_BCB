@@ -96,8 +96,6 @@ __published:
     TMyLed *mlSnEmpty_InputHasTray;
     TMyLed *mlSnEmpty_InputFullTray;
     TMyLed *mlSnEmpty_OutputBottomHasTray;
-    TMyLed *mlSnEmpty_TrayPos1;
-    TMyLed *mlSnEmpty_TrayPos2;
     TMyLed *mlC_Empty_FrontRiseTray_1_Off;
     TBtnPanel *bpC_Empty_LeanOnTray;
     TBtnPanel *bpC_Empty_FrontRiseTray_1;

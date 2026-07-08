@@ -1060,8 +1060,6 @@ void SYSTEM_MODULAR::InitialSensorName()
     Sen.SnSafeAuto6.Name="SnSafeAuto6";
     Sen.SnEmpty_InputHasTray.Name="SnEmpty_InputHasTray";
     Sen.SnEmpty_InputFullTray.Name="SnEmpty_InputFullTray";
-    Sen.SnEmpty_TrayPos1.Name="SnEmpty_TrayPos1";
-    Sen.SnEmpty_TrayPos2.Name="SnEmpty_TrayPos2";
     Sen.SnEmpty_OutputBottomHasTray.Name="SnEmpty_OutputBottomHasTray";
     Sen.SnEmpty_InputEnd.Name="SnEmpty_InputEnd";
     Sen.SnLoader_InputHasTray.Name="SnLoader_InputHasTray";

@@ -285,8 +285,6 @@ typedef struct SENSOR_MODULAR_STRUCT
     TMySensor SnSafeAuto6;
     TMySensor SnEmpty_InputHasTray;
     TMySensor SnEmpty_InputFullTray;
-    TMySensor SnEmpty_TrayPos1;
-    TMySensor SnEmpty_TrayPos2;
     TMySensor SnEmpty_OutputBottomHasTray;
     TMySensor SnEmpty_InputEnd;
     TMySensor SnLoader_InputHasTray;
