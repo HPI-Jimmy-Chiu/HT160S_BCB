@@ -692,6 +692,19 @@ bool TEmptyModule::DoGoUpTray(int Flag)
             break;
 
         case 10:
+            //AI(ht160s-goup-hastray-gate) 20260708 : confirm a FRONT tray is present before the
+            //raise. With an empty front rest the rise + Separate-pawl release (case 410) drops the
+            //stack above by one pitch (loud bang). No front tray -> skip the front raise (case
+            //100-600) and jump to rear handling (case 1000) so CleanOut drain and bReturnTray
+            //rear-return still complete. Mirrors DoGoDownTray case 10; sensor SnEmpty_InputHasTray
+            //-> bFrontHasTray. sim/dummy RefreshStateFromSensors early-returns and keeps the
+            //caller-maintained latch, so sim is unaffected.
+            RefreshStateFromSensors();
+            if(bFrontHasTray==false)
+            {
+                GoUpTask=1000;   //no front tray -> rear-handling terminal only, no empty raise
+                break;
+            }
             GoUpTask=100;
             break;
 
