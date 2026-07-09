@@ -1004,7 +1004,12 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
                 if(LotBinBinding.GetBindingByIndex(j, BindLotID, BindBin, BindAuto) && BindAuto==i)
                 {
                     if(bPassFailMode)
-                        sBin=(BindBin==PassBin)?AnsiString("PASS"):AnsiString("FAIL");
+                    {
+                        if(BindBin==PassBin)
+                            sBin=AnsiString("PASS");
+                        else
+                            sBin=AnsiString("FAIL");
+                    }
                     else
                         sBin=IntToStr(BindBin);
                     sLot=BindLotID;
