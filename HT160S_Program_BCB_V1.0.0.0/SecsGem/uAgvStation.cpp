@@ -22,9 +22,11 @@
 #include "aLoader.h"          // LoaderModule (P1 infeed handoff)
 #include "aEmpty.h"           // EmptyModule  (P2 infeed handoff)
 #include "aColor.h"           // ColorModule  (P3 infeed handoff)
+#include "uAmrInject.h"      // AI(ht160s-agv) 20260708 : AMR manual-inject test facility
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 TAgvCoordinator AgvCoord;
+TAmrInject AmrInject;
 
 // AI(ht160s-agv) 20260625 : ServiceHandshake runs on the THGem 1s tick (see
 // HT160Gem::ServiceAgv). A station that enters AGV_PREP / AGV_READY but never
@@ -228,7 +230,7 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             CarrierID[si] = Car->CarID;
         }
 
-        bool bFull = AutoModule->IsOutputCarFullForAmr(a);
+        bool bFull = AutoModule->IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
         // AI(ht160s-agv) 20260627 : do NOT re-CALL an Auto the operator is taking after a
         // station-side full-wait timeout (AbortAutoHandshake set Handshake=AGV_IDLE);
         // IsOperatorHolding is cleared by HOME/InitialFlag so re-CALL then resumes.
@@ -254,7 +256,7 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
     // count to 0; real reads SnX_Input(e)nd OFF). Mirrors the Auto full-call above.
     for(int p = 0; p < 3; p++)
     {
-        bool bShort = InfeedShortage(p);
+        bool bShort = InfeedShortage(p) || AmrInject.InputShort(p);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
         if(bShort && Handshake[p]==AGV_IDLE)
         {
             SupplementBitmap = BuildBitmap(AgvStation[p].PIndex);
@@ -290,7 +292,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         unsigned char hsBefore = Handshake[si];
         if(Handshake[si]==AGV_PREP)
         {
-            if(AutoModule->IsDrainedForAmr(a))
+            if(AutoModule->IsDrainedForAmr(a) || AmrInject.AutoDrained(a))   //AI(ht160s-agv) 20260708 : test-mode inject (SECS-273 gate only)
             {
                 StatusBitmap = BuildBitmap(AgvStation[si].PIndex);
                 Gem->EventReport(0, 273);   // CEID273 AGVLDUnLDStatus (Ready)
@@ -299,7 +301,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         }
         else if(Handshake[si]==AGV_READY)
         {
-            if(AutoModule->IsAmrTaken(a))
+            if(AutoModule->IsAmrTaken(a) || AmrInject.AutoTaken(a))   //AI(ht160s-agv) 20260708 : test-mode inject (one-shot)
             {
                 FinishBitmap = BuildBitmap(AgvStation[si].PIndex);
                 Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish
@@ -332,7 +334,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         unsigned char hsBefore = Handshake[p];
         if(Handshake[p]==AGV_PREP)
         {
-            if(InfeedReady(p))
+            if(InfeedReady(p) || AmrInject.InputReady(p))   //AI(ht160s-agv) 20260708 : test-mode inject (SECS-273 gate only)
             {
                 StatusBitmap = BuildBitmap(AgvStation[p].PIndex);
                 Gem->EventReport(0, 273);   // CEID273 AGVLDUnLDStatus (Ready)
@@ -341,7 +343,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         }
         else if(Handshake[p]==AGV_READY)
         {
-            if(InfeedFinished(p))
+            if(InfeedFinished(p) || AmrInject.InputFinish(p))   //AI(ht160s-agv) 20260708 : test-mode inject (one-shot)
             {
                 FinishBitmap = BuildBitmap(AgvStation[p].PIndex);
                 Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish
@@ -451,6 +453,7 @@ AnsiString TAgvCoordinator::DescribeAgvState()
            + " hs="    + AnsiString(AgvHsName(Handshake[i]))
            + " ready=" + IntToStr(iReady) + "\r\n";
     }
+    s += AmrInject.Describe();   //AI(ht160s-agv) 20260708 : test-mode + armed-latch state
     return s;
 }
 //---------------------------------------------------------------------------

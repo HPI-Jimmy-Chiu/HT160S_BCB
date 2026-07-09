@@ -18,6 +18,7 @@
 #include "aEmpty.h"   //AI(ht160s-actuator-timer) 20260627 : EmptyModule->PauseTimeoutTimers (AmrFeedWaitTimer freeze)
 #include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() in CheckCleanOutFinish
 #include "cprod.h"
+#include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject test mode on machine start
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
 #include "note.h"                       //AI(HT160S-Maintainer) 20260603 : ShowSystemError for ProcessAlarm dispatch
@@ -1133,6 +1134,7 @@ eMachineStartResult MachineStart(eMachineTrigger trig, AnsiString &Reason)
 		return msRejBusy;
 	if(fMain->CheckLotDataReady(Reason)==false)
 		return msRejNotReady;
+	AmrInject.Reset();   //AI(ht160s-agv) 20260708 : any machine start clears AMR manual-inject test mode + latches (no leak into a real run)
 	RecordProcess(AnsiString("MACHINE START by ")+MachineTriggerName(trig));
 	fMain->DoStartArm();
 	return msStarted;

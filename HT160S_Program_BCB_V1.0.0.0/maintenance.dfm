@@ -58,7 +58,7 @@ object fMaintenance: TfMaintenance
       ParentFont = False
       OnClick = spbMaintenanceMenuClick
     end
-    object spbMaintSoftSimu: TSpeedButton
+    object spbMaintAmr: TSpeedButton
       Left = 8
       Top = 120
       Width = 180
@@ -965,14 +965,14 @@ object fMaintenance: TfMaintenance
           OnClick = PwReloadClick
         end
       end
-      object tsMaintSoftSimu: TTabSheet
+      object tsMaintAmr: TTabSheet
         Caption = 'AMR'
         object memAmrStatus: TMemo
           Left = 0
           Top = 0
-          Width = 941
+          Width = 430
           Height = 915
-          Align = alClient
+          Align = alLeft
           Font.Charset = ANSI_CHARSET
           Font.Color = clWindowText
           Font.Height = -13
@@ -982,6 +982,61 @@ object fMaintenance: TfMaintenance
           ReadOnly = True
           ScrollBars = ssVertical
           TabOrder = 0
+        end
+        object chkAmrTestMode: TCheckBox
+          Left = 440
+          Top = 8
+          Width = 490
+          Height = 20
+          Caption = 'Enable AMR manual-inject test mode (bypass sensor edge only)'
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -13
+          Font.Name = 'MS Sans Serif'
+          Font.Style = []
+          ParentFont = False
+          TabOrder = 1
+          OnClick = chkAmrTestModeClick
+        end
+        object pnlAmrTestBanner: TPanel
+          Left = 440
+          Top = 32
+          Width = 495
+          Height = 24
+          Caption = '*** AMR TEST MODE ON - injection active, do NOT run real production ***'
+          Color = clRed
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWhite
+          Font.Height = -13
+          Font.Name = 'MS Sans Serif'
+          Font.Style = [fsBold]
+          ParentFont = False
+          TabOrder = 2
+          Visible = False
+        end
+        object pnlAmrInject: TPanel
+          Left = 440
+          Top = 60
+          Width = 495
+          Height = 560
+          BevelInner = bvLowered
+          Caption = ''
+          TabOrder = 3
+        end
+        object memAmrTx: TMemo
+          Left = 440
+          Top = 624
+          Width = 495
+          Height = 288
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -12
+          Font.Name = 'Courier New'
+          Font.Style = []
+          ParentFont = False
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 4
         end
       end
       object tsMaintFunctionDef: TTabSheet

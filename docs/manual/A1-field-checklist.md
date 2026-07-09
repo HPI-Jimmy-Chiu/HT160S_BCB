@@ -37,7 +37,7 @@
 - [ ] RadioGroup6 對應狀態列在記憶體 enum 為 LED_Heating，DFM 列標題為 "Reserved" 且 Visible=False；Heating/Reserved 之實際語意需現場確認
 - [ ] Heating（記憶體 LED_Heating）與畫面 "Reserved" 標籤之間的對應與實際語意，需現場確認
 - [ ] cbCommType（Option 分頁 "CommType" 勾選框）在 DFM 中存在，但 LoadHardwareSettings/SaveHardwareSettings 與其他 cpp 程式均未引用，實際作用無法從原始碼確認
-- [ ] Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）；tsMaintPassword、tsMaintSoftSimu 分頁在 DFM 中為空白頁，實際內容/功能未在本檔出現
+- [ ] Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）；tsMaintPassword 分頁在 DFM 中為空白頁，實際內容/功能未在本檔出現
 - [ ] cbbMCUColor（Color 下拉 GREEN/RED）在送出按鈕程式中未被讀取（Send 動作改用 edMCULightValue 的 Color Code），此下拉是否仍生效需現場確認
 - [ ] chkMCUCodeSymbol（"Symbol Code"）勾選框 DFM 有定義，但 btnMCUSend* 程式未引用，作用需現場確認
 - [ ] btnTopCcdShot 的 DFM Caption 螢幕文字未逐字讀取（由 .h/.cpp 確認為拍照觸發鈕），確切螢幕文字以現場為準

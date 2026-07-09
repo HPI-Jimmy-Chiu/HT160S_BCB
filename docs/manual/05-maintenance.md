@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | spbMaintTowerLight | button | 切換到號誌燈與音樂設定分頁 (tsMaintTowerLight) |
 | spbMaintPassword | button | 切換到密碼分頁 (tsMaintPassword，目前為空白頁) |
-| spbMaintSoftSimu | button | 切換到軟體模擬分頁 (tsMaintSoftSimu，目前為空白頁) |
+| spbMaintAmr | button | 切換到 AMR 狀態分頁 (tsMaintAmr)；分頁內 memAmrStatus 唯讀顯示 AgvCoord.DescribeAgvState() 的即時 AMR/AGV 握手狀態 |
 | spbMaintFunctionDef | button | 切換到功能定義分頁（含 G[General]、N[Network] 子頁，Network 內容隱藏） |
 | spbMaintHardware | button | 切換到硬體安裝設定分頁 (tsMaintHardware，內含 Loader/Unloader、ErrorMag、Sort Arm、Option、Lot Info 子頁) |
 | spbMaintIO | button | 開啟 IO 監看畫面 (fiosetview，ShowModal)；機台運轉 (SystemStart) 時按鈕被停用且點擊無作用 |
@@ -170,7 +170,7 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 | lblHardwareErrorCode1000 | 顯示 | 1000 = 2D scan fail -> [區域]（2D 掃描失敗對應的 BinArea，唯讀） |
 | lblHardwareErrorCode1001 | 顯示 | 1001 = no bin setting -> [區域]（無 Bin 設定對應的 BinArea，唯讀） |
 
-> 【待補：Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）；tsMaintPassword、tsMaintSoftSimu 分頁在 DFM 中為空白頁，實際內容/功能未在本檔出現。】
+> 【待補：Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）；tsMaintPassword 分頁在 DFM 中為空白頁，實際內容/功能未在本檔出現。】
 
 ---
 

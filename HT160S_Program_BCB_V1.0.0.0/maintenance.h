@@ -66,7 +66,7 @@ __published:
     TPanel *pnlMenu;
     TSpeedButton *spbMaintTowerLight;
     TSpeedButton *spbMaintPassword;
-    TSpeedButton *spbMaintSoftSimu;
+    TSpeedButton *spbMaintAmr;
     TSpeedButton *spbMaintFunctionDef;
     TSpeedButton *spbMaintHardware;
     TSpeedButton *spbMaintExit;
@@ -127,8 +127,12 @@ __published:
     TSpeedButton *sbMusic3;
     TSpeedButton *sbMusic4;
     TTabSheet *tsMaintPassword;
-    TTabSheet *tsMaintSoftSimu;
+    TTabSheet *tsMaintAmr;
     TMemo *memAmrStatus;
+    TCheckBox *chkAmrTestMode;
+    TPanel *pnlAmrTestBanner;
+    TPanel *pnlAmrInject;
+    TMemo *memAmrTx;
     TTabSheet *tsMaintFunctionDef;
     TTabSheet *tsMaintHardware;
     TPanel *pnlHardwareHeader;
@@ -363,6 +367,8 @@ __published:
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall chkHardwareColorBinAreaClick(TObject *Sender);
     void __fastcall chkUseAMRClick(TObject *Sender);
+    void __fastcall chkAmrTestModeClick(TObject *Sender);
+    void __fastcall AmrInjectButtonClick(TObject *Sender);
     void __fastcall chkUseLotBinModeClick(TObject *Sender);
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
@@ -427,6 +433,7 @@ private:
     void __fastcall RefreshLotWebApiStatus();
     void __fastcall AddLotWebApiLog(AnsiString Text);
     void __fastcall RefreshAmrStatus();
+    void __fastcall BuildAmrInjectPanel();
     void __fastcall ShowPasswordPage();
     void __fastcall RefreshPasswordGrid();
 public:

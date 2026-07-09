@@ -21,6 +21,7 @@
 #include "mymessbox.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : ShowSecsGemLog
 #include "SecsGem/uAgvStation.h"   //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState for AMR tab
+#include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : AMR manual-inject test facility
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -843,12 +844,84 @@ void __fastcall TfMaintenance::AddLotWebApiLog(AnsiString Text)
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RefreshAmrStatus()
 {
-    // AI(ht160s-agv) 20260625 : live dump of the AGV coordinator lock/handshake
-    // state into the AMR maintenance tab. AgvCoord is a global object (not a
-    // pointer), so guard only the memo control. DescribeAgvState() is read-only.
-    if(memAmrStatus==NULL)
+    if(memAmrStatus!=NULL)
+    {
+        AnsiString sAmrDump = AgvCoord.DescribeAgvState();
+        if(memAmrStatus->Lines->Text != sAmrDump)
+            memAmrStatus->Lines->Text = sAmrDump;
+    }
+    BuildAmrInjectPanel();
+    if(chkAmrTestMode!=NULL && chkAmrTestMode->Checked!=AmrInject.IsTestMode())
+        chkAmrTestMode->Checked = AmrInject.IsTestMode();
+    if(pnlAmrTestBanner!=NULL)
+        pnlAmrTestBanner->Visible = AmrInject.IsTestMode();
+    if(memAmrTx!=NULL && memAmrTx->Text!=AmrInject.GetLog())
+        memAmrTx->Text = AmrInject.GetLog();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::BuildAmrInjectPanel()
+{
+    if(pnlAmrInject==NULL || pnlAmrInject->ControlCount>0)
         return;
-    memAmrStatus->Lines->Text = AgvCoord.DescribeAgvState();
+    const char *InName[3] = {"Loader", "Empty", "Color"};
+    const char *InEdge[3] = {"Short", "Ready", "Finish"};
+    int InEdgeCode[3] = {AIE_SHORTAGE, AIE_READY, AIE_FINISH};
+    const char *AuEdge[3] = {"Full", "Drain", "Take"};
+    int AuEdgeCode[3] = {AIE_FULL, AIE_DRAINED, AIE_TAKEN};
+    int i, e, y;
+    TButton *B;
+    y = 8;
+    CreateMaintLabel(this, pnlAmrInject, 8, y, 460, 18, "Supply P1-P3 : arm one-shot inject");
+    y += 22;
+    for(i=0; i<3; i++)
+    {
+        CreateMaintLabel(this, pnlAmrInject, 8, y+6, 60, 18, InName[i]);
+        for(e=0; e<3; e++)
+        {
+            B = CreateMaintButton(this, pnlAmrInject, 70+e*130, y, 120,
+                AnsiString(InName[i])+" "+InEdge[e], AmrInjectButtonClick);
+            B->Tag = i*10 + InEdgeCode[e];
+        }
+        y += 34;
+    }
+    y += 12;
+    CreateMaintLabel(this, pnlAmrInject, 8, y, 460, 18, "Discharge P4-P9 (Auto1-6) : arm one-shot inject");
+    y += 22;
+    for(i=0; i<6; i++)
+    {
+        CreateMaintLabel(this, pnlAmrInject, 8, y+6, 60, 18, AnsiString("Auto")+IntToStr(i+1));
+        for(e=0; e<3; e++)
+        {
+            B = CreateMaintButton(this, pnlAmrInject, 70+e*130, y, 120,
+                AnsiString("A")+IntToStr(i+1)+" "+AuEdge[e], AmrInjectButtonClick);
+            B->Tag = 1000 + i*10 + AuEdgeCode[e];
+        }
+        y += 34;
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkAmrTestModeClick(TObject *Sender)
+{
+    (void)Sender;
+    if(chkAmrTestMode!=NULL)
+        AmrInject.SetTestMode(chkAmrTestMode->Checked);
+    RefreshAmrStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::AmrInjectButtonClick(TObject *Sender)
+{
+    if(Sender==NULL)
+        return;
+    int Tag  = ((TButton *)Sender)->Tag;
+    int kind = Tag / 1000;
+    int rem  = Tag % 1000;
+    int idx  = rem / 10;
+    int edge = rem % 10;
+    if(kind==1)
+        AmrInject.RequestAuto(idx, edge);
+    else
+        AmrInject.RequestInput(idx, edge);
+    RefreshAmrStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::btnLotApiSaveClick(TObject *Sender)
@@ -1358,7 +1431,7 @@ void __fastcall TfMaintenance::RegisterMaintenancePages()
     TMaintenancePageDef PageDefs[]={
         {tsMaintTowerLight,  spbMaintTowerLight,  maShowPage, false},
         {tsMaintPassword,    spbMaintPassword,    maShowPage, false},
-        {tsMaintSoftSimu,    spbMaintSoftSimu,    maShowPage, false},
+        {tsMaintAmr,    spbMaintAmr,    maShowPage, false},
         {tsMaintFunctionDef, spbMaintFunctionDef, maShowPage, false},
         {tsMaintHardware,    spbMaintHardware,    maShowPage, false},
         {tsMaintIO,          spbMaintIO,          maOpenIOView, false},

@@ -13,6 +13,7 @@
 #include "note.h"          // fNote (alarm dialog : fShow / Code)
 #include "cmydef.h"        // SoftStop (S2F42 PAUSE host command)
 #include "uAgvStation.h"   // AI(ht160s-agv) 20260615 : E87/AGV station table + AgvCoord
+#include "uAmrInject.h"   // AI(ht160s-agv) 20260708 : AMR manual-inject alert (HCACK!=0 surfacing)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -967,6 +968,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                      (int)LotRegistry.GetLotCount());
         HGemPtr->StringOut(sLog);
     }
+    if(HCACK!=0) AmrInject.NoteHostReject(S, HCACK);   // AI(ht160s-agv) 20260708 : surface rejected host cmd on AMR tab
     return 1;
 }
 //---------------------------------------------------------------------------

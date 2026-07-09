@@ -24,6 +24,7 @@
 #include "cStepTrace.h"
 #include "cStateRecordHT160.h"
 #include "systools.h"
+#include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject on any HOME/init
 #pragma package(smart_init)
 #pragma resource "*.dfm"
 //---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ __fastcall TDataModule1::TDataModule1(TComponent* Owner)
 //---------------------------------------------------------------------------
 void TDataModule1::InitialAllTask(bool bKeepMaterial)
 {
+    AmrInject.Reset();   //AI(ht160s-agv) 20260708 : any HOME/init clears AMR manual-inject test mode + latches
     if(UserMotion==NULL)
         return;
 

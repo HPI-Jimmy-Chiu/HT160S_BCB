@@ -356,7 +356,7 @@ fData	fData	Message	訊息
 fMaintenance	fMaintenance	Maintance	維護
 fMaintenance	spbMaintTowerLight	Tower Light	三色燈
 fMaintenance	spbMaintPassword	Password	密碼
-fMaintenance	spbMaintSoftSimu	AMR	AMR
+fMaintenance	spbMaintAmr	AMR	AMR
 fMaintenance	spbMaintFunctionDef	Function Define	功能定義
 fMaintenance	spbMaintHardware	Hardware Setup	硬體設定
 fMaintenance	spbMaintIO	IO Monitor	IO監控
@@ -388,7 +388,7 @@ fMaintenance	sbMusic2	Music2	音樂2
 fMaintenance	sbMusic3	Music3	音樂3
 fMaintenance	sbMusic4	Music4	音樂4
 fMaintenance	tsMaintPassword	Password	密碼
-fMaintenance	tsMaintSoftSimu	AMR	AMR
+fMaintenance	tsMaintAmr	AMR	AMR
 fMaintenance	tsMaintFunctionDef	Function Define	功能定義
 fMaintenance	pnlFunctionDefHeader	Function define setup	功能定義設定
 fMaintenance	tsFunctionGeneral	G[General]	G[一般]
