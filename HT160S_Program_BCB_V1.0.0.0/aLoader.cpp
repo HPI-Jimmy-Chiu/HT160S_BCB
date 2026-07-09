@@ -1736,8 +1736,18 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         //first-come-first-served; placement later just reads the binding.
                         TrayMotor->SetTrayLot(State->CcdX, State->CcdY, HitLotIndex);
                         TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
-                        if(GeneralSetting.bUseLotBinSortMode)
-                            LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+                        //AI(ht160s-lotpassfail) 20260709 : freeze the PASS/FAIL class at scan
+                        //(mirror SetTrayBin) so routing + the PassFail log read the SAME class.
+                        //Bind on the mode's key : Bin for Lot+Bin, PASS/FAIL(1/2) for Lot+PassFail
+                        //(class 0 = error/off -> no binding; read path routes it to the Error Auto).
+                        {
+                            int PassClass=BinAreaMap.GetPassFailClass(Bin);
+                            TrayMotor->SetTrayPassClass(State->CcdX, State->CcdY, PassClass);
+                            if(GeneralSetting.IsLotBinSortMode())
+                                LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+                            else if(GeneralSetting.IsLotPassFailSortMode() && PassClass>0)
+                                LotBinBinding.ResolveAuto(HitLotIndex, PassClass);
+                        }
                         LotRegistry.OnSorted(HitLotIndex, Bin);
                         //AI(ht160s-lot-reset) 20260706 : global per-Bin production count
                         //(HT172 parity: aSortArm/aMagArm bump BinICCnt[Bin] on sort). HT160
@@ -1825,8 +1835,15 @@ void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
             TrayMotor->SetTrayLot(State->CcdX, State->CcdY, HitLotIndex);
             TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, code);
             TrayMotor->SetTrayManual2D(State->CcdX, State->CcdY, true);
-            if(GeneralSetting.bUseLotBinSortMode)
-                LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+            //AI(ht160s-lotpassfail) 20260709 : freeze class + bind on the mode key (see scan-success path).
+            {
+                int PassClass=BinAreaMap.GetPassFailClass(Bin);
+                TrayMotor->SetTrayPassClass(State->CcdX, State->CcdY, PassClass);
+                if(GeneralSetting.IsLotBinSortMode())
+                    LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+                else if(GeneralSetting.IsLotPassFailSortMode() && PassClass>0)
+                    LotBinBinding.ResolveAuto(HitLotIndex, PassClass);
+            }
             LotRegistry.OnSorted(HitLotIndex, Bin);
             //AI(ht160s-lot-reset) 20260706 : per-Bin count on manual-2D sort too.
             if(Bin>=0 && Bin<TEST_MAX_BIN)

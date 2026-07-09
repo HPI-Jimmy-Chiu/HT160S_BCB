@@ -19,6 +19,7 @@ struct TSortArmSlotState
     int LotIndex;        //AI(ht160s-lotbin) 20260615 : owning LotIndex (By Lot+Bin routing key)
     AnsiString Code2D;   //AI(ht160s-lotbin) 20260615 : IC 2D code (Production_Log trace)
     bool bManual2D;   //AI(ht160s-ccd-manual2d) : IC 2D was operator hand-entered (Production_Log Manual2D)
+    int PassClass;       //AI(ht160s-lotpassfail) 20260709 : frozen PASS/FAIL class (By Lot+PassFail routing key)
 };
 //---------------------------------------------------------------------------
 class TTrayMotor;
@@ -55,6 +56,7 @@ private:
     int    iResidueAutoIndex;      //AI(ht160s-residue) 20260624 : Auto to report residue-clear to when bg check completes (-1 idle)
     bool   bResidueArmed;          //AI(ht160s-residue) 20260625 : residue check enabled only after nozzle lifted to top (place case 60)
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
+    unsigned int dwHoldLostStart;   //AI(ht160s-falldown) 20260706 : held-IC vacuum-loss debounce (GetTickCount of first OFF; 0=clear)
     bool bMoveAborted;   //AI(ht160s-sortarm) 20260703 : teach abort of an in-flight MoveSuckerToCell (bail before the next axis move; no stray Y after a fault modal raised mid-case-30). Cleared at case 0 / InitialFlag.
     int  iPickRetryCount;   //AI(ht160s-pick-retry) 20260702 : failed pick strokes on the current cell (HT172 iRetryCT port)
     bool bPickSuckErr[4];   //AI(ht160s-pick-retry) 20260702 : per-slot latched pick suck error (nozzle parked until retry/skip)
@@ -90,7 +92,6 @@ private:
     double GetTrayYPitch();
     int RoundPosition(double Value);
     int GetSortArmCellX(int BaseSortX, int ColMinusSlot);   //AI(ht160s-maintainer) 20260624 : cell->arm X with datum-sucker (iBaseSuckX) offset
-    int GetSortArmCellY(int BaseSortY, int Row);   //AI(ht160s-maintainer) 20260624 : symmetric Y helper (P1 HT172-align), behavior == old inline
     double GetTrayXStart();   //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset X (P2 HT172-align)
     double GetTrayYStart();
     int CalculatePitchPosition();
@@ -116,7 +117,7 @@ private:
     bool SelectPlaceAuto();
     bool FindPlaceCells(int AutoIndex);
     int GetSlotRoutingBin(int SlotIndex);
-    int GetMappedAutoIndex(int BinData, int LotIndex, bool &bFixedArea);
+    int GetMappedAutoIndex(int BinData, int LotIndex, int PassClass, bool &bFixedArea);
     bool CanPlaceSlotToAuto(int SlotIndex, int AutoIndex);
 
     bool SuckSelectedSlots();
@@ -132,10 +133,12 @@ private:
 
     bool DoPickFromLoader(int Flag);
     bool DoPlaceToAuto(int Flag);
+    bool CheckHoldFallDown(bool bAtPick);   //AI(ht160s-falldown) 20260706 : HT172 OutArmDeviceDropCheck port - held-IC transit vacuum drop monitor (bAtPick=at-Loader restore vs in-transit)
 
 public:
     int GetTrayXCount();   //AI(ht160s-ccd-teach-test) 20260628 : public for Teach numpad upper limit (tray-form columns)
     int GetTrayYCount();   //AI(ht160s-ccd-teach-test) 20260628 : public for Teach numpad upper limit (tray-form rows)
+    int GetSortArmCellY(int BaseSortY, int Row);   //AI(ht160s-maintainer) 20260624 : symmetric Y helper (P1 HT172-align); public for DoFeedTray cell-Y park (aAuto1To6)
     TSortArmModule();
     void InitialFlag(bool bKeepMaterial=false);
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze ResidueDelay[] timers on machine pause

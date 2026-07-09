@@ -72,7 +72,7 @@ AnsiString TDeviceInfo::GetTitleLine()
     return "Start Time,Load_X,Load_Y,Load_Time,Tray_ID,"
            "Which Arm,Suck_X,Suck_Y,Which Auto,"
            "Bin,Output tray,Unload_X,Unload_Y,Unload_Time,Error log,"
-           "TraceCode,ErrorType,Lot,Code2D,Manual2D";
+           "TraceCode,ErrorType,Lot,Code2D,Manual2D,PassFail";
 }
 
 //---------------------------------------------------------------------------
@@ -186,6 +186,15 @@ void TDeviceInfo::AddBinInfo(int iNozzle, int iBinIndex, int iGradeCode)
     }
 }
 
+//---------------------------------------------------------------------------
+void TDeviceInfo::AddPassFail(int iNozzle, const AnsiString& sPassFail)
+{
+    if (iNozzle < 0 || iNozzle >= 4)
+        return;
+    if (!m_records[iNozzle].bActive)
+        return;
+    m_records[iNozzle].sField[ePassFail] = sPassFail;
+}
 //---------------------------------------------------------------------------
 // iTraceCode: 0 = no trace (normal); 999~1099 = trace code; mapped to ErrorType label.
 void TDeviceInfo::AddTraceInfo(int iNozzle, int iTraceCode)

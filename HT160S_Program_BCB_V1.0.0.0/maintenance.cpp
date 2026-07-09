@@ -1101,8 +1101,11 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired - GeneralSetting.bUseTrayDatumModel
     //was removed (replaced by ini-only iSortArmXDatumBias/iSortArmYDatumBias). Remove the dead checkbox
     //from the maintenance form when finishing the datum-bias refactor.
-    if(chkUseLotBinMode!=NULL)
-        chkUseLotBinMode->Checked=GeneralSetting.bUseLotBinSortMode;
+    //AI(ht160s-lotpassfail) 20260709 : 3-way sort-mode selector. ItemIndex maps 1:1 to
+    //GeneralSetting.iSortMode (0=Normal,1=LotBin,2=LotPassFail). This runs inside the
+    //bLoadingHardwareSettings window so setting ItemIndex will NOT fire the restart prompt.
+    if(rgSortMode!=NULL)
+        rgSortMode->ItemIndex=GeneralSetting.iSortMode;
     if(chkUsePredictiveAutoSupply!=NULL)
         chkUsePredictiveAutoSupply->Checked=GeneralSetting.bUsePredictiveAutoSupply;
     {
@@ -1171,8 +1174,11 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     if(cbCommType!=NULL)
         GeneralSetting.bBinDispUseMyComm=cbCommType->Checked;
     //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired (bUseTrayDatumModel removed).
-    if(chkUseLotBinMode!=NULL)
-        GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
+    if(rgSortMode!=NULL)
+    {
+        int idx=rgSortMode->ItemIndex;   //AI(ht160s-lotpassfail) 20260709 : -1 (unselected) -> Normal
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+    }
     if(chkUsePredictiveAutoSupply!=NULL)
         GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
     {
@@ -1214,21 +1220,25 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
 //leaves the page editable again - matching the agreed "lock from Start to End" scope.
 void __fastcall TfMaintenance::ApplyHardwareEditLock()
 {
-    TCheckBox *Locked[13];
+    TCheckBox *Locked[12];
     bool bEnable;
     int i;
 
     bEnable=(MachineRun.bRunning==false);
     Locked[0]=chkHardwareColorBinArea;
     Locked[1]=chkUseAMR;
-    Locked[2]=chkUseLotBinMode;
-    Locked[3]=chkAutoEnable1; Locked[4]=chkAutoEnable2; Locked[5]=chkAutoEnable3;
-    Locked[6]=chkAutoEnable4; Locked[7]=chkAutoEnable5; Locked[8]=chkAutoEnable6;
-    Locked[9]=chkSuckEnable1; Locked[10]=chkSuckEnable2;
-    Locked[11]=chkSuckEnable3; Locked[12]=chkSuckEnable4;
-    for(i=0; i<13; i++)
+    Locked[2]=chkAutoEnable1; Locked[3]=chkAutoEnable2; Locked[4]=chkAutoEnable3;
+    Locked[5]=chkAutoEnable4; Locked[6]=chkAutoEnable5; Locked[7]=chkAutoEnable6;
+    Locked[8]=chkSuckEnable1; Locked[9]=chkSuckEnable2;
+    Locked[10]=chkSuckEnable3; Locked[11]=chkSuckEnable4;
+    for(i=0; i<12; i++)
         if(Locked[i]!=NULL)
             Locked[i]->Enabled=bEnable;
+    //AI(ht160s-lotpassfail) 20260709 : the sort-mode selector is now a TRadioGroup (not a
+    //TCheckBox) so it cannot live in the array above; lock it separately so the mode cannot
+    //be switched mid-lot (would corrupt the in-progress dynamic binding).
+    if(rgSortMode!=NULL)
+        rgSortMode->Enabled=bEnable;
 
     if(pnlHardwareHeader!=NULL)
     {
@@ -1887,17 +1897,22 @@ void __fastcall TfMaintenance::chkUseAMRClick(TObject *Sender)
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-lotbin) 20260615 : Sort mode toggle (Normal <-> By Lot+Bin). This flag
-//drives the routing core (GetMappedAutoIndex) and the dynamic binding table, which
-//are read all over the run loop, so a clean restart is the safe way to apply it.
-//Warn (do not force) the operator, matching the user's "remind, not enforce" rule.
-void __fastcall TfMaintenance::chkUseLotBinModeClick(TObject *Sender)
+//AI(ht160s-lotpassfail) 20260709 : Sort mode selector (Normal / By Lot+Bin / By Lot+PassFail).
+//iSortMode drives the routing core (GetMappedAutoIndex), the CCD-scan class freeze and the
+//dynamic binding table, all read across the run loop, so a clean restart is the safe way to
+//apply it. Warn (do not force), matching the user's "remind, not enforce" rule. The
+//bLoadingHardwareSettings guard MUST stay first : setting ItemIndex in LoadHardwareSettings
+//fires OnClick, and without the guard every page-load would pop this modal.
+void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
 {
     if(bLoadingHardwareSettings)
         return;
     (void)Sender;
-    if(chkUseLotBinMode!=NULL)
-        GeneralSetting.bUseLotBinSortMode=chkUseLotBinMode->Checked;
+    if(rgSortMode!=NULL)
+    {
+        int idx=rgSortMode->ItemIndex;
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+    }
     RefreshHardwareSettingsStatus();
     ShowMyMessage("Sort mode changed. Please restart the software so the new "
                   "classification mode takes effect cleanly.");

@@ -29,7 +29,7 @@ void THT160GeneralSetting::SetDefault()
 	bUseAMR=false;
 	for(int z=0;z<9;z++)
 		iSimAmrMaxTray[z]=10;
-	bUseLotBinSortMode=false;
+	iSortMode=smNormal;
 	bUsePredictiveAutoSupply=false;
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=true;
@@ -93,7 +93,16 @@ void THT160GeneralSetting::Load()
 	bUseAMR=Ini->ReadBool("HardwareInstall", "UseAMR", false);
 	for(int z=0;z<9;z++)
 		iSimAmrMaxTray[z]=Ini->ReadInteger("SimAMR", "MaxTray"+IntToStr(z), 10);
-	bUseLotBinSortMode=Ini->ReadBool("SortMode", "UseLotBinMode", false);
+	// AI(ht160s-lotpassfail) 20260709 : Mode-first back-compat. The new [SortMode] Mode
+	// wins; legacy [SortMode] UseLotBinMode is only the default when Mode is absent (so an
+	// upgraded machine that ran LotBin keeps LotBin, but an explicit Mode=2 is never
+	// clobbered back to 1). Clamp so a hand-edited/corrupt value fails safe to Normal.
+	{
+		int LegacyMode=Ini->ReadBool("SortMode", "UseLotBinMode", false)?smLotBin:smNormal;
+		iSortMode=Ini->ReadInteger("SortMode", "Mode", LegacyMode);
+		if(iSortMode<smNormal || iSortMode>smLotPassFail)
+			iSortMode=smNormal;
+	}
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
@@ -158,7 +167,11 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("HardwareInstall", "UseAMR", bUseAMR);
 	for(int z=0;z<9;z++)
 		Ini->WriteInteger("SimAMR", "MaxTray"+IntToStr(z), iSimAmrMaxTray[z]);
-	Ini->WriteBool("SortMode", "UseLotBinMode", bUseLotBinSortMode);
+	Ini->WriteInteger("SortMode", "Mode", iSortMode);
+	// AI(ht160s-lotpassfail) 20260709 : keep the legacy bool key in sync so an older exe
+	// (which only reads UseLotBinMode) still lands on a sane mode - LotBin stays LotBin,
+	// both Normal and LotPassFail map to false=Normal (safe downgrade).
+	Ini->WriteBool("SortMode", "UseLotBinMode", iSortMode==smLotBin);
 	Ini->WriteBool("SortMode", "UsePredictiveAutoSupply", bUsePredictiveAutoSupply);
 	for(int a=0;a<6;a++)
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);

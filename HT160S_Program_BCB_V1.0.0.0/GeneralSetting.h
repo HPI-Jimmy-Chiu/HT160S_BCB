@@ -9,6 +9,10 @@
 // Edited only through the Maintenance (commissioning) form.
 // See skill ht160s-config-tiers.
 //---------------------------------------------------------------------------
+// AI(ht160s-lotpassfail) 20260709 : sort-mode selector values. Top-level enum (no
+// enum class - BCB6). Replaces the old bool bUseLotBinSortMode two-way toggle.
+enum THT160SortMode { smNormal=0, smLotBin=1, smLotPassFail=2 };
+//---------------------------------------------------------------------------
 class THT160GeneralSetting
 {
 private:
@@ -32,13 +36,22 @@ public:
 	// Stored in General.ini [SimAMR] MaxTray0..8. Default 10.
 	int iSimAmrMaxTray[9];
 
-	// Sort mode (customer special request) : when true, classify ICs By Lot+Bin
-	// (dynamic (LotID,Bin)->Auto binding built at run time, see THT160LotBinBinding);
-	// when false, Normal mode (static Bin->Auto recipe table, THT160BinAreaMap).
-	// Two-way exclusive toggle. Edited on tsMaintHardware; changing it affects the
-	// in-memory routing core so the operator is told to restart the software.
-	// Stored in General.ini [SortMode] UseLotBinMode.
-	bool bUseLotBinSortMode;
+	// Sort mode (customer special request). Exclusive selector, 3 values :
+	//   smNormal       : static Bin->Auto recipe table (THT160BinAreaMap).
+	//   smLotBin        : dynamic (LotID,Bin)->Auto binding built at run time
+	//                     (THT160LotBinBinding), key = the IC's Bin.
+	//   smLotPassFail   : dynamic (LotID,PASS/FAIL)->Auto binding, key = PASS(1)/
+	//                     FAIL(2) derived from Bin==BinAreaMap.PassBin, frozen at
+	//                     CCD scan. At most 2 Autos bound per lot.
+	// Edited on tsMaintHardware; changing it affects the in-memory routing core so
+	// the operator is told to restart the software. Stored in General.ini
+	// [SortMode] Mode (legacy [SortMode] UseLotBinMode read for back-compat when
+	// Mode is absent). Use the Is*SortMode() helpers instead of comparing raw ints.
+	int iSortMode;
+	bool IsNormalSortMode()      { return iSortMode==smNormal; }
+	bool IsLotBinSortMode()      { return iSortMode==smLotBin; }
+	bool IsLotPassFailSortMode() { return iSortMode==smLotPassFail; }
+	bool IsDynamicBindingMode()  { return iSortMode==smLotBin || iSortMode==smLotPassFail; }
 
 	// AI(ht160s-predictive-supply) 20260707 : demand-aware TrayArm replenish order.
 	// When true, FindTrayRequestAuto first serves an Auto that SortArm is currently

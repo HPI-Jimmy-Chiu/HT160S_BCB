@@ -46,7 +46,7 @@
 ## 第 06 章　設定 (Config / Setup)
 - [ ] TrayForm.XStart/XPitch/YStart/YPitch 的工程單位 (mm 或 1/100mm) 無法由設定畫面原始碼判定 (只做 ReadFloat/WriteFloat)，需確認 TrayForm 結構與 Loader/SortArm 使用端
 - [ ] 各 Area (Auto1..Auto6, Color) 對應實體出料站/料盒的物理位置與 enum 編號間隙 (eHT160BinAreaAuto1=3..Auto6=8, Color=9，1/2 用途) 需由 CosFunction.h/機構定義確認
-- [ ] 硬體頁 checkbox 與相關控制項 (chkUseLotBinMode/chkAutoEnable*/chkSuckEnable*/chkHardwareColorBinArea/chkUseAMR/cbBinPanelType/edLotNo) 實際螢幕中文 Caption 需以 .dfm 或執行畫面確認
+- [ ] 硬體頁控制項 (rgSortMode/chkAutoEnable*/chkSuckEnable*/chkHardwareColorBinArea/chkUseAMR/cbBinPanelType/edLotNo) 與 Bin 頁 cbbPassBin 實際螢幕中文 Caption 需以 .dfm 或執行畫面確認
 - [ ] SYSTEM_BIN_SELECT BinSelect[2] (iCategData/bStackDefFailCate/bCategoryFail/iCategoryFailCountLimit/iOpenBin) 在 cprod 內僅宣告未見讀寫，填值來源與是否仍在使用需確認
 - [ ] Error Auto 決定 (GetErrorBinArea/GetErrorAutoIndex) 在 Error 區被設為 Color (非 Auto) 時 By Lot+Bin fallback 到最後一個 Auto 的邊界行為實機意圖需確認
 - [ ] By Lot+Bin 是否提供操作員手動指定/編輯特定 (Lot,Bin)->Auto 綁定的 UI 未在現有來源確認
@@ -141,9 +141,10 @@
 - [ ] Auto: maintenance 畫面 chkAutoEnable1~6 的實際螢幕中文 caption 未從原始碼判讀 (Big5)，需現場確認
 - [ ] Auto: tRunData.TrayICCnt[eAuto1+i] 計數於何處累加 (SortArm 放 IC 時) 未在本檔，主畫面僅讀取顯示
 
-## 第 15 章　By Lot+Bin 分流模式
-- [ ] 是否提供操作員手動指定/編輯特定 (Lot,Bin)->Auto 綁定的 UI；ResolveAuto 採最低 index 先到先得自動綁定，本批檔案未見手動編輯介面，需確認
-- [ ] 當 Error 區設為 Color（非 Auto）時，By Lot+Bin 會 fallback 到最後一個 Auto 的邊界行為與實機意圖，需現場確認
+## 第 15 章　動態分流模式（By Lot+Bin / By Lot+PassFail）
+- [ ] 是否提供操作員手動指定/編輯特定 (Lot,Bin)->Auto 或 (Lot,PASS/FAIL)->Auto 綁定的 UI；ResolveAuto 採最低 index 先到先得自動綁定，本批檔案未見手動編輯介面，需確認
+- [ ] By Lot+PassFail 多 Lot 併行時可用非 Error Auto 少於「2×Lot 數」會溢位到 Error Auto（良品/錯誤品混倉），目前靜默；是否加告警待評估
+- [ ] 當 Error 區設為 Color（非 Auto）時，動態模式會 fallback 到最後一個 Auto 的邊界行為與實機意圖，需現場確認
 - [ ] 配方選單畫面（若有獨立 form 供新增/複製/刪除/切換配方）對應的表單名稱與按鈕，本批檔案未確認（與第 6 章交叉）
 
 ## 第 16 章　常見問題 (FAQ)

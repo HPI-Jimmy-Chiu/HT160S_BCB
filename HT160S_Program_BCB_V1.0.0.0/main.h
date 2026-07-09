@@ -205,11 +205,10 @@ __published:	// IDE-managed Components
     TPageControl *pgcLog;
     TTabSheet *tsTrayStatus;
     TGroupBox *grpLoaderR;
-    TTMyTray *mtSortRecv;
+    TTMyTray *mtLoaderR;
     TPanel *lblLoaderCarID;
     TGroupBox *grpLoaderL;
-    TLabel *lblLoadCurrBin_1;
-    TTMyTray *mtWorkArea;
+    TTMyTray *mtLoaderL;
     TPanel *lblLoadCurrID_1;
     TTabSheet *tsLogs;
     TListBox *lstLog;
@@ -472,6 +471,9 @@ public:		// User declarations
     void __fastcall ShowCarTrayCount();      //AI(ht160s-agv) 20260624 : PanelMain6 header per-zone trays-on-AMR-car count
     void __fastcall ShowProductInfo();       //AI(ht160s-uph) 20260707 : live Lot/UPH product-info grid (HT172 sgProductInfo parity)
     void __fastcall ShowTrayUphHistory();    //AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172 UPH_StringGrid parity)
+    void __fastcall ClearProductInfoAtLotStart();
+    void __fastcall FreezeProductInfoAtLotEnd();
+    void __fastcall RefreshEventLogView();
     void __fastcall RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status diagnostic sheet pump (throttled; called from DoSystemMessage)
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);
     void LoadRunModePicture();

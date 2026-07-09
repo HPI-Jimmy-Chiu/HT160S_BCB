@@ -136,9 +136,9 @@ object fSetup: TfSetup
       Top = 44
       Width = 1002
       Height = 790
-      ActivePage = tsSetupRecipe
+      ActivePage = tsSetupBinSetting
       Align = alClient
-      TabIndex = 0
+      TabIndex = 2
       TabOrder = 1
       TabWidth = 120
       object tsSetupRecipe: TTabSheet
@@ -14014,7 +14014,7 @@ object fSetup: TfSetup
             end
             object spbBinLoadMap: TSpeedButton
               Left = 16
-              Top = 178
+              Top = 202
               Width = 116
               Height = 30
               Caption = 'Load Current'
@@ -14022,7 +14022,7 @@ object fSetup: TfSetup
             end
             object spbBinSaveMap: TSpeedButton
               Left = 148
-              Top = 178
+              Top = 202
               Width = 116
               Height = 30
               Caption = 'Save Map'
@@ -14030,7 +14030,7 @@ object fSetup: TfSetup
             end
             object spbBinValidate: TSpeedButton
               Left = 16
-              Top = 218
+              Top = 242
               Width = 116
               Height = 30
               Caption = 'Validate'
@@ -14038,7 +14038,7 @@ object fSetup: TfSetup
             end
             object spbBinClear: TSpeedButton
               Left = 148
-              Top = 218
+              Top = 242
               Width = 116
               Height = 30
               Caption = 'Clear All'
@@ -14046,11 +14046,18 @@ object fSetup: TfSetup
             end
             object spbBinDefault: TSpeedButton
               Left = 16
-              Top = 258
+              Top = 282
               Width = 116
               Height = 30
               Caption = 'Default 1-6'
               OnClick = spbBinDefaultClick
+            end
+            object lblPassBinTitle: TLabel
+              Left = 16
+              Top = 172
+              Width = 47
+              Height = 13
+              Caption = 'Pass Bin :'
             end
             object cbbBinErrorArea: TComboBox
               Left = 100
@@ -14068,6 +14075,15 @@ object fSetup: TfSetup
                 'Auto4'
                 'Auto5'
                 'Auto6')
+            end
+            object cbbPassBin: TComboBox
+              Left = 100
+              Top = 168
+              Width = 160
+              Height = 21
+              Style = csDropDownList
+              ItemHeight = 13
+              TabOrder = 1
             end
           end
         end
@@ -14103,7 +14119,7 @@ object fSetup: TfSetup
           object lblPnpPickDelay: TLabel
             Left = 32
             Top = 56
-            Width = 160
+            Width = 146
             Height = 16
             Caption = 'Arm Pick Delay Time'
             Font.Charset = DEFAULT_CHARSET
@@ -14116,7 +14132,7 @@ object fSetup: TfSetup
           object lblPnpPickDelayUnit: TLabel
             Left = 270
             Top = 56
-            Width = 40
+            Width = 24
             Height = 16
             Caption = 'Sec'
             Font.Charset = DEFAULT_CHARSET
@@ -14129,7 +14145,7 @@ object fSetup: TfSetup
           object lblPnpPlaceDelay: TLabel
             Left = 32
             Top = 96
-            Width = 160
+            Width = 156
             Height = 16
             Caption = 'Arm Place Delay Time'
             Font.Charset = DEFAULT_CHARSET
@@ -14142,7 +14158,7 @@ object fSetup: TfSetup
           object lblPnpPlaceDelayUnit: TLabel
             Left = 270
             Top = 96
-            Width = 40
+            Width = 24
             Height = 16
             Caption = 'Sec'
             Font.Charset = DEFAULT_CHARSET
@@ -14155,7 +14171,7 @@ object fSetup: TfSetup
           object lblPnpDestroyCheckTime: TLabel
             Left = 32
             Top = 136
-            Width = 160
+            Width = 141
             Height = 16
             Caption = 'Destroy Check Time'
             Font.Charset = DEFAULT_CHARSET
@@ -14168,7 +14184,7 @@ object fSetup: TfSetup
           object lblPnpDestroyCheckTimeUnit: TLabel
             Left = 270
             Top = 136
-            Width = 40
+            Width = 24
             Height = 16
             Caption = 'Sec'
             Font.Charset = DEFAULT_CHARSET
@@ -14181,7 +14197,7 @@ object fSetup: TfSetup
           object lblSuckEnableTitle: TLabel
             Left = 420
             Top = 56
-            Width = 240
+            Width = 213
             Height = 16
             Caption = 'Sucker Enable (green = in use)'
             Font.Charset = DEFAULT_CHARSET
@@ -14189,6 +14205,32 @@ object fSetup: TfSetup
             Font.Height = -15
             Font.Name = 'MS Sans Serif'
             Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblSortArmPickRetry: TLabel
+            Left = 420
+            Top = 216
+            Width = 115
+            Height = 16
+            Caption = 'Pick Retry Count'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblSortArmPickRetryHint: TLabel
+            Left = 420
+            Top = 244
+            Width = 250
+            Height = 16
+            Caption = '(retries after 1st fail; 0 = alarm immediately)'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
             ParentFont = False
           end
           object edPnpPickDelay: TEdit
@@ -14246,11 +14288,11 @@ object fSetup: TfSetup
             Font.Name = 'MS Sans Serif'
             Font.Style = []
             ItemIndex = 0
-            ParentFont = False
-            TabOrder = 3
             Items.Strings = (
               'Use All'
               'Use Select')
+            ParentFont = False
+            TabOrder = 3
           end
           object grdSuckEnable: TTMyTray
             Left = 420
@@ -14259,32 +14301,6 @@ object fSetup: TfSetup
             Height = 110
             XItem = 4
             YItem = 1
-          end
-          object lblSortArmPickRetry: TLabel
-            Left = 420
-            Top = 216
-            Width = 170
-            Height = 16
-            Caption = 'Pick Retry Count'
-            Font.Charset = DEFAULT_CHARSET
-            Font.Color = clWindowText
-            Font.Height = -15
-            Font.Name = 'MS Sans Serif'
-            Font.Style = [fsBold]
-            ParentFont = False
-          end
-          object lblSortArmPickRetryHint: TLabel
-            Left = 420
-            Top = 244
-            Width = 470
-            Height = 16
-            Caption = '(retries after 1st fail; 0 = alarm immediately)'
-            Font.Charset = DEFAULT_CHARSET
-            Font.Color = clWindowText
-            Font.Height = -13
-            Font.Name = 'MS Sans Serif'
-            Font.Style = []
-            ParentFont = False
           end
           object edSortArmPickRetry: TEdit
             Left = 600

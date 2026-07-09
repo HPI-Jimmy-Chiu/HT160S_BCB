@@ -54,6 +54,7 @@ void TMyTray::Clear()
             iLot[x][y]=-1;  //AI(ht160s-lotbin) 20260615 : -1 = no owning lot yet
             sCode2D[x][y]="";
             bManual2D[x][y]=false;
+            iPassClass[x][y]=0;  //AI(ht160s-lotpassfail) 20260709 : 0 = no PASS/FAIL class yet
         }
     TrayID="";
     Kind=eTrayKindNormal;   //AI(HT160S-Maintainer) 20260604 : default role = normal work tray
@@ -171,6 +172,7 @@ void TMyTray::ClearLotCode()
             iLot[x][y]=-1;
             sCode2D[x][y]="";
             bManual2D[x][y]=false;
+            iPassClass[x][y]=0;  //AI(ht160s-lotpassfail) 20260709 : clear frozen PASS/FAIL class
         }
 }
 //---------------------------------------------------------------------------
@@ -200,6 +202,21 @@ AnsiString TMyTray::GetCode2D(int x, int y)
     if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
         return "";
     return sCode2D[x][y];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotpassfail) 20260709 : per-cell PASS/FAIL class accessors (mirror SetBin/GetBin)
+void TMyTray::SetPassClass(int x, int y, int c)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    iPassClass[x][y]=c;
+}
+//---------------------------------------------------------------------------
+int TMyTray::GetPassClass(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return 0;
+    return iPassClass[x][y];
 }
 //---------------------------------------------------------------------------
 void TMyTray::SetManual2D(int x, int y, bool b)
@@ -1056,6 +1073,17 @@ void TTrayMotor::SetTrayCode2D(int x, int y, AnsiString code)
 AnsiString TTrayMotor::GetTrayCode2D(int x, int y)
 {
     return Tray.GetCode2D(x, y);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotpassfail) 20260709 : frozen PASS/FAIL class cell accessors (By Lot+PassFail mode)
+void TTrayMotor::SetTrayPassClass(int x, int y, int c)
+{
+    Tray.SetPassClass(x, y, c);
+}
+//---------------------------------------------------------------------------
+int TTrayMotor::GetTrayPassClass(int x, int y)
+{
+    return Tray.GetPassClass(x, y);
 }
 //---------------------------------------------------------------------------
 void TTrayMotor::SetTrayManual2D(int x, int y, bool b)

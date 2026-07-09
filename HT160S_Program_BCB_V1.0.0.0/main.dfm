@@ -2295,6 +2295,8 @@ object fMain: TfMain
                 Align = alBottom
                 TabOrder = 4
                 object sgProductInfo: TStringGrid
+                  FixedCols = 0
+                  FixedRows = 0
                   Left = 1
                   Top = 1
                   Width = 336
@@ -3336,7 +3338,7 @@ object fMain: TfMain
                 Font.Style = [fsBold]
                 ParentFont = False
                 TabOrder = 1
-                object mtSortRecv: TTMyTray
+                object mtLoaderR: TTMyTray
                   Left = 16
                   Top = 76
                   Width = 225
@@ -3374,21 +3376,7 @@ object fMain: TfMain
                 Font.Style = [fsBold]
                 ParentFont = False
                 TabOrder = 0
-                object lblLoadCurrBin_1: TLabel
-                  Left = 2
-                  Top = 43
-                  Width = 256
-                  Height = 25
-                  Align = alTop
-                  Caption = 'Current Sorting Bin :'
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clWindowText
-                  Font.Height = -21
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
-                end
-                object mtWorkArea: TTMyTray
+                object mtLoaderL: TTMyTray
                   Left = 16
                   Top = 76
                   Width = 225
@@ -5949,7 +5937,6 @@ object fMain: TfMain
                     Color = 14670284
                     ColCount = 3
                     DefaultColWidth = 260
-                    DefaultRowHeight = 24
                     FixedCols = 0
                     RowCount = 13
                     TabOrder = 0

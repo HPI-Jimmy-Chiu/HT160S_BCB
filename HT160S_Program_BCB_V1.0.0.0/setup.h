@@ -82,6 +82,8 @@ __published:
     TLabel *lblBinColorValue;
     TLabel *lblBinErrorTitle;
     TComboBox *cbbBinErrorArea;
+    TComboBox *cbbPassBin;
+    TLabel *lblPassBinTitle;
     TSpeedButton *spbBinLoadMap;
     TSpeedButton *spbBinSaveMap;
     TSpeedButton *spbBinValidate;

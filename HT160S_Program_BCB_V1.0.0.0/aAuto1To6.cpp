@@ -589,7 +589,18 @@ bool TAutoModule::DoFeedTray(int Flag)
             break;
 
         case 6000:
-            if(MoveAutoY(iFeedAuto, GetAutoFirstSortY(iFeedAuto)))
+            //AI(ht160s-sortarm) 20260707 : park directly at the first-cell Y so the carrier
+            //stops at cell(0,0) instead of overshooting to the raw taught FirstSortY datum and
+            //being walked back by the SortArm's first place move. GetSortArmCellY folds in the
+            //SortArm datum bias + tray YStart (same single source the place move uses). A freshly
+            //fed work tray is all EMPTY_IC, so FindPlaceCells' top-to-bottom scan makes Row0 the
+            //first placement. NULL-guard falls back to the raw FirstSortY; the SortArm still
+            //issues the authoritative absolute place move, so a non-Row0 first cell only forgoes
+            //the optimization -- it cannot mis-place.
+            if(MoveAutoY(iFeedAuto,
+                         (SortArmModule!=NULL)
+                             ? SortArmModule->GetSortArmCellY(GetAutoFirstSortY(iFeedAuto), 0)
+                             : GetAutoFirstSortY(iFeedAuto)))
                 FeedTask=7000;
             break;
 

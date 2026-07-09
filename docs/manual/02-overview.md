@@ -133,7 +133,7 @@ Loader 內部狀態旗標序列：`LS_IDLE → LS_FEEDING → LS_CCD_SCAN → LS
 | `iRealDummy`（`HSys.LastSet.iRealDummy`） | DUMMY / HAS_TRAY / REALLY | 運轉模式，影響感測器/CCD/拍照是否走實機路徑（三層 IO 檢查層級）；於主畫面 `pnRealDummy` 切換，僅停機可改 |
 | `iStartMode` | 0=Initial / 1=Continue | 起動模式：初始起動或續做；於 `pnStartMode` 切換，僅停機可改 |
 | `GeneralSetting.bUseAMR` | true/false | AMR/AGV 堆疊模式總開關，決定堆疊順序 identity→cover→normal、滿車服務與 AGV 握手 |
-| `GeneralSetting.bUseLotBinSortMode` | true/false | By Lot+Bin 動態路由模式（2D 反查後 `ResolveAuto` 動態綁定 (Lot,Bin)→Auto） |
+| `GeneralSetting.iSortMode` | 0/1/2 | 分流模式：0=Normal（靜態 Bin→Auto 表）、1=By Lot+Bin（動態綁定 (Lot,Bin)→Auto）、2=By Lot+PassFail（動態綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由 Bin==Pass Bin 導出、掃描時凍結）。詳見第 15 章 |
 | `CosFunction.bUse2DBinMap` | true/false | 是否啟用 Top CCD 2D 條碼讀取與 Bin2DMap 反查（關閉則只讀有無料的 Bin） |
 | `CosFunction.bUseColorCcd` | true/false | `[ColorCCD] Enable`；false 時 Color 跳過相機、2D 碼留空，供盤照常進行 |
 | `CosFunction.bUseSecsGem` | true/false | SECS/GEM 功能旗標，決定 SECS 徽章是否顯示與可點擊 |

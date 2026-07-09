@@ -40,6 +40,7 @@ static const int SORT_ARM_AUTO_COUNT=6;
 static const int iDestroyCheckMS=300;   //AI(ht160s-residue) 20260624 : re-suck settle (ms) for place residue check
 static const int SORT_ARM_SAFE_Z_POSITION=10;
 static const int SUCK_HOME_LOST_MS=100;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce window (ms); time-based, not cycle-count
+static const int FALLDOWN_LOST_MS=100;   //AI(ht160s-falldown) 20260706 : held-IC vacuum-loss confirm window (ms); reject a single noisy read (mirrors SUCK_HOME_LOST_MS)
 //---------------------------------------------------------------------------
 static int ClampIntValue(int Value, int MinValue, int MaxValue)
 {
@@ -148,6 +149,7 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     bCleanOutFinish=false;
     bOneCycleFinish=false;
     dwSuckHomeLostStart=0;
+    dwHoldLostStart=0;   //AI(ht160s-falldown) 20260706 : reset held-IC vacuum-loss debounce
     bMoveAborted=false;   //AI(ht160s-sortarm) 20260703 : no pending in-flight move abort on home/init
     iPickRetryCount=0;   //AI(ht160s-pick-retry) 20260702 : fresh pick-retry budget on home/init
     iResidueAutoIndex=-1;   //AI(ht160s-residue) 20260624 : no pending residue report
@@ -218,6 +220,7 @@ void TSortArmModule::ClearSlot(int SlotIndex)
     Slot[SlotIndex].LotIndex=-1;       //AI(ht160s-lotbin) 20260615 : clear carried lot
     Slot[SlotIndex].Code2D="";         //AI(ht160s-lotbin) 20260615 : clear carried 2D code
     Slot[SlotIndex].bManual2D=false;   //AI(ht160s-ccd-manual2d) : clear manual-2D flag
+    Slot[SlotIndex].PassClass=0;       //AI(ht160s-lotpassfail) 20260709 : clear frozen PASS/FAIL class
     if(Sucker!=NULL)
     {
         Sucker->Item=EMPTY_IC;
@@ -831,6 +834,7 @@ bool TSortArmModule::FindPickCells(int LoaderNo)
                 //routing and Production_Log; harmless in Normal mode (unused).
                 Slot[PickSlot].LotIndex=TrayMotor->GetTrayLot(XIndex, YIndex);
                 Slot[PickSlot].Code2D=TrayMotor->GetTrayCode2D(XIndex, YIndex);
+                Slot[PickSlot].PassClass=TrayMotor->GetTrayPassClass(XIndex, YIndex);   //AI(ht160s-lotpassfail) 20260709
                 Slot[PickSlot].bManual2D=TrayMotor->GetTrayManual2D(XIndex, YIndex);
                 return true;
             }
@@ -851,7 +855,7 @@ int TSortArmModule::GetSlotRoutingBin(int SlotIndex)
     return Slot[SlotIndex].TrayData;
 }
 //---------------------------------------------------------------------------
-int TSortArmModule::GetMappedAutoIndex(int BinData, int LotIndex, bool &bFixedArea)
+int TSortArmModule::GetMappedAutoIndex(int BinData, int LotIndex, int PassClass, bool &bFixedArea)
 {
     int Area;
 
@@ -861,13 +865,32 @@ int TSortArmModule::GetMappedAutoIndex(int BinData, int LotIndex, bool &bFixedAr
     //binding - no allocation side-effect during the per-slot/per-Auto place scan.
     //Error bins (2D fail / no bin setting) and ICs with no owning lot route to the
     //Error Auto. Color is not used for sorting in this mode (AMR identity tray only).
-    if(GeneralSetting.bUseLotBinSortMode)
+    if(GeneralSetting.IsLotBinSortMode())
     {
         int AutoIndex;
         bFixedArea=true;
         if(LotIndex>=0 && BinAreaMap.IsErrorBin(BinData)==false)
         {
             AutoIndex=LotBinBinding.FindAuto(LotIndex, BinData);
+            if(AutoIndex>=0)
+                return AutoIndex;
+        }
+        Area=BinAreaMap.GetErrorBinArea();
+        if(Area>=eHT160BinAreaAuto1 && Area<=eHT160BinAreaAuto6)
+            return Area-eHT160BinAreaAuto1;
+        return -1;
+    }
+    //AI(ht160s-lotpassfail) 20260709 : By Lot+PassFail mode. The PASS/FAIL class was
+    //frozen at CCD scan (Slot.PassClass, passed in via the PassClass arg) and bound to an
+    //Auto by LotBinBinding.ResolveAuto; here we only READ it. PassClass 0 (error bin /
+    //PassBin off) and ICs with no owning lot route to the Error Auto - same as Lot+Bin.
+    if(GeneralSetting.IsLotPassFailSortMode())
+    {
+        int AutoIndex;
+        bFixedArea=true;
+        if(LotIndex>=0 && PassClass>0)
+        {
+            AutoIndex=LotBinBinding.FindAuto(LotIndex, PassClass);
             if(AutoIndex>=0)
                 return AutoIndex;
         }
@@ -915,7 +938,7 @@ bool TSortArmModule::CanPlaceSlotToAuto(int SlotIndex, int AutoIndex)
     if(SlotIndex<0 || SlotIndex>=SORT_ARM_SUCKER_COUNT || Slot[SlotIndex].bHasIC==false)
         return false;
 
-    MappedAutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, bFixedArea);
+    MappedAutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, Slot[SlotIndex].PassClass, bFixedArea);
     if(MappedAutoIndex>=0)
         return (MappedAutoIndex==AutoIndex);
     return (bFixedArea==false);
@@ -939,7 +962,7 @@ int TSortArmModule::GetHeldTargetAutos(int *OutAutoList, int MaxCount)
         if(Slot[SlotIndex].bHasIC==false)
             continue;
         bool bFixedArea=false;
-        int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, bFixedArea);
+        int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, Slot[SlotIndex].PassClass, bFixedArea);
         if(AutoIndex>=0)
             OutAutoList[Count++]=AutoIndex;
     }
@@ -1035,7 +1058,7 @@ bool TSortArmModule::SelectPlaceAuto()
         if(Slot[SlotIndex].bHasIC)
         {
             bool bFixedArea=false;
-            int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, bFixedArea);
+            int AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(SlotIndex), Slot[SlotIndex].LotIndex, Slot[SlotIndex].PassClass, bFixedArea);
             if(AutoIndex>=0 && FindPlaceCells(AutoIndex))
             {
                 iActiveAutoIndex=AutoIndex;
@@ -1359,11 +1382,143 @@ void TSortArmModule::TransferPlaceDataToAuto()
             if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)
                 tRunData.TrayICCnt[iActiveAutoIndex+1]++;
             g_DeviceInfo.AddBinInfo(SlotIndex, iActiveAutoIndex, Slot[SlotIndex].TrayData);
+            {   //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL vs operator Pass Bin.
+                //AI(ht160s-lotpassfail) 20260709 : read the class FROZEN at CCD scan (Slot.PassClass)
+                //so the logged result matches the class the IC was actually routed on; 0 -> blank.
+                int PassClassVal=Slot[SlotIndex].PassClass;
+                AnsiString PassFailText=(PassClassVal==1)?AnsiString("PASS"):((PassClassVal==2)?AnsiString("FAIL"):AnsiString(""));
+                g_DeviceInfo.AddPassFail(SlotIndex, PassFailText);
+            }
             g_DeviceInfo.AddOutputInfo(SlotIndex, "Auto"+IntToStr(iActiveAutoIndex+1), "", Slot[SlotIndex].PlaceY, Slot[SlotIndex].PlaceX);
             ClearSlot(SlotIndex);
         }
     }
     UpdateKitSuckState();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-falldown) 20260706 : HT172 OutArmDeviceDropCheck / CheckIsFallDown port.
+//HT160S verified sucker vacuum ONLY once (at suck, SuckSelectedSlots case 50) and never
+//again, so an IC that dropped after a "successful" suck went unnoticed : no alarm, no SKIP.
+//Mirrors HT172 : while the arm carries picked ICs from the Loader to the Auto (post-suck,
+//Z at/going to safe, BEFORE the place Z-down), re-read each holding nozzle's LIVE vacuum. A
+//holding nozzle (bHasIC) whose vacuum reads OFF has dropped its IC. bAtPick decides what to
+//do with the Loader source cell (already marked EMPTY_IC at pick by TransferPickDataFromLoader):
+//  bAtPick==true  (DoPickFromLoader case 60, still parked at the Loader) : the IC fell back
+//                 at the Loader tray -> RESTORE the source cell to its original data so DoLoader
+//                 case 3000 sees ActiveTrayAllData(EMPTY_IC)==false and keeps the side
+//                 LS_READY_SORT instead of discharging the tray to the rear WITH the IC (the
+//                 exact reported symptom). ReleaseSortOwner is NOT called (caller breaks), so
+//                 the discharge is blocked while the alarm is up as well.
+//  bAtPick==false (DoPlaceToAuto transit) : the IC was lifted clear of the Loader and is lost
+//                 in the travel path; the Loader cell is legitimately empty -> NOT restored.
+//Either way : real decel-stop ALL motion, write the SortArm slot off (never a phantom placed
+//OK / counted), and alarm with the dropped cell identity. A single OFF read is NOT trusted : it
+//must persist FALLDOWN_LOST_MS (time-window debounce, same idiom as the suck-home interlock) so
+//scan-rate sensor jitter cannot false-stop the machine. REALLY-only (sim/DUMMY have no real
+//vacuum); the Sensor.Enable gate skips an uninstalled point.
+bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
+{
+    int iFirstDrop=-1;
+    int iDropRow=0;
+    int iDropCol=0;
+    AnsiString sDrop2D="";
+    bool bAnyOff=false;
+
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return false;
+
+    //any holding nozzle currently reading vacuum-OFF ? (raw scan)
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(Slot[s].bHasIC==false)
+            continue;
+        TMySucker *Sucker=GetSucker(s);
+        if(Sucker==NULL || Sucker->Enable==false || Sucker->Sensor.Enable==false)
+            continue;
+        if(Sucker->GetStatus()==false)
+        {
+            bAnyOff=true;
+            break;
+        }
+    }
+
+    //time-window debounce (mirror the suck-home interlock) : a single bad read is rejected; a
+    //real drop holds the sensor OFF continuously, so it survives the FALLDOWN_LOST_MS window.
+    if(bAnyOff==false)
+    {
+        dwHoldLostStart=0;
+        return false;
+    }
+    if(dwHoldLostStart==0)
+    {
+        dwHoldLostStart=GetTickCount();
+        return false;
+    }
+    if((int)(GetTickCount()-dwHoldLostStart)<FALLDOWN_LOST_MS)
+        return false;
+    dwHoldLostStart=0;
+
+    //confirmed drop. Identity scan (first still-OFF held nozzle) for the breadcrumb only; do
+    //NOT mutate yet so the modal can offer a real choice before the Loader source cell is set.
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(Slot[s].bHasIC==false)
+            continue;
+        TMySucker *Sucker=GetSucker(s);
+        if(Sucker==NULL || Sucker->Enable==false || Sucker->Sensor.Enable==false)
+            continue;
+        if(Sucker->GetStatus()==false)
+        {
+            iFirstDrop=s;
+            iDropRow=Slot[s].PickY;
+            iDropCol=Slot[s].PickX;
+            sDrop2D=Slot[s].Code2D;
+            break;
+        }
+    }
+
+    if(iFirstDrop<0)
+        return false;   //every OFF nozzle recovered within the window : rejected glitch
+
+    HSys.StopAllMotor();   //MC88X1 : real decel-stop ALL (DecStopAllMotor is a no-op here)
+
+    //breadcrumb : dropped cell tray Row/Col (+2D) into the alarm region so it is shown + logged
+    //(HT160S alarms persist to the EventLog), mirroring HT172 RecordProcess.
+    AnsiString Part="SortArm IC Dropped ";
+    Part+=(bAtPick?"At Pick R":"In Transit R")+IntToStr(iDropRow)+" C"+IntToStr(iDropCol);
+    if(sDrop2D!="")
+        Part+=" 2D="+sDrop2D;
+
+    //Honor the operator key (do NOT ignore it). At a PICK drop the IC fell at the Loader, so the
+    //operator gets a real choice : K_RETRY keeps the IC in the tray (restore the source cell ->
+    //re-pick, never discharge with it); K_SKIP writes it EMPTY_IC (abandon; the tray may then
+    //discharge - the operator's call, mirrors the pick-retry SkipErroredPickCells + HT172
+    //SkipError(NULL_IC)). A TRANSIT drop has no recoverable source (IC lost in the travel path),
+    //so it is SKIP-only : acknowledge the loss.
+    int iKey=K_SKIP;
+    TMySucker *DropSucker=GetSucker(iFirstDrop);
+    if(DropSucker!=NULL)
+        iKey=ShowSuckError(*DropSucker, 3, bAtPick?(K_RETRY|K_SKIP):K_SKIP, Part);   //CodeType 3 = drop (pick=1, place/residue=2)
+
+    //dispose every still-OFF held nozzle per the choice, then write the SortArm slot off
+    TTrayMotor *LoaderTray=(bAtPick?GetLoaderVMotor(iActiveLoaderNo):NULL);
+    for(int s2=0; s2<SORT_ARM_SUCKER_COUNT; s2++)
+    {
+        if(Slot[s2].bHasIC==false)
+            continue;
+        TMySucker *Sk=GetSucker(s2);
+        if(Sk==NULL || Sk->Enable==false || Sk->Sensor.Enable==false)
+            continue;
+        if(Sk->GetStatus()==false)
+        {
+            if(bAtPick && LoaderTray!=NULL)   //RETRY: restore (keep IC in tray) ; SKIP: abandon (EMPTY_IC)
+                LoaderTray->SetTraySingleData(Slot[s2].PickX, Slot[s2].PickY, (iKey==K_SKIP)?EMPTY_IC:Slot[s2].TrayData);
+            Sk->Normal();     //drop the now-meaningless vacuum/blow outputs on this nozzle
+            ClearSlot(s2);    //write the SortArm slot off : not held, not place-selected, never counted
+        }
+    }
+    UpdateKitSuckState();
+    return true;
 }
 //---------------------------------------------------------------------------
 bool TSortArmModule::DoPickFromLoader(int Flag)
@@ -1510,6 +1665,11 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
         case 60:
             if(SortArmZToSafePos())
             {
+                //AI(ht160s-falldown) 20260706 : confirm the just-picked ICs survived the lift to
+                //safe before handing back the Loader-Y / declaring the batch picked. A drop here
+                //stops+alarms+writes the slot off (HT172 OutArmDeviceDropCheck at the transit start).
+                if(CheckHoldFallDown(true))
+                    break;
                 LoaderModule->ReleaseSortOwner(iActiveLoaderNo);
                 PickTask=1;
                 return true;
@@ -1576,6 +1736,16 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
     {
         PlaceTask=1;
         return false;
+    }
+
+    //AI(ht160s-falldown) 20260706 : HT172 OutArmDeviceDropCheck port -- continuous held-IC
+    //vacuum drop monitor across the transit to Auto (Z at/going to safe, BEFORE the place
+    //Z-down at case 40). NOT gated during Z-down/destroy/blow (>=40) where vacuum legitimately
+    //changes. A drop stops ALL motion + alarms + writes the slot off (never a phantom placed OK).
+    if(PlaceTask>=10 && PlaceTask<=35)
+    {
+        if(CheckHoldFallDown(false))
+            return false;
     }
 
     switch(PlaceTask)
@@ -1786,7 +1956,7 @@ AnsiString TSortArmModule::DescribeHolding()
         {
             int  RouteBin = GetSlotRoutingBin(i);
             bool bFixed   = false;
-            int  Mapped   = GetMappedAutoIndex(RouteBin, Slot[i].LotIndex, bFixed);
+            int  Mapped   = GetMappedAutoIndex(RouteBin, Slot[i].LotIndex, Slot[i].PassClass, bFixed);
             AnsiString Dest = (Mapped>=0) ? ("Auto"+IntToStr(Mapped+1)) : AnsiString("none(Color/Err)");
             s += "  TrayData=" + IntToStr(Slot[i].TrayData)
                + "  Bin="      + IntToStr(Slot[i].BinValue)

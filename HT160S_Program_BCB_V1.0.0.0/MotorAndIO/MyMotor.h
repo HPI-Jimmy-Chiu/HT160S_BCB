@@ -64,6 +64,10 @@ public:
     int iLot[MAX_TRAY_X][MAX_TRAY_Y];
     AnsiString sCode2D[MAX_TRAY_X][MAX_TRAY_Y];
     bool bManual2D[MAX_TRAY_X][MAX_TRAY_Y];   //AI(ht160s-ccd-manual2d) : per-cell flag, IC 2D was operator hand-entered
+    //AI(ht160s-lotpassfail) 20260709 : per-cell PASS/FAIL class frozen at CCD scan
+    //(0=none/error, 1=PASS, 2=FAIL). Mirrors iBin; feeds By Lot+PassFail routing and the
+    //Production_Log PassFail column so both read the SAME scan-time class (no place-time recompute).
+    int iPassClass[MAX_TRAY_X][MAX_TRAY_Y];
     AnsiString TrayID;
     eTrayKind Kind;   //AI(HT160S-Maintainer) 20260604 : tray role in stacking car
 
@@ -88,6 +92,8 @@ public:
     int  GetLot(int x, int y);
     void SetCode2D(int x, int y, AnsiString code);
     AnsiString GetCode2D(int x, int y);
+    void SetPassClass(int x, int y, int c);   //AI(ht160s-lotpassfail) 20260709 : mirror SetBin
+    int  GetPassClass(int x, int y);          //AI(ht160s-lotpassfail) 20260709 : mirror GetBin
     void SetManual2D(int x, int y, bool b);
     bool GetManual2D(int x, int y);
     //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
@@ -302,6 +308,8 @@ public:
     int  GetTrayLot(int x, int y);            //AI(ht160s-lotbin) 20260615 : read owning LotIndex for a cell
     void SetTrayCode2D(int x, int y, AnsiString code);  //AI(ht160s-lotbin) 20260615 : write IC 2D code for a cell
     AnsiString GetTrayCode2D(int x, int y);             //AI(ht160s-lotbin) 20260615 : read IC 2D code for a cell
+    void SetTrayPassClass(int x, int y, int c);         //AI(ht160s-lotpassfail) 20260709 : write frozen PASS/FAIL class
+    int  GetTrayPassClass(int x, int y);                //AI(ht160s-lotpassfail) 20260709 : read frozen PASS/FAIL class
     void SetTrayManual2D(int x, int y, bool b);
     bool GetTrayManual2D(int x, int y);
     void Refresh();

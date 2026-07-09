@@ -289,7 +289,7 @@ __published:
     TTabSheet *tsLotInfo;
     TPanel *pnlSortModeBox;
     TLabel *lblLotBinModeHint;
-    TCheckBox *chkUseLotBinMode;
+    TRadioGroup *rgSortMode;
     TCheckBox *chkUseTrayDatumModel;
     TCheckBox *cbCommType;
     TPanel *plLoaderSafeDistanceSet;
@@ -369,7 +369,7 @@ __published:
     void __fastcall chkUseAMRClick(TObject *Sender);
     void __fastcall chkAmrTestModeClick(TObject *Sender);
     void __fastcall AmrInjectButtonClick(TObject *Sender);
-    void __fastcall chkUseLotBinModeClick(TObject *Sender);
+    void __fastcall rgSortModeClick(TObject *Sender);
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);

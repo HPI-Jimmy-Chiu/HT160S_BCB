@@ -117,7 +117,7 @@
 | --- | --- | --- |
 | `GeneralSetting.iLoaderYSafeDistance` | 預設 10000（=100mm）；`<=0` 停用 | 兩側 Loader-Y 車跨側最小安全間隔（1/100mm），`General.ini [Safety] LoaderYSafeDistance` |
 | `GeneralSetting.iSimAmrMaxTray[0]` | 模擬補料用；index 0=Loader | 模擬 Loader 來料疊盤盤數（每次取盤遞減，0 缺料呼叫 AGV） |
-| `GeneralSetting.bUseLotBinSortMode` | bool | By Lot+Bin 分類模式；開啟時 2D 反查後 `ResolveAuto` 動態綁定 (Lot,Bin)→Auto |
+| `GeneralSetting.iSortMode` | 0/1/2 | 分流模式；1=By Lot+Bin（2D 反查後 `ResolveAuto` 綁定 (Lot,Bin)→Auto）、2=By Lot+PassFail（綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由 Bin==Pass Bin 導出、掃描時凍結） |
 | `CosFunction.bUse2DBinMap` | bool | 是否啟用 Top CCD 2D 條碼讀取與 Bin2DMap 反查（關閉只讀有無料） |
 | `Teach.Loader1/2CarFeedTrayYPosition` | 教導值 | 各側 Loader-Y 取盤位（1/100mm） |
 | `Teach.Loader1/2CarDischargeTrayYPosition` | 教導值 | 各側空盤排出位 |
@@ -448,7 +448,7 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | `TRAYARM_ZUP_LOST_MS` | 100 ms | 盤臂 X 移動 Z 脫離上位去抖窗 |
 | `GeneralSetting.bSuckerEnabled[s]` | per-sucker bool | 各吸嘴（0..3）是否啟用；影響取放選擇與互鎖檢查範圍 |
 | `GeneralSetting.bUseAMR` | bool | AMR 模式開關，決定 TrayArm 派工策略 |
-| `GeneralSetting.bUseLotBinSortMode` | bool | By Lot+Bin 路由模式，決定 `GetMappedAutoIndex` 用綁定查表 |
+| `GeneralSetting.iSortMode` | 0/1/2 | 分流模式；動態模式（1 By Lot+Bin / 2 By Lot+PassFail）時 `GetMappedAutoIndex` 用綁定查表（Bin 或凍結的 PASS/FAIL 分類鍵） |
 | `GeneralSetting.bShowSortArmPlaceCheck` | 預設 OFF | [診斷] 放料前彈出實際 vs 預期位置比對（生產應關） |
 | `Teach.SortArmToLoader1/2XPosition` | 教導值 | 分類臂對 Loader1/2 取料 X 基準位 |
 | `Teach.SortArmToLoader_1/2_Z1..Z4Position` | 教導值 | 分類臂在 Loader 各吸嘴下降 Z 位 |
@@ -557,7 +557,7 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | --- | --- | --- |
 | `GeneralSetting.bAutoEnabled[0..5]` | 預設全 true；存於 INI `[SortMode] AutoEnabled0..5` | 每站 Auto1~6 啟用旗標；關閉站在 Lot+Bin 路由與置盤掃描中被略過。改動後需重啟軟體。Error Auto 即使關閉仍作溢位目標 |
 | `GeneralSetting.bUseAMR` | bool | AMR 堆疊模式總開關（堆疊順序、放料閘控、滿車服務、AGV 握手） |
-| `GeneralSetting.bUseLotBinSortMode` | bool | By Lot+Bin 動態路由模式（影響顯示）；路由邏輯在 SortArm |
+| `GeneralSetting.iSortMode` | 0/1/2 | 動態路由模式（1 By Lot+Bin / 2 By Lot+PassFail，影響 Unload 面板顯示：PassFail 模式顯示 PASS/FAIL）；路由邏輯在 SortArm |
 | `GeneralSetting.iSimAmrMaxTray[3+Index]` | 整數（盤），index 3..8 對應 Auto1~6 | 模擬各 Auto 堆疊車滿車門檻 |
 | `Teach.Auto1..6CarFeedTrayYPosition` | 教導值（1/100mm） | 各站取盤高度 Y（DoFeedTray case 1000） |
 | `Teach.Auto1..6CarDischargeTrayYPosition` | 教導值 | 各站出盤/堆疊 Y（DoDischargeTray case 1000） |

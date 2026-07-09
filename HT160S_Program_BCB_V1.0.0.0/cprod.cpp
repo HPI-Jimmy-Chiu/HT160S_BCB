@@ -356,6 +356,16 @@ void TrayUphLog_OnLotStart(AnsiString LotID)
     g_UphActive=true;
 }
 //---------------------------------------------------------------------------
+void TrayUphLog_EnsureActive(AnsiString LotID)
+{
+    //AI(ht160s-uph) 20260708 : 172-aligned. Arm the per-tray sampler from the actual run
+    //(DoStartArm) if neither the Lot Start button nor SECS LOTSTART armed it, so UPH
+    //history is captured however the machine was started. Idempotent : never re-clears
+    //an already-active lot (Pause/Stop resume keeps its history).
+    if(g_UphActive==false)
+        TrayUphLog_OnLotStart(LotID);
+}
+//---------------------------------------------------------------------------
 static void UphPushRow(AnsiString sStart, AnsiString sEnd, AnsiString sPause, int iUph)
 {
     int k;

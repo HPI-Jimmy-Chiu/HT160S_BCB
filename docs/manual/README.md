@@ -21,7 +21,7 @@
 | 12 | SECS/GEM 與 AMR/AGV | [12-secs-amr.md](12-secs-amr.md) |
 | 13 | 警報訊息與排除 | [13-alarms.md](13-alarms.md) |
 | 14 | 各模組運作流程 | [14-module-flows.md](14-module-flows.md) |
-| 15 | By Lot+Bin 分流模式 | [15-lotbin-mode.md](15-lotbin-mode.md) |
+| 15 | 動態分流模式（By Lot+Bin / By Lot+PassFail） | [15-lotbin-mode.md](15-lotbin-mode.md) |
 | 16 | 常見問題 (FAQ) | [16-faq.md](16-faq.md) |
 
 ## 附錄（自機台設定檔產生，用於補齊各章「待補」）

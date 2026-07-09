@@ -229,6 +229,7 @@ void ResetPerLotProductionCounters();
 //(GetCalculateUPH); per-tray UPH is diagnostic. See
 //docs/plan/uph-suite-persistence-biniccnt-plan-20260706.md.
 void TrayUphLog_OnLotStart(AnsiString LotID);
+void TrayUphLog_EnsureActive(AnsiString LotID);
 void TrayUphLog_Tick();
 void TrayUphLog_OnLotEnd(AnsiString LotID, int TotalIC, int LotUPH);
 void TrayUphLog_PruneOld();

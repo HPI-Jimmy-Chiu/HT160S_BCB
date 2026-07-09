@@ -2001,20 +2001,21 @@ object fMaintenance: TfMaintenance
                 Left = 0
                 Top = 0
                 Width = 929
-                Height = 64
+                Height = 80
                 Align = alTop
                 BevelInner = bvLowered
                 TabOrder = 0
                 object lblLotBinModeHint: TLabel
                   Left = 240
-                  Top = 12
+                  Top = 8
                   Width = 609
-                  Height = 36
+                  Height = 64
                   AutoSize = False
-                  Caption = 
-                    'When ON, classify By Lot+Bin (each Lot+Bin pair binds to an Auto' +
-                    ' dynamically). When OFF, Normal mode (static Bin->Auto table). C' +
-                    'hanging this needs a software restart.'
+                  Caption =
+                    'Normal = static Bin->Auto recipe table.  By Lot+Bin = each (Lot,B' +
+                    'in) pair binds to an Auto dynamically.  By Lot+PassFail = PASS/FAI' +
+                    'L (vs the Pass Bin set on the Bin Setting page) binds to an Auto p' +
+                    'er lot.  Changing the mode needs a software restart.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -2023,20 +2024,26 @@ object fMaintenance: TfMaintenance
                   ParentFont = False
                   WordWrap = True
                 end
-                object chkUseLotBinMode: TCheckBox
-                  Left = 16
-                  Top = 20
-                  Width = 210
-                  Height = 20
-                  Caption = 'Sort By Lot+Bin'
+                object rgSortMode: TRadioGroup
+                  Left = 8
+                  Top = 2
+                  Width = 224
+                  Height = 74
+                  Caption = 'Sort Mode'
+                  Columns = 1
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
-                  Font.Height = -15
+                  Font.Height = -13
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
+                  ItemIndex = 0
+                  Items.Strings = (
+                    'Normal'
+                    'By Lot+Bin'
+                    'By Lot+PassFail')
                   ParentFont = False
                   TabOrder = 0
-                  OnClick = chkUseLotBinModeClick
+                  OnClick = rgSortModeClick
                 end
               end
             end

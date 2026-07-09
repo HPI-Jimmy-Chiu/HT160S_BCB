@@ -11,7 +11,7 @@
 #include <SyncObjs.hpp>
 //---------------------------------------------------------------------------
 
-#define PROD_LOG_FIELD_COUNT    20
+#define PROD_LOG_FIELD_COUNT    21
 
 enum eICRecordField
 {
@@ -24,7 +24,9 @@ enum eICRecordField
     //appended so existing column positions are unchanged)
     eLotID, e2DCode,
     //AI(ht160s-ccd-manual2d) 20260626 : 1 = IC 2D operator hand-entered (appended; positions unchanged)
-    eManual2D
+    eManual2D,
+    //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL vs operator Pass Bin (append; positions unchanged)
+    ePassFail
 };
 
 //---------------------------------------------------------------------------
@@ -83,6 +85,9 @@ public:
 
     // Called at classify: fill bin assignment per nozzle
     void AddBinInfo(int iNozzle, int iBinIndex, int iGradeCode);
+
+    //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL text; set before AddOutputInfo flush
+    void AddPassFail(int iNozzle, const AnsiString& sPassFail);
 
     // trace code attach -- 0 = no trace
     void AddTraceInfo(int iNozzle, int iTraceCode);

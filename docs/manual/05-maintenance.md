@@ -106,8 +106,8 @@
 | --- | --- | --- |
 | chkHardwareColorBinArea | checkbox | 是否安裝 Color bin 區硬體；OnClick 即時寫入 GeneralSetting.bColorBinAreaInstalled，存檔時寫入 General.ini |
 | chkUseAMR | checkbox | 是否使用 AMR；OnClick 即時寫入 GeneralSetting.bUseAMR，存檔寫入 General.ini |
-| chkAutoEnable1..chkAutoEnable6 | checkbox | 各 Auto 啟用（僅 By Lot+Bin 模式有效）；未勾選的 Auto 在綁定新 Lot+Bin 時被跳過。OnClick 即時寫入 GeneralSetting.bAutoEnabled[]，但會跳提示需重新啟動軟體才乾淨生效；運轉時被鎖定 |
-| chkUseLotBinMode | checkbox | 切換分類模式：勾選=依 Lot+Bin 動態綁定 Auto，取消=Normal（靜態 Bin->Auto 表）。OnClick 即時寫入 GeneralSetting.bUseLotBinSortMode 並提示需重新啟動軟體；運轉時被鎖定 |
+| chkAutoEnable1..chkAutoEnable6 | checkbox | 各 Auto 啟用（僅動態模式 By Lot+Bin / By Lot+PassFail 有效）；未勾選的 Auto 在綁定新分類鍵時被跳過。OnClick 即時寫入 GeneralSetting.bAutoEnabled[]，但會跳提示需重新啟動軟體才乾淨生效；運轉時被鎖定 |
+| rgSortMode | radiogroup（3 選項） | 切換分類模式：Normal（靜態 Bin->Auto 表）/ By Lot+Bin（動態綁定 (Lot,Bin)）/ By Lot+PassFail（動態綁定 (Lot,PASS/FAIL)，PASS/FAIL 由 Bin==Pass Bin 導出）。ItemIndex 對應 GeneralSetting.iSortMode(0/1/2)，OnClick 即時寫入並提示需重新啟動軟體；運轉時被鎖定。詳見第 15 章 |
 | edLoaderSafeDistance | edit | 兩台 Loader 車的最小間距（325~650 mm）；ReadOnly，點擊以螢幕鍵盤 (fQwertyKey) 輸入，OK 後 YES/NO 確認才存，即時寫入 GeneralSetting.iLoaderYSafeDistance（以 1/100mm 儲存、顯示為 mm）並 Save()；運轉時被鎖定；aLoader IsLoaderYMoveSafe 即時讀取 |
 
 #### 相關參數
@@ -116,8 +116,8 @@
 | --- | --- | --- |
 | GeneralSetting.bColorBinAreaInstalled | bool；由勾選決定 | 是否安裝 Color bin 區硬體 |
 | GeneralSetting.bUseAMR | bool | 是否使用 AMR |
-| GeneralSetting.bUseLotBinSortMode | bool；變更需重啟軟體 | 分類模式：true=By Lot+Bin 動態綁定，false=Normal 靜態 Bin->Auto |
-| GeneralSetting.bAutoEnabled[6] | bool ×6；預設皆勾選；變更需重啟 | Auto1~Auto6 各別啟用（僅 Lot+Bin 模式有效） |
+| GeneralSetting.iSortMode | 0/1/2；變更需重啟軟體 | 分類模式：0=Normal 靜態 Bin->Auto、1=By Lot+Bin 動態綁定、2=By Lot+PassFail 動態綁定（依 Bin==Pass Bin 分 PASS/FAIL）。存 General.ini [SortMode] Mode（另同步寫 legacy UseLotBinMode 供舊版降級） |
+| GeneralSetting.bAutoEnabled[6] | bool ×6；預設皆勾選；變更需重啟 | Auto1~Auto6 各別啟用（僅動態模式有效） |
 | GeneralSetting.iLoaderYSafeDistance | 325.00~650.00 mm（=32500~65000）；DFM 預設顯示 100.00 | 兩台 Loader 車最小間距，儲存單位 1/100mm，畫面以 mm 顯示/輸入 |
 
 #### 操作步驟

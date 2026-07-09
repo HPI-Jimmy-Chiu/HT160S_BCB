@@ -552,9 +552,16 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
         }
         Lines->Add("  ],");
 
-        //AI(ht160s-lotbin) 20260615 : dump the dynamic (Lot,Bin)->Auto table so a
-        //snapshot taken in By Lot+Bin mode shows which Auto each pair was bound to.
-        Lines->Add("  \"SortMode\": \""+AnsiString(GeneralSetting.bUseLotBinSortMode?"LotBin":"Normal")+"\",");
+        //AI(ht160s-lotbin) 20260615 : dump the dynamic (Lot,key)->Auto table so a snapshot
+        //taken in a dynamic mode shows which Auto each pair was bound to.
+        //AI(ht160s-lotpassfail) 20260709 : 3-way mode name + PassBin. NOTE the "Bin" field
+        //below carries a PASS/FAIL class (1=PASS,2=FAIL) when SortMode is "LotPassFail".
+        {
+            AnsiString SortModeName = GeneralSetting.IsLotBinSortMode() ? AnsiString("LotBin")
+                                    : (GeneralSetting.IsLotPassFailSortMode() ? AnsiString("LotPassFail") : AnsiString("Normal"));
+            Lines->Add("  \"SortMode\": \""+SortModeName+"\",");
+        }
+        Lines->Add("  \"PassBin\": "+IntToStr(BinAreaMap.GetPassBin())+",");
         Lines->Add("  \"LotBinBinding\": [");
         {
             int BindCount=LotBinBinding.GetBindingCount();
@@ -741,7 +748,7 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
     Out += "[Config gates]\r\n";
     Out += "  bUseAMR=" + IntToStr(GeneralSetting.bUseAMR ? 1 : 0)
          + "  bColorBinAreaInstalled=" + IntToStr(GeneralSetting.bColorBinAreaInstalled ? 1 : 0)
-         + "  bUseLotBinSortMode=" + IntToStr(GeneralSetting.bUseLotBinSortMode ? 1 : 0) + "\r\n";
+         + "  iSortMode=" + IntToStr(GeneralSetting.iSortMode) + "  PassBin=" + IntToStr(BinAreaMap.GetPassBin()) + "\r\n";
     Out += "  bUsePredictiveAutoSupply=" + IntToStr(GeneralSetting.bUsePredictiveAutoSupply ? 1 : 0) + "\r\n";
     Out += "  bUseColorCcd=" + IntToStr(CosFunction.bUseColorCcd ? 1 : 0)
          + "  bUseTopCcd=" + IntToStr(CosFunction.bUseTopCcd ? 1 : 0)

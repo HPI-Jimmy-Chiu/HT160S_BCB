@@ -90,6 +90,7 @@ private:
 	int AreaToBin[HT160_BIN_AREA_MAX_AREA];
 	int ErrorBinToArea[HT160_BIN_ERROR_REASON_COUNT];
 	int ErrorBinArea;
+	int PassBin;   //AI(ht160s-bin-passfail) 20260708 : bin# that counts as PASS (0 = feature off)
 
 	bool IsValidBin(int Bin);
 	bool IsValidArea(int Area);
@@ -120,6 +121,13 @@ public:
 	AnsiString GetDefaultIniFileName();
 	void LoadFromIni(AnsiString FileName);
 	void SaveToIni(AnsiString FileName);
+	int GetPassBin();
+	void SetPassBin(int Bin);
+	// AI(ht160s-lotpassfail) 20260709 : single classifier shared by the CCD-scan freeze
+	// (aLoader), the place-time PASS/FAIL log and the By Lot+PassFail routing read, so all
+	// three agree. Returns 0 = no class (error bin, or PassBin feature off) -> Error Auto /
+	// blank log ; 1 = PASS (Bin==PassBin) ; 2 = FAIL (any other real bin).
+	int GetPassFailClass(int Bin);
 	void LoadDefault();
 	void SaveDefault();
 };

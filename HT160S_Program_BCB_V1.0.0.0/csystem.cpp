@@ -1409,6 +1409,7 @@ void ProcessMotion()
 		{
 			tRunData.LotEndTime=Now();
 			tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
+			if(fMain!=NULL) fMain->FreezeProductInfoAtLotEnd();
 			InitialAllTask();
 			HSys.Sys.bCleanOut=false;   //AI(HT160S-Maintainer) 20260605 : CleanOut fully done, drop nested latch
 			//AI(HT160S-Maintainer) 20260612 : pop a "CleanOut finish" note (ref HT172

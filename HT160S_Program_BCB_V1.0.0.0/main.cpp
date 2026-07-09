@@ -274,6 +274,53 @@ void __fastcall TfMain::apbLogsClick(TObject *Sender)
 {
     if(pgcLog != NULL)
         pgcLog->ActivePage = tsLogs;
+    RefreshEventLogView();   //AI(ht160s-eventlog-view) 20260708 : show today's EventLog tail
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::RefreshEventLogView()
+{
+    if(lstLog==NULL)
+        return;
+    AnsiString path=HSys.LogRootDir+"/EventLog/"+FormatDateTime("yyyy_mm", Now())+"/HT160S_"+FormatDateTime("yyyy_mm_dd", Now())+".csv";
+    lstLog->Items->BeginUpdate();
+    lstLog->Clear();
+    if(FileExists(path)==false)
+    {
+        lstLog->Items->Add("(no EventLog today)");
+        lstLog->Items->EndUpdate();
+        return;
+    }
+    TFileStream *fs=NULL;
+    TStringList *sl=NULL;
+    char *buf=NULL;
+    try
+    {
+        fs=new TFileStream(path, fmOpenRead | fmShareDenyNone);
+        const int TAIL=8192;   //AI(ht160s-eventlog-view) 20260708 : read only the tail (~last lines) to stay cheap on a large daily log
+        __int64 sz=fs->Size;
+        __int64 start=(sz>TAIL)?(sz-TAIL):0;
+        int len=(int)(sz-start);
+        fs->Position=start;
+        buf=new char[len+1];
+        int got=(len>0)?fs->Read(buf, len):0;
+        buf[got]=0;
+        sl=new TStringList;
+        sl->Text=AnsiString(buf, got);
+        int first=(start>0 && sl->Count>0)?1:0;   //skip the partial first line when we seeked into the file
+        int from=sl->Count-20;
+        if(from<first)
+            from=first;
+        for(int i=from; i<sl->Count; i++)
+            lstLog->Items->Add(sl->Strings[i]);
+    }
+    catch(...)
+    {
+        lstLog->Items->Add("(EventLog read error)");
+    }
+    if(buf!=NULL) delete [] buf;
+    if(sl!=NULL) delete sl;
+    if(fs!=NULL) delete fs;
+    lstLog->Items->EndUpdate();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnTrayMapClick(TObject *Sender)
@@ -762,7 +809,30 @@ static AnsiString FmtCarKinds(int t, int id0, int cv0)
 //AI(ht160s-uph) 20260707 : sgProductInfo row indices (mirror HT172 IncludeAllHeader
 // e-enum: Lot Start / Lot End / Alarm Time / Pause Time / UPH). File-scope enum
 // (this is a .cpp, not the form class body).
-enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH };
+enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH, PI_TotalTime };
+//AI(ht160s-uph) 20260708 : Lot End time + final UPH + UPH-denominator time are shown only
+//AFTER a lot ends (blank during a running lot). false at Lot Start, true at Lot End finalize.
+static bool bLotEnded=false;
+//---------------------------------------------------------------------------
+void __fastcall TfMain::ClearProductInfoAtLotStart()
+{
+    bLotEnded=false;
+    if(sgProductInfo==NULL)
+        return;
+    sgProductInfo->Cells[1][PI_LotEnd   ]="";
+    sgProductInfo->Cells[1][PI_UPH      ]="";
+    sgProductInfo->Cells[1][PI_TotalTime]="";
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::FreezeProductInfoAtLotEnd()
+{
+    bLotEnded=true;
+    if(sgProductInfo==NULL)
+        return;
+    sgProductInfo->Cells[1][PI_LotEnd   ]=FormatDateTime("hh:nn:ss", tRunData.LotEndTime);
+    sgProductInfo->Cells[1][PI_UPH      ]=IntToStr(tRunData.UPH);
+    sgProductInfo->Cells[1][PI_TotalTime]=(tRunData.LotEndTime-tRunData.StartTime-tUPH_PauseTime).FormatString("hh:nn:ss");
+}
 //---------------------------------------------------------------------------
 // AI(ht160s-uph) 20260707 : live production-info panel (HT172 TfMain::ShowProductInfo
 // parity). One-time header, then per-cycle fill of Lot Start/End/Alarm/Pause and a
@@ -783,15 +853,17 @@ void __fastcall TfMain::ShowProductInfo()
         sgProductInfo->Cells[0][PI_PauseTime]="Pause Time :";
         sgProductInfo->Cells[0][PI_UPH      ]="UPH :";
         sgProductInfo->Cells[2][PI_UPH      ]="Unit / Hr";
+        sgProductInfo->Cells[0][PI_TotalTime]="UPH Time :";
     }
     sgProductInfo->Cells[1][PI_LotStart ]=FormatDateTime("hh:nn:ss", tRunData.StartTime);
-    sgProductInfo->Cells[1][PI_LotEnd   ]=FormatDateTime("hh:nn:ss", tRunData.LotEndTime);
+    sgProductInfo->Cells[1][PI_LotEnd   ]=bLotEnded ? FormatDateTime("hh:nn:ss", tRunData.LotEndTime) : AnsiString("");
     sgProductInfo->Cells[1][PI_AlarmTime]=FormatDateTime("hh:nn:ss", tRunData.AlarmTime);
     sgProductInfo->Cells[1][PI_PauseTime]=tUPH_PauseTime.FormatString("hh:nn:ss");
     if(HSys.Sys.SystemStart && bFirstRun==false && tRunData.TotalIC>0)
     {
         tRunData.UPH=GetCalculateUPH(Now());
         sgProductInfo->Cells[1][PI_UPH]=IntToStr(tRunData.UPH);
+        sgProductInfo->Cells[1][PI_TotalTime]=(Now()-tRunData.StartTime-tUPH_PauseTime).FormatString("hh:nn:ss");
     }
 }
 //---------------------------------------------------------------------------
@@ -871,14 +943,18 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
     TPanel *CntPanel[6]={palAuto01Cnt, palAuto02Cnt, palAuto03Cnt, palAuto04Cnt, palAuto05Cnt, palAuto06Cnt};
     TPanel *LotPanel[6]={plLotNumberAuto1, plLotNumberAuto2, plLotNumberAuto3, plLotNumberAuto4, plLotNumberAuto5, plLotNumberAuto6};
 
-    bool bLotBinMode=GeneralSetting.bUseLotBinSortMode;
+    //AI(ht160s-lotpassfail) 20260709 : both dynamic modes reverse-look-up the binding table.
+    //The middle field is a Bin in Lot+Bin mode but a PASS/FAIL class (1/2) in Lot+PassFail
+    //mode, so show "PASS"/"FAIL" text there instead of the raw class number.
+    bool bDynamicMode=GeneralSetting.IsDynamicBindingMode();
+    bool bPassFailMode=GeneralSetting.IsLotPassFailSortMode();
 
     for(int i=0; i<6; i++)
     {
         AnsiString sBin="0";
         AnsiString sLot="";
 
-        if(bLotBinMode)
+        if(bDynamicMode)
         {
             int BindCount=LotBinBinding.GetBindingCount();
             for(int j=0; j<BindCount; j++)
@@ -887,7 +963,10 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
                 int BindBin=0, BindAuto=-1;
                 if(LotBinBinding.GetBindingByIndex(j, BindLotID, BindBin, BindAuto) && BindAuto==i)
                 {
-                    sBin=IntToStr(BindBin);
+                    if(bPassFailMode)
+                        sBin=(BindBin==1)?AnsiString("PASS"):((BindBin==2)?AnsiString("FAIL"):AnsiString("?"));
+                    else
+                        sBin=IntToStr(BindBin);
                     sLot=BindLotID;
                     break;
                 }
@@ -1136,6 +1215,14 @@ void __fastcall TfMain::InitSimulateScreenBinding()
     BindMovingTrayPanel(HSys.Mot.MLoaderY_1, HSys.VMot.MMLoaderY_1, plLoaderLTrayWork, mtLoaderLTrayWork);
     BindMovingTrayPanel(HSys.Mot.MLoaderY_2, HSys.VMot.MMLoaderY_2, plLoaderRTrayWork, mtLoaderRTrayWork);
 
+    //AI(ht160s-loader-2d-panel) 20260708 : mirror each Loader lane tray onto the static
+    //"Loader 2D Left/Right" grids on the Tray Status page - the SUB panel of the same
+    //content motor (TTrayMotor::Refresh paints main + sub). Display only, no gating.
+    if(HSys.VMot.MMLoaderY_1 != NULL && mtLoaderL != NULL)
+        HSys.VMot.MMLoaderY_1->SetSubHTrayPanel(mtLoaderL);
+    if(HSys.VMot.MMLoaderY_2 != NULL && mtLoaderR != NULL)
+        HSys.VMot.MMLoaderY_2->SetSubHTrayPanel(mtLoaderR);
+
     // Size every content grid to the active Recipe Col/Row (XDivision/YDivision)
     // instead of leaving them at the fixed dfm 4x5.
     SyncMonitorTrayDivision();
@@ -1163,6 +1250,10 @@ void __fastcall TfMain::SyncMonitorTrayDivision()
 
     ApplyTrayDivisionToPanel(mtLoaderLTrayWork, HSys.VMot.MMLoaderY_1, X, Y);
     ApplyTrayDivisionToPanel(mtLoaderRTrayWork, HSys.VMot.MMLoaderY_2, X, Y);
+
+    //AI(ht160s-loader-2d-panel) 20260708 : size the static Loader 2D Left/Right grids too.
+    ApplyTrayDivisionToPanel(mtLoaderL, HSys.VMot.MMLoaderY_1, X, Y);
+    ApplyTrayDivisionToPanel(mtLoaderR, HSys.VMot.MMLoaderY_2, X, Y);
 }
 //---------------------------------------------------------------------------
 // Simulation IC: assign virtual ICs to incoming trays without CCD hardware.
@@ -1789,6 +1880,14 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
     // poka-yoke that blocked Start on GetBindingCount()<=0 contradicted this model (a
     // fresh order could never satisfy it -- binds are only made while running) and is
     // removed; the lot/2D-data gates above already guarantee routable data before Start.
+    //AI(ht160s-lotpassfail) 20260709 : By Lot+PassFail routes on PASS (Bin==PassBin) vs FAIL.
+    // With PassBin unset (0) every IC classifies FAIL and piles into a single Auto, so refuse
+    // to start until the operator picks a Pass Bin on the Bin Setting page.
+    if(GeneralSetting.IsLotPassFailSortMode() && BinAreaMap.GetPassBin()<=0)
+    {
+        Reason="By Lot+PassFail mode is ON but no Pass Bin is set. Set the Pass Bin on the Bin Setting page before Start !";
+        return false;
+    }
     return true;
 }
 //---------------------------------------------------------------------------
@@ -1828,6 +1927,7 @@ void TfMain::DoStartArm()
             HSys.Sys.SystemStart=true;                                              //20140411 wei
             SoftStart=true;
             g_DeviceInfo.OnLotStart(edLotNo->Text, Now());                          //AI(HT160S-Maintainer) 20260603 : start per-IC production trace batch
+            TrayUphLog_EnsureActive(edLotNo->Text);   //AI(ht160s-uph) 20260708 : 172-aligned arm-on-run (idempotent; skips if Lot Start/SECS already armed or on resume)
             if(LoaderModule!=NULL)
                 LoaderModule->SetCurrentLotNumber(edLotNo->Text);                   //AI(HT160S-Maintainer) 20260604 : P3 2D->Bin lookup keyed by lot number
 //        }
@@ -2054,6 +2154,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     ResetPerLotProductionCounters();
     //AI(ht160s-uph) 20260706 : open this work order's per-tray/lot UPH log folder.
     TrayUphLog_OnLotStart(FirstLot);
+    ClearProductInfoAtLotStart();
 
     MachineRun.bRunning=true;
     MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
@@ -2269,6 +2370,7 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
     RecordProcess("End of Lot: Lot="+edLotNo->Text+", TotalIC="+IntToStr(tRunData.TotalIC)+", UPH="+IntToStr(tRunData.UPH));
     TrayUphLog_OnLotEnd(edLotNo->Text, tRunData.TotalIC, tRunData.UPH);
+    FreezeProductInfoAtLotEnd();
     WriteLastDataIni();
 
     //AI(ht160s-lot-webapi) 20260612 : stop any in-flight "pull all lots" sweep so

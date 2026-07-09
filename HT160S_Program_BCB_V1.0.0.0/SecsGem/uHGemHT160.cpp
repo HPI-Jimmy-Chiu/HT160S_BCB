@@ -833,6 +833,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         ResetPerLotProductionCounters();
                         //AI(ht160s-uph) 20260706 : open the per-tray/lot UPH log folder.
                         TrayUphLog_OnLotStart(FirstLot);
+                        fMain->ClearProductInfoAtLotStart();
                         fMain->edLotNo->Text = FirstLot;         // active lot backfill
                         fMain->RefreshLotListFromRegistry();
                         //AI(ht160s-2dbin-manual) 20260628 : persist the SECS-registered lots

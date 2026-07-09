@@ -301,6 +301,7 @@ void THT160BinAreaMap::Clear()
 	for(Index=0; Index<HT160_BIN_ERROR_REASON_COUNT; Index++)
 		ErrorBinToArea[Index]=0;
 	ErrorBinArea=HT160_DEFAULT_ERROR_BIN_AREA;
+	PassBin=0;
 }
 //---------------------------------------------------------------------------
 bool THT160BinAreaMap::AddBinArea(int Bin, int Area)
@@ -543,6 +544,7 @@ void THT160BinAreaMap::LoadFromIni(AnsiString FileName)
 			ErrorArea=HT160_DEFAULT_ERROR_BIN_AREA;
 	}
 	SetErrorBinArea(ErrorArea);
+	PassBin=Ini->ReadInteger("BinAreaMap", "PassBin", 0);   //AI(ht160s-bin-passfail) 20260708
 	for(Bin=HT160_BIN_ERROR_2D_SCAN_FAIL; Bin<=HT160_BIN_ERROR_NO_BIN_SETTING; Bin++)
 	{
 		ErrorText=Ini->ReadString("ErrorBinAreaMap", GetErrorBinName(Bin), "Default");
@@ -580,6 +582,7 @@ void THT160BinAreaMap::SaveToIni(AnsiString FileName)
 			Ini->WriteInteger("BinAreaMap", GetAreaName(Area), GetBinByArea(Area));
 	}
 	Ini->WriteString("BinAreaMap", "ErrorBinArea", GetAreaName(GetErrorBinArea()));
+	Ini->WriteInteger("BinAreaMap", "PassBin", PassBin);   //AI(ht160s-bin-passfail) 20260708
 	Ini->EraseSection("ErrorBinAreaMap");
 	for(Index=0; Index<HT160_BIN_ERROR_REASON_COUNT; Index++)
 	{
@@ -592,6 +595,28 @@ void THT160BinAreaMap::SaveToIni(AnsiString FileName)
 		Ini->WriteInteger("ErrorBinAreaMap", GetErrorBinName(Bin)+AnsiString("Code"), Bin);
 	}
 	delete Ini;
+}
+//---------------------------------------------------------------------------
+int THT160BinAreaMap::GetPassBin()
+{
+	return PassBin;
+}
+//---------------------------------------------------------------------------
+void THT160BinAreaMap::SetPassBin(int Bin)
+{
+	PassBin=Bin;
+}
+//---------------------------------------------------------------------------
+// AI(ht160s-lotpassfail) 20260709 : PASS/FAIL classifier. Single source shared by the
+// CCD-scan freeze, the place-time log and By Lot+PassFail routing. 0=no class (error bin
+// or PassBin off -> Error Auto / blank), 1=PASS (Bin==PassBin), 2=FAIL (any other real bin).
+int THT160BinAreaMap::GetPassFailClass(int Bin)
+{
+	if(PassBin<=0)
+		return 0;
+	if(IsErrorBin(Bin))
+		return 0;
+	return (Bin==PassBin) ? 1 : 2;
 }
 //---------------------------------------------------------------------------
 void THT160BinAreaMap::LoadDefault()
@@ -1726,6 +1751,10 @@ void THT160LotBinBinding::SaveToIni()
 	try
 	{
 		Ini->EraseSection("LotBinBinding");
+		// AI(ht160s-lotpassfail) 20260709 : tag the file with the sort mode it was written
+		// under. The middle key field is a Bin in LotBin mode but a PASS/FAIL code in
+		// LotPassFail mode, so LoadFromIni must refuse a file authored under a different mode.
+		Ini->WriteInteger("LotBinBinding", "Mode", GeneralSetting.iSortMode);
 		Ini->WriteInteger("LotBinBinding", "Count", m_List->Count);
 		for(i=0; i<m_List->Count; i++)
 		{
@@ -1761,6 +1790,13 @@ void THT160LotBinBinding::LoadFromIni()
 	Ini=new TIniFile(FileName);
 	try
 	{
+		// AI(ht160s-lotpassfail) 20260709 : reject a binding file authored under a different
+		// sort mode (its middle key field would be reinterpreted with the wrong semantics).
+		// A legacy file with no Mode key is trusted (defaults to the current mode) so the
+		// LotBin upgrade path keeps its mid-lot restart bindings.
+		int SavedMode=Ini->ReadInteger("LotBinBinding", "Mode", GeneralSetting.iSortMode);
+		if(SavedMode!=GeneralSetting.iSortMode)
+			return;   // Clear() already ran above; leave the table empty
 		Count=Ini->ReadInteger("LotBinBinding", "Count", 0);
 		for(i=0; i<Count; i++)
 		{
