@@ -326,6 +326,10 @@ __published:
     TEdit *edSettle8;
     TLabel *lblSettle9;
     TEdit *edSettle9;
+    TPanel *pnlUphSampleBox;
+    TLabel *lblUphMinSample;
+    TLabel *lblUphMinSampleHint;
+    TEdit *edUphMinSampleIC;
     TLabel *labPwHint;
     TLabel *labPwIdCaption;
     TLabel *labPwPassCaption;
@@ -375,6 +379,7 @@ __published:
     void __fastcall chkSuckEnableClick(TObject *Sender);
     void __fastcall edLoaderSafeDistanceClick(TObject *Sender);
     void __fastcall edSettleDelayClick(TObject *Sender);
+    void __fastcall edUphMinSampleICClick(TObject *Sender);
     void __fastcall PwListClick(TObject *Sender);
     void __fastcall PwIdClick(TObject *Sender);
     void __fastcall PwPassClick(TObject *Sender);

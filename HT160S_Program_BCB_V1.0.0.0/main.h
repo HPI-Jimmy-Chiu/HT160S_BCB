@@ -408,6 +408,7 @@ __published:	// IDE-managed Components
     void __fastcall FormShow(TObject *Sender);
     void __fastcall btnLotStartClick(TObject *Sender);
     void __fastcall btnLotEndClick(TObject *Sender);
+    void __fastcall btnClearCountClick(TObject *Sender);
     void __fastcall btnAddLotClick(TObject *Sender);
     void __fastcall btnEditLotClick(TObject *Sender);
     void __fastcall btnRemoveLotClick(TObject *Sender);

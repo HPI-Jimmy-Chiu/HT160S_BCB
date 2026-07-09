@@ -1154,6 +1154,7 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     if(edSettle7!=NULL) edSettle7->Text=IntToStr(GeneralSetting.iTrayArmClampSettleMs);
     if(edSettle8!=NULL) edSettle8->Text=IntToStr(GeneralSetting.iEmptyFeedClampSettleMs);
     if(edSettle9!=NULL) edSettle9->Text=IntToStr(GeneralSetting.iColorFeedClampSettleMs);
+    if(edUphMinSampleIC!=NULL) edUphMinSampleIC->Text=IntToStr(GeneralSetting.iUphMinSampleIC);
     bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
@@ -2073,6 +2074,35 @@ void __fastcall TfMaintenance::edSettleDelayClick(TObject *Sender)
     if(v>5000)
         v=5000;
     *pv=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-uph) 20260709 : UPH min-sample warm-up threshold (hide the early
+//tiny-elapsed UPH spike). 0 = auto (one full tray). Same touch-numpad idiom as
+//edSettleDelayClick; value lives in GeneralSetting.iUphMinSampleIC / General.ini.
+void __fastcall TfMaintenance::edUphMinSampleICClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    TEdit *ed=(TEdit*)Sender;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, 0.0, 9999.0,
+        LangT("UPH min sample (IC); 0=auto one tray"))==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save UPH min sample?"))!=1)
+    {
+        ed->Text=IntToStr(GeneralSetting.iUphMinSampleIC);
+        return;
+    }
+    int v=ed->Text.ToIntDef(GeneralSetting.iUphMinSampleIC);
+    if(v<0)
+        v=0;
+    if(v>9999)
+        v=9999;
+    GeneralSetting.iUphMinSampleIC=v;
     GeneralSetting.Save();
     ed->Text=IntToStr(v);
     RefreshHardwareSettingsStatus();

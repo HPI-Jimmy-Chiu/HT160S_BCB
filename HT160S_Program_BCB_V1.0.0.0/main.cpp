@@ -824,6 +824,26 @@ void __fastcall TfMain::ClearProductInfoAtLotStart()
     sgProductInfo->Cells[1][PI_TotalTime]="";
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-uph) 20260709 : "Clear All" counts button (previously a dead DFM control).
+//Zeroes the per-lot production counters (TotalIC/Bin/Tray/UPH/Loader/Jam + SECS
+//Scanned/Sorted) via the shared reset, persists lastdata, and blanks the product-info
+//panel. Blocked while running. This is the missing UI to clear a stale TotalIC that
+//lastdata restored at boot, which would otherwise ride into the next run and spike UPH.
+void __fastcall TfMain::btnClearCountClick(TObject *Sender)
+{
+    (void)Sender;
+    if(HSys.Sys.SystemStart)
+    {
+        ShowMyMessage(LangT("Stop the machine before Clear Count."));
+        return;
+    }
+    if(ShowMyMessageBox_YES_NO(LangT("Clear all production counts ?"))!=TMyMessageBox::msgrtnYES)
+        return;
+    ResetPerLotProductionCounters();
+    WriteLastDataIni();
+    ClearProductInfoAtLotStart();
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::FreezeProductInfoAtLotEnd()
 {
     bLotEnded=true;
@@ -861,8 +881,24 @@ void __fastcall TfMain::ShowProductInfo()
     sgProductInfo->Cells[1][PI_PauseTime]=tUPH_PauseTime.FormatString("hh:nn:ss");
     if(HSys.Sys.SystemStart && bFirstRun==false && tRunData.TotalIC>0)
     {
-        tRunData.UPH=GetCalculateUPH(Now());
-        sgProductInfo->Cells[1][PI_UPH]=IntToStr(tRunData.UPH);
+        // AI(ht160s-uph) 20260709 : small-sample warm-up guard. Early in a lot the
+        // elapsed window is tiny, so GetCalculateUPH (TotalIC*3600/sec) explodes into a
+        // bogus spike. Below the threshold, hide it: screen shows "--", tRunData.UPH=0 so
+        // SECS SVID 1021 does not report the spike either. GeneralSetting.iUphMinSampleIC:
+        // 0 = auto (one full tray from live TrayForm geometry); >0 = fixed IC count.
+        int iUphMinN=GeneralSetting.iUphMinSampleIC;
+        if(iUphMinN<=0)
+            iUphMinN=(SortArmModule!=NULL) ? (SortArmModule->GetTrayXCount()*SortArmModule->GetTrayYCount()) : 0;
+        if(iUphMinN>0 && tRunData.TotalIC<iUphMinN)
+        {
+            tRunData.UPH=0;
+            sgProductInfo->Cells[1][PI_UPH]="--";
+        }
+        else
+        {
+            tRunData.UPH=GetCalculateUPH(Now());
+            sgProductInfo->Cells[1][PI_UPH]=IntToStr(tRunData.UPH);
+        }
         sgProductInfo->Cells[1][PI_TotalTime]=(Now()-tRunData.StartTime-tUPH_PauseTime).FormatString("hh:nn:ss");
     }
 }

@@ -167,6 +167,14 @@ public:
 	//AI(ht160s-uph) 20260706 : per-tray/lot UPH logs under UPHLog (month buckets).
 	int iLogRetentionUPHLogDays;    // UPHLog per-lot folders
 
+	// AI(ht160s-uph) 20260709 : min-sample warm-up guard for the on-screen + SECS UPH.
+	// Early in a lot the elapsed window is tiny, so TotalIC*3600/sec spikes to a huge
+	// bogus figure. Until TotalIC reaches this threshold the UPH panel shows "--" and
+	// SVID reads 0. 0 = auto (one full tray, from live TrayForm geometry); >0 = fixed
+	// IC count. Edited on the maintenance tsFunctionGeneral tab. Stored in General.ini
+	// [UPH] MinSampleIC. Does NOT change GetCalculateUPH (lot-end value stays exact).
+	int iUphMinSampleIC;
+
 	// Per-unit fixed label text + color, old-160 style. Index order (P0 lock):
 	// 0=Empty 1=Loader 2..7=Auto1..6 8=Color. Text is one char: digit/letter/blank.
 	// Color is the raw LED code sent to the board (e.g. 1 or 3).

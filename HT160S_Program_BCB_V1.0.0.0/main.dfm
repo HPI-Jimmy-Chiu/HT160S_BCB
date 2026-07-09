@@ -1303,6 +1303,7 @@ object fMain: TfMain
               Font.Name = 'Arial'
               Font.Style = [fsBold]
               ParentFont = False
+              OnClick = btnClearCountClick
             end
             object lblUnloadingCount: TLabel
               Left = 132
