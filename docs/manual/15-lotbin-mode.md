@@ -193,7 +193,7 @@ By Lot+PassFail 把每顆 IC 依「是否為 Pass Bin」分成 PASS / FAIL 兩�
 
 > 【待補：是否提供操作員手動指定/編輯特定 (Lot,Bin)->Auto 或 (Lot,PASS/FAIL)->Auto 綁定的 UI。`ResolveAuto` 採「最低 index 先到先得」自動綁定，本批檔案未見手動編輯介面，需確認。】
 
-> 【待補：By Lot+PassFail 多 Lot 併行時，可用非 Error Auto 少於「2 × 併行 Lot 數」會溢位到 Error Auto（良品與錯誤品混倉），目前為靜默（與 By Lot+Bin 現況相同）；是否加操作員告警，待評估。】
+> ℹ️ By Lot+PassFail 多 Lot 併行時，可用非 Error Auto 少於「2 × 併行 Lot 數」會使某個 PASS/FAIL 桶溢位到 Error Auto。客戶接受此溢位行為（不跳 Note、不擋料），但溢位的每顆合法 PASS/FAIL 產品會於 `Production_Log` 以 `TraceCode=1004`、`ErrorType=PFOverflow` 記錄（PassFail 欄仍為 PASS/FAIL、Which Auto 為 Error Auto），以便追溯混入 Error Auto 的合格品。注意：此處 FAIL 是「合法產品等級（Bin）」，與 2D 讀碼失敗的 Error（走 Error Auto、無 PassFail 記錄）是兩回事。
 
 > 【待補：當 Error 區設為 Color（非 Auto）時，動態模式會 fallback 到最後一個 Auto 的邊界行為與實機意圖，需現場確認。】
 

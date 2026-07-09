@@ -143,7 +143,7 @@
 
 ## 第 15 章　動態分流模式（By Lot+Bin / By Lot+PassFail）
 - [ ] 是否提供操作員手動指定/編輯特定 (Lot,Bin)->Auto 或 (Lot,PASS/FAIL)->Auto 綁定的 UI；ResolveAuto 採最低 index 先到先得自動綁定，本批檔案未見手動編輯介面，需確認
-- [ ] By Lot+PassFail 多 Lot 併行時可用非 Error Auto 少於「2×Lot 數」會溢位到 Error Auto（良品/錯誤品混倉），目前靜默；是否加告警待評估
+- [ ] By Lot+PassFail 多 Lot 併行時可用非 Error Auto 少於「2×Lot 數」會使 PASS/FAIL 桶溢位到 Error Auto（客戶接受，不跳 Note）；溢位的合法產品以 Production_Log TraceCode=1004/PFOverflow 記錄，現場確認可據此追溯
 - [ ] 當 Error 區設為 Color（非 Auto）時，動態模式會 fallback 到最後一個 Auto 的邊界行為與實機意圖，需現場確認
 - [ ] 配方選單畫面（若有獨立 form 供新增/複製/刪除/切換配方）對應的表單名稱與按鈕，本批檔案未確認（與第 6 章交叉）
 

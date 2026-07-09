@@ -4,7 +4,8 @@
 > 狀態：**已實作（2026-07-09），待現場驗證**。sim `-Full` EXIT 0、real-machine（`SOFT_SIMULATE` off）`-Full` EXIT 0、dev define 還原後再 build EXIT 0。未 commit（依慣例由使用者上機驗證）。
 > 已採用選項：per-cell `iPassClass` 凍結；錯誤/無 Lot IC → Error Auto。
 > 已內建 blocker 對策：分類凍結（§4-1）、對稱 error gate（§4-2，PassFail 以 `PassClass>0` 收斂）、Mode-first 相容+clamp+legacy mirror（§4-3）、PassBin>0 Start gate（§4-5，於 `CheckLotDataReady`）、綁定 .ini `Mode=` 標頭+跨模式清除（§4-6）、執行中拒改 PassBin（§4-5，於 `SaveBinSettingMap`，以 binding count>0 判定執行中）。
-> **未做（後續）**：§4-7 溢位到 Error Auto 的操作告警（與 LotBin 現況相同，非退步）；Error Bin 執行中鎖定；docs/manual 更新。
+> **已補（20260709）**：§4-7 溢位改為**記錄於 Production_Log**（`TraceCode 1004 = PFOverflow`，不跳 Note；客戶接受溢位本身，重點是可追溯）。docs/manual 已更新（ch.15/06/05/02/14 + README）。
+> **未做（後續）**：Error Bin 執行中鎖定（其餘 blocker 皆已處理）。
 > 目標：在既有 `pnlSortModeBox` 的 Normal / By Lot+Bin 兩模式之外，新增第三種 **By Lot+PassFail**。
 
 ---

@@ -1389,6 +1389,19 @@ void TSortArmModule::TransferPlaceDataToAuto()
                 AnsiString PassFailText=(PassClassVal==1)?AnsiString("PASS"):((PassClassVal==2)?AnsiString("FAIL"):AnsiString(""));
                 g_DeviceInfo.AddPassFail(SlotIndex, PassFailText);
             }
+            //AI(ht160s-lotpassfail) 20260709 : By Lot+PassFail overflow trace. When every
+            //non-Error Auto is taken, ResolveAuto binds a PASS/FAIL bucket to the Error Auto,
+            //so a valid (PassClass>0) product physically lands there mixed with 2D read-fail
+            //ICs. The customer accepts the overflow; record it in Production_Log (TraceCode
+            //1004 = PFOverflow) with NO operator Note. Non-overflow products keep their own
+            //Auto and stay trace 0. Only class>0 can hit this (scan-fail ICs are PassClass 0).
+            if(GeneralSetting.IsLotPassFailSortMode() && Slot[SlotIndex].PassClass>0)
+            {
+                int ErrArea=BinAreaMap.GetErrorBinArea();
+                int ErrAuto=(ErrArea>=eHT160BinAreaAuto1 && ErrArea<=eHT160BinAreaAuto6)?(ErrArea-eHT160BinAreaAuto1):(SORT_ARM_AUTO_COUNT-1);
+                if(iActiveAutoIndex==ErrAuto)
+                    g_DeviceInfo.AddTraceInfo(SlotIndex, 1004);
+            }
             g_DeviceInfo.AddOutputInfo(SlotIndex, "Auto"+IntToStr(iActiveAutoIndex+1), "", Slot[SlotIndex].PlaceY, Slot[SlotIndex].PlaceX);
             ClearSlot(SlotIndex);
         }

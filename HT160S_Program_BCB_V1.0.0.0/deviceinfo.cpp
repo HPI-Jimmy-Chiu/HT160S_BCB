@@ -220,6 +220,7 @@ void TDeviceInfo::AddTraceInfo(int iNozzle, int iTraceCode)
         case 1001: sLabel = "2DMapMissing";  break;
         case 1002: sLabel = "ParseFail";     break;
         case 1003: sLabel = "SortFail";      break;
+        case 1004: sLabel = "PFOverflow";    break;   //AI(ht160s-lotpassfail) 20260709 : PASS/FAIL product forced to Error Auto (all non-Error Autos taken)
         default:   sLabel = "TraceCode_" + IntToStr(iTraceCode); break;
     }
     m_records[iNozzle].sField[eErrorType] = sLabel;
