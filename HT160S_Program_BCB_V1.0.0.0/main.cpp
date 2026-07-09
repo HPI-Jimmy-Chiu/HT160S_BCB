@@ -948,6 +948,10 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
     //mode, so show "PASS"/"FAIL" text there instead of the raw class number.
     bool bDynamicMode=GeneralSetting.IsDynamicBindingMode();
     bool bPassFailMode=GeneralSetting.IsLotPassFailSortMode();
+    //AI(ht160s-lotpassfail) 20260709 : PASS/FAIL label follows the configurable Pass Bin
+    //(the same source sort routing + Production_Log use), not a hardcoded 1/2. Read once
+    //here from the live BinAreaMap (the routing determinant) rather than the setup combo.
+    int PassBin=BinAreaMap.GetPassBin();
 
     for(int i=0; i<6; i++)
     {
@@ -964,7 +968,7 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
                 if(LotBinBinding.GetBindingByIndex(j, BindLotID, BindBin, BindAuto) && BindAuto==i)
                 {
                     if(bPassFailMode)
-                        sBin=(BindBin==1)?AnsiString("PASS"):((BindBin==2)?AnsiString("FAIL"):AnsiString("?"));
+                        sBin=(BindBin==PassBin)?AnsiString("PASS"):AnsiString("FAIL");
                     else
                         sBin=IntToStr(BindBin);
                     sLot=BindLotID;
