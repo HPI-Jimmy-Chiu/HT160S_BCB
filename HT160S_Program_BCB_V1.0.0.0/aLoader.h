@@ -72,7 +72,6 @@ private:
 
     void ResetSide(TLoaderSideState *State);
     void PrepareTrayMap(int LoaderNo);
-    void ChangeActiveTrayData(int LoaderNo, int SourceData, int TargetData);
     bool HasActiveTrayData(int LoaderNo, int Data);
     bool ActiveTrayAllData(int LoaderNo, int Data);
     bool FindNextCcdCell(int LoaderNo, int &CellX, int &CellY);
@@ -126,6 +125,7 @@ public:
     void SetCurrentLotNumber(AnsiString Lot);
     bool IsLoaderReadyForSort(int LoaderNo);
     bool HasPickableIC(int LoaderNo);                     //AI(ht160s-sortarm) 20260625 : tray-content "still has pickable ICs" predicate (LS_ToRear-transient-safe) for DoSortArm sticky-side commit
+    void ChangeActiveTrayData(int LoaderNo, int SourceData, int TargetData);   //AI(ht160s-ktrayend) 20260709 : public for SortArm pick K_TRAY_END tray-end wipe (Loader owns tray data; mirrors WAR0330 CCD tray-end)
     //AI(ht160s-loader) 20260708 : optional WhyBlocked out-param (default arg ONLY here, not at
     //the definition) tags the refusing rule for the DescribeState dump : "rear-rest" /
     //"gap:other-feeding" / "gap:both-loaded". Production callers pass nothing.

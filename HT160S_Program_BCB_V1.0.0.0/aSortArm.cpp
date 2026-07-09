@@ -1643,7 +1643,7 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
                 {
                     TMySucker *Sucker=GetSucker(s);
                     if(Sucker!=NULL)
-                        iKey=ShowSuckError(*Sucker, 1, K_RETRY|K_SKIP, "SortArm Pick");
+                        iKey=ShowSuckError(*Sucker, 1, K_RETRY|K_SKIP|K_TRAY_END, "SortArm Pick");
                     break;
                 }
             }
@@ -1652,6 +1652,23 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             {
                 SkipErroredPickCells();
                 TransferPickDataFromLoader();
+                PickTask=60;
+            }
+            else if(iKey==K_TRAY_END)
+            {
+                //AI(ht160s-ktrayend) 20260709 : operator declares THIS Loader tray done from the
+                //pick-vacuum error. A suck miss does NOT prove the cell is empty (nozzle wear,
+                //vacuum build fail or wrong pick height read the same), so ending the tray is the
+                //operator's call, not automatic. Place the ICs already held on the nozzles (case 60),
+                //write the failed cells off, then wipe the WHOLE remaining tray - both CCD-passed
+                //HAS_OK_IC and un-scanned UNCHECK_IC - to EMPTY_IC so HasPickableIC/FindNextCcdCell
+                //go false and the Loader ladder discharges the emptied tray to rear (HT172 K_TRAY_END
+                //= InitNewTray(NULL_IC) + still place the held ICs). Held ICs live on Slot[].bHasIC,
+                //not the tray grid, so clearing Data leaves them untouched.
+                SkipErroredPickCells();
+                TransferPickDataFromLoader();
+                LoaderModule->ChangeActiveTrayData(iActiveLoaderNo, HAS_OK_IC, EMPTY_IC);
+                LoaderModule->ChangeActiveTrayData(iActiveLoaderNo, UNCHECK_IC, EMPTY_IC);
                 PickTask=60;
             }
             else
