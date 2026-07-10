@@ -71,6 +71,9 @@ private:
     HTimer PickWaitTimer;              //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog window (DoPick gate 1/10). NOT ArmDelay -- that is the clamp-settle dwell, re-armed mid-job via SetMS+On without Clear
     bool bPickWaitArmed;               //AI(ht160s-rearready-p0) 20260705 : watchdog armed latch (MES0920-style : at most one Note per full window)
     unsigned int dwPickGateLastPollTick;   //AI(ht160s-rearready-p0) 20260705 : GetTickCount of the last blocked poll; a gap > scan-gap means MainProc was suspended (modal Note / IO Set View) or the machine was stopped -- re-arm the window instead of charging that span (ion-fan precedent)
+    HTimer PlaceWaitTimer;             //AI(ht160s-home-resume-p0) 20260710 : blocked-place watchdog window (DoPlaceToEmpty/Color case-500 rear-clear wait; mirrors PickWaitTimer)
+    bool bPlaceWaitArmed;              //AI(ht160s-home-resume-p0) 20260710 : watchdog armed latch (at most one Note per full window)
+    unsigned int dwPlaceGateLastPollTick;  //AI(ht160s-home-resume-p0) 20260710 : poll-continuity tick (same re-arm rule as the pick gate)
     unsigned int dwZUpLostStart;       //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce (GetTickCount of first loss; 0=clear)
     bool bResiduePendingNotify;        //AI(ht160s-home-residue) 20260708 : one-shot operator notify pending for a sensor-adopted held tray (set at InitialFlag adopt, fired/cleared in DoTrayArm case 100)
 
@@ -90,6 +93,8 @@ private:
     int GetColorX();                   //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup X
     bool IsPickFromColor();            //AI(HT160S-Maintainer) 20260605 : this job picks from Color (identity)
     void OnPickGateBlocked(AnsiString Source);   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog tick (arm window / raise MES1721 on expiry)
+    void OnPlaceGateBlocked(AnsiString Dest);    //AI(ht160s-home-resume-p0) 20260710 : blocked-place watchdog tick (case-500 rear-clear wait / raise MES1723 on expiry)
+    void ClearPlaceGateWatch();                  //AI(ht160s-home-resume-p0) 20260710 : disarm the place watchdog (gate pass / divert / job reset / InitialFlag)
     //AI(ht160s-trayarm-teach-test) 20260627 : shared physical motion primitives. Production
     //(DoPick/DoPlace/DoPlaceToEmpty/DoPlaceToColor) AND the Teach Advanced test compose these,
     //so the grab/release choreography lives in ONE place (single source of truth).

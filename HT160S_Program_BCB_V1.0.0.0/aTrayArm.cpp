@@ -22,6 +22,7 @@ TTrayArmModule *TrayArmModule=NULL;
 static const int TRAYARM_ZUP_LOST_MS=100;   //AI(HT160S-Maintainer) 20260622 : TrayArm X-move Z-up loss debounce window (ms); time-based, not cycle-count
 static const int TRAYARM_PICK_GATE_SCAN_GAP_MS=1500;   //AI(ht160s-rearready-p0) 20260705 : blocked-poll continuity gap (mirrors ION_FAN_SCAN_GAP_MS) -- a larger gap means the wall-clock span was NOT blocked run-time (modal Note froze MainProc, IO Set View open, machine stopped) and must re-arm, not charge, the watchdog window
 static const int TRAYARM_PICK_GATE_ALARM_MS=60000;   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog window (ms). A normal rear handoff (Empty feed / Loader discharge remainder) finishes well under 30s; a full silent minute at the DoPick 1/10 gate means the readiness latch is stuck -- notify (report P1), never wait silently
+static const int TRAYARM_PLACE_GATE_ALARM_MS=60000;   //AI(ht160s-home-resume-p0) 20260710 : blocked-place watchdog window (ms). A receiver GoUp that frees the rear finishes well under 30s; a full silent minute at the DoPlaceToEmpty/Color case-500 rear-clear wait means the return handshake is torn (post-HOME wipe) or the rear is stuck occupied -- notify, never wait silently. Shares TRAYARM_PICK_GATE_SCAN_GAP_MS for poll continuity.
 //---------------------------------------------------------------------------
 TTrayArmModule::TTrayArmModule()
 {
@@ -74,6 +75,9 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     PickWaitTimer.Clear();   //AI(ht160s-rearready-p0) 20260705 : per-wait transient; also resets a Paused timer (HTimer trap)
     bPickWaitArmed=false;
     dwPickGateLastPollTick=0;
+    PlaceWaitTimer.Clear();   //AI(ht160s-home-resume-p0) 20260710 : place-gate watchdog is per-wait transient (mirrors the pick trio)
+    bPlaceWaitArmed=false;
+    dwPlaceGateLastPollTick=0;
     dwZUpLostStart=0;
     //AI(HT160S-Maintainer) 20260612 : recoverable home while a tray is in hand. Keep the
     //delivery job + destination (Auto target, AMR kind, 2D TrayID, place dest) so the arm
@@ -134,11 +138,13 @@ void TTrayArmModule::PauseTimeoutTimers()
     //WITHOUT Clear, and HTimer::On() does not reset Paused -- pausing it could leave
     //the production/Teach-test dwell Paused-stuck.
     PickWaitTimer.Pause();
+    PlaceWaitTimer.Pause();   //AI(ht160s-home-resume-p0) 20260710 : same freeze rule as the pick watchdog
 }
 //---------------------------------------------------------------------------
 void TTrayArmModule::ReStartTimeoutTimers()
 {
     PickWaitTimer.ReStart();
+    PlaceWaitTimer.ReStart();
 }
 //---------------------------------------------------------------------------
 static AnsiString SR_TrayArmStatusText(int St)
@@ -182,6 +188,7 @@ AnsiString TTrayArmModule::DescribeState()
        + "  iDeliverTrayID=" + iDeliverTrayID
        + "  iAutoTarget=" + IntToStr(iAutoTarget) + "\r\n";
     s += "  PickWaitArmed=" + IntToStr(bPickWaitArmed ? 1 : 0)
+       + "  PlaceWaitArmed=" + IntToStr(bPlaceWaitArmed ? 1 : 0)
        + "  bCleanOutFinish=" + IntToStr(bCleanOutFinish ? 1 : 0)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
     return s;
@@ -234,6 +241,45 @@ void TTrayArmModule::OnPickGateBlocked(AnsiString Source)
     if(gStateRecord!=NULL)
         gStateRecord->TriggerSnapshot("TrayArmPickBlocked_" + Source);
     ShowMyError("MES1721", LangT("TrayArm pick blocked - rear source not ready") + " (" + Source + ")", K_RETRY);
+}
+//---------------------------------------------------------------------------
+void TTrayArmModule::OnPlaceGateBlocked(AnsiString Dest)
+{
+    //AI(ht160s-home-resume-p0) 20260710 : blocked-place watchdog (silent-stop-must-notify;
+    //exact mirror of OnPickGateBlocked). The DoPlaceToEmpty/DoPlaceToColor case-500
+    //rear-clear waits were unbounded and silent -- after a mid-carry full-machine HOME
+    //wiped the receiver's bReturnTray handshake the arm could pin here forever with no
+    //alarm (the pick-side watchdog never covered the place side). Same MES0920 window
+    //pattern, same poll-continuity re-arm rule, same stop-then-snapshot posture.
+    unsigned int uNow=GetTickCount();
+    bool bPollGap = (dwPlaceGateLastPollTick!=0 &&
+                     (uNow-dwPlaceGateLastPollTick)>(unsigned int)TRAYARM_PICK_GATE_SCAN_GAP_MS);
+    dwPlaceGateLastPollTick=uNow;
+    if(bPlaceWaitArmed==false || bPollGap)
+    {
+        PlaceWaitTimer.Clear();   //HTimer trap : On() does not reset Paused -- Clear() first
+        PlaceWaitTimer.SetMS(TRAYARM_PLACE_GATE_ALARM_MS);
+        PlaceWaitTimer.On();
+        bPlaceWaitArmed=true;
+        return;
+    }
+    if(PlaceWaitTimer.Off()==false)
+        return;
+    ClearPlaceGateWatch();
+    //AI(ht160s-home-resume-p0) 20260710 : STOP FIRST, then snapshot (TriggerSnapshot does
+    //multi-second synchronous IO on this control thread; see OnPickGateBlocked rationale).
+    HSys.DecStopAllMotor();
+    HSys.Sys.SystemStart=false;
+    if(gStateRecord!=NULL)
+        gStateRecord->TriggerSnapshot("TrayArmPlaceBlocked_" + Dest);
+    ShowMyError("MES1723", LangT("TrayArm place blocked - destination rear not free") + " (" + Dest + ")", K_RETRY);
+}
+//---------------------------------------------------------------------------
+void TTrayArmModule::ClearPlaceGateWatch()
+{
+    PlaceWaitTimer.Clear();   //HTimer trap : also resets a Paused timer
+    bPlaceWaitArmed=false;
+    dwPlaceGateLastPollTick=0;
 }
 //---------------------------------------------------------------------------
 bool TTrayArmModule::IsCleanOutFinish()
@@ -675,6 +721,7 @@ bool TTrayArmModule::DoPlace(int Flag)
     {
         PlaceTask=1;
         ArmDelay.Clear();
+        ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : new place job = new watchdog window
         return true;
     }
 
@@ -846,6 +893,7 @@ bool TTrayArmModule::TryDivertCarriedTrayToAuto()
         return false;
     if(EmptyModule!=NULL)
         EmptyModule->CancelReturnTray();
+    ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : retargeted -- the Empty rear-clear wait (and its watchdog) is abandoned
     iAutoTarget=idx;
     PlaceDest=TAPLACE_AUTO;
     PlaceTask=1;
@@ -867,6 +915,7 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
     {
         PlaceTask=1;
         ArmDelay.Clear();
+        ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : new place job = new watchdog window
         return true;
     }
 
@@ -893,13 +942,19 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
             //7000), so the IsRearHasTray()==false gate below alone would let TrayArm dive into
             //the arriving carrier. Real-machine only; ES_FEEDING clears when the feed completes.
             if(IsSoftSimulate()==false && EmptyModule!=NULL && EmptyModule->GetStatus()==ES_FEEDING)
+            {
+                OnPlaceGateBlocked("Empty");   //AI(ht160s-home-resume-p0) 20260710 : watchdog tick while blocked
                 break;
+            }
             //Wait until EmptyTray has raised and cleared its rear before depositing.
             if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
             {
+                ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : gate passed -- close the watchdog window
                 Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts
                 PlaceTask=1000;
             }
+            else
+                OnPlaceGateBlocked("Empty");   //AI(ht160s-home-resume-p0) 20260710 : watchdog tick while blocked
             break;
 
         case 1000:
@@ -939,6 +994,7 @@ bool TTrayArmModule::DoPlaceToColor(int Flag)
     {
         PlaceTask=1;
         ArmDelay.Clear();
+        ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : new place job = new watchdog window
         return true;
     }
 
@@ -959,13 +1015,19 @@ bool TTrayArmModule::DoPlaceToColor(int Flag)
         case 500:
             //AI(ht160s-status) 20260703 : anti-collision (mirrors Empty concern B).
             if(IsSoftSimulate()==false && ColorModule!=NULL && ColorModule->GetStatus()==CS_FEEDING)
+            {
+                OnPlaceGateBlocked("Color");   //AI(ht160s-home-resume-p0) 20260710 : watchdog tick while blocked
                 break;
+            }
             //Wait until Color has raised and cleared its rear before depositing.
             if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
             {
+                ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : gate passed -- close the watchdog window
                 Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts
                 PlaceTask=1000;
             }
+            else
+                OnPlaceGateBlocked("Color");   //AI(ht160s-home-resume-p0) 20260710 : watchdog tick while blocked
             break;
 
         case 1000:
@@ -1016,6 +1078,19 @@ void TTrayArmModule::DoTrayArm(int &Task)
                 if(Job!=TAJOB_NONE)
                 {
                     Status=TAS_CARRYING;
+                    //AI(ht160s-home-resume-p0) 20260710 : re-sign the return handshake torn by a
+                    //full-machine HOME. InitialAllTask(true) keeps this arm's Job/PlaceDest, but
+                    //Empty/Color InitialFlag take no bKeepMaterial and wiped bReturnTray, and this
+                    //resume path skips DecidePlaceDestAfterPick, so the request was never re-sent :
+                    //the receiver refills/keeps its rear while the case-500 rear-clear wait pins the
+                    //arm forever (sender remembers the contract, receiver forgot it). RequestReturnTray
+                    //is idempotent (sets bReturnTray, clears bTrayXToEmptyFinish) and also drives the
+                    //receiver to GoUp-clear an occupied rear, so it heals both the wiped-handshake and
+                    //the sensor-relatched-rear cases.
+                    if(PlaceDest==TAPLACE_EMPTY && EmptyModule!=NULL)
+                        EmptyModule->RequestReturnTray();
+                    if(PlaceDest==TAPLACE_COLOR && ColorModule!=NULL)
+                        ColorModule->RequestReturnTray();
                     DoPlace(0);
                     Task=2000;
                     break;
