@@ -21,6 +21,7 @@ P0 修復 commit `d63d33a`（TrayArm 回收握手重發 + place 看門狗 MES172
 | 確認源 | 完成判定的實體來源（缸 On/Off reed、編碼器到位、sensor） |
 | commit | 該相位提交的資料/閂鎖變更（理想＝單掃描原子） |
 | 重入類別 | 見下 |
+| drain | HOME 汽缸收斂段可否代跑此相位：**可收斂**（純汽缸，標注收斂到哪個邊界）／**不可**（含馬達移動或真空交接）／—（無運動） |
 
 ### 重入類別
 
@@ -121,11 +122,45 @@ Auto `DoFeedTray`/`DoDischargeTray`/CleanOut 梯。
 StageRearGrid／SetRearHasTray*／SetPlaceResidueClear／ChangeActiveTrayData…），
 每個 setter 問三題：HOME 後發訊方記得嗎？收訊方記得嗎？誰負責重同步？
 
-### 待 owner 決策／機構確認
+### 待 owner 決策／機構確認 — **全數已決（2026-07-10）**
 
-| 代號 | 事項 | 類型 |
+| 代號 | 事項 | 答覆 |
 |---|---|---|
-| M1 | front 盤升起時 SnEmpty_InputHasTray 可視性 | 機構確認 |
-| M2 | Rise_2 伸出時重插 Separate 爪的幾何安全 | 機構確認 |
-| L1 | 過頂點歧義修法：retain latch vs 前滾收斂 | owner 選型 |
-| （掛） | ArmMotorHome 無條件清全軸 bHomeFlag（Loader 保盤前置） | owner 政策 |
+| M1 | front 盤升起時 SnEmpty_InputHasTray 可視性 | **仍讀得到**（被上升機構擋住＝sensor 保持 ON）→ 重入可信任 front sensor |
+| M2 | Rise_2 伸出時重插 Separate 爪 | **靜止時重插安全，移動中禁止**（梯形圖每步等 reed 確認，結構上保證靜止）|
+| L1 | 過頂點歧義修法 | **前滾收斂為主**（owner 選定）＋retain latch 為備（收斂被成因閘門跳過時用）|
+| （掛） | ArmMotorHome 全軸清 flag | **維持全機 realign 政策不改**——park & re-acquire 協定（下節）使 LoaderY 照常歸位也不丟盤，此決策消解 |
+| A1 | 盤停放支撐 | 前擋＋後推皆 Off 時，MotorY 移動**不會拖住盤**（盤留在原位）|
+| A2 | HOME 中/後軸序 | TrayArm Z 先升、SuckZ 先升＝**鐵律**；HOME 後回復也必須等 ArmX 停下才允許 Z 升降 |
+| A3 | 停放期間人為介入 | 不可能（人不能動）→ 盲取可接受 |
+| A4 | 該軸自身伺服警報子集 | 比例少 → 維持人工移盤 fallback |
+
+---
+
+## 4. HOME 物料協定（五步，2026-07-10 決議）
+
+適用軸：Empty／Loader L·R／Auto1-6／Color 的 MotorY（載盤車）。目標：生產中
+按 HOME，物料不丟、不需人工移盤、HOME 完成後保料續跑。
+
+```
+按 HOME
+ ① 汽缸收斂（drain）：in-flight 純汽缸相位跑到相位邊界才放行
+    - 只到相位邊界，絕不跨進含馬達的相位（相位表 drain 欄＝此段規格）
+    - 成因閘門：EMG／安全門／氣壓失效觸發的 HOME 跳過收斂
+    - 逾時上限（可調，預設 10-15s）→ 放棄收斂＋通知；缸自身 Push/Pop 逾時自報警
+    - 收斂被跳過的 action：不得自動續跑，靠 retain latch 或標記待對帳
+ ② 放開停放（park）：各 MotorY 有盤者
+    - 記憶目前 Y（A6 絕對編碼器讀值；單位 1/100mm）＋盤籍（fHasTray＋grid）→ retain
+    - 放開後推（LeanOnTray）→ 放開前擋（PushTray）（同現行 uHome case 50/60 順序）
+    - A1：兩者皆 Off 後 Y 移動不拖盤，盤留在原位
+ ③ 馬達歸位：全軸照常全機對位（ArmMotorHome 政策不變）
+ ④ 重新取回（re-acquire）：對每個停放盤
+    - Y 回到記憶位置＋offset（可調，預設 +1mm＝+100 counts）
+    - 先前擋 Push → 後後推 Push（避免在原位升前擋把盤往上打）→ Y 退回原位
+    - 缸 reed 確認；後續流程定點 sensor 補驗（A3：盤不會被人動過）
+    - 例外：該軸自身伺服警報（位置不可信）→ 維持今日人工移盤（A4：比例少）
+ ⑤ InitialAllTask(true) 保料續跑（P0 握手重發 d63d33a 已上）
+```
+
+軸序鐵律（A2）：①④ 兩步中任何 Z 升降都必須在對應 ArmX 靜止時執行；
+歸位順序維持 Z 群先升再動 XY。
