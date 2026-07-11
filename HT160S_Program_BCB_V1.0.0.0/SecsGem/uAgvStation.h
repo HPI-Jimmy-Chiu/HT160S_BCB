@@ -66,6 +66,7 @@ public:
     void PollAndCall(THGem *Gem);                // Phase B : shortage/full -> CEID272
     void ServiceHandshake(THGem *Gem);           // Phase D : drive CEID273 / CEID274
     bool BeginPrep(AnsiString cpName);           // Phase C : START_AGV -> prep
+    void ReassertLocks();                        //AI(ht160s-home-resume-w5) 20260711 : post-HOME lock re-assert (InitialAllTask tail)
 
     // AI(ht160s-agv) 20260627 : station-side timeout release. Auto-full waited
     // iAmrFullWaitSec for the AGV; drop THIS Auto's handshake (lock + state) so

@@ -99,7 +99,14 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         //re-CALL stays suppressed after HOME).
         bWaitingAmrFull[Index]=false;
         AmrFullWaitTimer[Index].Clear();
-        bOperatorHolding[Index]=false;
+        //AI(ht160s-home-resume-w5) 20260711 : bOperatorHolding models a PHYSICAL fact
+        //(a person is carrying the full car away) that a HOME cannot erase -- clearing
+        //it here let PollAndCall re-CALL the AGV into the operator's hands within 1s of
+        //HOME completion (FX(S)-1). Keep it on a keep-material HOME; it now clears on
+        //the car-change commit below (sensor-OFF edge / operator confirm), which also
+        //removes the old "HOME is the only way out" escape (FX(S)-2).
+        if(bKeepMaterial==false)
+            bOperatorHolding[Index]=false;
         //AI(HT160S-Maintainer) 20260612 : on a recoverable home keep the car stack + its
         //tray roles/2D identity so the Auto does not forget what it is holding. Only the
         //sensor-backed presence above and the cleanout transient flags are refreshed.
@@ -1551,6 +1558,7 @@ void TAutoModule::ServiceCarFull()
             while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
             Car[Index].Clear();
             InitAutoCarStack(Index);
+            bOperatorHolding[Index]=false;   //AI(ht160s-home-resume-w5) : car changed (sensor OFF confirmed) -> person done, re-CALL re-armed
         }
         else if(bLogicalFull)
         {
@@ -1559,6 +1567,7 @@ void TAutoModule::ServiceCarFull()
             ShowMyError(AnsiString().sprintf("MES%d25", 11+Index), ErrorText, K_RETRY);
             Car[Index].Clear();
             InitAutoCarStack(Index);
+            bOperatorHolding[Index]=false;   //AI(ht160s-home-resume-w5) : car changed (operator confirmed) -> re-CALL re-armed
         }
     }
 }

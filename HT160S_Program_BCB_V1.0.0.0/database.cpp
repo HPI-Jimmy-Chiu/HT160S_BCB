@@ -36,6 +36,8 @@ __fastcall TDataModule1::TDataModule1(TComponent* Owner)
 {
 }
 //---------------------------------------------------------------------------
+#include "uAgvStation.h"   //AI(ht160s-home-resume-w5) 20260711 : AgvCoord.ReassertLocks at the InitialAllTask tail
+//---------------------------------------------------------------------------
 void TDataModule1::InitialAllTask(bool bKeepMaterial)
 {
     AmrInject.Reset();   //AI(ht160s-agv) 20260708 : any HOME/init clears AMR manual-inject test mode + latches
@@ -65,6 +67,12 @@ void TDataModule1::InitialAllTask(bool bKeepMaterial)
         SortArmModule->InitialFlag(bKeepMaterial);
     if(ColorModule!=NULL)
         ColorModule->InitialFlag(bKeepMaterial);
+    //AI(ht160s-home-resume-w5) 20260711 : the InitialFlag calls above just wiped every
+    //module bAmrLocked while AgvCoord.Handshake[] survives -> re-couple the locks for
+    //stations whose AMR handshake is still in flight (owner D1 : a HOME during a docked
+    //exchange is allowed; the handshake stays alive, frozen by the Run_Home gate in
+    //ServiceHandshake, and resumes after this). No-op when all stations are IDLE.
+    AgvCoord.ReassertLocks();
 }
 //---------------------------------------------------------------------------
 void TDataModule1::DoAllProcess()

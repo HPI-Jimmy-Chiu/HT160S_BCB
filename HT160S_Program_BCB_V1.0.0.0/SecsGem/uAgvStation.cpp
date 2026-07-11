@@ -11,6 +11,8 @@
 #pragma hdrstop
 
 #include "uAgvStation.h"
+#include "cmydef.h"      //AI(ht160s-home-resume-w5) : fAllMotorHome for the HOME freeze gate
+#include "note.h"        //AI(ht160s-home-resume-w5) : RecordProcess
 //AI(ht160s-agv) 20260615 : Phase B sources - AMR car-full state + mode gates +
 // SECS transport to fire S6F11. All project-root headers (bare names resolve via
 // the same include path uHGemHT160.cpp uses).
@@ -285,6 +287,15 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         return;
     if(Gem==NULL || Gem->IsSelected()==false)
         return;
+    //AI(ht160s-home-resume-w5) 20260711 : HOME freeze (owner ruling D1 + FX(A)-2).
+    //This runs on the SECS 1s timer with no RunMode gate, so a full-machine HOME used
+    //to keep advancing the handshake : CEID273/274 fired off module state that
+    //InitialAllTask was about to rebuild, and the PREP/READY watchdog aged through
+    //the homing span (a slow HOME silently force-released a docked AMR's handshake).
+    //Freeze transitions AND aging while homing / not yet homed; nothing is cleared,
+    //and InitialAllTask's ReassertLocks() re-couples the module locks afterwards.
+    if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+        return;
 
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
@@ -380,6 +391,18 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
     int i = LookupByName(cpName);
     if(i < 0)
         return false;
+    //AI(ht160s-home-resume-w5) 20260711 : operator-holding gate (FX(S)-8). After a
+    //full-wait timeout the operator is manually taking this car; dispatching the AGV
+    //into their hands is a person/vehicle conflict. The CP name IS a known station, so
+    //still return true (the caller keys the SECS reply shape off that) -- we simply do
+    //not enter PREP : the host sees no Ready and its own timeout handles the retry.
+    //bOperatorHolding now clears on the car-change commit (sensor-OFF edge), not HOME.
+    if(AgvStation[i].Kind==ASK_AUTO && AutoModule!=NULL && AgvStation[i].AutoIndex>=0 &&
+       AutoModule->IsOperatorHolding(AgvStation[i].AutoIndex))
+    {
+        RecordProcess("AGV: START_AGV "+cpName+" ignored - operator holding the full car");
+        return true;
+    }
     Handshake[i] = AGV_PREP;     // station asked to prepare for AGV handoff
     PrepDone[i]  = 0;
     if(AgvStation[i].Kind==ASK_AUTO && AutoModule!=NULL && AgvStation[i].AutoIndex>=0)
@@ -396,6 +419,32 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
 // re-CALL path (PollAndCall) touches it again until the next clean full edge -- the
 // re-CALL is additionally gated by IsOperatorHolding, cleared on HOME/InitialFlag.
 // Modeled on the link-down release in PollAndCall (SetAmrLock false + AGV_IDLE).
+//AI(ht160s-home-resume-w5) 20260711 : post-HOME lock re-assert (D1 + FX(A)-1/FX(A)-5).
+//InitialAllTask wipes every module bAmrLocked while Handshake[] survives (Reset runs
+//only in the ctor) -> lock/state split : after a HOME during CALLED/PREP/READY the
+//docked/en-route AMR keeps handshaking but the supposedly-frozen station resumes
+//destacking/stacking into it. Called at the InitialAllTask tail : re-assert the module
+//lock for every station whose handshake is still in flight. Locks are idempotent; a
+//cold init has all stations IDLE so this is a no-op there. Infeed CALLED takes no lock
+//by design (it is only locked from BeginPrep), mirroring the normal flow.
+void TAgvCoordinator::ReassertLocks()
+{
+    for(int a = 0; a < AGV_AUTO_COUNT; a++)
+    {
+        int si = a + 3;
+        if(Handshake[si]==AGV_CALLED || Handshake[si]==AGV_PREP || Handshake[si]==AGV_READY)
+        {
+            if(AutoModule!=NULL)
+                AutoModule->SetAmrLock(a, true);
+        }
+    }
+    for(int p = 0; p < 3; p++)
+    {
+        if(Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY)
+            InfeedSetLock(p, true);
+    }
+}
+//---------------------------------------------------------------------------
 void TAgvCoordinator::AbortAutoHandshake(int Index)
 {
     if(Index < 0 || Index >= AGV_AUTO_COUNT)
