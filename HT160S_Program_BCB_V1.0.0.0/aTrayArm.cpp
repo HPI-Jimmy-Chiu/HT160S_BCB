@@ -553,6 +553,7 @@ int TTrayArmModule::DecideJob()
             if(idx>=0)
             {
                 iAutoTarget=idx;
+                iDeliverKind=eTrayKindNormal;   //AI(ht160s-home-resume-w6) 20260711 : TA-3 - a plain Empty->Auto supply must not inherit a stale Identity kind (the CleanOut divert routes on it and would missend a plain tray to Color)
                 return TAJOB_EMPTYTRAY_TO_AUTO;
             }
         }
@@ -653,6 +654,23 @@ bool TTrayArmModule::DoPick(int Flag)
                 PickWaitTimer.Clear();   //AI(ht160s-rearready-p0) 20260705 : gate passed -- close the watchdog window
                 bPickWaitArmed=false;
                 dwPickGateLastPollTick=0;
+#ifndef SOFT_SIMULATE
+                //AI(ht160s-home-resume-w6) 20260711 : TP-1 asymmetry guard. uHome keeps the
+                //clamps closed on EITHER clamp On reed (conservative never-drop) while the
+                //InitialFlag residue-adopt needs BOTH On (phantom-adopt safety) -- with
+                //exactly one reed On the arm reaches a fresh pick closed-jawed holding a
+                //tray the latch does not know about, and the grab ladder would Z-down
+                //closed onto the occupied source rear (double-stack jam). Require both
+                //reeds fully OPEN before any new grab; otherwise route to the existing
+                //MES1722 removal flow instead of diving.
+                if(HSys.LastSet.iRealDummy!=DUMMY &&
+                   ((HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable && HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn()) ||
+                    (HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn())))
+                {
+                    ShowMyError("MES1722", LangT("TrayArm holds an unidentified tray - open the clamps in Teach and remove it"), K_RETRY);
+                    return false;
+                }
+#endif
                 PickTask=1000;
             }
             break;
