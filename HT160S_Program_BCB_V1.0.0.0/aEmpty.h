@@ -62,7 +62,7 @@ private:
 
 public:
     TEmptyModule();
-    void InitialFlag();
+    void InitialFlag(bool bKeepMaterial=false);   //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the return handshake (aligned with Auto/TrayArm/SortArm)
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze AmrFeedWaitTimer (source-dry AMR wait) on machine pause
     void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw it on resume (csystem actuator-timer enrollment)
     void DoEmpty(int &Task);

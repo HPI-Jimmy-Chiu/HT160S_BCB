@@ -25,7 +25,7 @@ TColorModule::TColorModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-void TColorModule::InitialFlag()
+void TColorModule::InitialFlag(bool bKeepMaterial)
 {
     bAmrLocked=false;
     bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait (P4)
@@ -37,21 +37,47 @@ void TColorModule::InitialFlag()
     SortBinTask=1;
     iICCount=0;
     bInputFullTray=false;
-    bRearHasTray=false;
-    bTrayReady=false;
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves a PRESENTED
+    //identity tray (pick latch bTrayReady published AND rear still physically confirmed
+    //occupied). The scanned 2D + grid are NOT re-derivable from sensors; wiping them
+    //turned a good presented tray into an MES1426 leftover the operator had to remove.
+    //Gate mirrors the Loader bKeepRear idiom; real tier only (DUMMY/sim sensors are
+    //garbage -> fall back to today's wipe, sim behavior unchanged).
+    bool bKeepPresented=false;
+#ifndef SOFT_SIMULATE
+    if(bKeepMaterial && bTrayReady && bRearHasTray && HSys.LastSet.iRealDummy!=DUMMY)
+    {
+        if(HSys.Sen.SnColor_OutputBottomHasTray.Enable && HSys.Sen.SnColor_OutputBottomHasTray.IsOn())
+            bKeepPresented=true;
+        if(HSys.Sen.SnColor_TrayPos1.Enable && HSys.Sen.SnColor_TrayPos1.IsOn())
+            bKeepPresented=true;
+    }
+#endif
+    if(bKeepPresented==false)
+    {
+        bRearHasTray=false;
+        bTrayReady=false;
+        if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : hide Color grid on init
+    }
     bSupplyRequested=false;
     bFrontHasTray=false;
-    if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : hide Color grid on init
     FrontSourceTray.Clear();   //AI(ht160s-color-align-empty) : no stale front-born grid across init/lot
     ScanTask=1;
     GoDownTask=1;
     //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow (mirrors Empty).
     GoUpTask=1;
-    bReturnTray=false;
-    bTrayXToEmptyFinish=false;
-    iReturnedCount=0;
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the return
+    //handshake (mirror of Empty; the TrayArm sender keeps Job/PlaceDest) and the
+    //return-history counter. sTrayID2D rides with the presented-tray keep above.
+    if(bKeepMaterial==false)
+    {
+        bReturnTray=false;
+        bTrayXToEmptyFinish=false;
+        iReturnedCount=0;
+    }
     GoUpDelay.Clear();
-    sTrayID2D="";
+    if(bKeepPresented==false)
+        sTrayID2D="";
     FeedDelay.Clear();
     GoDownDelay.Clear();
     ScanDelay.Clear();

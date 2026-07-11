@@ -59,11 +59,18 @@ static const int LOADER_Y_OWNER_SORTARM=1;
 //so the owner model can grow to a third actor without touching existing call sites.
 static const int LOADER_Y_OWNER_TRAYARM=2;
 //---------------------------------------------------------------------------
-void TLoaderModule::InitialFlag()
+void TLoaderModule::InitialFlag(bool bKeepMaterial)
 {
     bAmrLocked=false;
-    iSecsCarTrayCount=0;     //AI(ht160s-agv) 20260627 : no host count yet; RefillSimInfeed falls back to iSimAmrMaxTray
-    RefillSimInfeed();
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the AMR car ledger
+    //(host tray count + derived car total here, feed serial below) -- the physical car
+    //stack does not change across a HOME, but zeroing these made GetFedTrayKind classify
+    //the remaining cover/identity trays as Normal and broke the MES0921 cross-check.
+    if(bKeepMaterial==false)
+    {
+        iSecsCarTrayCount=0;     //AI(ht160s-agv) 20260627 : no host count yet; RefillSimInfeed falls back to iSimAmrMaxTray
+        RefillSimInfeed();
+    }
     ResetSide(&Side[0]);
     ResetSide(&Side[1]);
     //AI(ht160s-rearready-p0) 20260705 : PRESERVE a settled rear tray across a runtime
@@ -92,7 +99,8 @@ void TLoaderModule::InitialFlag()
     iYOwner[0]=LOADER_Y_OWNER_NONE;
     iYOwner[1]=LOADER_Y_OWNER_NONE;
     SimuCcdCycleIndex=0;
-    iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - reset feed counter
+    if(bKeepMaterial==false)
+        iFeedSerial=0;        //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - reset feed counter (kept on keep-material HOME, see car-ledger note above)
     //AI(ht160s-rearready-p0) 20260705 : RearKind/RearTrayID/RearSourceTray moved into
     //the bKeepRear guard above -- wiping them while the tray stays parked would
     //misroute a preserved cover/identity tray as Normal.

@@ -84,7 +84,7 @@ private:
 
 public:
     TColorModule();
-    void InitialFlag();
+    void InitialFlag(bool bKeepMaterial=false);   //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the return handshake + a sensor-confirmed presented identity tray
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze ScanDelay timeout window on machine pause
     void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw it on resume (csystem actuator-timer enrollment)
     void DoColor(int &Task);

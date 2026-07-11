@@ -45,17 +45,18 @@ void TDataModule1::InitialAllTask(bool bKeepMaterial)
     for(int ActionIndex=0; ActionIndex<UserMotion->ActionCount; ActionIndex++)
         UserMotion->Actions[ActionIndex]->Tag=1;
 
+    //AI(ht160s-home-resume-w1) 20260711 : on a recoverable full-machine home (bKeepMaterial)
+    //every module now keeps the state that is NOT re-derivable from sensors : Loader keeps
+    //the AMR car ledger (host count / car totals / feed serial), Empty keeps the return
+    //handshake, Color keeps the return handshake + a sensor-confirmed presented identity
+    //tray (scanned 2D is not re-derivable), and the three arms keep held material. Loader
+    //additionally preserves a sensor-confirmed settled rear tray independent of
+    //bKeepMaterial (ht160s-rearready-p0) : wiping it stranded the tray with no path back
+    //to pickable (TrayArm pinned, no alarm).
     if(LoaderModule!=NULL)
-        LoaderModule->InitialFlag();
+        LoaderModule->InitialFlag(bKeepMaterial);
     if(EmptyModule!=NULL)
-        EmptyModule->InitialFlag();
-    //AI(HT160S-Maintainer) 20260612 : on a recoverable full-machine home (bKeepMaterial)
-    //the arms that physically still hold material keep their material memory so production
-    //can resume without dropping/misrouting. Loader/Empty/Color take no bKeepMaterial
-    //flag; but note Loader's own InitialFlag preserves a sensor-confirmed settled rear
-    //tray (latch + Kind/ID) independent of bKeepMaterial (gated only on its own
-    //bRearReadyForPick + rear sensor) -- see aLoader.cpp (ht160s-rearready-p0); wiping
-    //it stranded the tray with no path back to pickable (TrayArm pinned, no alarm).
+        EmptyModule->InitialFlag(bKeepMaterial);
     if(AutoModule!=NULL)
         AutoModule->InitialFlag(bKeepMaterial);
     if(TrayArmModule!=NULL)
@@ -63,7 +64,7 @@ void TDataModule1::InitialAllTask(bool bKeepMaterial)
     if(SortArmModule!=NULL)
         SortArmModule->InitialFlag(bKeepMaterial);
     if(ColorModule!=NULL)
-        ColorModule->InitialFlag();
+        ColorModule->InitialFlag(bKeepMaterial);
 }
 //---------------------------------------------------------------------------
 void TDataModule1::DoAllProcess()

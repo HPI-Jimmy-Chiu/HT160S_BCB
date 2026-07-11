@@ -110,7 +110,7 @@ private:
 
 public:
     TLoaderModule();
-    void InitialFlag();
+    void InitialFlag(bool bKeepMaterial=false);   //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the AMR car ledger (host count / car totals / feed serial)
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze per-side CcdDelay timeout on machine pause
     void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
     void DoLoader(int LoaderNo, int &Task);

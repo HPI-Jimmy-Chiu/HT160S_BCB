@@ -22,7 +22,7 @@ TEmptyModule::TEmptyModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-void TEmptyModule::InitialFlag()
+void TEmptyModule::InitialFlag(bool bKeepMaterial)
 {
     bAmrLocked=false;
     bWaitingAmrFeed=false;       //AI(ht160s-agv) Empty source-dry AMR wait latch
@@ -35,9 +35,18 @@ void TEmptyModule::InitialFlag()
     GoUpTask=1;
     bFrontHasTray=false;
     bRearHasTray=false;
-    bReturnTray=false;
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the return
+    //handshake (the sender TrayArm keeps Job/PlaceDest and re-signs on resume, but
+    //keeping the receiver side too removes the one-scan race where a wiped bReturnTray
+    //let the feed branch grab the rear first). bRearReturnInProgress is NOT kept :
+    //a kept bReturnTray re-dispatches DoGoUpTray whose Flag==0 re-arms it, while a
+    //stale true with no ladder running would block TrayArm picks forever.
+    if(bKeepMaterial==false)
+    {
+        bReturnTray=false;
+        bTrayXToEmptyFinish=false;
+    }
     bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no rear-return in flight at init
-    bTrayXToEmptyFinish=false;
     bLotFinish=false;
     FrontSourceTray.Clear();   //AI(ht160s-tray-source) : no stale front grid across init/lot
     if(HSys.VMot.MMEmptyY!=NULL) HSys.VMot.MMEmptyY->ClearTray();   //AI(ht160s-tray-source) : rear tray lives on MEmptyY; hide grid on init
