@@ -134,6 +134,10 @@ StageRearGrid／SetRearHasTray*／SetPlaceResidueClear／ChangeActiveTrayData…
 | A2 | HOME 中/後軸序 | TrayArm Z 先升、SuckZ 先升＝**鐵律**；HOME 後回復也必須等 ArmX 停下才允許 Z 升降 |
 | A3 | 停放期間人為介入 | 不可能（人不能動）→ 盲取可接受 |
 | A4 | 該軸自身伺服警報子集 | 比例少 → 維持人工移盤 fallback |
+| D1 | AMR 靠站中 HOME | **允許**。交換中回 HOME 無干涉；約束＝HOME 全程（含 drain）不得執行 GoUp/GoDown 與分離夾爪動作（該站 Handshake 非 IDLE 時凍結），只做 sensor 判斷 |
+| D2 | SP-1 物理程序 | 「IC 留穴」成立，但**物理原理修正：真空一旦建立，必須吹氣才會放開**——只斷真空 IC 可能黏嘴不留穴。程序＝Z 下位：斷真空＋開吹氣＋dwell；**吹氣關閉點＝Z 回 Safe（SuckZ 歸位完成）之後**（同 place case 50-70 blow-through-lift 慣用法） |
+| D3 | EMG 與氣壓 | **EMG 只斷馬達電力，氣不斷**；氣壓只有「不足」情境，由 sensor 判斷跳 Alarm 中斷所有動作。→ drain 的成因閘門收斂為：氣壓不足 Alarm＝跳過 drain；EMG 復位後的 HOME 氣仍在＝drain 照跑 |
+| D4 | drain 中開夾交接 | **允許**。汽缸動作（含開夾放盤交接）在 drain 內做完；前提＝馬達尚未動作、馬達歸位尚未開始（協定順序 ①→③ 天然滿足） |
 
 ---
 
