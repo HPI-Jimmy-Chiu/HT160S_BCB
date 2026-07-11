@@ -122,6 +122,7 @@ public:
     void PauseTimeoutTimers();
     void ReStartTimeoutTimers();
     AnsiString DescribeState();
+    bool HomeDrainTick();            //AI(ht160s-home-resume-drain) 20260711 : finish an in-flight grab/deposit ladder (cylinder+data only; D4 open-clamp handoff allowed)
     int GetPickTask();
     int GetPlaceTask();
     int GetJob();

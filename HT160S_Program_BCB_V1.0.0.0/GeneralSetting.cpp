@@ -46,6 +46,7 @@ void THT160GeneralSetting::SetDefault()
 	iAutoPushConfirmSettleMs=500;
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
+	iHomeDrainTimeoutSec=15;
 	iAutoFrontRiseDwellMs=500;
 	iAutoCleanOutRiseDwellMs=500;
 	iTrayArmClampSettleMs=300;
@@ -123,6 +124,7 @@ void THT160GeneralSetting::Load()
 	iAutoPushConfirmSettleMs=Ini->ReadInteger("SettleDelay", "AutoPushConfirmSettleMs", 500);
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
 	iHomeReacquireOffsetCnt=Ini->ReadInteger("HomeResume", "ReacquireOffsetCnt", 100);
+	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
 	iAutoFrontRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoFrontRiseDwellMs", 500);
 	iAutoCleanOutRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoCleanOutRiseDwellMs", 500);
 	iTrayArmClampSettleMs=Ini->ReadInteger("SettleDelay", "TrayArmClampSettleMs", 300);
@@ -192,6 +194,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "AutoPushConfirmSettleMs", iAutoPushConfirmSettleMs);
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
+	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
 	Ini->WriteInteger("SettleDelay", "AutoFrontRiseDwellMs", iAutoFrontRiseDwellMs);
 	Ini->WriteInteger("SettleDelay", "AutoCleanOutRiseDwellMs", iAutoCleanOutRiseDwellMs);
 	Ini->WriteInteger("SettleDelay", "TrayArmClampSettleMs", iTrayArmClampSettleMs);

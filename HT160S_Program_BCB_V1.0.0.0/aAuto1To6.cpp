@@ -134,6 +134,26 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook (AF-2). A HOME landing in the
+//FeedTask 6000/7000 window leaves a tray physically clamped on the car with fHasTray
+//still false (software-blind -> resume JAM + Skip ghost tray). Case 7000 is a verified
+//single-scan pure-data commit, so stand-in execute it (spec-sanctioned Task write; case
+//6000 itself contains MoveAutoY and is never pumped). FeedTask=1 afterwards - the
+//commit is NOT idempotent (car ledger increments), it must run exactly once.
+bool TAutoModule::HomeDrainTick()
+{
+    if(iFeedAuto>=0 && iFeedAuto<AUTO_STATION_COUNT &&
+       (FeedTask==6000 || FeedTask==7000))
+    {
+        FeedTask=7000;
+        if(DoFeedTray(1))
+            FeedTask=1;
+        else
+            return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
 bool TAutoModule::IsSoftSimulate()
 {
     #ifdef SOFT_SIMULATE

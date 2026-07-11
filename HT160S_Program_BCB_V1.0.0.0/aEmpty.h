@@ -90,7 +90,8 @@ public:
     void RefillSimInfeed();
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the supply car (PanelMain6 Motion View header)
 
-    int GetHomeHaulTargetY();        //AI(ht160s-home-resume-w3b2) 20260711 : uHome PARK snapshot haul-target (-1 = no haul in flight)
+    int GetHomeHaulTargetY();
+    bool HomeDrainTick();            //AI(ht160s-home-resume-drain) 20260711 : pump the pure-cylinder destack ladders to their phase boundary (true=converged/idle)        //AI(ht160s-home-resume-w3b2) 20260711 : uHome PARK snapshot haul-target (-1 = no haul in flight)
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp, mirrors DoGoUpTray rise steps)
     bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, mirrors DoGoDownTray)
 };

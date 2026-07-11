@@ -141,6 +141,8 @@ public:
     int GetSortArmCellY(int BaseSortY, int Row);   //AI(ht160s-maintainer) 20260624 : symmetric Y helper (P1 HT172-align); public for DoFeedTray cell-Y park (aAuto1To6)
     TSortArmModule();
     void InitialFlag(bool bKeepMaterial=false);
+    bool HomeDrainTick();            //AI(ht160s-home-resume-drain) 20260711 : SP-1 vacuum reconciliation (ownerless suck -> vacuum off + blow, IC stays in pocket per D2)
+    void HomeDrainBlowOff();         //AI(ht160s-home-resume-drain) 20260711 : uHome case-100 completion : Z back at safe -> stop the reconciliation blow (D2)
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze ResidueDelay[] timers on machine pause
     void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
     void ApplyPnPDefaults();   //AI(ht160s-pnp) 20260626 : seed PnP scalar defaults (ctor only; recipe values survive re-home)

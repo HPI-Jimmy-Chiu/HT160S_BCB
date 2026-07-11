@@ -119,6 +119,7 @@ private:
 public:
     TAutoModule();
     void InitialFlag(bool bKeepMaterial=false);
+    bool HomeDrainTick();            //AI(ht160s-home-resume-drain) 20260711 : stand-in execute the FeedTask 6000/7000 single-scan commit (AF-2) so the clamped tray is never software-blind
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze AmrFullWaitTimer[] (AMR full/source wait) on machine pause
     void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
     void DoAuto(int &Task);

@@ -148,6 +148,7 @@ public:
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the shared supply car (PanelMain6 Motion View header)
     bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
 
+    bool HomeDrainTick();            //AI(ht160s-home-resume-drain) 20260711 : pump the destack cylinder segment (FeedTask 4000/4100/8200/8300) to the 9000 entry boundary
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; shared destacker, no LoaderNo)
     bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, extracted from DoFeedTray)
     bool CanMoveCcdToCell(int LoaderNo, int CellX, int CellY, AnsiString &Err);  //AI(ht160s-ccd-teach-test) 20260628 : Teach CCD move-to-cell foolproof gate (mirror SortArm CanMoveSuckerToCell); 0-based cells

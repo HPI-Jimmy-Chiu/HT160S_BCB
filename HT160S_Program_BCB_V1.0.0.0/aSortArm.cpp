@@ -226,6 +226,56 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     UpdateKitSuckState();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-home-resume-drain) 20260711 : SP-1 vacuum reconciliation (owner D2). A HOME
+//landing in the suck stroke (vacuum ON, bHasIC not yet committed) leaves an ownerless
+//IC on the nozzle : InitialFlag's ClearSlot never touches the vacuum output, so the IC
+//rides up invisible and the next pick crushes it. While the Z is STILL DOWN in the
+//pocket (drain runs before any motor homing) cut the vacuum AND blow (D2 : once vacuum
+//is established only positive pressure releases the IC - cutting vacuum alone leaves
+//it stuck on the nozzle), so the IC settles back into its source cell (grid data was
+//never transferred -> it is simply re-picked on resume). The blow stays ON through the
+//SuckZ homing and is stopped at the uHome case-100 completion (Z back at safe, D2).
+//Idempotent : once the vacuum output is off the slot no longer matches. Real tier only.
+static bool s_bHomeDrainBlow[SORT_ARM_SUCKER_COUNT]={false,false,false,false};
+//---------------------------------------------------------------------------
+bool TSortArmModule::HomeDrainTick()
+{
+#ifndef SOFT_SIMULATE
+    if(HSys.LastSet.iRealDummy!=DUMMY)
+    {
+        for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        {
+            TMySucker *Sucker=GetSucker(s);
+            if(Sucker==NULL)
+                continue;
+            if(Sucker->GetOnBit() && Slot[s].bHasIC==false)
+            {
+                Sucker->Off();
+                Sucker->OnDestroy();
+                s_bHomeDrainBlow[s]=true;
+                RecordProcess("Home: drain vacuum-reconcile sucker "+IntToStr(s+1)+" (ownerless IC released into its cell)");
+            }
+        }
+    }
+#endif
+    return true;
+}
+//---------------------------------------------------------------------------
+void TSortArmModule::HomeDrainBlowOff()
+{
+#ifndef SOFT_SIMULATE
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(s_bHomeDrainBlow[s]==false)
+            continue;
+        TMySucker *Sucker=GetSucker(s);
+        if(Sucker!=NULL)
+            Sucker->OffDestroy();
+        s_bHomeDrainBlow[s]=false;
+    }
+#endif
+}
+//---------------------------------------------------------------------------
 void TSortArmModule::ClearSlot(int SlotIndex)
 {
     TMySucker *Sucker=GetSucker(SlotIndex);

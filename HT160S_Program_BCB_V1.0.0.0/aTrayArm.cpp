@@ -129,6 +129,37 @@ int TTrayArmModule::GetJob()
     return Job;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook. Finish an in-flight grab or
+//deposit (PickTask/PlaceTask >= 1000 = the pure cylinder+data ladder; the positioning
+//and rear-clear waits < 1000 are deliberately NOT pumped - they resume via the
+//keep-material path). Status discriminates which cursor is live (both linger at 4000
+//after completion, so raw ranges would double-commit). D4 : the open-clamp handoff is
+//allowed inside the drain because no motor has moved yet. After a drained grab the
+//Loader-recovery job still needs its destination decision (normally DoTrayArm case
+//1000) - do it here so the resume heal re-signs the right receiver. A2 holds : the
+//arm X was stationary at the station when the ladder was interrupted.
+bool TTrayArmModule::HomeDrainTick()
+{
+    if(Status==TAS_PICKING && PickTask>=1000 && PickTask<=4000)
+    {
+        if(DoPick(1)==false)
+            return false;
+        Status=TAS_CARRYING;
+        if(Job==TAJOB_LOADER_RECOVERY)
+            DecidePlaceDestAfterPick();
+        return true;
+    }
+    if((Status==TAS_CARRYING || Status==TAS_PLACING) && bHasTray &&
+       PlaceTask>=1000 && PlaceTask<=4000)
+    {
+        if(DoPlace(1)==false)
+            return false;
+        Status=TAS_IDLE;
+        Job=TAJOB_NONE;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
 void TTrayArmModule::PauseTimeoutTimers()
 {
     //AI(ht160s-rearready-p0) 20260705 : freeze the blocked-pick watchdog across a machine

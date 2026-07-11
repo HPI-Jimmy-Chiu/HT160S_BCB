@@ -21,6 +21,9 @@
 #include "aEmpty.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Empty carriage PARK haul-target
 #include "aColor.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Color carriage PARK haul-target
 #include "GeneralSetting.h"   //AI(ht160s-home-resume-w3c) 20260711 : iHomeReacquireOffsetCnt
+#include "aAuto1To6.h"   //AI(ht160s-home-resume-drain) 20260711 : Auto drain hook (AF-2 commit stand-in)
+#include "aSortArm.h"    //AI(ht160s-home-resume-drain) 20260711 : SP-1 vacuum reconciliation + blow-off
+#include "uAgvStation.h" //AI(ht160s-home-resume-drain) 20260711 : D1 - freeze destacker drains at non-IDLE AMR stations
 #pragma package(smart_init)
 #pragma link "ALed"
 #pragma resource "*.dfm"
@@ -352,6 +355,11 @@ bool TfHome::ProcessMotorHome()
 	static bool bCarUnparkedCarry[10]={false,false,false,false,false,false,false,false,false,false};
 	static int  iReacqCar=0;
 	static int  iReacqStep=0;
+	//AI(ht160s-home-resume-drain) 20260711 : W2 drain stage state. Phase 0=arm, 1=pump,
+	//2=done/skipped. Reset on every new round (see the iPrevHomeStep edge below).
+	static int iHomeDrainPhase=2;
+	static int iPrevHomeStep=-999;
+	static HTimer HomeDrainTimer;
 #ifdef SOFT_SIMULATE
 	//Trace gate: log only on the FIRST entry of each case so a case that polls
 	//(returns false for many cycles) is written ONCE, not every tick. The clean
@@ -360,6 +368,12 @@ bool TfHome::ProcessMotorHome()
 	bool bSimNewStep=(iMotorHomeTask!=iSimLastStep);
 	iSimLastStep=iMotorHomeTask;
 #endif
+	//AI(ht160s-home-resume-drain) 20260711 : new-round edge (ArmMotorHome re-enters at
+	//step 1 from a non-1 step) -> re-arm the drain stage. A mid-drain abort re-entering
+	//at 1->1 keeps the running phase/timer (drain simply continues or times out).
+	if(iMotorHomeTask==1 && iPrevHomeStep!=1)
+		iHomeDrainPhase=0;
+	iPrevHomeStep=iMotorHomeTask;
 	switch(iMotorHomeTask)
 	{
 		case 1:
@@ -368,6 +382,63 @@ bool TfHome::ProcessMotorHome()
 			if(bSimNewStep)
 				SimHomeTrace("==== HOME ROUND START ====  case1: power-cycle gate (SIM forces skip) -> case2", true);
 #endif
+			//AI(ht160s-home-resume-drain) 20260711 : W2 drain stage (five-step protocol step 1,
+			//spec docs/plan/home-resume-drain-spec.md). BEFORE any power cycle / motor command,
+			//pump the in-flight pure-cylinder/data ladders to their phase boundary in the same
+			//scan (cross-module interlocks self-resolve) : Empty/Color/Loader destackers,
+			//TrayArm grab/deposit completion (D4), Auto 6000/7000 commit stand-in (AF-2), and
+			//the SP-1 vacuum reconciliation (Z still down -> vacuum off + blow, D2). Cause gate
+			//per D3 : only an air-pressure alarm skips the drain (EMG cuts motor power, not
+			//air). D1 : destacker hooks are frozen at stations with a non-IDLE AMR handshake.
+			//On timeout the round proceeds - PARK/removal are the fallback for whatever did
+			//not converge.
+			if(iHomeDrainPhase==0)
+			{
+				if(IsAirCheck())
+				{
+					RecordProcess("Home: drain skipped (air-pressure alarm)");
+					iHomeDrainPhase=2;
+				}
+				else
+				{
+					HomeDrainTimer.Clear();
+					HomeDrainTimer.SetMS(GeneralSetting.iHomeDrainTimeoutSec*1000);
+					HomeDrainTimer.On();
+					RecordProcess("Home: drain stage start");
+					iHomeDrainPhase=1;
+				}
+			}
+			if(iHomeDrainPhase==1)
+			{
+				bool bAllDrained=true;
+				if(LoaderModule!=NULL && AgvCoord.Handshake[0]==AGV_IDLE &&
+				   LoaderModule->HomeDrainTick()==false)
+					bAllDrained=false;
+				if(EmptyModule!=NULL && AgvCoord.Handshake[1]==AGV_IDLE &&
+				   EmptyModule->HomeDrainTick()==false)
+					bAllDrained=false;
+				if(ColorModule!=NULL && AgvCoord.Handshake[2]==AGV_IDLE &&
+				   ColorModule->HomeDrainTick()==false)
+					bAllDrained=false;
+				if(AutoModule!=NULL && AutoModule->HomeDrainTick()==false)
+					bAllDrained=false;
+				if(TrayArmModule!=NULL && TrayArmModule->HomeDrainTick()==false)
+					bAllDrained=false;
+				if(SortArmModule!=NULL && SortArmModule->HomeDrainTick()==false)
+					bAllDrained=false;
+				if(bAllDrained)
+				{
+					RecordProcess("Home: drain stage done");
+					iHomeDrainPhase=2;
+				}
+				else if(HomeDrainTimer.Off())
+				{
+					RecordProcess("Home: drain stage TIMEOUT - fallback to park/removal");
+					iHomeDrainPhase=2;
+				}
+				else
+					return false;
+			}
 			//AI(ht160s-home-resume-w3b2) 20260711 : PARK snapshot (protocol step 2) for all
 			//park-capable carriages (Loader1/2 + Auto1-6 + Empty + Color). Taken at case 1 =
 			//the single tick per round BEFORE any power cycle, so a live per-axis servo alarm
@@ -729,6 +800,10 @@ bool TfHome::ProcessMotorHome()
 					bZHomed=false;
 			}
             if(bZHomed)
+				//AI(ht160s-home-resume-drain) 20260711 : SuckZ batch homed = Z back at safe ->
+				//stop the SP-1 reconciliation blow now (owner D2 : blow off only after Z-safe).
+				if(SortArmModule!=NULL)
+					SortArmModule->HomeDrainBlowOff();
 			    iMotorHomeTask=200;
 			return false;
 		}

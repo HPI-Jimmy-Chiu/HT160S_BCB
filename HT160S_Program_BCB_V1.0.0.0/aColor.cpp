@@ -99,6 +99,25 @@ void TColorModule::InitialFlag(bool bKeepMaterial)
 //set bTrayReady (a mid-scan identity tray must never be presented unscanned), so a
 //completed feed haul lands as a rear leftover -> existing MES1426 operator removal.
 //Material safe, identity never mis-routed; the Empty analog fully self-heals.
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook, mirror of Empty (see there).
+bool TColorModule::HomeDrainTick()
+{
+    bool bDone=true;
+    if(GoDownTask>=100 && GoDownTask<=600)
+    {
+        DoGoDownTray(1);
+        if(GoDownTask>=100 && GoDownTask<=600)
+            bDone=false;
+    }
+    if(GoUpTask>=100 && GoUpTask<=600)
+    {
+        DoGoUpTray(1);
+        if(GoUpTask>=100 && GoUpTask<=600)
+            bDone=false;
+    }
+    return bDone;
+}
+//---------------------------------------------------------------------------
 int TColorModule::GetHomeHaulTargetY()
 {
     if(GoUpTask>=3000 && GoUpTask<8000)

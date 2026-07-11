@@ -79,6 +79,31 @@ int TEmptyModule::GetHomeHaulTargetY()
     return -1;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook. Pump ONLY the pure-cylinder
+//destack phases to their boundary (GoDown 100-600 -> stop at the 700 sensor/commit
+//entry, EG-3; GoUp phase A 100-600 -> its own 600 commit lands at 1000 which is NOT
+//pumped - 1000 decides into the motor haul). Idle/decision states (1/10) are never
+//pumped (pumping them would START a new destack). The clamp/haul segments need no
+//drain : PARK + haul-finish covers them. Cylinder reed timeouts can still raise the
+//ladder's own alarm - accepted deviation, a stuck cylinder is a hardware fault.
+bool TEmptyModule::HomeDrainTick()
+{
+    bool bDone=true;
+    if(GoDownTask>=100 && GoDownTask<=600)
+    {
+        DoGoDownTray(1);
+        if(GoDownTask>=100 && GoDownTask<=600)
+            bDone=false;
+    }
+    if(GoUpTask>=100 && GoUpTask<=600)
+    {
+        DoGoUpTray(1);
+        if(GoUpTask>=100 && GoUpTask<=600)
+            bDone=false;
+    }
+    return bDone;
+}
+//---------------------------------------------------------------------------
 bool TEmptyModule::IsSoftSimulate()
 {
     #ifdef SOFT_SIMULATE

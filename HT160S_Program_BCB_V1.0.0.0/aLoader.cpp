@@ -2121,6 +2121,29 @@ bool TLoaderModule::TestGoDownTray(int Flag)
 //---------------------------------------------------------------------------
 //AI(general) 20260617 : Teach Advanced destacker test. Cylinder-only GoUp
 //(return one tray up into the stack) mirrors Empty DoGoUpTray rise steps 100-600.
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook. Pump the pure-cylinder destack
+//segment (FeedTask 4000/4100/8200/8300, incl. the DoFrontDestackDown sub-ladder) to the
+//9000 ENTRY boundary (LK-3 arbitration : drain never executes 9000+ - modal + mint; an
+//interrupted un-minted tray is closed by the resume-side self-adopt instead). Same-scan
+//pumping with the Empty hook resolves the shared front-separate interlock (LK-5).
+bool TLoaderModule::HomeDrainTick()
+{
+    bool bDone=true;
+    for(int LoaderNo=1; LoaderNo<=2; LoaderNo++)
+    {
+        TLoaderSideState *S=GetSide(LoaderNo);
+        if(S==NULL)
+            continue;
+        if(S->FeedTask==4000 || S->FeedTask==4100 || S->FeedTask==8200 || S->FeedTask==8300)
+        {
+            DoFeedTray(LoaderNo, 1);
+            if(S->FeedTask==4000 || S->FeedTask==4100 || S->FeedTask==8200 || S->FeedTask==8300)
+                bDone=false;
+        }
+    }
+    return bDone;
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::TestGoUpTray(int Flag)
 {
     if(Flag==0)
