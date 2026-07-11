@@ -120,6 +120,7 @@ public:
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the presented identity tray
 
+    int GetHomeHaulTargetY();        //AI(ht160s-home-resume-w3b2) 20260711 : uHome PARK snapshot haul-target (-1 = no haul in flight)
     bool TestGoUpTray(int Flag);     //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoUp; Color has no production GoUp)
     bool TestGoDownTray(int Flag);   //AI(general) 20260617 : Teach Advanced destacker test (cylinder-only GoDown, mirrors Empty)
     bool MoveColorCcdToScan();       //AI(ht160s-color-ccd-xy) 20260628 : carriage Y + CCD reader X to photo pos together (prod case3000 + Teach test)

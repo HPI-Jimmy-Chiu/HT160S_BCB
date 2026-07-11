@@ -86,6 +86,28 @@ void TColorModule::InitialFlag(bool bKeepMaterial)
     TestDelay.Clear();
 }
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-home-resume-w3b2) 20260711 : HOME PARK haul-target for this carriage.
+//Called by uHome at the case-1 PARK snapshot (module Task cursors are still intact
+//there -- the InitialAllTask wipe only runs after ProcessMotorHome returns true).
+//A mid-haul park must FINISH the interrupted transfer at re-acquire : re-clamping at
+//a mid-rail position and resuming blind would let the restarted ladder stage a second
+//tray and collide (EF-2). Direction from the ladder cursors; the clamp out-bits are
+//the actual carry gate (checked on the uHome side).
+//DoGoUpTray phase B hauls rear->front (target = receive Y); DoFeedTray hauls
+//front->rear (target = TrayArm pick Y). Completion is PHYSICAL only : it does NOT
+//set bTrayReady (a mid-scan identity tray must never be presented unscanned), so a
+//completed feed haul lands as a rear leftover -> existing MES1426 operator removal.
+//Material safe, identity never mis-routed; the Empty analog fully self-heals.
+int TColorModule::GetHomeHaulTargetY()
+{
+    if(GoUpTask>=3000 && GoUpTask<8000)
+        return Teach.ColorReceiveTrayYPosition;
+    if(FeedTask>=2000 && FeedTask<7000)
+        return Teach.ColorTrayArmPickYPosition;
+    return -1;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-actuator-timer) 20260627 : freeze/thaw this module's wall-clock timeout
 //windows (ScanDelay CCD shot + AmrFeedWaitTimer source-dry AMR wait MES1421) so a machine pause taken mid-scan is not
 //charged against the timeout budget -- no false scan-timeout on resume. Called from

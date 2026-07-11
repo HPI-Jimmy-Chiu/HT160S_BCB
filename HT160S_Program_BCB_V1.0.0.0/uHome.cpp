@@ -18,6 +18,8 @@
 #include "csystem.h"
 #include "aTrayArm.h"   //AI(HT160S-Maintainer) 20260612 : TrayArmModule->HasTray() guard for held-tray home
 #include "aLoader.h"    //AI(HT160S-Maintainer) 20260617 : LoaderModule + held-tray safe-home clamp release
+#include "aEmpty.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Empty carriage PARK haul-target
+#include "aColor.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Color carriage PARK haul-target
 #pragma package(smart_init)
 #pragma link "ALed"
 #pragma resource "*.dfm"
@@ -297,9 +299,10 @@ static void SimHomeTrace(AnsiString line, bool bReset)
 //AI(ht160s-home-resume-w3b) 20260711 : carriage table for PARK & RE-ACQUIRE.
 //idx 0/1 = Loader1/2, idx 2..7 = Auto1..6. Same clamp semantics on every carriage :
 //PushTray = front stopper, LeanOnTray = rear hook (owner order : release rear then
-//front, engage front then rear). Empty/Color carriages are deferred to W3b-2 : a
-//mid-haul park there needs a module-side haul-target getter (EF-2/CG-3) before the
-//re-acquire can finish the interrupted transfer.
+//front, engage front then rear). idx 8=Empty, 9=Color (W3b-2) : their carry gate is
+//the clamp out-bits (their VMot fHasTray means a tray at the REAR SEAT, not on the
+//car) and a mid-haul park must finish the interrupted transfer to the module-owned
+//haul target (GetHomeHaulTargetY) before releasing there.
 static void HomeParkCarriage(int idx, TTrayMotor **Mot, TTrayMotor **VMot,
                              TMyCylinder **Front, TMyCylinder **Rear, AnsiString *Name)
 {
@@ -314,6 +317,8 @@ static void HomeParkCarriage(int idx, TTrayMotor **Mot, TTrayMotor **VMot,
 		case 5: *Mot=HSys.Mot.MAutoY_4; *VMot=HSys.VMot.MMAutoY_4; *Front=&HSys.Cyn.C_Auto4_PushTray; *Rear=&HSys.Cyn.C_Auto4_LeanOnTray; *Name="Auto4"; break;
 		case 6: *Mot=HSys.Mot.MAutoY_5; *VMot=HSys.VMot.MMAutoY_5; *Front=&HSys.Cyn.C_Auto5_PushTray; *Rear=&HSys.Cyn.C_Auto5_LeanOnTray; *Name="Auto5"; break;
 		case 7: *Mot=HSys.Mot.MAutoY_6; *VMot=HSys.VMot.MMAutoY_6; *Front=&HSys.Cyn.C_Auto6_PushTray; *Rear=&HSys.Cyn.C_Auto6_LeanOnTray; *Name="Auto6"; break;
+		case 8: *Mot=HSys.Mot.MEmptyY; *VMot=HSys.VMot.MMEmptyY; *Front=&HSys.Cyn.C_Empty_PushTray; *Rear=&HSys.Cyn.C_Empty_LeanOnTray; *Name="Empty"; break;
+		case 9: *Mot=HSys.Mot.MColorY; *VMot=HSys.VMot.MMColorY; *Front=&HSys.Cyn.C_Color_PushTray; *Rear=&HSys.Cyn.C_Color_LeanOnTray; *Name="Color"; break;
 	}
 }
 //---------------------------------------------------------------------------
@@ -333,9 +338,17 @@ bool TfHome::ProcessMotorHome()
 	//HOME material protocol steps 2+4). W3a=Loader cars, W3b=+Auto1-6 working trays.
 	//Snapshot at case 1 (per-axis alarm still visible there, A4), clamps released at
 	//case 50/60, re-acquire at case 300 after all axes homed.
-	static const int HOME_PARK_N=8;
-	static bool bCarParked[8]={false,false,false,false,false,false,false,false};
-	static int  iCarParkPos[8]={0,0,0,0,0,0,0,0};
+	static const int HOME_PARK_N=10;
+	static bool bCarParked[10]={false,false,false,false,false,false,false,false,false,false};
+	static int  iCarParkPos[10]={0,0,0,0,0,0,0,0,0,0};
+	//W3b-2 : haul target per parked carriage (-1 = plain re-acquire at the park spot;
+	//>=0 = after re-clamping, FINISH the interrupted Empty/Color transfer to this Y and
+	//release there with the module order Pop PushTray -> Pop LeanOnTray).
+	static int  iCarHaulTarget[10]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+	//W3b-2 : snapshot-time carry that could NOT be parked (A4 alarm / no haul target) ->
+	//case-200 operator-removal fallback keys off this, not off fHasTray (Empty/Color
+	//fHasTray = rear-seat tray, must never be cleared by the fallback).
+	static bool bCarUnparkedCarry[10]={false,false,false,false,false,false,false,false,false,false};
 	static int  iReacqCar=0;
 	static int  iReacqStep=0;
 	//+1mm approach offset (units 1/100mm) : raise the front stopper CLEAR of the tray
@@ -359,33 +372,57 @@ bool TfHome::ProcessMotorHome()
 			if(bSimNewStep)
 				SimHomeTrace("==== HOME ROUND START ====  case1: power-cycle gate (SIM forces skip) -> case2", true);
 #endif
-			//AI(ht160s-home-resume-w3b) 20260711 : PARK snapshot (protocol step 2) for all
-			//park-capable carriages (Loader1/2 + Auto1-6). Taken at case 1 = the single tick
-			//per round BEFORE any power cycle, so a live per-axis servo alarm is still visible
-			//(A4 : an alarmed axis' position is untrusted -> no park, that carriage falls back
-			//to the case-200 operator-removal path). A parked carriage keeps fHasTray + grid
-			//across the home; case 50/60 release every carriage clamp unconditionally
-			//(A1 : both Off -> Y motion does not drag the parked tray).
+			//AI(ht160s-home-resume-w3b2) 20260711 : PARK snapshot (protocol step 2) for all
+			//park-capable carriages (Loader1/2 + Auto1-6 + Empty + Color). Taken at case 1 =
+			//the single tick per round BEFORE any power cycle, so a live per-axis servo alarm
+			//is still visible (A4 : an alarmed axis' position is untrusted -> no park, the
+			//carriage falls into the case-200 operator-removal fallback). Loader/Auto carry =
+			//VMot fHasTray; Empty/Color carry = clamp out-bits (mid-haul grip; their fHasTray
+			//is the rear-seat tray) and additionally needs a module haul target so the
+			//re-acquire can FINISH the interrupted transfer (EF-2). Case 50/60 release every
+			//clamp unconditionally (A1 : both Off -> Y motion does not drag the parked tray).
 			for(int pk=0; pk<HOME_PARK_N; pk++)
 			{
 				TTrayMotor *PMot; TTrayMotor *PV; TMyCylinder *PF; TMyCylinder *PR; AnsiString PName;
 				HomeParkCarriage(pk, &PMot, &PV, &PF, &PR, &PName);
 				//aborted-round guard : a still-pending park means the carriage may already have
-				//moved (tray left at the OLD position) -- keep the latched position, never
-				//re-snapshot it from the current (possibly homed) encoder value.
-				if(bCarParked[pk] && PV!=NULL && PV->fHasTray)
-					continue;
+				//moved (tray left at the OLD position) -- keep the latched position/target, never
+				//re-snapshot from the current (possibly homed) encoder value.
+				if(bCarParked[pk])
+				{
+					if(pk>=8 || (PV!=NULL && PV->fHasTray))
+						continue;
+				}
 				bCarParked[pk]=false;
 				iCarParkPos[pk]=0;
+				iCarHaulTarget[pk]=-1;
+				bCarUnparkedCarry[pk]=false;
 				if(PMot==NULL || PV==NULL || PF==NULL || PR==NULL)
 					continue;
-				if(PV->fHasTray==false)
+				bool bCarry=false;
+				int iHaul=-1;
+				if(pk>=8)
+				{
+					if(PF->GetOutBit() || PR->GetOutBit())
+						bCarry=true;
+					if(pk==8 && EmptyModule!=NULL)
+						iHaul=EmptyModule->GetHomeHaulTargetY();
+					if(pk==9 && ColorModule!=NULL)
+						iHaul=ColorModule->GetHomeHaulTargetY();
+				}
+				else
+					bCarry=PV->fHasTray;
+				if(bCarry==false)
 					continue;
-				if(PMot->GetEnable()==false || PMot->bIsServoMotor==false)
+				if(PMot->GetEnable()==false || PMot->bIsServoMotor==false ||
+				   PMot->Led[iAlarmLed] || (pk>=8 && iHaul<0))
+				{
+					bCarUnparkedCarry[pk]=true;
+					RecordProcess("Home: "+PName+" carries a tray but cannot be parked (alarm/no-target)");
 					continue;
-				if(PMot->Led[iAlarmLed])
-					continue;
+				}
 				iCarParkPos[pk]=PMot->ReadEncoderPos();
+				iCarHaulTarget[pk]=(pk>=8)?iHaul:-1;
 				bCarParked[pk]=true;
 				RecordProcess("Home: PARK "+PName+" tray at Y="+IntToStr(iCarParkPos[pk]));
 			}
@@ -743,19 +780,20 @@ bool TfHome::ProcessMotorHome()
 				//also drops fHasTray). The loader feed Task is re-initialized to "request a new
 				//tray from scratch" by the InitialAllTask(true) the home caller runs right after
 				//this returns true (see ProcessMotion Layer 2 in csystem.cpp).
-				//AI(ht160s-home-resume-w3b) 20260711 : forced removal is ONLY the fallback for a
-				//carriage that could NOT be parked (own servo alarm at case 1, A4). Parked
-				//carriages keep tray identity + grid and are re-acquired at case 300, so
-				//production resumes the half-picked source tray / half-filled working tray.
+				//AI(ht160s-home-resume-w3b2) 20260711 : forced removal is ONLY the fallback for a
+				//carriage that was carrying but could NOT be parked (own servo alarm at case 1 A4,
+				//or an Empty/Color carry with no resolvable haul target). Keyed on the snapshot
+				//flag, NOT on fHasTray : Empty/Color fHasTray is the rear-seat tray and must not
+				//be cleared here. ClearTray applies to Loader/Auto carriages only.
 				bool bUnparked=false;
 				for(int pk=0; pk<HOME_PARK_N; pk++)
 				{
-					TTrayMotor *PMot; TTrayMotor *PV; TMyCylinder *PF; TMyCylinder *PR; AnsiString PName;
-					HomeParkCarriage(pk, &PMot, &PV, &PF, &PR, &PName);
-					if(PV!=NULL && PV->fHasTray && bCarParked[pk]==false)
+					if(bCarUnparkedCarry[pk])
 					{
+						TTrayMotor *PMot; TTrayMotor *PV; TMyCylinder *PF; TMyCylinder *PR; AnsiString PName;
+						HomeParkCarriage(pk, &PMot, &PV, &PF, &PR, &PName);
 						bUnparked=true;
-						RecordProcess("Home: unparked "+PName+" tray -> operator removal + ClearTray");
+						RecordProcess("Home: unparked "+PName+" tray -> operator removal");
 					}
 				}
 				if(bUnparked)
@@ -763,9 +801,14 @@ bool TfHome::ProcessMotorHome()
 					ShowMyMessage(LangT("A tray carriage still holds a tray that could not be parked. Please MANUALLY REMOVE it, then press OK."));
 					for(int pk2=0; pk2<HOME_PARK_N; pk2++)
 					{
+						if(bCarUnparkedCarry[pk2]==false)
+							continue;
+						bCarUnparkedCarry[pk2]=false;
+						if(pk2>=8)
+							continue;   //Empty/Color : rail tray removed by hand; rear-seat fHasTray untouched
 						TTrayMotor *PMot; TTrayMotor *PV; TMyCylinder *PF; TMyCylinder *PR; AnsiString PName;
 						HomeParkCarriage(pk2, &PMot, &PV, &PF, &PR, &PName);
-						if(PV!=NULL && PV->fHasTray && bCarParked[pk2]==false)
+						if(PV!=NULL && PV->fHasTray)
 							PV->ClearTray();
 					}
 				}
@@ -817,24 +860,26 @@ bool TfHome::ProcessMotorHome()
 		}
 		case 300:
 		{
-			//AI(ht160s-home-resume-w3b) 20260711 : RE-ACQUIRE (protocol step 4), sequential per
-			//parked carriage (Loader1/2 then Auto1-6). Y returns to the memorized park position
-			//+ offset, raises the front stopper FIRST (clear of the tray edge so it cannot flip
-			//the tray up), then the rear hook squeezes, then the carriage creeps back to the
-			//exact park position. Loader pair order is safe (both targets coexisted in
-			//production, each car approaches from its own home end - INFERRED, first on-machine
-			//run supervised); Auto stations are independent rails. Push() self-alarms on a reed
-			//timeout; MotorMove respects limits; motors are still at home speed here
-			//(SetMotorSpeed(true) runs after this returns true).
+			//AI(ht160s-home-resume-w3b2) 20260711 : RE-ACQUIRE (protocol step 4), sequential
+			//per parked carriage. Y returns to the memorized park position + offset, raises
+			//the front stopper FIRST (clear of the tray edge so it cannot flip the tray up),
+			//then the rear hook squeezes. Then : Loader/Auto creep back to the exact park
+			//position (production geometry restored); Empty/Color instead FINISH the
+			//interrupted haul to the module-owned target Y and release there with the module
+			//order (Pop PushTray -> Pop LeanOnTray) -- the destination sensors then let the
+			//restarted ladders re-derive with zero memory (Empty rear edge re-births; a Color
+			//feed haul lands as an MES1426 leftover by design, never presented unscanned).
+			//Safe: all axes are homed (TrayArm X parked, Z up per case 2), motors still at
+			//home speed; Push()/Pop() self-alarm on reed timeout; MotorMove respects limits.
 #ifdef SOFT_SIMULATE
 			if(bSimNewStep)
-				SimHomeTrace("case300: re-acquire parked tray(s) -> DONE when re-clamped", false);
+				SimHomeTrace("case300: re-acquire parked tray(s) -> DONE when re-clamped/hauled", false);
 #endif
 			while(iReacqCar<HOME_PARK_N && bCarParked[iReacqCar]==false)
 				iReacqCar++;
 			if(iReacqCar>=HOME_PARK_N)
 			{
-				RecordProcess("Home: re-acquire done, all parked trays re-clamped");
+				RecordProcess("Home: re-acquire done, all parked trays re-clamped/hauled");
 #ifdef SOFT_SIMULATE
 				SimHomeTrace("==== HOME ROUND DONE (case300 re-acquire done) ====", false);
 #endif
@@ -861,12 +906,30 @@ bool TfHome::ProcessMotorHome()
 						break;
 					case 2:   //rear hook squeezes the tray against the stopper
 						if(PR->Push())
-							iReacqStep=3;
+							iReacqStep=(iCarHaulTarget[iReacqCar]>=0)?4:3;
 						break;
-					case 3:   //creep back to the exact park position (production geometry restored)
+					case 3:   //Loader/Auto : creep back to the exact park position
 						if(PMot->MotorMove(iCarParkPos[iReacqCar]))
 						{
 							RecordProcess("Home: RE-ACQUIRE "+PName+" tray at Y="+IntToStr(iCarParkPos[iReacqCar]));
+							bCarParked[iReacqCar]=false;
+							iReacqCar++;
+							iReacqStep=0;
+						}
+						break;
+					case 4:   //Empty/Color : finish the interrupted haul to the module target
+						if(PMot->MotorMove(iCarHaulTarget[iReacqCar]))
+							iReacqStep=5;
+						break;
+					case 5:   //release at the destination : module order Pop PushTray first
+						if(PF->Pop())
+							iReacqStep=6;
+						break;
+					case 6:   //...then Pop LeanOnTray; destination sensors take over on resume
+						if(PR->Pop())
+						{
+							RecordProcess("Home: HAUL-FINISH "+PName+" tray to Y="+IntToStr(iCarHaulTarget[iReacqCar]));
+							iCarHaulTarget[iReacqCar]=-1;
 							bCarParked[iReacqCar]=false;
 							iReacqCar++;
 							iReacqStep=0;

@@ -58,6 +58,27 @@ void TEmptyModule::InitialFlag(bool bKeepMaterial)
     TestDelay.Clear();
 }
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-home-resume-w3b2) 20260711 : HOME PARK haul-target for this carriage.
+//Called by uHome at the case-1 PARK snapshot (module Task cursors are still intact
+//there -- the InitialAllTask wipe only runs after ProcessMotorHome returns true).
+//A mid-haul park must FINISH the interrupted transfer at re-acquire : re-clamping at
+//a mid-rail position and resuming blind would let the restarted ladder stage a second
+//tray and collide (EF-2). Direction from the ladder cursors; the clamp out-bits are
+//the actual carry gate (checked on the uHome side).
+//DoGoUpTray phase B hauls rear->front (target = feed Y); DoFeedTray hauls
+//front->rear (target = discharge Y). Completion releases at the destination with
+//the module's own order (Pop PushTray then Pop LeanOnTray); the rear sensor edge
+//then re-births the tray on resume (zero-memory convergence).
+int TEmptyModule::GetHomeHaulTargetY()
+{
+    if(GoUpTask>=3000 && GoUpTask<8000)
+        return Teach.EmptyCarFeedTrayYPosition;
+    if(FeedTask>=2000 && FeedTask<7000)
+        return Teach.EmptyCarDischargeTrayYPosition;
+    return -1;
+}
+//---------------------------------------------------------------------------
 bool TEmptyModule::IsSoftSimulate()
 {
     #ifdef SOFT_SIMULATE
