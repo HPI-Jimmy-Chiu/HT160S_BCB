@@ -152,11 +152,33 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     dwHoldLostStart=0;   //AI(ht160s-falldown) 20260706 : reset held-IC vacuum-loss debounce
     bMoveAborted=false;   //AI(ht160s-sortarm) 20260703 : no pending in-flight move abort on home/init
     iPickRetryCount=0;   //AI(ht160s-pick-retry) 20260702 : fresh pick-retry budget on home/init
-    iResidueAutoIndex=-1;   //AI(ht160s-residue) 20260624 : no pending residue report
-    bResidueArmed=false;   //AI(ht160s-residue) 20260625 : disarm; armed at place case 60
+    //AI(ht160s-home-resume-w4) 20260711 : keep-material HOME preserves an UNFINISHED
+    //place-residue verify (SR-2). The Auto-side bResidueClear=false gate now also
+    //survives a keep-material HOME (aAuto1To6 InitialFlag), so wiping the pending list
+    //here would leave that gate closed forever with no owner to re-open it. Keep the
+    //pending set + report target, restart each ladder at 1, and RE-ARM : uHome case 100
+    //homes the SuckZ axes to the top, which satisfies the "never re-suck near a tray"
+    //arming precondition, so the background verify re-runs and reports the verdict.
+    bool bKeepResidue=false;
+    if(bKeepMaterial)
+    {
+        for(int r=0; r<SORT_ARM_SUCKER_COUNT; r++)
+        {
+            if(bNeedResidueCheck[r])
+                bKeepResidue=true;
+        }
+    }
+    if(bKeepResidue==false)
+    {
+        iResidueAutoIndex=-1;   //AI(ht160s-residue) 20260624 : no pending residue report
+        bResidueArmed=false;   //AI(ht160s-residue) 20260625 : disarm; armed at place case 60
+    }
+    else
+        bResidueArmed=true;    //AI(ht160s-home-resume-w4) : re-arm the surviving verify (SuckZ at top after case 100)
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)   //AI(ht160s-residue) 20260624 : reset residue-check state on home/init
     {
-        bNeedResidueCheck[s]=false;
+        if(bKeepResidue==false)
+            bNeedResidueCheck[s]=false;
         ResidueTask[s]=1;
         ResidueDelay[s].Clear();
         //AI(ht160s-pnp) 20260626 : an abort/home during the place hold-through-lift window (case50..70)
@@ -184,8 +206,10 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
             TMySucker *Sucker=GetSucker(SlotIndex);
             Slot[SlotIndex].bCanPick=false;
             Slot[SlotIndex].bPlaceSelected=false;
-            Slot[SlotIndex].PickX=0;
-            Slot[SlotIndex].PickY=0;
+            //AI(ht160s-home-resume-w4) 20260711 : PickX/PickY are KEPT for a held IC
+            //(SP-2) -- the falldown monitor's bAtPick source-cell restore needs the
+            //origin cell to write a dropped IC back to the source grid after a resumed
+            //home; zeroing them degraded every post-home drop to SKIP-only.
             Slot[SlotIndex].PlaceX=0;
             Slot[SlotIndex].PlaceY=0;
             if(Sucker!=NULL && IsSoftSimulate()==false)

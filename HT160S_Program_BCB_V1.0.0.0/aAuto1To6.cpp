@@ -91,7 +91,6 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         State[Index].bCarHasTray=(TrayMotor!=NULL && TrayMotor->fHasTray);
         State[Index].Status=(State[Index].bCarHasTray ? AS_SORTING : AS_IDLE);   //AI(ht160s-status) 20260703 : re-derive from held material (bKeepMaterial-safe)
         State[Index].bCleanOutFinish=false;
-        State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : clear place-residue gate on home/init
         bCleanOutCheck[Index]=false;
         bCleanOutResidualLogged[Index]=false;   //AI(cleanout) 20260706 : new episode, allow one residual log again
         bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
@@ -106,6 +105,12 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         //sensor-backed presence above and the cleanout transient flags are refreshed.
         if(bKeepMaterial)
             continue;
+        //AI(ht160s-home-resume-w4) 20260711 : moved BELOW the keep-material early-out
+        //(was unconditional, SR-1/AD-4) : a keep-material HOME must NOT silently PASS an
+        //unfinished place-residue verify -- the gate survives and the SortArm side keeps
+        //its pending list + re-arms, so the verify re-runs and reports the real verdict.
+        //A full wipe (cold init) still opens the gate as before.
+        State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : clear place-residue gate on cold init
         State[Index].bRearHasTray=false;
         State[Index].bRearCanUse=false;
         State[Index].bFrontHasTray=false;
