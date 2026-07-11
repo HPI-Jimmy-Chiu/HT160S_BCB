@@ -20,6 +20,7 @@
 #include "aLoader.h"    //AI(HT160S-Maintainer) 20260617 : LoaderModule + held-tray safe-home clamp release
 #include "aEmpty.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Empty carriage PARK haul-target
 #include "aColor.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Color carriage PARK haul-target
+#include "GeneralSetting.h"   //AI(ht160s-home-resume-w3c) 20260711 : iHomeReacquireOffsetCnt
 #pragma package(smart_init)
 #pragma link "ALed"
 #pragma resource "*.dfm"
@@ -351,11 +352,6 @@ bool TfHome::ProcessMotorHome()
 	static bool bCarUnparkedCarry[10]={false,false,false,false,false,false,false,false,false,false};
 	static int  iReacqCar=0;
 	static int  iReacqStep=0;
-	//+1mm approach offset (units 1/100mm) : raise the front stopper CLEAR of the tray
-	//edge, then creep back (owner ruling). SIGN/direction MUST be verified on-machine
-	//per carriage -- the two Loader-Y encoders run the same stroke with opposite signs
-	//(LD-4); Auto1-6 directions unverified too.
-	static const int HOME_REACQ_OFFSET_CNT=100;
 #ifdef SOFT_SIMULATE
 	//Trace gate: log only on the FIRST entry of each case so a case that polls
 	//(returns false for many cycles) is written ONCE, not every tick. The clean
@@ -897,7 +893,9 @@ bool TfHome::ProcessMotorHome()
 				switch(iReacqStep)
 				{
 					case 0:   //approach : park position + offset (stopper clear of the tray edge)
-						if(PMot->MotorMove(iCarParkPos[iReacqCar]+HOME_REACQ_OFFSET_CNT))
+						//approach offset : GeneralSetting.iHomeReacquireOffsetCnt (1/100mm; sign per carriage
+						//MUST be verified on-machine -- LD-4 : the Loader-Y pair runs opposite signs)
+						if(PMot->MotorMove(iCarParkPos[iReacqCar]+GeneralSetting.iHomeReacquireOffsetCnt))
 							iReacqStep=1;
 						break;
 					case 1:   //front stopper first (never raise it AT the tray edge)

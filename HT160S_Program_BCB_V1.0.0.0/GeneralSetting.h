@@ -108,6 +108,7 @@ public:
 	int iLoaderDestackSettleMs;
 	int iAutoPushConfirmSettleMs;
 	int iAutoDischargePostYSettleMs;
+	int iHomeReacquireOffsetCnt;   //AI(ht160s-home-resume-w3c) 20260711 : HOME re-acquire approach offset (1/100mm; front stopper rises this far clear of the parked tray edge). Sign/direction verified on-machine per carriage.
 	int iAutoFrontRiseDwellMs;
 	int iAutoCleanOutRiseDwellMs;
 	int iTrayArmClampSettleMs;
