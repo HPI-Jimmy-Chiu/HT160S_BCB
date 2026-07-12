@@ -1,7 +1,7 @@
 # Suck2 四真空產生器模式（Suck2 Quad-Vacuum）作戰計畫
 
 日期：2026-07-12
-狀態：執行中（owner 2026-07-12 全部同意含 D1~D5）
+狀態：完成（建置＋sim 冒煙皆過；真機吸放/掉落/殘料驗證由 owner 執行）
 Owner 定案來源：2026-07-12 對話問答（8 題全數回覆）
 
 ## 0. 執行狀態（每步完成即 commit，中斷後由此接續）
@@ -9,12 +9,18 @@ Owner 定案來源：2026-07-12 對話問答（8 題全數回覆）
 - [x] Step 1 GeneralSetting 欄位 bSuck2QuadVacuum（編譯過）
 - [x] Step 2 TMySucker gang 機制（MyKitSuck.h/.cpp）（編譯過；Normal 路徑 iGangCount=0 不變）
 - [x] Step 3 開機閂鎖（database.cpp gang 佈線；遮罩強制改放 GeneralSetting::Load()，見 3.3 修訂）（編譯過）
-- [ ] Step 4 aSortArm 兩處 GetStatus 呼叫端替換（位元組安全）
-- [ ] Step 5 maintenance UI（DFM+h+cpp）
-- [ ] Step 6 setup.cpp PnP 頁鎖定
-- [ ] Step 7 language.txt Big5 附加
-- [ ] Step 8 全量驗證關卡（-Clean／真機建置閘／編碼檢查）
-- [ ] Step 9 Sim 冒煙＋最終 commit
+- [x] Step 4 aSortArm 呼叫端替換：掉落3處→GetStatusAllOn、殘料1處→GetStatusAnyOn（位元組安全；非ASCII=7不變；編譯過）
+- [x] Step 5 maintenance UI（DFM+h+cpp；後續依 owner 補充改為獨立面板 pnlSuck2QuadBox＋改名 pnlBinDisplayBox）（編譯過）
+- [x] Step 6 setup.cpp PnP 頁鎖定（編譯過）
+- [x] Step 7 language.txt Big5 附加（chkSuck2QuadVacuum＋lblSuck2QuadHint 兩條；CRLF/Big5 完好）
+- [x] Step 8 全量驗證：-Clean exit0／真機 -Full exit0（SOFT_SIMULATE 已還原重建）／編碼檢查通過
+- [x] Step 9 冒煙：HOME 自測 quad=0 PASS、quad=1 PASS（開機閂鎖無異常）；General.ini 已還原
+
+### 附帶發現與修正（2026-07-12）
+HOME 自測基準跑出 FAIL，追查為 **e9fd637（drain engine v1）預先存在的懸掛 if**：
+uHome.cpp case100 的 `HomeDrainBlowOff()` 插入偷走 `if(bZHomed)` 本體，使
+`iMotorHomeTask=200` 無條件執行→SuckZ M14~M17 未歸home即進 XY 批次（真機碰撞隱患、
+自測假 exit 0）。已補大括號還原閘門（commit f1464f0），修正後自測 PASS。與本案無關但被本案攔到。
 
 ## 1. 需求（已定案）
 
