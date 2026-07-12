@@ -800,11 +800,16 @@ bool TfHome::ProcessMotorHome()
 					bZHomed=false;
 			}
             if(bZHomed)
+			{
 				//AI(ht160s-home-resume-drain) 20260711 : SuckZ batch homed = Z back at safe ->
 				//stop the SP-1 reconciliation blow now (owner D2 : blow off only after Z-safe).
 				if(SortArmModule!=NULL)
 					SortArmModule->HomeDrainBlowOff();
-			    iMotorHomeTask=200;
+				//AI(ht160s-suck2-quad) 20260712 : braces restore the bZHomed gate - the blow-off
+				//insert had stolen this if-body, advancing to case 200 before SuckZ finished
+				//(selftest M14-M17 NOThomed; real-machine XY-vs-SuckZ collision hazard).
+				iMotorHomeTask=200;
+			}
 			return false;
 		}
 		case 200:
