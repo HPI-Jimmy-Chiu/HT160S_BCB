@@ -35,6 +35,7 @@ void THT160GeneralSetting::SetDefault()
 		bAutoEnabled[a]=true;
 	for(int s=0;s<4;s++)
 		bSuckerEnabled[s]=true;
+	bSuck2QuadVacuum=false;
 	bShowSortArmPlaceCheck=false;
 	iSortArmXDatumBias=-1000;
 	iSortArmYDatumBias=-1000;
@@ -111,6 +112,16 @@ void THT160GeneralSetting::Load()
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
 	for(int s=0;s<4;s++)
 		bSuckerEnabled[s]=Ini->ReadBool("HardwareInstall", "SuckerEnabled"+IntToStr(s), true);
+	bSuck2QuadVacuum=Ini->ReadBool("HardwareInstall", "Suck2QuadVacuum", false);
+	if(bSuck2QuadVacuum)
+	{
+		// Quad mode has only the Suck2 nozzle installed : force the pick mask to
+		// Nozzle2-only on EVERY load (maintenance reopens call Load() too) so a
+		// hand-edited SuckerEnabled key can never route work to a nozzle that is
+		// not there. Not written back to the ini here.
+		for(int s=0;s<4;s++)
+			bSuckerEnabled[s]=(s==1);
+	}
 	bShowSortArmPlaceCheck=Ini->ReadBool("Diagnostic", "ShowSortArmPlaceCheck", false);
 	iSortArmXDatumBias=Ini->ReadInteger("SortArm", "XDatumBias", -1000);
 	iSortArmYDatumBias=Ini->ReadInteger("SortArm", "YDatumBias", -1000);
@@ -183,6 +194,7 @@ void THT160GeneralSetting::Save()
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);
 	for(int s=0;s<4;s++)
 		Ini->WriteBool("HardwareInstall", "SuckerEnabled"+IntToStr(s), bSuckerEnabled[s]);
+	Ini->WriteBool("HardwareInstall", "Suck2QuadVacuum", bSuck2QuadVacuum);
 	Ini->WriteBool("Diagnostic", "ShowSortArmPlaceCheck", bShowSortArmPlaceCheck);
 	Ini->WriteInteger("SortArm", "XDatumBias", iSortArmXDatumBias);
 	Ini->WriteInteger("SortArm", "YDatumBias", iSortArmYDatumBias);

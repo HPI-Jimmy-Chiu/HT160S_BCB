@@ -20,6 +20,7 @@
 #include "csystem.h"
 #include "myio_MN200.h"
 #include "CosFunction.h"
+#include "GeneralSetting.h"
 #include "SecsGem\uHGemClass.h"
 #include "cStepTrace.h"
 #include "cStateRecordHT160.h"
@@ -1481,6 +1482,20 @@ void SYSTEM_MODULAR::LoadSuckerParameterFromDataBase()
                 }
             }
         }
+    }
+
+    //AI(ht160s-suck2-quad) 20260712 : boot latch for the Suck2 quad-vacuum machine
+    //variant (all 4 generator circuits plumbed to the single Suck2 nozzle).
+    //GeneralSetting is already loaded (InitialCosFunction runs earlier in the same
+    //init) and the gang is wired only here, so changing the option takes effect on
+    //RESTART. The Nozzle2-only pick mask is enforced inside
+    //THT160GeneralSetting::Load().
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        TMySucker *GangMaster=&Suck.SortArmSuck.Suck[0][1];
+        for(int GangIndex=0; GangIndex<MAX_SUB_SUCKER_ITEM; GangIndex++)
+            GangMaster->pGang[GangIndex]=&Suck.SortArmSuck.Suck[0][GangIndex];
+        GangMaster->iGangCount=MAX_SUB_SUCKER_ITEM;
     }
 }
 //---------------------------------------------------------------------------

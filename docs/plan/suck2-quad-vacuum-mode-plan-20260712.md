@@ -1,8 +1,20 @@
 # Suck2 四真空產生器模式（Suck2 Quad-Vacuum）作戰計畫
 
 日期：2026-07-12
-狀態：計畫（待 owner 核可後執行）
+狀態：執行中（owner 2026-07-12 全部同意含 D1~D5）
 Owner 定案來源：2026-07-12 對話問答（8 題全數回覆）
+
+## 0. 執行狀態（每步完成即 commit，中斷後由此接續）
+
+- [x] Step 1 GeneralSetting 欄位 bSuck2QuadVacuum（編譯過）
+- [x] Step 2 TMySucker gang 機制（MyKitSuck.h/.cpp）（編譯過；Normal 路徑 iGangCount=0 不變）
+- [x] Step 3 開機閂鎖（database.cpp gang 佈線；遮罩強制改放 GeneralSetting::Load()，見 3.3 修訂）（編譯過）
+- [ ] Step 4 aSortArm 兩處 GetStatus 呼叫端替換（位元組安全）
+- [ ] Step 5 maintenance UI（DFM+h+cpp）
+- [ ] Step 6 setup.cpp PnP 頁鎖定
+- [ ] Step 7 language.txt Big5 附加
+- [ ] Step 8 全量驗證關卡（-Clean／真機建置閘／編碼檢查）
+- [ ] Step 9 Sim 冒煙＋最終 commit
 
 ## 1. 需求（已定案）
 
@@ -79,9 +91,12 @@ Owner 定案來源：2026-07-12 對話問答（8 題全數回覆）
 ### 3.3 開機閂鎖（database.cpp）
 
 `LoadSuckerParameterFromDataBase()` 尾端：若 `GeneralSetting.bSuck2QuadVacuum`：
-1. `Suck[0][1]`（Suck2）設為 master：`pGang[0..3]=&Suck[0][0..3]`、`iGangCount=4`。
-2. 防衛：記憶體內強制 `GeneralSetting.bSuckerEnabled = {F,T,F,F}`（不回寫 ini）——
-   即使有人手改 ini 讓 Nozzle3 開著，運轉也不會用到沒有扇出的吸嘴。
+`Suck[0][1]`（Suck2）設為 master：`pGang[0..3]=&Suck[0][0..3]`、`iGangCount=4`。
+
+**執行時修訂（2026-07-12）**：遮罩強制不放 database（原設計），改放
+`THT160GeneralSetting::Load()` 內——因維護頁每次開啟都重跑 `Load()`（maintenance.cpp:1086），
+若只在開機強制一次會被後續 Load 洗掉。現在 quad=true 時每次 Load 都在記憶體強制
+`bSuckerEnabled={F,T,F,F}`（不回寫 ini），防手改 ini 更徹底。
 
 ### 3.4 aSortArm.cpp 呼叫端替換（僅 2 處，位元組安全編輯）
 

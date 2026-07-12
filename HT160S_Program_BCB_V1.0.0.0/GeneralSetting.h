@@ -78,6 +78,17 @@ public:
 	// no restart needed. Stored in General.ini [HardwareInstall] SuckerEnabled0..3.
 	bool bSuckerEnabled[4];
 
+	// Hardware install : Suck2 quad-vacuum mode. The machine variant mounts only the
+	// Suck2 nozzle (Suck1/3/4 not installed) and plumbs all 4 vacuum generator circuits
+	// (Suck1..4_On/_Off/sensor) to that single nozzle. When true, sucker index 1 becomes
+	// the gang master (all 4 valves driven together; pick = all 4 sensors ON, release =
+	// all 4 OFF, any mismatch alarms via the original SUCxxxx flow) and the effective
+	// pick mask is forced to Nozzle2 only. Latched once at boot in
+	// LoadSuckerParameterFromDataBase, so a RESTART is required after changing it.
+	// Operator-editable on tsOption (warns to restart). Stored in General.ini
+	// [HardwareInstall] Suck2QuadVacuum.
+	bool bSuck2QuadVacuum;
+
 	// Diagnostic : when true, SortArm pops a modal message before each Auto Z-down
 	// comparing actual vs expected motor positions. Per-machine engineering check,
 	// default OFF. Toggle via [Diagnostic] ShowSortArmPlaceCheck in General.ini.
