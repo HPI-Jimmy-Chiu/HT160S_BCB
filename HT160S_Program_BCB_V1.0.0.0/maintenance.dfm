@@ -1995,7 +1995,7 @@ object fMaintenance: TfMaintenance
             object tsOption: TTabSheet
               Caption = 'Option'
               ImageIndex = 3
-              object Panel5: TPanel
+              object pnlBinDisplayBox: TPanel
                 Left = 0
                 Top = 0
                 Width = 929
@@ -2041,13 +2041,32 @@ object fMaintenance: TfMaintenance
                   Caption = 'Tray Datum (XStart/YStart)'
                   TabOrder = 2
                 end
-                object chkSuck2QuadVacuum: TCheckBox
-                  Left = 730
+              end
+              object pnlSuck2QuadBox: TPanel
+                Left = 0
+                Top = 40
+                Width = 929
+                Height = 64
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblSuck2QuadHint: TLabel
+                  Left = 16
                   Top = 8
-                  Width = 190
+                  Width = 897
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Suck2 quad-vacuum : all 4 vacuum generator circuits feed the Suck' +
+                    '2 nozzle (Nozzle2 only). Any sensor mismatch alarms. Restart req' +
+                    'uired.'
+                end
+                object chkSuck2QuadVacuum: TCheckBox
+                  Left = 16
+                  Top = 32
+                  Width = 250
                   Height = 17
                   Caption = 'Suck2 = 4 Vacuum Generators'
-                  TabOrder = 3
+                  TabOrder = 0
                   OnClick = chkSuck2QuadVacuumClick
                 end
               end

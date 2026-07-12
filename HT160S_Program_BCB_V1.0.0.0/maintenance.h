@@ -283,7 +283,7 @@ __published:
     TCheckBox *chkSuckEnable3;
     TCheckBox *chkSuckEnable4;
     TTabSheet *tsOption;
-    TPanel *Panel5;
+    TPanel *pnlBinDisplayBox;
     TLabel *lblBinPanelType;
     TComboBox *cbBinPanelType;
     TTabSheet *tsLotInfo;
@@ -292,6 +292,8 @@ __published:
     TRadioGroup *rgSortMode;
     TCheckBox *chkUseTrayDatumModel;
     TCheckBox *cbCommType;
+    TPanel *pnlSuck2QuadBox;
+    TLabel *lblSuck2QuadHint;
     TCheckBox *chkSuck2QuadVacuum;
     TPanel *plLoaderSafeDistanceSet;
     TLabel *lblLoaderSafeDistance;
