@@ -292,6 +292,7 @@ __published:
     TRadioGroup *rgSortMode;
     TCheckBox *chkUseTrayDatumModel;
     TCheckBox *cbCommType;
+    TCheckBox *chkSuck2QuadVacuum;
     TPanel *plLoaderSafeDistanceSet;
     TLabel *lblLoaderSafeDistance;
     TEdit *edLoaderSafeDistance;
@@ -377,6 +378,7 @@ __published:
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
+    void __fastcall chkSuck2QuadVacuumClick(TObject *Sender);
     void __fastcall edLoaderSafeDistanceClick(TObject *Sender);
     void __fastcall edSettleDelayClick(TObject *Sender);
     void __fastcall edUphMinSampleICClick(TObject *Sender);

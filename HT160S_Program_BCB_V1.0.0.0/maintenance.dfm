@@ -2041,6 +2041,15 @@ object fMaintenance: TfMaintenance
                   Caption = 'Tray Datum (XStart/YStart)'
                   TabOrder = 2
                 end
+                object chkSuck2QuadVacuum: TCheckBox
+                  Left = 730
+                  Top = 8
+                  Width = 190
+                  Height = 17
+                  Caption = 'Suck2 = 4 Vacuum Generators'
+                  TabOrder = 3
+                  OnClick = chkSuck2QuadVacuumClick
+                end
               end
             end
             object tsLotInfo: TTabSheet

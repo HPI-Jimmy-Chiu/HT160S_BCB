@@ -1322,7 +1322,7 @@ bool TSortArmModule::CheckPlaceResidue()
             case 300:
                 if(ResidueDelay[s].Off())
                 {
-                    if(Sucker->GetStatus())
+                    if(Sucker->GetStatusAnyOn())
                     {
                         ShowSuckError(*Sucker, 2, K_RETRY, "SortArm Residue");
                         ResidueTask[s]=200;
@@ -1522,7 +1522,7 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
         TMySucker *Sucker=GetSucker(s);
         if(Sucker==NULL || Sucker->Enable==false || Sucker->Sensor.Enable==false)
             continue;
-        if(Sucker->GetStatus()==false)
+        if(Sucker->GetStatusAllOn()==false)
         {
             bAnyOff=true;
             break;
@@ -1554,7 +1554,7 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
         TMySucker *Sucker=GetSucker(s);
         if(Sucker==NULL || Sucker->Enable==false || Sucker->Sensor.Enable==false)
             continue;
-        if(Sucker->GetStatus()==false)
+        if(Sucker->GetStatusAllOn()==false)
         {
             iFirstDrop=s;
             iDropRow=Slot[s].PickY;
@@ -1596,7 +1596,7 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
         TMySucker *Sk=GetSucker(s2);
         if(Sk==NULL || Sk->Enable==false || Sk->Sensor.Enable==false)
             continue;
-        if(Sk->GetStatus()==false)
+        if(Sk->GetStatusAllOn()==false)
         {
             if(bAtPick && LoaderTray!=NULL)   //RETRY: restore (keep IC in tray) ; SKIP: abandon (EMPTY_IC)
                 LoaderTray->SetTraySingleData(Slot[s2].PickX, Slot[s2].PickY, (iKey==K_SKIP)?EMPTY_IC:Slot[s2].TrayData);

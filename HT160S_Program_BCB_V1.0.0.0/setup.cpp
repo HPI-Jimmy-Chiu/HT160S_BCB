@@ -465,6 +465,18 @@ void __fastcall TfSetup::LoadSuckEnable()
     RefreshSuckGrid();
     if(rgPnpUseSuck!=NULL && grdSuckEnable!=NULL)
         grdSuckEnable->Enabled=(rgPnpUseSuck->ItemIndex==1);
+    //AI(ht160s-suck2-quad) 20260712 : quad-vacuum variant - the pick mask is forced to
+    //Nozzle2-only by GeneralSetting.Load() and must not be edited here; lock both the
+    //mode selector and the grid (maintenance tsOption owns the option itself).
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        if(rgPnpUseSuck!=NULL)
+            rgPnpUseSuck->Enabled=false;
+        if(grdSuckEnable!=NULL)
+            grdSuckEnable->Enabled=false;
+    }
+    else if(rgPnpUseSuck!=NULL)
+        rgPnpUseSuck->Enabled=true;
     //AI(ht160s-pick-retry) 20260706 : reflect machine-level [SortArm] PickRetryCount into the edit.
     if(edSortArmPickRetry!=NULL)
         edSortArmPickRetry->Text=IntToStr(GeneralSetting.iSortArmPickRetryCount);
@@ -526,6 +538,8 @@ void __fastcall TfSetup::grdSuckEnableMouseUp(TObject *Sender,
         return;
     if(bLoadingPnP)
         return;
+    if(GeneralSetting.bSuck2QuadVacuum)
+        return;
     if(rgPnpUseSuck!=NULL && rgPnpUseSuck->ItemIndex==0)
         return;
     if(grdSuckEnable->ConvertIndexCells(X, Y)!=1)
@@ -563,6 +577,8 @@ void __fastcall TfSetup::rgPnpUseSuckClick(TObject *Sender)
 
     (void)Sender;
     if(bLoadingPnP)
+        return;
+    if(GeneralSetting.bSuck2QuadVacuum)
         return;
     if(rgPnpUseSuck==NULL)
         return;

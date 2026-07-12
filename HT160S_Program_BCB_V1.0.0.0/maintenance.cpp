@@ -1098,6 +1098,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     }
     if(cbCommType!=NULL)
         cbCommType->Checked=GeneralSetting.bBinDispUseMyComm;
+    if(chkSuck2QuadVacuum!=NULL)
+        chkSuck2QuadVacuum->Checked=GeneralSetting.bSuck2QuadVacuum;
     //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired - GeneralSetting.bUseTrayDatumModel
     //was removed (replaced by ini-only iSortArmXDatumBias/iSortArmYDatumBias). Remove the dead checkbox
     //from the maintenance form when finishing the datum-bias refactor.
@@ -1174,6 +1176,8 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     }
     if(cbCommType!=NULL)
         GeneralSetting.bBinDispUseMyComm=cbCommType->Checked;
+    if(chkSuck2QuadVacuum!=NULL)
+        GeneralSetting.bSuck2QuadVacuum=chkSuck2QuadVacuum->Checked;
     //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired (bUseTrayDatumModel removed).
     if(rgSortMode!=NULL)
     {
@@ -1221,7 +1225,7 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
 //leaves the page editable again - matching the agreed "lock from Start to End" scope.
 void __fastcall TfMaintenance::ApplyHardwareEditLock()
 {
-    TCheckBox *Locked[12];
+    TCheckBox *Locked[13];
     bool bEnable;
     int i;
 
@@ -1232,9 +1236,21 @@ void __fastcall TfMaintenance::ApplyHardwareEditLock()
     Locked[5]=chkAutoEnable4; Locked[6]=chkAutoEnable5; Locked[7]=chkAutoEnable6;
     Locked[8]=chkSuckEnable1; Locked[9]=chkSuckEnable2;
     Locked[10]=chkSuckEnable3; Locked[11]=chkSuckEnable4;
-    for(i=0; i<12; i++)
+    Locked[12]=chkSuck2QuadVacuum;
+    for(i=0; i<13; i++)
         if(Locked[i]!=NULL)
             Locked[i]->Enabled=bEnable;
+    //AI(ht160s-suck2-quad) 20260712 : the quad-vacuum variant has only Nozzle2
+    //installed - the per-nozzle mask is forced by GeneralSetting.Load() and must not
+    //be hand-edited, so keep the nozzle checkboxes locked whenever the option is on.
+    //This runs after every load/toggle, so it wins over the blanket re-enable above.
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        if(chkSuckEnable1!=NULL) chkSuckEnable1->Enabled=false;
+        if(chkSuckEnable2!=NULL) chkSuckEnable2->Enabled=false;
+        if(chkSuckEnable3!=NULL) chkSuckEnable3->Enabled=false;
+        if(chkSuckEnable4!=NULL) chkSuckEnable4->Enabled=false;
+    }
     //AI(ht160s-lotpassfail) 20260709 : the sort-mode selector is now a TRadioGroup (not a
     //TCheckBox) so it cannot live in the array above; lock it separately so the mode cannot
     //be switched mid-lot (would corrupt the in-progress dynamic binding).
@@ -1949,6 +1965,42 @@ void __fastcall TfMaintenance::chkAutoEnableClick(TObject *Sender)
     RefreshHardwareSettingsStatus();
     ShowMyMessage("Auto enable changed. Please restart the software so the new "
                   "Lot+Bin routing takes effect cleanly.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-suck2-quad) 20260712 : Suck2 quad-vacuum machine option (all 4 vacuum
+//generator circuits plumbed to the single Suck2 nozzle). The gang is latched once
+//at boot (LoadSuckerParameterFromDataBase), so warn (do not force) a restart,
+//matching the Sort-mode toggle above. Checking it also persists the pick mask to
+//Nozzle2-only right away (this variant physically has no other nozzle) and locks
+//the per-nozzle checkboxes via ApplyHardwareEditLock. The bLoadingHardwareSettings
+//wrapper around the Checked= writes is required : setting Checked fires OnClick.
+void __fastcall TfMaintenance::chkSuck2QuadVacuumClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkSuck2QuadVacuum!=NULL)
+        GeneralSetting.bSuck2QuadVacuum=chkSuck2QuadVacuum->Checked;
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        TCheckBox *SuckChk[4];
+        int s;
+        SuckChk[0]=chkSuckEnable1; SuckChk[1]=chkSuckEnable2;
+        SuckChk[2]=chkSuckEnable3; SuckChk[3]=chkSuckEnable4;
+        bLoadingHardwareSettings=true;
+        for(s=0; s<4; s++)
+        {
+            GeneralSetting.bSuckerEnabled[s]=(s==1);
+            if(SuckChk[s]!=NULL)
+                SuckChk[s]->Checked=(s==1);
+        }
+        bLoadingHardwareSettings=false;
+    }
+    GeneralSetting.Save();
+    ApplyHardwareEditLock();
+    RefreshHardwareSettingsStatus();
+    ShowMyMessage("Suck2 quad-vacuum mode changed. Please restart the software "
+                  "so the new vacuum gang takes effect cleanly.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-maintainer) 20260616 : Per-nozzle (SortArm sucker) enable. Unchecked
