@@ -226,12 +226,13 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         TMyCar *Car = AutoModule->GetAutoCar(a);
         if(Car!=NULL)
         {
-            // AI(ht160s-agv-devicecount) 20260713 : keep the SVID snapshot live for
-            // ad-hoc S1F3 reads AND for the AGVSupplement/AGVLDUnLDFinish reports
-            // (Report 6) fired below/in ServiceHandshake. GetTotalDeviceCount() sums
-            // every stacked tray's real IC count (was hardcoded 0 before).
+            // AI(ht160s-agv-devicecount) 20260713 : keep the SVID snapshot live for ad-hoc
+            // S1F3 reads AND the AGVSupplement/AGVLDUnLDFinish Report 6. DeviceCount comes
+            // from the per-Auto running IC total (GetAmrDeviceCount, tallied at discharge) -
+            // NOT from summing the car's Tray[] grids, which are never filled with placed-IC
+            // data and always summed to 0 (that was the original no-op bug).
             TrayCount[si] = Car->iTrayCount;
-            DeviceCount[si] = Car->GetTotalDeviceCount();
+            DeviceCount[si] = AutoModule->GetAmrDeviceCount(a);
             CarrierID[si] = Car->CarID;
         }
 
@@ -325,7 +326,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 if(FinishCar!=NULL)
                 {
                     TrayCount[si]   = FinishCar->iTrayCount;
-                    DeviceCount[si] = FinishCar->GetTotalDeviceCount();
+                    DeviceCount[si] = AutoModule->GetAmrDeviceCount(a);
                 }
                 FinishBitmap = BuildBitmap(AgvStation[si].PIndex);
                 Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish

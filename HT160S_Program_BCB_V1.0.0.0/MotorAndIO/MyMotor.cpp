@@ -302,17 +302,10 @@ bool TMyCar::IsFull()
     return (iTrayCount>=MAX_TRAY_PER_CAR);
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-agv-devicecount) 20260713 : sum every stacked tray's IC count. Called
-//while the car is still intact (before Clear()), e.g. by the AGV coordinator
-//just ahead of ClearAmrCar so the SECS report carries the real total, not 0.
-int TMyCar::GetTotalDeviceCount()
-{
-    int n=0;
-    for(int i=0; i<iTrayCount && i<MAX_TRAY_PER_CAR; i++)
-        n+=Tray[i].CountIC();
-    return n;
-}
-//---------------------------------------------------------------------------
+//AI(ht160s-agv-devicecount) 20260713 : TMyCar::GetTotalDeviceCount() removed - it summed
+//CountIC() over Car.Tray[], but the car's Tray[] grids are never populated with placed-IC
+//data (ICs live in the working TTrayMotor tray), so it always returned 0. The AMR IC total
+//is now a per-Auto running counter tallied at discharge: TAutoModule::GetAmrDeviceCount().
 void TMyCar::PackForAmrUpload()
 {
     //AI(HT160S-Maintainer) 20260604 : AMR upload payload not designed yet; stub.

@@ -768,6 +768,7 @@ bool TAutoModule::DoDischargeTray(int Flag)
                 TrayMotor=GetAutoVMotor(iDischargeAuto);
                 if(TrayMotor!=NULL)
                 {
+                    iAmrDeviceCount[iDischargeAuto]+=TrayMotor->Tray.CountIC();   //AI(ht160s-agv-devicecount) 20260713 : tally this tray's ICs into the car running total BEFORE ClearTray wipes it (Car.Tray grids are never filled, so the old car-sum was always 0)
                     TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
                 }
                 State[iDischargeAuto].bFullIC=false;
@@ -1148,6 +1149,17 @@ int TAutoModule::GetCarTrayCount(int Index)
     return Car[Index].iTrayCount;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv-devicecount) 20260713 : running IC total on the output car, accumulated
+//per discharged tray from the working tray's CountIC (see DoDischargeTray). Source for
+//the AGV DeviceCount SVID; replaces the always-0 TMyCar::GetTotalDeviceCount (the Car's
+//Tray[] grids are never filled with placed-IC data, so summing them returned 0).
+int TAutoModule::GetAmrDeviceCount(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return 0;
+    return iAmrDeviceCount[Index];
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-motion-view) 20260618 : 2D TrayID now at the working position, for the
 //Unload-area Auto-info ID panel (palAutoXXID). Empty until an identity tray is seen.
 AnsiString TAutoModule::GetWorkingTrayID(int Index)
@@ -1163,6 +1175,7 @@ void TAutoModule::InitAutoCarStack(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return;
+    iAmrDeviceCount[Index]=0;   //AI(ht160s-agv-devicecount) 20260713 : car re-seed resets the running IC total (every car-clear path funnels here; a keep-material HOME skips InitAutoCarStack so its ledger is preserved)
     for(int i=0; i<MAX_TRAY_PER_CAR; i++)
     {
         if(i==0)

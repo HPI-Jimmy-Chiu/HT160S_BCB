@@ -81,6 +81,7 @@ private:
     bool bDischargeTailPending[6];   //AI(ht160s-home-resume-drain) 20260713 : AD-1 - HOME landed in the discharge eject tail (DischargeTask 5000-6100); finish MoveAutoY-to-feed + FrontRise on resume (cleared on COLD init only)
     int RearKind[6];      //AI(HT160S-Maintainer) 20260605 : AMR kind of tray TrayArm placed at rear
     int WorkingKind[6];   //AI(HT160S-Maintainer) 20260605 : AMR kind of tray now at the sort working position
+    int iAmrDeviceCount[6];   //AI(ht160s-agv-devicecount) 20260713 : per-Auto running IC total for the SECS DeviceCount SVID. Tallied at discharge from the populated working tray (Car.Tray grids are never filled with IC data); reset in InitAutoCarStack, so a keep-material HOME (which skips it) preserves the count.
     AnsiString RearTrayID[6];     //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the identity tray TrayArm placed at rear (from Color CCD)
     AnsiString WorkingTrayID[6];  //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray now at the working position
     TMyTray RearGrid[6];          //AI(ht160s-tray-source) : per-cell grid TrayArm staged at rear (copied into working tray at DoFeedTray c7000)
@@ -134,6 +135,7 @@ public:
     TMyCar Car[6];
     TMyCar *GetAutoCar(int Index);          // NULL if out of range
     int GetCarTrayCount(int Index);         //AI(ht160s-agv) 20260624 : trays stacked on the output car (PanelMain6 Motion View header); 0 if out of range
+    int GetAmrDeviceCount(int Index);       //AI(ht160s-agv-devicecount) 20260713 : running IC total on the output car (SECS DeviceCount SVID source); 0 if out of range
     //AI(ht160s-agv) 20260615 : AMR/AGV output-car-full test for the SECS AGVSupplement
     //  trigger. Real machine = the SnAutoX_InputFullTray sensor (IsOn); simulation =
     //  a logical tray threshold (AMR_FULL_TRAY_SIM). Distinct from TMyCar::IsFull()

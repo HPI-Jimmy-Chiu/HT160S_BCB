@@ -126,7 +126,6 @@ public:
     TMyTray *GetIdentityTray();        // first eTrayKindIdentity tray, else NULL
     bool IsFull();
     void PackForAmrUpload();           //AI(HT160S-Maintainer) 20260604 : payload TBD, stub for now
-    int  GetTotalDeviceCount();        //AI(ht160s-agv-devicecount) 20260713 : sum CountIC() over Tray[0..iTrayCount-1]
 };
 //---------------------------------------------------------------------------
 class TMyMotor
