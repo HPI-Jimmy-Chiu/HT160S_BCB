@@ -126,5 +126,24 @@ SECS「盤數 = work-only」不只進料側，**Unloader(Auto 輸出)上傳的�
 
 ---
 
+## 設計審查發現（wf 攻防裁判 2026-07-13，動工前必修）
+以下皆為設計階段 gap（尚無程式碼），實作前務必在本計畫落實：
+
+**設計 A（多趟佇列）**
+- **F1 空佇列 fallback**：mint(case 9500)在**所有模式**都跑，但入列只在 CEID274（bUseAMR 才觸發）。AMR=0/純 sim 下 TripQueue 空，A.3/A.4 對空 TList 取 `Items[0]` 會拋 EListError。→ 必須在**全模式 init seed 站點**（InitialFlag/RefillSimInfeed）也入列一筆 fallback（AMR off 用 iSimAmrMaxTray[0]），或 mint 前判空→Normal。
+- **F2 CleanOut 排序**：A.5 的 `Count==0` ≠ 舊 `(iCarTrayTotal-iFeedSerial)<=0`（少了 `iCarTrayTotal>0` 排除開機、且趟間隙也 Count==0）。置於 case 9000 頂端會搶先既有 AMR feed-wait 延遲（bWaitingAmrFeed/FeedWaitTimer :1524-1537），造成趟間隙/開機提前 CleanOut。→ 源乾 CleanOut 要排在 AMR 等待計時**之後**，或 gate 在「確定無後續趟」。
+- **F3 DescribeState**：A.1 移除 `iCarTrayTotal`/`iFeedSerial`，但 `DescribeState()`(aLoader.cpp:2296-2299)讀它們且**不在 A.6 touchpoint**。→ 用 TripQueue 深度 + 隊首 iServed/iTotal 取代 scalar dump（否則編譯錯 + FeederDecision.txt 失去 hang 分析欄位）。
+- **F4 iSimInfeedCount seed**：唯一 seed `=iCarTrayTotal`(:566)被消除，三讀者(GetCarTrayCount/IsInputShortageForAmr/sim drain)未列 touchpoint。→ EnqueueTrip 時同步用 trip 總量 re-seed iSimInfeedCount，否則 sim 下 IsInputShortageForAmr 恆真、Motion View 顯 0。
+- **F6 RecycleExtraToEmpty fire-once latch**：A.5 sketch 無 latch + 無 FeedTask 前進 → Count==0+Inputend ON 每掃描重觸發 + log spam。→ 補一次性 latch，每張超盤只 recycle+log 一次。（IC 遺失風險已被使用者接受並雙重記錄，非 bug。）
+
+**設計 B（Color 讀身分盤）+ Unloader**
+- **B-1 觸發互斥（重要）**：1800(新)與 1700(既有 return)共用觸發旗標，priority 不清 sibling `bReturnTray`/`bTrayXToEmptyFinish`。identity 盤現在在 aTrayArm.cpp:940-946/855-859/1210-1213 呼叫 `RequestReturnTray()`。→ 這三處改呼叫 `RequestReadIdentityTray()`（取代，非並存），且 1800 終端清 `bReturnTray`/`bTrayXToEmptyFinish`，否則會 phantom return（供給池計數 +1，後續 MES1421）。
+- **B-2 先移位再夾**：case 1 未先 `MoveColorY(Teach.ColorTrayArmPickYPosition)` 就夾，前停位會夾空氣、盤留 rear。→ case 1 鏡像 DoGoUpTray case 2000：先移到後方 pick Y 再 Lean+Push。
+- **B-4 回送 Kind 重補**：DoGoUpTray 回送把盤推上前車設 bFrontHasTray=true 但不 birth FrontSourceTray 為 Identity；StampReadIdentity2D 只補 TrayID 不補 Kind → 回送 identity 盤可能被當 Normal 誤路由。→ 退回時重生 FrontSourceTray 為 Identity（或 StampReadIdentity2D 也補 Kind，或排除回送盤再供給）。
+
+**已上線程式碼另有真 bug（見 TODO#7/#8，非本計畫設計）**：AGV DeviceCount 恆 0（GetTotalDeviceCount 讀空的 Car 盤）、模擬器 S1F3 Tray/IC Count preset CLI 不可用。
+
+---
+
 ## 檔案（絕對路徑，皆在 `D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\`）
 `aLoader.cpp` / `aLoader.h` / `aColor.cpp` / `uteach.h` / `SecsGem\uAgvStation.cpp` / `SecsGem\uAgvStation.h` / `SecsGem\uHGemHT160.cpp` / `SecsGem\uHGemEquipment.cpp`
