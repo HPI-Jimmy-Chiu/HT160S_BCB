@@ -134,6 +134,20 @@ bool TMyTray::FullThisIC(int data)
     return true;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv-devicecount) 20260713 : total IC in this tray, any bin (pass or fail
+//alike, since routing already grouped same-kind IC onto the same Auto before arrival).
+int TMyTray::CountIC()
+{
+    int xEnd=GetTrayRealXCount();
+    int yEnd=GetTrayRealYCount();
+    int n=0;
+    for(int y=0; y<yEnd; y++)
+        for(int x=0; x<xEnd; x++)
+            if(Data[x][y]!=0)
+                n++;
+    return n;
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260601 : iBin sorting-bin grid helpers (mirror Data helpers)
 void TMyTray::ClearBin()
 {
@@ -286,6 +300,17 @@ TMyTray *TMyCar::GetIdentityTray()
 bool TMyCar::IsFull()
 {
     return (iTrayCount>=MAX_TRAY_PER_CAR);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-devicecount) 20260713 : sum every stacked tray's IC count. Called
+//while the car is still intact (before Clear()), e.g. by the AGV coordinator
+//just ahead of ClearAmrCar so the SECS report carries the real total, not 0.
+int TMyCar::GetTotalDeviceCount()
+{
+    int n=0;
+    for(int i=0; i<iTrayCount && i<MAX_TRAY_PER_CAR; i++)
+        n+=Tray[i].CountIC();
+    return n;
 }
 //---------------------------------------------------------------------------
 void TMyCar::PackForAmrUpload()

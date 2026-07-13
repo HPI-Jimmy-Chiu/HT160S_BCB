@@ -81,6 +81,7 @@ public:
     bool FullIC();
     bool HasThisIC(int data);
     bool FullThisIC(int data);
+    int  CountIC();   //AI(ht160s-agv-devicecount) 20260713 : cell count where Data!=0, ignores iBin pass/fail class
     //AI(HT160S-Maintainer) 20260601 : iBin sorting-bin grid helpers (mirror Data helpers)
     void ClearBin();
     void SetAllBin(int bin);
@@ -125,6 +126,7 @@ public:
     TMyTray *GetIdentityTray();        // first eTrayKindIdentity tray, else NULL
     bool IsFull();
     void PackForAmrUpload();           //AI(HT160S-Maintainer) 20260604 : payload TBD, stub for now
+    int  GetTotalDeviceCount();        //AI(ht160s-agv-devicecount) 20260713 : sum CountIC() over Tray[0..iTrayCount-1]
 };
 //---------------------------------------------------------------------------
 class TMyMotor

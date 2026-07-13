@@ -226,9 +226,12 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         TMyCar *Car = AutoModule->GetAutoCar(a);
         if(Car!=NULL)
         {
-            // keep the SVID snapshot live for ad-hoc S1F3 reads (DeviceCount stays 0
-            // until the per-tray IC count / AMR upload payload is designed).
+            // AI(ht160s-agv-devicecount) 20260713 : keep the SVID snapshot live for
+            // ad-hoc S1F3 reads AND for the AGVSupplement/AGVLDUnLDFinish reports
+            // (Report 6) fired below/in ServiceHandshake. GetTotalDeviceCount() sums
+            // every stacked tray's real IC count (was hardcoded 0 before).
             TrayCount[si] = Car->iTrayCount;
+            DeviceCount[si] = Car->GetTotalDeviceCount();
             CarrierID[si] = Car->CarID;
         }
 
@@ -314,9 +317,21 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         {
             if(AutoModule->IsAmrTaken(a) || AmrInject.AutoTaken(a))   //AI(ht160s-agv) 20260708 : test-mode inject (one-shot)
             {
+                //AI(ht160s-agv-devicecount) 20260713 : final snapshot BEFORE ClearAmrCar
+                //wipes the car, so the Report 6 SVIDs on THIS S6F11 carry the real closing
+                //tray/IC count instead of the post-clear 0 (mirrors the HT9045 AutoUP
+                //discipline of populate-then-send-then-reset, e.g. asendic_Auto.cpp:1642-1646).
+                TMyCar *FinishCar = AutoModule->GetAutoCar(a);
+                if(FinishCar!=NULL)
+                {
+                    TrayCount[si]   = FinishCar->iTrayCount;
+                    DeviceCount[si] = FinishCar->GetTotalDeviceCount();
+                }
                 FinishBitmap = BuildBitmap(AgvStation[si].PIndex);
                 Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish
                 AutoModule->ClearAmrCar(a);
+                TrayCount[si]   = 0;        //AI(ht160s-agv-devicecount) : car is now empty, keep the SVID snapshot honest
+                DeviceCount[si] = 0;
                 Handshake[si] = AGV_IDLE;
             }
         }

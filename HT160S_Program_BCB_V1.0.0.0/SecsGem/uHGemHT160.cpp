@@ -252,13 +252,17 @@ void HT160Gem::AddCEID()
     // NOT report 1, so the host receives the P-bitmap / carrier id, not the 13
     // machine-status SVs that every other CEID carries. Report content is defined
     // in AddReprot() (runs after AddCEID; EventReport resolves report->SV at send).
-    unsigned rptSup[1]; rptSup[0] = 2;
+    //AI(ht160s-agv-devicecount) 20260713 : 272 (call) and 274 (finish) additionally
+    // carry report 6 (all-station Tray/Device Count, see AddReprot) so the host gets
+    // the real closing tray+IC numbers on the SAME S6F11 as the bitmap, no follow-up
+    // S1F3 needed. 273 (Ready) stays bitmap-only : nothing has been counted yet.
+    unsigned rptSup[2]; rptSup[0] = 2; rptSup[1] = 6;
     unsigned rptSta[1]; rptSta[0] = 3;
-    unsigned rptFin[1]; rptFin[0] = 4;
+    unsigned rptFin[2]; rptFin[0] = 4; rptFin[1] = 6;
     unsigned rptCid[1]; rptCid[0] = 5;
-    HGemPtr->SetCEIDContent(272, "AGVSupplement",   1, rptSup, EquDefault);
+    HGemPtr->SetCEIDContent(272, "AGVSupplement",   2, rptSup, EquDefault);
     HGemPtr->SetCEIDContent(273, "AGVLDUnLDStatus", 1, rptSta, EquDefault);
-    HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 1, rptFin, EquDefault);
+    HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 2, rptFin, EquDefault);
     HGemPtr->SetCEIDContent(275, "AGVLdID",         1, rptCid, EquDefault);
 
     //AI(ht160s-secsgem) 20260625 : two-stage Auto Full pre-notification. Register the
@@ -310,6 +314,17 @@ void HT160Gem::AddReprot()
     for(int ci = 0; ci < AGV_STATION_COUNT; ci++)
         rCid[ci] = AgvStation[ci].SvidCarrierID;
     HGemPtr->SetReportIDContent(5, AGV_STATION_COUNT, rCid, EquDefault);
+
+    //AI(ht160s-agv-devicecount) 20260713 : report 6 = all nine stations' Tray Count
+    // then all nine Device Count SVIDs (same fixed P1-P9 order as report 5's carrier
+    // ids), attached to CEID272/274 (AddCEID) so the host reads the real per-station
+    // tray+IC numbers off the same S6F11 as the bitmap.
+    unsigned rCnt[AGV_STATION_COUNT * 2];
+    for(int ni = 0; ni < AGV_STATION_COUNT; ni++)
+        rCnt[ni] = AgvStation[ni].SvidTrayCount;
+    for(int ni = 0; ni < AGV_STATION_COUNT; ni++)
+        rCnt[AGV_STATION_COUNT + ni] = AgvStation[ni].SvidDeviceCnt;
+    HGemPtr->SetReportIDContent(6, AGV_STATION_COUNT * 2, rCnt, EquDefault);
 
     HGemPtr->SaveEventReportData();
 }
