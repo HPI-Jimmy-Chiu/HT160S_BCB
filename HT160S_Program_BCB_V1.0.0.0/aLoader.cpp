@@ -1350,6 +1350,24 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 State->FeedTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                 return true;
             }
+            //AI(ht160s-home-resume-lk1) 20260713 : orphan-tray self-collect on resume. A
+            //HOME taken between the destack landing (case 8300 clamps the tray on the
+            //carriage) and the identity mint (case 9500) leaves a tray PHYSICALLY on the
+            //carriage while fHasTray was reset false by InitialFlag. uHome's fHasTray-keyed
+            //removal hint cannot see it, and the destack path below (case 100 -> 4000) would
+            //drop a SECOND tray onto it (clamps/cuts it + scatters IC). Route straight to the
+            //confirm-then-mint case 9500 instead, reusing the CleanOut case-9000 self-collect
+            //predicate. REAL + Enable gate only : sim/DUMMY InType=0 phantom-present would
+            //mint ghost trays forever. On-machine verify : SnLoader_InputHasTray must read
+            //the carriage tray at this HOME-Y (the case-9000 mirror proves the read at
+            //feed-Y). A false miss is no worse than today (falls through to destack); a false
+            //hit routes to 9500 = JAM0913 safe stop, never a collision.
+            if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
+               HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+            {
+                State->FeedTask=9500;
+                break;
+            }
             State->FeedTask=100;
             break;
 
