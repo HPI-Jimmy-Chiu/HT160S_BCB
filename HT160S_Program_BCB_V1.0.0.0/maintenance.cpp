@@ -1100,9 +1100,6 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         cbCommType->Checked=GeneralSetting.bBinDispUseMyComm;
     if(chkSuck2QuadVacuum!=NULL)
         chkSuck2QuadVacuum->Checked=GeneralSetting.bSuck2QuadVacuum;
-    //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired - GeneralSetting.bUseTrayDatumModel
-    //was removed (replaced by ini-only iSortArmXDatumBias/iSortArmYDatumBias). Remove the dead checkbox
-    //from the maintenance form when finishing the datum-bias refactor.
     //AI(ht160s-lotpassfail) 20260709 : 3-way sort-mode selector. ItemIndex maps 1:1 to
     //GeneralSetting.iSortMode (0=Normal,1=LotBin,2=LotPassFail). This runs inside the
     //bLoadingHardwareSettings window so setting ItemIndex will NOT fire the restart prompt.
@@ -1178,7 +1175,6 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         GeneralSetting.bBinDispUseMyComm=cbCommType->Checked;
     if(chkSuck2QuadVacuum!=NULL)
         GeneralSetting.bSuck2QuadVacuum=chkSuck2QuadVacuum->Checked;
-    //AI(ht160s-ccd-teach-test) 20260628 : chkUseTrayDatumModel unwired (bUseTrayDatumModel removed).
     if(rgSortMode!=NULL)
     {
         int idx=rgSortMode->ItemIndex;   //AI(ht160s-lotpassfail) 20260709 : -1 (unselected) -> Normal

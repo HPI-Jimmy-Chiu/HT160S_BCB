@@ -2033,14 +2033,6 @@ object fMaintenance: TfMaintenance
                   Caption = 'CommType'
                   TabOrder = 1
                 end
-                object chkUseTrayDatumModel: TCheckBox
-                  Left = 470
-                  Top = 8
-                  Width = 250
-                  Height = 17
-                  Caption = 'Tray Datum (XStart/YStart)'
-                  TabOrder = 2
-                end
               end
               object pnlSuck2QuadBox: TPanel
                 Left = 0

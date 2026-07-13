@@ -290,7 +290,6 @@ __published:
     TPanel *pnlSortModeBox;
     TLabel *lblLotBinModeHint;
     TRadioGroup *rgSortMode;
-    TCheckBox *chkUseTrayDatumModel;
     TCheckBox *cbCommType;
     TPanel *pnlSuck2QuadBox;
     TLabel *lblSuck2QuadHint;

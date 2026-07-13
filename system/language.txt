@@ -423,7 +423,6 @@ fMaintenance	chkSuckEnable4	Nozzle4	吸嘴4
 fMaintenance	tsOption	Option	選項
 fMaintenance	lblBinPanelType	Bin Display Panel	Bin顯示面板
 fMaintenance	cbCommType	CommType	通訊類型
-fMaintenance	chkUseTrayDatumModel	Tray Datum (XStart/YStart)	料盤基準(XStart/YStart)
 fMaintenance	chkSuck2QuadVacuum	Suck2 = 4 Vacuum Generators	Suck2=4組真空產生器
 fMaintenance	lblSuck2QuadHint	Suck2 quad-vacuum : all 4 vacuum generator circuits feed the Suck2 nozzle (Nozzle2 only). Any sensor mismatch alarms. Restart required.	Suck2四真空產生器：4組真空迴路全接Suck2吸嘴(僅吸嘴2)。任一感測不符即警報。變更後需重新啟動。
 fMaintenance	tsLotInfo	Lot Info	Lot資訊
