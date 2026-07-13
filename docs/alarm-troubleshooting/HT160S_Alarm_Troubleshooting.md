@@ -1,248 +1,189 @@
-# HT160S 警報 / 警示 檢修對應手冊
-> 版本日期：2026-07-13 ｜ 來源：機台的 `system/AlarmList.csv` + `system/IO_Table.csv` 與實機行為
-> 涵蓋：**576** 則 — 汽缸 55×6=330、馬達 20×9=180、真空 1×6=6、流程字串碼 60
+# HT160S 警報 / 警示 現場排除手冊（操作員版）
+> 版本日期：2026-07-13 ｜ 對象：現場操作員（OP）初步排除用
 
-本手冊每一則警報都以「**應該狀態（健康）→ 目前狀態（故障）**」對照呈現，並指出要在哪個畫面（IOsetview / MotionView / State Record）查哪個 IO、汽缸、馬達或真空點。
-
----
+本手冊供【現場操作員（OP）】初步排除 HT160S 設備警報使用。看到警報時，先記下畫面上的【代碼】與【訊息】，依本手冊找到對應項目，對照「裝置**應該狀態** vs **目前狀態**」做初步排除；若無法排除，再把代碼、訊息與你檢查到的狀態回報工程師。
 
 ## 目錄
-1. [如何使用本手冊](#一如何使用本手冊)
-2. [警報分類與編碼](#二警報分類與編碼)
-3. [汽缸類 4xxxx](#三汽缸類-4xxxx)
-4. [馬達／伺服類 5xxxx](#四馬達伺服類-5xxxx)
-5. [真空吸嘴類 6xxxx](#五真空吸嘴類-6xxxx)
-6. [系統流程類 JAM／MES／WAR](#六系統流程類-jammeswar)
-7. [附錄：快速查碼與位址說明](#七附錄快速查碼與位址說明)
+1. [看到警報怎麼辦（含代碼快速定位）](#一看到警報怎麼辦)
+2. [汽缸類 4xxxx](#二汽缸類-4xxxx)
+3. [馬達／伺服類 5xxxx](#三馬達伺服類-5xxxx)
+4. [真空吸嘴類 6xxxx](#四真空吸嘴類-6xxxx)
+5. [系統流程類 JAM／MES／WAR](#五系統流程類-jammeswar)
+6. [附錄：IO 判讀小提醒](#六附錄io-判讀小提醒)
 
 ---
 
-## 一、如何使用本手冊
-本手冊將 HT160S 全機 576 個警報 (alarm) 與警示 (warning) 對應到「檢修判讀」：每一則警報的本質都是**某個裝置沒有達到機台預期的狀態**。因此每一節都以「**應該是什麼狀態 (健康) vs. 目前是什麼狀態 (故障)**」呈現，讓操作員與維修人員能快速鎖定要查看的 IO、汽缸、馬達或真空點。
+## 一、看到警報怎麼辦
+### 1.1 排除流程
+1. 記下畫面上的【警報代碼】與【訊息】。
+2. 用下方【代碼快速定位】找出它屬於哪一類、要看本手冊哪一章。
+3. 對照該項目的【裝置狀態表】，逐一檢查表中裝置「目前狀態」是否和「應該狀態」一致，不一致的就是嫌疑點。
+4. 依【初步排除】欄位處理（清盤、補料、確認氣壓、重試等）。
+5. 仍無法排除 → 依【通報工程師】欄位，把代碼、訊息與檢查到的裝置狀態告訴工程師。
 
-### 1.1 警報的三個通道
-發生警報時，同一則訊息會走三個通道，可從不同地方查到：
-
-| 通道 | 內容 | 在哪裡看 |
+### 1.2 代碼快速定位
+| 看到的代碼 | 屬於 | 看哪一章 |
 |---|---|---|
-| **Code → SECS ALID** | 警報代碼 (如 `40203` / `JAM1030`)，對應 SECS 主機的 alarm 表 | 主機端 / EventLog |
-| **Message → 畫面 + EventLog + SECS ALTX** | 一行文字訊息 (可能帶 `[IO=感測器名]`) | 螢幕紅字、EventLog |
-| **Detail → Note 備註** | 詳細說明 (含觸發 IO 全文與驅動流程軌跡) | 警報彈窗 (Note) 的備註欄 |
+| `4` 開頭 5 位數（如 `40203`） | 汽缸到位 | 二、汽缸類；末碼 **3=伸出沒到位、0=縮回沒到位** |
+| `5` 開頭 5 位數（如 `50013`） | 馬達／伺服 | 三、馬達類（末碼查錯誤別、代碼查是哪顆馬達） |
+| `6000` 開頭（如 `60002`） | 真空吸嘴 | 四、真空吸嘴類 |
+| `JAM…` / `MES…` / `WAR…`（如 `JAM1030`） | 盤流／供料／讀碼／計數 | 五、系統流程類 |
 
-汽缸／馬達的排隊式警報，在**發生當下**會於 EventLog 寫入一行軌跡紀錄，載明「是哪個裝置、由哪個動作、在流程的哪一步」在驅動該裝置。這行紀錄是事後追查原因的關鍵。
 
-### 1.2 三個現場查看工具
-本手冊指向三個現場查看工具：
-
-- **IOsetview (IO 監看畫面)** — 查 sensor / switch / 汽缸到位訊號的即時 ON/OFF。以 **Alias (名稱)** 搜尋 (例如 `SnLoader_InputHasTray`、`C_Empty_PushTray_On`)。
-  - ⚠️ 綁定成功的點永遠不會變紅；「綠/灰但永遠不變」代表該節點的 MotionNet 讀取失敗 (位址／環號設定問題)，並非顯示問題。
-- **MotionView (馬達畫面)** — 查馬達命令位置、編碼器位置、軟／硬體極限、伺服狀態。馬達以 `[M01] MSortingArmX` 之類的編號+別名標示。
-- **State Record / EventLog** — 查邏輯狀態、盤流計數、以及警報前的動作軌跡。純邏輯類 (如盤數不符) 無單一 IO，需在此查對應的計數／旗標。
+### 1.3 兩個查看畫面
+- **IOsetview（IO 監看畫面）**：看感測器、汽缸到位訊號目前是亮（ON）還是不亮（OFF）。一律用**名稱**搜尋（例 `SnColor_InputHasTray`、`C_Color_FrontRiseTray_1`）。
+- **MotionView（馬達畫面）**：看馬達目前位置、是否壓到極限、伺服是否有警報。
 
 ---
 
-## 二、警報分類與編碼
-警報代碼分四大族：
+## 二、汽缸類 4xxxx
+### 2.1 汽缸警報是什麼意思
+汽缸由電磁閥推動**伸出**或**縮回**，兩端各可裝一個**到位感測器**確認是否到定位。系統下令動作後，若在時限內沒收到到位訊號，就發此警報：
 
-| 代碼族 | 範圍 | 類型 | 產生方式 |
-|---|---|---|---|
-| **汽缸 Cylinder** | `4xxxx` | 到位逾時 | `4` + 三碼汽缸序號 + 一碼錯誤別 (共 55 汽缸 × 6 = 330) |
-| **馬達 Motor** | `5xxxx` | 伺服／極限 | `5` + 三碼馬達序號 + 一碼錯誤別 (共 20 馬達 × 9 = 180) |
-| **真空 Sucker** | `6xxxx` | 真空／掉件 | `6` + 三碼吸嘴組序號 + 一碼錯誤別 (1 組 × 6 = 6) |
-| **流程 JAM/MES/WAR** | 字串碼 | 盤流／視覺／計數 | 對齊 HT9045 客戶既有代碼，機台內以字串登錄 (60 筆) |
+- 代碼**末碼 3** = **伸出**沒到位（例 `40203`）。
+- 代碼**末碼 0** = **縮回**沒到位（例 `40200`）。
 
-編碼規則：代碼由「族別 (1 碼) + 裝置序號 (3 碼) + 錯誤別 (1 碼)」串成一組數字。例：`40203` = 汽缸族(4)、序號 020、錯誤別 3 → 第 20 號汽缸 `C_Auto1_PushTray` 的「伸出無法到位」。
+注意：若某方向的到位感測器**停用／未安裝**，該方向只靠時間判斷、不會發到位警報，在畫面上找不到該感測器是正常的（見對照表「說明」欄）。
 
----
+### 2.2 汽缸警報排除順序
+看到汽缸警報時，依序檢查：
 
-## 三、汽缸類 4xxxx
-### 3.1 動作與警報機制
-每個汽缸都有三個要素：一個**輸出線圈**（電磁閥），一個**伸出到位 sensor**（別名 = 汽缸名 + `_On`），一個**縮回到位 sensor**（別名 = 汽缸名 + `_Off`）。
+1. **氣壓**：總氣壓是否足夠（可看 `SnAirIsEnough` 是否亮）？該區氣壓／流量是否正常？
+2. **氣管／電磁閥**：電磁閥動作時有沒有聲音？氣管有沒有脫落、折到、漏氣？
+3. **機構卡住**：有沒有盤子、IC 或異物卡住汽缸行程？
+4. **到位感測器**：用「汽缸對照表」找到該汽缸的到位感測器名稱，在 IOsetview 手動推到定位時看它會不會亮？位置／感應距離是否跑掉？
+5. **配線**：感測器接頭是否鬆脫。
 
-- **伸出動作**：線圈通電（ON）→ 等伸出到位 sensor 變 ON；若在伸出逾時（預設 5000ms）內仍未到位 → 發**伸出逾時碼 `…3`「can not on」**。
-- **縮回動作**：線圈斷電（OFF）→ 等縮回到位 sensor 變 ON；若在縮回逾時內仍未到位 → 發**縮回逾時碼 `…0`「can not off」**。
-- 若某 sensor 在 IO_Table 內**停用（Enable=0）**，該行程會直接視為到位、**不做確認也不發到位警報**。因此請先確認該 sensor 是否啟用，再判斷警報。
+以上都排除不了 → 記下**汽缸名稱**與**代碼**，通報工程師。
 
-**只有 `…0`（縮回逾時）與 `…3`（伸出逾時）兩碼由現行伸出／縮回流程觸發**；同一汽缸另外 4 碼（`…1/…2/…4/…5`）已登錄於代碼表但現行流程不觸發（保留）。
-
-### 3.2 六種錯誤子類（`4`＋序號＋錯誤別）
-| 錯誤別 | 行程 | 訊息 | 現行觸發？ | 應該狀態 | 目前狀態(故障) |
-|---|---|---|---|---|---|
-| `…0` | 縮回 | `can not off error` | 是（縮回逾時） | 縮回到位 sensor(_Off) = ON、輸出線圈 = OFF | 縮回到位 sensor(_Off) 仍 = OFF（逾時內未確認） |
-| `…3` | 伸出 | `can not on error` | 是（伸出逾時） | 伸出到位 sensor(_On) = ON、輸出線圈 = ON | 伸出到位 sensor(_On) 仍 = OFF（逾時內未確認） |
-| `…1` | 縮回 | `can not on error` | 否（保留，現行流程不觸發） | — | — |
-| `…2` | 縮回 | `off sensor is on error` | 否（保留） | 同時只應有一個到位 sensor 為 ON | 縮回 sensor 與伸出 sensor 同時 ON（機構不可能）= sensor 卡死/短路/接錯 |
-| `…4` | 伸出 | `can not off error` | 否（保留） | — | — |
-| `…5` | 伸出 | `on sensor is on error` | 否（保留） | 同時只應有一個到位 sensor 為 ON | 伸出 sensor 與縮回 sensor 同時 ON = sensor 卡死/短路/接錯 |
-
-### 3.3 檢修順序
-**伸出無法到位（`…3` can not on）／縮回無法到位（`…0` can not off）檢修順序**：
-
-1. **氣壓** — 總氣壓是否足夠（`SnAirIsEnough` 是否 ON）？該汽缸分歧氣壓/流量閥是否正常？
-2. **氣管/電磁閥** — 線圈是否有作動聲/得電（IOsetview 看該汽缸輸出）？氣管是否脫落、折到、漏氣？電磁閥是否卡住？
-3. **機構** — 是否被盤/IC/異物卡住？滑軌、連桿是否卡死？行程是否被干涉？
-4. **到位 sensor** — 對照本手冊該汽缸的 sensor 位址，在 IOsetview 手動推到位看 sensor 是否會 ON？感測距離/位置是否跑掉？
-5. **配線** — sensor→控制卡的配線、接頭是否鬆脫；InType（常開/常閉）是否與實際相符。
-
-### 3.4 各子系統到位確認概況
-| 子系統 | 汽缸數 | 伸出到位確認 | 縮回到位確認 |
-|---|---|---|---|
-| TrayArm 送盤手臂 | 4 | 4/4 | 0/4 |
-| Empty 空盤供給 | 7 | 5/7 | 4/7 |
-| Loader 進料 | 8 | 7/8 | 6/8 |
-| Color 色帶/覆蓋盤供給 | 6 | 4/6 | 3/6 |
-| Auto1 出料站 | 5 | 4/5 | 4/5 |
-| Auto2 出料站 | 5 | 4/5 | 4/5 |
-| Auto3 出料站 | 5 | 4/5 | 4/5 |
-| Auto4 出料站 | 5 | 4/5 | 4/5 |
-| Auto5 出料站 | 5 | 4/5 | 4/5 |
-| Auto6 出料站 | 5 | 4/5 | 4/5 |
-
-> 「伸出／縮回到位確認」= 該 sensor 有配線且啟用，能真正發到位逾時警報。未列入者靠逾時但無 sensor 確認。
-
-本機組態下，以下汽缸**輸出線圈為停用（未安裝/未使用）**，其警報不會出現，若出現代表組態被更動：
-
-- `C_Auto1_FrontSeparateTray_1`
-- `C_Auto2_FrontSeparateTray_1`
-- `C_Auto3_FrontSeparateTray_1`
-- `C_Auto4_FrontSeparateTray_1`
-- `C_Auto5_FrontSeparateTray_1`
-- `C_Auto6_FrontSeparateTray_1`
-- `C_Color_RearRiseTray`
-
-### 3.5 全汽缸參考表
-> 欄位：伸出碼(`…3`)／縮回碼(`…0`)、輸出線圈 IO、伸出到位 sensor、縮回到位 sensor。位址格式 `L環號/IP/P埠/b位元`；以 IOsetview 用 **Alias 名稱**搜尋最準。逾時為 On/Off AlarmTime(ms)。
+### 2.3 汽缸對照表（代碼 → 汽缸 → 要檢查的到位感測器）
 
 #### TrayArm 送盤手臂
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_TrayArmZ_Up` | 40003 | 40000 | L0/IP0/P2/b5 (啟用) | `C_TrayArmZ_Up_On` L0/IP0/P1/b5 常閉(NC) (啟用) | `C_TrayArmZ_Up_Off` 未配線 — (停用) | 5000 |
-| `C_TrayArmZ_Down` | 40013 | 40010 | L0/IP0/P2/b4 (啟用) | `C_TrayArmZ_Down_On` L0/IP0/P1/b4 常閉(NC) (啟用) | `C_TrayArmZ_Down_Off` 未配線 — (停用) | 5000 |
-| `C_TrayArm_FrontClamp` | 40023 | 40020 | L0/IP0/P2/b6 (啟用) | `C_TrayArm_FrontClamp_On` L0/IP0/P1/b6 常閉(NC) (啟用) | `C_TrayArm_FrontClamp_Off` 未配線 — (停用) | 5000 |
-| `C_TrayArm_RearClamp` | 40033 | 40030 | L0/IP0/P2/b7 (啟用) | `C_TrayArm_RearClamp_On` L0/IP0/P1/b7 常閉(NC) (啟用) | `C_TrayArm_RearClamp_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_TrayArmZ_Up` | 40003 | 40000 | `C_TrayArmZ_Up_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_TrayArmZ_Down` | 40013 | 40010 | `C_TrayArmZ_Down_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_TrayArm_FrontClamp` | 40023 | 40020 | `C_TrayArm_FrontClamp_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_TrayArm_RearClamp` | 40033 | 40030 | `C_TrayArm_RearClamp_On` | （無此感測器） | 無縮回到位感測器 |
+
 
 #### Empty 空盤供給
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Empty_FrontRiseTray_1` | 40043 | 40040 | L0/IP8/P0/b0 (啟用) | `C_Empty_FrontRiseTray_1_On` L0/IP2/P0/b0 常閉(NC) (啟用) | `C_Empty_FrontRiseTray_1_Off` L0/IP1/P0/b1 常閉(NC) (啟用) | 5000 |
-| `C_Empty_FrontRiseTray_2` | 40053 | 40050 | L0/IP8/P3/b6 (啟用) | `C_Empty_FrontRiseTray_2_On` L0/IP1/P0/b0 常閉(NC) (啟用) | `C_Empty_FrontRiseTray_2_Off` 未配線 — (停用) | 5000 |
-| `C_Empty_PushTray` | 40063 | 40060 | L0/IP8/P0/b1 (啟用) | `C_Empty_PushTray_On` L0/IP1/P0/b3 常閉(NC) (啟用) | `C_Empty_PushTray_Off` L0/IP1/P0/b2 常閉(NC) (啟用) | 5000 |
-| `C_Empty_LeanOnTray` | 40073 | 40070 | L0/IP8/P0/b2 (啟用) | `C_Empty_LeanOnTray_On` L0/IP1/P1/b0 常閉(NC) (啟用) | `C_Empty_LeanOnTray_Off` L0/IP1/P1/b1 常閉(NC) (啟用) | 5000 |
-| `C_Empty_FrontSeparateTray_1` | 40083 | 40080 | L0/IP8/P0/b3 (啟用) | `C_Empty_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Empty_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
-| `C_Empty_RearRiseTray` | 40093 | 40090 | L0/IP8/P0/b7 (啟用) | `C_Empty_RearRiseTray_On` L0/IP1/P1/b4 常閉(NC) (啟用) | `C_Empty_RearRiseTray_Off` L0/IP1/P1/b5 常閉(NC) (啟用) | 5000 |
-| `C_Empty_RearSeparateTray_1` | 40103 | 40100 | L0/IP8/P1/b0 (啟用) | `C_Empty_RearSeparateTray_1_On` 未配線 — (停用) | `C_Empty_RearSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Empty_FrontRiseTray_1` | 40043 | 40040 | `C_Empty_FrontRiseTray_1_On` | `C_Empty_FrontRiseTray_1_Off` | — |
+| `C_Empty_FrontRiseTray_2` | 40053 | 40050 | `C_Empty_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_Empty_PushTray` | 40063 | 40060 | `C_Empty_PushTray_On` | `C_Empty_PushTray_Off` | — |
+| `C_Empty_LeanOnTray` | 40073 | 40070 | `C_Empty_LeanOnTray_On` | `C_Empty_LeanOnTray_Off` | — |
+| `C_Empty_FrontSeparateTray_1` | 40083 | 40080 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
+| `C_Empty_RearRiseTray` | 40093 | 40090 | `C_Empty_RearRiseTray_On` | `C_Empty_RearRiseTray_Off` | — |
+| `C_Empty_RearSeparateTray_1` | 40103 | 40100 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
+
 
 #### Loader 進料
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Loader_FrontRiseTray_1` | 40113 | 40110 | L0/IP8/P1/b4 (啟用) | `C_Loader_FrontRiseTray_1_On` L0/IP2/P0/b1 常閉(NC) (啟用) | `C_Loader_FrontRiseTray_1_Off` L0/IP1/P1/b7 常閉(NC) (啟用) | 5000 |
-| `C_Loader_FrontRiseTray_2` | 40123 | 40120 | L0/IP8/P3/b7 (啟用) | `C_Loader_FrontRiseTray_2_On` L0/IP1/P1/b6 常閉(NC) (啟用) | `C_Loader_FrontRiseTray_2_Off` 未配線 — (停用) | 5000 |
-| `C_Loader1_PushTray` | 40133 | 40130 | L0/IP8/P1/b5 (啟用) | `C_Loader1_PushTray_On` L0/IP1/P2/b1 常閉(NC) (啟用) | `C_Loader1_PushTray_Off` L0/IP1/P2/b0 常閉(NC) (啟用) | 5000 |
-| `C_Loader2_PushTray` | 40143 | 40140 | L0/IP8/P1/b6 (啟用) | `C_Loader2_PushTray_On` L0/IP1/P2/b3 常閉(NC) (啟用) | `C_Loader2_PushTray_Off` L0/IP1/P2/b2 常閉(NC) (啟用) | 5000 |
-| `C_Loader1_LeanOnTray` | 40153 | 40150 | L0/IP8/P1/b7 (啟用) | `C_Loader1_LeanOnTray_On` L0/IP1/P3/b0 常閉(NC) (啟用) | `C_Loader1_LeanOnTray_Off` L0/IP1/P3/b1 常閉(NC) (啟用) | 5000 |
-| `C_Loader2_LeanOnTray` | 40163 | 40160 | L0/IP8/P2/b0 (啟用) | `C_Loader2_LeanOnTray_On` L0/IP1/P3/b2 常閉(NC) (啟用) | `C_Loader2_LeanOnTray_Off` L0/IP1/P3/b3 常閉(NC) (啟用) | 5000 |
-| `C_Loader_FrontSeparateTray_1` | 40173 | 40170 | L0/IP8/P2/b1 (啟用) | `C_Loader_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Loader_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
-| `C_Loader_RearRiseTray` | 40183 | 40180 | L0/IP8/P2/b5 (啟用) | `C_Loader_RearRiseTray_On` L0/IP1/P3/b6 常閉(NC) (啟用) | `C_Loader_RearRiseTray_Off` L0/IP1/P3/b7 常閉(NC) (啟用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Loader_FrontRiseTray_1` | 40113 | 40110 | `C_Loader_FrontRiseTray_1_On` | `C_Loader_FrontRiseTray_1_Off` | — |
+| `C_Loader_FrontRiseTray_2` | 40123 | 40120 | `C_Loader_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_Loader1_PushTray` | 40133 | 40130 | `C_Loader1_PushTray_On` | `C_Loader1_PushTray_Off` | — |
+| `C_Loader2_PushTray` | 40143 | 40140 | `C_Loader2_PushTray_On` | `C_Loader2_PushTray_Off` | — |
+| `C_Loader1_LeanOnTray` | 40153 | 40150 | `C_Loader1_LeanOnTray_On` | `C_Loader1_LeanOnTray_Off` | — |
+| `C_Loader2_LeanOnTray` | 40163 | 40160 | `C_Loader2_LeanOnTray_On` | `C_Loader2_LeanOnTray_Off` | — |
+| `C_Loader_FrontSeparateTray_1` | 40173 | 40170 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
+| `C_Loader_RearRiseTray` | 40183 | 40180 | `C_Loader_RearRiseTray_On` | `C_Loader_RearRiseTray_Off` | — |
 
-#### Color 色帶/覆蓋盤供給
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Color_FrontRiseTray_1` | 40493 | 40490 | L0/IPW/P0/b7 (啟用) | `C_Color_FrontRiseTray_1_On` L0/IP6/P2/b5 常閉(NC) (啟用) | `C_Color_FrontRiseTray_1_Off` L0/IP6/P1/b3 常閉(NC) (啟用) | 5000 |
-| `C_Color_FrontRiseTray_2` | 40503 | 40500 | L0/IPW/P1/b0 (啟用) | `C_Color_FrontRiseTray_2_On` L0/IP6/P1/b2 常閉(NC) (啟用) | `C_Color_FrontRiseTray_2_Off` 未配線 — (停用) | 5000 |
-| `C_Color_PushTray` | 40513 | 40510 | L0/IPW/P1/b1 (啟用) | `C_Color_PushTray_On` L0/IP6/P1/b5 常閉(NC) (啟用) | `C_Color_PushTray_Off` L0/IP6/P1/b4 常閉(NC) (啟用) | 5000 |
-| `C_Color_LeanOnTray` | 40523 | 40520 | L0/IPW/P1/b2 (啟用) | `C_Color_LeanOnTray_On` L0/IP6/P2/b1 常閉(NC) (啟用) | `C_Color_LeanOnTray_Off` L0/IP6/P2/b2 常閉(NC) (啟用) | 5000 |
-| `C_Color_RearRiseTray` | 40533 | 40530 | 未配線 (停用) | `C_Color_RearRiseTray_On` 未配線 — (停用) | `C_Color_RearRiseTray_Off` 未配線 — (停用) | 5000 |
-| `C_Color_FrontSeparateTray_1` | 40543 | 40540 | L0/IPW/P1/b3 (啟用) | `C_Color_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Color_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+
+#### Color 覆蓋盤/色帶供給
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Color_FrontRiseTray_1` | 40493 | 40490 | `C_Color_FrontRiseTray_1_On` | `C_Color_FrontRiseTray_1_Off` | — |
+| `C_Color_FrontRiseTray_2` | 40503 | 40500 | `C_Color_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_Color_PushTray` | 40513 | 40510 | `C_Color_PushTray_On` | `C_Color_PushTray_Off` | — |
+| `C_Color_LeanOnTray` | 40523 | 40520 | `C_Color_LeanOnTray_On` | `C_Color_LeanOnTray_Off` | — |
+| `C_Color_RearRiseTray` | 40533 | 40530 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Color_FrontSeparateTray_1` | 40543 | 40540 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
+
 
 #### Auto1 出料站
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Auto1_FrontRiseTray` | 40193 | 40190 | L0/IP8/P2/b6 (啟用) | `C_Auto1_FrontRiseTray_On` L0/IP3/P0/b0 常閉(NC) (啟用) | `C_Auto1_FrontRiseTray_Off` L0/IP3/P0/b1 常閉(NC) (啟用) | 5000 |
-| `C_Auto1_PushTray` | 40203 | 40200 | L0/IP8/P2/b7 (啟用) | `C_Auto1_PushTray_On` L0/IP3/P0/b3 常閉(NC) (啟用) | `C_Auto1_PushTray_Off` L0/IP3/P0/b2 常閉(NC) (啟用) | 5000 |
-| `C_Auto1_LeanOnTray` | 40213 | 40210 | L0/IP8/P3/b0 (啟用) | `C_Auto1_LeanOnTray_On` L0/IP3/P1/b0 常閉(NC) (啟用) | `C_Auto1_LeanOnTray_Off` L0/IP3/P1/b1 常閉(NC) (啟用) | 5000 |
-| `C_Auto1_RearRiseTray` | 40223 | 40220 | L0/IP8/P3/b1 (啟用) | `C_Auto1_RearRiseTray_On` L0/IP3/P1/b4 常閉(NC) (啟用) | `C_Auto1_RearRiseTray_Off` L0/IP3/P1/b5 常閉(NC) (啟用) | 5000 |
-| `C_Auto1_FrontSeparateTray_1` | 40233 | 40230 | L0/IP8/P3/b2 (停用) | `C_Auto1_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto1_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Auto1_FrontRiseTray` | 40193 | 40190 | `C_Auto1_FrontRiseTray_On` | `C_Auto1_FrontRiseTray_Off` | — |
+| `C_Auto1_PushTray` | 40203 | 40200 | `C_Auto1_PushTray_On` | `C_Auto1_PushTray_Off` | — |
+| `C_Auto1_LeanOnTray` | 40213 | 40210 | `C_Auto1_LeanOnTray_On` | `C_Auto1_LeanOnTray_Off` | — |
+| `C_Auto1_RearRiseTray` | 40223 | 40220 | `C_Auto1_RearRiseTray_On` | `C_Auto1_RearRiseTray_Off` | — |
+| `C_Auto1_FrontSeparateTray_1` | 40233 | 40230 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+
 
 #### Auto2 出料站
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Auto2_FrontRiseTray` | 40243 | 40240 | L0/IP8/P2/b5 (啟用) | `C_Auto2_FrontRiseTray_On` L0/IP3/P1/b6 常閉(NC) (啟用) | `C_Auto2_FrontRiseTray_Off` L0/IP3/P1/b7 常閉(NC) (啟用) | 5000 |
-| `C_Auto2_PushTray` | 40253 | 40250 | L0/IP8/P3/b1 (啟用) | `C_Auto2_PushTray_On` L0/IP3/P2/b1 常閉(NC) (啟用) | `C_Auto2_PushTray_Off` L0/IP3/P2/b0 常閉(NC) (啟用) | 5000 |
-| `C_Auto2_LeanOnTray` | 40263 | 40260 | L0/IP8/P3/b2 (啟用) | `C_Auto2_LeanOnTray_On` L0/IP3/P2/b6 常閉(NC) (啟用) | `C_Auto2_LeanOnTray_Off` L0/IP3/P2/b7 常閉(NC) (啟用) | 5000 |
-| `C_Auto2_RearRiseTray` | 40273 | 40270 | L0/IP9/P0/b3 (啟用) | `C_Auto2_RearRiseTray_On` L0/IP3/P3/b2 常閉(NC) (啟用) | `C_Auto2_RearRiseTray_Off` L0/IP3/P3/b3 常閉(NC) (啟用) | 5000 |
-| `C_Auto2_FrontSeparateTray_1` | 40283 | 40280 | L0/IP9/P0/b4 (停用) | `C_Auto2_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto2_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Auto2_FrontRiseTray` | 40243 | 40240 | `C_Auto2_FrontRiseTray_On` | `C_Auto2_FrontRiseTray_Off` | — |
+| `C_Auto2_PushTray` | 40253 | 40250 | `C_Auto2_PushTray_On` | `C_Auto2_PushTray_Off` | — |
+| `C_Auto2_LeanOnTray` | 40263 | 40260 | `C_Auto2_LeanOnTray_On` | `C_Auto2_LeanOnTray_Off` | — |
+| `C_Auto2_RearRiseTray` | 40273 | 40270 | `C_Auto2_RearRiseTray_On` | `C_Auto2_RearRiseTray_Off` | — |
+| `C_Auto2_FrontSeparateTray_1` | 40283 | 40280 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+
 
 #### Auto3 出料站
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Auto3_FrontRiseTray` | 40293 | 40290 | L0/IP9/P1/b0 (啟用) | `C_Auto3_FrontRiseTray_On` L0/IP3/P3/b4 常閉(NC) (啟用) | `C_Auto3_FrontRiseTray_Off` L0/IP3/P3/b5 常閉(NC) (啟用) | 5000 |
-| `C_Auto3_PushTray` | 40303 | 40300 | L0/IP9/P1/b1 (啟用) | `C_Auto3_PushTray_On` L0/IP3/P3/b7 常閉(NC) (啟用) | `C_Auto3_PushTray_Off` L0/IP3/P3/b6 常閉(NC) (啟用) | 5000 |
-| `C_Auto3_LeanOnTray` | 40313 | 40310 | L0/IP9/P1/b2 (啟用) | `C_Auto3_LeanOnTray_On` L0/IP4/P0/b4 常閉(NC) (啟用) | `C_Auto3_LeanOnTray_Off` L0/IP4/P0/b5 常閉(NC) (啟用) | 5000 |
-| `C_Auto3_RearRiseTray` | 40323 | 40320 | L0/IP9/P1/b3 (啟用) | `C_Auto3_RearRiseTray_On` L0/IP4/P1/b0 常閉(NC) (啟用) | `C_Auto3_RearRiseTray_Off` L0/IP4/P1/b1 常閉(NC) (啟用) | 5000 |
-| `C_Auto3_FrontSeparateTray_1` | 40333 | 40330 | L0/IP9/P1/b4 (停用) | `C_Auto3_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto3_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Auto3_FrontRiseTray` | 40293 | 40290 | `C_Auto3_FrontRiseTray_On` | `C_Auto3_FrontRiseTray_Off` | — |
+| `C_Auto3_PushTray` | 40303 | 40300 | `C_Auto3_PushTray_On` | `C_Auto3_PushTray_Off` | — |
+| `C_Auto3_LeanOnTray` | 40313 | 40310 | `C_Auto3_LeanOnTray_On` | `C_Auto3_LeanOnTray_Off` | — |
+| `C_Auto3_RearRiseTray` | 40323 | 40320 | `C_Auto3_RearRiseTray_On` | `C_Auto3_RearRiseTray_Off` | — |
+| `C_Auto3_FrontSeparateTray_1` | 40333 | 40330 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+
 
 #### Auto4 出料站
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Auto4_FrontRiseTray` | 40343 | 40340 | L0/IP9/P2/b0 (啟用) | `C_Auto4_FrontRiseTray_On` L0/IP5/P0/b0 常閉(NC) (啟用) | `C_Auto4_FrontRiseTray_Off` L0/IP5/P0/b1 常閉(NC) (啟用) | 5000 |
-| `C_Auto4_PushTray` | 40353 | 40350 | L0/IP9/P2/b1 (啟用) | `C_Auto4_PushTray_On` L0/IP5/P0/b3 常閉(NC) (啟用) | `C_Auto4_PushTray_Off` L0/IP5/P0/b2 常閉(NC) (啟用) | 5000 |
-| `C_Auto4_LeanOnTray` | 40363 | 40360 | L0/IP9/P2/b2 (啟用) | `C_Auto4_LeanOnTray_On` L0/IP5/P1/b0 常閉(NC) (啟用) | `C_Auto4_LeanOnTray_Off` L0/IP5/P1/b1 常閉(NC) (啟用) | 5000 |
-| `C_Auto4_RearRiseTray` | 40373 | 40370 | L0/IP9/P2/b3 (啟用) | `C_Auto4_RearRiseTray_On` L0/IP5/P1/b4 常閉(NC) (啟用) | `C_Auto4_RearRiseTray_Off` L0/IP5/P1/b5 常閉(NC) (啟用) | 5000 |
-| `C_Auto4_FrontSeparateTray_1` | 40383 | 40380 | L0/IP9/P2/b4 (停用) | `C_Auto4_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto4_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Auto4_FrontRiseTray` | 40343 | 40340 | `C_Auto4_FrontRiseTray_On` | `C_Auto4_FrontRiseTray_Off` | — |
+| `C_Auto4_PushTray` | 40353 | 40350 | `C_Auto4_PushTray_On` | `C_Auto4_PushTray_Off` | — |
+| `C_Auto4_LeanOnTray` | 40363 | 40360 | `C_Auto4_LeanOnTray_On` | `C_Auto4_LeanOnTray_Off` | — |
+| `C_Auto4_RearRiseTray` | 40373 | 40370 | `C_Auto4_RearRiseTray_On` | `C_Auto4_RearRiseTray_Off` | — |
+| `C_Auto4_FrontSeparateTray_1` | 40383 | 40380 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+
 
 #### Auto5 出料站
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Auto5_FrontRiseTray` | 40393 | 40390 | L0/IP9/P3/b0 (啟用) | `C_Auto5_FrontRiseTray_On` L0/IP5/P1/b6 常閉(NC) (啟用) | `C_Auto5_FrontRiseTray_Off` L0/IP5/P1/b7 常閉(NC) (啟用) | 5000 |
-| `C_Auto5_PushTray` | 40403 | 40400 | L0/IP9/P3/b1 (啟用) | `C_Auto5_PushTray_On` L0/IP5/P2/b1 常閉(NC) (啟用) | `C_Auto5_PushTray_Off` L0/IP5/P2/b0 常閉(NC) (啟用) | 5000 |
-| `C_Auto5_LeanOnTray` | 40413 | 40410 | L0/IP9/P3/b2 (啟用) | `C_Auto5_LeanOnTray_On` L0/IP5/P2/b6 常閉(NC) (啟用) | `C_Auto5_LeanOnTray_Off` L0/IP5/P2/b7 常閉(NC) (啟用) | 5000 |
-| `C_Auto5_RearRiseTray` | 40423 | 40420 | L0/IP9/P3/b3 (啟用) | `C_Auto5_RearRiseTray_On` L0/IP5/P3/b2 常閉(NC) (啟用) | `C_Auto5_RearRiseTray_Off` L0/IP5/P3/b3 常閉(NC) (啟用) | 5000 |
-| `C_Auto5_FrontSeparateTray_1` | 40433 | 40430 | L0/IP9/P3/b4 (停用) | `C_Auto5_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto5_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Auto5_FrontRiseTray` | 40393 | 40390 | `C_Auto5_FrontRiseTray_On` | `C_Auto5_FrontRiseTray_Off` | — |
+| `C_Auto5_PushTray` | 40403 | 40400 | `C_Auto5_PushTray_On` | `C_Auto5_PushTray_Off` | — |
+| `C_Auto5_LeanOnTray` | 40413 | 40410 | `C_Auto5_LeanOnTray_On` | `C_Auto5_LeanOnTray_Off` | — |
+| `C_Auto5_RearRiseTray` | 40423 | 40420 | `C_Auto5_RearRiseTray_On` | `C_Auto5_RearRiseTray_Off` | — |
+| `C_Auto5_FrontSeparateTray_1` | 40433 | 40430 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+
 
 #### Auto6 出料站
-| 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
-|---|---|---|---|---|---|---|
-| `C_Auto6_FrontRiseTray` | 40443 | 40440 | L0/IPW/P0/b2 (啟用) | `C_Auto6_FrontRiseTray_On` L0/IP5/P3/b4 常閉(NC) (啟用) | `C_Auto6_FrontRiseTray_Off` L0/IP5/P3/b5 常閉(NC) (啟用) | 5000 |
-| `C_Auto6_PushTray` | 40453 | 40450 | L0/IPW/P0/b3 (啟用) | `C_Auto6_PushTray_On` L0/IP5/P3/b7 常閉(NC) (啟用) | `C_Auto6_PushTray_Off` L0/IP5/P3/b6 常閉(NC) (啟用) | 5000 |
-| `C_Auto6_LeanOnTray` | 40463 | 40460 | L0/IPW/P0/b4 (啟用) | `C_Auto6_LeanOnTray_On` L0/IP6/P0/b4 常閉(NC) (啟用) | `C_Auto6_LeanOnTray_Off` L0/IP6/P0/b5 常閉(NC) (啟用) | 5000 |
-| `C_Auto6_RearRiseTray` | 40473 | 40470 | L0/IPW/P0/b5 (啟用) | `C_Auto6_RearRiseTray_On` L0/IP6/P1/b0 常閉(NC) (啟用) | `C_Auto6_RearRiseTray_Off` L0/IP6/P1/b1 常閉(NC) (啟用) | 5000 |
-| `C_Auto6_FrontSeparateTray_1` | 40483 | 40480 | L0/IPW/P0/b6 (停用) | `C_Auto6_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto6_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
+| 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
+|---|---|---|---|---|---|
+| `C_Auto6_FrontRiseTray` | 40443 | 40440 | `C_Auto6_FrontRiseTray_On` | `C_Auto6_FrontRiseTray_Off` | — |
+| `C_Auto6_PushTray` | 40453 | 40450 | `C_Auto6_PushTray_On` | `C_Auto6_PushTray_Off` | — |
+| `C_Auto6_LeanOnTray` | 40463 | 40460 | `C_Auto6_LeanOnTray_On` | `C_Auto6_LeanOnTray_Off` | — |
+| `C_Auto6_RearRiseTray` | 40473 | 40470 | `C_Auto6_RearRiseTray_On` | `C_Auto6_RearRiseTray_Off` | — |
+| `C_Auto6_FrontSeparateTray_1` | 40483 | 40480 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+
 
 ---
 
-## 四、馬達／伺服類 5xxxx
+## 三、馬達／伺服類 5xxxx
+全機共 20 顆馬達。馬達／伺服類警報多屬設備內部問題（伺服電源、驅動器、極限、位置誤差），OP 通常無法自行修復；下表說明各錯誤別的意思與 OP 可先做的動作，之後對照代碼表確認是哪一顆馬達，再通報工程師。
 
-全機 20 顆馬達（以 MC88X1 伺服為主），每顆有 9 種錯誤別。代碼組成方式為：開頭 `5`＋三碼馬達序號＋一碼錯誤別（例如 `50013`）。下表為 9 種錯誤的判讀；再接全馬達對照表。
+### 3.1 馬達錯誤別判讀
+| 錯誤別 | 名稱 | 狀況 | 應該狀態 | 目前狀態(故障) | 查看 | OP 處置 |
+|---|---|---|---|---|---|---|
+| 末碼 0 | 伺服電源異常（Power Off） | 該馬達的伺服在待命中失去電源或激磁（伺服 OFF）。 | 伺服電源繼電器 SwMotorRelay 亮（ON）、伺服電源正常、驅動器無警報。 | 伺服電源／激磁掉了，或驅動器沒有 READY。 | IOsetview（SwMotorRelay／SnMotorPower）＋馬達畫面（該軸 Alarm／ServoAlarm 燈）。 | 伺服警報無法用軟體清除：請關閉再開啟伺服電源後重新 HOME；仍不行通報工程師。記下馬達名與代碼。 |
+| 末碼 1 | 扭力不足／過載（Out Of Torque） | 移動途中驅動器跳警報，馬達到不了或撐不住位置（過載、碰撞或失步）。 | 無驅動器警報，每次移動都能到定位。 | 移動中驅動器警報、還沒到定位。 | MotionView（命令位置 vs 編碼器差）＋馬達畫面（Alarm／ServoAlarm）。 | 檢查該軸是否被卡住或負載異常；排除後關再開伺服電源、重新 HOME；仍不行通報工程師。 |
+| 末碼 2 | 正向極限被觸發（CW sensor ON） | 該軸壓到正向（＋）端的實體極限開關。 | 正向極限開關不亮（OFF），軸在行程範圍內。 | 正向極限開關亮（ON），軸撞到或越過正向端。 | IOsetview（該軸 ＋極限）＋MotionView（位置在正向極端）。 | 用寸動（Jog）把軸往負向移離極限；檢查極限開關與是否有機構過衝；仍不行通報工程師。 |
+| 末碼 3 | 負向極限被觸發（CCW sensor ON） | 該軸壓到負向（－）端的實體極限開關。 | 負向極限開關不亮（OFF），軸在行程範圍內。 | 負向極限開關亮（ON），軸撞到或越過負向端。 | IOsetview（該軸 －極限）＋MotionView（位置在負向極端）。 | 用寸動（Jog）把軸往正向移離極限；檢查極限開關與機構過衝；仍不行通報工程師。 |
+| 末碼 4 | 超過正向軟體極限（Soft P） | 軸的位置到達或超過設定的正向軟體上限。 | 位置在軟體上、下限之間。 | 位置超過正向軟體上限。 | MotionView（位置 vs 正向軟限）。 | 用寸動把軸移回範圍內；確認教導位置與軟限設定；必要時重新 HOME；仍不行通報工程師。 |
+| 末碼 5 | 超過負向軟體極限（Soft N） | 軸的位置到達或低於設定的負向軟體下限。 | 位置在軟體上、下限之間。 | 位置低於負向軟體下限。 | MotionView（位置 vs 負向軟限）。 | 用寸動把軸移回範圍內；確認教導位置與軟限設定；必要時重新 HOME；仍不行通報工程師。 |
+| 末碼 6 | 位置誤差過大（需重新 HOME） | 驅動器因位置／跟隨誤差過大跳警報（掉步、皮帶打滑或原點跑掉），需重新 HOME 再啟動。 | 編碼器跟得上命令，每次都到定位。 | 命令與編碼器差太多，驅動器警報。 | MotionView（命令 vs 編碼器）＋馬達畫面（Alarm）。 | 關再開伺服電源後重新 HOME 再啟動；仍不行通報工程師（可能是編碼器、皮帶或增益問題）。 |
+| 末碼 7 | 未定義錯誤（Undefine） | 系統讀到無法歸類的馬達狀態（通常是瞬間讀取異常），正常運轉幾乎不會出現。 | 正常故障都會落在已定義的類別，此類不該常出現。 | 狀態讀取無法歸類，可能是瞬間跳動或未涵蓋的驅動器狀態。 | 狀態紀錄（該代碼與當時狀態）＋馬達畫面再看是否持續。 | 重新確認該軸；若持續出現，關再開伺服電源、重新 HOME；仍不行通報工程師。 |
+| 末碼 8 | 目標超出範圍（Target will Out Of Limit） | 系統下達的移動目標超出允許範圍，在動作前就被擋下（馬達沒動）。 | 移動目標在軟體上、下限之間，移動才會放行。 | 目標超出範圍，移動被擋下、馬達不動。 | 警報明細（目標值／目前／範圍）＋MotionView（教導目標 vs 軟限）。 | 這是範圍保護、非實體極限，IOsetview 看不到燈號；先看警報明細的數字。修正教導位置／目標或範圍設定後再重試；若一重試就再跳，不要反覆重試，直接通報工程師（可能原點跑掉）。 |
 
-### 4.1 九種錯誤別判讀
 
-| 錯誤別 | 意義 | 應該狀態 | 目前狀態(故障) | 在哪看 |
-|---|---|---|---|---|
-| `…0` Power Off | 該軸伺服電源掉電（電源繼電器 SwMotorRelay／電源感測 SnMotorPower 失電），軸在待命時就失去激磁。 | 驅動器已激磁：SwMotorRelay ON、SnMotorPower 有電；馬達狀態格裡該軸的 Alarm／ServoAlarm 燈是暗的。 | 該軸的驅動器警報、卡片伺服警報、到位訊號同時亮起，代表放大器已斷電或激磁在待命中掉落。 | IOsetview（看 SwMotorRelay 輸出／SnMotorPower 輸入）＋主畫面馬達狀態格（該軸 Alarm／ServoAlarm／InPos 燈）。 |
-| `…1` Out Of Torque | 該軸在移動中失速、超過扭力上限，編碼器跟不上指令。 | 沒有警報；每次定位動作結束會到位；指令位置與編碼器位置在容許誤差內收斂。 | 警報亮起但還沒到位，代表軸在負載下卡住／移動中超出扭力，編碼器落後指令。 | MotionView（看該軸指令位置與編碼器位置的落差）＋馬達狀態格（Alarm＋ServoAlarm 亮、InPos 暗）。 |
-| `…2` CW sensor ON | 該軸壓到或衝過正向（CW／+LM）硬體極限。 | 正向硬體極限訊號 OFF（軸在行程範圍內）；IOsetview 中該極限燈是暗的。 | 正向極限訊號 ON，代表軸實體頂到或衝過正向端點。 | IOsetview（該軸的 CW／+LM 極限輸入燈）＋MotionView（現在位置落在正向極端）。 |
-| `…3` CCW sensor ON | 該軸壓到或衝過負向（CCW／-LM）硬體極限。 | 負向硬體極限訊號 OFF（軸在行程範圍內）；IOsetview 中該極限燈是暗的。 | 負向極限訊號 ON，代表軸實體頂到或衝過負向端點。 | IOsetview（該軸的 CCW／-LM 極限輸入燈）＋MotionView（現在位置落在負向極端）。 |
-| `…4` Soft P position | 該軸到達或超過正向軟體極限 SoftLimitP。 | 現在位置落在 SoftLimitN～SoftLimitP 之間；正向軟極限旗標沒亮。 | 位置到達或超過 SoftLimitP，卡片正向軟極限被觸發。 | MotionView（現在位置對照該軸的 SoftLimitP 值）。 |
-| `…5` Soft N position | 該軸到達或超過負向軟體極限 SoftLimitN。 | 現在位置落在 SoftLimitN～SoftLimitP 之間；負向軟極限旗標沒亮。 | 位置到達或低於 SoftLimitN，卡片負向軟極限被觸發。 | MotionView（現在位置對照該軸的 SoftLimitN 值）。 |
-| `…6` position Error（需回 HOME＋重啟） | 該軸位置／跟隨誤差過大，驅動器鎖定位置偏差警報（沒有伴隨極限或卡片伺服警報）。 | 沒有警報；編碼器跟得上指令（跟隨誤差在容許內）；軸能到達並維持每個目標。 | 驅動器因位置偏差過大而鎖定警報，但沒有任何極限或卡片伺服警報同時亮起。 | MotionView（指令位置與編碼器位置的落差）＋馬達狀態格（Alarm 亮、所有極限／伺服警報燈暗）。 |
-| `…7` Undefine | 讀到一組無法歸類的狀態，通常是瞬間跳動或未被建模的警報來源，正常運轉不該出現。 | 真正的故障都會落到已定義的錯誤別；此類代碼正常不會出現。 | 狀態快照沒有任何可辨識的警報位，可能是瞬間雜訊，或是系統未涵蓋的警報來源。 | State Record・EventLog（看跳出的 5xxx7 代碼與當下的狀態快照），再回馬達狀態格即時確認是否持續。 |
-| `…8` Target will Out Of Limit | 要下達的目標位置超出軟體極限範圍，移動被事先擋下（不是實際撞到極限）。 | 要求的目標落在 SoftLimitN～SoftLimitP 之間，移動照常進行。 | 要求的目標落在軟極限範圍外，移動被擋下；Note 會印出目標值／現在位置／軟極限 N～P（單位 1/100mm）。 | Note 備註列（印出的目標／現在／極限值，前綴為該軸別名）＋MotionView（設定的 SoftLimitN／P 對照 teach 目標）。 |
-
-**處置：**
-
-- `…0` Power Off：恢復伺服／主電源。鎖定的過載或伺服警報無法用軟體清除，請把電源繼電器 SwMotorRelay 關再開做一次斷電重置，然後對該軸重新回 HOME（HOME 會刻意切斷再恢復馬達電源，本來就負責這種復歸）。
-- `…1` Out Of Torque：先排除該軸的機構卡死／過載，檢查扭力上限與負載、齒輪；用 SwMotorRelay 斷電重置清除驅動器警報，再重新回 HOME。
-- `…2` CW sensor ON：用寸動把該軸往負向（離開 CW 極限）退出，檢查 +LM 極限開關的接線與安裝，並確認有無機構衝過頭。注意：回 HOME 過程中壓到極限屬正常，這個警報只有在運轉中才會停機。
-- `…3` CCW sensor ON：用寸動把該軸往正向（離開 CCW 極限）退出，檢查 -LM 極限開關與機構衝過頭。回 HOME 中壓到極限屬正常，只有運轉中才會停機。
-- `…4` Soft P position：用寸動把該軸退回軟極限範圍內；確認 teach 目標與該軸的 SoftLimitP 設定；若位置基準跑掉就重新回 HOME。
-- `…5` Soft N position：用寸動把該軸退回軟極限範圍內；確認 teach 目標與該軸的 SoftLimitN 設定；若位置基準錯誤就重新回 HOME。
-- `…6` position Error（需回 HOME＋重啟）：對該軸重新回 HOME 並重啟。鎖定的放大器警報無法用軟體清除，請先用 SwMotorRelay 斷電重置再回 HOME；並排查偏差原因（編碼器聯軸、增益、機構阻力）。
-- `…7` Undefine：重新掃描該軸；若重複發生，視為未歸類的驅動器警報，先做 SwMotorRelay 斷電重置＋重新回 HOME，並回報維修人員檢查狀態訊號或接線異常。
-- `…8` Target will Out Of Limit：修正 teach 位置或要下達的目標，使其落在 SoftLimitN～SoftLimitP 範圍內，或修正該軸的 SoftLimitN／SoftLimitP 設定；若軸的位置基準跑掉也要重新回 HOME（基準遺失會讓原本合法的目標被判為超界）。
-
-### 4.2 全馬達對照表
-
-| 編號 | 別名 Alias | 起始碼 | 碼範圍(9碼) |
+### 3.2 馬達代碼對照（哪個代碼是哪一顆馬達）
+| 編號 | 馬達名稱 | 起始碼 | 碼範圍 |
 |---|---|---|---|
 | M01 | `MSortingArmX` | `50000` | `50000`~`50008` |
 | M02 | `MTrayArmX` | `50010` | `50010`~`50018` |
@@ -265,558 +206,435 @@
 | M19 | `MColorY` | `50180` | `50180`~`50188` |
 | M20 | `MTopCCDX_Color` | `50190` | `50190`~`50198` |
 
-> 例：`50013` = 馬達序號 001（`MTrayArmX`，M02）錯誤別 3（CCW 負向極限 ON）。
+> 例：`50013` = 第 001 號馬達（`MTrayArmX`）的末碼 3 錯誤。
 
 ---
 
-## 五、真空吸嘴類 6xxxx
-分類手臂真空吸嘴組 `SortArmSuck`（1 組 4 嘴），共 6 種錯誤別（`6000x`）。四嘴的真空感測器代號為 SuckAa / SuckAb / SuckAc / SuckAd（即 Suck1～Suck4）。
+## 四、真空吸嘴類 6xxxx
+分類手臂的真空吸嘴（`SortArmSuck`，共 4 個吸嘴）用來吸取／放下 IC。以下是各種真空相關警報的判讀。
 
-| 代碼 | 意義 | 應該狀態 | 目前狀態(故障) | 查看 | 處置 |
-|---|---|---|---|---|---|
-| `60000` | 吸取確認失敗：吸嘴下壓、開真空(關吹氣閥、開吸氣閥)後，在警報等待時間內真空感測器一直沒讀到 ON，代表 IC 沒被吸上吸嘴。 | 吸取指令後，該嘴真空感測器（SuckAa～SuckAd）在警報時間內讀到 ON（吸住了）。 | 真空感測器超過警報等待時間仍讀到 OFF（沒吸住）。 | IOsetview — 故障嘴的真空感測器 LED。吸嘴下壓後應立即亮起；故障時始終不亮。 | 先確認來源盤格內是否真的有 IC（空格本來就吸不到，屬正常）。若有 IC 但感測器不亮：檢查氣壓／真空供應壓力、是否漏氣或吸嘴嘴頭堵塞磨損、密封不良（IC 歪斜），並在 IOsetview 輸出確認吸氣電磁閥確實作動、感測器配線正常。常見原因：無 IC／漏氣／吸嘴堵塞／真空不足／感測器失效。排除後按 RETRY 重試，或按 SKIP 跳過。 |
-| `60001` | 釋放確認失敗：關真空並吹氣(關吸氣閥、開吹氣閥)後，在警報等待時間內真空感測器仍未落到 OFF，代表 IC 沒從吸嘴放開。 | 釋放指令後真空感測器在警報時間內落到 OFF（IC 已放入目標盤格）。 | 真空感測器超過警報等待時間仍讀到 ON（沒放開）。 | IOsetview — 放料嘴的真空感測器 LED。吹氣時應熄滅；故障時仍亮著。 | 在 IOsetview 輸出與氣路確認吹氣閥確實作動且有正壓空氣。檢查 IC 是否被吸嘴黏住、吸氣電磁閥是否真的關閉。若無真空但感測器仍亮，懷疑感測器卡在 ON 或短路。常見原因：IC 黏住沒放開／電磁閥卡在 ON／無吹氣空氣／感測器卡 ON。排除後按 RETRY 或 SKIP。 |
-| `60002` | 持料途中失壓：某支標記為「正持有 IC」的吸嘴，其真空感測器在搬運途中讀到 OFF，屬瞬間或部分失壓的初判。 | 吸嘴持有 IC 期間，真空感測器持續穩定讀到 ON。 | 搬運途中真空感測器讀到 OFF（真空掉了）。此為在確認掉落(60003)之前的早期徵兆。 | IOsetview — 持料嘴的真空感測器 LED。搬運中應恆亮；故障時閃爍或掉 OFF。 | 檢查該嘴是否出現漏氣或密封邊緣不良、負載下氣壓下降、嘴頭部分堵塞、或感測器／接頭接觸不良而間歇。此判定僅在 REALLY 實機模式生效，SOFT_SIMULATE 模式不會觸發。常見原因：漏氣／密封不良／堵塞／感測器間歇。 |
-| `60003` | 持料途中 IC 掉落：持料嘴的真空感測器讀到 OFF 並超過掉落去彈跳時間仍為 OFF（手臂正從 Loader 往 Auto 搬運）。機台會減速停下所有動作，該嘴的 IC 記為未放置。 | 持有 IC 期間真空感測器持續 ON，未出現確認的 OFF。 | 真空感測器 OFF 且持續超過掉落去彈跳時間，確認掉料並停機。 | IOsetview — 掉料嘴的真空感測器 LED；並看 Note 備註列，會印出掉落盤格身分（如「SortArm IC Dropped At Pick／In Transit R.. C.. 2D=..」）。 | 從機台內取回掉落的 IC，再找密封完全失效的原因：突發真空流失、吸嘴磨損或破裂、IC 搬運途中勾到、或真空壓力崩潰。與 60002 的差別在於本碼是去彈跳確認且會停機。取料後：於取料端掉落可按 RETRY 復原來源盤格，或按 SKIP 放棄該格。常見原因：掉料（密封破損）／真空驟失。 |
-| `60004` | 初始自檢：開機／重置時真空已通電，吸嘴的真空感測器本應確認 ON；若感測器卡 OFF 或真空路徑失效即屬此類。此為僅登錄於警報清單的分類代碼，實機上並無任何流程會實際觸發它；相同「真空開不起來」的情況在實機上會以吸取失敗 60000 呈現。 | （設計語意）初始化通真空時感測器讀到 ON。 | （設計語意）通真空後感測器仍為 OFF；實機無任何流程會實際觸發本碼，它只是警報清單內的分類項。 | IOsetview — 該嘴真空感測器 LED；此情況下通真空時不會亮。 | 視為文件／分類用途。若真的發生，根因為感測器始終未拉 ON：檢查真空產生器是否失效、無氣源、感測器脫落或卡 OFF、配線問題；實務上以 60000 的相同項目診斷。可於 State Record／EventLog 確認本碼只是登錄項而非實際發生事件。 |
-| `60005` | 初始自檢：開機／重置時，未指派 IC 的吸嘴本應無真空（感測器 OFF），但真空感測器卻讀到 ON。此為僅登錄於警報清單的分類代碼，實機並不會於執行時實際觸發。 | 閒置／初始化且未指派 IC 時，真空感測器讀到 OFF。 | （設計語意）初始化時空嘴上真空感測器卻讀到 ON；因無實際流程接上，目前不會於執行時觸發。 | IOsetview — 該嘴真空感測器 LED；此情況下開機無持料卻亮著。 | 若真空感測器在初始無持料時亮起：檢查真空電磁閥是否卡在 ON 或誤接（常閉）、感測器是否卡 ON 或短路、或上一循環殘留的 IC 仍黏在嘴上。常見原因：閥卡 ON／感測器卡 ON／殘留 IC。可於 State Record／EventLog 確認 60005 只是登錄項還是實際發生事件。 |
+| 代碼 | 名稱 | 狀況 | 應該狀態 | 目前狀態(故障) | 查看 | OP 處置 |
+|---|---|---|---|---|---|---|
+| `60000` | 吸取失敗（Pick Up） | 吸嘴下令吸取後，真空一直沒建立（沒吸住 IC）。 | 吸取後真空感測器亮（ON，吸住）。 | 超時仍不亮（OFF）：沒吸到 IC、漏氣或管路堵塞。 | IOsetview（該吸嘴真空感測器）。 | 確認該位置有 IC、吸嘴／海綿無破損、真空管沒脫落或堵塞；清理後重試；仍不行通報工程師。 |
+| `60001` | 放料／破真空失敗（Destroy） | 下令放料（關真空＋吹氣）後，真空一直沒解除（IC 沒放掉）。 | 放料後真空感測器不亮（OFF）。 | 超時仍亮（ON）：IC 沒放掉或感測器卡住。 | IOsetview（真空感測器）。 | 確認吹氣是否正常、IC 是否黏在吸嘴上；清理後重試；仍不行通報工程師。 |
+| `60002` | 真空中途消失（Vacuum Off） | 吸嘴正夾著 IC 時，真空中途掉了。 | 持料期間真空感測器持續亮（ON）。 | 持料中變成不亮（OFF）：中途漏氣。 | IOsetview（真空感測器）。 | 檢查真空管、接頭、吸嘴是否漏氣，IC 是否翹起；仍不行通報工程師。 |
+| `60003` | IC 掉落（Device Dropped） | 搬運中 IC 掉落（真空消失並持續一小段時間）。 | 持料期間真空持續亮（ON）。 | 真空由亮變不亮並持續 → 判定 IC 掉落。 | IOsetview（真空感測器）。 | 找回或清除掉落的 IC，檢查漏氣與吸嘴狀況；仍不行通報工程師。 |
+| `60004` | 初始真空未建立（Initial Sensor Off） | 初始／重置自檢時，真空該建立卻沒建立（感測器該亮卻不亮）。 | 初始通真空時真空感測器亮（ON）。 | 通真空後仍不亮：感測器卡住或真空源不良。 | IOsetview（真空感測器）。 | 檢查真空源與感測器；通報工程師。 |
+| `60005` | 初始有殘留真空／IC（Initial Sensor On） | 開機、重置或初始時，某個沒指派 IC 的空吸嘴卻讀到有真空。 | 待命且無 IC 時真空感測器不亮（OFF）。 | 空吸嘴卻亮（ON）：殘留真空或 IC 卡在吸嘴上。 | IOsetview（真空感測器）。 | 取下卡在吸嘴上的 IC、確認真空已釋放；仍不行通報工程師。 |
+
 
 ---
 
-## 六、系統流程類 JAM／MES／WAR
-這一類是**盤流／視覺／計數**層級的警報，源自各模組的邏輯判斷（非單純到位逾時）。每一則列出這則警報的意義、常見原因，以及要檢查的裝置「應該→目前」狀態與現場處置。
+## 五、系統流程類 JAM／MES／WAR
+這一類是**盤流、供料、讀碼、計數**層級的警報。每一則列出發生狀況、可能原因、要檢查的裝置「應該→目前」狀態、OP 初步排除、以及無法排除時如何通報工程師。
 
-### 6.1 Loader 進料
+### 5.1 Loader 進料
 
-#### `JAM0913` — Loader 盤子掉在載台上（Tray Lost On Carriage）
-- **意義**：前段拆盤完成、盤子理應落在 LoaderY 載台上並被載台有盤感測器 `SnLoader_InputHasTray` 讀到「有盤」，但確認時卻讀到「無盤」，代表這一盤在拆盤／推入過程中掉了或沒到位。此警報只在真機模式（非 SOFT_SIMULATE）且該感測器有啟用時才會判定。
-- **常見原因**：
-  - 拆下的盤在前拆盤機下降與後續推盤動作中掉落、卡住或分盤失敗，沒有正確落在 LoaderY 載台上；
-  - `SnLoader_InputHasTray` 載台有盤感測器故障、偏位或脫線，盤子在上面卻讀不到（這是唯一被判定條件讀取的裝置）；
-  - LoaderY 載台沒停在正確的進料 Y 位置，盤子落點偏離感測器；
-  - 上游推盤氣缸 `C_Loader1_PushTray / C_Loader2_PushTray` 或靠盤氣缸 `C_Loader1_LeanOnTray / C_Loader2_LeanOnTray` 沒推到定位，盤子還沒送到載台就進了確認步驟。
-- **檢查點**：
+#### `JAM0913` — Loader 送料盤沒有落到載台上
+- **發生狀況**：這個警報表示:Loader 在送料時,從疊料區分下來的料盤,沒有正確落到送料載台上。通常出現在「分料下降、把料盤推上載台準備送料」的這段動作;系統做最後確認時發現載台上沒有盤,就報這個警報。常見狀況是盤掉落、卡在半路、或料盤沒分好。
+- **可能原因**：分下來的料盤掉落或卡在疊料區與送料載台之間,沒有真正落到載台上。；載台上的有盤感測器 SnLoader_InputHasTray 沒吸到、沒對正或接線鬆脫,實際有盤卻讀成無盤(這是系統唯一直接用來判斷的點)。；送料載台沒停在正確的送料位置,盤雖然落下卻偏離感測器,讀不到。；推盤或靠盤汽缸沒有完全動作到位,料盤沒被推上去或沒被扶住,在確認前就滑離載台(較少見,屬上游可能相關)。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnLoader_InputHasTray` | sensor | 讀到 ON（載台上有盤，確認通過） | 讀到 OFF（載台空、拆下的盤沒落上去，或感測器故障） | IOsetview（也會印在 Note 備註列） |
-  | `C_Loader1_PushTray / C_Loader2_PushTray` | cylinder | 已推出到位，把盤送上載台 | 判定不直接讀它，僅上游嫌疑：若沒推到位，盤就到不了載台，導致 `SnLoader_InputHasTray` 讀 OFF | IOsetview（電磁閥輸出＋到位感測點） |
-  | `C_Loader1_LeanOnTray / C_Loader2_LeanOnTray` | cylinder | 已推出到位，搬送中夾住／頂住分開的盤 | 判定不直接讀它，僅上游嫌疑：若沒作動，盤沒被頂住，可能在確認前從載台滑掉 | IOsetview（電磁閥輸出＋到位感測點） |
-  | `MMLoaderY_1 / MMLoaderY_2` 的 `fHasTray`(邏輯) | logic | 尚未建立盤身分（確認通過後才登錄盤別與序號） | 這條警報路徑不會登錄任何盤身分，所以 SKIP/RETRY 都不需回滾 | State Record・EventLog |
-- **處置**：先打開 Loader 前門，取出任何卡在拆盤機與 LoaderY 載台之間的盤，避免重跑時把第二盤再壓上去。確認載台確實停在進料位、盤能落在感測器上。清好後：按 RETRY 從頭重跑整段進料；或按 SKIP 結束這次進料（不帶盤，因為沒登錄任何盤身分，不需回滾）。若拿掉盤後感測器仍讀不到「有盤」，多半是該感測器或線路故障，請報修。
+  | `SnLoader_InputHasTray` | 感測器 | 亮(ON):分料下降後,料盤已好好落在送料載台上 | 不亮(OFF):載台上沒有盤;可能是料盤根本沒落上去,也可能是這顆感測器本身故障或接線鬆脫沒讀到 | IOsetview(IO 監看畫面);此警報的訊息明細也會直接顯示這顆感測器 |
+  | `C_Loader1_PushTray / C_Loader2_PushTray` | 汽缸 | 在伸出(推出)位:把料盤推上載台坐好 | 非系統直接判斷點,屬上游可能相關,可一併檢查:若卡住或沒推到位,料盤到不了載台,感測器就會讀不到盤 | IOsetview(IO 監看畫面):看電磁閥輸出,以及伸出/縮回的定位感測器 |
+  | `C_Loader1_LeanOnTray / C_Loader2_LeanOnTray` | 汽缸 | 在伸出(壓/靠)位:把分開的料盤靠住、扶好,傳送過程不會鬆脫 | 非系統直接判斷點,屬上游可能相關,可一併檢查:若沒有動作,料盤沒被扶住,可能在確認前就掉離載台 | IOsetview(IO 監看畫面):看電磁閥輸出與定位感測器 |
+  | `MMLoaderY_1 / MMLoaderY_2` | 狀態/計數 | 尚未登記這盤的身分:系統只有在確認載台上真的有盤之後,才會登記這一盤並累加送料序號 | 這個警報發生時,系統沒有登記任何盤身分,所以之後選 SKIP 或 RETRY 都不需要回復扣帳。這是內部狀態,沒有單一感測器可以直接看 | 狀態紀錄(或請通報工程師) |
+- **初步排除**：先打開 Loader 前方,把卡在疊料區與送料載台之間、沒落好的料盤取出或重新擺正,並確認載台上沒有多餘的盤。清乾淨後,選「RETRY(重試)」讓整個送料動作重新跑一次;若這一輪不想補盤,可選「SKIP(略過)」以無盤結束這次送料(系統沒登記任何盤,不會有扣帳問題)。重要:RETRY 前一定要先清掉懸空或半卡的盤,避免重新下降時把第二片盤又壓上去。
+- **通報工程師**：若清盤、重新擺正後重試仍一直報同一警報,請通報工程師,並提供以下資訊:在 IOsetview 觀察 SnLoader_InputHasTray——載台上明明放了盤卻仍然不亮(OFF),多半是這顆感測器或它的接線故障(這是系統唯一直接判斷的點);手動作動推盤與靠盤汽缸(C_LoaderN_PushTray、C_LoaderN_LeanOnTray)時料盤是否能被推到、扶到位;在 MotionView(馬達畫面)確認送料載台是否有停在正確的送料位置,讓盤能落在感測器上。另請一併告知發生時間、是否可重現,方便工程師比對狀態紀錄。
 
-#### `MES0920` — Loader 進料源已空（Tray Empty）
-- **意義**：進料時偵測不到可拆的盤——供料車讀到「已空」（`SnLoader_Inputend` OFF），或推盤氣缸的到位感測器一直沒確認有盤到拆盤處。此警報在 CleanOut 清機模式下不會發出；若有啟用 AMR，會先等一個完整的等料窗（`iAmrFeedWaitSec` 秒）沒補到料才發。
-- **常見原因**：
-  - 供料匣／進料車真的沒盤了，`SnLoader_Inputend` 讀 OFF（最常見的正常情況）；
-  - 啟用 AMR 時，AMR 在 `iAmrFeedWaitSec`(設定) 時限內沒把料補上，等料逾時；
-  - 推盤氣缸到位感測器 `C_Loader1_PushTray / C_Loader2_PushTray` 一直沒確認有盤實際到拆盤處；
-  - `SnLoader_Inputend` 進料源存量感測器故障或脫線，車上有料卻誤讀為空。
-- **檢查點**：
+#### `MES0920` — Loader 進料缺盤(料用完或未確認送達)
+- **發生狀況**：這個警報代表 Loader(上料站)的進料彈匣/料車已經沒有托盤可以用,或是機台無法確認有托盤真的被送到分盤位置。通常在正常生產中出現:Loader 想從料車補一片新托盤下來時,發現沒有盤可拿,就會跳這個警報並停下。
+- **可能原因**：料車/進料彈匣真的沒盤了,也就是進料源用完了。這是最常見、也是正常的情況。；(只有在使用 AMR 自動搬運補料時)AMR 沒有在設定的等待時間內把盤補上,等到超時才跳警報。；料車有盤,但推盤汽缸沒有確認托盤真的被推到分盤位置(可能盤卡住或沒推到定位),機台判定沒有盤送到。；進料料量感測器 SnLoader_Inputend 故障或線路鬆脫,料車明明有盤,卻被讀成沒盤。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnLoader_Inputend` | sensor | 讀到 ON（供料車還有料） | 讀到 OFF（供料車已空／進料源沒盤，或感測器脫線誤讀為空） | IOsetview（也會印在 Note 備註列） |
-  | `C_Loader1_PushTray / C_Loader2_PushTray` 到位確認 | cylinder | 到位感測讀 ON（推盤氣缸已到推出位，代表有盤實際到達拆盤處） | 到位感測讀 OFF（拆盤處沒感測到盤，或氣缸沒到位） | IOsetview（此氣缸感測不印在 Note 列，直接看 LED） |
-  | AMR 等料計時／等待旗標(邏輯) | logic | 已清除（等料窗關閉前盤已到，等待被解除）※僅 AMR 啟用時有作用 | 等料窗逾時仍沒補到料，才落到本警報；未啟用 AMR 時為立即發警 | State Record・EventLog（邏輯／計時狀態，無單一 IO 點） |
-- **處置**：補滿 Loader 供料匣（或等 AMR／重新叫車補料），然後按 RETRY。RETRY 會從「載台確認」那一步接續，不會重新拆盤，所以不會把已分開的盤再夾／切一次。若要放空整機，改按 CLEAN OUT 進入清機模式把機內剩餘 IC 全數排出。若確定車上有料卻仍報空，請在 IOsetview 確認 `SnLoader_Inputend` 在有料時會亮 ON、推盤氣缸到位感測在盤到拆盤處時會亮 ON，排除感測器誤讀。
+  | `SnLoader_Inputend` | 感測器 | 亮(ON)——料車裡還有盤。 | 不亮(OFF)——料車讀為沒盤;若料車其實有盤,則可能是感測器脫落或故障造成的誤判。 | IOsetview(IO 監看畫面),看它的燈號;此感測器狀態也會顯示在警報訊息的明細行。 |
+  | `C_Loader1_PushTray / C_Loader2_PushTray` | 汽缸 | 到位感測器亮——推盤汽缸已推到定位,代表有一片托盤實際被送到分盤位置。 | 到位感測器不亮——推盤位置沒感測到托盤,或汽缸沒確認到定位。 | IOsetview(IO 監看畫面),直接看這個汽缸的到位感測器燈號;它不會顯示在警報訊息行,要自己找。 |
+  | `AMR 補料等待計時(僅在使用 AMR 自動搬運補料時才有作用)` | 狀態/計數 | 已解除——在等待時間內有盤補到並被確認,等待就會取消,不會跳警報。 | 等待超時——超過設定的 AMR 補料等待秒數仍沒補到盤,才會跳這個警報;若沒有使用 AMR,則是一發現沒盤就立即跳警報。 | 狀態紀錄。這是邏輯/計時的狀態,沒有單一 IO 燈號可以看,需要進一步確認時請通報工程師。 |
+- **初步排除**：先把 Loader 進料彈匣補滿托盤;如果是用 AMR 自動搬運補料,就等 AMR 把盤補上,或重新呼叫 AMR。確認料車確實有盤後,在警報畫面選「RETRY(重試)」,機台會從「確認托盤」這一步接著繼續進料,不會把下面已經分好的盤再重夾、重切一次,可以放心重試。若你想把機台裡剩下的 IC 全部跑完清空,改選「CLEAN OUT(清機)」進入清機模式即可。
+- **通報工程師**：如果已經補好盤、也重試過,卻還是一直跳同一個警報,請通報工程師,並提供下列資訊:1) 料車明明有盤時,在 IOsetview 裡 SnLoader_Inputend 的燈號會不會亮(用來排除感測器脫落或故障造成的誤判)。2) 托盤送到分盤位置時,推盤汽缸 C_Loader1_PushTray / C_Loader2_PushTray 的到位感測器會不會真的亮(若始終不亮,即使有盤也會被判定沒盤)。3) 若使用 AMR:AMR 補料的呼叫有沒有發出、以及補料等待時間的設定是否足夠涵蓋一次完整的補料流程。4) 附上警報發生當下的狀態紀錄。
 
-#### `MES0921` — Loader 盤數與感測器不符（Tray Count Mismatch）
-- **意義**：啟用 AMR 時，SECS 主機宣告的整車盤數（`iCarTrayTotal`(邏輯)）已被進料序號 `iFeedSerial`(邏輯) 全數消耗完，但供料車存量感測器 `SnLoader_Inputend` 卻仍讀到有盤——盤數與硬體不一致。此警報在 CleanOut 模式下不會發出，且不掛特定感測器名稱，Note 上不印 IO 名。
-- **常見原因**：
-  - SECS 主機下的整車盤數比車上實際裝的盤少（`iCarTrayTotal` 太低）；
-  - 車上實際多裝了超出宣告數的盤；
-  - `iFeedSerial` 計數失準（某盤重複計或漏計），導致提早看似用完；
-  - `SnLoader_Inputend` 卡在 ON／誤觸發，車其實已空卻讀有盤。
-- **檢查點**：
+#### `MES0921` — Loader 進料盤數不符
+- **發生狀況**：這個警報代表 Loader(進料車)的「盤數」對不上。機台依主機(AMR/SECS)一開始告知的車上盤數去計算,算到後來認為車上的盤已經全部送完、車應該空了;但 Loader 進料口的感測器 SnLoader_Inputend 卻還偵測到有盤在。通常發生在自動生產中、Loader 正把車上的盤一盤一盤往裡送、快到最後一盤附近時跳出。簡單講就是:帳面上算「送完了」,可是實際看車上好像還有盤(或反過來,車上被多放了盤)。
+- **可能原因**：主機一開始告知的車上盤數,比實際放上車的盤數少(帳面數字太小,實際盤比較多)。；進料車上被多放了盤,超過當初宣告的數量。；送料過程中盤數被數錯(某一盤重複計到、或漏計一盤),導致帳面提早算成「已送完」。；Loader 進料口感測器 SnLoader_Inputend 卡住一直亮(ON)或誤觸發,其實車上已經沒盤了。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `iCarTrayTotal`(邏輯)（SECS 宣告的整車盤數，到車時鎖定） | logic | 等於車上實際盤數（含 IC 盤、cover、身分盤） | 已被消耗完（宣告數扣掉已進數 ≤ 0），但車其實還沒空 | State Record・EventLog |
-  | `iFeedSerial`(邏輯)（本車已進盤數） | logic | 小於整車盤數，代表還有盤可進 | 已達或超過整車盤數（計數說車已放空） | State Record・EventLog |
-  | `SnLoader_Inputend` | sensor | 讀到 OFF（與「車已放空」一致） | 讀到 ON（仍有盤實際存在，與計數矛盾） | IOsetview |
-- **處置**：先實地清點車上還剩幾盤，對照主機宣告數。按 RETRY 會把感測器仍看得到的那盤進掉並繼續生產；或按 CLEAN OUT 進入清機排空模式。若確認是主機盤數給錯，請通知修正 AMR／SECS 端的盤數來源；若是 `SnLoader_Inputend` 卡 ON，在 IOsetview 檢修該感測器。
+  | `車上宣告盤數(主機告知、進料車到站時記錄下來的總盤數)` | 狀態/計數 | 等於實際放在車上的盤數(含 IC 盤、蓋板盤、身分盤) | 扣掉已送出的盤數後,帳面已判定車上沒盤了,但實際車上還有盤 | 狀態紀錄(數字需工程師協助判讀) |
+  | `已送出盤數(這台車到目前為止已送入的盤數)` | 狀態/計數 | 在還有盤要送時,這個數字應小於車上宣告的總盤數 | 已經達到或超過宣告總盤數,帳面因此認為整車已送完 | 狀態紀錄(數字需工程師協助判讀) |
+  | `SnLoader_Inputend` | 感測器 | 若帳面判定車已空,這顆感測器應該不亮(OFF) | 亮(ON):代表實際上還有一盤在,與帳面「已送完」互相矛盾 | IOsetview(IO 監看畫面) |
+- **初步排除**：1. 先走到 Loader 進料車旁,實際用眼睛數一下車上還剩幾盤,和主機告知的盤數比對,看是哪邊對、哪邊錯。
+2. 到 IOsetview(IO 監看畫面)看感測器 SnLoader_Inputend:若車上實際還有盤,它亮(ON)是正常的;若車已經空了它卻還一直亮,可能是感測器卡住或誤觸發。
+3. 若確認車上實際還有盤要送:選【RETRY(重試)】,讓機台把感測器看到的那盤繼續送完。
+4. 若要把整車清空、結束這台車:選【CLEAN OUT(清機/排空)】,進入排空模式。
+5. 做選擇前一定要先用眼睛確認車上實際盤數,避免帳面與實際不一致,造成後面卡料或漏送。
+- **通報工程師**：若實際盤數和主機告知的數字怎麼看都對不上,或 SnLoader_Inputend 明顯卡住(車明明空了卻一直亮),請通報工程師。通報時請提供:警報代碼 MES0921、當下 Loader 車上實際剩幾盤、主機告知的盤數是多少、以及是哪一台料車、哪個時間點。可請工程師從「狀態紀錄」調出宣告盤數、已送盤數與剩餘盤數做比對:若是主機盤數來源給錯,需要修正 AMR/SECS 的盤數設定;若是 SnLoader_Inputend 卡住,需要在 IOsetview 檢修這顆感測器。
 
-#### `MES0924` — Loader 後段有殘留盤（Rear Leftover Tray）
-- **意義**：Loader 後段出料底部放著一盤，但系統沒有把它標記為「可被 TrayArm 取走」、也沒有任何排盤動作在進行，等於這盤永遠取不走、會讓 TrayArm 空等。只在真機模式（非 DUMMY）下判定，且每次事件只發一次。通常發生在：開機時後段本來就壓著一盤，或排盤中途被中止、盤別／盤號沒登錄，Loader 重置時無法保留後段狀態。健康狀態應為後段淨空（OFF）。
-- **常見原因**：
-  - 冷開機／上電時後段出料底部本來就實體留著一盤；
-  - 排盤中途被中止，留下一盤盤別／盤號不明的盤——系統未登錄它為可取，為避免把 cover／身分盤誤送進正常料流，須由操作員手動移除；
-  - `SnLoader_OutputBottomHasTray` 誤讀為 ON（感測器卡住或偏位，後段其實是空的），使系統誤判後段被佔用。
-- **檢查點**：
+#### `MES0924` — Loader 後方殘留盤未清除,請人工移除
+- **發生狀況**：Loader 後方(靠近出料下方的位置)偵測到還有一個盤子沒有被清走。通常出現在開機通電後,或是上一輪把盤子往後方送出的動作被中途中斷之後。由於系統不確定這個殘留盤的身分和內容,為了避免把身分盤或蓋盤誤混進正常盤流,設備不會自己去夾取,必須由操作員先把它拿掉,才能繼續生產。
+- **可能原因**：開機通電時,Loader 後方本來就留著上次沒清走的盤子。；上一輪把盤子往後方送出的動作中途被中止,後方留下一個身分/內容不明的盤子;為了避免把身分盤或蓋盤誤混進正常盤流,設備不會自動夾取,必須由人工移除。；後方其實已經淨空,但 SnLoader_OutputBottomHasTray 感測器卡住或位置沒對準,一直誤判為有盤(較少見)。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnLoader_OutputBottomHasTray` | sensor | 讀到 OFF（正常流程下後段出料底部淨空） | 讀到 ON（後段被一盤殘留盤佔用；真機下會使後段判定為「有盤」） | IOsetview（也會印在 Note 備註列） |
-  | `bRearReadyForPick`(邏輯) | logic | 對「正常排出、TrayArm 可取」的後段盤為 TRUE | FALSE——殘留盤的盤別／盤號不明，從未被標記為可取 | State Record・EventLog |
-  | `bRearDischargeInProgress`(邏輯) | logic | 只有在排盤正往後段沉降時為 TRUE | FALSE——沒有排盤在進行，後段卻被佔用（死結情況） | State Record・EventLog |
-  | `bRearResidualAlarmed`(邏輯) | logic | 進入時為 FALSE；由本警報鎖為 TRUE（每次事件只發一次） | 發警時被設為 TRUE；只在後段感測器變空的瞬間或重置時重新解除 | State Record・EventLog |
-- **處置**：手動把 Loader 後段出料底部的殘留盤取走，然後按 RETRY。取走盤後 `SnLoader_OutputBottomHasTray` 會轉 OFF，系統會在這個變空的瞬間清掉可取標記並重新武裝警報，之後才能對新的殘留事件再次發警。若盤已實體移除、感測器仍讀 ON，請在 IOsetview 檢修／重新校正該感測器。
+  | `SnLoader_OutputBottomHasTray` | 感測器 | 正常生產、後方(出料下方)淨空時,這個感測器不亮(OFF)。 | 目前亮(ON),表示後方有盤子佔住;如果後方其實已經淨空它還一直亮,可能是感測器卡住或位置沒對準。 | IOsetview(IO 監看畫面);此警報也會把這個感測器的狀態顯示在提示訊息的明細列上。 |
+  | `bRearReadyForPick` | 狀態/計數 | 若後方那盤是正常送出、可讓 TrayArm 夾取的盤,這個內部狀態會顯示為「可夾取」。 | 目前是「不可夾取」,因為殘留盤的身分/內容不明,系統沒有把它標記成可夾取。這是內部邏輯判斷,畫面上沒有單一感測器可直接看。 | 狀態紀錄(看不懂請通報工程師)。 |
+  | `bRearDischargeInProgress` | 狀態/計數 | 只有在正把盤子往後方送出的過程中,這個內部狀態才會是「進行中」。 | 目前是「非進行中」,但後方卻有盤子佔住,形成沒有人接手的卡死狀況。這是內部邏輯,沒有單一感測器可看。 | 狀態紀錄(看不懂請通報工程師)。 |
+  | `bRearResidualAlarmed` | 狀態/計數 | 一開始是「未報警」。 | 這個警報發出後被記為「已報警」(同一次事件只會提醒一次);要等後方感測器確認淨空(盤子被拿走)或重新開機後才會重置,之後同樣情況才能再次提醒。這是內部邏輯,沒有單一感測器可看。 | 狀態紀錄(看不懂請通報工程師)。 |
+- **初步排除**：用手把 Loader 後方(出料下方)殘留的盤子取出,確認該處已淨空。此時在 IOsetview 上可看到 SnLoader_OutputBottomHasTray 會由亮(ON)轉成不亮(OFF)。接著按 RETRY(重試)即可繼續。盤子被拿走的那一刻,系統會自動清掉夾取標記並重置警報,之後同樣狀況才能再次提醒。
+- **通報工程師**：若盤子已經取出、後方確實淨空,但在 IOsetview 中 SnLoader_OutputBottomHasTray 仍一直亮(不會轉為不亮),表示感測器卡住或位置沒對準,請通報工程師檢修或校正感測器。若感測器已正常轉為不亮、但按 RETRY 後警報仍反覆出現,或你不確定後方那盤的來源(疑似開機前就殘留、或上一輪送盤中途被中止),也請通報工程師,並提供:警報代碼 MES0924、發生時間、當時是否剛開機、以及狀態紀錄。
 
-### 6.2 Empty 空盤供給
+### 5.2 Empty 空盤供給
 
-#### `JAM1030` — Empty 推盤未確認
-- **意義**：Empty 供料時推盤氣缸 `C_Empty_PushTray` 伸出後，其到位感測在整定時間內沒讀到 ON，判定夾盤未成功。
-- **常見原因**：
-  - 夾盤位置底下根本沒有盤，或行程不足、氣壓不足，推盤沒有頂實
-  - 上游供料／分盤未送盤，夾爪關下去沒有盤可夾
-  - 推盤到位感測沒對準、髒污或接線／氣路故障，伸出後始終讀不到 ON
-  - `MEmptyY` 沒停在教導的供料 Y 位置，盤落在夾爪外側，推盤無法就位
-- **檢查點**：
+#### `JAM1030` — 空盤站推盤夾持失敗(沒夾到盤)
+- **發生狀況**：這個警報是空盤站在「把空盤推進去夾住」的動作時出現的。推盤汽缸伸出後,本來應該偵測到「已經到位、盤子被夾住」,但等了一小段時間還是沒偵測到,機台就把汽缸縮回並報出這個警報。簡單說:空盤沒被順利夾好。通常發生在空盤進料、夾盤的當下。
+- **可能原因**：進料位置根本沒有盤子,夾爪推出去沒東西可夾(最常見)；空盤沒有剛好停在夾持位置,盤子落在夾爪外面,推出去夾不到；推盤的到位確認感測器沒對準、鏡面髒污,或接線/氣壓有問題,導致伸出到位時一直讀不到訊號；供氣氣壓不足或推的行程太短,汽缸推不到定位；可能相關,可一併檢查:靠緊/擋盤汽缸沒先確認到位,造成後面推盤動作卡住
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `C_Empty_PushTray` | cylinder | 推盤伸出並經整定後，到位感測讀到 ON（已夾到盤） | 已下令伸出，但整定時間過後到位感測仍為 OFF，隨即縮回並報警 | IOsetview / Note 備註列 |
-  | `C_Empty_LeanOnTray` | cylinder | 靠位氣缸先動作並確認到位，之後才進行推盤 | 不是 JAM1030 的直接觸發裝置；若靠位一直沒確認，流程會停在靠位步驟而不報 JAM1030，屬另一個上游原因 | IOsetview |
-  | `MEmptyY` | motor | 停在教導的 `EmptyCarFeedTrayYPosition`，盤剛好在推盤夾爪下方 | 位置偏掉時盤不在夾爪下方，推盤到位感測無法確認 | MotionView |
-- **處置**：先確認 Empty 供料位確實有盤，清除任何卡料、確認盤有落到夾爪位置，然後按 RETRY 重新定位 Empty-Y 並重試靠位＋推盤夾盤。若反覆失敗，順手檢查推盤氣缸是否伸滿、到位感測有無對準／髒污、供氣壓力是否足夠，以及靠位氣缸是否先確認到位。
+  | `C_Empty_PushTray` | 汽缸 | 推盤伸出後,經過短暫等待,到位確認訊號應該亮(ON),代表夾爪到位、盤子被夾住。 | 已經命令它伸出,但等待後到位確認訊號仍不亮(OFF);機台把它縮回並發出 JAM1030,代表沒夾到。 | IOsetview(IO 監看畫面),並可對照畫面上的警報 Note 明細 |
+  | `C_Empty_LeanOnTray` | 汽缸 | 這支靠緊/擋盤汽缸會先動作,而且要先確認到位,推盤的動作才會開始。 | 它不是 JAM1030 的直接觸發裝置。如果它一直沒確認到位,流程會停在更前面而不會報這個警報。屬於上游可能相關的原因,工程師可一併排除。 | IOsetview(IO 監看畫面) |
+  | `MEmptyY` | 馬達 | 停在教導設定的空盤進料位置,讓盤子剛好落在推盤夾爪下方。 | 如果位置跑掉,盤子就不在夾爪下方,推盤到位訊號一直讀不到,夾持因此失敗。 | MotionView(馬達畫面) |
+- **初步排除**：先到空盤進料位置確認「真的有一片盤子」在那裡;若盤子歪掉或沒放好,擺正到定位。確認後按畫面上的「Retry(重試)」。重試時機台會讓空盤載台重新回到教導的進料位置,並重新做一次靠緊+推盤夾持的動作。若重試一兩次仍失敗,請不要一直重試,改為通報工程師。
+- **通報工程師**：若已確認有盤子、擺正後重試仍然失敗,請通報工程師,並提供:警報代碼 JAM1030、發生當下畫面上的 Note 警報明細、以及當時是在哪個動作出現。請工程師檢查:推盤汽缸 C_Empty_PushTray 是否有完全伸出、其到位確認感測器在伸出位置能否正常亮(ON)(檢查感測器間隙、對準、接線),以及供氣氣壓是否足夠;確認馬達 MEmptyY 是否有停在教導設定的進料位置;並一併排除上游靠緊汽缸 C_Empty_LeanOnTray 是否有先確認到位。
 
-#### `MES1021` — 後端(底部)空盤缺失
-- **意義**：Empty 送盤到後端出料底部後，底部到位感測 `SnEmpty_OutputBottomHasTray` 沒讀到盤，判定該位置沒有盤就位。
-- **常見原因**：
-  - 盤根本沒到後端底部位置，或在鬆夾時掉落／位移
-  - `SnEmpty_OutputBottomHasTray` 沒對準、髒污或接線故障，實際有盤卻讀 OFF
-  - `MEmptyY` 出料教導位置設錯或行程過／不足，盤停在感測範圍外
-  - 上游進料源乾掉，根本沒送盤上來，流程卻仍走到此確認步驟
-- **檢查點**：
+#### `MES1021` — 空盤後方底部找不到盤子
+- **發生狀況**：設備在空盤區的後方（輸出底部）位置要確認有一片盤子，但底部感測器沒偵測到盤子，所以停機報警。通常出現在「空盤送到後方底部、夾爪放開準備輸出」的那個動作階段。簡單說：設備以為盤子已經到位並放好了，可是那個位置的感測器看不到盤。
+- **可能原因**：盤子根本沒送到後方底部位置，或夾爪放開的瞬間盤子掉落、滑掉、歪掉，離開了感測器偵測的位置。；底部感測器 SnEmpty_OutputBottomHasTray 沒對準、被灰塵或碎屑遮住、或接線鬆脫，導致實際上有盤卻讀成沒盤（這是本警報唯一真正判讀的裝置）。；空盤升降馬達 MEmptyY 的卸盤停靠位置教導值設得不對，盤子雖然停下了，卻停在感測器照不到的地方。；上游進料源已經沒有盤可送（料已空），設備卻仍進到這個「確認有盤」的步驟。；（少見，主要供診斷）設備被留在空跑／測試模式時，這個確認會被略過、警報不會出現；若懷疑此點請通報工程師。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnEmpty_OutputBottomHasTray` | sensor | 讀到 ON（盤已就位於 Empty 後端／出料底部）；這是本警報唯一實際讀取的裝置 | 讀到 OFF（底部位置偵測不到盤）；感測也必須為啟用狀態警報才會武裝 | IOsetview / Note 備註列 |
-  | `MEmptyY` | motor | 停在教導的 `EmptyCarDischargeTrayYPosition`，盤正好在底部感測下方 | 移動已完成到達目標，但若教導值本身設錯，盤仍停在感測外——要核對教導位置，不能只看移動完成 | MotionView |
-  | `C_Empty_PushTray` | cylinder | 已在前一步鬆開釋放 | 正常與故障情況下都已鬆開，不是本警報的辨識點；僅在鬆夾造成盤位移／掉落時才是機械根因 | IOsetview |
-  | `C_Empty_LeanOnTray` | cylinder | 已在確認步驟前鬆開釋放 | 正常與故障都已鬆開，不是辨識點；僅懷疑鬆夾把盤帶離底部感測時才追查 | IOsetview |
-- **處置**：確認 Empty 後端／出料底部確實有盤。按 RETRY 會從頭重跑整段送盤；按 SKIP 會放棄這一盤並回到待命。若反覆失敗，重點檢查底部感測的對準／清潔／接線（實際有盤卻讀 OFF 時），並在 MotionView 核對 `MEmptyY` 是否停到正確的教導出料位置。鬆夾氣缸只在懷疑機械鬆夾把盤帶偏／帶掉時才檢查。另注意機台若處於 DUMMY 模式會略過此確認，警報不會出現。
+  | `SnEmpty_OutputBottomHasTray` | 感測器 | 有盤時應該亮（ON）：代表盤子確實停在空盤區後方底部位置。這是本警報唯一真正判讀的裝置。 | 不亮（OFF）：底部位置偵測不到盤子（此感測器也要在啟用狀態下才會觸發警報）。 | IOsetview（IO 監看畫面），找 SnEmpty_OutputBottomHasTray 的燈號；報警訊息明細列也會顯示這個感測器名稱。 |
+  | `MEmptyY` | 馬達 | 停在正確的空盤卸盤位置，讓盤子正好落在底部感測器 SnEmpty_OutputBottomHasTray 的下方。 | 畫面上顯示已經到位，但如果教導的卸盤停靠位置本身設錯，盤子會停在感測器照不到的地方。要核對「教導的卸盤位置」是否正確，不能只看『移動完成』。 | MotionView（馬達畫面），比對 MEmptyY 目前位置與教導的卸盤停靠位置是否一致。 |
+  | `C_Empty_PushTray` | 汽缸 | 到這個步驟時應該已經放開（縮回／鬆開）盤子。 | 不論正常或故障，這支汽缸都是放開狀態，本身不是判斷此警報的差異點。可能相關，可一併檢查：如果放開時把盤子碰得移位或掉落，底部感測器就會讀不到盤。 | IOsetview（IO 監看畫面），看它的回授燈號。 |
+  | `C_Empty_LeanOnTray` | 汽缸 | 到這個確認步驟前應該已經放開（縮回／鬆開）盤子。 | 不論正常或故障，這支汽缸都是放開狀態，本身不是判斷差異點。可能相關，可一併檢查：放開這支夾爪時，可能讓盤子離開底部偵測位置。 | IOsetview（IO 監看畫面），看它的回授燈號。 |
+  | `iRealDummy` | 狀態 | 實際生產時應為「非空跑（正常生產）」模式，此時底部感測器的確認才會啟用。 | 若被設成空跑／測試模式，整個確認會被略過，此警報不會出現。此項一般 OP 看不到，只在診斷「為何警報有出現或沒出現」時才需注意。 | 狀態紀錄（或請通報工程師）。 |
+- **初步排除**：先到現場確認空盤區「後方底部」位置是不是真的有一片盤子。若實際有盤：多半是底部感測器沒對準、被髒污遮住，或盤子有點歪掉。請把感測器擦乾淨、把盤子擺正對齊到定位，再按重試，設備會從頭重跑整個送盤流程。若實際沒盤：可能上游沒送到或盤子掉了，把盤子放到定位後按重試；若這片盤不要了，可按略過放棄這片盤，設備會清掉這片盤的紀錄並回到待命。
+- **通報工程師**：如果清潔、對正、重新擺放並重試多次後，MES1021 仍持續出現，請通報工程師，並提供：現場實際是否有盤（可拍照盤子位置）、IOsetview 中 SnEmpty_OutputBottomHasTray 在有盤時燈號是否會亮、MotionView 中 MEmptyY 目前位置與教導卸盤位置是否一致。工程師會檢查：底部感測器 SnEmpty_OutputBottomHasTray 的對準／清潔／接線（本警報唯一判讀的裝置）、MEmptyY 教導的卸盤位置是否正確、兩支夾爪汽缸 C_Empty_PushTray 與 C_Empty_LeanOnTray 放開時是否在機械上把盤子碰掉或碰移，以及設備是否被誤留在空跑／測試模式。
 
-#### `MES1022` — Empty 供料倉料盡
-- **意義**：Empty 進料源乾掉，進料端感測 `SnEmpty_InputEnd` 讀到 OFF，供料倉沒有盤可取。
-- **常見原因**：
-  - Empty 供料倉真的用完了，進料端沒有盤
-  - AMR 模式下，AGV 未在 `iAmrFeedWaitSec`（AMR 補料等待秒數）內完成補料
-  - `SnEmpty_InputEnd` 故障／偏位，實際有盤卻讀 OFF
-  - 模擬模式下虛擬供料數 `iSimInfeedCount`（邏輯）歸零（虛擬料車空）
-- **檢查點**：
+#### `MES1022` — 空盤供料站沒盤(空盤彈匣用完)
+- **發生狀況**：這個警報代表「空盤供料站」已經沒有空盤可以拿了。機台要從供料源取一個空盤時,發現源頭是空的。通常發生在自動生產進行中,空盤一直被用掉、卻沒有及時補料的時候。如果現場有搭配自動搬運車(AMR/AGV)自動送盤,也可能是搬運車還沒把新的空盤送到,機台等待補料的時間已經超過而跳警報。
+- **可能原因**：空盤供料源真的用完了:料盤被機台一路用光,現場沒有及時補料(最常見)。；有搭配自動搬運車(AMR/AGV)的模式下,搬運車還沒把新的空盤送過來,機台等到超時。；供料位其實有放盤,但偵測用的感測器 SnEmpty_InputEnd 沒對準、鏡面髒污或接線鬆脫,一直被判成「沒有盤」。；僅限模擬測試模式:虛擬供料車的庫存被用到 0,是軟體模擬造成,非真的缺料。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnEmpty_InputEnd` | sensor | 讀到 ON（進料／供料倉有盤）；感測須為啟用狀態，停用時不會偵測缺料 | 讀到 OFF（進料源乾掉）→ 判定缺料 | IOsetview / Note 備註列 |
-  | `bWaitingAmrFeed` | logic (邏輯) | AMR 模式：等待計時中，給 AGV 最多 `iAmrFeedWaitSec` 秒補料再報警 | 計時到期而料源仍空 → 報警；偵測到補料後解除 | State Record・EventLog |
-  | `iSimInfeedCount` | logic (邏輯) | 模擬模式：大於 0（虛擬料倉有存量） | 模擬模式下歸零觸發缺料；RETRY 會自動補滿虛擬料車 | State Record・EventLog |
-- **處置**：重新裝填 Empty 供料倉（或等 AGV 補料），然後按 RETRY，警報會在有料後自動解除；模擬模式下按 RETRY 會自動補滿虛擬料車。若料倉已裝滿但仍報缺料，檢查 `SnEmpty_InputEnd` 的間隙／對準／接線並確認感測為啟用狀態；AMR 模式下確認 AGV 確實有送到，並檢視 `iAmrFeedWaitSec` 設定。註：CleanOut 模式下不會出現此警報；唯一恢復鍵為 RETRY。
+  | `SnEmpty_InputEnd` | 感測器 | 供料位有放空盤時,這顆感測器會亮(ON)。(此感測器必須設為「啟用」;若被停用,機台不會判斷缺料,也就不會跳這個警報。) | 供料位沒有空盤時,感測器不亮(OFF),機台就判定缺料並跳警報。 | IOsetview(IO 監看畫面);也可對照警報訊息明細那一行的感測器狀態。 |
+- **初步排除**：把空盤重新補進供料站(或等自動搬運車把空盤送到定位),補好後按「Retry(重試)」鍵。機台會重新去確認供料位有沒有盤,只要盤補回來,警報就會自動解除。這個警報唯一的復歸按鈕就是「Retry(重試)」。(在模擬測試模式下,按 Retry 會自動補滿虛擬供料車。)
+- **通報工程師**：如果已經補了料盤、供料位明明有盤,警報卻還是一直跳、或機台仍判成沒盤,就請通報工程師。通報時請提供:警報代碼 MES1022、發生時的生產模式(一般生產或有搭配自動搬運車 AMR/AGV)、供料站當下是否真的有空盤、以及在 IOsetview 看到的 SnEmpty_InputEnd 是亮(ON)還是不亮(OFF)。工程師會確認:供料站有盤時 SnEmpty_InputEnd 是否正常亮起、感測器的對位/距離/接線與是否設為啟用;若是搬運車模式,會再確認搬運車是否真的有送料到位、以及等待補料的時間設定是否合理。(註:在清機(Clean Out)模式下不會跳這個警報。)
 
-#### `MES1023` — Empty 供料堆疊已滿(感測)
-- **意義**：批次結束 CleanOut 排空、要把盤送回供料堆疊時，堆疊滿盤感測 `SnEmpty_InputFullTray` 讀到 ON，堆疊已滿無法回盤。
-- **常見原因**：
-  - Empty 供料堆疊實際已滿，排空的盤無處可回
-  - `SnEmpty_InputFullTray` 卡在 ON／偏位，實際堆疊仍有空間
-  - CleanOut 排空過程中，操作員尚未把 Empty 供料倉裡堆疊的盤取走
-- **檢查點**：
+#### `MES1023` — 空盤供料疊盤區已滿,空盤放不回去
+- **發生狀況**：這個警報代表 Empty(空盤)供料端的「疊盤區」已經放滿盤子。通常出現在一批生產做完、機台正在清盤(把機台裡剩下的盤子排空)的時候:機台想把排出來的空盤放回供料疊盤區,但疊盤區已經滿了,盤子沒有地方放,動作就停住並跳出這個警報。只要疊盤區還是滿的,警報會一直重複顯示,直到疊盤區騰出空位為止。
+- **可能原因**：供料疊盤區真的已經放滿盤子,清盤排出的空盤沒有空位可以放回(最常見)。；清盤排空過程中,操作員還沒把疊盤區堆好的盤子取走。；疊盤區其實還有空間,但滿盤感測器 SnEmpty_InputFullTray 卡住或安裝位置偏移,一直誤判成『已滿』。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnEmpty_InputFullTray` | sensor | 讀到 OFF（堆疊有空間可讓排空的盤送回） | 讀到 ON（堆疊已滿），警報視窗會持續重複顯示直到清空 | IOsetview / Note 備註列 |
-  | `bLotFinish` | logic (邏輯) | true——此排空回盤路徑要求批次已結束 | true（屬 CleanOut／批次結束排空情境） | State Record・EventLog |
-  | `bFrontHasTray` / `bRearHasTray` | logic (邏輯) | 至少一個為 true——仍有盤在供料機上要排回堆疊 | 至少一個為 true（因此才嘗試排空回盤），而滿盤感測擋住回送 | State Record・EventLog |
-  | `bAmrLocked` | logic (邏輯) | false——此排空回盤只在非 AMR 交接時執行 | 觸發本警報時為 false（AMR=0 操作員排空，或 AMR 閒置） | State Record・EventLog |
-- **處置**：把 Empty 供料倉／堆疊上堆滿的盤取走。警報視窗會自動重複顯示，直到 `SnEmpty_InputFullTray` 變成 OFF 後排空回盤才會繼續。若堆疊已空或只有部分盤卻仍讀 ON，懷疑滿盤感測卡住或偏位（檢查其啟用狀態與備註列顯示的位址）。此警報只在批次結束／CleanOut 排空且非 AMR 鎖定時出現，模擬模式下不會出現。
+  | `SnEmpty_InputFullTray` | 感測器 | 不亮(OFF):供料疊盤區還有空位,清盤排出的空盤可以順利放回。 | 亮(ON):疊盤區已滿,空盤放不回去,動作卡住。 | IOsetview(IO 監看畫面)裡找到 SnEmpty_InputFullTray 的燈號;警報的詳細訊息那一行也會顯示這個感測器名稱,以及它『應該的狀態』和『目前的狀態』。 |
+- **初步排除**：走到 Empty 空盤供料端的疊盤區,把堆疊在那裡的盤子取走、騰出空位。取走後到 IOsetview 確認 SnEmpty_InputFullTray 的燈號已經熄滅(變成不亮/OFF)。燈一熄,機台會自動把空盤放回並繼續完成清盤,警報就會解除。
+- **通報工程師**：如果疊盤區已經清空、或只剩少量盤子,但 SnEmpty_InputFullTray 還是一直亮(ON)不熄,就可能是這顆感測器卡住或安裝位置偏移。請記下警報代碼 MES1023、以及警報詳細訊息那一行顯示的感測器名稱和『應該/目前』狀態,通報工程師檢查這顆感測器(是否啟用、安裝位置與接線)。
 
-#### `MES1024` — 前端空盤缺失
-- **意義**：分盤下料完成後，前端有盤感測 `SnEmpty_InputHasTray` 沒讀到盤，判定前端單盤位置沒有盤。
-- **常見原因**：
-  - 分盤沒把盤降到前端位置（供料倉空，或升降／分離爪沒抓住並放下單盤）
-  - 分離過程中盤掉落——第二段升降下降確認太慢／臨界，分離爪在堆疊被夾住前就打開
-  - `SnEmpty_InputHasTray` 偏位／髒污／接線故障，前端實際有盤卻讀 OFF
-  - 前端分離與 Loader 分盤氣缸 `C_Loader_FrontSeparateTray_1` 的互鎖時序錯亂，放出的盤數不對
-- **檢查點**：
+#### `MES1024` — 前方空盤缺料(前方沒有空盤到位)
+- **發生狀況**：這個警報代表「拆盤放盤後,前方分料位置應該要有一片空盤,結果卻偵測不到盤」。通常發生在設備自動供應空盤、要把一片空盤分離出來送到前方位置的時候;當前方位置在該有盤的時機讀不到盤,就會跳出這個警報而停機。
+- **可能原因**：進料彈匣裡的空盤已經用完了(來源沒盤,最常見)。；放盤過程中盤子掉落:接盤的動作太慢或不確實,盤還沒被接住就被放開,結果整疊盤掉下去,前方就沒盤了。；前方感測器 SnEmpty_InputHasTray 沒對準、感測面髒污或接線鬆脫,實際有盤卻被讀成「沒盤」。；拆盤/分離用的汽缸動作沒到位或時序不對,導致沒有盤、或盤數不對,沒能正確送一片空盤到前方位置。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnEmpty_InputHasTray` | sensor | 分盤後讀到 ON（一片空盤就位於前端單盤位置）；這是報警時唯一讀取的裝置 | 讀到 OFF（前端位置偵測不到盤） | IOsetview / Note 備註列 |
-  | `C_Empty_FrontRiseTray_1` | cylinder | 上游分盤動作，撐住堆疊後再鬆開，行程確認正常 | 若沒抓住／夾持或鬆開確認卡住，前端就沒有盤降下 | IOsetview |
-  | `C_Empty_FrontRiseTray_2` | cylinder | 上游分盤動作，在分離前先下降確認以夾住堆疊 | 下降確認太慢／臨界時，可能在堆疊被夾住前就鬆開而掉盤，前端無盤 | IOsetview |
-  | `C_Empty_FrontSeparateTray_1` | cylinder | 上游分盤動作，在 Loader 前端分離互鎖後動作，鬆開時剛好放下一片盤 | 分離時序錯亂時，前端無盤或放出的盤數不對 | IOsetview |
-- **處置**：確認確實有一片空盤降到前端單盤位置、且進料倉不是空的，然後按 RETRY 重跑分盤。若反覆失敗，先在 IOsetview 檢查 `SnEmpty_InputHasTray` 的對準／清潔／接線（實際有盤時應讀 ON）；感測正常卻讀 OFF 時，代表上游分盤失敗——檢查三支分盤氣缸的行程與確認感測，並留意分離過程中堆疊掉落的情形。另注意機台若處於 DUMMY 模式會略過此實體確認。
+  | `SnEmpty_InputHasTray` | 感測器 | 拆盤完成後應該亮(ON),表示前方分料位置已經停好一片空盤。 | 目前不亮(OFF),表示在該檢查的時機前方位置偵測不到盤。這是本警報唯一直接判斷的裝置。 | IOsetview(IO 監看畫面);警報訊息明細行也會顯示這個感測器名稱 |
+  | `C_Empty_FrontRiseTray_1` | 汽缸 | 拆盤上游動作(非前方直接判斷點,可能相關,可一併檢查):負責頂住整疊盤,之後再放開讓盤下降;動作到位時它的確認會顯示已到位。 | 如果它沒接住/夾不住盤,或放開後的到位確認卡住,就不會有盤下降到前方,造成前方感測器讀不到盤。 | IOsetview(IO 監看畫面) |
+  | `C_Empty_FrontRiseTray_2` | 汽缸 | 拆盤上游動作(可能相關,可一併檢查):在分離之前先頂住整疊盤;下降到位的確認要確實。 | 如果下降到位確認太慢或不確實,可能在盤還沒被接住前就放開,把整疊盤掉落,前方位置就變空。 | IOsetview(IO 監看畫面) |
+  | `C_Empty_FrontSeparateTray_1` | 汽缸 | 拆盤上游動作(可能相關,可一併檢查):在前方分離連鎖許可後動作,一次只放下一片盤。 | 如果分離時序不對,可能沒有盤、或盤數不對送到前方,造成前方確認失敗。 | IOsetview(IO 監看畫面) |
+- **初步排除**：先確認兩件事:一是前方分料位置是不是真的有一片空盤停好;二是進料彈匣還有沒有空盤(是不是已經空掉了)。若彈匣空了就補入空盤;若有盤卡住或沒對正就整理好。確認後按「重試」鍵,讓拆盤動作重新執行一次。若連續重試仍跳同一個警報,請通報工程師。
+- **通報工程師**：若自行排除後仍無法解除,請通報工程師,並提供:警報代碼 MES1024、發生當下前方位置有沒有盤、進料彈匣是否還有空盤,以及在 IOsetview 看到的 SnEmpty_InputHasTray 是亮(ON)還是不亮(OFF)。工程師會先在 IOsetview 確認這顆感測器(對準、清潔、接線)是否正常,因為它是前方唯一的判斷點,有盤時應該要亮;若感測器正常卻讀不到盤,再檢查三顆拆盤汽缸(C_Empty_FrontRiseTray_1、C_Empty_FrontRiseTray_2、C_Empty_FrontSeparateTray_1)是否動作到位、確認訊號是否正常,並查看分離過程是否發生整疊掉落;另外確認機台不是在測試(空跑)模式,否則實體感測器的確認會被跳過。
 
-### 6.3 Color 供給
+### 5.3 Color 供給
 
-#### `MES1421` — Color 供料盤未就緒
+#### `MES1421` — Color 供料未就緒（後方取料位沒有盤）
+- **發生狀況**：Color 供料站要把一片盤送到後方取料位交給 TrayArm 取用，但在該檢查的時機，後方取料位偵測不到盤。通常出現在 Color 供盤、把盤搬到後方取料位之後。
+- **可能原因**：Color 供料彈匣沒盤了（來源用完，最常見）；盤在搬到後方途中掉落或沒停到定位（夾持中途鬆脫、或載台沒走到位）；後方感測器 SnColor_OutputBottomHasTray 沒對準、髒污或未啟用，實際有盤卻讀不到；（僅模擬測試模式會跳過此檢查，非真的缺盤）
+- **裝置狀態**：
 
-- **意義**：Color 供料流程把已夾持的料盤送到後側取料 Y 位置後，後側取料槽的到位感測器沒有讀到盤，代表這一輪供料實際上沒有把盤送到定位。
-- **常見原因**：
-  - Color 供料倉已空，實際上沒有盤被送到後側取料槽；
-  - 盤在運送到後側取料位途中掉落或未到位（夾持中途鬆脫，或載台行程不足）；
-  - `SnColor_OutputBottomHasTray` 感測器歪位、髒污或故障，看不到已送達的盤（若該感測器被關閉 Enable，則整個檢查被略過、不會報此警）；
-  - AMR 模式下（`bUseAMR`）：在 `iAmrFeedWaitSec` 設定的等待秒數內，AGV 沒有補送/交付供料盤。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnColor_OutputBottomHasTray` | sensor | 讀到 ON（後側/輸出取料槽有盤） | 讀到 OFF（取料槽沒有盤） | IOsetview（感測器 LED）；此 IO 也會印在 Note 備註列 |
-  | `MColorY` | motor | 已到達 `ColorTrayArmPickYPosition`（後側取料 Y），使盤停在感測器上方 | 行程不足會讓盤停在感測器前方（此警不直接讀馬達，僅為上游原因；真正超行程另報馬達警） | MotionView（軸位置 vs 教導位置） |
-  | `C_Color_PushTray / C_Color_LeanOnTray` | cylinder | 運送途中夾住盤，到達後側前才退回 | 夾持途中鬆脫會把盤留在原處、送不到後側感測器（此警不直接讀汽缸，僅為上游原因） | IOsetview（汽缸開關 + 到位 LED） |
+  | `SnColor_OutputBottomHasTray` | 感測器 | 後方取料位有盤時亮（ON） | 不亮（OFF），重新確認後方仍判定沒盤 | IOsetview（此感測器也會顯示在警報明細） |
+  | `MColorY` | 馬達 | 已移動到 Color 後方取料位置，盤停在該處 | 若沒走到位，盤會停在取料位外側，後方讀不到（上游可能原因，可一併檢查） | MotionView |
+  | `C_Color_PushTray / C_Color_LeanOnTray` | 汽缸 | 搬運中夾住盤、到取料位後才放開 | 若中途鬆脫，盤會掉或位移（上游可能原因，可一併檢查） | IOsetview |
+- **初步排除**：確認 Color 供料站是否還有盤，沒盤就補盤；檢查後方取料位是否有盤、盤是否停到定位。補好或擺正後按 Retry（重試）。
+- **通報工程師**：若已補盤、後方明明有盤卻一直判成沒盤，通報工程師，提供代碼 MES1421、後方是否真有盤、以及 SnColor_OutputBottomHasTray 在 IOsetview 亮不亮。工程師會確認感測器對位/啟用、MColorY 是否停到取料位、夾持汽缸是否中途鬆脫。
 
-- **處置**：補滿 Color 供料倉。若有盤卡在運送途中，先清除。AMR 模式下確認 AGV 確實已把供料盤送到 Color 進料源。到 IOsetview 確認 `SnColor_OutputBottomHasTray` 在盤實際停在後側槽時會亮 ON、且其 Enable 為開。若 AMR 等待太短，可調高 system/General.ini 內的 `iAmrFeedWaitSec`。排除後按 RETRY，供料流程會從頭重跑。
+#### `MES1422` — Color 推盤夾持失敗（沒夾到盤）
+- **發生狀況**：Color 供料在「靠緊＋推盤夾住」的動作時，推盤汽缸伸出後等了一小段時間仍沒偵測到到位，機台判定沒夾到盤而報警。
+- **可能原因**：推盤汽缸 C_Color_PushTray 伸出後，到位確認一直讀不到（沒盤可夾／行程不足／氣壓低）；供氣氣壓不足或機構卡住，推不到定位；到位確認感測器沒對準、髒污或接線問題
+- **裝置狀態**：
 
-#### `MES1422` — Color 推盤未確認（Push Tray Miss）
-
-- **意義**：Color 供料的推盤汽缸 `C_Color_PushTray` 被下令伸出，但在夾持穩定時間內其到位確認感測器沒有讀到 ON，夾持動作判定失敗、推盤退回。
-- **常見原因**：
-  - `C_Color_PushTray` 被下令伸出，但到位確認感測器在 `iColorFeedClampSettleMs` 時間內沒讀到 ON；
-  - 廠務氣壓不足或機構卡滯，推盤到不了確認的伸出位置；
-  - `iColorFeedClampSettleMs` 設太短，確認訊號其實剛好在檢查之後才到；
-  - 到位確認簧片/接線故障：汽缸實際已伸出，但確認感測器一直沒回報 ON；
-  - 前端接料位盤未坐正，推盤到不了確認行程（完全沒有盤通常會先報 MES1424，而非 MES1422）。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `C_Color_PushTray`（其到位感測器） | cylinder | 讀到 ON（推盤完全伸出、到位感測器在穩定時間內確認） | 讀到 OFF（下令推出但到位感測器一直沒到，隨後退回） | Note 備註列（印出該 IO 名與期望 ON/實際狀態）；IOsetview 推盤到位 LED |
+  | `C_Color_PushTray` | 汽缸 | 推盤完全伸出、到位確認亮（ON），代表夾到盤 | 已命令伸出但到位確認一直不亮（OFF），機台把它縮回並報警 | IOsetview（警報明細會帶出此裝置） |
+- **初步排除**：確認推盤位置真的有一片盤、盤有沒有擺正。確認後按 Retry（會重做一次靠緊＋推盤）。重試一兩次仍失敗，就通報工程師。
+- **通報工程師**：提供代碼 MES1422、警報明細、以及當時的動作。工程師會檢查推盤汽缸是否完全伸出、到位感測器在伸出位能否正常亮、供氣氣壓、以及靠緊汽缸是否先到位。
 
-- **處置**：確認 Color 前端接料位確實有盤且坐正，清除任何卡料，檢查廠務氣壓，然後按 RETRY（供料會回到重新接近並重新夾持的步驟）。可在 IOsetview 手動點動 `C_Color_PushTray`，觀察其到位 LED 在完整行程時是否確實亮/滅；檢查氣壓與汽缸速度。若只是確認訊號稍慢，調高 system/General.ini [Color] 內的 `iColorFeedClampSettleMs`。同時確認前端確有盤（IOsetview 看 `SnColor_InputHasTray` LED）——完全沒盤通常會在更上游報 MES1424，所以 MES1422 多半代表盤在但推盤行程不足或到位感測器故障。
+#### `MES1424` — Color 前段供料沒有盤子
+- **發生狀況**：這個警報表示:機台在做 Color 前段「拆盤補料」這個動作時,原本應該有一片盤子被分出來、放到前段的供料緩衝位上,但機台在那個位置沒有偵測到盤子。通常發生在前段拆盤補料的當下,結果就是前段供料區缺盤,沒辦法繼續往下供料。
+- **可能原因**：前段的疊盤(料倉)已經空了,所以拆盤時根本沒有盤子可以分出來放到前段緩衝位。；前段拆盤的汽缸沒有把動作做完:負責把整疊料頂起來夾住的兩支上升汽缸(C_Color_FrontRiseTray_1 / C_Color_FrontRiseTray_2),或負責一次只分出一片盤子的分離爪汽缸(C_Color_FrontSeparateTray_1),其中有一支卡住或沒到位,導致沒有盤子被放下來。；偵測盤子的感測器 SnColor_InputHasTray 該亮的時候沒亮(可能是位置沒對準、髒污或感測器故障),明明有盤子放上去卻讀成「沒有盤」。；盤子放下後還沒完全落穩,機台就太早去讀感測器,結果讀到當下還是沒盤(屬於節拍/沉澱時間太短,通常要通報工程師調整)。
+- **裝置狀態**：
 
-#### `MES1424` — Color 前端供料盤缺料
-
-- **意義**：Color 前端分盤（destack）流程跑完後，前端輸入/供料緩衝區的到位感測器沒有讀到盤，代表分盤沒有把任何一盤放到前端緩衝區。
-- **常見原因**：
-  - Color 前端供料疊盤已空，分盤沒有分出任何盤到前端緩衝；
-  - 某個前端分盤汽缸沒完成循環（雙頂升 `C_Color_FrontRiseTray_1`/`_2` 撐住疊盤，或分離爪 `C_Color_FrontSeparateTray_1` 分出單一盤），導致沒有盤被放下到前端緩衝；
-  - `SnColor_InputHasTray` 卡在 OFF（歪位/髒污/故障）而其 Enable 為開，使已放下的盤被判為缺料（Enable 關閉不會造成此警，只會略過檢查）；
-  - `iColorDestackSettleMs` 設太短，流程在分出的盤還沒坐穩前就讀感測器。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnColor_InputHasTray` | sensor | 讀到 ON（分盤後有一盤落在 Color 前端輸入/供料緩衝上） | 讀到 OFF（取樣時前端緩衝沒偵測到盤） | IOsetview（感測器 LED）；此 IO 名會印在 Note 備註列 |
-  | `C_Color_FrontRiseTray_1` | cylinder | 先頂升撐住前端疊盤，之後下降把最底盤放到前端緩衝 | 沒完成頂升/下降循環，未把盤放到緩衝 | IOsetview（汽缸 LED） |
-  | `C_Color_FrontSeparateTray_1` | cylinder | 分離爪切入分出單一盤，再退出放行剛好一盤 | 未能從疊盤分離/放出一盤 | IOsetview（汽缸 LED） |
+  | `SnColor_InputHasTray` | 感測器 | 亮(ON):拆盤後,前段供料緩衝位上有一片盤子,感測器應該亮。 | 不亮(OFF):機台去偵測的時候,前段緩衝位上沒有偵測到盤子。 | IOsetview(IO 監看畫面)看這個感測器的燈號;這個感測器的名稱也會顯示在警報提示視窗的明細那一行,方便對照。 |
+  | `C_Color_FrontRiseTray_1` | 汽缸 | 補料時先伸出(上升)把整疊盤子頂起來夾住,之後再縮回(下降)把最底下那一片盤子放到前段緩衝位上。 | 沒有把「上升→下降」這個動作做完,所以沒有盤子被放到緩衝位上。 | IOsetview(IO 監看畫面)看這支汽缸的燈號。 |
+  | `C_Color_FrontSeparateTray_1` | 汽缸 | 補料時分離爪伸入,把一片盤子和上面那疊隔開,之後縮回,剛好只放出一片盤子。 | 沒有成功把一片盤子從料疊分離放出來。 | IOsetview(IO 監看畫面)看這支汽缸的燈號。 |
+- **初步排除**：1. 先幫 Color 前段的料倉補滿盤子。2. 檢查前段拆盤的地方有沒有盤子放歪、卡住或疊錯,有的話把它清乾淨、擺正。3. 順手看一下前段的上升汽缸(C_Color_FrontRiseTray_1 / C_Color_FrontRiseTray_2)和分離爪汽缸(C_Color_FrontSeparateTray_1)有沒有卡住。4. 都排除後按 RETRY(重試),機台會重新做一次拆盤補料的動作。
+- **通報工程師**：如果補料、清盤後按 RETRY 還是一直報同一個警報,請通報工程師,並提供以下資訊:(1) 在 IOsetview 確認實際放一片盤子在前段緩衝位上時,SnColor_InputHasTray 會不會由不亮變亮(用來判斷是不是感測器卡死、髒污或沒對準);(2) 補料過程中,前段兩支上升汽缸(C_Color_FrontRiseTray_1、C_Color_FrontRiseTray_2)和分離爪汽缸(C_Color_FrontSeparateTray_1)是不是每一支都有正常動作;(3) 如果觀察到盤子其實有放下、只是落穩得比較慢、感測器讀取時機太早,請告知工程師,可調整前段拆盤的沉澱等待時間設定。註:Color 的 Y 軸搬運馬達 MColorY 不屬於這個補料動作,不用往那個方向懷疑。
 
-- **處置**：補滿 Color 前端供料疊盤，清除前端分盤處任何錯位或卡住的盤，然後按 RETRY（分盤流程重跑）。可在 IOsetview 確認 `SnColor_InputHasTray` 在盤實際放在前端緩衝時會亮 ON（排除感測器卡死/髒污/歪位），並觀察前端分盤汽缸 `C_Color_FrontRiseTray_1`、`C_Color_FrontRiseTray_2` 與分離爪 `C_Color_FrontSeparateTray_1` 是否都有動作。若盤坐穩時間略晚於取樣，調高 system/General.ini 內的 `iColorDestackSettleMs`。此流程與 `MColorY`（Y 運送）無關，不必懷疑該軸。
+#### `MES1426` — Color 後方交接位有殘留盤子
+- **發生狀況**：這個警報表示 Color 區後方的交接位置上還留著一個盤子。系統通常是在準備送出新的一盤(供料)之前先檢查後方交接位:照理這個位置應該是空的,但卻偵測到還有盤子,系統就會停下來報這個警報,以免把新盤疊上去或撞到。最常見的情況,是先前發生過故障、中止,或斷電重開之後,有盤子沒被清走留在原處。
+- **可能原因**：先前發生故障、被中止,或斷電重開之後,有一個盤子被留在 Color 後方交接位置,沒有清走。；後方偵測盤子的感測器(SnColor_OutputBottomHasTray 或 SnColor_TrayPos1)卡在一直有訊號(一直亮)的狀態,其實沒有盤子卻被誤判成有盤。；先前的接收/回收盤子動作被中途打斷,系統內部記著「後方有盤」,還沒有重新用感測器實況更新過來。
+- **裝置狀態**：
 
-#### `MES1426` — Color 後側殘留料盤
-
-- **意義**：一輪 Color 供料開始前檢查發現後側交接槽被判定仍有盤（`bRearHasTray`（邏輯）為真），代表有盤殘留在該處，既不能被取走也不能重新上料，必須人工移除。
-- **常見原因**：
-  - 先前的故障、中止或斷電後，有一盤被留/卡在 Color 後側交接槽；
-  - 後側到位感測器（`SnColor_OutputBottomHasTray` 或 `SnColor_TrayPos1`）卡在 ON 或誤讀，使 `bRearHasTray`（邏輯）在沒有實際盤時為真；
-  - 接料/回收流程被中斷，`bRearHasTray`（邏輯）在感測器刷新前仍鎖在真。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `bRearHasTray`（邏輯） | logic | 為 false（新一輪供料開始前後側交接槽是空的） | 為 true（後側槽被標為佔用/殘留盤，擋住供料） | State Record・EventLog（此警不會在 Note 印出 IO 名） |
-  | `SnColor_OutputBottomHasTray` | sensor | Enable 開時讀到 OFF（後側/輸出槽無盤） | ON（有殘留盤，或感測器卡在 ON）——會使後側判定為佔用 | IOsetview（IO LED） |
-  | `SnColor_TrayPos1` | sensor | Enable 開時讀到 OFF（後側位置無盤） | ON（偵測到殘留盤）——並列的後側感測器，同樣使後側判定為佔用 | IOsetview（IO LED） |
+  | `後方有盤(系統內部判定,畫面上無對應 IO 名稱)` | 狀態/計數 | 開始供料前,後方交接位置應判定為「無盤(空的)」。 | 被判定為「有盤」(疑似殘留盤子),因而擋住送料。 | 狀態紀錄(這是系統內部的判斷,警報畫面上不會顯示對應的感測器名稱,請通報工程師協助查閱) |
+  | `SnColor_OutputBottomHasTray` | 感測器 | 沒有盤子時應「不亮(OFF)」,代表後方/出料位置是空的(此感測器須為啟用狀態)。 | 「亮(ON)」,代表位置上有殘留盤子,或是感測器卡在一直亮的狀態。 | IOsetview(IO 監看畫面) |
+  | `SnColor_TrayPos1` | 感測器 | 沒有盤子時應「不亮(OFF)」,代表後方位置是空的(此感測器須為啟用狀態)。 | 「亮(ON)」,偵測到殘留盤子;它是與上一個並行的後方感測器,同樣會讓系統判定後方有盤。 | IOsetview(IO 監看畫面) |
+- **初步排除**：1. 到 Color 區後方的交接位置,實際看一下是否有殘留的盤子,若有請把它取走。2. 盤子取走後,後方感測器就會回到「無盤」狀態。3. 按 RETRY(重試),系統會重新用感測器實況再檢查一次;若確認已淨空,就會繼續正常送料。4. 若取走後仍被判定有盤,送料會直接結束、不會再送出盤子,此時請進一步檢查感測器或通報工程師。
+- **通報工程師**：若後方交接位置實際上已經沒有盤子,警報卻一直出現,請通報工程師,並提供以下資訊:在 IOsetview(IO 監看畫面)查看 SnColor_OutputBottomHasTray 與 SnColor_TrayPos1 這兩個後方感測器,是否卡在一直亮(ON)的狀態,並確認兩者都是「啟用」狀態(其中任一顆卡在亮,都會讓系統誤判後方有盤)。同時請工程師調閱狀態紀錄,確認先前是否有被中途打斷的接收/回收盤子動作,導致系統內部「後方有盤」的記憶沒有更新回來。
 
-- **處置**：把殘留盤從 Color 後側交接槽實際移除，後側到位感測器隨即清除該旗標。按 RETRY 會重新檢查；若已清空，供料繼續進行；若仍佔用，供料會落到結束終點而不出盤。若實際上沒有盤但警報仍在，到 IOsetview 檢查 `SnColor_OutputBottomHasTray` 與 `SnColor_TrayPos1` 是否卡在 ON（並確認各自 Enable 為開），並查 State Record・EventLog 是否有中斷的接料/回收流程把旗標鎖住。
+#### `MES1427` — Color 供料/回收料倉滿盤,排空盤子無處可放
+- **發生狀況**：這個警報表示 Color 站的供料/回收料倉已經堆滿盤子,沒有空位可以放盤。它通常出現在「清機排空(Clean Out)」的時候:設備正把 Color 站剩下的盤子往回送回料倉,但料倉已經塞滿,盤子無處可放,於是停下來等你把盤子取出。
+- **可能原因**：料倉真的滿了:清機排空時盤子一直往回送、堆到滿,還沒有人把盤子拿走。；堆滿的盤子還沒被取出:要先把料倉裡的盤子拿走,騰出空位,排空才能繼續。；感測器誤判或卡住:SnColor_InputFullTray 一直顯示「滿」,但實際上料倉並沒有滿(感測器故障)。
+- **裝置狀態**：
 
-#### `MES1427` — Color 供料疊盤已滿（感測器）
-
-- **意義**：只在 Clean Out 排空階段觸發——Color 把剩餘料盤逐一送回車時，供料/回收疊盤已滿（`SnColor_InputFullTray` 讀到 ON），送回的盤無處可放。
-- **常見原因**：
-  - Clean Out 排空時，Color 把每個剩餘盤送回車，但供料/回收疊盤滿了（`SnColor_InputFullTray` ON），排出的盤沒地方去；
-  - 操作員尚未把排空推回倉裡的疊盤取走；
-  - `SnColor_InputFullTray` 卡住/誤讀為 ON（感測器故障），實際上疊盤並未滿。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnColor_InputFullTray` | sensor | 讀到 OFF（Color 供料/回收疊盤仍有空間） | ON（只要仍讀到 ON，就反覆重跳 MES1427） | IOsetview（LED，別名 `SnColor_InputFullTray`）；此 IO 也會印在 Note 備註列 |
+  | `SnColor_InputFullTray` | 感測器 | 不亮(OFF):料倉還有空位可以放盤 | 亮(ON):判定料倉已滿,警報會一直重複跳出,直到它變成不亮 | IOsetview(IO 監看畫面),找別名 SnColor_InputFullTray;警報訊息那一行也會標出這顆感測器的名稱,方便對照 |
+- **初步排除**：1. 到 Color 站的供料/回收料倉,把堆積在裡面的盤子取出來,騰出空位。 2. 取出後,在畫面上按「重試(RETRY)」,設備會重新檢查感測器。 3. 只要料倉確實清空、感測器不再顯示滿,警報就會消失,排空動作會自動繼續。 若已經把盤子取出、料倉看起來並沒有滿,按重試卻還是一直跳同樣的警報,就可能是感測器問題,請通報工程師。
+- **通報工程師**：若料倉已經清空、盤子都拿走了,重試後警報仍一直出現,請通報工程師,並提供:(1) 警報代碼 MES1427;(2) 發生當下的動作(清機排空 Clean Out 進行中);(3) 到 IOsetview 觀察 SnColor_InputFullTray:拿走盤子時它有沒有跟著變成不亮(OFF)、料倉滿時是不是會亮(ON)。若拿走盤子後它還是一直亮,很可能是這顆感測器卡住或故障。請提醒工程師:這顆感測器一旦卡在「滿」,不只會卡住排空,也會讓整個清機一直無法完成;此問題只會在真機上發生,模擬模式不會出現。
 
-- **處置**：把 Color 供料/回收倉裡疊放的盤取走。此警會反覆彈出（RETRY）直到 `SnColor_InputFullTray` 讀到 OFF；按 RETRY 會重新檢查感測器，一旦疊盤實體清空，迴圈退出、排空繼續。若疊盤已取空但警報仍在，到 IOsetview 確認 `SnColor_InputFullTray` 在移除盤時是否轉為 OFF、放滿時轉為 ON（排除卡死感測器把排空困在迴圈裡）。此檢查只在 Clean Out 排空階段生效，且卡在 ON 的感測器也會讓排空永遠無法完成，在 SOFT_SIMULATE 模擬下不會觸發，只能在真機重現。
+### 5.4 Auto 出料站 1~6（六站同型）
 
-### 6.4 Auto 出料站 1~6 (六站同模式)
+#### `JAM1102~1602` — 自動站推盤未到定位(推盤汽缸未確認)
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：這個警報代表:自動站(Auto1~Auto6 其中一站)在把托盤往工作載具推進去時,推盤的汽缸沒有推到「已推到底、盤已就位」的位置,設備收不到到位確認,就停下來報警。通常發生在推盤這個動作的當下。哪一站報警看代碼結尾就知道(JAM1102 是 Auto1,JAM1202 是 Auto2,依此類推到 JAM1602 是 Auto6)。
+- **可能原因**：托盤卡住或沒放正,汽缸推不到底(最常見)；確認到位的感測器髒了、被撞歪、位置跑掉,汽缸實際推到了但感測器沒感應到；氣壓不足或電磁閥不順,汽缸推到一半就停住,到不了到位點；這隻汽缸推到定位的時間比設定的等待時間還久,設備還沒等到到位就先判定失敗(屬時間偏緊,通報工程師調整)
+- **裝置狀態**：
 
-#### `JAM1102~JAM1602` — Auto 推盤未到定位
-- **適用**：Auto1~6 各站（序號 11~16）
-- **意義**：Auto 站推盤氣缸推出後，在等待時間內沒有讀到「推到定位」的確認訊號，代表盤子沒有被推到最前端的定位。
-- **常見原因**：
-  - 盤子實體卡住或沒放正，推盤氣缸無法完全推到定位；
-  - 推盤氣缸的到位確認 sensor 故障、脫線或位置偏掉，盤子已到定位卻讀不到；
-  - 氣壓不足或電磁閥故障，氣缸推到一半就停住；
-  - 該站推盤確認的等待時間 `iAutoPushConfirmSettleMs`（General.ini 設定）太短，氣缸還沒推到就先做確認。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `C_Auto1_PushTray`（代表；其餘站為 `C_Auto2..6_PushTray`） | cylinder | 推出並穩定後推到最前定位，到位 sensor 亮（有到位）→ 流程往下進 | 沒到定位：等待時間內到位 sensor 一直沒亮，隨後氣缸縮回才報警 | IOsetview（推盤電磁閥輸出＋氣缸到位確認 sensor 燈）；Note 備註列也會印出這顆到位 sensor 的 IO 名稱 |
-  | `C_AutoN_PushTray` 的到位確認 sensor（其名稱會印在 Note 的 [IO=...]） | sensor | 氣缸完全推出、盤子就位時讀到 ON（到位） | 讀到 OFF（未到位）— 在等待時間內始終沒亮 | Note 備註列（印出此 sensor 的 IO 名稱與期望/實際）；再到 IOsetview 現場確認 |
-- **處置**：打開該站，取出或重新擺正卡住／沒放正的盤子，然後按 RETRY 重新推盤。若氣缸有完全推出但到位 sensor 燈不亮，多半是 sensor／接線／對位問題；若氣缸推到一半就停，檢查氣壓與機構卡滯。重複發生就停機找維修人員。
+  | `C_Auto1_PushTray(此為代表;其他站為 C_Auto2_PushTray ~ C_Auto6_PushTray)` | 汽缸 | 推盤後應完全伸出到到位點,盤子就位,汽缸上的到位感測器亮(ON)代表推到底了,設備才會繼續下一步 | 沒推到到位點:在等待時間內到位感測器一直沒亮(OFF),之後汽缸又縮回,接著報警 | IOsetview(IO 監看畫面):看推盤電磁閥的輸出,以及這隻汽缸的到位確認感測器燈號;警報明細那行也會顯示這顆到位感測器的 IO 名稱 |
+  | `C_AutoN_PushTray 的到位確認感測器(附屬在推盤汽缸上,是判斷汽缸有沒有推到底的感測器)` | 感測器 | 當推盤汽缸完全推到底、盤子就位時應亮(ON) | 不亮(OFF):在等待時間內從頭到尾都沒亮起來,所以設備判定汽缸沒到位 | 警報明細那行會印出這顆感測器的 IO 名稱與應該/目前狀態;也可到 IOsetview(IO 監看畫面)即時確認燈號 |
+- **初步排除**：打開該站,把卡住或沒放正的托盤取出或重新擺正放好,然後選「重試(Retry)」讓設備重新推一次。若一直重複發生,請停機並通報工程師。
+- **通報工程師**：請工程師在 IOsetview(IO 監看畫面)一邊動作一邊觀察:看推盤電磁閥輸出與到位確認感測器的燈號。若汽缸有完全伸出、但感測器燈一直不亮,就是感測器/接線/位置對位有問題;若汽缸推到一半就停,檢查氣壓與機構有沒有卡到。若動作都正常只是時間偏緊,請調長推盤到位的等待時間。另外要確認這顆到位感測器有「啟用(Enable)」——若被停用,設備會誤判成已到位而蓋掉這個故障。這 6 個自動站的處理方式完全相同。通報時請附上:哪一站(警報代碼)、警報明細那行顯示的感測器 IO 名稱與狀態、以及重試幾次仍失敗。
 
-#### `JAM1111~JAM1611` — Auto 後段已登記盤資料但後段無盤 sensor
-- **適用**：Auto1~6 各站（序號 11~16）
-- **意義**：軟體判定 TrayArm 已把盤交到這個 Auto 站的後段暫存位（有交盤鎖存），但要移動前檢查後段底部 sensor 卻讀不到盤。
-- **常見原因**：
-  - TrayArm 其實從未真正交盤，或交盤鎖存 `bRearDeliveredPending`（邏輯）設立後盤又滑掉／被取走；
-  - 後段底部 `SnAutoN_OutputBottomHasTray` sensor 故障、被停用、脫線或對位偏掉，有盤卻讀成無盤；
-  - 前次中斷或 HOME 打斷的循環留下殘存／假的交盤鎖存，讓 `bRearHasTray`（邏輯）在 sensor 已 OFF 時仍被鎖成有盤；
-  - 盤子有放，但落在後段底部 sensor 的偵測範圍之外。
-- **檢查點**：
+#### `JAM1111~JAM1611(Auto1~Auto6 後方料盤,每站各一個代碼)` — Auto 後方顯示「已送到料盤」,但感測器卻偵測不到盤
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：這個警報通常出現在自動生產中、供盤手臂剛把料盤補到某個 Auto 站「後方下層放盤位」之後。系統認為手臂已經把一個料盤送到該站後方,但那個位置的底部有盤感測器卻偵測不到盤。也就是「系統以為有盤、機構卻看不到盤」,兩邊對不起來,所以停機示警。Auto1~Auto6 任一站都可能出現,代碼會依站別不同(例如 Auto3 就是 JAM1311)。
+- **可能原因**：料盤其實沒被真正放好,或放好後又滑掉、被人取走了。；後方底部的有盤感測器(SnAuto1_OutputBottomHasTray 這一類)故障、被關閉(未啟用)、接線鬆脫或位置沒對準,導致明明有盤卻讀成沒盤。；之前有一次生產被中途取消,或途中回 HOME 被打斷,系統殘留了一筆舊的「已送盤」記憶,即使感測器現在沒盤,系統仍當作有盤。；料盤有放,但位置偏掉了,剛好落在感測器偵測範圍之外,所以感測不到。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnAuto1_OutputBottomHasTray`（代表；各站為 `SnAuto2_..SnAuto6_OutputBottomHasTray`） | sensor | 讀到 ON（有盤）— 後段暫存位確實有盤，與軟體交盤鎖存相符 | 讀到 OFF（無盤，或 sensor 未接／被停用）— 軟體認為已交盤但 sensor 讀不到 | IOsetview（後段底部有盤 sensor 燈）；Note 備註列也會印出此 sensor 的 IO 名稱 |
-  | `bRearDeliveredPending`（邏輯，交盤鎖存，護住 `bRearHasTray`） | logic | 只有 TrayArm 真正把盤交到此 Auto 後段（Z 上升確認完成）才會設立；用來防止後段有盤鎖存被 OFF sensor 誤清 | 無盤在場卻被設為成立 — 假／滯留的交盤鎖存讓 `bRearHasTray` 一直鎖成有盤，選料仍會選到本站 | State Record・EventLog（後段交盤鎖存與 `bRearHasTray` 狀態） |
-- **處置**：先清掉 Auto 後段任何滯留的盤。若確實有盤、sensor 應該要看到它，按 RETRY 重新讀 sensor（有盤讀不到多半是 sensor／接線／對位故障或被停用，需維修處理）。若後段確實沒有盤，按 SKIP 清掉這筆後段登記資料，TrayArm 之後會依需求重新補盤。
+  | `SnAuto1_OutputBottomHasTray(代表;各站分別為 SnAuto2~SnAuto6_OutputBottomHasTray)` | 感測器 | 後方下層放盤位真的有盤時應該亮(ON),和系統認為的「已送盤」一致 | 不亮(OFF),或這顆感測器未啟用、沒接上;但系統仍認為已經送了一個盤到這裡 | IOsetview(IO 監看畫面):看這一站後方底部「有盤」感測器的燈號;警報明細也會顯示這顆感測器的名稱,可直接照著找 |
+  | `軟體記錄的「後方已送盤」狀態(送盤記憶)` | 狀態/計數 | 只有在供盤手臂確實把盤交到這個 Auto 後方後才會記成「有盤」,用意是避免感測器瞬間讀不到就被誤清掉 | 實際上沒有盤,卻被記成「有盤」,變成殘留的假記憶,讓系統一直以為這站有盤而持續挑這站補料 | 狀態紀錄;這是純軟體內部記憶、OP 在畫面上看不到單一燈號,若懷疑是這項請通報工程師 |
+- **初步排除**：先看該 Auto 站後方下層放盤位上,有沒有殘留、放歪或半掉出來的料盤:有的話先把它取走或擺正。若確實有盤、但感測器沒反應,選「重試(Retry)」讓系統重新確認一次感測器。若確認那裡真的沒有盤,選「略過(Skip)」清掉這筆「已送盤」的資料,之後供盤手臂會在需要時重新補盤。
+- **通報工程師**：若取走殘留盤、重試、略過都排除不了,或懷疑感測器壞掉:請通報工程師。通報時請提供:1) 是哪一個 Auto 站(1~6)、2) 警報代碼(例如 JAM1311)、3) 當下後方放盤位實際上到底有沒有盤、4) 在 IOsetview 看到該站 SnAutoN_OutputBottomHasTray 這顆感測器的燈號是亮還是不亮。工程師會拿一個確定有盤的料盤去比對這顆感測器:若有盤卻讀不到,就修感測器/接線/對位或重新啟用它;若確認是殘留的假記憶(沒盤但感測器正常),用「略過」清掉該站狀態,再到狀態紀錄逐站確認。此警報適用全部 6 個 Auto 站。
 
-#### `MES1120~MES1620` — Auto 出料堆疊實體已滿（sensor）
-- **適用**：Auto1~6 各站（序號 11~16）
-- **意義**：Auto 站的滿料 sensor `InputFullTray` 讀到 ON，代表該站出料堆疊實體已滿，無法再收盤。此警報只在真機出現。
-- **常見原因**：
-  - 出料堆疊已裝滿完成盤 — 在 AMR=0／人工顧機的機台上是正常的批次結束狀態，操作員（或 AGV）尚未取走盤子；
-  - 完成盤未清空，導致清機上升或出料／退料循環無法進到已滿的堆疊；
-  - `SnAutoN_InputFullTray` 滿料 sensor 卡住／誤報 ON（被雜物擋住、對位偏掉或接線異常），實際並未滿 — 此時警報視窗會因為一直讀到 ON 而無法自動關閉。
-- **檢查點**：
+#### `MES1120 / MES1220 / MES1320 / MES1420 / MES1520 / MES1620(對應 Auto1~Auto6 出料站,各一個代碼)` — Auto 出料站疊盤區已滿(滿盤感測器亮起)
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：這個警報表示某一台 Auto 出料站的「出料疊盤區已經滿了」。系統偵測到該站的滿盤感測器亮起,代表疊盤區已經沒有空間再放下一片完成的盤。通常在整批快做完、或完成盤沒有及時被取走時出現。此時畫面會跳出提示視窗把該站擋住,並持續重新偵測感測器,直到你把盤取走、感測器變回不亮,視窗才會自動關閉。屬於「等操作員處理」的正常提示,不一定是故障。
+- **可能原因**：出料疊盤區被完成盤放滿了。在沒有 AMR、由人員顧機的機台,這通常是整批快結束時的正常現象,只是完成盤還沒被人員(或 AGV)取走。；完成盤沒有清走,導致清機或出料動作無法再把盤送進已經放滿的疊盤區。；滿盤感測器卡住或誤動作(被異物遮住、盤沒對正、或接線問題),實際上疊盤區並沒有滿卻一直亮。這種情況下提示視窗不會自己關掉,因為它一直讀到感測器是亮的。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnAuto1_InputFullTray`（代表；各站為 `SnAuto2_..SnAuto6_InputFullTray`） | sensor | 讀到 OFF（未滿，堆疊還有空間） | 讀到 ON（偵測到滿）— 警報視窗每輪重讀此 sensor，直到讀到 OFF 才會關閉 | IOsetview（此 sensor 的 IO 燈）；Note 備註列也會直接印出此 sensor 名稱、期望 OFF／實際 ON 與其位址 |
-- **處置**：把該 Auto 站出料堆疊上的完成盤取走。警報視窗（RETRY）會在每一輪重讀滿料 sensor，一旦 sensor 變 OFF 就自動關閉，系統隨即清空該車計數並重新初始化堆疊 — 不需要手動輸入數量，全由 sensor 決定。若堆疊看起來明明是空的但視窗一直關不掉，到 IOsetview 檢查該站 `SnAutoN_InputFullTray` 是否卡在 ON（光學被擋、滿料撥片偏位或接線短路），sensor 一直讀 ON 視窗就無法自行關閉。
+  | `SnAuto1_InputFullTray(代表值;各站分別為 SnAuto1_InputFullTray ~ SnAuto6_InputFullTray,對應 Auto1~Auto6)` | 感測器 | 不亮(OFF)——表示出料疊盤區還有空間,可以放下一片盤。 | 亮(ON)——表示疊盤區被判定已滿,放不下新的盤。 | IOsetview(IO 監看畫面),找這顆感測器的 IO 燈號。跳出的提示視窗明細列也會直接印出這顆感測器的名稱與位址,可對照確認。 |
+- **初步排除**：到該台 Auto 出料站,把已完成的盤取走、清空疊盤區。系統會持續重新偵測滿盤感測器,只要感測器變回不亮(OFF),提示視窗就會自動關閉,系統也會自動把該站的盤數歸零並重新開始堆疊,不需要你手動輸入盤數,整個過程是靠感測器判斷的。
+- **通報工程師**：先確認是哪一台站別發出警報:MES1120=Auto1、MES1220=Auto2、MES1320=Auto3、MES1420=Auto4、MES1520=Auto5、MES1620=Auto6。如果疊盤區明明已經清空、提示視窗卻一直關不掉,請到 IOsetview 檢查該站的 SnAutoN_InputFullTray 是否卡在亮(ON)——可能被異物遮住、盤上的滿位標記沒對正、或接線短路。可把提示視窗明細列印出的感測器名稱與位址記下來,提供給工程師。此警報只會在真機發生(模擬模式不會出現),請在真機上排查。另外提醒:同一站別還有另一組「疊盤計數已達上限」的警報(屬純計數邏輯、沒有單一感測器可看),那是不同的警報,請勿混淆。
 
-#### `MES1123~MES1623` — Auto 清機排空後仍有殘留盤
-- **適用**：Auto1~6 各站（序號 11~16）
-- **意義**：在 Clean Out 清機模式下、且所有站的排空鎖存都已完成時，看門檢查發現某 Auto 站的三個 sensor（前段進料、滿料堆疊、後段底部）之中仍有一個讀到有盤，代表排空已判定完成但實體還留著盤。此為診斷紀錄，不會停機、沒有恢復按鈕，機台繼續運轉。只在真機出現。
-- **常見原因**：
-  - 清機排空完成時，某 Auto 站（前段進料位、滿料／出料堆疊、或後段／出料底部暫存）仍卡著一盤沒清掉；
-  - 該站三個 sensor 之一卡在 ON（被擋住／對位偏掉／接線異常），站其實是空的卻被記成有殘留盤；
-  - 排空完成是純邏輯鎖存 `bCleanOutFinish`（邏輯，不看 sensor），在盤子還沒實際離開前軟體旗標就先被清掉，導致鎖存提前判完成。
-- **檢查點**：
+#### `MES1123~MES1623(Auto1~Auto6 站別各對應一組)` — 自動清機完成後,Auto 站別仍偵測到殘留料盤(診斷紀錄,不停機)
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：這是一筆「診斷紀錄」,不是會停機的警報。畫面上不會跳出視窗、也沒有復歸按鈕,機台會照常繼續運轉,只是把狀況記在紀錄裡供事後查看。它出現的時機是:執行「清機(Clean Out)」清空作業,系統已判定該 Auto 站別清空完成之後,現場的料盤感測器卻仍偵測到有盤。每個 Auto 站別(Auto1~Auto6)都有各自的一組代碼(MES1123~MES1623),只在清機模式下才會出現。簡單說,就是「系統認為已經清乾淨,但感測器說還有一片盤」,兩者對不上。
+- **可能原因**：清機結束時,有一片料盤實際被遺留在某個 Auto 站別 —— 可能在前段進料位、滿盤/疊放位、或後段/底部暫存位。；該站三個位置感測器其中一個卡在「有盤」狀態(被料盤或雜物遮擋、位置偏移、或接線異常),站別其實已經空了,系統卻誤以為還有盤。；系統內部提前判定清機完成,但實際上料盤還沒離開站別。這種情況沒有單一感測器可以直接看出來,需請工程師協助判斷。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnAuto1_InputHasTray`（各站 `SnAuto2..6_InputHasTray`）— 前段進料位有盤 sensor | sensor | 排空後讀到 OFF（前段進料位無殘留盤） | 讀到 ON — 紀錄的 Where 欄位顯示 front=1 | State Record・EventLog（該筆 MES 紀錄的 Where 欄 front=/full=/rear=）；再到 IOsetview 現場確認 |
-  | `SnAuto1_InputFullTray`（各站 `SnAuto2..6_InputFullTray`）— 滿料堆疊有盤 sensor | sensor | 排空後讀到 OFF（堆疊已空） | 讀到 ON — Where 欄顯示 full=1 | State Record・EventLog（Where full= 旗標）；再到 IOsetview 確認 |
-  | `SnAuto1_OutputBottomHasTray`（各站 `SnAuto2..6_OutputBottomHasTray`）— 後段／出料底部暫存 sensor | sensor | 排空後讀到 OFF（後段暫存無殘留盤） | 讀到 ON — Where 欄顯示 rear=1 | State Record・EventLog（Where rear= 旗標）；再到 IOsetview 確認 |
-  | `bCleanOutFinish`（邏輯，排空完成鎖存）與每次只記一行的記錄鎖存 | logic-state | 該站真正排空（無實體盤）時才鎖存完成 | 排空已鎖存完成，卻仍有實體 sensor 讀到 ON — 兩者不一致就產生此紀錄 | State Record・EventLog（排空完成鎖存與記錄旗標會印在 Auto 狀態追蹤中） |
-- **處置**：這是診斷紀錄，不是彈窗 — 機台不會停、也沒有恢復按鈕。清機結束後，到 D:\HT160S_Log 的 EventLog 找到該站的 MES1123..MES1623 那一行，讀它的 Where 欄（front=／full=／rear=）判斷是哪個位置有盤，再到現場檢查並取走殘留盤：front＝前段進料位、full＝滿料／出料堆疊、rear＝後段／出料底部暫存。若該位置實體是空的、sensor 卻仍讀 ON，代表該 sensor 被擋住／對位偏掉／接線異常，需修 sensor（也可能是排空提前鎖存完成所致）。
+  | `SnAuto1_InputHasTray(各站別依序為 SnAuto2~6_InputHasTray)— 前段進料位的料盤感測器` | 感測器 | 清機完成後應「不亮(OFF)」,代表前段進料位沒有殘留料盤 | 若紀錄標示前段位置有盤,表示此感測器仍「亮(ON)」 | 先看狀態紀錄(該筆紀錄會標出前段/滿盤/後段哪個位置被判定有盤),再到 IOsetview(IO 監看畫面)確認現況 |
+  | `SnAuto1_InputFullTray(各站別依序為 SnAuto2~6_InputFullTray)— 滿盤/出料疊放位的料盤感測器` | 感測器 | 清機完成後應「不亮(OFF)」,代表疊放位已清空 | 若紀錄標示滿盤位置有盤,表示此感測器仍「亮(ON)」 | 先看狀態紀錄(滿盤位置標記),再到 IOsetview(IO 監看畫面)確認現況 |
+  | `SnAuto1_OutputBottomHasTray(各站別依序為 SnAuto2~6_OutputBottomHasTray)— 後段/出料底部暫存位的料盤感測器` | 感測器 | 清機完成後應「不亮(OFF)」,代表後段暫存位沒有殘留料盤 | 若紀錄標示後段位置有盤,表示此感測器仍「亮(ON)」 | 先看狀態紀錄(後段位置標記),再到 IOsetview(IO 監看畫面)確認現況 |
+  | `清機完成判定(系統內部邏輯狀態,沒有對應的單一實體感測器)` | 狀態/計數 | 只有當站別真的淨空(沒有任何實體料盤)時,系統才判定清機完成 | 系統已判定清機完成,但仍有一個實體感測器顯示有盤 —— 就是這個「對不上」才產生這筆紀錄 | 無法在畫面上單獨查看,請通報工程師 |
+- **初步排除**：這是一筆診斷紀錄,不是停機警報:畫面不會跳視窗、沒有復歸按鈕,機台會繼續運轉,OP 不需要當下做任何緊急處置。清機作業結束後,請依這筆紀錄做初步確認:1) 找出被標記的 Auto 站別(Auto1~Auto6)。2) 看紀錄指出的位置是「前段進料位」「滿盤/疊放位」還是「後段/底部暫存位」,到現場該位置目視檢查。3) 若真有殘留料盤,直接把它取走即可。4) 若現場明明已經沒有料盤,可到 IOsetview(IO 監看畫面)看對應的感測器是不是還「亮(ON)」;若還亮,通常是感測器被遮擋、位置偏移或接線異常 —— 這部分需請工程師檢修,OP 不需自行拆裝感測器。
+- **通報工程師**：如果清空後感測器仍顯示有盤、或現場已確認淨空但這筆紀錄反覆出現,請通報工程師,並提供以下資訊:發生的 Auto 站別編號(Auto1~Auto6)、對應的警報代碼(MES1123~MES1623)、以及狀態紀錄中標示的位置(前段/滿盤/後段是哪一個)。對應關係供工程師參考:前段對應 SnAutoN_InputHasTray、滿盤對應 SnAutoN_InputFullTray、後段對應 SnAutoN_OutputBottomHasTray(N 為站別編號)。工程師會在 IOsetview 逐一比對這些感測器,判斷是「真的有殘盤」還是「感測器故障」;若站別確實淨空卻仍被判定完成,則屬系統內部判定提前完成的問題,需由工程師進一步檢查。
 
-#### `MES1125~MES1625` — Auto 出料車依盤數計數判定已滿
-- **適用**：Auto1~6 各站（序號 11~16）
-- **意義**：在 Normal 正常生產模式下，此 Auto 站出料車的軟體盤數計數 `iTrayCount`（邏輯）已達每車上限（100 盤），而且實體滿料 sensor 沒有觸發（OFF／停用／未接），因此改由盤數計數判定滿車。此為純計數警報，不對應任何 IO。
-- **常見原因**：
-  - 正常換車時機：自上次清空以來已餵入 100 盤到此 Auto 出料車 — 在未啟用實體滿料 sensor 的機台上，這是標準換車觸發；
-  - 實體 `SnAuto{N}_InputFullTray` sensor 讀 OFF／被停用／未設定，所以實體滿料 sensor 路徑（`MES1120~MES1620`）沒觸發，改由此盤數計數接手；
-  - 操作員先前換／清實體車時沒有在彈窗上按確認，計數沒被歸零而持續累加到 100 — 因此即使實體車沒真的滿也可能報警（計數不會因出料或清機而自動歸零）。
-- **檢查點**：
+#### `MES1125 / MES1225 / MES1325 / MES1425 / MES1525 / MES1625(Auto1~Auto6 各一組,出料車滿盤警報)` — 出料車已滿(依盤數累計)— Auto 出料需換車
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：這個警報代表某一台 Auto(Auto1~Auto6 其中一台)的出料車,依系統累計的放盤數量已經達到滿車上限(100 盤),所以機台停下來要求你換車。它通常出現在自動生產、Auto 正把盤放進出料車的過程中,畫面會顯示類似「Auto 出料車已滿(100 盤),請更換料車後確認」的訊息。要特別注意:這是「用累計盤數」判定的滿車,不是靠出料車上的滿盤感測器偵測到的滿(感測器偵測到滿是另一支警報)。
+- **可能原因**：正常換車時機:這台 Auto 自上次清空後,已經累計放入 100 盤到出料車,達到設定的滿車上限,所以提示你換車。在「沒有啟用出料車滿盤感測器」的機台上,這就是標準的換車提示,屬正常狀況。；出料車的滿盤感測器(SnAuto1_InputFullTray ~ SnAuto6_InputFullTray)沒有亮(OFF)、被關閉或沒有配置,所以「感測器偵測到滿」的警報沒有先跳,改由這個「累計盤數」的判定接手。；之前有人換過或清過料車,但沒有在畫面上按確認,系統的累計盤數就沒有歸零,會一直往上加到 100;因此就算料車實際上還沒真的裝滿,也可能跳出這個警報。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `iTrayCount`（邏輯，軟體盤數計數）對每車上限（100 盤） | logic | 計數 < 100（帳面上還有容量） | 計數 ≥ 100（帳面判滿）。此計數只在餵料時累加、只在車體清空時歸零；出料或清機都不會改動它 | State Record・EventLog（車體盤數計數；此警報不帶 IO，故無 sensor 燈、無 Note 備註列） |
-  | `SnAuto{N}_InputFullTray`（N=站號；`SnAuto1_..SnAuto6_InputFullTray`） | sensor | 要走到本警報而非 `MES1120~MES1620`，此 sensor 必須讀 OFF／停用／未設定；若它是 ON，會改觸發姊妹警報 `MES1120~MES1620` | OFF／停用／未接（確認這是計數判滿、不是實體 sensor 判滿）。它在此只作為兩條分支的判別依據，不是本警報的觸發裝置 | IOsetview（IO 燈） |
-- **處置**：換／清空出料車，然後在彈窗上按 RETRY／確認。按確認後系統會清空該車資料、重新初始化堆疊並解除該站的保留狀態，重新開放餵料。注意：若你換了實體車卻沒在此彈窗上按確認，計數不會歸零，警報會一直回來。若 `SnAuto{N}_InputFullTray` 有啟用且接好，機台正常應先觸發 `MES1120~MES1620`；若它未啟用，此盤數上限就是預期的滿車偵測方式。
+  | `出料車滿盤計數(軟體累計放盤數,上限 100 盤)` | 狀態/計數 | 累計盤數小於 100,代表出料車還有可放空間 | 累計盤數達到或超過 100,被判定為滿。這個盤數只在「放盤進料」時往上加,只有在「按確認換車、清空料車」時才會歸零;正常出料或清機都不會改變它 | 狀態紀錄(此警報不帶單一感測器,IO 畫面上沒有對應燈號可看) |
+  | `SnAuto1_InputFullTray ~ SnAuto6_InputFullTray(N 對應 Auto1~Auto6 的出料車滿盤感測器)` | 感測器 | 會跳出這支「累計盤數」滿車警報時,這支感測器通常是不亮(OFF)、被關閉或未配置的狀態;如果它有亮(ON,代表真的偵測到滿),機台會改跳另一支「感測器滿車」警報,而不是這一支 | 不亮(OFF)/關閉/未配置,這也印證了目前是「累計盤數」判定的滿、而非感測器偵測到的滿。它只是用來區分這兩種滿車情況的參考點,並不是觸發這個警報的直接裝置(可一併檢查) | IOsetview(IO 監看畫面) |
+- **初步排除**：更換或清空該台 Auto 的出料車,然後在畫面上按確認/重試鍵。按下確認後,系統會清掉這台車的累計盤數、重新開始計數,並重新允許這台 Auto 繼續放盤。重要提醒:如果你換了或清了料車卻沒有在畫面上按確認,累計盤數不會歸零,這個警報會一直重複跳出來。
+- **通報工程師**：如果換車並按確認後警報仍反覆出現,或你確認料車其實沒有裝滿卻一直跳,請通報工程師。這是「用累計盤數」判定的滿車,沒有單一感測器可以在 IO 畫面上直接看,無法只靠現場排除。通報時請提供:是哪一台 Auto(Auto1~Auto6)、大約已放幾盤、是否曾在沒按確認的情況下換過或清過料車、以及出料車滿盤感測器(SnAuto1_InputFullTray ~ SnAuto6_InputFullTray)是否有啟用/接線。請工程師確認:若該感測器有啟用,正常應先跳出「感測器滿車」警報;若未啟用,這個累計盤數上限就是設計上預期的滿車判定方式。此警報只在正常生產模式下作用,Auto1~Auto6 六台各有一組(MES1125~MES1625)。
 
-#### `WAR1130~WAR1630` — Auto 餵盤未到位
-- **適用**：Auto1~6 各站（序號 11~16）
-- **意義**：Auto 站完成餵料 Y 軸移動後，後段底部有盤 sensor 沒讀到盤，代表盤子沒有正確落在餵料位上。屬警告級（WAR），只能重試。
-- **常見原因**：
-  - 盤子在餵料 Y 移動過程中／之後位移、傾斜或掉落，離開了後段底部 sensor 的偵測範圍；
-  - 後段底部有盤 sensor（`SnAutoN_OutputBottomHasTray`）故障或對位偏掉 — 有盤卻讀成 OFF；
-  - `MAutoY_N` 餵料軸沒有真正到達教導的餵料 Y 位置，盤子沒對準到 sensor 下方；
-  - 此站的餵料 Y 教導值錯誤或已飄移。
-- **檢查點**：
+#### `WAR1130~WAR1630(對應 Auto1~Auto6 六個進料站,每站一組)` — Auto 進料站送盤到定位後偵測不到料盤
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：當某一個 Auto 進料站(Auto1~Auto6 其中一站)的 Y 軸把料盤送到進料位置後,後方底部的「有盤」感測器卻沒有確認到料盤,機台就會跳這個警報。通常發生在自動生產中,料盤剛被搬到進料定位、準備供料的那一刻。這是警告等級的警報,只能選擇重試。
+- **可能原因**：料盤在搬送過程中或到位後滑動、歪斜或掉落,偏離了感測器的偵測範圍(最常見)；後方底部「有盤」感測器髒污、鬆脫或位置偏移,料盤其實在位卻不亮(沒偵測到)；Y 軸沒有真正走到進料定位,料盤沒對準感測器下方；該站的進料定位教導值跑掉或設錯,料盤停在錯誤位置(較少見)
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnAuto1_OutputBottomHasTray`（代表；`SnAuto2..6_OutputBottomHasTray`） | sensor | 已啟用且餵料 Y 移動後讀到 ON／到位 — 後段底部餵料位有盤 | 已啟用但讀到 OFF — Y 移動後餵料位沒偵測到盤（若 sensor 被停用或在模擬模式，此警報不會觸發，故它觸發就代表 sensor 已啟用且讀 OFF） | IOsetview（後段底部有盤 sensor 燈）與 Note 備註列（印出 [IO=<sensor 名稱>] 及期望 ON／實際的對比） |
-  | `MAutoY_1`（代表；`MAutoY_2..6`）— Auto Y 餵料軸 | motor | 到達餵料 Y 教導目標，盤子落在後段底部 sensor 下方 | 可能沒到教導的餵料 Y 目標或偏掉，使盤子落在 sensor 範圍外（觸發判斷只讀 sensor、不讀馬達，馬達是上游根因，需另行查證） | MotionView（`MAutoY_N` 命令位置對實際位置／軟體極限狀態） |
-- **處置**：檢查 Auto 後段餵料位上的盤，若位移或掉落就重新擺正，再按 RETRY 重新執行 Y 移動並重讀 sensor。若重試仍失敗：先在 MotionView 確認 `MAutoY_N` 有到達餵料 Y 目標，偏掉就重新教導餵料 Y 位置；再到 IOsetview 用一盤確定放正的盤驗證 `SnAutoN_OutputBottomHasTray`，有盤讀不到就是 sensor／接線／對位故障。
+  | `SnAuto1_OutputBottomHasTray(代表;各站為 SnAuto2~6_OutputBottomHasTray)` | 感測器 | 料盤送到進料位置後,這顆感測器應該要亮(ON),代表後方底部確實有料盤。 | 目前不亮(OFF),代表送到位置後偵測不到料盤。(若這顆感測器被關閉或在模擬狀態,就不會跳這個警報;會跳表示它是啟用中而且沒偵測到盤。) | IOsetview(IO 監看畫面):查這顆「後方底部有盤」感測器的燈號。警報視窗的明細行也會顯示對應的感測器名稱與「應該亮 vs 目前狀態」。 |
+  | `MAutoY_1(代表;各站為 MAutoY_2~6)— Auto Y 進料軸` | 馬達 | 應該要走到該站的進料定位,讓料盤剛好停在後方底部感測器的正下方。 | 可能沒走到定位或偏離定位,使料盤停在感測器偵測範圍外。這顆馬達不是警報的直接判斷點,只是上游可能相關的原因,可一併檢查,由工程師另外確認。 | MotionView(馬達畫面):比對這軸的指令位置與實際位置是否一致,以及是否碰到軟體極限。 |
+- **初步排除**：到跳警報的那個 Auto 進料站,檢查後方進料位置的料盤:如果料盤歪掉、移位或掉了,重新擺正、放好;有雜物就清掉。確認料盤確實放好後,選擇「Retry(重試)」,讓機台重新把 Y 軸移到定位並重新讀取感測器。若重試幾次仍失敗,請通報工程師。
+- **通報工程師**：如果重新擺放料盤並重試後仍持續跳警報,請通報工程師,並提供下列資訊:警報代碼是哪一個(WAR1130~WAR1630,即哪一個 Auto 站)、料盤是否確實在位、IOsetview 裡該站後方底部有盤感測器(SnAutoN_OutputBottomHasTray)的燈號狀態、以及 MotionView 裡該站 Y 軸(MAutoY_N)的指令位置與實際位置是否一致。工程師會先確認 Y 軸有無到達進料定位(必要時重新教導定位值),再用一片確定放好的料盤在 IOsetview 檢查感測器是否正常。
 
-### 6.5 TrayArm 送盤手臂
+### 5.5 TrayArm 送盤手臂
 
-#### `MES1721` — TrayArm 取盤受阻
-- **意義**：送盤手臂被派去後方料源取盤，但料源在整個等待窗（60 秒）內始終沒準備好可取的盤，手臂只能停在 Z 上位空等，逾時後停機發此警報。
-- **常見原因**：
-  - 料源=Empty：後方一直沒有空盤送到，或搬運還在進行中（`SnEmpty_OutputBottomHasTray` 讀不到盤、`bRearHasTray`(邏輯) 為否，或供料流程還卡在中途交接）。
-  - 料源=Empty：搬運夾爪 `C_Empty_PushTray` / `C_Empty_LeanOnTray` 在取盤當下仍在夾持狀態，盤還被搬運端佔住還沒放到後方。
-  - 料源=Empty：Empty 站正在供料中或回收中，某個流程正佔用後方。
-  - 料源=Loader：卸盤動作一直沒完成（`bRearReadyForPick`(邏輯) 這個放行閂始終沒亮起），或 `SnLoader_OutputBottomHasTray` 讀不到盤、後方判定為未佔用。
-  - 後方殘留或卡住一片盤，使新盤無法乾淨呈現；或料源模組整個停滯，60 秒內始終無法達到可取狀態。
-- **檢查點**：
+#### `MES1721` — TrayArm 取盤受阻（來源後方尚未就緒）
+- **發生狀況**：TrayArm 要去某來源（Empty 或 Loader）後方取盤，但等了約一分鐘，來源後方仍未備妥可取的盤，手臂被卡在上方等待而報警。警報明細會標出是哪個來源。
+- **可能原因**：來源後方還沒送到盤（供料未就緒／仍在搬運中）；來源的搬運夾爪（如 C_Empty_PushTray／C_Empty_LeanOnTray）還沒放開、仍夾著盤，擋住取料；來源＝Loader：上一輪送盤動作被中斷（例如中途 HOME），後方沒被標記成可取；後方感測器沒偵測到盤（SnEmpty_OutputBottomHasTray／SnLoader_OutputBottomHasTray 不亮）
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnEmpty_OutputBottomHasTray` | sensor | 料源=Empty 時讀到 ON（有空盤穩定停在 Empty 後方、等待交接） | 讀到 OFF（後方還沒送到盤，取盤放行條件不成立） | IOsetview（Note 括號會標示料源「(Empty)」） |
-  | `C_Empty_PushTray` | cylinder | 取盤當下輸出關（縮回）——搬運端已把盤釋放到後方 | 輸出仍開（仍在夾持）——搬運夾爪還抓著盤，後方取盤條件不成立 | IOsetview |
-  | `C_Empty_LeanOnTray` | cylinder | 取盤當下輸出關（縮回）——搬運端已放手 | 輸出仍開（仍在夾持）——盤仍被搬運端佔住，放行閘卡住 | IOsetview |
-  | `SnLoader_OutputBottomHasTray` | sensor | 料源=Loader 時讀到 ON（卸出的空盤已穩定停在 Loader 後方） | 讀到 OFF（Loader 後方未佔用，取盤放行條件不成立） | IOsetview（Note 括號會標示料源「(Loader)」） |
-  | `bRearReadyForPick`(邏輯)（Loader 放行閂） | logic | 為真——只有 Loader 卸盤流程完整走完（車體退回進料 Y、Push/Lean 夾爪確認）才會亮起 | 為否——卸盤流程沒走完或被中途打斷（例如中途 HOME），或後方變空又把它重置，手臂始終拿不到放行 | State Record・EventLog |
-  | `PickWaitTimer / bPickWaitArmed`(邏輯) | logic | 已清除——放行通過、取盤在 60 秒窗內順利前進 | 已武裝且逾時仍受阻——這是本警報的直接觸發點 | State Record・EventLog（快照 TrayArmPickBlocked_<料源>；FeederDecision.txt 記錄每個閘門輸入） |
-- **處置**：Note 提供 RETRY。先看 Note 括號標示的料源（Empty 或 Loader），到該後方確認實體確實有一片空盤且完全就定位。若搬運還在送盤途中，稍候再按 RETRY；若後方卡住殘留盤，先清除卡料再按 RETRY。也可在 IOsetview 觀察 `SnEmpty_OutputBottomHasTray`（或 `SnLoader_OutputBottomHasTray`）在盤到位時是否轉 ON，並確認 `C_Empty_PushTray` / `C_Empty_LeanOnTray` 在搬運端放手後輸出是否降到關。
+  | `SnEmpty_OutputBottomHasTray` | 感測器 | （來源＝Empty 時）後方備妥空盤時亮（ON） | 不亮（OFF），Empty 後方還沒送到盤 | IOsetview（明細會標來源） |
+  | `SnLoader_OutputBottomHasTray` | 感測器 | （來源＝Loader 時）後方有已送出的盤時亮（ON） | 不亮（OFF），Loader 後方未備妥 | IOsetview（明細會標來源） |
+  | `C_Empty_PushTray / C_Empty_LeanOnTray` | 汽缸 | 取料時應已縮回（放開盤） | 仍伸出（仍夾著盤），擋住取料 | IOsetview |
+  | `Loader 後方就緒狀態` | 狀態/計數 | 已標記為可取（上一輪送盤正常完成） | 未標記（送盤被中斷／未完成） | 狀態紀錄（需工程師） |
+- **初步排除**：看警報明細確認來源（Empty／Loader）。到該來源看後方是否有盤：沒盤就補料或等供料完成；若夾爪還夾著盤就等它放開。之後按 Retry。
+- **通報工程師**：後方明明有盤卻仍判未就緒、或反覆卡住，通報工程師，提供代碼 MES1721、來源別、後方感測器亮不亮、以及是否剛發生過 HOME 或中斷。
 
-#### `MES1722` — TrayArm 夾著一片來歷不明的盤
-- **意義**：送盤手臂被派去空手取盤（照理夾爪應是空的），但夾爪的閉合到位感測讀到「已夾著盤」，若繼續下夾會疊盤，因此停機發此警報。此警報只在真機（非 DUMMY、非模擬）模式下才會啟動。
-- **常見原因**：
-  - 手臂帶著一片盤走到取盤點，但 `bHasTray` / `fHasTray`(邏輯) 這個攜帶閂從沒記錄到——可能是搬運中途被中斷、中途斷電，或是「單邊到位」的 HOME（HOME 只要任一側夾爪到位就保持閉合，但殘料認養需要兩側都到位，所以只有一側到位的手臂不會被認養，卻仍被派去空手取盤而夾著閉合）。
-  - 整機 HOME 時夾爪裡就有一片盤：HOME 時若兩側夾爪到位感測都讀到 ON，手臂會被認養為殘料（`bHasTray`(邏輯) 設為真、`bResiduePendingNotify`(邏輯) 設為真）並一次性提示。
-  - 某側夾爪到位感測（`C_TrayArm_FrontClamp` / `C_TrayArm_RearClamp` 的到位感測）卡在 ON 或調整不良，假造出「夾著盤」的假象，在實體無盤下反覆觸發此警報。
-- **檢查點**：
+#### `MES1722` — TrayArm 夾著身分不明的盤（請在 Teach 開夾爪取出）
+- **發生狀況**：TrayArm 準備新的取盤時，夾爪的「夾住」感測器顯示手臂上還夾著一片盤，但系統內部沒有這片盤的紀錄（不知它是什麼盤）。常發生在中途中斷、斷電後、或 HOME 後夾爪仍夾著盤但系統狀態沒對上。為避免誤放，必須人工取出。
+- **可能原因**：前一次搬運中途中斷或斷電，手臂仍夾著盤但紀錄遺失；HOME 後夾爪維持夾住，系統未認養這片盤；夾爪的夾住感測器誤判（卡住／誤觸發），其實手臂上沒盤
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `C_TrayArm_FrontClamp` 到位感測 | sensor | 手臂真的空的時候（取盤前或 HOME 時，夾爪張開、沒夾盤）讀到 OFF | 讀到 ON（夾爪閉合感測認為夾著盤）。取盤閘門：任一側到位感測 ON 就會觸發；HOME 殘料認養：兩側都要 ON | IOsetview（TrayArm 前夾爪閉合到位感測） |
-  | `C_TrayArm_RearClamp` 到位感測 | sensor | 手臂真的空的時候讀到 OFF（夾爪張開） | 讀到 ON（夾爪閉合感測認為夾著盤）。與前夾爪相同：任一側 ON 觸發取盤閘門，HOME 認養需兩側都 ON | IOsetview（TrayArm 後夾爪閉合到位感測） |
-  | `bHasTray / fHasTray`(邏輯)（TrayArm 攜帶閂） | logic | 與感測一致——只有夾爪到位感測都讀 OFF（手臂真的空）時才為否 | 為否（系統認為沒帶盤）但某側夾爪到位感測卻讀 ON——這就是不同步的癥結 | State Record・EventLog（TrayArm 狀態傾印） |
-  | `bResiduePendingNotify`(邏輯) | logic | 為否（沒有待提示的認養殘料） | 為真——HOME 時把兩側都到位的殘料認養了並排入一次性提示 | State Record・EventLog |
-- **處置**：在 Teach 打開 TrayArm 夾爪，實體把手臂夾著的那片盤取下，再按 RETRY。不需要重開程式：只要夾爪到位感測都不再讀 ON，系統會自動解除認養，清掉 `bHasTray` / `fHasTray` / `bResiduePendingNotify`，生產即可恢復。若在實體無盤下警報仍反覆出現，到 IOsetview 確認 `C_TrayArm_FrontClamp` 與 `C_TrayArm_RearClamp` 的閉合到位感測是否調整正確、有沒有卡在 ON——調整不良的感測會在 HOME 時誤認幻影殘料、並在取盤時反覆誤觸此警報。
+  | `C_TrayArm_FrontClamp（夾住感測器）` | 感測器 | 手臂空時不亮（OFF，夾爪開、無盤） | 亮（ON，夾爪讀到夾著盤） | IOsetview（前夾爪 夾住訊號） |
+  | `C_TrayArm_RearClamp（夾住感測器）` | 感測器 | 手臂空時不亮（OFF） | 亮（ON） | IOsetview（後夾爪 夾住訊號） |
+  | `TrayArm 內部持盤紀錄` | 狀態/計數 | 與夾爪一致（夾爪無盤時＝紀錄無盤） | 紀錄顯示無盤，但夾爪卻讀到有盤（狀態不一致） | 狀態紀錄（需工程師） |
+- **初步排除**：進 Teach（教導）畫面，打開 TrayArm 前／後夾爪，把手臂上那片盤取出。確認取出後夾爪的夾住感測器轉為不亮，再按 Retry。
+- **通報工程師**：手臂上其實沒盤、夾爪感測器卻一直亮，通報工程師檢修夾爪感測器；若不確定那片盤的來源也請通報，提供代碼 MES1722。
 
-#### `MES1723` — TrayArm 放盤受阻
-- **意義**：送盤手臂帶著盤要放到目的站，但目的站後方在整個等待窗（60 秒）內始終沒讓出位置，手臂只能等，逾時後停機發此警報。目的地會標在 Note 括號內（Auto / Empty / Color）。
-- **常見原因**：
-  - 目的地=Auto：目標 Auto 站後方實體還壓著一片盤（`SnAuto<n>_OutputBottomHasTray` 為 ON，使該站後方判定為佔用）。
-  - 目的地=Auto：或雖然感測 OFF，但「已送達未消耗」的閂 `bRearDeliveredPending`(邏輯) 仍把後方鎖為佔用。
-  - 目的地=Empty/Color：接收站後方沒清空——`SnEmpty_OutputBottomHasTray`（Empty），或 `SnColor_OutputBottomHasTray` / `SnColor_TrayPos1`（Color）仍為 ON，使清後方的等待一直不通過。
-  - 目的地=Empty/Color：接收站卡在供料中（Empty 供料中 / Color 供料中）持續整個 60 秒窗，觸發防撞閘，與後方感測狀態無關。
-  - 帶盤途中發生整機 HOME，把接收站的「回盤」交握清掉了；恢復時只有在「所攜帶盤尚未放下」的情況才會重新簽署回盤請求，若這步沒跑到，接收站就保留或重新填滿了後方而手臂還在等。
-  - 目的地後方感測卡住或調整不良、在實體無盤下維持 ON，或接收站抬升清後方的動作在 60 秒內始終沒完成。
-- **檢查點**：
+#### `MES1723` — TrayArm 放盤受阻（目的地後方未淨空）
+- **發生狀況**：TrayArm 要把盤放到目的地（Auto 某站／Empty／Color）後方，但該處後方還有盤佔住、或接收站的送盤動作還沒完成，無法放盤而報警。警報明細會標出目的地。
+- **可能原因**：目的地 Auto 站後方還有盤（對應的 SnAuto n_OutputBottomHasTray 亮），或有「已送達待取」標記佔住；目的地＝Empty：Empty 後方仍有盤（SnEmpty_OutputBottomHasTray 亮）；目的地＝Color：Color 後方仍有盤（SnColor_OutputBottomHasTray 亮）；接收站仍在送盤中（尚未完成），為防碰撞暫不放盤
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `SnAuto<n>_OutputBottomHasTray`（n 為目標站，Auto1..Auto6） | sensor | 讀到 OFF——目標 Auto 站後方空著、可接收放下的盤。目的站是動態的，同一閘門涵蓋 6 個 Auto 站，請看對應的那一個 | 讀到 ON——Auto 後方仍壓著盤，該站後方判定為佔用 | IOsetview（Note 括號印「(Auto)」；目標站序號要看快照裡 TrayArm 狀態傾印，不在 Note 上） |
-  | `SnEmpty_OutputBottomHasTray` | sensor | 目的地=Empty 放盤時讀到 OFF（Empty 已抬升、讓出後方） | 讀到 ON——Empty 後方仍被佔用，清後方的等待始終不通過 | IOsetview（Note 括號印「(Empty)」） |
-  | `SnColor_OutputBottomHasTray`（與 `SnColor_TrayPos1`） | sensor | 目的地=Color 放盤時兩者都讀 OFF（Color 已抬升、讓出後方）。Color 後方只要任一感測 ON 就算佔用，故兩者須都 OFF | 其中一個讀到 ON——Color 後方仍被佔用，清後方的等待始終不通過 | IOsetview（Note 括號印「(Color)」） |
-  | 接收站狀態（Empty 供料中 / Color 供料中） | logic | 放盤時非供料中——接收站的送盤動作已完成，防撞閘放行 | 卡在供料中（Empty / Color）整個 60 秒窗——這是真機才有的阻擋來源，即使後方感測 OFF 也會觸發本警報 | State Record・EventLog（Empty/Color 狀態傾印的 Status 欄） |
-  | `bRearDeliveredPending`(邏輯)（Auto 閂）/ `bReturnTray`(邏輯)（Empty/Color 接收站交握） | logic | Auto 後方簽為空（無已送達未消耗閂），且接收站的回盤交握存在，故會抬升清後方 | Auto 後方被 `bRearDeliveredPending` 鎖為佔用；或帶盤途中 HOME 後 `bReturnTray` 被清掉、恢復時該癒合步驟被跳過，接收站保留或重新填滿後方 | State Record・EventLog（Auto 傾印 RearHasTray/DeliveredPending；Empty/Color 傾印 bReturnTray/bRearHasTray） |
-  | `PlaceWaitTimer / bPlaceWaitArmed`(邏輯) | logic | 已清除——後方讓出（或供料完成）、放盤前進，等待窗關閉 | 已武裝且逾時、目的地仍受阻——這是本警報的確切觸發條件 | State Record・EventLog（快照 TrayArmPlaceBlocked_<目的地>） |
-- **處置**：Note 提供 RETRY。先看 Note 括號標示的目的地（Auto / Empty / Color）。該接收站後方還壓著一片盤（或接收站正在供料中）。清除／移走擋住的那片盤讓後方空出來，再按 RETRY。也可在 IOsetview 確認目的地後方感測在後方空著時讀 OFF：Auto 看目標站的 `SnAuto<n>_OutputBottomHasTray`（站序號查快照 TrayArmPlaceBlocked_Auto 內的 TrayArm 傾印），Empty 看 `SnEmpty_OutputBottomHasTray`，Color 要同時看 `SnColor_OutputBottomHasTray` 與 `SnColor_TrayPos1`。若感測在實體無盤下仍維持 ON，即為卡住／調整不良。若後方已讀空但 Empty/Color 仍觸發，多半是接收站卡在供料中而觸發防撞閘；若阻擋發生在帶盤途中整機 HOME 之後，請確認接收站確實有抬升清出後方。
+  | `SnAuto n_OutputBottomHasTray（n＝目的 Auto 站號）` | 感測器 | 放盤時後方應淨空、不亮（OFF） | 亮（ON），Auto 後方仍有盤 | IOsetview（明細標「(Auto)」） |
+  | `SnEmpty_OutputBottomHasTray` | 感測器 | （目的＝Empty）放盤時不亮（OFF） | 亮（ON），Empty 後方仍被佔 | IOsetview（明細標「(Empty)」） |
+  | `SnColor_OutputBottomHasTray` | 感測器 | （目的＝Color）放盤時不亮（OFF） | 亮（ON），Color 後方仍被佔 | IOsetview（明細標「(Color)」） |
+  | `接收站送盤狀態` | 狀態/計數 | 放盤時接收站已完成送盤（非送盤中） | 仍在送盤中，為防碰撞暫停放盤 | 狀態紀錄（需工程師） |
+- **初步排除**：看明細確認目的地。到該站清掉後方殘留盤（或等接收站送盤完成），讓後方感測器轉為不亮，再按 Retry。
+- **通報工程師**：後方已清空、感測器卻仍亮，或反覆受阻，通報工程師，提供代碼 MES1723、目的地別、以及後方感測器狀態。
 
-### 6.6 CCD / 視覺
+### 5.6 CCD 讀碼 / 視覺
 
-#### `WAR0330` — Top CCD Bin 分類讀取尚未就緒
+#### `WAR0330` — Top CCD 分類判別功能尚未就緒
+- **發生狀況**：這個警報代表機台在上料讀取 IC 的時候,想用 Top CCD(上方相機)判別這一顆 IC 的分類等級,但這台實機的 Top CCD 分類判別功能目前還沒有實際接上、還不能用,所以一去讀就失敗,於是跳出這個警報。通常出現在:設定裡有開啟 Top CCD 分類判別、而且機台是實機正式生產(不是模擬)時,一到要用 Top CCD 判別 IC 的動作就會跳。這是「功能是否就緒」的判斷,不是某一顆感測器或馬達壞掉。
+- **可能原因**：機台設定裡有開啟「Top CCD 分類判別」功能,但這台實機的 Top CCD 分類判別其實還沒有接好、還沒提供,所以每次讀取都會失敗(最常見)。；目前是實機正式生產模式;模擬模式下這個判別會直接當作成功、不會跳警報,只有實機才會跳。；如果現場本來就沒有要用 Top CCD 做分類判別,那有可能是「Top CCD 分類判別」設定被誤開了,應該要關掉。
+- **初步排除**：警報跳出時,畫面會提供三個選項,可以先這樣初步處理:一、按「重試」:機台會再移到同一顆 IC 位置重新判別一次;但如果這台實機的 Top CCD 分類判別還沒接好,重試通常還是會失敗、再跳一次,所以不要一直重複按重試。二、按「略過」:把目前這一顆當作「空的(沒有 IC)」處理,然後繼續往下做。三、按「整盤結束」:把目前這一盤還沒判別的位置全部當作「空的」處理,直接結束這一盤。若確認現場本來就沒有要用 Top CCD 做分類判別,請通報工程師把這個功能關閉,關掉後就不會再跳。
+- **通報工程師**：這是一個「功能有沒有準備好」的邏輯判斷警報,沒有單一的感測器、汽缸或馬達燈號可以看,IOsetview(IO 監看畫面)上也查不到對應的點,請不要去找感測器或馬達。若重試一直失敗、無法排除,請通報工程師,並提供:警報代碼 WAR0330、發生時間、當時正在做的動作(上料讀取 IC 分類時)、以及機台目前是實機正式生產。同時告訴工程師兩種可能方向:一是這台實機本來就沒有要用 Top CCD 做分類判別,那應由工程師把「Top CCD 分類判別」設定關閉;二是如果現場確實需要 Top CCD 做分類,那代表這個判別功能目前尚未接上、還沒完成,需由工程師在軟體端把功能做好後才能開啟。
 
-- **意義**：Loader 站要做 Top CCD 的 Bin 分類讀取，但在真機生產模式下這個讀取一律回報失敗，於是跳出此警示。目前 Top CCD 的「Bin 分類讀取」在 HT160S 真機上尚未接通（只有另一條「2D 條碼讀取」是實作好的），所以只要開啟 `tFunction.UseCCD`（設定：使用 CCD Bin 分類讀取）就會固定失敗。
-- **常見原因**：
-  - `tFunction.UseCCD` 被開成 ON，但機台實際上沒有可用的 Top CCD Bin 分類讀取功能；
-  - 機台跑的是真機生產模式（非 SOFT_SIMULATE、也不是模擬跑料），此時 Bin 分類讀取一律回報「讀不到」。
-- **檢查點**：
+#### `WAR0462` — Top CCD 讀取 IC 上 2D 條碼逾時、沒有回應
+- **發生狀況**：生產中,當 IC 被送到 Top CCD(上方視覺相機)去讀取 IC 上的 2D 條碼、辨識這顆 IC 的身分時出現。系統已經對相機下了拍照與讀碼的指令,但在大約 3 秒內都沒有收到相機讀出的 2D 條碼結果,於是判定「讀碼逾時」並跳出這個警報。簡單說:相機該回報一組 2D 條碼給機台,但等到時間到都沒回。
+- **可能原因**：IC 上的 2D 條碼本身讀不到:條碼模糊、歪斜、被擋住、髒污或缺漏,或讀碼位置光線、對焦不良,相機讀不出來所以沒有回覆(最常見)。；IC 停放的讀碼位置沒對準相機,條碼沒有正確呈現在鏡頭正下方。；Top CCD 視覺相機端(視覺電腦)雖然收到拍照指令,但程式沒在跑、卡住、或還在處理,沒能在時間內把結果傳回來。；機台與 Top CCD 讀碼器之間的連線(網路/通訊)中斷或卡住,指令送出後就一直收不到回應(較少見,但若同時跳連線警報就要優先懷疑這項)。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | `tFunction.UseCCD` | 設定(邏輯) | 沒有可用的 Bin 分類 CCD 讀取時應設 OFF（此時盤格直接當成合格 IC，不會跳警示） | ON，於是真機生產模式下 Bin 讀取固定失敗並跳 WAR0330 | State Record・EventLog |
-  | `tSimuData.bRunSimulation` | 邏輯 | 模擬跑料時為 ON，可讓 Bin 讀取視為成功而抑制此警示 | OFF（正式生產），走真機失敗分支 | State Record・EventLog |
-  | SOFT_SIMULATE 開發／筆電模式 | 邏輯 | 開發／筆電模式成立時可抑制此警示 | 真機建置不成立，配合 UseCCD ON 就會固定跳警示 | State Record・EventLog |
-- **處置**：本項是「功能尚未就緒」的邏輯警示，機台上沒有對應的感測器或馬達 LED 可查，不需要去找 IO。若機台沒有安裝 Bin 分類 CCD 讀取功能，請維修人員把設定 `tFunction.UseCCD` 關成 OFF，盤格就會被當成合格 IC、警示不再出現。若真的需要 Bin 分類讀取，需先由韌體把該功能接通後才能啟用。畫面 Note 可按 RETRY（重新移到該格再讀，真機上仍會再失敗）、SKIP（把該格標記為空 IC 後繼續）、或 TRAY END（把目前盤剩餘未檢的格子全部清為空後結束該盤）。
+  | `TopCcdSocket` | 狀態/計數(相機通訊連線) | 連線正常,相機端在約 3 秒內回傳一組讀到的 2D 條碼。 | 一直收不到相機回覆,等到時間到仍沒讀到 2D 條碼;連線可能中斷或相機端沒有回應。 | 狀態紀錄(另可看維修畫面上的 Top CCD 連線指示是否正常) |
+  | `CcdDelay(2D 讀碼等待計時,約 3 秒)` | 狀態/計數(內部計時) | 在這段等待時間結束前就成功讀到 2D 條碼,計時被重置、不會逾時。 | 等待時間到了(約 3 秒)仍沒讀到 2D 條碼,因而觸發此警報。這是純計時判斷,畫面上沒有單一感測器可看。 | 請通報工程師(系統內部計時,無單一感測器可直接查看,可對照狀態紀錄的發生時間) |
+- **初步排除**：警報跳出時,畫面會提供三個選項:「重試」、「跳過」、「手動輸入 2D」。建議依序處理:1) 先按「重試」,系統會重新拍照、重讀一次,多數暫時性讀不到用重試就能通過。2) 若連續重試幾次仍失敗,檢查這顆 IC 的 2D 條碼是否清楚、有無歪斜、髒污、被擋住,以及讀碼位置的光線是否正常;必要時輕輕清潔或確認 IC 有沒有擺正。3) 若條碼真的讀不出來但號碼看得清楚,可用「手動輸入 2D」把 IC 上的 2D 條碼號碼親手輸入,系統會照正常流程去比對分類儲位(Bin)與批號(Lot)。4) 若要略過這顆不辨識,選「跳過」,該顆 IC 會被歸到錯誤(Error)區。
+- **通報工程師**：若重試多次、清潔與對位後仍一直逾時,或整批 IC 都讀不到(不是偶發),或同時出現 Top CCD 連線相關警報(例如 WAR16120、TopCCD_Connect),請通報工程師。通報時請提供:警報代碼 WAR0462、發生時間、是哪一站與哪一批/哪顆 IC、是整批都讀不到還是偶發、維修畫面上 Top CCD 連線指示是否正常、相機端(視覺電腦)程式是否有在執行。工程師需確認:相機連線是否連上、視覺電腦程式是否運作並能正常讀碼、IC 停放讀碼位置是否對準相機、鏡頭對焦與光源是否正常、條碼是否存在且清晰;若連線警報同時發生,請優先檢查通訊線材、接頭與電源。
 
-#### `WAR0462` — Top CCD 2D 無回應（2DID 通訊逾時）
+#### `WAR0475` — 掃到的 2D 條碼在所有已載入批號中都找不到
+- **發生狀況**：機台用頂部 CCD 掃描 IC 上的 2D 條碼後,會拿這串條碼去比對目前已載入的所有批號(Lot / 工單)資料,決定這顆 IC 該歸到哪個 Bin。這個警報代表:比對完每一批之後,都找不到這串條碼對應的料號與分類。通常出現在生產進行中、頂部 CCD 剛讀完某顆 IC、正要決定分類的時候。畫面跳出的提示訊息會把這次讀到的 2D 條碼內容顯示出來,方便你對照。
+- **可能原因**：載入的批號 / 工單資料不對或不完整,裡面根本就沒有這顆 IC 的 2D 條碼(最常見)。；生產開始前沒有先把正確的批號資料下載 / 載入到機台。；頂部 CCD 讀錯,把 2D 條碼認成一個實際不存在的數值(讀取品質或打光不良)。
+- **初步排除**：提示訊息通常提供三個選項:重試、手動輸入 2D、跳過。1) 先按「重試」:機台會重新用頂部 CCD 拍照並重讀一次;若剛才只是單顆讀取不良,重讀常常就能過。2) 若確定 IC 上的條碼本身沒問題,可用「手動輸入 2D」把畫面顯示的那串條碼手動鍵入(請注意:手動輸入後,機台仍會拿同一份批號資料去比對,如果批號資料裡本來就沒有這顆條碼,還是會找不到)。3) 若想先讓生產繼續,可按「跳過」:這顆 IC 會被歸到錯誤 / 未分類的位置,不會算進正常良品,可事後再處理。同時請先核對:畫面訊息上顯示的 2D 條碼,和你這次要生產的批號 / 工單是不是同一個。
+- **通報工程師**：如果重試、手動輸入都還是找不到,或是大量 IC 都出現同樣找不到的情形,這通常是資料 / 批號載入的問題,不是單一零件故障,現場沒有單一感測器可以直接看。請通報工程師,並提供:警報代碼 WAR0475、畫面訊息上顯示的那串 2D 條碼、目前這台機台載入 / 正在生產的是哪一個批號或工單、以及是「只有這一顆找不到」還是「很多顆都找不到」。若懷疑是頂部 CCD 讀錯,也請一併告知,方便工程師檢查 CCD 的讀取與打光。
 
-- **意義**：Loader 站對 Top CCD 讀碼器發出拍照觸發後，在 3000 毫秒的等待視窗內始終沒有收到解碼完成的 2D 字串，逾時而跳出此警示。
-- **常見原因**：
-  - Top CCD 視覺 PC 有收到拍照觸發，但沒在 3000 毫秒內回傳解碼後的 2D 字串；
-  - 觸發後 Top CCD 讀碼器的網路／連線斷掉或卡住，一直收不到回覆；
-  - IC 上的 2D 條碼在教導的讀取位置讀不到（模糊、旋轉、缺件、打光不良）。
-- **檢查點**：
+#### `WAR0970` — Color CCD 讀取身分盤 2D 條碼逾時、無回應
+- **發生狀況**：這個警報出現在 Color(顏色/身分)站要讀取「身分盤」上的 2D 條碼(用來辨識盤別身分)的時候。系統已經下達拍照讀碼指令,但在大約 3 秒的等待時間內,Color CCD 一直沒有回傳任何讀到的 2D 條碼結果,系統就判定為「讀碼逾時、沒有回應」而發出此警報。
+- **可能原因**：身分盤上的 2D 條碼讀不出來:條碼缺失、模糊、髒污、貼歪或打光不良,讀碼器一直辨識不到(最常見)。；讀碼器沒有正對到條碼:相機雖然回報已到位,但盤上的 2D 條碼其實沒有落在讀碼器視野的正下方,所以讀不到。；相機鏡頭髒污、對焦或打光不良,使影像品質不足以解碼。；Color CCD 讀碼端(視覺電腦)與設備之間的連線在拍照後中途斷線,結果一直傳不回來,直到逾時(較少見)。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | Top CCD 2D 讀碼連線 | 邏輯 | 在 3000 毫秒視窗內回傳一組解碼成功的 2D 字碼 | 沒有回覆進來，一直讀不到，於是落入逾時分支 | State Record・EventLog（另可看維護頁 Top CCD 連線指示、`CosFunction.bUseTopCcd` 旗標） |
-  | Top CCD 3000 毫秒等待計時 | 邏輯 | 在計時到期前被一次成功讀碼清除／重置 | 計時到期而仍未讀到 2D，觸發警示 | State Record・EventLog |
-- **處置**：先確認 IC 是否確實停在教導的讀取位置、2D 條碼是否有出現且清晰（檢查對焦與打光、條碼有無缺件或歪斜）。確認 Top CCD 視覺 PC 有開機、程式在跑並能正常解碼，網路線／交換器接妥。若同時出現 `WAR16120`（TopCCD_Connect），請先把連線／線材／電源當成主因處理。畫面 Note 可按 RETRY（重新拍照並重新等待 3 秒）、MANUAL 2D（由操作員手動輸入該 IC 的 2D 碼，再走正常 Bin/Lot 綁定）、或 SKIP（把該 IC 送到 Error bin 後繼續，此路徑不會累計任何計數）。
+  | `ColorCcdSocket(Color CCD 讀碼器連線)` | 狀態/連線 | 讀碼器連線正常,並在約 3 秒內回傳一組有效、非空白的盤別 2D 條碼。 | 始終沒有回傳結果,一路到逾時才觸發此警報。這是一條程式內部連線,OP 無法直接目視,需靠紀錄判讀。 | 狀態紀錄 |
+  | `ScanDelay(3 秒讀碼等待計時)` | 狀態/計數 | 在 3 秒內就成功收到讀碼結果,計時還沒到就結束。 | 3 秒等待時間到了仍沒有收到結果,這正是觸發本警報的條件。屬程式內部計時,OP 無法直接目視。 | 狀態紀錄 |
+  | `MTopCCDX_Color` | 馬達 | 已移動到教導設定的「2D 讀碼位置」並停穩,讓讀碼器正對身分盤上的 2D 條碼。 | 雖然回報已到位,但等待時間內讀碼器仍讀不到條碼;請確認是否真的到達教導位置、且條碼確實在讀碼器正下方。 | MotionView |
+- **初步排除**：畫面上的提示訊息會提供處理選項,可依現場狀況操作:一、先檢查身分盤上的 2D 條碼:是否存在、是否清晰、有沒有貼歪或髒污;必要時擦拭乾淨或重貼條碼,並確認相機鏡頭乾淨、打光正常。二、檢查完後,可選「重試(Retry)」讓系統重新拍照讀碼一次。三、若條碼確實讀不出來、但盤別身分已知,可選「手動輸入 2D(Manual 2D)」直接鍵入正確身分後繼續。四、若依現場規定這一盤不需要身分,可選「略過(Skip)」以空白身分繼續。
+- **通報工程師**：若已清潔鏡頭、重試、重貼條碼後仍持續逾時,請通報工程師,並提供:警報代碼 WAR0970、發生的盤別/批號、發生時間,以及當時的狀態紀錄與事件紀錄。請工程師協助確認:一、Color CCD 讀碼功能是否已啟用;二、讀碼器連線(ColorCcdSocket)在拍照全程是否保持連線、視覺程式是否有正常解碼;三、馬達 MTopCCDX_Color 是否確實停在教導的 2D 讀碼位置(可在 MotionView 查看);四、相機對焦、打光,以及盤上的 2D 條碼是否存在且清晰可讀。
 
-#### `WAR0475` — 2D 碼在所有 Lot 中都查不到
+#### `WAR16120` — 上方 CCD 讀碼系統連線未就緒(Loader 讀盤/IC 2D 無回應)
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：機台在 Loader 這一站要用「上方 CCD 讀碼相機」去讀取托盤或 IC 的 2D 條碼時,發現和「上方 CCD 視覺電腦」之間的網路連線沒有接通,讀不到碼、也等不到回應,所以跳出這個警報。通常發生在生產進行中、Loader 準備讀取盤上料件身分(2D 碼)的那一刻。畫面上會提供「重試(Retry)」與「略過(Skip)」兩個選項。
+- **可能原因**：上方 CCD 視覺電腦沒有開機、或電腦上的讀碼程式沒有啟動、沒有在等待連線；機台與視覺電腦之間的網路線鬆脫、沒插好,或中間的網路交換器(switch)沒通電/故障；機台設定裡的視覺電腦連線位址(IP)或連接埠(Port)設錯,和實際的視覺電腦對不上；生產一開始有連上,但中途網路斷線,系統雖會每隔約 2 秒自動嘗試重連,但此刻還沒接回來；這台其實沒有安裝上方 CCD 讀碼系統,但設定裡卻把「上方 CCD 讀碼功能」開啟了,造成機台一直去找一台不存在的相機
+- **裝置狀態**：
 
-- **意義**：Top CCD 已成功讀到 IC 的 2D 碼，但拿這個碼去反查所有已載入的 Lot 都找不到對應資料，於是跳出此警示。
-- **常見原因**：
-  - 掃到的 2D 碼不在任何已載入 Lot 的 2D-Bin 對照表內（載入了錯的或不完整的 WorkOrder/Lot）；
-  - 開始生產前沒有把正確的 Lot 資料下載／載入；
-  - Top CCD 誤讀成一個不存在於任何已註冊 Lot 的值。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | 已載入 Lot 的 2D→Bin 反查表 | 邏輯 | 含有掃到的 2D 碼，可查出所屬 Lot 與 Bin | 查不到，該碼不在任何已載入的 Lot 內 | State Record・EventLog |
-  | 掃到的 2D 字碼 | 邏輯 | 對應到某個已載入 Lot 中已註冊的碼 | 作為查不到的值附在 Note 訊息上；手動輸入時同理 | Note 備註列 |
-- **處置**：先比對 Note 備註列印出的 2D 碼與目前載入的 Lot 是否相符。若 Lot 是對的、只有這一顆碼查不到，多半是 Top CCD 誤讀（檢查讀取位置、對焦與打光）。若很多顆都查不到，通常是開始生產前載入了錯的或不完整的 Lot／WorkOrder，請重新載入正確資料。畫面 Note 可按 RETRY（重新拍照重讀）、MANUAL 2D（手動輸入該碼，仍走同一套反查）、或 SKIP（把該 IC 送到 Error Auto 並累計未知 2D 計數）。
+  | `上方 CCD 讀碼系統連線` | 狀態/連線 | 連線狀態為「已連線」,機台能正常跟視覺電腦一問一答 | 連線狀態為「未連線」,問了讀不到回應(這就是實際故障點) | 狀態紀錄(EventLog);連線本身沒有單一感測器可看,請以狀態紀錄為準 |
+  | `上方 CCD 讀碼功能(General.ini 內 TopCCD Enable)` | 開關/設定 | 只有在這台確實裝了上方 CCD、而且連得上時才開啟 | 連線是斷的,但這個功能被設為開啟中 | 請通報工程師(設定檔項目,OP 勿自行更改) |
+  | `2D 條碼分盤功能(2DBinMap)` | 開關/設定 | 開啟時才會走「上方 CCD 讀 2D 分盤」這條流程;這個警報只有在它開啟時才會出現 | 開啟中(所以走進了這條讀碼流程) | 請通報工程師(設定檔項目,OP 勿自行更改) |
+  | `機台實/虛模式設定(RealDummy)` | 開關/設定 | 設為「實機」只用在真的有接讀碼相機的真實機台上 | 設為「實機」但上方 CCD 卻是沒連線的狀態 | 請通報工程師(設定檔項目,OP 勿自行更改) |
+- **初步排除**：先做以下初步排除:1) 確認上方 CCD 視覺電腦有開機、螢幕正常、上面的讀碼程式有開著。2) 檢查機台到視覺電腦的網路線兩端有沒有插好、沒有鬆脫,中間的網路交換器(switch)有沒有通電。3) 都確認正常後,在警報畫面上按「重試(Retry)」,機台會自動再連一次並重讀;若連線恢復,就會繼續生產。4) 若必須先讓這一盤過關、稍後再處理,可按「略過(Skip)」,系統會把這顆料件標記為「2D 讀碼失敗」並回到待命,但這只是暫時繞過,問題仍需解決。若按了幾次「重試」都連不上,請通報工程師。
+- **通報工程師**：若初步排除後仍連不上,請通報工程師,並提供:警報代碼 WAR16120、發生時間、當時在讀哪一盤/哪一站(Loader)、上方 CCD 視覺電腦當時是否有開機與程式是否有開、網路線與交換器檢查結果。工程師會進一步確認:視覺電腦是否有開機且程式在等待連線、機台設定的連線位址(IP)與連接埠(Port)是否和視覺電腦一致、網路線與交換器是否正常,並可在維護(保養)畫面用「上方 CCD 連線」按鈕強制重連,確認連線回到「已連線」。若這台本來就沒有安裝上方 CCD,工程師會把「上方 CCD 讀碼功能」或「2D 條碼分盤功能」關閉,讓機台不再走這條讀碼流程。
 
-#### `WAR0970` — Color CCD 2D 無回應（Tray ID 通訊逾時）
+#### `WAR16121` — Color CCD 讀碼器連線未就緒(讀不到 Color 盤身分)
+- **適用**：適用 Auto1~6 各站
+- **發生狀況**：這個警報代表:設備要向 Color CCD(顏色影像讀碼電腦)取得這一盤的 2D 身分資料時,設備和讀碼器之間的連線沒有接通,所以一直讀不到回應。通常出現在 Color 站準備讀取盤子條碼、確認這盤身分的時候。這是一個「連線/通訊」的問題,不是機構卡住或馬達的問題,所以在 IOsetview 或 MotionView 上不會有單一裝置可以直接看出原因。
+- **可能原因**：Color CCD 影像電腦沒有開機,或它的讀碼程式沒有啟動,所以設備連不上。；設備到影像電腦之間的網路線、網路交換器(switch)沒接好或有故障。；影像電腦的連線位址(IP)或連接埠(Port)設定和讀碼器對不起來。；本機其實沒有裝 Color CCD 讀碼器,但設定裡卻把 Color CCD 功能開著,結果每次要讀身分就跳這個警報。
+- **裝置狀態**：
 
-- **意義**：Color 站對 Color CCD 讀碼器發出拍照觸發後，在 3000 毫秒視窗內始終沒有收到解碼後的身分盤 Tray-ID 2D 字串，逾時而跳出此警示（連線在拍照前已確認正常，屬於「已觸發但逾時未解碼」）。
-- **常見原因**：
-  - Color CCD 視覺 PC 有收到觸發，但沒在 3000 毫秒內回傳解碼後的 Tray-ID 2D；
-  - 觸發之後 Color 讀碼器連線才斷掉，導致一直收不到結果直到逾時；
-  - 身分盤的 2D 條碼在教導的 `ColorRead2DXPosition` 讀不到（缺件／模糊／歪斜／打光不良）。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | Color CCD 讀碼連線 | 邏輯 | 在 3000 毫秒視窗內回傳一組非空的 Tray-ID 字串 | 一直讀不到，逾時後結束拍照並跳警示 | State Record・EventLog |
-  | Color CCD 3000 毫秒拍照等待計時 | 邏輯 | 在計時到期前先取得成功結果 | 計時到期仍無結果，正是觸發 WAR0970 的條件 | State Record・EventLog |
-  | `MTopCCDX_Color` | 馬達 | 已移動並停在教導的 `ColorRead2DXPosition`，讓讀碼器正對身分盤條碼 | 回報已到位，但仍讀不到碼（請確認確實到達教導位置、且條碼在讀碼器下方） | MotionView |
-- **處置**：先確認 `MTopCCDX_Color` 在 MotionView 有確實到達教導的 `ColorRead2DXPosition`、讀碼器正對身分盤 2D，再檢查對焦／打光與條碼有無出現且清晰。確認 Color CCD 視覺 PC 已開機、讀碼程式在解碼；若機台沒有安裝 Color 讀碼器，可把設定 `CosFunction.bUseColorCcd`（[ColorCCD] Enable）關掉，改用模擬身分而不跳警示。畫面 Note 可按 RETRY（重新觸發並重新計時 3 秒）、MANUAL 2D（採用操作員手動輸入的身分並蓋到身分盤上）、或 SKIP（設定空身分後回到待機）。
+  | `Color CCD 連線狀態` | 狀態/計數 | 已和 Color CCD 影像電腦連線成功 | 未連線(連不上或連線中斷) | 狀態紀錄 |
+  | `Color CCD 功能啟用設定` | 開關 | 只有這台機器實際裝了 Color CCD 讀碼器時才開啟;沒有裝就應該關閉 | 設定為開啟,但實際上連不到讀碼器 | 請通報工程師 |
+- **初步排除**：1. 先依畫面提示處理:可先按「重試(Retry)」,讓設備重新嘗試連線 Color CCD 讀碼器,看能不能恢復。
+2. 若重試還是連不上,檢查 Color CCD 影像電腦是否有開機、讀碼程式是否有啟動。
+3. 檢查設備到影像電腦之間的網路線與網路交換器有沒有接好、燈號是否正常。
+4. 若當下需要先讓生產繼續,可按「略過(Skip)」;設備會把這盤的 2D 身分當作空白繼續流程(身分資料會留白,事後要留意這盤)。
+5. 若這台機器本來就沒有裝 Color CCD 讀碼器,請通報工程師確認是否要把 Color CCD 功能關閉。
+- **通報工程師**：若上述都排除不了,請通報工程師,並提供:警報代碼 WAR16121、發生時間、Color CCD 影像電腦目前是否開機、讀碼程式是否有啟動、網路線與交換器的狀態,以及是否曾按過重試/略過。請工程師確認:Color CCD 影像電腦與讀碼程式是否正常運作、系統設定裡 Color CCD 的連線位址與連接埠是否和讀碼器一致、線路是否正常;若本機沒有安裝 Color CCD 讀碼器,由工程師關閉 Color CCD 功能,讓身分讀取改用模擬方式,不再跳這個警報。
 
-#### `WAR16120` — Top CCD 連線尚未就緒（Loader Tray ID 無回應）
+### 5.7 SortArm 分類手臂
 
-- **意義**：在 Top CCD 2D-Bin 對照路徑下、且是真機（REALLY）並啟用 Top CCD 的情況下，發現與 Top CCD 視覺 PC 的連線不在「已連線」狀態，於是跳出此警示。
-- **常見原因**：
-  - 到 Top CCD 視覺 PC 的網路連線不在已連線狀態（網路線沒插、視覺 PC 沒開、IP/Port 錯、程式沒在監聽）；
-  - `CosFunction.bUseTopCcd`（[TopCCD] Enable）在真機上開著，但讀碼器連不上；
-  - 初始化後到本次掃描之間連線斷掉，自動重連（約每 2 秒節流一次）還沒接回。
-- **檢查點**：
+#### `WAR0154` — 分類手臂 X 軸即將超出可移動範圍(軟體極限)
+- **發生狀況**：這個警報代表:設備要把「分類手臂」往左右方向(X 方向)移動時,系統算出來的目標位置超出了允許的移動範圍(軟體極限)。為了避免手臂衝過頭撞到機構,系統在手臂還沒開始動之前就先把這次移動擋下來,並跳出警報。通常出現在分類手臂要移動到某個取料/放料位置時(自動區或 Loader 區的分類欄位),或是在教導(Teach)測試手臂移動的時候。
+- **可能原因**：手臂要去的目標位置(教導值)被設得太靠邊,超過了允許的移動範圍。；依目前盤子的格數/欄位算出來的目標位置,超出手臂實際能到的範圍(例如欄位或格間距設定不對)。；這支馬達的可移動範圍(軟體極限上、下限)本身設得太窄,連正常該到的位置都被擋掉。；手臂原點跑掉了(之前撞到、失步,或回原點沒回好),導致目前位置的基準偏掉,原本正常的目標就落到範圍外。；在教導測試手臂移動時,輸入或選到的位置本來就超出範圍,測試動作觸發了這個警報。
+- **裝置狀態**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
   |---|---|---|---|---|
-  | Top CCD 連線 | 邏輯 | 處於「已連線」狀態 | 未處於已連線狀態，即為本項的實際故障 | State Record・EventLog |
-  | `CosFunction.bUseTopCcd` | 設定(邏輯) | 對應 [TopCCD] Enable；僅在有 Top CCD 讀碼器且連得上時才開 ON | ON，但連線是斷的 | State Record・EventLog |
-  | `CosFunction.bUse2DBinMap` | 設定(邏輯) | 開 ON 才會走 Top CCD 2D 對照路徑；本警示只有在此為 ON 時才會到達 | ON（已進入該路徑） | State Record・EventLog |
-  | `HSys.LastSet.iRealDummy` | 邏輯 | 只有在真機且讀碼器已接線時為 REALLY | REALLY，但沒有實際連上 Top CCD | State Record・EventLog |
-- **處置**：確認 Top CCD 視覺 PC 已開機、程式在監聽，且機台設定的 [TopCCD] Address/Port 與讀碼器相符，並檢查網路線／交換器。可在維護頁用 Top CCD 連線鈕強制重連，確認連線回到「已連線」狀態。若機台沒有安裝 Top CCD，請把 [TopCCD] Enable 關掉（讓 `CosFunction.bUseTopCcd` 為 false）以略過 2D 路徑；或在整個 2D-Bin 對照功能不使用時，把 `bUse2DBinMap` 關掉。畫面 Note 可按 RETRY（重跑本步，內含隱式重連）或 SKIP（把該格 Bin 標記為 2D 掃描失敗後回到待機）。
-
-#### `WAR16121` — Color CCD 連線尚未就緒（Color Tray ID 無回應）
-
-- **意義**：在真機且啟用 Color 讀碼器的情況下，Color 站要讀身分盤 2D 前發現與 Color CCD 視覺 PC 的連線不存在或不在「已連線」狀態，於是跳出此警示。
-- **常見原因**：
-  - 到 Color CCD 視覺 PC 的連線沒建立（連線物件為空，或狀態不是已連線）；
-  - `bUseColorCcd`（[ColorCCD] Enable）開著但讀碼器連不上（視覺 PC 沒開、Address/Port 錯、線材／交換器故障）；
-  - Color 讀碼器程式沒啟動或沒在設定的埠監聽。
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
-  |---|---|---|---|---|
-  | Color CCD 連線 | 邏輯 | 存在且處於「已連線」狀態 | 不存在，或不在已連線狀態 | State Record・EventLog |
-  | `CosFunction.bUseColorCcd` | 設定(邏輯) | 對應 [ColorCCD] Enable（預設開啟）；僅在實體有 Color 讀碼器且連得上時才該開 ON（關 OFF 時會改用模擬身分、不會到本警示） | ON，但連線是斷的，於是走到連線檢查而跳警示 | State Record・EventLog |
-- **處置**：這是連線故障、不是動作故障。確認 Color CCD 視覺 PC 已開機、讀碼程式在監聽，且 system\General.ini 內 [ColorCCD] 的 Address 與 Port 與讀碼器相符，並檢查控制器與視覺 PC 之間的線材／交換器。若機台沒有安裝 Color 讀碼器，把 [ColorCCD] Enable 設為 false（連動 `CosFunction.bUseColorCcd`），身分 2D 路徑就改用模擬而不跳警示。畫面 Note 可按 RETRY（重建連線並重新檢查）或 SKIP（設定空身分後讓掃描回到待機）。
-
-### 6.7 SortArm 分類手臂
-
-#### `WAR0154` — Sorting Arm X 軸即將超出行程
-
-- **意義**：分類手臂 X 軸（`MSortingArmX`）在移動前的軟體行程檢查沒過──系統要它去的 X 目標位置，落在允許的軟體行程範圍（`SoftLimitN` ~ `SoftLimitP`）之外，所以在馬達還沒開始動之前就先擋下、發出警報。這是「移動前」的軟體保護，不是撞到實體限位開關。
-
-- **常見原因**：
-  - 某個分類手臂 X 的教導位置（例如某 Auto/Loader 分類欄的 X、或 Pitch 間距目標）被設在軟體行程範圍之外；
-  - 由基準 X 加上欄位/間距算出的格位 X 目標，對目前這種盤型或欄位索引來說超出實體行程；
-  - `MSortingArmX` 馬達參數裡的 `SoftLimitN` / `SoftLimitP` 設得太窄，蓋不住實際需要的行程；
-  - 手臂因失步或原點回不準，導致目前位置偏掉，使得原本合理的目標算出來變成超出範圍；
-  - 在教導的進階測試流程中，下達了一個超出範圍的 X 目標。
-
-- **檢查點**：
-
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
-  |---|---|---|---|---|
-  | `MSortingArmX` | motor | 要去的 X 目標落在軟體行程範圍內（`SoftLimitN` ~ `SoftLimitP` 之間），允許移動 | 目標低於 `SoftLimitN` 或高於 `SoftLimitP`，移動在啟動前被拒絕 | MotionView（即時位置 + 設定的軟體行程 N/P 範圍）；Note 備註列上也會印出 target/now/N~P 數值 |
-  | `Requested X target`（要求的 X 目標，邏輯） | logic | 上游算出的目的地（教導的分類手臂 X、或由格位推算的目標、或進階測試目標）落在 `SoftLimitN` ~ `SoftLimitP` 之內 | 以目前校正狀態算出的目標超出範圍；備註列會顯示 target 落在 N~P 範圍之外 | Note 備註列（target / now / N~P，單位 1/100mm）；State Record・EventLog 看前一步的移動判斷背景 |
-  | `MSortingArmX SoftLimitN / SoftLimitP` | logic | 軟體行程範圍夠寬，能涵蓋所有合法的分類手臂 X 目的地（各 Auto/Loader 分類欄教導位置加上格位間距展開） | 範圍設得太窄（或整體偏移），把合法目的地卡掉、拒絕移動 | MotionView 的 `MSortingArmX` 軟體行程欄位；馬達參數表中設定的行程上下限值 |
-
-- **處置**：先看 Note 備註列，上面會顯示 target（要去的位置）、now（目前位置）與軟體行程範圍 N ~ P（單位 1/100mm）。用這三個數值判斷：如果是某個教導位置或算出的格位目標超出範圍，需先修正該教導值；如果 now 明顯偏掉、疑似失步或原點跑掉，先讓分類手臂重新回原點使 now 回到校正狀態。修正之後才按 RETRY。若一按 RETRY 又立刻重跳同一警報，代表目標確實超出範圍，不要一直重試，請停機找維修人員（可能需放寬馬達行程上下限）。這是純軟體行程保護，IOsetview 上沒有對應的 IO 燈可看，只能對照 Note 數值與 MotionView 判讀。
+  | `MSortingArmX` | 馬達 | 要移動到的目標位置落在允許的移動範圍內(在軟體極限上限與下限之間),移動才會被放行。 | 目標位置比下限還低、或比上限還高,所以系統在手臂動作前就擋下這次移動,馬達完全不會動。 | MotionView(馬達畫面):看 MSortingArmX 的目前位置,以及設定的移動範圍上、下限。警報視窗的明細行也會印出目標值、目前值與範圍。 |
+  | `要移動到的目標位置(系統計算值)` | 狀態/計數 | 系統依教導值、或依格數/欄位算出來的目標位置,落在允許的移動範圍之內。 | 算出來的目標位置超出目前的範圍;警報明細行會顯示「目標值」落在允許範圍之外(數字單位為 1/100 mm)。 | 警報視窗的明細行(顯示目標值、目前位置、允許範圍上下限);必要時看狀態紀錄,了解前一個動作當時的情況。這是純計算/邏輯判斷,沒有單一感測器燈號可看。 |
+  | `MSortingArmX 移動範圍(軟體極限)上、下限設定` | 狀態/計數 | 移動範圍設得夠寬,能涵蓋分類手臂所有正常要到的位置(自動區/Loader 區各分類欄位,再加上格與格之間的間距)。 | 範圍設得太窄(或整體偏掉),把正常該到的位置也一起擋掉了。 | MotionView(馬達畫面):看 MSortingArmX 的移動範圍上、下限欄位。 |
+- **初步排除**：先看警報視窗的明細行:上面會顯示「目標值、目前位置、允許範圍(下限~上限)」(單位 1/100 mm),可以判斷是超出上限還是下限。這個警報是可以重試(Retry)的:但一定要先確認手臂位置或教導值已經修正好,再按重試。如果一按重試就馬上又跳出同一個警報,代表目標位置真的超出範圍,請不要一直反覆重試,直接通報工程師。特別提醒:這是「軟體範圍保護」,不是實體極限開關,所以在 IOsetview(IO 監看畫面)看不到對應燈號;要看的是警報明細上的數字和 MotionView(馬達畫面)。
+- **通報工程師**：通報工程師時,請提供:警報代碼 WAR0154、警報明細行上的「目標值 / 目前位置 / 允許範圍上下限」三個數字,以及當時設備正在做什麼(哪一站、哪一盤、第幾格或哪個欄位,或是否正在教導測試中)。工程師會在 MotionView 比對 MSortingArmX 的目標值與移動範圍上下限,判斷是教導位置要修正、範圍要放寬,還是手臂原點跑掉需要重新回原點校正。
 
 ---
 
-## 七、附錄：快速查碼與位址說明
-
-### 7.1 代碼快速定位
-| 看到的代碼 | 查哪一節 |
-|---|---|
-| `4xxxx`（5 位、開頭 4） | 三、汽缸類 → 3.5 對照表，末碼 3=伸出失敗 / 0=縮回失敗 |
-| `5xxxx`（5 位、開頭 5） | 四、馬達類 → 4.2 找馬達，末碼查 4.1 |
-| `6000x` | 五、真空吸嘴類 |
-| `JAM…` / `MES…` / `WAR…` | 六、系統流程類（依模組分節） |
-
-### 7.2 IO 位址欄位說明
-位址格式 `L<環號>/IP<節點>/P<埠>/b<位元>`，代表這個訊號點在 MotionNet 上的位置：第幾條環、第幾個節點、第幾個埠、第幾個位元。機台就是照這四個數字去讀取該點是 ON 還是 OFF。
-
-- **環號 Lane**：0 起算，本機共 2 條環（只有 Lane 0、Lane 1 存在；若看到 Lane 2 表示該點讀不到）。
-- **InType 極性**：0=常開(NO)、1=常閉(NC)；判讀 ON/OFF 時務必對照極性，否則會判反。
-- **Enable**：0=停用（該點不讀、也不會發到位警報）。
-- ⚠️ IOsetview 滑鼠停留時顯示的位址，其 IP/埠部分經過另一層編碼轉換，與本表的原始數值不一定逐字相同；**搜尋時請以 Alias 名稱為準**，位址僅作輔助。
+## 六、附錄：IO 判讀小提醒
+- 在 IOsetview 一律用**名稱**搜尋（例 `SnColor_InputHasTray`），不用記位址。
+- 感測器有**常開／常閉**之分，「亮／不亮」代表的意義可能相反；判讀不確定時請一併告知工程師。
+- 對照表中標**停用**或**本機未安裝**的感測器／汽缸不會有訊號，屬正常，不用找。
+- 標**邏輯／計數**的項目沒有單一感測器可看，通常需要工程師協助。
 
 ---
 
-*本手冊由 `system/AlarmList.csv`（開機時自動匯出）與 `system/IO_Table.csv` 交叉比對，並參照機台實際運行行為整理而成。生成日期 2026-07-13。*
+*本手冊涵蓋全機 576 個警報：汽缸 330、馬達 180、真空 6、系統流程 60。生成日期 2026-07-13。*
