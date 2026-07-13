@@ -46,7 +46,7 @@ td.act{background:var(--act-bg);color:var(--act-fg)}
 .nohit{display:none !important}
 .emptynote{color:var(--muted);font-style:italic;padding:12px}
 footer{color:var(--muted);font-size:12.4px;margin:38px 0 20px;text-align:center}
-</style><header class="top"><h1>HT160S 警報／警示 現場排除手冊</h1><span class="meta">操作員版 ｜ 2026-07-13</span><input id="search" placeholder="🔍 輸入代碼或關鍵字（如 40203 / JAM1030 / 推盤 / 極限）"><button id="themeBtn">🌙 主題</button></header><div class="wrap"><nav class="toc"><a href="#s1">一、看到警報怎麼辦</a><a href="#s2">二、汽缸 4xxxx</a><a href="#s3">三、馬達 5xxxx</a><a href="#s4">四、真空 6xxxx</a><a href="#s5">五、系統流程</a><a href="#s6">六、附錄</a></nav><h2 id="s1">一、看到警報怎麼辦</h2><p>本手冊供【現場操作員（OP）】初步排除 HT160S 設備警報使用。看到警報時，先記下畫面上的【代碼】與【訊息】，依本手冊找到對應項目，對照「裝置<strong>應該狀態</strong> vs <strong>目前狀態</strong>」做初步排除；若無法排除，再把代碼、訊息與你檢查到的狀態回報工程師。</p><h3>1.1 排除流程</h3><ol>
+</style><header class="top"><h1>HT160S 警報／警示 現場排除手冊</h1><span class="meta">操作員版 ｜ 2026-07-13</span><span style="flex:1"></span><button id="themeBtn">🌙 主題</button></header><div class="wrap"><nav class="toc"><a href="#s1">一、看到警報怎麼辦</a><a href="#s2">二、汽缸 4xxxx</a><a href="#s3">三、馬達 5xxxx</a><a href="#s4">四、真空 6xxxx</a><a href="#s5">五、系統流程</a><a href="#s6">六、附錄</a></nav><h2 id="s1">一、看到警報怎麼辦</h2><p>本手冊供【現場操作員（OP）】初步排除 HT160S 設備警報使用。看到警報時，先記下畫面上的【代碼】與【訊息】，依本手冊找到對應項目，對照「裝置<strong>應該狀態</strong> vs <strong>目前狀態</strong>」做初步排除；若無法排除，再把代碼、訊息與你檢查到的狀態回報工程師。</p><h3>1.1 排除流程</h3><ol>
 <li>記下畫面上的【警報代碼】與【訊息】。</li>
 <li>用下方【代碼快速定位】找出它屬於哪一類、要看本手冊哪一章。</li>
 <li>對照該項目的【裝置狀態表】，逐一檢查表中裝置「目前狀態」是否和「應該狀態」一致，不一致的就是嫌疑點。</li>
@@ -82,23 +82,6 @@ footer{color:var(--muted);font-size:12.4px;margin:38px 0 20px;text-align:center}
 <li>對照表中標<strong>停用</strong>或<strong>本機未安裝</strong>的感測器／汽缸不會有訊號，屬正常，不用找。</li>
 <li>標<strong>邏輯／計數</strong>的項目沒有單一感測器可看，通常需要工程師協助。</li>
 </ul><footer>HT160S 警報現場排除手冊（操作員版）｜涵蓋全機 576 個警報｜生成日期 2026-07-13</footer></div><script>
-const box=document.getElementById('search');
-const items=[...document.querySelectorAll('[data-s]')];
-const nm=x=>(x||'').toLowerCase();
-box.addEventListener('input',()=>{
- const v=nm(box.value.trim());
- items.forEach(el=>el.classList.toggle('nohit', v!=='' && !nm(el.dataset.s).includes(v)));
- document.querySelectorAll('table').forEach(t=>{
-   const rows=[...t.querySelectorAll('tbody tr[data-s]')];
-   if(rows.length){const vis=rows.some(r=>!r.classList.contains('nohit'));
-     const w=t.closest('.tblwrap'); if(w) w.style.display=vis?'':'none';}
- });
- document.querySelectorAll('section.grp').forEach(s=>{
-   const cards=[...s.querySelectorAll('.card[data-s]')];
-   if(cards.length){const vis=cards.some(c=>!c.classList.contains('nohit'));
-     s.style.display=vis?'':'none';}
- });
-});
 const tb=document.getElementById('themeBtn');
 tb.addEventListener('click',()=>{
  const r=document.documentElement, cur=r.getAttribute('data-theme');

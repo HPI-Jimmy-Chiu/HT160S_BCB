@@ -8,7 +8,7 @@ IO／汽缸／馬達／真空點的 **應該狀態（健康）→ 目前狀態�
 
 | 檔案 | 用途 |
 |---|---|
-| [`HT160S_Alarm_Troubleshooting.html`](HT160S_Alarm_Troubleshooting.html) | 互動版（鴻勁紅配色、可搜尋代碼／關鍵字、淺深色切換）。用瀏覽器開啟，現場首選。 |
+| [`HT160S_Alarm_Troubleshooting.html`](HT160S_Alarm_Troubleshooting.html) | 手冊版（鴻勁紅配色、可淺深色切換）。用瀏覽器開啟，現場首選。 |
 | [`HT160S_Alarm_Troubleshooting.md`](HT160S_Alarm_Troubleshooting.md) | Markdown 版（可在 GitHub / VS Code 檢視、可貼進其他文件）。 |
 | `data/`（內部參考資料） | 汽缸／馬達代碼對照與各警報判讀的原始整理資料（`cyl_ref`／`mot_ref`／`op_out.json` 等），供日後**重建對照表**用，非操作員閱讀。 |
 
