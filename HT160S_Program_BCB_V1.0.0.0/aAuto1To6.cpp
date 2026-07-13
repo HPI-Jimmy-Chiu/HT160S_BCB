@@ -123,6 +123,7 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         State[Index].bFrontHasTray=false;
         State[Index].bFullIC=false;
         bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 latch reset
+        bDischargeTailPending[Index]=false;   //AI(ht160s-home-resume-drain) 20260713 : AD-1 latch cleared on COLD init only (below the keep-material early-out, so a recoverable HOME preserves an in-flight eject tail)
         RearKind[Index]=eTrayKindNormal;     //AI(HT160S-Maintainer) 20260605 : AMR reset
         WorkingKind[Index]=eTrayKindNormal;  //AI(HT160S-Maintainer) 20260605 : AMR reset
         RearTrayID[Index]="";                //AI(HT160S-Maintainer) 20260608 : AMR 2D TrayID reset
@@ -151,6 +152,35 @@ bool TAutoModule::HomeDrainTick()
         else
             return false;
     }
+    //AI(ht160s-home-resume-drain) 20260713 : AD-1 discharge-tail latch. The eject tail
+    //(DischargeTask 5000-6100 = MoveAutoY-to-feed + FrontRise) is a MOTOR phase a drain
+    //cannot pump; the working tray was committed at DoDischargeTray case 1000 and the
+    //clamps released at 3000/4000, so the tray sits free at the output with no live
+    //discharge candidate (FindDischargeAuto needs bFullIC, cleared at 1000). Latch the
+    //station; DoAuto case 3000 finishes the eject on resume (latch survives keep-material).
+    if(iDischargeAuto>=0 && iDischargeAuto<AUTO_STATION_COUNT &&
+       (DischargeTask==5000 || DischargeTask==6000 || DischargeTask==6100))
+        bDischargeTailPending[iDischargeAuto]=true;
+    //AI(ht160s-home-resume-drain) 20260713 : AD-2 FrontRise convergence. uHome homes only
+    //MAutoY and InitialFlag only resets the DischargeSubTask cursor, so a riser left On by
+    //a HOME in the discharge / cleanout FrontRise dwell stays extended and collides on the
+    //next GoUp index. Force every station's FrontRise Off and HOLD the drain open (return
+    //false) until the Off reed confirms, so the risers are down BEFORE MAutoY homes. M2 :
+    //lowering a static riser is safe; an air-pressure-alarm HOME skips the whole drain (D3)
+    //so a coil is only commanded when air is trusted. Lowering is NOT gated by the D1 AMR
+    //freeze (which freezes destacker RISE / separate only).
+    bool bAllRiserOff=true;
+    for(int i=0; i<AUTO_STATION_COUNT; i++)
+    {
+        TMyCylinder *Rise=GetFrontRise(i);
+        if(Rise==NULL)
+            continue;
+        Rise->Off();
+        if(IsCylinderOffReady(Rise, IsSoftSimulate())==false)
+            bAllRiserOff=false;
+    }
+    if(bAllRiserOff==false)
+        return false;
     return true;
 }
 //---------------------------------------------------------------------------
@@ -467,6 +497,23 @@ bool TAutoModule::IsRearHasTray(int Index)
         return false;
     RefreshAutoState();
     return State[Index].bRearHasTray;
+}
+//---------------------------------------------------------------------------
+bool TAutoModule::IsRearPlacedButUnsigned(int Index)
+{
+    //AI(ht160s-home-resume-drain) 20260713 : XS-1/TA-2 adopt-as-delivered discriminator.
+    //True when the rear PHYSICALLY holds a tray (raw OutputBottomHasTray sensor, Enable-
+    //gated) that was never signed as delivered (bRearDeliveredPending==false, set at
+    //DoPlace case 4000 via Notify/SetRearHasTrayFromTrayArm, cleared on consume/discharge/
+    //cold-init). That is the HOME-interrupted-deposit window : jaws opened (case 2000) but
+    //the case-4000 sign never ran. IsRearHasTray() conflates raw-sensor OR latch, so it
+    //cannot tell signed from unsigned; this can.
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    TMySensor *Sn=GetOutputBottomHasTray(Index);
+    if(Sn==NULL || Sn->Enable==false)
+        return false;
+    return (Sn->IsOn() && bRearDeliveredPending[Index]==false);
 }
 //---------------------------------------------------------------------------
 void TAutoModule::SetRearHasTrayFromTrayArm(int Index, bool bHasTray)
@@ -1640,7 +1687,31 @@ void TAutoModule::DoAuto(int &Task)
             break;
 
         case 3000:
+        {
             CheckAutoTray();
+            //AI(ht160s-home-resume-drain) 20260713 : AD-1 discharge-tail resume. A HOME
+            //that landed at DischargeTask 5000-6100 left a committed tray free at the
+            //output with no live discharge candidate (bFullIC was cleared at case 1000, so
+            //FindDischargeAuto skips it). Re-enter the eject phase at its START (case 5000
+            //re-commands MoveAutoY-to-feed and arms a FRESH DischargeDelay) : a phase-start
+            //re-entry, not a mid-step jump into a Clear'd timer. AD-2 forced every FrontRise
+            //Off during the drain, so the 6100 pump starts from a known-down riser. The
+            //latch survived the keep-material wipe; consume it here so the tail runs once.
+            int iTail=-1;
+            for(int i=0; i<AUTO_STATION_COUNT; i++)
+                if(bDischargeTailPending[i])
+                {
+                    iTail=i;
+                    break;
+                }
+            if(iTail>=0)
+            {
+                bDischargeTailPending[iTail]=false;
+                iDischargeAuto=iTail;
+                DischargeTask=5000;
+                Task=4000;
+                break;
+            }
             if(FindDischargeAuto()>=0)
             {
                 DoDischargeTray(0);
@@ -1649,6 +1720,7 @@ void TAutoModule::DoAuto(int &Task)
             else
                 Task=1;
             break;
+        }
 
         case 4000:
             if(DoDischargeTray(1))

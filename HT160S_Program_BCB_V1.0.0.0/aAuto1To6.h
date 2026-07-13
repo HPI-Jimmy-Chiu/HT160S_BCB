@@ -78,6 +78,7 @@ private:
     //Cleared when the Auto consumes the rear tray (DoFeedTray 7000), discharges,
     //or cleans out. True only after SetRearHasTrayFromTrayArm/NotifyTrayArmDelivered.
     bool bRearDeliveredPending[6];
+    bool bDischargeTailPending[6];   //AI(ht160s-home-resume-drain) 20260713 : AD-1 - HOME landed in the discharge eject tail (DischargeTask 5000-6100); finish MoveAutoY-to-feed + FrontRise on resume (cleared on COLD init only)
     int RearKind[6];      //AI(HT160S-Maintainer) 20260605 : AMR kind of tray TrayArm placed at rear
     int WorkingKind[6];   //AI(HT160S-Maintainer) 20260605 : AMR kind of tray now at the sort working position
     AnsiString RearTrayID[6];     //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the identity tray TrayArm placed at rear (from Color CCD)
@@ -125,6 +126,7 @@ public:
     void DoAuto(int &Task);
     int FindEmptyRearForTrayArm();
     bool IsRearHasTray(int Index);
+    bool IsRearPlacedButUnsigned(int Index);   //AI(ht160s-home-resume-drain) 20260713 : XS-1/TA-2 - rear physically holds a tray (raw sensor) NOT signed as delivered (bRearDeliveredPending==false); TrayArm adopt-as-delivered discriminator
     void SetRearHasTrayFromTrayArm(int Index, bool bHasTray);
     void SetPlaceResidueClear(int Index, bool bClear);   //AI(ht160s-residue) 20260624 : SortArm reports place-residue result for the target Auto
     bool IsAllCleanOutFinish();  //AI(HT160S-Maintainer) 20260602 : expose for csystem CheckCleanOutFinish
