@@ -29,6 +29,14 @@ void THT160GeneralSetting::SetDefault()
 	bUseAMR=false;
 	for(int z=0;z<9;z++)
 		iSimAmrMaxTray[z]=10;
+	// AI(ht160s-loader-worktray-count) 20260713 : header defaults match the previously
+	// hardcoded FmtCarKinds args - Loader/Auto 1 cover + 1 identity, Empty 1 cover + 0
+	// identity, Color whole-car identity (-1).
+	for(int z=0;z<9;z++)
+	{
+		iAmrCoverTray[z]=(z==2)?0:1;
+		iAmrIdentityTray[z]=(z==1)?0:((z==2)?-1:1);
+	}
 	iSortMode=smNormal;
 	bUsePredictiveAutoSupply=false;
 	for(int a=0;a<6;a++)
@@ -97,6 +105,15 @@ void THT160GeneralSetting::Load()
 	bUseAMR=Ini->ReadBool("HardwareInstall", "UseAMR", false);
 	for(int z=0;z<9;z++)
 		iSimAmrMaxTray[z]=Ini->ReadInteger("SimAMR", "MaxTray"+IntToStr(z), 10);
+	// AI(ht160s-loader-worktray-count) 20260713 : per-zone AMR header composition. Defaults
+	// preserve the previous hardcoded FmtCarKinds split so an ini without [AMR] is unchanged.
+	for(int z=0;z<9;z++)
+	{
+		int cvDef=(z==2)?0:1;
+		int idDef=(z==1)?0:((z==2)?-1:1);
+		iAmrCoverTray[z]=Ini->ReadInteger("AMR", "CoverTray"+IntToStr(z), cvDef);
+		iAmrIdentityTray[z]=Ini->ReadInteger("AMR", "IdentityTray"+IntToStr(z), idDef);
+	}
 	// AI(ht160s-lotpassfail) 20260709 : Mode-first back-compat. The new [SortMode] Mode
 	// wins; legacy [SortMode] UseLotBinMode is only the default when Mode is absent (so an
 	// upgraded machine that ran LotBin keeps LotBin, but an explicit Mode=2 is never
@@ -184,6 +201,12 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("HardwareInstall", "UseAMR", bUseAMR);
 	for(int z=0;z<9;z++)
 		Ini->WriteInteger("SimAMR", "MaxTray"+IntToStr(z), iSimAmrMaxTray[z]);
+	// AI(ht160s-loader-worktray-count) 20260713 : persist per-zone AMR header composition.
+	for(int z=0;z<9;z++)
+	{
+		Ini->WriteInteger("AMR", "CoverTray"+IntToStr(z), iAmrCoverTray[z]);
+		Ini->WriteInteger("AMR", "IdentityTray"+IntToStr(z), iAmrIdentityTray[z]);
+	}
 	Ini->WriteInteger("SortMode", "Mode", iSortMode);
 	// AI(ht160s-lotpassfail) 20260709 : keep the legacy bool key in sync so an older exe
 	// (which only reads UseLotBinMode) still lands on a sane mode - LotBin stays LotBin,

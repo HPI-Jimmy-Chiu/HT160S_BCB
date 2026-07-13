@@ -558,11 +558,23 @@ void TLoaderModule::RefillSimInfeed()
 {
     //AI(ht160s-agv) 20260627 : latch the FIXED magazine total for this car. When AMR is
     //on and the host declared a LoaderTrayCount (SECS S2F41 -> SetExpectedCarTrayCount),
-    //that physical total (IC + cover + identity) is the source of truth for tray-kind
+    //that physical total (SECS work-only count + firmware-added header) is the source of truth
     //tagging and the count-vs-Inputend cross-check; otherwise fall back to the sim max.
-    iCarTrayTotal = (GeneralSetting.bUseAMR && iSecsCarTrayCount>0)
-                    ? iSecsCarTrayCount
-                    : GeneralSetting.iSimAmrMaxTray[0];
+    //AI(ht160s-loader-worktray-count) 20260713 : the host SECS LoaderTrayCount is WORK trays
+    //ONLY (9045 iSECSSetTrayCount parity); the cover/identity header trays are firmware-added
+    //here so iCarTrayTotal is the true physical magazine total. Header = [AMR] CoverTray0 +
+    //IdentityTray0 (a negative identity sentinel contributes 0). Fixes the old
+    //"iCarTrayTotal = iSecsCarTrayCount" that treated the work count as the full total, so the
+    //Motion-View work count read short by the header count. Sim-fallback (no host count) still
+    //uses the configured per-zone max as the physical total.
+    if(GeneralSetting.bUseAMR && iSecsCarTrayCount>0)
+    {
+        int iHeader = GeneralSetting.iAmrCoverTray[0]
+                    + ((GeneralSetting.iAmrIdentityTray[0]>0) ? GeneralSetting.iAmrIdentityTray[0] : 0);
+        iCarTrayTotal = iSecsCarTrayCount + iHeader;
+    }
+    else
+        iCarTrayTotal = GeneralSetting.iSimAmrMaxTray[0];
     iSimInfeedCount=iCarTrayTotal;
     iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - new car => restart feed serial
 }
@@ -593,10 +605,18 @@ eTrayKind TLoaderModule::GetFedTrayKind(int feedSerial, int total)
     //Force Normal so recovered empties recycle to the Empty pool / requesting Autos.
     if(GeneralSetting.bUseAMR==false)
         return eTrayKindNormal;
-    if(feedSerial>=total)
-        return eTrayKindIdentity;
-    if(feedSerial==total-1)
-        return eTrayKindCover;
+    //AI(ht160s-loader-worktray-count) 20260713 : config-driven header boundaries. The trailing
+    //iAmrIdentityTray[0] trays are identity (fed LAST), the iAmrCoverTray[0] before them are
+    //cover, the rest are work. Defaults 1 identity + 1 cover reproduce the old total / total-1
+    //rule. A negative identity (Color-style sentinel) contributes no identity trays here.
+    {
+        int idCount = (GeneralSetting.iAmrIdentityTray[0]>0) ? GeneralSetting.iAmrIdentityTray[0] : 0;
+        int cvCount = (GeneralSetting.iAmrCoverTray[0]>0)    ? GeneralSetting.iAmrCoverTray[0]    : 0;
+        if(feedSerial > total - idCount)
+            return eTrayKindIdentity;
+        if(feedSerial > total - idCount - cvCount)
+            return eTrayKindCover;
+    }
     return eTrayKindNormal;
 }
 //---------------------------------------------------------------------------
@@ -1445,7 +1465,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
 
         case 9000:
             //AI(ht160s-agv) 20260627 : AMR-on tray-count vs Inputend cross-check. iCarTrayTotal
-            //is the FIXED physical magazine total (SECS LoaderTrayCount = IC + cover + identity,
+            //is the FIXED physical magazine total (SECS work-only LoaderTrayCount + firmware header,
             //latched at car arrival). Once iFeedSerial has consumed the whole total the count
             //says the car is drained; if SnLoader_Inputend still reads a tray the count and the
             //hardware disagree -> abnormal, raise MES0921 rather than feed a tray the count says

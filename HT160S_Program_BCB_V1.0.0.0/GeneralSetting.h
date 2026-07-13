@@ -36,6 +36,17 @@ public:
 	// Stored in General.ini [SimAMR] MaxTray0..8. Default 10.
 	int iSimAmrMaxTray[9];
 
+	// AI(ht160s-loader-worktray-count) 20260713 : per-zone AMR magazine header (non-work)
+	// tray composition. Index 0=Loader, 1=Empty, 2=Color, 3..8=Auto1..6 (same layout as
+	// iSimAmrMaxTray). Cover = top cover/header trays; Identity = 2D identity trays; a
+	// negative Identity is the "whole car is identity" sentinel (Color supply). The header
+	// count (Cover + max(0,Identity)) is ADDED to the host-declared SECS work-only
+	// LoaderTrayCount to get the physical car total, and drives both the FmtCarKinds display
+	// split and GetFedTrayKind tagging. Stored in General.ini [AMR] CoverTray0..8 /
+	// IdentityTray0..8. Defaults reproduce the previous hardcoded FmtCarKinds args.
+	int iAmrCoverTray[9];
+	int iAmrIdentityTray[9];
+
 	// Sort mode (customer special request). Exclusive selector, 3 values :
 	//   smNormal       : static Bin->Auto recipe table (THT160BinAreaMap).
 	//   smLotBin        : dynamic (LotID,Bin)->Auto binding built at run time

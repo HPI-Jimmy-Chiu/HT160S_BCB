@@ -952,11 +952,11 @@ void __fastcall TfMain::ShowTrayUphHistory()
 void __fastcall TfMain::ShowCarTrayCount()
 {
     if(LoaderModule!=NULL && lbCarTrayCount_Loader!=NULL)
-        lbCarTrayCount_Loader->Caption=FmtCarKinds(LoaderModule->GetCarTrayCount(), 1, 1);
+        lbCarTrayCount_Loader->Caption=FmtCarKinds(LoaderModule->GetCarTrayCount(), GeneralSetting.iAmrIdentityTray[0], GeneralSetting.iAmrCoverTray[0]);
     if(EmptyModule!=NULL && lbCarTrayCount_Empty!=NULL)
-        lbCarTrayCount_Empty->Caption=FmtCarKinds(EmptyModule->GetCarTrayCount(), 0, 1);
+        lbCarTrayCount_Empty->Caption=FmtCarKinds(EmptyModule->GetCarTrayCount(), GeneralSetting.iAmrIdentityTray[1], GeneralSetting.iAmrCoverTray[1]);
     if(ColorModule!=NULL && lbCarTrayCount_Color!=NULL)
-        lbCarTrayCount_Color->Caption=FmtCarKinds(ColorModule->GetCarTrayCount(), -1, 0);
+        lbCarTrayCount_Color->Caption=FmtCarKinds(ColorModule->GetCarTrayCount(), GeneralSetting.iAmrIdentityTray[2], GeneralSetting.iAmrCoverTray[2]);
 
     if(AutoModule!=NULL)
     {
@@ -964,7 +964,7 @@ void __fastcall TfMain::ShowCarTrayCount()
                             lbCarTrayCount_Auto4, lbCarTrayCount_Auto5, lbCarTrayCount_Auto6};
         for(int i=0; i<6; i++)
             if(AutoLbl[i]!=NULL)
-                AutoLbl[i]->Caption=FmtCarKinds(AutoModule->GetCarTrayCount(i), 1, 1);
+                AutoLbl[i]->Caption=FmtCarKinds(AutoModule->GetCarTrayCount(i), GeneralSetting.iAmrIdentityTray[3+i], GeneralSetting.iAmrCoverTray[3+i]);
     }
 }
 //---------------------------------------------------------------------------

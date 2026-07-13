@@ -75,8 +75,8 @@ static void InfeedRefill(int p)
 {
     if(p==0 && LoaderModule!=NULL)
     {
-        //AI(ht160s-agv) 20260627 : latch the host-declared physical magazine total
-        //(SECS LoaderTrayCount = IC + cover + identity) that the preceding S2F41
+        //AI(ht160s-agv) 20260627 : latch the host-declared SECS LoaderTrayCount (WORK
+        //trays only; RefillSimInfeed adds the cover/identity header trays) that the preceding S2F41
         //START_AGV captured into AgvCoord.TrayCount[0], so the Loader tags tray kind
         //and runs the count-vs-Inputend cross-check against the REAL total. 0 = host
         //silent -> the Loader falls back to iSimAmrMaxTray inside RefillSimInfeed.

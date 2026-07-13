@@ -55,7 +55,7 @@ private:
     AnsiString CurrentLotNumber;
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
-    int iSecsCarTrayCount;    //AI(ht160s-agv) 20260627 : host-declared physical magazine total (SECS LoaderTrayCount = IC + cover + identity); 0 = host silent
+    int iSecsCarTrayCount;    //AI(ht160s-agv) 20260627 : host-declared SECS LoaderTrayCount = WORK trays ONLY (firmware adds cover/identity header); 0 = host silent
     int iCarTrayTotal;        //AI(ht160s-agv) 20260627 : fixed total for the current car (SECS count when AMR+nonzero, else iSimAmrMaxTray); drives kind tagging + count-vs-Inputend cross-check
     //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray hold (transfer-chain relay).
     //Kind is tagged on the carriage Tray grid at feed time; at discharge it is
