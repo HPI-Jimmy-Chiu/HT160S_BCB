@@ -728,12 +728,18 @@ sequenceDiagram
 <tr>
 <td>275</td>
 <td>AGVLdID</td>
-<td>carrier ID（現行韌體已於 CEID registry 定義 275→Report 5＝9 站 carrier-ID SVID <code>38202</code>–<code>38210</code>，但尚無程式路徑觸發發送，故仍不會出現）</td>
+<td>身分盤（identity/cover tray）2D 上傳。<strong>自 2026-07-13 起（commit 21ecb0f）已實作發報</strong>：當 AMR 身分盤（其 2D 由 Color CCD 讀取）經 TrayArm 送上 Auto 堆疊時以 S6F11 CEID275 上報，SVID <code>38202</code>（Load Port Carrier ID）帶該 2D，走<strong>專屬 report 7＝僅 <code>38202</code></strong>（非 9 站全帶的 report 5）。本 run（2026-06-26）早於此實作故未出現</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>關於 CEID 275（AGVLdID）</strong>：275 是 AGV CEID 集合中定義的 carrier ID 事件，但<strong>本 run 並未發出 275</strong>——本範例的 6 個 AGV cycle 只出現 272／273／274，因此 275 <strong>沒有對應的 FIELD TABLE（沒有 evidence row 可引用）</strong>。這與 P3（Color）的缺席性質相同：屬本 run 未觸發的情境，並非漏列或失敗。host 端不應預期每個 run 都一定看到 275。</p>
+<p><strong>關於 CEID 275（AGVLdID）</strong>：275 是身分盤（identity/cover tray）2D 的上傳事件。<strong>本 run（2026-06-26）並未發出 275</strong>——當時韌體尚未實作發報，且本範例的 6 個 AGV cycle 只出現 272／273／274，故 275 <strong>沒有對應的 evidence row 可引用</strong>。</p>
+<p><strong>自 2026-07-13 起（commit 21ecb0f）275 已實作並會實際發報</strong>：韌體在 AMR 身分盤經 TrayArm 送達 Auto 堆疊、且其 2D 為真實讀值時，發出 S6F11 CEID275，SVID <code>38202</code>（Load Port Carrier ID）帶該 2D（對齊 HT9045 AGVLdID）。要點：
+- 只上報<strong>剛取放的 Loader 身分盤</strong>單一 2D——用<strong>專屬 report 7（僅 <code>38202</code>）</strong>，不夾帶其餘 8 站的 carrier id；Auto 各站的 carrier id（<code>38205</code>–<code>38210</code>）改由 host 以 <strong>S1F3 輪詢</strong>取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
+- 作業員略過／讀取失敗（空 2D）者<strong>不上報</strong>（與 9045 一致，不送空碼）。
+- 真機關閉 Color CCD 時韌體產生的暫代碼（<code>COLOR2D_…</code>）<strong>不上報</strong>（避免假碼進 MES）；筆電模擬（SOFT_SIMULATE）的種子碼則會上報，供 SECS 模擬器對測。
+- <code>EventReport</code> 於 HSMS <strong>SELECTED</strong> 才送（未連線時為 no-op）。</p>
+<p>host 端仍不應假設每個 run 都必有 275——僅在該 run 有身分盤補給且連線時才出現。</p>
 </blockquote>
 <p><strong>START_AGV body 結構</strong>：</p>
 <pre><code>L[2]
