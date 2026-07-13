@@ -413,6 +413,18 @@ void TEmptyModule::DoEmpty(int &Task)
                 bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-return finished (tray back at front, rear cleared); lift the pick block
                 if(bReturnTray && bTrayXToEmptyFinish==false)
                     return;
+                //AI(ht160s-home-resume-cg4) 20260713 : Empty mirror of the Color CG-4
+                //close-out blind-spot guard. NotifyTrayXToEmptyFinish sets bRearHasTray +
+                //bTrayXToEmptyFinish together, but a late Notify can commit with the tray
+                //still at rear (case 1000 already skipped the haul). On real hardware case
+                //1000's RefreshStateFromSensors self-corrects; the sim / rear-sensor-disabled
+                //config is where it strands and inflates the return count. Require the rear
+                //cleared; else re-haul one more round.
+                if(bReturnTray && bRearHasTray)
+                {
+                    DoGoUpTray(0);
+                    return;
+                }
                 bReturnTray=false;
                 Status=(bRearHasTray ? ES_REAR_READY : ES_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;

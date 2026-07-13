@@ -479,6 +479,22 @@ void TColorModule::DoColor(int &Task)
             {
                 if(bReturnTray && bTrayXToEmptyFinish==false)
                     return;
+                //AI(ht160s-home-resume-cg4) 20260713 : close-out blind-spot guard.
+                //NotifyTrayXToEmptyFinish sets bRearHasTray + bTrayXToEmptyFinish together,
+                //but the deposit Notify can land AFTER DoGoUpTray case 1000 already read
+                //bRearHasTray==false and ran the ladder to its 9000/10000 terminal without
+                //hauling (case 7000, which clears bRearHasTray, was skipped) -> the tray is
+                //still physically at the rear yet DoGoUpTray returned true. Committing now
+                //inflates iReturnedCount and strands the tray (next DoFeedTray case 10 raises
+                //MES1426). Require the rear actually cleared; else re-arm (DoGoUpTray(0)) and
+                //re-dispatch one more haul round. bRearHasTray is the member cleared at GoUp
+                //case 7000 (no RefreshStateFromSensors between there and the terminal), so
+                //this cannot livelock even on a stuck-ON rear sensor.
+                if(bReturnTray && bRearHasTray)
+                {
+                    DoGoUpTray(0);
+                    return;
+                }
                 bReturnTray=false;
                 iReturnedCount++;
                 iSimInfeedCount++;
