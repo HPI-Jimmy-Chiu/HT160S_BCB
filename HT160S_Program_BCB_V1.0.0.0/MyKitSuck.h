@@ -103,7 +103,6 @@ public:
     bool GetOffBit();
     void ResetSuckTask();
     void SetRetryCount(int Count);
-    void CheckIsFallDown();
     void PushOnTime();
     void PushOffTime();
 };

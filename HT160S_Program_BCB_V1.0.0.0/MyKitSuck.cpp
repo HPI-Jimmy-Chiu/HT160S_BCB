@@ -324,14 +324,6 @@ void TMySucker::SetRetryCount(int Count)
     (void)Count;
 }
 //---------------------------------------------------------------------------
-void TMySucker::CheckIsFallDown()
-{
-    if(Enable==false || Task>2 || HSys.LastSet.iRealDummy!=REALLY)
-        return;
-    if(Sensor.IsOn()==false)
-        Normal();
-}
-//---------------------------------------------------------------------------
 void TMySucker::PushOnTime()
 {
 }
