@@ -140,6 +140,19 @@ __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     palAllOff=NULL;
     Color=IO_COLOR_FORM;
     fShow=false;
+    //AI 20260713 : ts_IOSelfTest cylinder auto-poll runtime state (Feature A).
+    bSelfTestRunning=false;
+    iSelfTestCursor=0;
+    iSelfTestPhase=0;
+    iSelfTestRow=1;
+    dwSelfTestPhaseStart=0;
+    iSelfTestPass=0;
+    iSelfTestFail=0;
+    iSelfTestSkip=0;
+    bStExtendConfirmed=false;
+    bStExtendTimeout=false;
+    bStRetractConfirmed=false;
+    bStRetractTimeout=false;
     CreateSuckerGroupButtons();
 }
 //---------------------------------------------------------------------------
@@ -1926,6 +1939,10 @@ void __fastcall Tfiosetview::FormShow(TObject *Sender)
     RefreshLegacyIOMaps();
     UpdateLegacyPageTabsVisible();
     SetRefreshTimerEnabled(true);
+    //AI 20260713 : ts_IOSelfTest - re-arm the cylinder self-test tab on each open.
+    bSelfTestRunning=false;
+    SelfTestSetButtonsRunning(false);
+    SelfTestPopulateItems();
     fShow=true;
 }
 //---------------------------------------------------------------------------
@@ -2171,6 +2188,11 @@ void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)
     RefreshCurrentView();
     RefreshMN200();
     UpdateLegacyPageTabsVisible();
+    //AI 20260713 : ts_IOSelfTest cylinder auto-poll is advanced one phase per 200ms tick
+    //here (this timer is the sole cylinder driver while the view is open - MainProc is
+    //suspended by csystem.cpp fiosetview->Visible early-return).
+    if(bSelfTestRunning)
+        SelfTestCylinderTick();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormClose(TObject *Sender,
@@ -2178,6 +2200,13 @@ void __fastcall Tfiosetview::FormClose(TObject *Sender,
 {
     (void)Sender;
     (void)Action;
+    //AI 20260713 : never leave a cylinder self-test running across a close. SelfTestStop
+    //retracts the in-flight cylinder (every tested cylinder already ends retracted). The
+    //restore-on-close path below then reverts outputs to the FormShow snapshot - EXCEPT
+    //when opened from Teach (bFromTeach), which by design skips restore; in that case the
+    //cylinders are simply left in their retracted end state.
+    if(bSelfTestRunning)
+        SelfTestStop(true);
     //AI 20260619 : restore-on-close decision tree, aligned with HT172
     //(maintenance.cpp spbIoMonitorClick). If any output was toggled in this IO view :
     //  - opened from Teach (bFromTeach) -> do NOTHING : no prompt, no restore. HT172's
@@ -2203,29 +2232,458 @@ void __fastcall Tfiosetview::FormClose(TObject *Sender,
     fShow=false;
 }
 //---------------------------------------------------------------------------
-//AI 20260713 : ts_IOSelfTest skeleton - empty event stubs, detection logic TBD.
+//AI 20260713 : ts_IOSelfTest Feature A - cylinder auto-poll. See iosetview.h for the
+//design rationale (On()/Off() manual-drive idiom + self-owned deadline, NOT Push/Pop).
 void __fastcall Tfiosetview::rgSelfTestModeClick(TObject *Sender)
 {
     (void)Sender;
+    if(bSelfTestRunning)
+        return;
+    SelfTestPopulateItems();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::btnSelfTestSelectAllClick(TObject *Sender)
 {
     (void)Sender;
+    if(bSelfTestRunning || clbSelfTestItems==NULL)
+        return;
+    for(int i=0; i<clbSelfTestItems->Items->Count; i++)
+        clbSelfTestItems->Checked[i]=true;
+    SelfTestUpdateProgress();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::btnSelfTestSelectNoneClick(TObject *Sender)
 {
     (void)Sender;
+    if(bSelfTestRunning || clbSelfTestItems==NULL)
+        return;
+    for(int i=0; i<clbSelfTestItems->Items->Count; i++)
+        clbSelfTestItems->Checked[i]=false;
+    SelfTestUpdateProgress();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::btnSelfTestStartClick(TObject *Sender)
 {
     (void)Sender;
+    SelfTestStart();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::btnSelfTestStopClick(TObject *Sender)
 {
     (void)Sender;
+    if(bSelfTestRunning)
+        SelfTestStop(true);
+}
+//---------------------------------------------------------------------------
+bool Tfiosetview::SelfTestTierIsReal()
+{
+    //Confirm-capable tier : REALLY or HAS_TRAY read real position sensors; DUMMY skips
+    //them (matches TMyCylinder::Push gate iRealDummy!=DUMMY); SOFT_SIMULATE has no IO.
+    #ifdef SOFT_SIMULATE
+    return false;
+    #else
+    return (HSys.LastSet.iRealDummy!=DUMMY);
+    #endif
+}
+//---------------------------------------------------------------------------
+AnsiString Tfiosetview::SelfTestTierName()
+{
+    #ifdef SOFT_SIMULATE
+    return AnsiString("SIM");
+    #else
+    if(HSys.LastSet.iRealDummy==REALLY)
+        return AnsiString("REALLY");
+    if(HSys.LastSet.iRealDummy==HAS_TRAY)
+        return AnsiString("HAS_TRAY");
+    return AnsiString("DUMMY");
+    #endif
+}
+//---------------------------------------------------------------------------
+int Tfiosetview::SelfTestCountSelected()
+{
+    int n=0;
+    if(clbSelfTestItems==NULL)
+        return 0;
+    for(int i=0; i<clbSelfTestItems->Items->Count; i++)
+        if(clbSelfTestItems->Checked[i])
+            n++;
+    return n;
+}
+//---------------------------------------------------------------------------
+int Tfiosetview::SelfTestPhaseDeadline(TMyCylinder *Cyl, bool Extend)
+{
+    //Reuse the cylinder's own tuned in-position timeout as the self-test wait budget so
+    //the harness allows about as long as production would (production alarms at exactly
+    //this value). No artificial floor : a deliberately tight OnAlarmTime must be honored,
+    //else the tool would give a sticky fast cylinder a false PASS. Only a ceiling remains.
+    int t=Extend?Cyl->OnAlarmTime:Cyl->OffAlarmTime;
+    if(t<=0)
+        t=3000;   //untuned -> generous default (this is NOT a floor on tuned values)
+    t+=500;       //slack for the 200ms Timer1 poll granularity
+    if(t>10000)
+        t=10000;
+    return t;
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestPopulateItems()
+{
+    if(clbSelfTestItems==NULL)
+        return;
+    clbSelfTestItems->Items->BeginUpdate();
+    clbSelfTestItems->Items->Clear();
+    if(rgSelfTestMode!=NULL && rgSelfTestMode->ItemIndex==0)
+    {
+        for(int i=0; i<HSys.iTotalCylinder; i++)
+        {
+            AnsiString nm=HSys.CynPtr[i].CylinderName;
+            if(nm==AnsiString(""))
+                nm=AnsiString("Cyl#")+IntToStr(i);
+            clbSelfTestItems->Items->Add(nm);
+        }
+        for(int i=0; i<clbSelfTestItems->Items->Count && i<HSys.iTotalCylinder; i++)
+            clbSelfTestItems->Checked[i]=HSys.CynPtr[i].Switch.Enable;
+        if(lblSelfTestDetectHdr!=NULL)
+            lblSelfTestDetectHdr->Caption=LangT("Detection - cylinders (select items)");
+    }
+    else
+    {
+        if(lblSelfTestDetectHdr!=NULL)
+            lblSelfTestDetectHdr->Caption=LangT("Detection - sensors (not implemented)");
+    }
+    clbSelfTestItems->Items->EndUpdate();
+    SelfTestUpdateProgress();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSetupGrid(int SelCount)
+{
+    if(grdSelfTest==NULL)
+        return;
+    int rows=(SelCount>0)?(1+SelCount):2;
+    grdSelfTest->ColCount=6;
+    grdSelfTest->RowCount=rows;
+    grdSelfTest->FixedCols=0;
+    grdSelfTest->FixedRows=1;
+    grdSelfTest->ColWidths[0]=34;
+    grdSelfTest->ColWidths[1]=176;
+    grdSelfTest->ColWidths[2]=78;
+    grdSelfTest->ColWidths[3]=72;
+    grdSelfTest->ColWidths[4]=72;
+    grdSelfTest->ColWidths[5]=76;
+    grdSelfTest->Cells[0][0]=AnsiString("#");
+    grdSelfTest->Cells[1][0]=LangT("Cylinder");
+    grdSelfTest->Cells[2][0]=LangT("Tier");
+    grdSelfTest->Cells[3][0]=LangT("Extend");
+    grdSelfTest->Cells[4][0]=LangT("Retract");
+    grdSelfTest->Cells[5][0]=LangT("Result");
+    for(int r=1; r<grdSelfTest->RowCount; r++)
+        for(int c=0; c<grdSelfTest->ColCount; c++)
+            grdSelfTest->Cells[c][r]=AnsiString("");
+}
+//---------------------------------------------------------------------------
+bool Tfiosetview::SelfTestPrecondition(AnsiString *Why)
+{
+    if(HSys.Sys.SystemStart)
+    {
+        if(Why!=NULL) *Why=LangT("Machine is running. Stop the machine before self-test.");
+        return false;
+    }
+    if(IsEMGPressed()>0)
+    {
+        if(Why!=NULL) *Why=LangT("Emergency stop is pressed.");
+        return false;
+    }
+    if(IsSafeDoorOpen()>0)
+    {
+        if(Why!=NULL) *Why=LangT("Safety door is open.");
+        return false;
+    }
+    if(IsAirCheck())
+    {
+        if(Why!=NULL) *Why=LangT("Air pressure is not ready.");
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestStart()
+{
+    if(bSelfTestRunning)
+        return;
+    if(rgSelfTestMode!=NULL && rgSelfTestMode->ItemIndex!=0)
+    {
+        ShowMyOKMessageNoStop(LangT("Sensor self-test is not implemented yet."));
+        return;
+    }
+    AnsiString Why;
+    if(!SelfTestPrecondition(&Why))
+    {
+        ShowMyOKMessageNoStop(Why);
+        return;
+    }
+    int sel=SelfTestCountSelected();
+    if(sel<=0)
+    {
+        ShowMyOKMessageNoStop(LangT("No cylinder selected."));
+        return;
+    }
+    iSelfTestPass=0;
+    iSelfTestFail=0;
+    iSelfTestSkip=0;
+    iSelfTestRow=1;
+    SelfTestSetupGrid(sel);
+    iSelfTestCursor=0;
+    iSelfTestPhase=0;
+    bStExtendConfirmed=false;
+    bStExtendTimeout=false;
+    bStRetractConfirmed=false;
+    bStRetractTimeout=false;
+    bOutDataChange=true;   //outputs will be driven -> restore-on-close path applies
+    bSelfTestRunning=true;
+    SelfTestSetButtonsRunning(true);
+    SelfTestLog(AnsiString("=== cylinder self-test start (")+IntToStr(sel)+
+                AnsiString(" items, tier=")+SelfTestTierName()+AnsiString(") ==="));
+    SelfTestUpdateSummary();
+    SelfTestUpdateProgress();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestStop(bool bByOperator)
+{
+    bool bWasRunning=bSelfTestRunning;
+    bSelfTestRunning=false;
+    //Bring the in-flight cylinder back to the retracted (safe) state on an operator abort.
+    if(bByOperator && iSelfTestCursor>=0 && iSelfTestCursor<HSys.iTotalCylinder)
+        HSys.CynPtr[iSelfTestCursor].Off();
+    SelfTestSetButtonsRunning(false);
+    if(bWasRunning)
+        SelfTestLog(bByOperator?AnsiString("=== stopped by operator ==="):AnsiString("=== complete ==="));
+    SelfTestUpdateSummary();
+    if(lblSelfTestProgress!=NULL)
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : ")+LangT("done");
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestCylinderTick()
+{
+    if(clbSelfTestItems==NULL)
+    {
+        SelfTestStop(false);
+        return;
+    }
+    //AI 20260713 : mid-run safety re-check. While this view is visible MainProc() early-
+    //returns (csystem.cpp) so the machine's own EMG / safety-door / air reaction is NOT
+    //running - this 200ms timer is the only live logic and it is the sole driver of the
+    //cylinder outputs. Re-evaluate the safety inputs every tick and abort (retracting the
+    //in-flight cylinder via SelfTestStop) the instant any trips; the Start-time
+    //SelfTestPrecondition check alone would let a run keep cycling through an emergency.
+    if(IsEMGPressed()>0 || IsSafeDoorOpen()>0 || IsAirCheck())
+    {
+        SelfTestLog(AnsiString("=== safety trip (EMG / door / air) - aborted ==="));
+        SelfTestStop(true);
+        return;
+    }
+    unsigned long now=GetTickCount();
+
+    switch(iSelfTestPhase)
+    {
+    case 0:   //pick next selected cylinder and drive it out
+        {
+            while(iSelfTestCursor<HSys.iTotalCylinder &&
+                  (iSelfTestCursor>=clbSelfTestItems->Items->Count ||
+                   clbSelfTestItems->Checked[iSelfTestCursor]==false))
+                iSelfTestCursor++;
+            if(iSelfTestCursor>=HSys.iTotalCylinder)
+            {
+                SelfTestStop(false);
+                return;
+            }
+            bStExtendConfirmed=false;
+            bStExtendTimeout=false;
+            bStRetractConfirmed=false;
+            bStRetractTimeout=false;
+            HSys.CynPtr[iSelfTestCursor].On();
+            dwSelfTestPhaseStart=now;
+            iSelfTestPhase=1;
+            SelfTestUpdateProgress();
+        }
+        break;
+    case 1:   //waiting for extend (On) confirm or deadline
+        {
+            TMyCylinder *Cyl=&HSys.CynPtr[iSelfTestCursor];
+            //Switch.Enable gates the physical output : if the output is disabled, On()/Off()
+            //are no-ops (myswitch.cpp), so the cylinder never moves and can never confirm -
+            //treat it as non-confirmable (-> SKIP), NOT a FAIL from an unreachable sensor.
+            bool canConfirm=Cyl->Switch.Enable && SelfTestTierIsReal() && Cyl->OnSensor.Enable;
+            unsigned long deadline=(unsigned long)SelfTestPhaseDeadline(Cyl, true);
+            bool advance=false;
+            if(canConfirm)
+            {
+                if(Cyl->IsOn())
+                {
+                    bStExtendConfirmed=true;
+                    advance=true;
+                }
+                else if((now-dwSelfTestPhaseStart)>deadline)
+                {
+                    bStExtendTimeout=true;
+                    advance=true;
+                }
+            }
+            else if((now-dwSelfTestPhaseStart)>deadline)
+            {
+                advance=true;
+            }
+            if(advance)
+            {
+                Cyl->Off();
+                dwSelfTestPhaseStart=now;
+                iSelfTestPhase=2;
+            }
+        }
+        break;
+    case 2:   //waiting for retract (Off) confirm or deadline
+        {
+            TMyCylinder *Cyl=&HSys.CynPtr[iSelfTestCursor];
+            bool canConfirm=Cyl->Switch.Enable && SelfTestTierIsReal() && Cyl->OffSensor.Enable;
+            unsigned long deadline=(unsigned long)SelfTestPhaseDeadline(Cyl, false);
+            bool done=false;
+            if(canConfirm)
+            {
+                if(Cyl->IsOff())
+                {
+                    bStRetractConfirmed=true;
+                    done=true;
+                }
+                else if((now-dwSelfTestPhaseStart)>deadline)
+                {
+                    bStRetractTimeout=true;
+                    done=true;
+                }
+            }
+            else if((now-dwSelfTestPhaseStart)>deadline)
+            {
+                done=true;
+            }
+            if(done)
+                SelfTestFinishCurrentCylinder();
+        }
+        break;
+    default:
+        iSelfTestPhase=0;
+        break;
+    }
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestFinishCurrentCylinder()
+{
+    TMyCylinder *Cyl=&HSys.CynPtr[iSelfTestCursor];
+    bool bReal=SelfTestTierIsReal();
+
+    AnsiString ext;
+    if(!(bReal && Cyl->Switch.Enable && Cyl->OnSensor.Enable))
+        ext=AnsiString("--");
+    else if(bStExtendConfirmed)
+        ext=AnsiString("OK");
+    else if(bStExtendTimeout)
+        ext=AnsiString("FAIL");
+    else
+        ext=AnsiString("?");
+
+    AnsiString ret;
+    if(!(bReal && Cyl->Switch.Enable && Cyl->OffSensor.Enable))
+        ret=AnsiString("--");
+    else if(bStRetractConfirmed)
+        ret=AnsiString("OK");
+    else if(bStRetractTimeout)
+        ret=AnsiString("FAIL");
+    else
+        ret=AnsiString("?");
+
+    AnsiString res;
+    if(bStExtendTimeout || bStRetractTimeout)
+    {
+        res=AnsiString("FAIL");
+        iSelfTestFail++;
+    }
+    else if(bStExtendConfirmed || bStRetractConfirmed)
+    {
+        res=AnsiString("PASS");
+        iSelfTestPass++;
+    }
+    else
+    {
+        res=AnsiString("SKIP");   //driven but no confirmable sensor (SIM/DUMMY/no sensor)
+        iSelfTestSkip++;
+    }
+
+    if(grdSelfTest!=NULL)
+    {
+        if(iSelfTestRow>=grdSelfTest->RowCount)
+            grdSelfTest->RowCount=iSelfTestRow+1;
+        grdSelfTest->Cells[0][iSelfTestRow]=IntToStr(iSelfTestCursor);
+        grdSelfTest->Cells[1][iSelfTestRow]=Cyl->CylinderName;
+        grdSelfTest->Cells[2][iSelfTestRow]=SelfTestTierName();
+        grdSelfTest->Cells[3][iSelfTestRow]=ext;
+        grdSelfTest->Cells[4][iSelfTestRow]=ret;
+        grdSelfTest->Cells[5][iSelfTestRow]=res;
+    }
+    iSelfTestRow++;
+
+    SelfTestLog(Cyl->CylinderName+AnsiString("  ext=")+ext+
+                AnsiString("  ret=")+ret+AnsiString("  -> ")+res);
+
+    iSelfTestCursor++;
+    iSelfTestPhase=0;
+    SelfTestUpdateSummary();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestUpdateProgress()
+{
+    if(lblSelfTestProgress==NULL)
+        return;
+    if(bSelfTestRunning && iSelfTestCursor<HSys.iTotalCylinder)
+    {
+        //Count against the SELECTED subset, not the whole cylinder array : iSelfTestRow is
+        //the 1-based position of the item currently under test (it increments once per
+        //finished cylinder), and SelfTestCountSelected() is the true denominator.
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : ")+
+            IntToStr(iSelfTestRow)+AnsiString(" / ")+IntToStr(SelfTestCountSelected())+
+            AnsiString("  ")+HSys.CynPtr[iSelfTestCursor].CylinderName;
+    }
+    else if(bSelfTestRunning)
+    {
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : ")+LangT("finishing");
+    }
+    else
+    {
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : -   (")+
+            IntToStr(SelfTestCountSelected())+AnsiString(" ")+LangT("selected")+AnsiString(")");
+    }
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestUpdateSummary()
+{
+    if(lblSelfTestSummary==NULL)
+        return;
+    lblSelfTestSummary->Caption=AnsiString("PASS ")+IntToStr(iSelfTestPass)+
+        AnsiString("    FAIL ")+IntToStr(iSelfTestFail)+
+        AnsiString("    SKIP ")+IntToStr(iSelfTestSkip);
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSetButtonsRunning(bool Running)
+{
+    if(btnSelfTestStart!=NULL)     btnSelfTestStart->Enabled=!Running;
+    if(btnSelfTestSelectAll!=NULL) btnSelfTestSelectAll->Enabled=!Running;
+    if(btnSelfTestSelectNone!=NULL)btnSelfTestSelectNone->Enabled=!Running;
+    if(rgSelfTestMode!=NULL)        rgSelfTestMode->Enabled=!Running;
+    if(clbSelfTestItems!=NULL)      clbSelfTestItems->Enabled=!Running;
+    if(btnSelfTestStop!=NULL)       btnSelfTestStop->Enabled=Running;
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestLog(AnsiString Line)
+{
+    if(memSelfTestLog==NULL)
+        return;
+    memSelfTestLog->Lines->Add(FormatDateTime("hh:nn:ss  ", Now())+Line);
+    while(memSelfTestLog->Lines->Count>200)
+        memSelfTestLog->Lines->Delete(0);
 }
 //---------------------------------------------------------------------------

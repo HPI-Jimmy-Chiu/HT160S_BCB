@@ -687,6 +687,42 @@ private:
     TBtnPanel *palAllOff;
     void CreateSuckerGroupButtons();
     void __fastcall SuckGroupAllClick(TObject *Sender);
+
+    //AI 20260713 : ts_IOSelfTest Feature A - cylinder auto-poll. The run drives each
+    //selected cylinder out->in with the SAME manual-output idiom the IO view already
+    //uses (TMyCylinder::On()/Off(), see ToggleLegacyButtonOutput) and confirms travel
+    //with its OWN per-phase wall-clock deadline + OnSensor/OffSensor read. It does NOT
+    //use Push()/Pop(): on timeout those queue a numbered cylinder alarm into HAlarm,
+    //but MainProc is suspended while this view is visible (csystem.cpp fiosetview->Visible
+    //early-return), so those alarms would only batch-pop when the view closes. Keeping
+    //pass/fail in grdSelfTest/memSelfTestLog avoids polluting the live machine alarm queue.
+    bool bSelfTestRunning;
+    int  iSelfTestCursor;              // 0..HSys.iTotalCylinder-1, cylinder under test
+    int  iSelfTestPhase;              // 0=begin, 1=wait-extend, 2=wait-retract
+    int  iSelfTestRow;               // next grdSelfTest result row to write (>=1)
+    unsigned long dwSelfTestPhaseStart;   // GetTickCount at phase entry (wrap-safe diff)
+    int  iSelfTestPass;
+    int  iSelfTestFail;
+    int  iSelfTestSkip;
+    bool bStExtendConfirmed;
+    bool bStExtendTimeout;
+    bool bStRetractConfirmed;
+    bool bStRetractTimeout;
+    void SelfTestPopulateItems();
+    void SelfTestSetupGrid(int SelCount);
+    bool SelfTestPrecondition(AnsiString *Why);
+    bool SelfTestTierIsReal();
+    AnsiString SelfTestTierName();
+    int  SelfTestCountSelected();
+    int  SelfTestPhaseDeadline(TMyCylinder *Cyl, bool Extend);
+    void SelfTestStart();
+    void SelfTestStop(bool bByOperator);
+    void SelfTestCylinderTick();
+    void SelfTestFinishCurrentCylinder();
+    void SelfTestUpdateProgress();
+    void SelfTestUpdateSummary();
+    void SelfTestSetButtonsRunning(bool Running);
+    void SelfTestLog(AnsiString Line);
 public:
     __fastcall Tfiosetview(TComponent* Owner);
     __fastcall ~Tfiosetview();
