@@ -95,6 +95,7 @@ private:
     void OnPickGateBlocked(AnsiString Source);   //AI(ht160s-rearready-p0) 20260705 : blocked-pick watchdog tick (arm window / raise MES1721 on expiry)
     void OnPlaceGateBlocked(AnsiString Dest);    //AI(ht160s-home-resume-p0) 20260710 : blocked-place watchdog tick (case-500 rear-clear wait / raise MES1723 on expiry)
     void ClearPlaceGateWatch();                  //AI(ht160s-home-resume-p0) 20260710 : disarm the place watchdog (gate pass / divert / job reset / InitialFlag)
+    bool IsCarriedTrayAlreadyDeposited();         //AI(ht160s-home-resume-drain) 20260713 : TA-2/XS-1/XS-2 adopt-as-delivered detector (carry latch set, both clamps physically open, destination rear occupied+unsigned = a HOME interrupted a deposit before the case-4000 sign)
     //AI(ht160s-trayarm-teach-test) 20260627 : shared physical motion primitives. Production
     //(DoPick/DoPlace/DoPlaceToEmpty/DoPlaceToColor) AND the Teach Advanced test compose these,
     //so the grab/release choreography lives in ONE place (single source of truth).

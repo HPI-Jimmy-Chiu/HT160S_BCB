@@ -313,6 +313,43 @@ void TTrayArmModule::ClearPlaceGateWatch()
     dwPlaceGateLastPollTick=0;
 }
 //---------------------------------------------------------------------------
+bool TTrayArmModule::IsCarriedTrayAlreadyDeposited()
+{
+    //AI(ht160s-home-resume-drain) 20260713 : adopt-as-delivered detector (TA-2/XS-1/XS-2).
+    //A full-machine HOME can interrupt a deposit ladder AFTER DoLowerClampRaise case 2000
+    //opened the jaws (tray released onto the destination rear) but BEFORE the case-4000
+    //sign. InitialFlag(keepMaterial) then resumes with bHasTray still latched, so DoPlace
+    //re-runs the deposit : the Auto path re-descends open-jawed over the placed tray, and
+    //the Empty/Color case-100 heal re-sends RequestReturnTray (receiver GoUp-collects the
+    //just-placed tray, then an empty-jaw deposit signs a phantom finish). Detect the window
+    //: carry latch set, BOTH clamp On sensors read OFF (jaws physically open = released),
+    //and the destination rear still shows the tray. REAL + non-DUMMY only (same gate as the
+    //InitialFlag residue adopt and the uHome case-2 keep-clamps guard; sim/DUMMY have no
+    //trustworthy reeds). INFERRED-safe, NO production precedent -- on-machine verify.
+#ifdef SOFT_SIMULATE
+    return false;
+#else
+    if(HSys.LastSet.iRealDummy==DUMMY)
+        return false;
+    if(bHasTray==false)
+        return false;
+    if(HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable==false ||
+       HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable==false)
+        return false;
+    if(HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn() ||
+       HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn())
+        return false;   //a clamp still reads On = still gripping, not yet released
+    if(PlaceDest==TAPLACE_AUTO)
+        return (AutoModule!=NULL && iAutoTarget>=0 &&
+                AutoModule->IsRearPlacedButUnsigned(iAutoTarget));
+    if(PlaceDest==TAPLACE_EMPTY)
+        return (EmptyModule!=NULL && EmptyModule->IsRearHasTray());
+    if(PlaceDest==TAPLACE_COLOR)
+        return (ColorModule!=NULL && ColorModule->IsRearHasTray());
+    return false;
+#endif
+}
+//---------------------------------------------------------------------------
 bool TTrayArmModule::IsCleanOutFinish()
 {
     //AI(cleanout) 20260701 : real CleanOut finish gate (was: always true). TrayArm still has
@@ -774,6 +811,16 @@ bool TTrayArmModule::DoPlace(int Flag)
         return true;
     }
 
+    //AI(ht160s-home-resume-drain) 20260713 : adopt-as-delivered fast-forward (TA-2/XS-1/
+    //XS-2). On a resume re-entering at PlaceTask==1, if the carried tray was already
+    //deposited on its destination rear before a full-machine HOME (jaws open, rear
+    //occupied+unsigned) skip the deposit ladder and jump to the case-4000 handoff commit --
+    //do NOT re-descend open-jawed (Auto) nor let the case-100 heal re-collect it (Empty/
+    //Color). This runs before the PlaceDest dispatch so DoPlaceToColor/DoPlaceToEmpty(1)
+    //also enter their switch at case 4000.
+    if(PlaceTask==1 && IsCarriedTrayAlreadyDeposited())
+        PlaceTask=4000;
+
     //AI(HT160S-Maintainer) 20260606 : Loader-recovery jobs may instead recycle the tray
     //back to the EmptyTray rear when no Auto needs one. Dispatch to that path.
     if(PlaceDest==TAPLACE_COLOR)
@@ -823,6 +870,22 @@ bool TTrayArmModule::DoPlace(int Flag)
             }
             if(DoMoveToStationZSafe(GetAutoX(iAutoTarget), PlaceTask))
             {
+                //AI(ht160s-home-resume-drain) 20260713 : TP-4 Auto rear re-verify. Unlike
+                //the DoPlaceToEmpty/DoPlaceToColor case-500 gate, the Auto path had NO
+                //rear-clear check -- X-in-position fell straight into DoLowerClampRaise.
+                //After a full-machine HOME the case-100 heal re-signs only EMPTY/COLOR, so
+                //an Auto rear that re-latched occupied would be descended onto open-jawed
+                //with no re-verify and no alarm. Tick the SAME MES1723 place watchdog. sim
+                //keeps the latch model (bypass mirrors the case-500 IsSoftSimulate gate).
+                //The TA-2 adopt fast-forward sets PlaceTask=4000 for an already-placed tray,
+                //so the switch skips this case entirely (never blocked).
+                if(IsSoftSimulate()==false && AutoModule!=NULL && iAutoTarget>=0 &&
+                   AutoModule->IsRearHasTray(iAutoTarget))
+                {
+                    OnPlaceGateBlocked("Auto");
+                    break;
+                }
+                ClearPlaceGateWatch();
                 Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts (Z will lower)
                 PlaceTask=1000;
             }
@@ -1136,10 +1199,19 @@ void TTrayArmModule::DoTrayArm(int &Task)
                     //is idempotent (sets bReturnTray, clears bTrayXToEmptyFinish) and also drives the
                     //receiver to GoUp-clear an occupied rear, so it heals both the wiped-handshake and
                     //the sensor-relatched-rear cases.
-                    if(PlaceDest==TAPLACE_EMPTY && EmptyModule!=NULL)
-                        EmptyModule->RequestReturnTray();
-                    if(PlaceDest==TAPLACE_COLOR && ColorModule!=NULL)
-                        ColorModule->RequestReturnTray();
+                    //AI(ht160s-home-resume-drain) 20260713 : XS-2 -- do NOT re-arm the
+                    //return handshake if the carried tray was already deposited on the
+                    //receiver rear before the HOME. Re-sending RequestReturnTray would make
+                    //the receiver GoUp and COLLECT the just-placed tray, after which an
+                    //empty-jaw deposit signs a phantom NotifyTrayXToEmptyFinish. The DoPlace
+                    //adopt fast-forward instead signs the real (present) tray at case 4000.
+                    if(IsCarriedTrayAlreadyDeposited()==false)
+                    {
+                        if(PlaceDest==TAPLACE_EMPTY && EmptyModule!=NULL)
+                            EmptyModule->RequestReturnTray();
+                        if(PlaceDest==TAPLACE_COLOR && ColorModule!=NULL)
+                            ColorModule->RequestReturnTray();
+                    }
                     DoPlace(0);
                     Task=2000;
                     break;
