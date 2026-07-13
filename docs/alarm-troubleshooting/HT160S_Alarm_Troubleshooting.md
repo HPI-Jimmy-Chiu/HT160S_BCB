@@ -1,8 +1,10 @@
 # HT160S 警報 / 警示 檢修對應手冊
-> 版本日期：2026-07-13 ｜ 來源：`system/AlarmList.csv` + `system/IO_Table.csv` + 程式碼實測
+> 版本日期：2026-07-13 ｜ 來源：機台的 `system/AlarmList.csv` + `system/IO_Table.csv` 與實機行為
 > 涵蓋：**576** 則 — 汽缸 55×6=330、馬達 20×9=180、真空 1×6=6、流程字串碼 60
 
-本手冊每一則警報都以「**應該狀態（健康）→ 目前狀態（故障）**」對照呈現，並指出要在哪個畫面（IOsetview / MotionView / State Record）量測哪個 IO、汽缸、馬達或真空點。
+本手冊每一則警報都以「**應該狀態（健康）→ 目前狀態（故障）**」對照呈現，並指出要在哪個畫面（IOsetview / MotionView / State Record）查哪個 IO、汽缸、馬達或真空點。
+
+---
 
 ## 目錄
 1. [如何使用本手冊](#一如何使用本手冊)
@@ -16,26 +18,26 @@
 ---
 
 ## 一、如何使用本手冊
-本手冊將 HT160S 全機 576 個警報 (alarm) 與警示 (warning) 對應到「檢修判讀」：每一則警報的本質都是**某個裝置沒有達到程式預期的狀態**。因此每一節都以「**應該是什麼狀態 (健康) vs. 目前是什麼狀態 (故障)**」呈現，讓工程師能快速鎖定要量測的 IO、汽缸、馬達或真空點。
+本手冊將 HT160S 全機 576 個警報 (alarm) 與警示 (warning) 對應到「檢修判讀」：每一則警報的本質都是**某個裝置沒有達到機台預期的狀態**。因此每一節都以「**應該是什麼狀態 (健康) vs. 目前是什麼狀態 (故障)**」呈現，讓操作員與維修人員能快速鎖定要查看的 IO、汽缸、馬達或真空點。
 
 ### 1.1 警報的三個通道
-發生警報時，同一則訊息會走三個通道，工程師可從不同地方查到：
+發生警報時，同一則訊息會走三個通道，可從不同地方查到：
 
 | 通道 | 內容 | 在哪裡看 |
 |---|---|---|
 | **Code → SECS ALID** | 警報代碼 (如 `40203` / `JAM1030`)，對應 SECS 主機的 alarm 表 | 主機端 / EventLog |
 | **Message → 畫面 + EventLog + SECS ALTX** | 一行文字訊息 (可能帶 `[IO=感測器名]`) | 螢幕紅字、EventLog |
-| **Detail → Note 備註** | 詳細說明 (含觸發 IO 全文 / 驅動流程 breadcrumb) | 警報彈窗 (Note) 的備註欄 |
+| **Detail → Note 備註** | 詳細說明 (含觸發 IO 全文與驅動流程軌跡) | 警報彈窗 (Note) 的備註欄 |
 
-汽缸/馬達的排隊式警報，在**發生當下**會於 EventLog 寫入一行 `ALARM raised <code> : Cylinder=... Func=Push | Step=<動作/Task>`，這行 breadcrumb 記錄了「是哪個動作、哪個 Task」在驅動該裝置，是事後不設中斷點追因的關鍵。
+汽缸／馬達的排隊式警報，在**發生當下**會於 EventLog 寫入一行軌跡紀錄，載明「是哪個裝置、由哪個動作、在流程的哪一步」在驅動該裝置。這行紀錄是事後追查原因的關鍵。
 
 ### 1.2 三個現場查看工具
 本手冊指向三個現場查看工具：
 
 - **IOsetview (IO 監看畫面)** — 查 sensor / switch / 汽缸到位訊號的即時 ON/OFF。以 **Alias (名稱)** 搜尋 (例如 `SnLoader_InputHasTray`、`C_Empty_PushTray_On`)。
-  - ⚠️ 綁定成功的點永遠不會變紅；「綠/灰但永遠不變」代表該節點的 MotionNet 讀取失敗 (位址/環號設定問題)，非顯示 bug。
-- **MotionView (馬達畫面)** — 查馬達命令位置、編碼器位置、軟/硬體極限、伺服狀態。馬達以 `[M01] MSortingArmX` 之類的編號+別名標示。
-- **State Record / EventLog** — 查邏輯狀態、盤流計數、以及警報前的動作軌跡 (breadcrumb)。純邏輯類 (如盤數不符) 無單一 IO，需在此查對應的計數/旗標。
+  - ⚠️ 綁定成功的點永遠不會變紅；「綠/灰但永遠不變」代表該節點的 MotionNet 讀取失敗 (位址／環號設定問題)，並非顯示問題。
+- **MotionView (馬達畫面)** — 查馬達命令位置、編碼器位置、軟／硬體極限、伺服狀態。馬達以 `[M01] MSortingArmX` 之類的編號+別名標示。
+- **State Record / EventLog** — 查邏輯狀態、盤流計數、以及警報前的動作軌跡。純邏輯類 (如盤數不符) 無單一 IO，需在此查對應的計數／旗標。
 
 ---
 
@@ -45,43 +47,42 @@
 | 代碼族 | 範圍 | 類型 | 產生方式 |
 |---|---|---|---|
 | **汽缸 Cylinder** | `4xxxx` | 到位逾時 | `4` + 三碼汽缸序號 + 一碼錯誤別 (共 55 汽缸 × 6 = 330) |
-| **馬達 Motor** | `5xxxx` | 伺服/極限 | `5` + 三碼馬達序號 + 一碼錯誤別 (共 20 馬達 × 9 = 180) |
-| **真空 Sucker** | `6xxxx` | 真空/掉件 | `6` + 三碼吸嘴組序號 + 一碼錯誤別 (1 組 × 6 = 6) |
-| **流程 JAM/MES/WAR** | 字串碼 | 盤流/視覺/計數 | 對齊 HT9045 客戶既有代碼，程式內以字串註冊 (60 筆) |
+| **馬達 Motor** | `5xxxx` | 伺服／極限 | `5` + 三碼馬達序號 + 一碼錯誤別 (共 20 馬達 × 9 = 180) |
+| **真空 Sucker** | `6xxxx` | 真空／掉件 | `6` + 三碼吸嘴組序號 + 一碼錯誤別 (1 組 × 6 = 6) |
+| **流程 JAM/MES/WAR** | 字串碼 | 盤流／視覺／計數 | 對齊 HT9045 客戶既有代碼，機台內以字串登錄 (60 筆) |
 
-編碼公式：`sprintf("%d%03d%1d", 族, 序號, 錯誤別)`。例：`40203` = 汽缸族(4)、序號 020、錯誤別 3 → 第 20 號汽缸 `C_Auto1_PushTray` 的「伸出無法到位」。
+編碼規則：代碼由「族別 (1 碼) + 裝置序號 (3 碼) + 錯誤別 (1 碼)」串成一組數字。例：`40203` = 汽缸族(4)、序號 020、錯誤別 3 → 第 20 號汽缸 `C_Auto1_PushTray` 的「伸出無法到位」。
 
 ---
 
 ## 三、汽缸類 4xxxx
 ### 3.1 動作與警報機制
-每個汽缸是一個 `TMyCylinder` (mycylin.cpp)，含一個**輸出線圈** (電磁閥 `Switch`)、一個**伸出到位 sensor** (`OnSensor`，別名 = 汽缸名 + `_On`)、一個**縮回到位 sensor** (`OffSensor`，別名 = 汽缸名 + `_Off`)。
+每個汽缸都有三個要素：一個**輸出線圈**（電磁閥），一個**伸出到位 sensor**（別名 = 汽缸名 + `_On`），一個**縮回到位 sensor**（別名 = 汽缸名 + `_Off`）。
 
-- **`Push()` 伸出**：驅動線圈 ON → 等 `OnSensor` 變 ON；若在 `OnAlarmTime` (預設 5000ms) 內未到 → 發 **OnAlarmCode = `…3`「can not on」**。
-- **`Pop()` 縮回**：驅動線圈 OFF → 等 `OffSensor` 變 ON；若在 `OffAlarmTime` 內未到 → 發 **OffAlarmCode = `…0`「can not off」**。
-- 若某 sensor 在 IO_Table 內 **停用 (Enable=0)**，該行程會直接視為到位、**不做確認也不發到位警報**。因此請先確認該 sensor 是否啟用，再判斷警報。
+- **伸出動作**：線圈通電（ON）→ 等伸出到位 sensor 變 ON；若在伸出逾時（預設 5000ms）內仍未到位 → 發**伸出逾時碼 `…3`「can not on」**。
+- **縮回動作**：線圈斷電（OFF）→ 等縮回到位 sensor 變 ON；若在縮回逾時內仍未到位 → 發**縮回逾時碼 `…0`「can not off」**。
+- 若某 sensor 在 IO_Table 內**停用（Enable=0）**，該行程會直接視為到位、**不做確認也不發到位警報**。因此請先確認該 sensor 是否啟用，再判斷警報。
 
-**只有 `…0` (縮回逾時) 與 `…3` (伸出逾時) 兩碼由現行 Push/Pop 觸發**；同一汽缸另外 4 碼 (`…1/…2/…4/…5`) 已註冊於代碼表但現行流程不觸發 (保留)。
+**只有 `…0`（縮回逾時）與 `…3`（伸出逾時）兩碼由現行伸出／縮回流程觸發**；同一汽缸另外 4 碼（`…1/…2/…4/…5`）已登錄於代碼表但現行流程不觸發（保留）。
 
 ### 3.2 六種錯誤子類（`4`＋序號＋錯誤別）
-| 錯誤別 | 列舉常數 | 行程 | 訊息 | 現行觸發？ | 應該狀態 | 目前狀態(故障) |
-|---|---|---|---|---|---|---|
-| `…0` | eOffNotOnErr | 縮回 | `can not off error` | 是 (Pop 逾時 = OffAlarmCode) | 縮回到位 sensor(_Off) = ON、輸出線圈 = OFF | 縮回到位 sensor(_Off) 仍 = OFF (逾時 OffAlarmTime 內未確認) |
-| `…3` | eOnNotOnErr | 伸出 | `can not on error` | 是 (Push 逾時 = OnAlarmCode) | 伸出到位 sensor(_On) = ON、輸出線圈 = ON | 伸出到位 sensor(_On) 仍 = OFF (逾時 OnAlarmTime 內未確認) |
-| `…1` | eOffNotOffErr | 縮回 | `can not on error` | 否 (保留，現行 Push/Pop 不觸發) | — | — |
-| `…2` | eOffIsOnErr | 縮回 | `off sensor is on error` | 否 (保留) | 同時只應有一個到位 sensor 為 ON | 縮回 sensor 與伸出 sensor 同時 ON (機構不可能) = sensor 卡死/短路/接錯 |
-| `…4` | eOnNotOffErr | 伸出 | `can not off error` | 否 (保留) | — | — |
-| `…5` | eOnIsOnErr | 伸出 | `on sensor is on error` | 否 (保留) | 同時只應有一個到位 sensor 為 ON | 伸出 sensor 與縮回 sensor 同時 ON = sensor 卡死/短路/接錯 |
-
+| 錯誤別 | 行程 | 訊息 | 現行觸發？ | 應該狀態 | 目前狀態(故障) |
+|---|---|---|---|---|---|
+| `…0` | 縮回 | `can not off error` | 是（縮回逾時） | 縮回到位 sensor(_Off) = ON、輸出線圈 = OFF | 縮回到位 sensor(_Off) 仍 = OFF（逾時內未確認） |
+| `…3` | 伸出 | `can not on error` | 是（伸出逾時） | 伸出到位 sensor(_On) = ON、輸出線圈 = ON | 伸出到位 sensor(_On) 仍 = OFF（逾時內未確認） |
+| `…1` | 縮回 | `can not on error` | 否（保留，現行流程不觸發） | — | — |
+| `…2` | 縮回 | `off sensor is on error` | 否（保留） | 同時只應有一個到位 sensor 為 ON | 縮回 sensor 與伸出 sensor 同時 ON（機構不可能）= sensor 卡死/短路/接錯 |
+| `…4` | 伸出 | `can not off error` | 否（保留） | — | — |
+| `…5` | 伸出 | `on sensor is on error` | 否（保留） | 同時只應有一個到位 sensor 為 ON | 伸出 sensor 與縮回 sensor 同時 ON = sensor 卡死/短路/接錯 |
 
 ### 3.3 檢修順序
-**伸出無法到位 (`…3` can not on) / 縮回無法到位 (`…0` can not off) 檢修順序**：
+**伸出無法到位（`…3` can not on）／縮回無法到位（`…0` can not off）檢修順序**：
 
-1. **氣壓** — 總氣壓是否足夠 (`SnAirIsEnough` 是否 ON)？該汽缸分歧氣壓/流量閥是否正常？
-2. **氣管/電磁閥** — 線圈是否有作動聲/得電 (IOsetview 看該汽缸輸出)？氣管是否脫落、折到、漏氣？電磁閥是否卡住？
+1. **氣壓** — 總氣壓是否足夠（`SnAirIsEnough` 是否 ON）？該汽缸分歧氣壓/流量閥是否正常？
+2. **氣管/電磁閥** — 線圈是否有作動聲/得電（IOsetview 看該汽缸輸出）？氣管是否脫落、折到、漏氣？電磁閥是否卡住？
 3. **機構** — 是否被盤/IC/異物卡住？滑軌、連桿是否卡死？行程是否被干涉？
 4. **到位 sensor** — 對照本手冊該汽缸的 sensor 位址，在 IOsetview 手動推到位看 sensor 是否會 ON？感測距離/位置是否跑掉？
-5. **配線** — sensor→控制卡的配線、接頭是否鬆脫；InType (常開/常閉) 是否與實際相符。
+5. **配線** — sensor→控制卡的配線、接頭是否鬆脫；InType（常開/常閉）是否與實際相符。
 
 ### 3.4 各子系統到位確認概況
 | 子系統 | 汽缸數 | 伸出到位確認 | 縮回到位確認 |
@@ -99,7 +100,7 @@
 
 > 「伸出／縮回到位確認」= 該 sensor 有配線且啟用，能真正發到位逾時警報。未列入者靠逾時但無 sensor 確認。
 
-本機組態下，以下汽缸**輸出線圈為停用 (未安裝/未使用)**，其警報不會出現，若出現代表組態被更動：
+本機組態下，以下汽缸**輸出線圈為停用（未安裝/未使用）**，其警報不會出現，若出現代表組態被更動：
 
 - `C_Auto1_FrontSeparateTray_1`
 - `C_Auto2_FrontSeparateTray_1`
@@ -108,7 +109,6 @@
 - `C_Auto5_FrontSeparateTray_1`
 - `C_Auto6_FrontSeparateTray_1`
 - `C_Color_RearRiseTray`
-
 
 ### 3.5 全汽缸參考表
 > 欄位：伸出碼(`…3`)／縮回碼(`…0`)、輸出線圈 IO、伸出到位 sensor、縮回到位 sensor。位址格式 `L環號/IP/P埠/b位元`；以 IOsetview 用 **Alias 名稱**搜尋最準。逾時為 On/Off AlarmTime(ms)。
@@ -121,7 +121,6 @@
 | `C_TrayArm_FrontClamp` | 40023 | 40020 | L0/IP0/P2/b6 (啟用) | `C_TrayArm_FrontClamp_On` L0/IP0/P1/b6 常閉(NC) (啟用) | `C_TrayArm_FrontClamp_Off` 未配線 — (停用) | 5000 |
 | `C_TrayArm_RearClamp` | 40033 | 40030 | L0/IP0/P2/b7 (啟用) | `C_TrayArm_RearClamp_On` L0/IP0/P1/b7 常閉(NC) (啟用) | `C_TrayArm_RearClamp_Off` 未配線 — (停用) | 5000 |
 
-
 #### Empty 空盤供給
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
 |---|---|---|---|---|---|---|
@@ -132,7 +131,6 @@
 | `C_Empty_FrontSeparateTray_1` | 40083 | 40080 | L0/IP8/P0/b3 (啟用) | `C_Empty_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Empty_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
 | `C_Empty_RearRiseTray` | 40093 | 40090 | L0/IP8/P0/b7 (啟用) | `C_Empty_RearRiseTray_On` L0/IP1/P1/b4 常閉(NC) (啟用) | `C_Empty_RearRiseTray_Off` L0/IP1/P1/b5 常閉(NC) (啟用) | 5000 |
 | `C_Empty_RearSeparateTray_1` | 40103 | 40100 | L0/IP8/P1/b0 (啟用) | `C_Empty_RearSeparateTray_1_On` 未配線 — (停用) | `C_Empty_RearSeparateTray_1_Off` 未配線 — (停用) | 5000 |
-
 
 #### Loader 進料
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
@@ -146,7 +144,6 @@
 | `C_Loader_FrontSeparateTray_1` | 40173 | 40170 | L0/IP8/P2/b1 (啟用) | `C_Loader_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Loader_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
 | `C_Loader_RearRiseTray` | 40183 | 40180 | L0/IP8/P2/b5 (啟用) | `C_Loader_RearRiseTray_On` L0/IP1/P3/b6 常閉(NC) (啟用) | `C_Loader_RearRiseTray_Off` L0/IP1/P3/b7 常閉(NC) (啟用) | 5000 |
 
-
 #### Color 色帶/覆蓋盤供給
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
 |---|---|---|---|---|---|---|
@@ -157,7 +154,6 @@
 | `C_Color_RearRiseTray` | 40533 | 40530 | 未配線 (停用) | `C_Color_RearRiseTray_On` 未配線 — (停用) | `C_Color_RearRiseTray_Off` 未配線 — (停用) | 5000 |
 | `C_Color_FrontSeparateTray_1` | 40543 | 40540 | L0/IPW/P1/b3 (啟用) | `C_Color_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Color_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
 
-
 #### Auto1 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
 |---|---|---|---|---|---|---|
@@ -166,7 +162,6 @@
 | `C_Auto1_LeanOnTray` | 40213 | 40210 | L0/IP8/P3/b0 (啟用) | `C_Auto1_LeanOnTray_On` L0/IP3/P1/b0 常閉(NC) (啟用) | `C_Auto1_LeanOnTray_Off` L0/IP3/P1/b1 常閉(NC) (啟用) | 5000 |
 | `C_Auto1_RearRiseTray` | 40223 | 40220 | L0/IP8/P3/b1 (啟用) | `C_Auto1_RearRiseTray_On` L0/IP3/P1/b4 常閉(NC) (啟用) | `C_Auto1_RearRiseTray_Off` L0/IP3/P1/b5 常閉(NC) (啟用) | 5000 |
 | `C_Auto1_FrontSeparateTray_1` | 40233 | 40230 | L0/IP8/P3/b2 (停用) | `C_Auto1_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto1_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
-
 
 #### Auto2 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
@@ -177,7 +172,6 @@
 | `C_Auto2_RearRiseTray` | 40273 | 40270 | L0/IP9/P0/b3 (啟用) | `C_Auto2_RearRiseTray_On` L0/IP3/P3/b2 常閉(NC) (啟用) | `C_Auto2_RearRiseTray_Off` L0/IP3/P3/b3 常閉(NC) (啟用) | 5000 |
 | `C_Auto2_FrontSeparateTray_1` | 40283 | 40280 | L0/IP9/P0/b4 (停用) | `C_Auto2_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto2_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
 
-
 #### Auto3 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
 |---|---|---|---|---|---|---|
@@ -186,7 +180,6 @@
 | `C_Auto3_LeanOnTray` | 40313 | 40310 | L0/IP9/P1/b2 (啟用) | `C_Auto3_LeanOnTray_On` L0/IP4/P0/b4 常閉(NC) (啟用) | `C_Auto3_LeanOnTray_Off` L0/IP4/P0/b5 常閉(NC) (啟用) | 5000 |
 | `C_Auto3_RearRiseTray` | 40323 | 40320 | L0/IP9/P1/b3 (啟用) | `C_Auto3_RearRiseTray_On` L0/IP4/P1/b0 常閉(NC) (啟用) | `C_Auto3_RearRiseTray_Off` L0/IP4/P1/b1 常閉(NC) (啟用) | 5000 |
 | `C_Auto3_FrontSeparateTray_1` | 40333 | 40330 | L0/IP9/P1/b4 (停用) | `C_Auto3_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto3_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
-
 
 #### Auto4 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
@@ -197,7 +190,6 @@
 | `C_Auto4_RearRiseTray` | 40373 | 40370 | L0/IP9/P2/b3 (啟用) | `C_Auto4_RearRiseTray_On` L0/IP5/P1/b4 常閉(NC) (啟用) | `C_Auto4_RearRiseTray_Off` L0/IP5/P1/b5 常閉(NC) (啟用) | 5000 |
 | `C_Auto4_FrontSeparateTray_1` | 40383 | 40380 | L0/IP9/P2/b4 (停用) | `C_Auto4_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto4_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
 
-
 #### Auto5 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
 |---|---|---|---|---|---|---|
@@ -206,7 +198,6 @@
 | `C_Auto5_LeanOnTray` | 40413 | 40410 | L0/IP9/P3/b2 (啟用) | `C_Auto5_LeanOnTray_On` L0/IP5/P2/b6 常閉(NC) (啟用) | `C_Auto5_LeanOnTray_Off` L0/IP5/P2/b7 常閉(NC) (啟用) | 5000 |
 | `C_Auto5_RearRiseTray` | 40423 | 40420 | L0/IP9/P3/b3 (啟用) | `C_Auto5_RearRiseTray_On` L0/IP5/P3/b2 常閉(NC) (啟用) | `C_Auto5_RearRiseTray_Off` L0/IP5/P3/b3 常閉(NC) (啟用) | 5000 |
 | `C_Auto5_FrontSeparateTray_1` | 40433 | 40430 | L0/IP9/P3/b4 (停用) | `C_Auto5_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto5_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
-
 
 #### Auto6 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 輸出線圈 | 伸出到位 sensor | 縮回到位 sensor | 逾時ms |
@@ -217,38 +208,40 @@
 | `C_Auto6_RearRiseTray` | 40473 | 40470 | L0/IPW/P0/b5 (啟用) | `C_Auto6_RearRiseTray_On` L0/IP6/P1/b0 常閉(NC) (啟用) | `C_Auto6_RearRiseTray_Off` L0/IP6/P1/b1 常閉(NC) (啟用) | 5000 |
 | `C_Auto6_FrontSeparateTray_1` | 40483 | 40480 | L0/IPW/P0/b6 (停用) | `C_Auto6_FrontSeparateTray_1_On` 未配線 — (停用) | `C_Auto6_FrontSeparateTray_1_Off` 未配線 — (停用) | 5000 |
 
-
 ---
 
 ## 四、馬達／伺服類 5xxxx
-全機 20 顆馬達（MC88X1 伺服為主），每顆有 9 種錯誤別（`5`＋三碼馬達序號＋一碼錯誤別）。下表為 9 種錯誤的判讀；再接全馬達對照表。
+
+全機 20 顆馬達（以 MC88X1 伺服為主），每顆有 9 種錯誤別。代碼組成方式為：開頭 `5`＋三碼馬達序號＋一碼錯誤別（例如 `50013`）。下表為 9 種錯誤的判讀；再接全馬達對照表。
 
 ### 4.1 九種錯誤別判讀
-| 錯誤別 | 列舉常數 | 意義 | 訊號來源 | 應該狀態 | 目前狀態(故障) | 查看 |
-|---|---|---|---|---|---|---|
-| `…0` | eMotPwrErr | Power Off | Led[iAlarmLed]=MotDI bit 0x80 (A6 driver ALM, sampled only when ServoAlarmOn) AND Led[iServoalarmLed]=MC88X1PGetMotionInput bit 0x10 (card servo-alarm) AND Led[iInposLed]=MotDI bit 0x40 (A6 INP). Root physical: servo power relay SwMotorRelay / SnMotorPower. | Drive energized: SwMotorRelay ON, SnMotorPower present; ALM=0, servo-alarm status=0. In the Motor status grid the Alarm/ServoAlarm LEDs are dark. | ALM(0x80)+servo-alarm(0x10)+INP(0x40) all ON simultaneously = amp powered down / SRV-ON dropped while axis idle. | IOsetview (SwMotorRelay output / SnMotorPower input) plus the main Motor status grid (Alarm / ServoAlarm / InPos LEDs for that axis). |
-| `…1` | eMotTorqueErr | Out Of Torque | Led[iAlarmLed]=MotDI 0x80 (A6 ALM) AND Led[iServoalarmLed]=MotionInput 0x10 (card servo-alarm), with Led[iInposLed]=MotDI 0x40 OFF (not in position). | No ALM; INP asserts at the end of each PTP move; commanded NowPos and Encoder converge within the following-error tolerance. | ALM+servo-alarm set while INP is still 0 -> axis stalled under load / exceeded torque limit mid-move; encoder lags command. | MotionView (command NowPos vs Encoder following gap for the stalled axis) plus the Motor status grid (Alarm+ServoAlarm ON, InPos OFF). |
-| `…2` | eMotCWOnErr | CW sensor ON | Led[iCwLed]=MC88X1PGetMotionInput bit 0x04 (+LM / CW hard-limit input); Led[iAlarmLed] is forced true by the lit limit. | CW/+LM hard-limit input OFF (axis inside its travel band); iCwLed LED dark in IOsetview. | +LM CW limit input ON -> axis physically pressed against / overran the CW end stop. | IOsetview (the CW / +LM limit input LED for that axis) plus MotionView (Now Position at the CW extreme). |
-| `…3` | eMotCCWOnErr | CCW sensor ON | Led[iCcwLed]=MC88X1PGetMotionInput bit 0x08 (-LM / CCW hard-limit input); Led[iAlarmLed] forced true by the lit limit. | CCW/-LM hard-limit input OFF (axis inside travel); iCcwLed LED dark. | -LM CCW limit input ON -> axis pressed against / overran the CCW end stop. | IOsetview (the CCW / -LM limit input LED for that axis) plus MotionView (Now Position at the CCW extreme). |
-| `…4` | eMotSoftPErr | Soft P position | Led[iSoftcwLed]=MC88X1PGetMotionInput bit 0x01 (card soft/comp CW limit, set from SoftLimitP via SetMC88X1SoftLimit) AND Led[iAlarmLed]. | Now Position within [SoftLimitN, SoftLimitP]; soft-CW flag off. | Position at/beyond SoftLimitP -> card positive comp-limit asserted. | MotionView (Now Position vs the axis SoftLimitP value). |
-| `…5` | eMotSoftNErr | Soft N position | Led[iSoftccwLed]=MC88X1PGetMotionInput bit 0x02 (card soft/comp CCW limit, set from SoftLimitN) AND Led[iAlarmLed]. | Now Position within [SoftLimitN, SoftLimitP]; soft-CCW flag off. | Position at/below SoftLimitN -> card negative comp-limit asserted. | MotionView (Now Position vs the axis SoftLimitN value). |
-| `…6` | eMotPosErr | position Error / home+restart | Led[iAlarmLed]=MotDI 0x80 (A6 ALM) set while Led[iServoalarmLed], Led[iCwLed], Led[iCcwLed], Led[iSoftcwLed], Led[iSoftccwLed] are all OFF. A6 position/deviation (Err) alarm. | ALM off; encoder tracks command (following error within tolerance); axis reaches and holds each target. | Driver ALM latched from an excessive position/following deviation with no accompanying limit or card servo-alarm bit. | MotionView (command NowPos vs Encoder following gap) plus the Motor status grid (Alarm ON, all limit/servo-alarm LEDs OFF). |
-| `…7` | eMotUnDefErr | Undefine | None - pure logic default of the classifier when no recognized status-bit combination is present (no dedicated IO). The logic variable is the returned errIndex itself. | A genuine fault always matches a defined branch (0-6/8); errIndex 7 should not appear in normal operation. | Status snapshot had no classifiable alarm bit -> transient/jittered MotDI+MotionInput read, or an alarm source not modeled by ScanMotorStatus. | State Record / EventLog (the raised 5xxx7 code and the surrounding Led snapshot) then re-read the Motor status grid live to see if it persists. |
-| `…8` | eMotOverLimitErr | Target will Out Of Limit | Logic/soft-limit compare, no IO bit: CheckSoftLimit(p) = (p<=SoftLimitP && p>=SoftLimitN) in MyMotor.cpp:503-507; sets bErrorMove in MotorMoveSub (MyMotor.cpp:523). Callers: aAuto1To6.cpp:370-373, aLoader.cpp:268/434, aEmpty.cpp:247, aColor.cpp:887/917/1168, aTrayArm.cpp:409, aSortArm.cpp:722/736/750. | Requested target within [SoftLimitN, SoftLimitP]; CheckSoftLimit returns true and MotorMove proceeds. | Requested target outside the soft-limit band -> CheckSoftLimit false, bErrorMove=true, move blocked; the Note prints SoftLimitDetail 'target=.. now=.. soft limit N=.. ~ P=.. (unit:1/100mm)' (MyMotor.cpp:512-516, note.cpp:865-871). | Note detail line (the printed SoftLimitDetail target/now/limit values, prefixed by the axis NumberAlias) plus MotionView (configured SoftLimitN/P vs the teach target). |
 
+| 錯誤別 | 意義 | 應該狀態 | 目前狀態(故障) | 在哪看 |
+|---|---|---|---|---|
+| `…0` Power Off | 該軸伺服電源掉電（電源繼電器 SwMotorRelay／電源感測 SnMotorPower 失電），軸在待命時就失去激磁。 | 驅動器已激磁：SwMotorRelay ON、SnMotorPower 有電；馬達狀態格裡該軸的 Alarm／ServoAlarm 燈是暗的。 | 該軸的驅動器警報、卡片伺服警報、到位訊號同時亮起，代表放大器已斷電或激磁在待命中掉落。 | IOsetview（看 SwMotorRelay 輸出／SnMotorPower 輸入）＋主畫面馬達狀態格（該軸 Alarm／ServoAlarm／InPos 燈）。 |
+| `…1` Out Of Torque | 該軸在移動中失速、超過扭力上限，編碼器跟不上指令。 | 沒有警報；每次定位動作結束會到位；指令位置與編碼器位置在容許誤差內收斂。 | 警報亮起但還沒到位，代表軸在負載下卡住／移動中超出扭力，編碼器落後指令。 | MotionView（看該軸指令位置與編碼器位置的落差）＋馬達狀態格（Alarm＋ServoAlarm 亮、InPos 暗）。 |
+| `…2` CW sensor ON | 該軸壓到或衝過正向（CW／+LM）硬體極限。 | 正向硬體極限訊號 OFF（軸在行程範圍內）；IOsetview 中該極限燈是暗的。 | 正向極限訊號 ON，代表軸實體頂到或衝過正向端點。 | IOsetview（該軸的 CW／+LM 極限輸入燈）＋MotionView（現在位置落在正向極端）。 |
+| `…3` CCW sensor ON | 該軸壓到或衝過負向（CCW／-LM）硬體極限。 | 負向硬體極限訊號 OFF（軸在行程範圍內）；IOsetview 中該極限燈是暗的。 | 負向極限訊號 ON，代表軸實體頂到或衝過負向端點。 | IOsetview（該軸的 CCW／-LM 極限輸入燈）＋MotionView（現在位置落在負向極端）。 |
+| `…4` Soft P position | 該軸到達或超過正向軟體極限 SoftLimitP。 | 現在位置落在 SoftLimitN～SoftLimitP 之間；正向軟極限旗標沒亮。 | 位置到達或超過 SoftLimitP，卡片正向軟極限被觸發。 | MotionView（現在位置對照該軸的 SoftLimitP 值）。 |
+| `…5` Soft N position | 該軸到達或超過負向軟體極限 SoftLimitN。 | 現在位置落在 SoftLimitN～SoftLimitP 之間；負向軟極限旗標沒亮。 | 位置到達或低於 SoftLimitN，卡片負向軟極限被觸發。 | MotionView（現在位置對照該軸的 SoftLimitN 值）。 |
+| `…6` position Error（需回 HOME＋重啟） | 該軸位置／跟隨誤差過大，驅動器鎖定位置偏差警報（沒有伴隨極限或卡片伺服警報）。 | 沒有警報；編碼器跟得上指令（跟隨誤差在容許內）；軸能到達並維持每個目標。 | 驅動器因位置偏差過大而鎖定警報，但沒有任何極限或卡片伺服警報同時亮起。 | MotionView（指令位置與編碼器位置的落差）＋馬達狀態格（Alarm 亮、所有極限／伺服警報燈暗）。 |
+| `…7` Undefine | 讀到一組無法歸類的狀態，通常是瞬間跳動或未被建模的警報來源，正常運轉不該出現。 | 真正的故障都會落到已定義的錯誤別；此類代碼正常不會出現。 | 狀態快照沒有任何可辨識的警報位，可能是瞬間雜訊，或是系統未涵蓋的警報來源。 | State Record・EventLog（看跳出的 5xxx7 代碼與當下的狀態快照），再回馬達狀態格即時確認是否持續。 |
+| `…8` Target will Out Of Limit | 要下達的目標位置超出軟體極限範圍，移動被事先擋下（不是實際撞到極限）。 | 要求的目標落在 SoftLimitN～SoftLimitP 之間，移動照常進行。 | 要求的目標落在軟極限範圍外，移動被擋下；Note 會印出目標值／現在位置／軟極限 N～P（單位 1/100mm）。 | Note 備註列（印出的目標／現在／極限值，前綴為該軸別名）＋MotionView（設定的 SoftLimitN／P 對照 teach 目標）。 |
 
-**工程師處置：**
-- `…0` Power Off：Restore servo/main power; a latched OT/servo alarm is NOT software-clearable (MC88X1 SetServoOn is a no-op), so do a SwMotorRelay Off->On power-cycle, then re-HOME the axis. HOME deliberately cuts and restores motor power and owns this recovery (uHome ProcessMotorHome case 20).
-- `…1` Out Of Torque：Clear the mechanical binding/overload on that axis, verify the A6 torque limit and load/gear, clear the driver alarm via a SwMotorRelay power-cycle, then re-HOME.
-- `…2` CW sensor ON：Jog the axis OFF the limit with JogN (away from CW); inspect the +LM switch wiring/mounting and check for mechanical overrun. Note: during HOME an on-limit alarm is treated as expected (csystem.cpp:482-483 continue), so this only stops the machine mid-run.
-- `…3` CCW sensor ON：Jog the axis OFF the limit with JogP (away from CCW); inspect the -LM switch and mechanical overrun. On-limit during HOME is expected (continue); this only halts mid-run.
-- `…4` Soft P position：Jog the axis back inside the soft-limit band; verify teach targets and the SoftLimitP config for that axis; re-HOME if the position reference was lost.
-- `…5` Soft N position：Jog the axis back inside the soft-limit band; verify teach targets and the SoftLimitN config; re-HOME if the position reference is wrong.
-- `…6` position Error / home+restart：Re-HOME and restart the axis (per the alarm name). The latched amp alarm is not software-clearable, so power-cycle SwMotorRelay first, then re-HOME; investigate cause of the deviation (encoder coupling, gain, mechanical drag).
-- `…7` Undefine：Re-scan the axis; if it recurs, capture the raw MotDI/MotionInput words (ReadStatus) - likely a status-word/wiring anomaly. Treat as an unclassified driver alarm and power-cycle + re-HOME.
-- `…8` Target will Out Of Limit：Correct the teach position or the requested target so it falls inside [SoftLimitN, SoftLimitP], or fix the SoftLimitN/SoftLimitP configuration for that axis; re-HOME if the axis position reference is off (a lost datum can push a valid target out of band).
+**處置：**
+
+- `…0` Power Off：恢復伺服／主電源。鎖定的過載或伺服警報無法用軟體清除，請把電源繼電器 SwMotorRelay 關再開做一次斷電重置，然後對該軸重新回 HOME（HOME 會刻意切斷再恢復馬達電源，本來就負責這種復歸）。
+- `…1` Out Of Torque：先排除該軸的機構卡死／過載，檢查扭力上限與負載、齒輪；用 SwMotorRelay 斷電重置清除驅動器警報，再重新回 HOME。
+- `…2` CW sensor ON：用寸動把該軸往負向（離開 CW 極限）退出，檢查 +LM 極限開關的接線與安裝，並確認有無機構衝過頭。注意：回 HOME 過程中壓到極限屬正常，這個警報只有在運轉中才會停機。
+- `…3` CCW sensor ON：用寸動把該軸往正向（離開 CCW 極限）退出，檢查 -LM 極限開關與機構衝過頭。回 HOME 中壓到極限屬正常，只有運轉中才會停機。
+- `…4` Soft P position：用寸動把該軸退回軟極限範圍內；確認 teach 目標與該軸的 SoftLimitP 設定；若位置基準跑掉就重新回 HOME。
+- `…5` Soft N position：用寸動把該軸退回軟極限範圍內；確認 teach 目標與該軸的 SoftLimitN 設定；若位置基準錯誤就重新回 HOME。
+- `…6` position Error（需回 HOME＋重啟）：對該軸重新回 HOME 並重啟。鎖定的放大器警報無法用軟體清除，請先用 SwMotorRelay 斷電重置再回 HOME；並排查偏差原因（編碼器聯軸、增益、機構阻力）。
+- `…7` Undefine：重新掃描該軸；若重複發生，視為未歸類的驅動器警報，先做 SwMotorRelay 斷電重置＋重新回 HOME，並回報維修人員檢查狀態訊號或接線異常。
+- `…8` Target will Out Of Limit：修正 teach 位置或要下達的目標，使其落在 SoftLimitN～SoftLimitP 範圍內，或修正該軸的 SoftLimitN／SoftLimitP 設定；若軸的位置基準跑掉也要重新回 HOME（基準遺失會讓原本合法的目標被判為超界）。
 
 ### 4.2 全馬達對照表
+
 | 編號 | 別名 Alias | 起始碼 | 碼範圍(9碼) |
 |---|---|---|---|
 | M01 | `MSortingArmX` | `50000` | `50000`~`50008` |
@@ -277,435 +270,532 @@
 ---
 
 ## 五、真空吸嘴類 6xxxx
-分類手臂真空吸嘴組 `SortArmSuck`（1 組 4 嘴），共 6 種錯誤別（`6000x`）。
+分類手臂真空吸嘴組 `SortArmSuck`（1 組 4 嘴），共 6 種錯誤別（`6000x`）。四嘴的真空感測器代號為 SuckAa / SuckAb / SuckAc / SuckAd（即 Suck1～Suck4）。
 
-| 代碼 | 列舉常數 | 意義 | 應該狀態 | 目前狀態(故障) | 查看 | 處置 |
-|---|---|---|---|---|---|---|
-| `60000` | eSuckPickErr | Pick-up confirmation failed. TMySucker::Suck() drove vacuum ON (On() = OffDestroy()+OnSuck(), i.e. blow valve OffSw off, suck valve OnSw on) and waited OnAlarmTime for the vacuum sensor to confirm ON; it never came ON, so the IC was not sucked onto the nozzle. | HEALTHY: after the suck command the vacuum sensor of the picking nozzle (TMySucker::Sensor, per-nozzle alias SuckAa/SuckAb/SuckAc/SuckAd = SuckerName Suck1..Suck4) reads ON within OnAlarmTime, so SensorAllOn()==true and Suck() advances Task 1->50->100 returning true. | FAULT: vacuum sensor stays OFF past OnAlarmTime. Entry gate MyKitSuck.cpp:195 `if(Sensor.Enable==true && SensorAllOn()==false && HSys.LastSet.iRealDummy==REALLY)` sends Task=50; the OnAlarmTime timer expires with sensor still OFF at MyKitSuck.cpp:220-225 `else if(Delay.Off()){Error=true; OffSuck(); Task=1; return false;}`. aSortArm SuckSelectedSlots latches bPickSuckErr[slot] (aSortArm.cpp:1178-1183) and later raises ShowSuckError(*Sucker,1,...) at aSortArm.cpp:1741. | IOsetview — vacuum sensor LED of the failed nozzle (Suck.Sensor SuckAa..SuckAd). It should latch ON right after the Suck-Z presses down; on this fault the LED never lights. | Confirm an IC is actually present in the source tray cell (empty cell = expected no-pick). If IC present but sensor never lights: check air/vacuum supply pressure, check for a leak or clogged/worn nozzle tip and bad seal (IC tilted), and verify the suck solenoid OnSw fires (IOsetview output) and the vacuum-sensor wiring. Root causes: no IC / leak / clogged nozzle / low vacuum / sensor dead. |
-| `60001` | eSuckDestroyErr | Release/destroy confirmation failed. TMySucker::Destroy() drove vacuum OFF + blow (Off() = OffSuck()+OnDestroy(), suck valve OnSw off, blow valve OffSw on) and waited OffAlarmTime for the vacuum sensor to drop OFF; the sensor stayed ON, so the IC did not release from the nozzle. | HEALTHY: after the release command the vacuum sensor falls OFF within OffAlarmTime, so SensorAnyOn()==false and Destroy() advances Task 1->50->100 returning true (IC placed into the target cell). | FAULT: vacuum sensor still reads ON past OffAlarmTime. Entry gate MyKitSuck.cpp:262 `if(Sensor.Enable==true && SensorAnyOn()==true && HSys.LastSet.iRealDummy==REALLY)` sends Task=50; the OffAlarmTime timer expires with sensor still ON at MyKitSuck.cpp:287-292 `else if(Delay.Off()){Error=true; OffDestroy(); Task=1; return false;}`. Raised via ShowSuckError(*Sucker,2,K_RETRY\|K_SKIP,"SortArm Place") at aSortArm.cpp:1389. | IOsetview — vacuum sensor LED of the placing nozzle (Suck.Sensor SuckAa..SuckAd). It should extinguish when the blow fires; on this fault the LED stays lit. | Verify the blow/destroy valve OffSw actually fires and positive-pressure air is present (IOsetview output + air line). Check the IC is not physically stuck to the nozzle and the suck solenoid OnSw truly dropped. If the sensor is lit with no vacuum, suspect a stuck-ON or shorted vacuum sensor. Root causes: IC stuck (didn't release) / solenoid stuck ON / no blow air / sensor stuck ON. |
-| `60002` | eSuckVacOffErr | A nozzle that should be holding an IC lost its vacuum — the held-vacuum monitor read the vacuum sensor OFF while the slot is marked carrying (bHasIC). This is the vacuum-sensor-OFF primitive judged by TMySucker::GetStatus()/SensorAllOn(). | HEALTHY: while a SortArm slot carries an IC (Slot[s].bHasIC==true) the nozzle's vacuum sensor is held continuously ON, so GetStatusAllOn()==true (GetStatus REALLY-guard MyKitSuck.cpp:106-111 + SensorAllOn MyKitSuck.cpp:82-92). | FAULT: vacuum sensor reads OFF mid-hold. The held re-read at aSortArm.cpp:1533 and :1565 `if(Sucker->GetStatusAllOn()==false)` trips. GetStatus() is Sensor.IsOn() on the real machine (MyKitSuck.cpp:72-77). A momentary/partial loss surfaces here before the debounce window escalates it to a confirmed drop (60003). | IOsetview — vacuum sensor LED of the holding nozzle (Suck.Sensor SuckAa..SuckAd). It should stay solid ON during transit; on this fault it flickers or drops OFF. | Inspect for a developing leak or marginal seal on that nozzle, air-pressure sag under load, a partially clogged tip, or an intermittent vacuum sensor / loose connector. Note: REALLY-only — never fires in SOFT_SIMULATE (GetStatus returns true when iRealDummy!=REALLY). Root causes: leak / marginal seal / clogged / intermittent sensor. |
-| `60003` | eSuckDropErr | A held IC physically dropped in transit. A holding nozzle's vacuum sensor read OFF and stayed OFF past the fall-down debounce window (FALLDOWN_LOST_MS) while the arm carried the IC from Loader toward Auto. The machine decel-stops all motion and the SortArm slot is written off (never counted as placed). | HEALTHY: while carrying an IC the vacuum sensor is continuously ON; CheckIsFallDown() (MyKitSuck.cpp:327-333) sees Sensor.IsOn()==true and does nothing, and the module monitor CheckHoldFallDown never confirms an OFF. | FAULT: vacuum sensor OFF persisting FALLDOWN_LOST_MS. Per-nozzle primitive MyKitSuck.cpp:331 `if(Sensor.IsOn()==false) Normal();` drops the outputs; the debounced module monitor CheckHoldFallDown (aSortArm.cpp:1526-1616) confirms via GetStatusAllOn()==false (:1533/:1565), calls HSys.StopAllMotor() (:1578), and raises ShowSuckError(*DropSucker,3,...) at aSortArm.cpp:1596. bAtPick decides whether the Loader source cell is restored (K_RETRY) or abandoned EMPTY_IC (K_SKIP). | IOsetview — vacuum sensor LED of the dropped nozzle (Suck.Sensor SuckAa..SuckAd), plus the Note detail line which prints the dropped cell identity ("SortArm IC Dropped At Pick/In Transit R.. C.. 2D=.."). | Retrieve the dropped IC from the machine, then find why the seal failed completely: sudden vacuum loss, worn/cracked nozzle, IC snagged during travel, or vacuum-pressure collapse. Distinguished from 60002 only by the debounced, motion-halting confirmation. Root cause: dropped (seal broke) / abrupt vacuum loss. |
-| `60004` | eSuckIniOffErr | Initial-state sensor self-check taxonomy: at init/reset with vacuum energized the nozzle's vacuum sensor should confirm ON; a stuck-OFF sensor or dead vacuum path would be this code. IMPORTANT — this is a REGISTERED taxonomy code only: the init self-check TMyKitSuck::CheckVaccumIsIniaialON (MyKitSuck.cpp:657-677) has no caller anywhere in HT160S, and no runtime site raises eSuckIniOffErr. On the live machine the same 'vacuum won't turn ON' condition surfaces instead as eSuckPickErr (60000). | HEALTHY (intended semantic): with vacuum commanded ON at initialization the vacuum sensor reads ON (GetStatus()==true). | FAULT (intended semantic): vacuum sensor stays OFF when vacuum is energized. No live if() raises this in HT160S; it exists in mapAlarmCodeList / AlarmList.csv (database.cpp:911,898) as Name+"_SuckIniOffErr" for the taxonomy. | IOsetview — vacuum sensor LED of the nozzle (Suck.Sensor SuckAa..SuckAd); it would fail to light when vacuum is applied at init. | Treat as documentation/taxonomy: if seen it originates from the sensor never asserting ON — check dead vacuum generator, no air supply, disconnected/stuck-OFF sensor, wiring. In practice diagnose the live pick fault 60000 with the same checks. State-wise verify in State Record / EventLog that the code is a registered entry, not a fired event. |
-| `60005` | eSuckIniOnErr | At power-up/reset/init a nozzle with NO IC assigned should hold no vacuum (sensor OFF); instead the vacuum sensor reads ON. The intended logic lives in TMyKitSuck::CheckVaccumIsIniaialON (MyKitSuck.cpp:657-677): if GetStatus()==true (:662) while Item is a Null/empty type (:664-667) it forces Normal() and sets Flag=true (:669-670). IMPORTANT — CheckVaccumIsIniaialON has no active caller in HT160S; 60005 is a registered taxonomy code (AlarmList.csv), not raised at runtime. | HEALTHY: at idle/init with no IC assigned (Item==SuckNullIC/SuckHasNullIC/test variants) the vacuum sensor reads OFF, so GetStatus()==false and CheckVaccumIsIniaialON takes the else branch (:673-675) calling Normal() with no flag. | FAULT (intended semantic): vacuum sensor reads ON at init on an empty nozzle. CheckVaccumIsIniaialON GetStatus()==true with an empty Item -> Normal()+Flag=true (MyKitSuck.cpp:662-671). Because the function is not wired in, no live if() raises the code today. | IOsetview — vacuum sensor LED of the nozzle (Suck.Sensor SuckAa..SuckAd); on this condition the LED is lit at startup with no IC held. | If the vacuum sensor is lit at init with nothing picked, check for a vacuum solenoid stuck ON / mis-wired (NC) OnSw, a stuck or shorted vacuum sensor, or a stray IC still adhered from the previous cycle. Root causes: stuck-ON valve / sensor stuck ON / residue IC. Confirm in State Record / EventLog whether 60005 is merely the registered taxonomy entry versus an actual fired event. |
-
+| 代碼 | 意義 | 應該狀態 | 目前狀態(故障) | 查看 | 處置 |
+|---|---|---|---|---|---|
+| `60000` | 吸取確認失敗：吸嘴下壓、開真空(關吹氣閥、開吸氣閥)後，在警報等待時間內真空感測器一直沒讀到 ON，代表 IC 沒被吸上吸嘴。 | 吸取指令後，該嘴真空感測器（SuckAa～SuckAd）在警報時間內讀到 ON（吸住了）。 | 真空感測器超過警報等待時間仍讀到 OFF（沒吸住）。 | IOsetview — 故障嘴的真空感測器 LED。吸嘴下壓後應立即亮起；故障時始終不亮。 | 先確認來源盤格內是否真的有 IC（空格本來就吸不到，屬正常）。若有 IC 但感測器不亮：檢查氣壓／真空供應壓力、是否漏氣或吸嘴嘴頭堵塞磨損、密封不良（IC 歪斜），並在 IOsetview 輸出確認吸氣電磁閥確實作動、感測器配線正常。常見原因：無 IC／漏氣／吸嘴堵塞／真空不足／感測器失效。排除後按 RETRY 重試，或按 SKIP 跳過。 |
+| `60001` | 釋放確認失敗：關真空並吹氣(關吸氣閥、開吹氣閥)後，在警報等待時間內真空感測器仍未落到 OFF，代表 IC 沒從吸嘴放開。 | 釋放指令後真空感測器在警報時間內落到 OFF（IC 已放入目標盤格）。 | 真空感測器超過警報等待時間仍讀到 ON（沒放開）。 | IOsetview — 放料嘴的真空感測器 LED。吹氣時應熄滅；故障時仍亮著。 | 在 IOsetview 輸出與氣路確認吹氣閥確實作動且有正壓空氣。檢查 IC 是否被吸嘴黏住、吸氣電磁閥是否真的關閉。若無真空但感測器仍亮，懷疑感測器卡在 ON 或短路。常見原因：IC 黏住沒放開／電磁閥卡在 ON／無吹氣空氣／感測器卡 ON。排除後按 RETRY 或 SKIP。 |
+| `60002` | 持料途中失壓：某支標記為「正持有 IC」的吸嘴，其真空感測器在搬運途中讀到 OFF，屬瞬間或部分失壓的初判。 | 吸嘴持有 IC 期間，真空感測器持續穩定讀到 ON。 | 搬運途中真空感測器讀到 OFF（真空掉了）。此為在確認掉落(60003)之前的早期徵兆。 | IOsetview — 持料嘴的真空感測器 LED。搬運中應恆亮；故障時閃爍或掉 OFF。 | 檢查該嘴是否出現漏氣或密封邊緣不良、負載下氣壓下降、嘴頭部分堵塞、或感測器／接頭接觸不良而間歇。此判定僅在 REALLY 實機模式生效，SOFT_SIMULATE 模式不會觸發。常見原因：漏氣／密封不良／堵塞／感測器間歇。 |
+| `60003` | 持料途中 IC 掉落：持料嘴的真空感測器讀到 OFF 並超過掉落去彈跳時間仍為 OFF（手臂正從 Loader 往 Auto 搬運）。機台會減速停下所有動作，該嘴的 IC 記為未放置。 | 持有 IC 期間真空感測器持續 ON，未出現確認的 OFF。 | 真空感測器 OFF 且持續超過掉落去彈跳時間，確認掉料並停機。 | IOsetview — 掉料嘴的真空感測器 LED；並看 Note 備註列，會印出掉落盤格身分（如「SortArm IC Dropped At Pick／In Transit R.. C.. 2D=..」）。 | 從機台內取回掉落的 IC，再找密封完全失效的原因：突發真空流失、吸嘴磨損或破裂、IC 搬運途中勾到、或真空壓力崩潰。與 60002 的差別在於本碼是去彈跳確認且會停機。取料後：於取料端掉落可按 RETRY 復原來源盤格，或按 SKIP 放棄該格。常見原因：掉料（密封破損）／真空驟失。 |
+| `60004` | 初始自檢：開機／重置時真空已通電，吸嘴的真空感測器本應確認 ON；若感測器卡 OFF 或真空路徑失效即屬此類。此為僅登錄於警報清單的分類代碼，實機上並無任何流程會實際觸發它；相同「真空開不起來」的情況在實機上會以吸取失敗 60000 呈現。 | （設計語意）初始化通真空時感測器讀到 ON。 | （設計語意）通真空後感測器仍為 OFF；實機無任何流程會實際觸發本碼，它只是警報清單內的分類項。 | IOsetview — 該嘴真空感測器 LED；此情況下通真空時不會亮。 | 視為文件／分類用途。若真的發生，根因為感測器始終未拉 ON：檢查真空產生器是否失效、無氣源、感測器脫落或卡 OFF、配線問題；實務上以 60000 的相同項目診斷。可於 State Record／EventLog 確認本碼只是登錄項而非實際發生事件。 |
+| `60005` | 初始自檢：開機／重置時，未指派 IC 的吸嘴本應無真空（感測器 OFF），但真空感測器卻讀到 ON。此為僅登錄於警報清單的分類代碼，實機並不會於執行時實際觸發。 | 閒置／初始化且未指派 IC 時，真空感測器讀到 OFF。 | （設計語意）初始化時空嘴上真空感測器卻讀到 ON；因無實際流程接上，目前不會於執行時觸發。 | IOsetview — 該嘴真空感測器 LED；此情況下開機無持料卻亮著。 | 若真空感測器在初始無持料時亮起：檢查真空電磁閥是否卡在 ON 或誤接（常閉）、感測器是否卡 ON 或短路、或上一循環殘留的 IC 仍黏在嘴上。常見原因：閥卡 ON／感測器卡 ON／殘留 IC。可於 State Record／EventLog 確認 60005 只是登錄項還是實際發生事件。 |
 
 ---
 
 ## 六、系統流程類 JAM／MES／WAR
-這一類是**盤流／視覺／計數**層級的警報，源自各模組的邏輯判斷（非單純到位逾時）。每一則列出觸發條件、主因、以及要檢查的裝置「應該→目前」狀態。
+這一類是**盤流／視覺／計數**層級的警報，源自各模組的邏輯判斷（非單純到位逾時）。每一則列出這則警報的意義、常見原因，以及要檢查的裝置「應該→目前」狀態與現場處置。
 
 ### 6.1 Loader 進料
 
-#### `JAM0913` — Loader Tray Lost On Carriage ✅已驗證
-- **觸發條件**：aLoader.cpp:1596 in TLoaderModule::DoFeedTray, case 9500 (post-godown carriage confirm). The alarm is the else-path taken when the confirm guard at aLoader.cpp:1568-1570 is FALSE, i.e. real machine (IsSoftSimulate()==false) AND HSys.Sen.SnLoader_InputHasTray.Enable==true AND SnLoader_InputHasTray.IsOff() after the front-destacker transfer sequence (case 8200 LeanCylinder->Push, case 8300 PushCylinder->Push). Only SnLoader_InputHasTray is read at this if(); the call is sensor-aware ShowMyError(&SnLoader_InputHasTray, bExpectedOn=true, K_SKIP|K_RETRY) so healthy=ON, fault=OFF. Tray identity (fHasTray/iFeedSerial/TrayID) is minted only in the pass branch at lines 1572-1587, so a lost tray leaves no phantom state. K_SKIP -> FeedTask=10000 (finish feed, no tray); K_RETRY -> FeedTask=1 (re-run whole feed).
-- **主因**：Destacked tray did not seat on the LoaderY carriage - dropped, jammed, or mis-separated during the front-destacker godown (DoFrontDestackDown at case 4100) and the following case 8200/8300 push sequence；SnLoader_InputHasTray carriage has-tray sensor faulty, misaligned, or disconnected (reads OFF over a present tray) - this is the only device the raise if() actually evaluates；LoaderY carriage not correctly parked at feed-Y (MoveLoaderY to GetLoaderFeedY at case 1000) so a present tray lands off the sensor；Upstream: PushCylinder (C_LoaderN_PushTray) / LeanCylinder (C_LoaderN_LeanOnTray) did not complete their case 8300/8200 advance, so the tray never reached the carriage before the confirm
-- **裝置狀態**：
+#### `JAM0913` — Loader 盤子掉在載台上（Tray Lost On Carriage）
+- **意義**：前段拆盤完成、盤子理應落在 LoaderY 載台上並被載台有盤感測器 `SnLoader_InputHasTray` 讀到「有盤」，但確認時卻讀到「無盤」，代表這一盤在拆盤／推入過程中掉了或沒到位。此警報只在真機模式（非 SOFT_SIMULATE）且該感測器有啟用時才會判定。
+- **常見原因**：
+  - 拆下的盤在前拆盤機下降與後續推盤動作中掉落、卡住或分盤失敗，沒有正確落在 LoaderY 載台上；
+  - `SnLoader_InputHasTray` 載台有盤感測器故障、偏位或脫線，盤子在上面卻讀不到（這是唯一被判定條件讀取的裝置）；
+  - LoaderY 載台沒停在正確的進料 Y 位置，盤子落點偏離感測器；
+  - 上游推盤氣缸 `C_Loader1_PushTray / C_Loader2_PushTray` 或靠盤氣缸 `C_Loader1_LeanOnTray / C_Loader2_LeanOnTray` 沒推到定位，盤子還沒送到載台就進了確認步驟。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnLoader_InputHasTray` | sensor | ON - a tray is seated on the LoaderY carriage after the godown; the guard at aLoader.cpp:1568-1570 passes and mint runs | OFF - the only condition the raise if() reads that is FALSE on a real, Enabled point; carriage empty, destacked tray never landed (or sensor fault) | IOsetview (also printed on the Note detail line - sensor-aware alarm passing &SnLoader_InputHasTray) |
-  | `C_Loader1_PushTray / C_Loader2_PushTray` | cylinder | Pushed (advanced) - .Push() completed at case 8300 (aLoader.cpp:1442) to seat the tray on the carriage before the confirm | NOT read at the raise if() - upstream suspect only: if stuck/not fully advanced the tray never reached the carriage, so SnLoader_InputHasTray reads OFF | IOsetview (solenoid output + OnSensor/OffSensor position points) |
-  | `C_Loader1_LeanOnTray / C_Loader2_LeanOnTray` | cylinder | Pushed - .Push() completed at case 8200 (aLoader.cpp:1437) leaning/holding the separated tray during transfer | NOT read at the raise if() - upstream suspect only: if it misfired the tray is not held and can drop off the carriage before the confirm | IOsetview (solenoid output + position sensors) |
-  | `MMLoaderY_1 / MMLoaderY_2 (TrayMotor->fHasTray)` | logic | fHasTray still false at case 9500 - the mint (fHasTray=true, iFeedSerial++, Tray.SetKind) at aLoader.cpp:1572-1587 runs only when the confirm passes | fHasTray stays false and no identity is minted on the JAM0913 path, so SKIP/RETRY need no rollback (case 10 fHasTray short-circuit stays false) | State Record / EventLog |
-- **操作員處置**：Choose RETRY to re-run the whole feed (FeedTask=1) after clearing/reseating the tray, or SKIP to finish this feed with no tray (FeedTask=10000; nothing was minted so no rollback). Open the Loader front and remove any tray hung between the destacker and the LoaderY carriage before RETRY, so the re-driven godown does not clamp a second tray onto it.
-- **工程師處置**：In IOsetview watch SnLoader_InputHasTray while manually cycling C_LoaderN_PushTray / C_LoaderN_LeanOnTray over a present tray - if it stays OFF with a tray physically on the carriage, the sensor or its wiring is the fault (this is the only point the raise if() reads). Confirm the LoaderY carriage stops at GetLoaderFeedY(LoaderNo) in MotionView so the tray lands on the sensor, and check the front-destacker separation timing in DoFrontDestackDown (case 4100) plus the case 8200/8300 push completion.
+  | `SnLoader_InputHasTray` | sensor | 讀到 ON（載台上有盤，確認通過） | 讀到 OFF（載台空、拆下的盤沒落上去，或感測器故障） | IOsetview（也會印在 Note 備註列） |
+  | `C_Loader1_PushTray / C_Loader2_PushTray` | cylinder | 已推出到位，把盤送上載台 | 判定不直接讀它，僅上游嫌疑：若沒推到位，盤就到不了載台，導致 `SnLoader_InputHasTray` 讀 OFF | IOsetview（電磁閥輸出＋到位感測點） |
+  | `C_Loader1_LeanOnTray / C_Loader2_LeanOnTray` | cylinder | 已推出到位，搬送中夾住／頂住分開的盤 | 判定不直接讀它，僅上游嫌疑：若沒作動，盤沒被頂住，可能在確認前從載台滑掉 | IOsetview（電磁閥輸出＋到位感測點） |
+  | `MMLoaderY_1 / MMLoaderY_2` 的 `fHasTray`(邏輯) | logic | 尚未建立盤身分（確認通過後才登錄盤別與序號） | 這條警報路徑不會登錄任何盤身分，所以 SKIP/RETRY 都不需回滾 | State Record・EventLog |
+- **處置**：先打開 Loader 前門，取出任何卡在拆盤機與 LoaderY 載台之間的盤，避免重跑時把第二盤再壓上去。確認載台確實停在進料位、盤能落在感測器上。清好後：按 RETRY 從頭重跑整段進料；或按 SKIP 結束這次進料（不帶盤，因為沒登錄任何盤身分，不需回滾）。若拿掉盤後感測器仍讀不到「有盤」，多半是該感測器或線路故障，請報修。
 
-#### `MES0920` — Loader Tray Empty ✅已驗證
-- **觸發條件**：aLoader.cpp:1538, raised in DoFeedTray case 9000 else-branch. Reached when the real-machine presence test at aLoader.cpp:1483-1486 is FALSE: NOT((SnLoader_Inputend.Enable==false || SnLoader_Inputend.IsOn()) && (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn())). I.e. the supply car reads dry (SnLoader_Inputend OFF) OR the push-cylinder On-position sensor never confirmed a tray at the destacker. Suppressed while HSys.Sys.RunMode==Run_CleanOut (breaks silently, aLoader.cpp:1508). When GeneralSetting.bUseAMR, the alarm is deferred one full wait window: State->FeedWaitTimer set to iAmrFeedWaitSec*1000 ms and only on its expiry does control fall through to line 1538 (aLoader.cpp:1524-1537). Sensor-aware ShowMyError(&SnLoader_Inputend, bExpectedOn=true, K_RETRY|K_CLEAN_OUT). VERIFIED against source; draft trigger, file:line and negated condition are correct.
-- **主因**：Supply magazine / feed car genuinely out of trays - SnLoader_Inputend reads OFF (source dry) - the normal case；AMR did not refill the magazine within iAmrFeedWaitSec so the per-side feed-wait deferral timed out (bUseAMR path only)；Push-cylinder On-position sensor (C_LoaderN_PushTray.OnSensor) never confirmed a tray physically reached the destacker；SnLoader_Inputend supply-stock sensor faulty/disconnected, reading false-OFF over a loaded car
-- **裝置狀態**：
+#### `MES0920` — Loader 進料源已空（Tray Empty）
+- **意義**：進料時偵測不到可拆的盤——供料車讀到「已空」（`SnLoader_Inputend` OFF），或推盤氣缸的到位感測器一直沒確認有盤到拆盤處。此警報在 CleanOut 清機模式下不會發出；若有啟用 AMR，會先等一個完整的等料窗（`iAmrFeedWaitSec` 秒）沒補到料才發。
+- **常見原因**：
+  - 供料匣／進料車真的沒盤了，`SnLoader_Inputend` 讀 OFF（最常見的正常情況）；
+  - 啟用 AMR 時，AMR 在 `iAmrFeedWaitSec`(設定) 時限內沒把料補上，等料逾時；
+  - 推盤氣缸到位感測器 `C_Loader1_PushTray / C_Loader2_PushTray` 一直沒確認有盤實際到拆盤處；
+  - `SnLoader_Inputend` 進料源存量感測器故障或脫線，車上有料卻誤讀為空。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnLoader_Inputend` | sensor | ON - supply car still holds stock (code comment aLoader.cpp:1479: 'ON = car still has stock') | OFF - supply car reads dry / source empty (or sensor disconnected reading false-OFF) | IOsetview (mlSnLoader_Inputend LED); also printed on the Note detail line - this is a sensor-aware alarm on SnLoader_Inputend |
-  | `C_Loader1_PushTray / C_Loader2_PushTray  (.OnSensor - push-cylinder On-position confirm; PushCylinder selected by LoaderNo at aLoader.cpp:1328/1334)` | cylinder | OnSensor ON - push cylinder reached its On/pushed position, i.e. a tray physically arrived at the destacker (physical-arrival interlock, aLoader.cpp:1480-1481) | OnSensor OFF - no tray sensed at the push cylinder / cylinder did not confirm the On position | IOsetview (this cylinder sensor is NOT printed on the Note line - read its LED directly) |
-  | `State->FeedWaitTimer / State->bWaitingAmrFeed  (per-Loader-side AMR feed-wait; ONLY active when GeneralSetting.bUseAMR)` | logic | Cleared/cancelled - a tray arrived (SnLoader_Inputend ON + push On sensor) before the wait window closed, clearing the wait at aLoader.cpp:1488-1489 | FeedWaitTimer expired after iAmrFeedWaitSec ms with no refill (bWaitingAmrFeed latched true), so control falls through to the MES0920 alarm at line 1538. Not involved when bUseAMR is off (immediate alarm). | State Record / EventLog (logic/timer state - no single IO point) |
-- **操作員處置**：Refill the Loader supply magazine (or wait for / re-dispatch the AMR), then choose RETRY. On RETRY the feed resumes at the carriage-confirm step (FeedTask=9500), NOT a full re-destack - confirming an existing separated tray via SnLoader_InputHasTray, so it will not re-clamp/cut a tray already separated below. Choose CLEAN OUT instead to enter CleanOut run mode and drain the whole machine of remaining ICs.
-- **工程師處置**：In IOsetview confirm mlSnLoader_Inputend toggles ON when a stocked car is present (rules out a false-OFF from a disconnected/faulty sensor). Check the push cylinder On-position sensor (C_Loader1_PushTray/C_Loader2_PushTray .OnSensor) actually goes ON when a tray reaches the destacker - if it never confirms, the presence AND-test fails even with stock present. If AMR-fed, verify GeneralSetting.iAmrFeedWaitSec covers a full AMR refill cycle and that the AGV call is firing; the only valid cancel of the deferral is the real push-cylinder/Inputend read, not a sim handoff flag.
+  | `SnLoader_Inputend` | sensor | 讀到 ON（供料車還有料） | 讀到 OFF（供料車已空／進料源沒盤，或感測器脫線誤讀為空） | IOsetview（也會印在 Note 備註列） |
+  | `C_Loader1_PushTray / C_Loader2_PushTray` 到位確認 | cylinder | 到位感測讀 ON（推盤氣缸已到推出位，代表有盤實際到達拆盤處） | 到位感測讀 OFF（拆盤處沒感測到盤，或氣缸沒到位） | IOsetview（此氣缸感測不印在 Note 列，直接看 LED） |
+  | AMR 等料計時／等待旗標(邏輯) | logic | 已清除（等料窗關閉前盤已到，等待被解除）※僅 AMR 啟用時有作用 | 等料窗逾時仍沒補到料，才落到本警報；未啟用 AMR 時為立即發警 | State Record・EventLog（邏輯／計時狀態，無單一 IO 點） |
+- **處置**：補滿 Loader 供料匣（或等 AMR／重新叫車補料），然後按 RETRY。RETRY 會從「載台確認」那一步接續，不會重新拆盤，所以不會把已分開的盤再夾／切一次。若要放空整機，改按 CLEAN OUT 進入清機模式把機內剩餘 IC 全數排出。若確定車上有料卻仍報空，請在 IOsetview 確認 `SnLoader_Inputend` 在有料時會亮 ON、推盤氣缸到位感測在盤到拆盤處時會亮 ON，排除感測器誤讀。
 
-#### `MES0921` — Loader Tray Count Mismatch ✅已驗證
-- **觸發條件**：aLoader.cpp:1464 (TLoaderModule::DoFeedTray, aLoader.cpp:1299; switch(State->FeedTask) at 1341; case 9000). Raised when the AMR count-vs-sensor cross-check at aLoader.cpp:1454-1458 is TRUE: GeneralSetting.bUseAMR && iCarTrayTotal>0 && (iCarTrayTotal - iFeedSerial)<=0 && HSys.Sen.SnLoader_Inputend.Enable==true && HSys.Sen.SnLoader_Inputend.IsOn(). Meaning: the SECS-declared magazine total (iCarTrayTotal, latched at car arrival from iSecsCarTrayCount = host LoaderTrayCount, aLoader.cpp:563) has been fully consumed by iFeedSerial, yet the supply-car stock sensor SnLoader_Inputend STILL reads a tray. NOT in Run_CleanOut (breaks first, aLoader.cpp:1462). This is a logic/count-vs-hardware disagreement, not a single-IO fault; the free-string ShowMyError has NO sensor overload (K_RETRY|K_CLEAN_OUT), so no IO name is printed on the Note.
-- **主因**：SECS host sent a LoaderTrayCount smaller than the trays physically loaded on the car (iCarTrayTotal / iSecsCarTrayCount too low)；Extra trays loaded on the car beyond the declared count；iFeedSerial miscounted (a feed double-counted or skipped) so the count reads drained early；SnLoader_Inputend stuck ON / false-triggered while the car is actually empty
-- **裝置狀態**：
+#### `MES0921` — Loader 盤數與感測器不符（Tray Count Mismatch）
+- **意義**：啟用 AMR 時，SECS 主機宣告的整車盤數（`iCarTrayTotal`(邏輯)）已被進料序號 `iFeedSerial`(邏輯) 全數消耗完，但供料車存量感測器 `SnLoader_Inputend` 卻仍讀到有盤——盤數與硬體不一致。此警報在 CleanOut 模式下不會發出，且不掛特定感測器名稱，Note 上不印 IO 名。
+- **常見原因**：
+  - SECS 主機下的整車盤數比車上實際裝的盤少（`iCarTrayTotal` 太低）；
+  - 車上實際多裝了超出宣告數的盤；
+  - `iFeedSerial` 計數失準（某盤重複計或漏計），導致提早看似用完；
+  - `SnLoader_Inputend` 卡在 ON／誤觸發，車其實已空卻讀有盤。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `iCarTrayTotal (SECS LoaderTrayCount via iSecsCarTrayCount, latched at car arrival)` | logic | Equals the physical tray count on the car (IC + cover + identity) | Consumed: iCarTrayTotal - iFeedSerial <= 0 while the car is not actually empty | State Record / EventLog |
-  | `iFeedSerial (trays fed so far this car; ++ at case 9500 aLoader.cpp:1577)` | logic | Less than iCarTrayTotal while trays remain to feed | >= iCarTrayTotal (count says the car is drained) | State Record / EventLog |
-  | `SnLoader_Inputend` | sensor | OFF - consistent with the count saying the car is drained | ON - a tray still physically present, contradicting the count | IOsetview |
-- **操作員處置**：Choose RETRY to feed the tray the sensor still sees and continue (State->FeedTask resets to 1, aLoader.cpp:1466), or CLEAN OUT to enter drain mode (RunMode=Run_CleanOut, bCleanOut=true, FeedTask=10000, aLoader.cpp:1469-1471). Physically verify how many trays remain on the car versus the host-declared count.
-- **工程師處置**：Compare the SECS-reported LoaderTrayCount (iCarTrayTotal) against the actual trays on the car and the fed count (iFeedSerial) in the State Record (dumped together at aLoader.cpp:2296-2299 with Remain=iCarTrayTotal-iFeedSerial). If the host count was wrong, correct the AMR/SECS LoaderTrayCount source (SetExpectedCarTrayCount, aLoader.cpp:573); if SnLoader_Inputend is stuck ON, service the sensor in IOsetview. Confirm iFeedSerial increments exactly once per fed tray (case 9500 mint, aLoader.cpp:1577, gated by SnLoader_InputHasTray confirm).
+  | `iCarTrayTotal`(邏輯)（SECS 宣告的整車盤數，到車時鎖定） | logic | 等於車上實際盤數（含 IC 盤、cover、身分盤） | 已被消耗完（宣告數扣掉已進數 ≤ 0），但車其實還沒空 | State Record・EventLog |
+  | `iFeedSerial`(邏輯)（本車已進盤數） | logic | 小於整車盤數，代表還有盤可進 | 已達或超過整車盤數（計數說車已放空） | State Record・EventLog |
+  | `SnLoader_Inputend` | sensor | 讀到 OFF（與「車已放空」一致） | 讀到 ON（仍有盤實際存在，與計數矛盾） | IOsetview |
+- **處置**：先實地清點車上還剩幾盤，對照主機宣告數。按 RETRY 會把感測器仍看得到的那盤進掉並繼續生產；或按 CLEAN OUT 進入清機排空模式。若確認是主機盤數給錯，請通知修正 AMR／SECS 端的盤數來源；若是 `SnLoader_Inputend` 卡 ON，在 IOsetview 檢修該感測器。
 
-#### `MES0924` — Loader rear has a leftover tray ✅已驗證
-- **觸發條件**：aLoader.cpp:1147-1149 (DoLoader rear-leftover watchdog). Raised when ALL of the guard at aLoader.cpp:1140-1145 hold: LoaderNo==1 (evaluated once per cycle) && HSys.LastSet.iRealDummy!=DUMMY && bRearResidualAlarmed==false (once per episode) && bRearDischargeInProgress==false && bRearReadyForPick==false && IsRearOccupied()==true. A tray sits in the rear output-bottom with NO published pick-readiness and NO discharge in flight, so it can never become pickable (bRearReadyForPick's only TRUE setter is DoDischargeTray case 4000 at aLoader.cpp:2032, and a new discharge cannot start while the rear is occupied) -> silent TrayArm starvation (TAJOB_LOADER_RECOVERY pins the arm with no alarm). Reached only when the Loader reset routine could NOT preserve the rear hold: the bKeepRear gate (aLoader.cpp:86 = bRearReadyForPick && IsOutputBottomOccupied()) is false, so a cold start over a leftover tray or a mid-discharge abort (readiness latch never set) falls through to this Note instead of the auto-preserve path. Sensor-aware ShowMyError(&SnLoader_OutputBottomHasTray, bExpectedOn=false, K_RETRY): healthy=OFF (rear clear), fault=ON.
-- **主因**：Cold start / power-up over a tray physically left in the Loader rear output-bottom (bKeepRear false at reset, aLoader.cpp:86)；Mid-discharge abort left a tray of unknown Kind/ID in the rear - bRearReadyForPick was never published (DoDischargeTray never reached case 4000), so auto-pick is disallowed to avoid misrouting a cover/identity tray into the normal pool; operator removal is required；SnLoader_OutputBottomHasTray false-ON (sensor stuck/misaligned over an actually-clear rear) driving IsRearOccupied() true
-- **裝置狀態**：
+#### `MES0924` — Loader 後段有殘留盤（Rear Leftover Tray）
+- **意義**：Loader 後段出料底部放著一盤，但系統沒有把它標記為「可被 TrayArm 取走」、也沒有任何排盤動作在進行，等於這盤永遠取不走、會讓 TrayArm 空等。只在真機模式（非 DUMMY）下判定，且每次事件只發一次。通常發生在：開機時後段本來就壓著一盤，或排盤中途被中止、盤別／盤號沒登錄，Loader 重置時無法保留後段狀態。健康狀態應為後段淨空（OFF）。
+- **常見原因**：
+  - 冷開機／上電時後段出料底部本來就實體留著一盤；
+  - 排盤中途被中止，留下一盤盤別／盤號不明的盤——系統未登錄它為可取，為避免把 cover／身分盤誤送進正常料流，須由操作員手動移除；
+  - `SnLoader_OutputBottomHasTray` 誤讀為 ON（感測器卡住或偏位，後段其實是空的），使系統誤判後段被佔用。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnLoader_OutputBottomHasTray` | sensor | OFF - rear output-bottom clear in normal flow | ON - a leftover tray occupies the rear; on a real machine RefreshRearState reads IsOn() (aLoader.cpp:694) -> bRearHasTray=true -> IsRearOccupied() true | IOsetview (also printed on the Note detail line - sensor-aware alarm) |
-  | `bRearReadyForPick` | logic | TRUE for a legitimately-discharged, TrayArm-pickable rear tray (set only at DoDischargeTray case 4000, aLoader.cpp:2032) | FALSE - the leftover tray's Kind/ID are unknown, so it was never published as pickable | State Record / EventLog |
-  | `bRearDischargeInProgress` | logic | TRUE only while a discharge is settling toward the rear (set at case-100 commit, aLoader.cpp:1983; cleared at case 4000, aLoader.cpp:2031) | FALSE - no discharge in flight, yet the rear is occupied (dead-end condition) | State Record / EventLog |
-  | `bRearResidualAlarmed` | logic | FALSE going in; latched TRUE by this alarm at aLoader.cpp:1147 (fires once per episode) | Set TRUE at raise; re-armed only on the rear sensor-empty edge (RefreshRearState, aLoader.cpp:711) or on reset (aLoader.cpp:96) | State Record / EventLog |
-- **操作員處置**：Manually remove the leftover tray from the Loader rear output-bottom, then choose RETRY. Removing the tray drops SnLoader_OutputBottomHasTray OFF; RefreshRearState clears bRearReadyForPick and re-arms bRearResidualAlarmed on that empty edge (aLoader.cpp:710-711), so the watchdog can fire again for a fresh episode.
-- **工程師處置**：In IOsetview confirm SnLoader_OutputBottomHasTray goes OFF once the rear is physically clear - if it stays ON, service/realign the sensor. In the State Record verify bRearReadyForPick==false and bRearDischargeInProgress==false (the dead-end signature) and that this followed a cold start or an aborted DoDischargeTray (never reached case 4000) - the tray Kind/ID were lost (bKeepRear false at aLoader.cpp:86), which is why auto-collect is disallowed and manual removal is required.
+  | `SnLoader_OutputBottomHasTray` | sensor | 讀到 OFF（正常流程下後段出料底部淨空） | 讀到 ON（後段被一盤殘留盤佔用；真機下會使後段判定為「有盤」） | IOsetview（也會印在 Note 備註列） |
+  | `bRearReadyForPick`(邏輯) | logic | 對「正常排出、TrayArm 可取」的後段盤為 TRUE | FALSE——殘留盤的盤別／盤號不明，從未被標記為可取 | State Record・EventLog |
+  | `bRearDischargeInProgress`(邏輯) | logic | 只有在排盤正往後段沉降時為 TRUE | FALSE——沒有排盤在進行，後段卻被佔用（死結情況） | State Record・EventLog |
+  | `bRearResidualAlarmed`(邏輯) | logic | 進入時為 FALSE；由本警報鎖為 TRUE（每次事件只發一次） | 發警時被設為 TRUE；只在後段感測器變空的瞬間或重置時重新解除 | State Record・EventLog |
+- **處置**：手動把 Loader 後段出料底部的殘留盤取走，然後按 RETRY。取走盤後 `SnLoader_OutputBottomHasTray` 會轉 OFF，系統會在這個變空的瞬間清掉可取標記並重新武裝警報，之後才能對新的殘留事件再次發警。若盤已實體移除、感測器仍讀 ON，請在 IOsetview 檢修／重新校正該感測器。
 
 ### 6.2 Empty 空盤供給
 
-#### `JAM1030` — Empty Push Tray Miss ✅已驗證
-- **觸發條件**：TEmptyModule::DoFeedTray() FeedTask case 2000: Clamp = DoClampTray(C_Empty_LeanOnTray, C_Empty_PushTray, FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iEmptyFeedClampSettleMs) at aEmpty.cpp:486-487; the else-if(Clamp==2) branch raises ShowMyError("JAM1030", LangT("Empty Push Tray Miss"), &C_Empty_PushTray.OnSensor, true, K_RETRY) at aEmpty.cpp:492. Clamp==2 is returned by DoClampTray case 30 (mycylin.cpp:76-82, 'return 2' at line 80), which is entered from case 20 (mycylin.cpp:64-74) when, after the iEmptyFeedClampSettleMs settle delay expires, IsCylinderOnReady(&Push) is FALSE at mycylin.cpp:67 (Push.OnSensor never came ON): the push cylinder was commanded to extend but its confirm sensor never latched, so case 30 retracts it and returns 2 to the caller to alarm. Note: bSoftSimulate short-circuits every DoClampTray case to return 1, so JAM1030 only fires on a real machine.
-- **主因**：C_Empty_PushTray extended but its OnSensor did not confirm within iEmptyFeedClampSettleMs (no tray under the clamp, short stroke, or low air pressure)；Feed slot had no tray for the clamp to close against (upstream feed/singulation miss)；Push-cylinder confirm sensor (OnSensor) mis-aligned, dirty, or wiring/air fault so it never reads ON at the extended position；Empty-Y carrier not at the taught feed position so the tray sits outside the clamp and the push never seats
-- **裝置狀態**：
+#### `JAM1030` — Empty 推盤未確認
+- **意義**：Empty 供料時推盤氣缸 `C_Empty_PushTray` 伸出後，其到位感測在整定時間內沒讀到 ON，判定夾盤未成功。
+- **常見原因**：
+  - 夾盤位置底下根本沒有盤，或行程不足、氣壓不足，推盤沒有頂實
+  - 上游供料／分盤未送盤，夾爪關下去沒有盤可夾
+  - 推盤到位感測沒對準、髒污或接線／氣路故障，伸出後始終讀不到 ON
+  - `MEmptyY` 沒停在教導的供料 Y 位置，盤落在夾爪外側，推盤無法就位
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `C_Empty_PushTray` | cylinder | After the push stroke + iEmptyFeedClampSettleMs settle, OnSensor reads ON (IsCylinderOnReady TRUE at mycylin.cpp:67) - clamp reached / tray captured | Commanded to extend but OnSensor stays OFF after the settle delay; DoClampTray case 30 retracts it (Push.Pop) and returns 2, firing JAM1030 | Note detail line (alarm pSn = &C_Empty_PushTray.OnSensor, bExpectedOn=true) and IOsetview |
-  | `C_Empty_LeanOnTray` | cylinder | Lean-stop is driven first in DoClampTray case 0 (Lean.Push()) and must confirm its OnSensor before the push step (case 10) runs; TMyCylinder::Push() only returns true once OnSensor.IsOn() | Not the JAM1030 trigger device - if lean never confirms, DoClampTray stalls at case 0 returning 0 (no alarm). A stuck/unconfirmed lean is therefore a distinct upstream cause the engineer should rule out, but it does not itself raise JAM1030 | IOsetview |
-  | `MEmptyY` | motor | Positioned at Teach.EmptyCarFeedTrayYPosition (FeedTask case 1000 MoveEmptyY completed, aEmpty.cpp:477) so the tray sits under the push clamp | If mis-positioned, the tray is not under the push clamp, so the push confirm sensor never latches and DoClampTray returns 2 | MotionView |
-- **操作員處置**：Confirm a tray is actually present at the Empty feed slot, then press Retry (K_RETRY). Retry sets FeedTask=1000, which re-positions Empty-Y to the taught feed Y and re-attempts the lean+push clamp.
-- **工程師處置**：Verify C_Empty_PushTray strokes fully and its OnSensor (reed/proximity) latches ON at the extended position within iEmptyFeedClampSettleMs; check supply air pressure and the sensor gap/wiring. Confirm MEmptyY stops at Teach.EmptyCarFeedTrayYPosition. Rule out the upstream lean cylinder: C_Empty_LeanOnTray must confirm first, else the flow stalls in case 0 without raising JAM1030.
+  | `C_Empty_PushTray` | cylinder | 推盤伸出並經整定後，到位感測讀到 ON（已夾到盤） | 已下令伸出，但整定時間過後到位感測仍為 OFF，隨即縮回並報警 | IOsetview / Note 備註列 |
+  | `C_Empty_LeanOnTray` | cylinder | 靠位氣缸先動作並確認到位，之後才進行推盤 | 不是 JAM1030 的直接觸發裝置；若靠位一直沒確認，流程會停在靠位步驟而不報 JAM1030，屬另一個上游原因 | IOsetview |
+  | `MEmptyY` | motor | 停在教導的 `EmptyCarFeedTrayYPosition`，盤剛好在推盤夾爪下方 | 位置偏掉時盤不在夾爪下方，推盤到位感測無法確認 | MotionView |
+- **處置**：先確認 Empty 供料位確實有盤，清除任何卡料、確認盤有落到夾爪位置，然後按 RETRY 重新定位 Empty-Y 並重試靠位＋推盤夾盤。若反覆失敗，順手檢查推盤氣缸是否伸滿、到位感測有無對準／髒污、供氣壓力是否足夠，以及靠位氣缸是否先確認到位。
 
-#### `MES1021` — Bottom Empty Tray Is Miss Error ✅已驗證
-- **觸發條件**：TEmptyModule::DoFeedTray() case 7000: if(HSys.Sen.SnEmpty_OutputBottomHasTray.Enable==true && HSys.Sen.SnEmpty_OutputBottomHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY) -> ShowMyError("MES1021", LangT("Bottom Empty Tray Is Miss Error"), &HSys.Sen.SnEmpty_OutputBottomHasTray, true, K_SKIP|K_RETRY). if() at aEmpty.cpp:518-520, raise at aEmpty.cpp:522 (case label 517). By the time this check runs, the feed has already: moved the Empty Y to the discharge position (case 4000, MoveEmptyY(Teach.EmptyCarDischargeTrayYPosition)), popped the push clamp (case 5000, C_Empty_PushTray.Pop()), and popped the lean-on clamp (case 6000, C_Empty_LeanOnTray.Pop()). Case 7000 is the rear/bottom sensor confirming a tray is actually seated at the output-bottom position. The else branch (sensor ON / DUMMY / sensor disabled) latches bRearHasTray=true and Status=ES_REAR_READY.
-- **主因**：Tray never reached the rear output-bottom position, or dropped/shifted when the clamps were released at case 5000/6000；SnEmpty_OutputBottomHasTray mis-aligned, dirty, or wiring fault reading OFF while a tray is actually present；MEmptyY discharge teach position (EmptyCarDischargeTrayYPosition) mis-set / axis under- or over-shot, so the tray parks off the bottom sensor；Feed never delivered a tray (upstream source dry) yet the ladder still advanced to case 7000；iRealDummy!=DUMMY (real run) so the physical sensor confirm is active - in DUMMY the check is bypassed and the alarm never fires
-- **裝置狀態**：
+#### `MES1021` — 後端(底部)空盤缺失
+- **意義**：Empty 送盤到後端出料底部後，底部到位感測 `SnEmpty_OutputBottomHasTray` 沒讀到盤，判定該位置沒有盤就位。
+- **常見原因**：
+  - 盤根本沒到後端底部位置，或在鬆夾時掉落／位移
+  - `SnEmpty_OutputBottomHasTray` 沒對準、髒污或接線故障，實際有盤卻讀 OFF
+  - `MEmptyY` 出料教導位置設錯或行程過／不足，盤停在感測範圍外
+  - 上游進料源乾掉，根本沒送盤上來，流程卻仍走到此確認步驟
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnEmpty_OutputBottomHasTray` | sensor | ON at case 7000 - tray seated at the Empty rear/output-bottom position (this is the ONLY device the MES1021 if() actually reads; bExpectedOn=true) | OFF - no tray detected at the output-bottom position (sensor .Enable must also be true for the alarm to arm) | IOsetview (LED mlSnEmpty_OutputBottomHasTray) and the Note detail line (alarm pSn = &SnEmpty_OutputBottomHasTray prints this IO name) |
-  | `MEmptyY` | motor | Parked at Teach.EmptyCarDischargeTrayYPosition (commanded at case 4000, MoveEmptyY returned true) so the tray sits directly under SnEmpty_OutputBottomHasTray | MoveEmptyY already returned true so the axis reached its commanded target; if the teach value itself is wrong the tray parks off the sensor even though the move 'succeeded' - verify the taught discharge position, not just move-complete | MotionView (compare live MEmptyY position against the EmptyCarDischargeTrayYPosition teach value) |
-  | `C_Empty_PushTray` | cylinder | Popped/released at case 5000 (must have returned Pop()==true to advance past 5000) | Still popped/released in BOTH healthy and faulty runs - NOT a state differentiator for this alarm. Suspect it only as a mechanical root cause: if releasing the clamp let the tray shift or drop, the bottom sensor then reads OFF | IOsetview (its OnSensor / off feedback LED) |
-  | `C_Empty_LeanOnTray` | cylinder | Popped/released at case 6000 (the step immediately before the check; must have returned Pop()==true to reach case 7000) | Still popped/released in both healthy and faulty runs - NOT a state differentiator. Candidate mechanical root cause only: releasing this clamp could let the tray move off the bottom detector | IOsetview (its off-feedback LED) |
-  | `iRealDummy` | logic | !=DUMMY on a real production run, which arms the sensor confirm at case 7000 | If ==DUMMY the entire if() is skipped (else branch latches bRearHasTray=true) so MES1021 never fires - only relevant when diagnosing why the alarm does or does not appear | State Record / EventLog (HSys.LastSet.iRealDummy) |
-- **操作員處置**：Confirm a tray is physically present at the Empty rear/output-bottom position. Retry (K_RETRY) sets FeedTask=1 and re-runs the whole feed from the start; Skip (K_SKIP) abandons this tray - clears bRearHasTray and bFrontHasTray, sets Status=ES_IDLE, and jumps to terminal case 13000 (which returns FeedTask to idle=1).
-- **工程師處置**：Primary suspect is SnEmpty_OutputBottomHasTray - check its alignment/cleanliness/wiring in IOsetview against the actual tray presence (this is the only device the alarm reads). Verify MEmptyY reached the correct taught discharge position in MotionView (a mis-taught EmptyCarDischargeTrayYPosition parks the tray off the sensor even though the move completes). The clamp cylinders C_Empty_PushTray/C_Empty_LeanOnTray have already popped successfully to reach case 7000, so their own state is not the fault - inspect them only for mechanical release disturbing/dropping the tray. Confirm the machine is not left in DUMMY mode (iRealDummy) which would suppress the check entirely.
+  | `SnEmpty_OutputBottomHasTray` | sensor | 讀到 ON（盤已就位於 Empty 後端／出料底部）；這是本警報唯一實際讀取的裝置 | 讀到 OFF（底部位置偵測不到盤）；感測也必須為啟用狀態警報才會武裝 | IOsetview / Note 備註列 |
+  | `MEmptyY` | motor | 停在教導的 `EmptyCarDischargeTrayYPosition`，盤正好在底部感測下方 | 移動已完成到達目標，但若教導值本身設錯，盤仍停在感測外——要核對教導位置，不能只看移動完成 | MotionView |
+  | `C_Empty_PushTray` | cylinder | 已在前一步鬆開釋放 | 正常與故障情況下都已鬆開，不是本警報的辨識點；僅在鬆夾造成盤位移／掉落時才是機械根因 | IOsetview |
+  | `C_Empty_LeanOnTray` | cylinder | 已在確認步驟前鬆開釋放 | 正常與故障都已鬆開，不是辨識點；僅懷疑鬆夾把盤帶離底部感測時才追查 | IOsetview |
+- **處置**：確認 Empty 後端／出料底部確實有盤。按 RETRY 會從頭重跑整段送盤；按 SKIP 會放棄這一盤並回到待命。若反覆失敗，重點檢查底部感測的對準／清潔／接線（實際有盤卻讀 OFF 時），並在 MotionView 核對 `MEmptyY` 是否停到正確的教導出料位置。鬆夾氣缸只在懷疑機械鬆夾把盤帶偏／帶掉時才檢查。另注意機台若處於 DUMMY 模式會略過此確認，警報不會出現。
 
-#### `MES1022` — Empty supply magazine empty ✳️已校正
-- **觸發條件**：TEmptyModule::DoEmpty(int &Task) case 100: if(IsInputShortageForAmr() && HSys.Sys.RunMode!=Run_CleanOut){ ... int Ret=ShowMyError("MES1022", LangT("Empty supply magazine empty"), &HSys.Sen.SnEmpty_InputEnd, true, K_RETRY); } -- if() at aEmpty.cpp:317, raise at aEmpty.cpp:343. In AMR mode (GeneralSetting.bUseAMR, line 319) the alarm is deferred: AmrFeedWaitTimer.SetMS(iAmrFeedWaitSec*1000) waits (bWaitingAmrFeed latch, lines 321-332) for an AGV refill and only raises after that timer expires. IsInputShortageForAmr() at aEmpty.cpp:159-163: sim = iSimInfeedCount<=0; real = HSys.Sen.SnEmpty_InputEnd.Enable==true && SnEmpty_InputEnd.IsOff(). NOTE: enclosing function is TEmptyModule::DoEmpty(int &Task), NOT MainProc() as the draft stated.
-- **主因**：Empty supply magazine ran dry - SnEmpty_InputEnd reads OFF (no tray at input source) on real hardware；AMR mode: AGV did not refill within iAmrFeedWaitSec (AmrFeedWaitTimer expired while still shortage)；SnEmpty_InputEnd sensor fault/misalignment reading OFF while trays are actually present；SOFT_SIMULATE only: iSimInfeedCount drained to 0 (virtual car empty)
-- **裝置狀態**：
+#### `MES1022` — Empty 供料倉料盡
+- **意義**：Empty 進料源乾掉，進料端感測 `SnEmpty_InputEnd` 讀到 OFF，供料倉沒有盤可取。
+- **常見原因**：
+  - Empty 供料倉真的用完了，進料端沒有盤
+  - AMR 模式下，AGV 未在 `iAmrFeedWaitSec`（AMR 補料等待秒數）內完成補料
+  - `SnEmpty_InputEnd` 故障／偏位，實際有盤卻讀 OFF
+  - 模擬模式下虛擬供料數 `iSimInfeedCount`（邏輯）歸零（虛擬料車空）
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnEmpty_InputEnd` | sensor | ON = tray present at the Empty input/supply magazine (Enable must be true; a disabled sensor makes IsInputShortageForAmr return false and no alarm fires) | OFF = source dry -> IsInputShortageForAmr() true on real hardware (aEmpty.cpp:163) | IOsetview and Note detail line (alarm pSn = &HSys.Sen.SnEmpty_InputEnd, bExpectedOn=true) |
-  | `AmrFeedWaitTimer / bWaitingAmrFeed` | logic | AMR mode: timer running (bWaitingAmrFeed true) giving the AGV up to iAmrFeedWaitSec to refill before alarming (aEmpty.cpp:321-329) | Timer expired (AmrFeedWaitTimer.Off()==true) with source still dry -> alarm raised; latch cleared once refill detected (aEmpty.cpp:359-363) | State Record / EventLog |
-  | `iSimInfeedCount` | logic | SOFT_SIMULATE: >0 (virtual magazine has stock) | <=0 in sim triggers the shortage (aEmpty.cpp:162); Retry calls RefillSimInfeed() to restock the virtual car (aEmpty.cpp:351-352) | State Record / EventLog |
-- **操作員處置**：Reload the Empty supply magazine (or let the AGV refill), then press Retry. Retry (K_RETRY) sets Task=1 which walks case 1->10->100 and re-checks IsInputShortageForAmr; the alarm clears once stock is back. In simulation, Retry auto-refills the virtual car (RefillSimInfeed).
-- **工程師處置**：Confirm SnEmpty_InputEnd reads ON in IOsetview with a stocked magazine; if trays are present but it reads OFF, check the sensor gap/alignment/wiring (and that the sensor is Enable=true, else no shortage is ever detected). In AMR mode verify the AGV actually delivered and review GeneralSetting.iAmrFeedWaitSec. Note: CleanOut mode suppresses this alarm (RunMode!=Run_CleanOut guard at line 317); the only recovery button is Retry.
+  | `SnEmpty_InputEnd` | sensor | 讀到 ON（進料／供料倉有盤）；感測須為啟用狀態，停用時不會偵測缺料 | 讀到 OFF（進料源乾掉）→ 判定缺料 | IOsetview / Note 備註列 |
+  | `bWaitingAmrFeed` | logic (邏輯) | AMR 模式：等待計時中，給 AGV 最多 `iAmrFeedWaitSec` 秒補料再報警 | 計時到期而料源仍空 → 報警；偵測到補料後解除 | State Record・EventLog |
+  | `iSimInfeedCount` | logic (邏輯) | 模擬模式：大於 0（虛擬料倉有存量） | 模擬模式下歸零觸發缺料；RETRY 會自動補滿虛擬料車 | State Record・EventLog |
+- **處置**：重新裝填 Empty 供料倉（或等 AGV 補料），然後按 RETRY，警報會在有料後自動解除；模擬模式下按 RETRY 會自動補滿虛擬料車。若料倉已裝滿但仍報缺料，檢查 `SnEmpty_InputEnd` 的間隙／對準／接線並確認感測為啟用狀態；AMR 模式下確認 AGV 確實有送到，並檢視 `iAmrFeedWaitSec` 設定。註：CleanOut 模式下不會出現此警報；唯一恢復鍵為 RETRY。
 
-#### `MES1023` — Empty supply stack FULL (sensor) ✳️已校正
-- **觸發條件**：Raised in TEmptyModule::DoEmpty(int &Task) [aEmpty.cpp:265], case 100 [277-393], in the lot-finish CleanOut drain-GoUp path. Enclosing gate: if(bLotFinish && (bFrontHasTray || bRearHasTray)) [aEmpty.cpp:373]; then if(bAmrLocked) break; [375-376] (Full gate only runs when NOT AMR-locked); then if(IsOutputCarFullForAmr()) [381] { do { ShowMyError("MES1023", "Empty supply stack FULL (sensor) - remove stacked trays", &HSys.Sen.SnEmpty_InputFullTray, false, K_RETRY); } while(HSys.Sen.SnEmpty_InputFullTray.Enable==true && HSys.Sen.SnEmpty_InputFullTray.IsOn()); } [383-388]. The do/while re-shows the modal until the Full sensor clears, then Status=ES_RETURNING; DoGoUpTray(0); Task=3000. IsOutputCarFullForAmr() [aEmpty.cpp:169-174]: real = SnEmpty_InputFullTray.Enable==true && SnEmpty_InputFullTray.IsOn(); sim (IsSoftSimulate) returns false, so it never blocks a laptop CleanOut. NOTE: draft said MainProc() - the actual function is TEmptyModule::DoEmpty(int&); also the bAmrLocked break precondition (375-376) was missing from the draft.
-- **主因**：Empty supply stack is physically full - SnEmpty_InputFullTray reads ON - so the CleanOut drain GoUp cannot push the drained tray back into the supply stack；SnEmpty_InputFullTray stuck ON / mis-aligned while the stack actually has room；Operator has not yet removed stacked trays from the Empty supply magazine during the CleanOut drain
-- **裝置狀態**：
+#### `MES1023` — Empty 供料堆疊已滿(感測)
+- **意義**：批次結束 CleanOut 排空、要把盤送回供料堆疊時，堆疊滿盤感測 `SnEmpty_InputFullTray` 讀到 ON，堆疊已滿無法回盤。
+- **常見原因**：
+  - Empty 供料堆疊實際已滿，排空的盤無處可回
+  - `SnEmpty_InputFullTray` 卡在 ON／偏位，實際堆疊仍有空間
+  - CleanOut 排空過程中，操作員尚未把 Empty 供料倉裡堆疊的盤取走
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnEmpty_InputFullTray` | sensor | OFF - room in the supply stack for the drained tray to GoUp (the do/while exits and DoGoUpTray proceeds) | ON - stack full; do/while at aEmpty.cpp:383-387 loops the modal while (Enable && IsOn()) stays true | IOsetview (LED mlSnEmpty_InputFullTray) and Note Detail line - TriggerLine prints 'SnEmpty_InputFullTray expect=OFF actual=ON addr(...)' plus [IO=SnEmpty_InputFullTray] in the message (note.cpp:1043,1055) |
-  | `bLotFinish` | logic | true - the enclosing gate requires the lot to be finished for the drain-GoUp path to run | true (this is a CleanOut/lot-finish drain context; without it case 100 takes the normal feed/GoDown paths above) | State Record / EventLog |
-  | `bFrontHasTray / bRearHasTray` | logic | at least one true - a tray still sits on the feeder to drain back up into the supply stack (gate is bLotFinish && (bFrontHasTray \|\| bRearHasTray)) | at least one is true (that is why the drain GoUp is attempting), and the Full sensor blocks the return | State Record / EventLog |
-  | `bAmrLocked` | logic | false - the Full gate/drain-GoUp only executes when not in an AMR handoff (if bAmrLocked the block breaks at aEmpty.cpp:376 before reaching MES1023) | false when this alarm fires (AMR=0 operator drain, or AMR idle) | State Record / EventLog |
-- **操作員處置**：Remove the stacked trays from the Empty supply magazine/stack. The alarm modal auto-repeats (do/while) and only clears once SnEmpty_InputFullTray goes OFF, after which the drain GoUp (DoGoUpTray) proceeds. This alarm never appears in SOFT_SIMULATE (IsOutputCarFullForAmr returns false in sim).
-- **工程師處置**：Physically clear the stacked trays and confirm SnEmpty_InputFullTray de-asserts (OFF) in IOsetview / on the Note Detail line (actual=OFF). If it stays ON with an empty or partial stack, suspect a stuck or mis-aligned Full sensor (check Enable and the addr shown in the TriggerLine). This alarm only appears in the lot-finish / CleanOut drain-GoUp path, only when bAmrLocked is false, and is sim-suppressed.
+  | `SnEmpty_InputFullTray` | sensor | 讀到 OFF（堆疊有空間可讓排空的盤送回） | 讀到 ON（堆疊已滿），警報視窗會持續重複顯示直到清空 | IOsetview / Note 備註列 |
+  | `bLotFinish` | logic (邏輯) | true——此排空回盤路徑要求批次已結束 | true（屬 CleanOut／批次結束排空情境） | State Record・EventLog |
+  | `bFrontHasTray` / `bRearHasTray` | logic (邏輯) | 至少一個為 true——仍有盤在供料機上要排回堆疊 | 至少一個為 true（因此才嘗試排空回盤），而滿盤感測擋住回送 | State Record・EventLog |
+  | `bAmrLocked` | logic (邏輯) | false——此排空回盤只在非 AMR 交接時執行 | 觸發本警報時為 false（AMR=0 操作員排空，或 AMR 閒置） | State Record・EventLog |
+- **處置**：把 Empty 供料倉／堆疊上堆滿的盤取走。警報視窗會自動重複顯示，直到 `SnEmpty_InputFullTray` 變成 OFF 後排空回盤才會繼續。若堆疊已空或只有部分盤卻仍讀 ON，懷疑滿盤感測卡住或偏位（檢查其啟用狀態與備註列顯示的位址）。此警報只在批次結束／CleanOut 排空且非 AMR 鎖定時出現，模擬模式下不會出現。
 
-#### `MES1024` — Front Empty Tray Is Miss Error ✅已驗證
-- **觸發條件**：TEmptyModule::DoGoDownTray() case 700, aEmpty.cpp:713-722. The raise if() (lines 714-716) reads ONLY the front has-tray sensor: if(HSys.Sen.SnEmpty_InputHasTray.Enable==true && HSys.Sen.SnEmpty_InputHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY){ bFrontHasTray=false; ShowMyError("MES1024", LangT("Front Empty Tray Is Miss Error"), &SnEmpty_InputHasTray, true, K_RETRY); }. Case 700 is the confirm step at the tail of the destack cycle: earlier cases lower one tray to the front singulated slot (Rise_1 push case 100 / Rise_2 push case 150 / Separate push case 200; Rise_2 pop case 300, Separate pop case 400, Rise_1 pop case 500; settle-timer gates at cases 300/350/450/600). After GoDown, SnEmpty_InputHasTray must read ON; if it is Enabled and OFF and not in DUMMY, the tray is missing and the alarm fires. bFrontHasTray is forced false at line 718 before the alarm. Recovery K_RETRY sets GoDownTask=1 (line 720-721), re-running the whole destack.
-- **主因**：Destack lowered no tray to the front position (supply magazine empty, or the rise/separate claws failed to catch and lower a single tray)；Tray dropped during separation - a slow/marginal Rise_2 down-confirm let the separation claw open before the stack was caught (see the case 300 guard comment, aEmpty.cpp:656-662)；SnEmpty_InputHasTray mis-aligned / dirty / wiring fault reading OFF with a tray actually present at the front slot；Front-separate interlock (IsFrontSeparateBlockedBy C_Loader_FrontSeparateTray_1, case 200) mis-sequenced so separation timing released the wrong count；Machine not in DUMMY (iRealDummy!=DUMMY), so the physical sensor confirm is armed
-- **裝置狀態**：
+#### `MES1024` — 前端空盤缺失
+- **意義**：分盤下料完成後，前端有盤感測 `SnEmpty_InputHasTray` 沒讀到盤，判定前端單盤位置沒有盤。
+- **常見原因**：
+  - 分盤沒把盤降到前端位置（供料倉空，或升降／分離爪沒抓住並放下單盤）
+  - 分離過程中盤掉落——第二段升降下降確認太慢／臨界，分離爪在堆疊被夾住前就打開
+  - `SnEmpty_InputHasTray` 偏位／髒污／接線故障，前端實際有盤卻讀 OFF
+  - 前端分離與 Loader 分盤氣缸 `C_Loader_FrontSeparateTray_1` 的互鎖時序錯亂，放出的盤數不對
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnEmpty_InputHasTray` | sensor | ON after destack - a single empty tray seated at the front singulated position (Enable=true, IsOn()) | OFF (IsOff()) - no tray detected at the front slot when case 700 checks; this is the only device read at the raise line | IOsetview and Note detail line (alarm pSn = SnEmpty_InputHasTray, so the IO name prints) |
-  | `C_Empty_FrontRiseTray_1` | cylinder | Upstream destack actuator (not read at the raise site): pushed at case 100 (aEmpty.cpp:628) to support the stack, popped at case 500 (line 700); its confirm sensors report full stroke | If it fails to catch/hold or its pop-confirm stalls, no tray is lowered to the front and case 700 finds the sensor OFF | IOsetview |
-  | `C_Empty_FrontRiseTray_2` | cylinder | Upstream destack actuator (not read at the raise site): pushed at case 150 (aEmpty.cpp:636), popped with confirm at case 300 (line 665) to hold the stack before separation | A slow/marginal down-confirm can release before the stack is caught and drop it (case 300 guard, lines 656-662), leaving nothing at the front slot | IOsetview |
-  | `C_Empty_FrontSeparateTray_1` | cylinder | Upstream destack actuator (not read at the raise site): pushed at case 200 (aEmpty.cpp:647) behind the Loader front-separate interlock, popped at case 400 (line 683) to release exactly one tray downward | If separation mis-times, either no tray or the wrong count reaches the front slot and the confirm at case 700 fails | IOsetview |
-- **操作員處置**：Confirm a single empty tray actually reached the front singulated slot and the input magazine is not empty, then press Retry (K_RETRY re-runs the destack from GoDownTask=1).
-- **工程師處置**：First verify SnEmpty_InputHasTray in IOsetview - alignment/cleanliness/wiring - since it is the only device the raise site reads; it should be ON with a tray present. If the sensor is sound but reading OFF, the destack failed upstream: check the three destack cylinders (C_Empty_FrontRiseTray_1 pop at case 500, C_Empty_FrontRiseTray_2 pop-confirm at case 300, C_Empty_FrontSeparateTray_1 pop at case 400) for full stroke and confirm sensors in IOsetview, and inspect for a stack drop during separation (the case 300 marginal-confirm failure mode). Confirm the machine is not in DUMMY mode (iRealDummy!=DUMMY), else the physical check is bypassed.
+  | `SnEmpty_InputHasTray` | sensor | 分盤後讀到 ON（一片空盤就位於前端單盤位置）；這是報警時唯一讀取的裝置 | 讀到 OFF（前端位置偵測不到盤） | IOsetview / Note 備註列 |
+  | `C_Empty_FrontRiseTray_1` | cylinder | 上游分盤動作，撐住堆疊後再鬆開，行程確認正常 | 若沒抓住／夾持或鬆開確認卡住，前端就沒有盤降下 | IOsetview |
+  | `C_Empty_FrontRiseTray_2` | cylinder | 上游分盤動作，在分離前先下降確認以夾住堆疊 | 下降確認太慢／臨界時，可能在堆疊被夾住前就鬆開而掉盤，前端無盤 | IOsetview |
+  | `C_Empty_FrontSeparateTray_1` | cylinder | 上游分盤動作，在 Loader 前端分離互鎖後動作，鬆開時剛好放下一片盤 | 分離時序錯亂時，前端無盤或放出的盤數不對 | IOsetview |
+- **處置**：確認確實有一片空盤降到前端單盤位置、且進料倉不是空的，然後按 RETRY 重跑分盤。若反覆失敗，先在 IOsetview 檢查 `SnEmpty_InputHasTray` 的對準／清潔／接線（實際有盤時應讀 ON）；感測正常卻讀 OFF 時，代表上游分盤失敗——檢查三支分盤氣缸的行程與確認感測，並留意分離過程中堆疊掉落的情形。另注意機台若處於 DUMMY 模式會略過此實體確認。
 
 ### 6.3 Color 供給
 
-#### `MES1421` — Color supply tray is not ready ✳️已校正
-- **觸發條件**：In TColorModule::DoFeedTray(int Flag) (aColor.cpp:935), switch(FeedTask) case 7000: after case 4000 carries the clamped tray to the rear pickup Y via MoveColorY(Teach.ColorTrayArmPickYPosition) and cases 5000/6000 pop C_Color_PushTray then C_Color_LeanOnTray, RefreshStateFromSensors() runs (aColor.cpp:1079) and then `if(HSys.Sen.SnColor_OutputBottomHasTray.Enable==true && HSys.Sen.SnColor_OutputBottomHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY)` at aColor.cpp:1080-1082. Under GeneralSetting.bUseAMR it first arms AmrFeedWaitTimer (SetMS(iAmrFeedWaitSec*1000)) and breaks; only after that timer expires with the sensor still OFF does it reach `Ret=ShowMyError("MES1421", LangT("Color supply tray is not ready"), &HSys.Sen.SnColor_OutputBottomHasTray, true, K_RETRY)` at aColor.cpp:1102 (K_RETRY -> FeedTask=1). Single-instance Color module; NOT a per-Auto-station sprintf family. Confirmed against source.
-- **主因**：Color supply magazine ran dry - no tray was actually fed to the rear pickup slot (the intended normal meaning of this alarm)；Tray dropped or mis-positioned during MColorY carriage transport to ColorTrayArmPickYPosition (clamp lost grip during cases 2000-4000, or carriage under-travelled)；SnColor_OutputBottomHasTray sensor misaligned/dirty (never sees the delivered tray) - note Enable=false disarms the check entirely, it does not fire the alarm；AMR mode only (bUseAMR): the AGV did not refill/deliver a supply tray within iAmrFeedWaitSec
-- **裝置狀態**：
+#### `MES1421` — Color 供料盤未就緒
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：Color 供料流程把已夾持的料盤送到後側取料 Y 位置後，後側取料槽的到位感測器沒有讀到盤，代表這一輪供料實際上沒有把盤送到定位。
+- **常見原因**：
+  - Color 供料倉已空，實際上沒有盤被送到後側取料槽；
+  - 盤在運送到後側取料位途中掉落或未到位（夾持中途鬆脫，或載台行程不足）；
+  - `SnColor_OutputBottomHasTray` 感測器歪位、髒污或故障，看不到已送達的盤（若該感測器被關閉 Enable，則整個檢查被略過、不會報此警）；
+  - AMR 模式下（`bUseAMR`）：在 `iAmrFeedWaitSec` 設定的等待秒數內，AGV 沒有補送/交付供料盤。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnColor_OutputBottomHasTray` | sensor | ON - a tray is present at the Color rear/output pickup slot when the carriage reaches case 7000 (the .Enable==true && .IsOff() clause is the sole IO read at the raise site) | OFF - RefreshStateFromSensors() re-read the sensor and it reports no tray at the rear pickup slot; polarity is IsOff()->fault, so healthy=ON / fault=OFF | IOsetview (sensor LED); the alarm also prints this IO on the Note detail line (passed as the pSn arg to ShowMyError) |
-  | `RealDummy mode (HSys.LastSet.iRealDummy)` | logic-state | iRealDummy != DUMMY - the check is armed ONLY in real/normal production; this is the third clause of the trigger if() | If iRealDummy==DUMMY the whole check is skipped (else-branch presents the tray, MES1421 suppressed). A fired MES1421 therefore confirms the machine is NOT in DUMMY mode. | State Record / EventLog (RealDummy tier / iRealDummy) |
-  | `MColorY` | motor | Reached Teach.ColorTrayArmPickYPosition at the prior case 4000 (rear pickup Y) so the fed tray sits over SnColor_OutputBottomHasTray | NOT read in the MES1421 trigger - check as an upstream cause: an under-travel leaves the tray short of the sensor. A genuine soft-limit fault on MColorY raises its own eMotOverLimitErr (aColor.cpp:887), not MES1421. | MotionView (axis position vs teach ColorTrayArmPickYPosition) |
-  | `C_Color_PushTray / C_Color_LeanOnTray` | cylinder | Gripped the supply tray through the carriage move (cases 2000-4000) and are POPPED/retracted at cases 5000/6000 just before the case 7000 sensor check | NOT read in the MES1421 trigger - check as an upstream cause: if a clamp lost grip during transport the tray was left behind and never reached the rear sensor. (Their .OnSensor is what MES1422 'Color Push Tray Miss' at aColor.cpp:1021 checks, not MES1421.) | IOsetview (cylinder on/off + OnSensor LEDs) |
-- **操作員處置**：Refill the Color supply magazine. If a tray is jammed in transit, clear it. In AMR mode confirm the AGV actually delivered a supply tray to the Color source. Press RETRY - the feed restarts at FeedTask=1.
-- **工程師處置**：The only device the MES1421 if() actually reads is SnColor_OutputBottomHasTray (plus the iRealDummy!=DUMMY gate); confirm in IOsetview that this sensor toggles ON when a tray physically sits at the rear/output slot and that its Enable is true (Enable=false disarms the check, it does not raise). MColorY and C_Color_PushTray/C_Color_LeanOnTray are upstream ladder steps (cases 4000/5000/6000), not read here - verify in MotionView that MColorY reaches ColorTrayArmPickYPosition and in IOsetview that the clamps held the tray through transport, only as root-cause checks for why the tray is absent. In AMR mode, if the wait expires too fast raise iAmrFeedWaitSec in system/General.ini.
+  | `SnColor_OutputBottomHasTray` | sensor | 讀到 ON（後側/輸出取料槽有盤） | 讀到 OFF（取料槽沒有盤） | IOsetview（感測器 LED）；此 IO 也會印在 Note 備註列 |
+  | `MColorY` | motor | 已到達 `ColorTrayArmPickYPosition`（後側取料 Y），使盤停在感測器上方 | 行程不足會讓盤停在感測器前方（此警不直接讀馬達，僅為上游原因；真正超行程另報馬達警） | MotionView（軸位置 vs 教導位置） |
+  | `C_Color_PushTray / C_Color_LeanOnTray` | cylinder | 運送途中夾住盤，到達後側前才退回 | 夾持途中鬆脫會把盤留在原處、送不到後側感測器（此警不直接讀汽缸，僅為上游原因） | IOsetview（汽缸開關 + 到位 LED） |
 
-#### `MES1422` — Color Push Tray Miss ✳️已校正
-- **觸發條件**：DoFeedTray case 2000 (aColor.cpp:997-1026): `int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray, FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iColorFeedClampSettleMs)` at aColor.cpp:1002-1003. DoClampTray (mycylin.cpp:40-85) runs lean-stop first (case 0), push last (case 10), starts a settle timer of iColorFeedClampSettleMs, then at case 20 (line 67) tests `IsCylinderOnReady(&Push,...)` i.e. C_Color_PushTray.OnSensor. If the push confirm has NOT made when the timer elapses it advances to case 30, retracts the push via `Push.Pop()`, resets FeedClampSub=0 and returns 2 (line 80). Clamp==2 raises `ShowMyError("MES1422", LangT("Color Push Tray Miss"), &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY)` at aColor.cpp:1021; K_RETRY sends feed back to case 1000 to re-approach and re-clamp.
-- **主因**：Push cylinder C_Color_PushTray was commanded to extend but its ON/confirm reed sensor (OnSensor) did not read ON within iColorFeedClampSettleMs (DoClampTray case 20 failed, case 30 retracted and returned 2)；Low shop-air pressure or a mechanical bind preventing C_Color_PushTray from reaching its confirmed extended position；iColorFeedClampSettleMs too short - the confirm actually arrives just after the case-20 check；OnSensor reed-switch / wiring fault: the cylinder physically extended but the on-sensor never reported ON；Mis-seated tray at the front receive position so the push cannot reach its confirmed stroke (a fully-absent tray normally trips MES1424 first, not MES1422)
-- **裝置狀態**：
+- **處置**：補滿 Color 供料倉。若有盤卡在運送途中，先清除。AMR 模式下確認 AGV 確實已把供料盤送到 Color 進料源。到 IOsetview 確認 `SnColor_OutputBottomHasTray` 在盤實際停在後側槽時會亮 ON、且其 Enable 為開。若 AMR 等待太短，可調高 system/General.ini 內的 `iAmrFeedWaitSec`。排除後按 RETRY，供料流程會從頭重跑。
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+#### `MES1422` — Color 推盤未確認（Push Tray Miss）
+
+- **意義**：Color 供料的推盤汽缸 `C_Color_PushTray` 被下令伸出，但在夾持穩定時間內其到位確認感測器沒有讀到 ON，夾持動作判定失敗、推盤退回。
+- **常見原因**：
+  - `C_Color_PushTray` 被下令伸出，但到位確認感測器在 `iColorFeedClampSettleMs` 時間內沒讀到 ON；
+  - 廠務氣壓不足或機構卡滯，推盤到不了確認的伸出位置；
+  - `iColorFeedClampSettleMs` 設太短，確認訊號其實剛好在檢查之後才到；
+  - 到位確認簧片/接線故障：汽缸實際已伸出，但確認感測器一直沒回報 ON；
+  - 前端接料位盤未坐正，推盤到不了確認行程（完全沒有盤通常會先報 MES1424，而非 MES1422）。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `C_Color_PushTray (its .OnSensor)` | cylinder | ON - push cylinder fully extended and its on-sensor (OnSensor) confirmed within iColorFeedClampSettleMs | OFF - push was commanded but OnSensor never made; DoClampTray case 20 confirm failed and case 30 retracted the push (Push.Pop) and returned 2 | Note detail line (the alarm prints [IO=<C_Color_PushTray.OnSensor.Name>] plus an expected-ON/actual TriggerLine); also IOsetview push on-sensor LED |
-- **操作員處置**：Confirm a tray is present and correctly seated at the Color front receive position, clear any jam, check shop-air pressure, then press RETRY (feed returns to case 1000 to re-approach and re-clamp).
-- **工程師處置**：In IOsetview jog C_Color_PushTray and watch its OnSensor LED make/break at full stroke; verify air pressure and cylinder speed. If the confirm is merely late, raise iColorFeedClampSettleMs in system/General.ini [Color]. Confirm a tray is actually present at the front (SnColor_InputHasTray LED in IOsetview) - a fully-missing tray normally raises MES1424 upstream in DoGoDownTray, so an MES1422 usually means the tray is present but the push under-strokes or its sensor is faulty. Note: a lean-stop (C_Color_LeanOnTray) failure raises that cylinder's own OnAlarmCode via its Task=50 timeout, NOT MES1422 - by the time MES1422 fires the lean-stop has already confirmed.
+  | `C_Color_PushTray`（其到位感測器） | cylinder | 讀到 ON（推盤完全伸出、到位感測器在穩定時間內確認） | 讀到 OFF（下令推出但到位感測器一直沒到，隨後退回） | Note 備註列（印出該 IO 名與期望 ON/實際狀態）；IOsetview 推盤到位 LED |
 
-#### `MES1424` — Color front supply tray is missing ✳️已校正
-- **觸發條件**：TColorModule::DoGoDownTray case 700 (aColor.cpp:646). The front destack runs entirely on cylinders: C_Color_FrontRiseTray_1 Push (case 100, :564) -> C_Color_FrontRiseTray_2 Push (case 150, :572) -> C_Color_FrontSeparateTray_1 Push (case 200, :580) -> Rise_2 Pop (case 300, :598) -> Separate_1 Pop (case 400, :616) -> Rise_1 Pop (case 500, :633), each followed by a GeneralSetting.iColorDestackSettleMs settle. At case 700 the code calls RefreshStateFromSensors() then `if(HSys.Sen.SnColor_InputHasTray.Enable==true && HSys.Sen.SnColor_InputHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY)` (aColor.cpp:653-655) and raises `ShowMyError("MES1424", ..., &HSys.Sen.SnColor_InputHasTray, true, K_RETRY)` (aColor.cpp:658). K_RETRY sets GoDownTask=1 (aColor.cpp:659-660) to re-destack. The alarm is guarded OUT when the sensor is disabled (Enable==false) or the machine is in DUMMY mode (iRealDummy==DUMMY) -- both take the else branch and declare success.
-- **主因**：Color front supply stack is empty - the destack separated no tray onto the front buffer；A front destacker cylinder failed to complete its cycle (dual rise C_Color_FrontRiseTray_1/_2 to lift-and-hold the stack, or the separation claw C_Color_FrontSeparateTray_1 to isolate a single tray), so no tray was released onto the front buffer；SnColor_InputHasTray stuck OFF (misaligned / dirty / faulty) while Enable==true, so a landed tray reads as absent (note: Enable==false does NOT cause this alarm - it bypasses the check)；iColorDestackSettleMs too short - case 700 reads the sensor before the separated tray has finished seating
-- **裝置狀態**：
+- **處置**：確認 Color 前端接料位確實有盤且坐正，清除任何卡料，檢查廠務氣壓，然後按 RETRY（供料會回到重新接近並重新夾持的步驟）。可在 IOsetview 手動點動 `C_Color_PushTray`，觀察其到位 LED 在完整行程時是否確實亮/滅；檢查氣壓與汽缸速度。若只是確認訊號稍慢，調高 system/General.ini [Color] 內的 `iColorFeedClampSettleMs`。同時確認前端確有盤（IOsetview 看 `SnColor_InputHasTray` LED）——完全沒盤通常會在更上游報 MES1424，所以 MES1422 多半代表盤在但推盤行程不足或到位感測器故障。
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+#### `MES1424` — Color 前端供料盤缺料
+
+- **意義**：Color 前端分盤（destack）流程跑完後，前端輸入/供料緩衝區的到位感測器沒有讀到盤，代表分盤沒有把任何一盤放到前端緩衝區。
+- **常見原因**：
+  - Color 前端供料疊盤已空，分盤沒有分出任何盤到前端緩衝；
+  - 某個前端分盤汽缸沒完成循環（雙頂升 `C_Color_FrontRiseTray_1`/`_2` 撐住疊盤，或分離爪 `C_Color_FrontSeparateTray_1` 分出單一盤），導致沒有盤被放下到前端緩衝；
+  - `SnColor_InputHasTray` 卡在 OFF（歪位/髒污/故障）而其 Enable 為開，使已放下的盤被判為缺料（Enable 關閉不會造成此警，只會略過檢查）；
+  - `iColorDestackSettleMs` 設太短，流程在分出的盤還沒坐穩前就讀感測器。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnColor_InputHasTray` | sensor | ON - a front-staged tray landed on the Color front input/supply buffer after the destack | OFF - no tray detected at the front buffer when case 700 samples it | IOsetview (sensor LED); the alarm passes this sensor as pSn with bExpectedOn=true so its IO name is printed on the Note detail line |
-  | `C_Color_FrontRiseTray_1` | cylinder | Push up at case 100 to lift/hold the front stack, then Pop down at case 500 to lower the bottom tray onto the front buffer | Did not complete its Push/Pop cycle, so no tray was lowered onto the buffer | IOsetview (cylinder LED) |
-  | `C_Color_FrontSeparateTray_1` | cylinder | Push in at case 200 (separation claw isolates a single tray) then Pop out at case 400 to release exactly one tray | Failed to separate/release one tray from the stack | IOsetview (cylinder LED) |
-- **操作員處置**：Refill the Color front supply stack and clear any mis-fed or jammed tray at the front destacker, then press RETRY (GoDownTask returns to 1 and re-runs the destack).
-- **工程師處置**：In IOsetview confirm SnColor_InputHasTray toggles ON with a tray physically on the front buffer (rule out a stuck/dirty/misaligned sensor); watch the front destacker cylinders C_Color_FrontRiseTray_1, C_Color_FrontRiseTray_2 and the separation claw C_Color_FrontSeparateTray_1 all cycle during the godown; if the tray seats slightly after the sensor is sampled, raise iColorDestackSettleMs in system/General.ini. MColorY (Y transport) is NOT part of this godown path and should not be suspected for this alarm.
+  | `SnColor_InputHasTray` | sensor | 讀到 ON（分盤後有一盤落在 Color 前端輸入/供料緩衝上） | 讀到 OFF（取樣時前端緩衝沒偵測到盤） | IOsetview（感測器 LED）；此 IO 名會印在 Note 備註列 |
+  | `C_Color_FrontRiseTray_1` | cylinder | 先頂升撐住前端疊盤，之後下降把最底盤放到前端緩衝 | 沒完成頂升/下降循環，未把盤放到緩衝 | IOsetview（汽缸 LED） |
+  | `C_Color_FrontSeparateTray_1` | cylinder | 分離爪切入分出單一盤，再退出放行剛好一盤 | 未能從疊盤分離/放出一盤 | IOsetview（汽缸 LED） |
 
-#### `MES1426` — Color rear has a leftover tray ✅已驗證
-- **觸發條件**：TColorModule::DoFeedTray case 10 (start of a supply feed), aColor.cpp:973-987. RefreshStateFromSensors() runs (line 973), then `if(bRearHasTray)` (line 974) AND `if(HSys.LastSet.iRealDummy!=DUMMY)` (line 976) raise `ShowMyError("MES1426", LangT("Color rear has a leftover tray - please remove it"), K_RETRY)` at aColor.cpp:978. This is the 3-arg Code/Msg/KCode overload (no pSn), so NO IO name is printed on the Note. bRearHasTray is derived in RefreshStateFromSensors (aColor.cpp:274-289): bOutputState becomes true from SnColor_OutputBottomHasTray.IsOn() (line 277, only if .Enable==true) OR SnColor_TrayPos1.IsOn() (line 284, only if .Enable==true), then `if(bHasOutputSensor) bRearHasTray=bOutputState;` (line 288-289). Because the guard is iRealDummy!=DUMMY, IsSoftSimulate() is false and the sim early-out at line 253 is bypassed, so the sensor path above is the live one. In this supply context bTrayReady (pickup gate) is false and the return branch already ran, so a true bRearHasTray means a tray was stranded at the Color rear handoff slot on startup/recovery: not pickable and not re-stageable, so the operator must remove it. After the dialog, RefreshStateFromSensors re-runs (line 979); if still set the feed goes to DONE terminal case 13000, if cleared it proceeds to case 1000.
-- **主因**：A tray was left / stranded at the Color rear handoff slot after a prior fault, abort, or power-cycle；Rear presence sensor (SnColor_OutputBottomHasTray or SnColor_TrayPos1) stuck ON or misread, making bRearHasTray true with no real tray；bRearHasTray latch held true from an interrupted receive/recycle path before the sensor refresh
-- **裝置狀態**：
+- **處置**：補滿 Color 前端供料疊盤，清除前端分盤處任何錯位或卡住的盤，然後按 RETRY（分盤流程重跑）。可在 IOsetview 確認 `SnColor_InputHasTray` 在盤實際放在前端緩衝時會亮 ON（排除感測器卡死/髒污/歪位），並觀察前端分盤汽缸 `C_Color_FrontRiseTray_1`、`C_Color_FrontRiseTray_2` 與分離爪 `C_Color_FrontSeparateTray_1` 是否都有動作。若盤坐穩時間略晚於取樣，調高 system/General.ini 內的 `iColorDestackSettleMs`。此流程與 `MColorY`（Y 運送）無關，不必懷疑該軸。
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+#### `MES1426` — Color 後側殘留料盤
+
+- **意義**：一輪 Color 供料開始前檢查發現後側交接槽被判定仍有盤（`bRearHasTray`（邏輯）為真），代表有盤殘留在該處，既不能被取走也不能重新上料，必須人工移除。
+- **常見原因**：
+  - 先前的故障、中止或斷電後，有一盤被留/卡在 Color 後側交接槽；
+  - 後側到位感測器（`SnColor_OutputBottomHasTray` 或 `SnColor_TrayPos1`）卡在 ON 或誤讀，使 `bRearHasTray`（邏輯）在沒有實際盤時為真；
+  - 接料/回收流程被中斷，`bRearHasTray`（邏輯）在感測器刷新前仍鎖在真。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `bRearHasTray` | logic | false - the rear handoff slot is empty before a new supply feed begins (checked at aColor.cpp:974) | true - rear slot flagged occupied (leftover tray), blocking the feed | State Record / EventLog (logic latch; also dumped in the Color state string at aColor.cpp:1668. This alarm prints NO IO name on the Note) |
-  | `SnColor_OutputBottomHasTray` | sensor | OFF when .Enable==true - no tray at the rear/output slot (line 277) | ON - a leftover tray is present, or the sensor is stuck ON; drives bOutputState -> bRearHasTray | IOsetview (IO LED view) |
-  | `SnColor_TrayPos1` | sensor | OFF when .Enable==true - no tray at the rear position (line 284) | ON - detects the leftover tray; parallel rear sensor that also drives bOutputState -> bRearHasTray | IOsetview (IO LED view) |
-- **操作員處置**：Physically remove the leftover tray from the Color rear handoff slot; the rear presence sensor then clears bRearHasTray. Press RETRY: RefreshStateFromSensors re-checks (aColor.cpp:979) and, if clear, the supply feed proceeds to case 1000. If still occupied, the feed drops to the DONE terminal (case 13000) without presenting a tray.
-- **工程師處置**：If no tray is physically present but the alarm persists, check SnColor_OutputBottomHasTray and SnColor_TrayPos1 in IOsetview for a stuck-ON sensor (confirm each is Enabled; a stuck ON here forces bRearHasTray true). Review State Record / EventLog for an interrupted receive/recycle path that left bRearHasTray latched before the sensor refresh.
+  | `bRearHasTray`（邏輯） | logic | 為 false（新一輪供料開始前後側交接槽是空的） | 為 true（後側槽被標為佔用/殘留盤，擋住供料） | State Record・EventLog（此警不會在 Note 印出 IO 名） |
+  | `SnColor_OutputBottomHasTray` | sensor | Enable 開時讀到 OFF（後側/輸出槽無盤） | ON（有殘留盤，或感測器卡在 ON）——會使後側判定為佔用 | IOsetview（IO LED） |
+  | `SnColor_TrayPos1` | sensor | Enable 開時讀到 OFF（後側位置無盤） | ON（偵測到殘留盤）——並列的後側感測器，同樣使後側判定為佔用 | IOsetview（IO LED） |
 
-#### `MES1427` — Color supply stack full (sensor) ✅已驗證
-- **觸發條件**：aColor.cpp DoColor() case 100. Fires only in the CleanOut drain phase: the gate `if(HSys.Sys.RunMode==Run_CleanOut && TrayArmModule!=NULL && TrayArmModule->IsCleanOutFinish())` (aColor.cpp:384-385) with a tray still present `if(bFrontHasTray || bRearHasTray)` (line 387) and the supply stack full `if(IsInputFullForAmr())` (line 392). A do/while then raises `ShowMyError("MES1427", "Color supply stack FULL (sensor) - remove stacked trays", &HSys.Sen.SnColor_InputFullTray, false, K_RETRY)` at aColor.cpp:396 and repeats `while(HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn())` (aColor.cpp:394-398). bExpectedOn=false, so healthy=OFF. IsInputFullForAmr() (aColor.cpp:186-191) returns false under IsSoftSimulate(), so this can only fire on a real machine during a CleanOut drain.
-- **主因**：During the CleanOut drain, Color GoUp-returns every remaining tray to the car, but the Color supply/return stack filled up (SnColor_InputFullTray ON) so the drained trays have nowhere to go；Operator has not yet removed the stacked trays the drain is pushing back into the magazine；SnColor_InputFullTray stuck/misread ON (sensor fault) even though the stack is not physically full
-- **裝置狀態**：
+- **處置**：把殘留盤從 Color 後側交接槽實際移除，後側到位感測器隨即清除該旗標。按 RETRY 會重新檢查；若已清空，供料繼續進行；若仍佔用，供料會落到結束終點而不出盤。若實際上沒有盤但警報仍在，到 IOsetview 檢查 `SnColor_OutputBottomHasTray` 與 `SnColor_TrayPos1` 是否卡在 ON（並確認各自 Enable 為開），並查 State Record・EventLog 是否有中斷的接料/回收流程把旗標鎖住。
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+#### `MES1427` — Color 供料疊盤已滿（感測器）
+
+- **意義**：只在 Clean Out 排空階段觸發——Color 把剩餘料盤逐一送回車時，供料/回收疊盤已滿（`SnColor_InputFullTray` 讀到 ON），送回的盤無處可放。
+- **常見原因**：
+  - Clean Out 排空時，Color 把每個剩餘盤送回車，但供料/回收疊盤滿了（`SnColor_InputFullTray` ON），排出的盤沒地方去；
+  - 操作員尚未把排空推回倉裡的疊盤取走；
+  - `SnColor_InputFullTray` 卡住/誤讀為 ON（感測器故障），實際上疊盤並未滿。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnColor_InputFullTray` | sensor | OFF - room remains in the Color supply/return stack (bExpectedOn=false at raise site, and the do/while exits only when this reads OFF) | ON - the do/while loop keeps re-showing MES1427 as long as SnColor_InputFullTray.Enable && IsOn() | IOsetview (TMyLed mlSnColor_InputFullTray, alias SnColor_InputFullTray). The alarm also prints this IO on the Note line: ShowMyError appends " [IO=SnColor_InputFullTray]" plus a TriggerLine detail (note.cpp:1050-1056). |
-- **操作員處置**：Remove the stacked trays from the Color supply/return magazine. The modal repeats (K_RETRY) until SnColor_InputFullTray reads OFF; pressing RETRY re-checks the sensor, and once the stack is physically cleared the loop exits and the drain resumes (Status=CS_RETURNING; DoGoUpTray(0); Task=1700 at aColor.cpp:400-402).
-- **工程師處置**：In IOsetview confirm SnColor_InputFullTray toggles OFF when trays are removed and ON when full (rule out a stuck sensor that would trap the drain in the do/while). Note this gate arms ONLY during a CleanOut drain (RunMode==Run_CleanOut && TrayArm IsCleanOutFinish()) and is qualified by IsInputFullForAmr(), which returns false in SOFT_SIMULATE (aColor.cpp:188-189), so it never fires in sim - reproduce only on a real machine. The same Full verdict also blocks TColorModule CleanOut-finish (IsInputFullForAmr() at aColor.cpp:1402-1403), so a stuck-ON sensor also prevents the drain from ever completing.
+  | `SnColor_InputFullTray` | sensor | 讀到 OFF（Color 供料/回收疊盤仍有空間） | ON（只要仍讀到 ON，就反覆重跳 MES1427） | IOsetview（LED，別名 `SnColor_InputFullTray`）；此 IO 也會印在 Note 備註列 |
+
+- **處置**：把 Color 供料/回收倉裡疊放的盤取走。此警會反覆彈出（RETRY）直到 `SnColor_InputFullTray` 讀到 OFF；按 RETRY 會重新檢查感測器，一旦疊盤實體清空，迴圈退出、排空繼續。若疊盤已取空但警報仍在，到 IOsetview 確認 `SnColor_InputFullTray` 在移除盤時是否轉為 OFF、放滿時轉為 ON（排除卡死感測器把排空困在迴圈裡）。此檢查只在 Clean Out 排空階段生效，且卡在 ON 的感測器也會讓排空永遠無法完成，在 SOFT_SIMULATE 模擬下不會觸發，只能在真機重現。
 
 ### 6.4 Auto 出料站 1~6 (六站同模式)
 
-#### `JAM1102~JAM1602` — Auto push tray miss ✅已驗證
+#### `JAM1102~JAM1602` — Auto 推盤未到定位
 - **適用**：Auto1~6 各站（序號 11~16）
-- **觸發條件**：TAutoModule::DoFeedTray (aAuto1To6.cpp:543, switch(FeedTask) at :560), case 5200 raise site at D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:664. Flow: case 5000 (:640) commands PushCylinder->Push() and arms FeedDelay=GeneralSetting.iAutoPushConfirmSettleMs (:642); case 5100 (:648-656) waits for the settle delay then reads IsCylinderOnReady(PushCylinder,...) (:652). On FALSE it goes 5100->5200. Case 5200 (:659) calls PushCylinder->Pop() (:661) to retract, then ShowMyError(sprintf("JAM%d02",11+iFeedAuto), ErrorText, &PushCylinder->OnSensor, true, K_RETRY) (:664). bExpectedOn=true so the healthy state of the printed IO is ON; the ShowMyError overload (note.cpp:1050-1056) prints [IO=<PushCylinder->OnSensor.Name>] plus a TriggerLine expected/actual detail. K_RETRY (:665-666) sets FeedTask=5000 to re-push. NOTE: IsCylinderOnReady (mycylin.cpp:24-33) returns true if OnSensor.Enable==false or soft-simulate, so this alarm only fires when the OnSensor is enabled and real IO is running.
-- **主因**：Tray physically jammed / mis-seated so the push cylinder cannot fully extend to its advanced position；Push cylinder advanced-position confirm sensor (OnSensor) failed, mis-wired, or knocked out of alignment so IsCylinderOnReady reads OnSensor.IsOn()==false；Low air pressure / faulty solenoid so the cylinder stalls short of the advanced OnSensor；GeneralSetting.iAutoPushConfirmSettleMs (settle window armed at aAuto1To6.cpp:642) too short for this cylinder to reach OnSensor before the case-5100 confirm read
-- **裝置狀態**：
+- **意義**：Auto 站推盤氣缸推出後，在等待時間內沒有讀到「推到定位」的確認訊號，代表盤子沒有被推到最前端的定位。
+- **常見原因**：
+  - 盤子實體卡住或沒放正，推盤氣缸無法完全推到定位；
+  - 推盤氣缸的到位確認 sensor 故障、脫線或位置偏掉，盤子已到定位卻讀不到；
+  - 氣壓不足或電磁閥故障，氣缸推到一半就停住；
+  - 該站推盤確認的等待時間 `iAutoPushConfirmSettleMs`（General.ini 設定）太短，氣缸還沒推到就先做確認。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `C_Auto1_PushTray (representative; C_Auto2..6_PushTray for the other stations, from GetPush() aAuto1To6.cpp:266-278)` | cylinder | Advanced/pushed after Push()+settle, its OnSensor confirming ON so IsCylinderOnReady() is true at case 5100 (line 652) and flow proceeds to 6000 | Did not reach advanced: IsCylinderOnReady() false at case 5100 (OnSensor not ON within iAutoPushConfirmSettleMs), then Pop()-retracted in case 5200 before the alarm | IOsetview (push solenoid output + the cylinder's advanced-confirm sensor LED); the Note detail line also names the OnSensor IO because pSn=&PushCylinder->OnSensor |
-  | `C_AutoN_PushTray->OnSensor (advanced-position confirm sensor member of the push cylinder; its .Name is printed as [IO=...])` | sensor | ON when the push cylinder is fully advanced with the tray seated (bExpectedOn=true); IsCylinderOnReady returns OnSensor.IsOn() | OFF - never read ON within the iAutoPushConfirmSettleMs settle window, so IsCylinderOnReady returned false | Note detail line (this sensor's IO name and expected/actual are printed via TriggerLine); confirm live in IOsetview |
-- **操作員處置**：Open the station, remove or re-seat the jammed/mis-seated tray, then choose Retry to re-run the push (FeedTask returns to case 5000). If it repeats, stop and call an engineer.
-- **工程師處置**：In IOsetview observe the push solenoid output and its advanced-confirm OnSensor LED while cycling: if the cylinder extends fully but the OnSensor LED stays OFF the sensor/wiring/alignment is faulty; if it stalls short check air pressure and mechanical binding. If motion is fine but timing-marginal, raise GeneralSetting.iAutoPushConfirmSettleMs. Confirm the cylinder's OnSensor is Enabled (a disabled OnSensor makes IsCylinderOnReady auto-pass, masking this fault). Applies identically to all 6 Auto stations (code index = 11+ai).
+  | `C_Auto1_PushTray`（代表；其餘站為 `C_Auto2..6_PushTray`） | cylinder | 推出並穩定後推到最前定位，到位 sensor 亮（有到位）→ 流程往下進 | 沒到定位：等待時間內到位 sensor 一直沒亮，隨後氣缸縮回才報警 | IOsetview（推盤電磁閥輸出＋氣缸到位確認 sensor 燈）；Note 備註列也會印出這顆到位 sensor 的 IO 名稱 |
+  | `C_AutoN_PushTray` 的到位確認 sensor（其名稱會印在 Note 的 [IO=...]） | sensor | 氣缸完全推出、盤子就位時讀到 ON（到位） | 讀到 OFF（未到位）— 在等待時間內始終沒亮 | Note 備註列（印出此 sensor 的 IO 名稱與期望/實際）；再到 IOsetview 現場確認 |
+- **處置**：打開該站，取出或重新擺正卡住／沒放正的盤子，然後按 RETRY 重新推盤。若氣缸有完全推出但到位 sensor 燈不亮，多半是 sensor／接線／對位問題；若氣缸推到一半就停，檢查氣壓與機構卡滯。重複發生就停機找維修人員。
 
-#### `JAM1111~JAM1611` — Auto rear tray data staged but no-tray sensor ✅已驗證
+#### `JAM1111~JAM1611` — Auto 後段已登記盤資料但後段無盤 sensor
 - **適用**：Auto1~6 各站（序號 11~16）
-- **觸發條件**：TAutoModule::DoFeedTray case 200 in D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp. Pre-move rear cross-check: at lines 587-588 if(IsSoftSimulate() || IsSensorOnReady(GetOutputBottomHasTray(iFeedAuto))) advance to case 1000; ELSE ShowMyError(sprintf("JAM%d11",11+iFeedAuto), ErrorText, GetOutputBottomHasTray(iFeedAuto), true, K_SKIP|K_RETRY) at line 595. This case is reached only because FindFeedAuto (case 100, lines 452-466) returned this station, which requires State[i].bRearHasTray && bRearDeliveredPending[i] (with bCarHasTray==false) - i.e. the TrayArm-delivered latch claims a tray is staged. RefreshAutoState (lines 417-423) keeps bRearHasTray latched true even when the raw rear sensor reads OFF as long as bRearDeliveredPending==true, so a phantom staging survives to here and the rear sensor being OFF makes IsSensorOnReady() false. On K_SKIP (596-608) the code clears bRearHasTray/bRearCanUse/bRearDeliveredPending/RearGrid/RearKind/RearTrayID, sets AS_IDLE, and aborts with NO Y motion; K_RETRY stays in case 200 and re-reads next cycle.
-- **主因**：Tray was never actually delivered by TrayArm, or slid off / was removed after the delivered-latch (bRearDeliveredPending) was set；Rear-bottom OutputBottomHasTray sensor failed, is disabled (Enable==false), mis-wired or misaligned so a present tray reads OFF；Stale/phantom rear-delivered latch (bRearDeliveredPending) from a prior aborted or HOME-interrupted cycle keeps bRearHasTray latched despite an OFF sensor；Tray present but sitting outside the rear-bottom sensor's detection window
-- **裝置狀態**：
+- **意義**：軟體判定 TrayArm 已把盤交到這個 Auto 站的後段暫存位（有交盤鎖存），但要移動前檢查後段底部 sensor 卻讀不到盤。
+- **常見原因**：
+  - TrayArm 其實從未真正交盤，或交盤鎖存 `bRearDeliveredPending`（邏輯）設立後盤又滑掉／被取走；
+  - 後段底部 `SnAutoN_OutputBottomHasTray` sensor 故障、被停用、脫線或對位偏掉，有盤卻讀成無盤；
+  - 前次中斷或 HOME 打斷的循環留下殘存／假的交盤鎖存，讓 `bRearHasTray`（邏輯）在 sensor 已 OFF 時仍被鎖成有盤；
+  - 盤子有放，但落在後段底部 sensor 的偵測範圍之外。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnAuto1_OutputBottomHasTray (representative; SnAuto2_..SnAuto6_OutputBottomHasTray per station via GetOutputBottomHasTray)` | sensor | ON - a tray physically sits at the Auto rear staging bottom, matching the software delivered-latch | OFF (or sensor NULL/Enable==false) - IsSensorOnReady() returns false while software believes a tray was delivered | IOsetview (rear-bottom has-tray sensor LED); the Note detail line also prints this sensor's IO name because pSn=GetOutputBottomHasTray(iFeedAuto) |
-  | `bRearDeliveredPending[i] (delivered latch) guarding State[i].bRearHasTray` | logic | Set true only when TrayArm actually handed a tray off to this Auto rear (set at DoPlace case4000 after the Z-lift is confirmed up); it protects bRearHasTray from being cleared by an OFF sensor in RefreshAutoState | Set true while no tray is physically present - a phantom/stranded delivered latch that keeps bRearHasTray latched true (RefreshAutoState lines 417-423), so FindFeedAuto still selects the station | State Record / EventLog (rear-delivered latch and bRearHasTray state) |
-- **操作員處置**：Remove any stranded tray at the Auto rear. If a tray really is there and the sensor should see it, choose Retry to recheck the sensor. If there is genuinely no tray, choose Skip to clear the staged rear data (TrayArm will re-supply on demand).
-- **工程師處置**：Verify SnAutoN_OutputBottomHasTray in IOsetview against a known-present tray: fix the sensor/wiring/alignment or re-enable its Enable flag if a present tray reads OFF. If the latch is phantom (no tray, sensor healthy), Skip clears bRearHasTray/bRearDeliveredPending for that station. Confirm per-station via State Record. Applies to all 6 Auto stations (sprintf index = 11+ai, ai=0..5).
+  | `SnAuto1_OutputBottomHasTray`（代表；各站為 `SnAuto2_..SnAuto6_OutputBottomHasTray`） | sensor | 讀到 ON（有盤）— 後段暫存位確實有盤，與軟體交盤鎖存相符 | 讀到 OFF（無盤，或 sensor 未接／被停用）— 軟體認為已交盤但 sensor 讀不到 | IOsetview（後段底部有盤 sensor 燈）；Note 備註列也會印出此 sensor 的 IO 名稱 |
+  | `bRearDeliveredPending`（邏輯，交盤鎖存，護住 `bRearHasTray`） | logic | 只有 TrayArm 真正把盤交到此 Auto 後段（Z 上升確認完成）才會設立；用來防止後段有盤鎖存被 OFF sensor 誤清 | 無盤在場卻被設為成立 — 假／滯留的交盤鎖存讓 `bRearHasTray` 一直鎖成有盤，選料仍會選到本站 | State Record・EventLog（後段交盤鎖存與 `bRearHasTray` 狀態） |
+- **處置**：先清掉 Auto 後段任何滯留的盤。若確實有盤、sensor 應該要看到它，按 RETRY 重新讀 sensor（有盤讀不到多半是 sensor／接線／對位故障或被停用，需維修處理）。若後段確實沒有盤，按 SKIP 清掉這筆後段登記資料，TrayArm 之後會依需求重新補盤。
 
-#### `MES1120~MES1620` — Auto output stack FULL (physical sensor) ✅已驗證
+#### `MES1120~MES1620` — Auto 出料堆疊實體已滿（sensor）
 - **適用**：Auto1~6 各站（序號 11~16）
-- **觸發條件**：Two raise sites, BOTH real-machine-only (each guarded so the sim path never reaches ShowMyError) and both ultimately gated on the same InputFullTray physical sensor being ON. (1) ServiceCarFull discharge path, D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp: at line 1616-1624 the sim path early-returns (continue) so only the real machine falls through; line 1626-1627 reads FullSensor=GetInputFullTray(Index) and bSensorFull=(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn()); the if() at line 1629 `if(bSensorFull)` enters a do{ ShowMyError(sprintf("MES%d20",11+Index), ErrorText, FullSensor, false, K_RETRY); FullSensor=GetInputFullTray(Index); } while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn()); (raise on line 1635), then Car[Index].Clear() + InitAutoCarStack(Index) once the sensor confirms OFF. (2) Clean-out GoUp Full gate (CleanOutTask case 4000), line 953 `if(IsSoftSimulate()==false && IsOutputCarFullForAmr(Index))` - IsOutputCarFullForAmr (aAuto1To6.cpp:1329-1337) on the real machine returns FullSensor->Enable && FullSensor->IsOn(), i.e. the same InputFullTray sensor; inside it runs the identical do/while modal, raise on line 960, then Car[Index].Clear()+InitAutoCarStack(Index). bExpectedOn=false at both raise sites, so healthy = sensor OFF; the modal loops until the sensor reads OFF.
-- **主因**：Output stack physically full of finished trays - normal end-of-batch condition on an AMR=0 / operator-tended machine; operator (or AGV) has not yet removed the trays；Finished trays not cleared, so a clean-out GoUp (case 4000) or a discharge/service cycle cannot proceed into the full stack；SnAutoN_InputFullTray full sensor stuck/false ON (blocked by debris, misaligned, or mis-wired) while the stack is actually not full - the modal will then never self-clear because it keeps re-reading IsOn()==true
-- **裝置狀態**：
+- **意義**：Auto 站的滿料 sensor `InputFullTray` 讀到 ON，代表該站出料堆疊實體已滿，無法再收盤。此警報只在真機出現。
+- **常見原因**：
+  - 出料堆疊已裝滿完成盤 — 在 AMR=0／人工顧機的機台上是正常的批次結束狀態，操作員（或 AGV）尚未取走盤子；
+  - 完成盤未清空，導致清機上升或出料／退料循環無法進到已滿的堆疊；
+  - `SnAutoN_InputFullTray` 滿料 sensor 卡住／誤報 ON（被雜物擋住、對位偏掉或接線異常），實際並未滿 — 此時警報視窗會因為一直讀到 ON 而無法自動關閉。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnAuto1_InputFullTray (representative; also SnAuto2_InputFullTray .. SnAuto6_InputFullTray, selected by GetInputFullTray(Index), Index=station-1)` | sensor | OFF - output stack has room. ShowMyError is called with bExpectedOn=false, so TriggerLine prints expect=OFF (note.cpp:1034-1037). | ON - stack detected full. TriggerLine prints actual=ON (Sn.IsOn()==true); the do/while modal re-reads GetInputFullTray(Index) each pass and only closes once Enable && IsOn goes false. | IOsetview (this sensor's IO LED). The Note also prints it directly on the Detail line - ShowMyError(...,pSn=FullSensor,...) routes through TriggerLine (note.cpp:1043) which prints "<Sn.Name> expect=OFF actual=ON addr(Card/Lane/IP/Port/Bit)", and injects [IO=<Sn.Name>] into the message (note.cpp:1055). |
-- **操作員處置**：Remove the finished trays from that Auto station's output stack. The K_RETRY modal re-reads the InputFullTray sensor on each loop and closes automatically once the sensor goes OFF; the code then clears the car count and re-initializes the stack (Car[Index].Clear() + InitAutoCarStack(Index)). No manual count entry is needed - it is sensor-driven.
-- **工程師處置**：Confirm which station fired from the code = 11+Index (11=Auto1 .. 16=Auto6). If the stack is visibly empty but the modal will not close, inspect SnAutoN_InputFullTray in IOsetview for a stuck/false ON (blocked optic, misaligned tray-full flag, or wiring/short) - the modal cannot self-clear while IsOn() stays true. Read the Note Detail line for the exact IO name + address printed by TriggerLine. This alarm is real-machine only (site 1 sim path continues before the sensor read at line 1616-1624; site 2 is gated by IsSoftSimulate()==false at line 953), so it cannot be reproduced under SOFT_SIMULATE - test on the real machine. Note the neighboring code MES%d25 (line 1647) is a DIFFERENT alarm - logical car-count full (Car[Index].iTrayCount>=MAX_TRAY_PER_CAR) with no sensor - do not confuse them.
+  | `SnAuto1_InputFullTray`（代表；各站為 `SnAuto2_..SnAuto6_InputFullTray`） | sensor | 讀到 OFF（未滿，堆疊還有空間） | 讀到 ON（偵測到滿）— 警報視窗每輪重讀此 sensor，直到讀到 OFF 才會關閉 | IOsetview（此 sensor 的 IO 燈）；Note 備註列也會直接印出此 sensor 名稱、期望 OFF／實際 ON 與其位址 |
+- **處置**：把該 Auto 站出料堆疊上的完成盤取走。警報視窗（RETRY）會在每一輪重讀滿料 sensor，一旦 sensor 變 OFF 就自動關閉，系統隨即清空該車計數並重新初始化堆疊 — 不需要手動輸入數量，全由 sensor 決定。若堆疊看起來明明是空的但視窗一直關不掉，到 IOsetview 檢查該站 `SnAutoN_InputFullTray` 是否卡在 ON（光學被擋、滿料撥片偏位或接線短路），sensor 一直讀 ON 視窗就無法自行關閉。
 
-#### `MES1123~MES1623` — Auto clean-out residual tray after drain ✳️已校正
+#### `MES1123~MES1623` — Auto 清機排空後仍有殘留盤
 - **適用**：Auto1~6 各站（序號 11~16）
-- **觸發條件**：TAutoModule::ServiceCleanOutResidualWatchdog, D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:1110-1132; the actual log call is line 1128, inside the if() at line 1124. Called from DoAuto ONLY when BOTH conditions hold: line 1657 if(HSys.Sys.RunMode==Run_CleanOut && AllStationsDrainLatched()) then line 1664 ServiceCleanOutResidualWatchdog(). (Draft correction: the draft omitted the RunMode==Run_CleanOut half of this gate - the watchdog runs only in Clean Out mode, not whenever stations happen to be drain-latched.) AllStationsDrainLatched() (line 1044) is a PURE LOGIC latch on State[Index].bCleanOutFinish - it reads no sensors, so the drain can latch done while a tray is still physically present. Real machine only: line 1112 IsSoftSimulate() early-return, so sim never logs it. Per station the watchdog reads three sensors: Front=GetInputHasTray, Full=GetInputFullTray, Rear=GetOutputBottomHasTray; bFrontOn/bFullOn/bRearOn = (sensor!=NULL && .Enable==true && .IsOn()). Line 1124 if(bFrontOn==false && bFullOn==false && bRearOn==false) continue; ELSE line 1128 g_EventLog.Log(sprintf("MES%d23",11+Index), "Auto%d clean-out residual tray after drain - remove it", Where) where Where=sprintf("front=%d full=%d rear=%d",...). One line per episode via the bCleanOutResidualLogged[Index] latch (set true line 1131, cleared in InitialFlag line 95). This is g_EventLog.Log, NOT ShowMyError - no modal, no operator gate, machine keeps running.
-- **主因**：A tray was left stranded at an Auto station (front feed position, full/output stack, or rear/output-bottom staging) when the clean-out drain completed；One of the three station sensors stuck ON (blocked/misaligned/mis-wired) so the drain-done logic latch reports a phantom residual tray while the station is really empty；The pure logic latch AllStationsDrainLatched() (State[].bCleanOutFinish) latched done while a tray was still physically present - drain ladder cleared the software flags at case 7000 before the physical tray left
-- **裝置狀態**：
+- **意義**：在 Clean Out 清機模式下、且所有站的排空鎖存都已完成時，看門檢查發現某 Auto 站的三個 sensor（前段進料、滿料堆疊、後段底部）之中仍有一個讀到有盤，代表排空已判定完成但實體還留著盤。此為診斷紀錄，不會停機、沒有恢復按鈕，機台繼續運轉。只在真機出現。
+- **常見原因**：
+  - 清機排空完成時，某 Auto 站（前段進料位、滿料／出料堆疊、或後段／出料底部暫存）仍卡著一盤沒清掉；
+  - 該站三個 sensor 之一卡在 ON（被擋住／對位偏掉／接線異常），站其實是空的卻被記成有殘留盤；
+  - 排空完成是純邏輯鎖存 `bCleanOutFinish`（邏輯，不看 sensor），在盤子還沒實際離開前軟體旗標就先被清掉，導致鎖存提前判完成。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnAuto1_InputHasTray (per station SnAuto2..6_InputHasTray) - front feed-position tray sensor; code comment line 1089 'residual tray at this Auto front feed position'` | sensor | OFF (IsOn()==false) after drain - no residual tray at the front feed position | ON (IsOn()==true) when the log line's Where field shows front=1 | State Record / EventLog (the MES%d23 line's Where field front=/full=/rear=); then confirm live in IOsetview |
-  | `SnAuto1_InputFullTray (per station SnAuto2..6_InputFullTray) - full-stack tray sensor; code comment line 1092 'output stack still holds trays'` | sensor | OFF (IsOn()==false) after drain - stack empty | ON (IsOn()==true) when the log line's Where field shows full=1 | State Record / EventLog (Where full= flag); then confirm live in IOsetview |
-  | `SnAuto1_OutputBottomHasTray (per station SnAuto2..6_OutputBottomHasTray) - rear / output-bottom staging sensor; code comment line 1089/1095 'residual tray at this Auto rear staging'` | sensor | OFF (IsOn()==false) after drain - no residual tray at the rear staging | ON (IsOn()==true) when the log line's Where field shows rear=1 | State Record / EventLog (Where rear= flag); then confirm live in IOsetview |
-  | `bCleanOutResidualLogged[Index] - per-station once-per-episode log latch (aAuto1To6.h:61); AllStationsDrainLatched() / State[Index].bCleanOutFinish - the logic latch that gates the watchdog` | logic-state | bCleanOutFinish latched true only when the station is truly drained (no physical tray); bCleanOutResidualLogged false at episode start (reset in InitialFlag) | bCleanOutFinish==true (drain latched) while a physical sensor still reads ON - the mismatch that produces the log; bCleanOutResidualLogged set true after the first log so only one line per episode is written | State Record / EventLog (bCleanOutFinish latch and ResidualLogged flag are dumped in the Auto state trace, e.g. aAuto1To6.cpp:1507) |
-- **操作員處置**：This is a diagnostic log line, not a modal - the machine does not stop and there is no recovery button. After the clean-out, physically inspect the flagged Auto station and remove any residual tray from the location the Where field points to (front = front feed position, full = full/output stack, rear = rear/output-bottom staging).
-- **工程師處置**：Open the D:\HT160S_Log EventLog, find the MES1123..MES1623 line for the affected station and read its Where field (front=N full=N rear=N) to see which of the three sensors is ON. Map: front -> SnAutoN_InputHasTray, full -> SnAutoN_InputFullTray, rear -> SnAutoN_OutputBottomHasTray. Cross-check that sensor live in IOsetview: if a tray is really there, remove it; if the station is empty but the sensor still reads ON, the sensor is blocked/misaligned/mis-wired - fix the sensor. Note the gate is a pure logic latch (State[].bCleanOutFinish via AllStationsDrainLatched, line 1044) so a stuck sensor can also mean the drain latched prematurely. Logged once per episode (bCleanOutResidualLogged latch, reset in InitialFlag line 95). Never appears in SOFT_SIMULATE (IsSoftSimulate early-return line 1112). Fires only in Run_CleanOut mode. Applies to all 6 Auto stations (code = 11+Index).
+  | `SnAuto1_InputHasTray`（各站 `SnAuto2..6_InputHasTray`）— 前段進料位有盤 sensor | sensor | 排空後讀到 OFF（前段進料位無殘留盤） | 讀到 ON — 紀錄的 Where 欄位顯示 front=1 | State Record・EventLog（該筆 MES 紀錄的 Where 欄 front=/full=/rear=）；再到 IOsetview 現場確認 |
+  | `SnAuto1_InputFullTray`（各站 `SnAuto2..6_InputFullTray`）— 滿料堆疊有盤 sensor | sensor | 排空後讀到 OFF（堆疊已空） | 讀到 ON — Where 欄顯示 full=1 | State Record・EventLog（Where full= 旗標）；再到 IOsetview 確認 |
+  | `SnAuto1_OutputBottomHasTray`（各站 `SnAuto2..6_OutputBottomHasTray`）— 後段／出料底部暫存 sensor | sensor | 排空後讀到 OFF（後段暫存無殘留盤） | 讀到 ON — Where 欄顯示 rear=1 | State Record・EventLog（Where rear= 旗標）；再到 IOsetview 確認 |
+  | `bCleanOutFinish`（邏輯，排空完成鎖存）與每次只記一行的記錄鎖存 | logic-state | 該站真正排空（無實體盤）時才鎖存完成 | 排空已鎖存完成，卻仍有實體 sensor 讀到 ON — 兩者不一致就產生此紀錄 | State Record・EventLog（排空完成鎖存與記錄旗標會印在 Auto 狀態追蹤中） |
+- **處置**：這是診斷紀錄，不是彈窗 — 機台不會停、也沒有恢復按鈕。清機結束後，到 D:\HT160S_Log 的 EventLog 找到該站的 MES1123..MES1623 那一行，讀它的 Where 欄（front=／full=／rear=）判斷是哪個位置有盤，再到現場檢查並取走殘留盤：front＝前段進料位、full＝滿料／出料堆疊、rear＝後段／出料底部暫存。若該位置實體是空的、sensor 卻仍讀 ON，代表該 sensor 被擋住／對位偏掉／接線異常，需修 sensor（也可能是排空提前鎖存完成所致）。
 
-#### `MES1125~MES1625` — Auto output car full by tray-count book-keeping ✳️已校正
+#### `MES1125~MES1625` — Auto 出料車依盤數計數判定已滿
 - **適用**：Auto1~6 各站（序號 11~16）
-- **觸發條件**：TAutoModule::ServiceCarFull(), D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:1643 (else-if) raising at :1647. Whole function is gated by RunMode==Run_Normal (:1567). Per station: bLogicalFull=(Car[Index].iTrayCount>=MAX_TRAY_PER_CAR) at :1614 (MAX_TRAY_PER_CAR=100, MotorAndIO/MyMotor.h:113). The sensor path is tried first: FullSensor=GetInputFullTray(Index); bSensorFull=(FullSensor!=NULL && FullSensor->Enable && FullSensor->IsOn()) at :1626-1627; if(bSensorFull) -> MES%d20 (:1635). This MES%d25 branch is the else-if, so it fires only when bSensorFull==false (sensor OFF, disabled, or NULL) AND iTrayCount>=100. Call: ShowMyError(sprintf("MES%d25",11+Index), ErrorText, K_RETRY) at :1647 - the K_RETRY-only overload with NO pSn, i.e. a pure logic/counter alarm. On confirm: Car[Index].Clear() (:1648), InitAutoCarStack(Index) (:1649), bOperatorHolding[Index]=false (:1650).
-- **主因**：Normal end-of-car: 100 trays have been FED into this Auto's output car since it was last cleared. iTrayCount is a book-keeping cap incremented only on the feed path (aAuto1To6.cpp:721, rear tray promoted to working) and reset only by Car.Clear() (MyMotor.cpp:275); it is never touched by discharge or cleanout (design comment aAuto1To6.cpp:1553-1554). This is the standard car-change trigger on machines where no physical InputFullTray sensor is enabled.；The physical SnAuto{N}_InputFullTray sensor reads OFF / is disabled / is unconfigured, so the sensor path (MES%d20) did not fire and this logical-count fallback took over.；Operator serviced/changed the physical car earlier WITHOUT confirming the modal, so Car.Clear() never ran and iTrayCount kept climbing to 100 - it can trip even when the physical car is not physically full, because the count is never auto-reset by discharge.
-- **裝置狀態**：
+- **意義**：在 Normal 正常生產模式下，此 Auto 站出料車的軟體盤數計數 `iTrayCount`（邏輯）已達每車上限（100 盤），而且實體滿料 sensor 沒有觸發（OFF／停用／未接），因此改由盤數計數判定滿車。此為純計數警報，不對應任何 IO。
+- **常見原因**：
+  - 正常換車時機：自上次清空以來已餵入 100 盤到此 Auto 出料車 — 在未啟用實體滿料 sensor 的機台上，這是標準換車觸發；
+  - 實體 `SnAuto{N}_InputFullTray` sensor 讀 OFF／被停用／未設定，所以實體滿料 sensor 路徑（`MES1120~MES1620`）沒觸發，改由此盤數計數接手；
+  - 操作員先前換／清實體車時沒有在彈窗上按確認，計數沒被歸零而持續累加到 100 — 因此即使實體車沒真的滿也可能報警（計數不會因出料或清機而自動歸零）。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `Car[Index].iTrayCount vs MAX_TRAY_PER_CAR (=100) (software tray counter)` | logic | iTrayCount < 100 (car has book-kept capacity) | iTrayCount >= 100 (logical full). Counter incremented ONLY on feed at aAuto1To6.cpp:721 and reset ONLY by Car.Clear() at MyMotor.cpp:275; never incremented or reset by discharge/cleanout | State Record / EventLog (Car tray counter; this alarm carries no pSn, so no IO LED / no Note detail line) |
-  | `SnAuto{N}_InputFullTray (N=Index+1; SnAuto1_InputFullTray .. SnAuto6_InputFullTray, via GetInputFullTray, aAuto1To6.cpp:322-333)` | sensor | For MES%d25 (not MES%d20) to fire this sensor must read OFF / be disabled / unconfigured -> bSensorFull==false at :1627. If it were ON, the sibling sensor alarm MES%d20 fires instead at :1635 | OFF / disabled / absent (confirming this is the logical-count full, not the physical-sensor full). It is READ here as the discriminator between the two branches, but is NOT the raise device of this alarm | IOsetview (IO LED view) |
-- **操作員處置**：Change / empty the output car, then choose Retry / confirm on the modal. On confirm the code clears the car data (Car.Clear, :1648), re-initializes the stack (InitAutoCarStack, :1649) and clears bOperatorHolding (:1650), re-arming feeding for that Auto. NOTE: if you service the physical car WITHOUT confirming this modal, the count is not reset and the alarm will keep returning.
-- **工程師處置**：No single IO to check - this is the logical (counter) full path, distinct from the physical-sensor path MES%d20 (which prints the SnAuto{N}_InputFullTray IO name). CORRECTION vs draft: iTrayCount is NOT counted on discharge. It is incremented only on the feed path (aAuto1To6.cpp:721, rear tray promoted to working position) and reset only by Car.Clear() / TMyCar init (MyMotor.cpp:275, iTrayCount=0); it is never incremented on discharge and never auto-reset by discharge or cleanout (see design comment aAuto1To6.cpp:1553-1554). So if this fires while the car is not physically full, either 100 trays really were fed since the last confirmed car change, or a car was serviced without confirming the modal so Clear() never ran. Confirm whether SnAuto{N}_InputFullTray is enabled/wired - if it is, the machine should normally trip MES%d20 first; if it is not enabled, this logical cap is the intended full-detection. Only active in RunMode==Run_Normal (:1567). Applies to all 6 Auto stations (code=11+Index, MES1125..MES1625).
+  | `iTrayCount`（邏輯，軟體盤數計數）對每車上限（100 盤） | logic | 計數 < 100（帳面上還有容量） | 計數 ≥ 100（帳面判滿）。此計數只在餵料時累加、只在車體清空時歸零；出料或清機都不會改動它 | State Record・EventLog（車體盤數計數；此警報不帶 IO，故無 sensor 燈、無 Note 備註列） |
+  | `SnAuto{N}_InputFullTray`（N=站號；`SnAuto1_..SnAuto6_InputFullTray`） | sensor | 要走到本警報而非 `MES1120~MES1620`，此 sensor 必須讀 OFF／停用／未設定；若它是 ON，會改觸發姊妹警報 `MES1120~MES1620` | OFF／停用／未接（確認這是計數判滿、不是實體 sensor 判滿）。它在此只作為兩條分支的判別依據，不是本警報的觸發裝置 | IOsetview（IO 燈） |
+- **處置**：換／清空出料車，然後在彈窗上按 RETRY／確認。按確認後系統會清空該車資料、重新初始化堆疊並解除該站的保留狀態，重新開放餵料。注意：若你換了實體車卻沒在此彈窗上按確認，計數不會歸零，警報會一直回來。若 `SnAuto{N}_InputFullTray` 有啟用且接好，機台正常應先觸發 `MES1120~MES1620`；若它未啟用，此盤數上限就是預期的滿車偵測方式。
 
-#### `WAR1130~WAR1630` — Auto feed tray miss ✅已驗證
+#### `WAR1130~WAR1630` — Auto 餵盤未到位
 - **適用**：Auto1~6 各站（序號 11~16）
-- **觸發條件**：TAutoModule::DoFeedTray, case 3000, D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:619-628 (raise at line 626). In case 1000 (line 615) MoveAutoY(iFeedAuto, GetAutoFeedY(iFeedAuto)) drives the feed-Y move; on completion FeedTask=3000. At case 3000: BottomSensor=GetOutputBottomHasTray(iFeedAuto) (line 620); if(IsSoftSimulate() || IsSensorOnReady(BottomSensor)) advance to case 4000 (line 621), ELSE ShowMyError(sprintf("WAR%d30",11+iFeedAuto), "Auto%d Feed Tray Miss", BottomSensor, true, K_RETRY) at line 626. bExpectedOn=true. K_RETRY sets FeedTask=1000 (line 627-628) to re-run the Y move and re-check. Alarm fires only when NOT sim AND the sensor is enabled AND not on-ready (IsSensorOnReady also returns true when the sensor is disabled, which suppresses this alarm).
-- **主因**：Tray shifted, tilted, or dropped during/after the feed-Y move so it left the rear-bottom sensor window；Rear-bottom has-tray sensor (SnAutoN_OutputBottomHasTray) fault or misalignment - reads OFF with a tray physically present；MAutoY_N feed axis did not actually reach the taught feed-Y position (GetAutoFeedY), so the tray is not aligned under the sensor；Wrong / drifted GetAutoFeedY teach value for this station
-- **裝置狀態**：
+- **意義**：Auto 站完成餵料 Y 軸移動後，後段底部有盤 sensor 沒讀到盤，代表盤子沒有正確落在餵料位上。屬警告級（WAR），只能重試。
+- **常見原因**：
+  - 盤子在餵料 Y 移動過程中／之後位移、傾斜或掉落，離開了後段底部 sensor 的偵測範圍；
+  - 後段底部有盤 sensor（`SnAutoN_OutputBottomHasTray`）故障或對位偏掉 — 有盤卻讀成 OFF；
+  - `MAutoY_N` 餵料軸沒有真正到達教導的餵料 Y 位置，盤子沒對準到 sensor 下方；
+  - 此站的餵料 Y 教導值錯誤或已飄移。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnAuto1_OutputBottomHasTray (representative; SnAuto2..6_OutputBottomHasTray)` | sensor | Enabled and reading ON / on-ready after the feed-Y move - a tray is present at the rear-bottom feed position. This is the exact IO the if() at aAuto1To6.cpp:621 tests (via GetOutputBottomHasTray, lines 350-362). | Enabled but reading OFF - no tray sensed at the feed position after the Y move. (If the sensor were disabled or in sim, IsSensorOnReady would return true and this alarm would NOT fire - so the fact it fired means the sensor is enabled and OFF.) | IOsetview (rear-bottom has-tray sensor LED) AND the Note detail line: ShowMyError prints [IO=<sensor Name>] and a TriggerLine (expected-ON vs actual) because pSn=BottomSensor (note.cpp:1054-1055). |
-  | `MAutoY_1 (representative; MAutoY_2..6) - Auto Y feed axis` | motor | Reached GetAutoFeedY(iFeedAuto) in case 1000 (MoveAutoY returned true, via GetAutoMotor -> HSys.Mot.MAutoY_N, lines 196-208) so the tray sits under the rear-bottom sensor. | Possibly short of / off the taught feed-Y target, leaving the tray outside the sensor window. NOTE: the WAR%d30 if() at line 621 does NOT read the motor - it reads only BottomSensor; the motor is the upstream root cause the engineer verifies separately. | MotionView (MAutoY_N commanded vs actual position / soft-limit state). |
-- **操作員處置**：Check the tray at the Auto rear feed position; re-seat it if displaced or removed, then choose Retry to re-run the Y move and re-read the sensor.
-- **工程師處置**：Because the alarm fired, the rear-bottom sensor is enabled and reading OFF. First confirm MAutoY_N reached the feed-Y target in MotionView; re-teach GetAutoFeedY if it is off. Then verify SnAutoN_OutputBottomHasTray against a known-good seated tray in IOsetview (the Note also prints [IO=SnAutoN_OutputBottomHasTray]). Warning-class (WAR), retry-only (K_RETRY). Applies to all 6 Auto stations (code = 11+iFeedAuto, Auto1=WAR1130 .. Auto6=WAR1630).
+  | `SnAuto1_OutputBottomHasTray`（代表；`SnAuto2..6_OutputBottomHasTray`） | sensor | 已啟用且餵料 Y 移動後讀到 ON／到位 — 後段底部餵料位有盤 | 已啟用但讀到 OFF — Y 移動後餵料位沒偵測到盤（若 sensor 被停用或在模擬模式，此警報不會觸發，故它觸發就代表 sensor 已啟用且讀 OFF） | IOsetview（後段底部有盤 sensor 燈）與 Note 備註列（印出 [IO=<sensor 名稱>] 及期望 ON／實際的對比） |
+  | `MAutoY_1`（代表；`MAutoY_2..6`）— Auto Y 餵料軸 | motor | 到達餵料 Y 教導目標，盤子落在後段底部 sensor 下方 | 可能沒到教導的餵料 Y 目標或偏掉，使盤子落在 sensor 範圍外（觸發判斷只讀 sensor、不讀馬達，馬達是上游根因，需另行查證） | MotionView（`MAutoY_N` 命令位置對實際位置／軟體極限狀態） |
+- **處置**：檢查 Auto 後段餵料位上的盤，若位移或掉落就重新擺正，再按 RETRY 重新執行 Y 移動並重讀 sensor。若重試仍失敗：先在 MotionView 確認 `MAutoY_N` 有到達餵料 Y 目標，偏掉就重新教導餵料 Y 位置；再到 IOsetview 用一盤確定放正的盤驗證 `SnAutoN_OutputBottomHasTray`，有盤讀不到就是 sensor／接線／對位故障。
 
 ### 6.5 TrayArm 送盤手臂
 
-#### `MES1721` — TrayArm pick blocked ✅已驗證
-- **觸發條件**：aTrayArm.cpp:274, TTrayArmModule::OnPickGateBlocked(AnsiString Source). A DoPick case 1/10 readiness gate held the arm at Z-UP for a full watchdog window. On the first blocked tick the timer is armed: PickWaitTimer.Clear(); PickWaitTimer.SetMS(TRAYARM_PICK_GATE_ALARM_MS=60000); PickWaitTimer.On(); bPickWaitArmed=true; return (aTrayArm.cpp:253-257). On a later tick, if the timer has NOT expired it returns early (aTrayArm.cpp:259 'if(PickWaitTimer.Off()==false) return;'); once PickWaitTimer.Off()==true (window elapsed still blocked) it clears the arm and does HSys.DecStopAllMotor(); HSys.Sys.SystemStart=false; gStateRecord->TriggerSnapshot("TrayArmPickBlocked_"+Source) (aTrayArm.cpp:261-273), then ShowMyError("MES1721", LangT("TrayArm pick blocked - rear source not ready")+" ("+Source+")", K_RETRY) at aTrayArm.cpp:274 (3-arg free-string form, no pSn -> Note prints only the source label, not an IO detail line). The block itself is a producer predicate returning false: Empty source -> EmptyModule->IsRearReadyForPick()==false (call sites aTrayArm.cpp:683 for TAJOB_EMPTYTRAY_TO_AUTO and :701 for TAJOB_AMR_SUPPLY non-Color); Loader source -> LoaderModule->IsRearReadyForPick()==false (aTrayArm.cpp:716). A poll gap > TRAYARM_PICK_GATE_SCAN_GAP_MS (1500ms; modal Note / IOsetview open / machine stopped) re-arms instead of firing (aTrayArm.cpp:248-257), so the alarm can only fire late, never early. Identity picks from Color are excluded (comment aTrayArm.cpp:698-699; they gate on Color's own bTrayReady).
-- **主因**：Source=Empty: rear empty-tray never presented or carrier still delivering - EmptyModule->IsRearReadyForPick() false because bRearHasTray==false (SnEmpty_OutputBottomHasTray OFF, aEmpty.cpp:1202) or FeedTask not parked at 1 or 13000 i.e. feed ladder mid-handoff (aEmpty.cpp:1204-1205)；Source=Empty: transport clamps C_Empty_PushTray / C_Empty_LeanOnTray out-bits still actuated at pick time - carrier still owns the tray (aEmpty.cpp:1206-1207)；Source=Empty: Status==ES_FEEDING or ES_RETURNING, or bRearReturnInProgress true - a ladder actively owns the rear (aEmpty.cpp:1200-1203)；Source=Loader: discharge never completed - bRearReadyForPick latch still false because DoDischargeTray never reached case-4000 success (aLoader.cpp:749), or SnLoader_OutputBottomHasTray OFF so IsRearOccupied() false (aLoader.cpp:691-696,716-720)；A leftover/jammed tray on the source rear prevents a clean fresh present, or the producer module stalled so IsRearReadyForPick() never returns true within the 60s TRAYARM_PICK_GATE_ALARM_MS window
-- **裝置狀態**：
+#### `MES1721` — TrayArm 取盤受阻
+- **意義**：送盤手臂被派去後方料源取盤，但料源在整個等待窗（60 秒）內始終沒準備好可取的盤，手臂只能停在 Z 上位空等，逾時後停機發此警報。
+- **常見原因**：
+  - 料源=Empty：後方一直沒有空盤送到，或搬運還在進行中（`SnEmpty_OutputBottomHasTray` 讀不到盤、`bRearHasTray`(邏輯) 為否，或供料流程還卡在中途交接）。
+  - 料源=Empty：搬運夾爪 `C_Empty_PushTray` / `C_Empty_LeanOnTray` 在取盤當下仍在夾持狀態，盤還被搬運端佔住還沒放到後方。
+  - 料源=Empty：Empty 站正在供料中或回收中，某個流程正佔用後方。
+  - 料源=Loader：卸盤動作一直沒完成（`bRearReadyForPick`(邏輯) 這個放行閂始終沒亮起），或 `SnLoader_OutputBottomHasTray` 讀不到盤、後方判定為未佔用。
+  - 後方殘留或卡住一片盤，使新盤無法乾淨呈現；或料源模組整個停滯，60 秒內始終無法達到可取狀態。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnEmpty_OutputBottomHasTray` | sensor | ON when Source=Empty - an empty tray is present and settled on the Empty rear ready to hand off (RefreshStateFromSensors sets bRearHasTray=IsOn(), aEmpty.cpp:220-237) | OFF - no tray delivered to the Empty rear yet, so bRearHasTray==false and IsRearReadyForPick() stays false (aEmpty.cpp:1202) | IOsetview (Note detail names the source: "(Empty)") |
-  | `C_Empty_PushTray` | cylinder | out-bit OFF (retracted) at pick time - carrier has released the tray to the rear (aEmpty.cpp:1206 requires GetOutBit()==false) | out-bit still ON (actuated) - transport clamp still gripping, ComputeRearPickReadyNoRefresh returns false (aEmpty.cpp:1206-1207) | IOsetview |
-  | `C_Empty_LeanOnTray` | cylinder | out-bit OFF (retracted) at pick time (aEmpty.cpp:1206 requires GetOutBit()==false) | out-bit still ON (actuated) - carrier still owns the tray, gate holds (aEmpty.cpp:1206-1207) | IOsetview |
-  | `SnLoader_OutputBottomHasTray` | sensor | ON when Source=Loader - discharged empty tray settled on the Loader rear (RefreshRearState sets bRearHasTray=IsOn(), aLoader.cpp:691-696; IsRearOccupied() returns it, :716-720) | OFF - Loader rear not occupied, IsRearOccupied() false so IsRearReadyForPick() false (aLoader.cpp:749) | IOsetview (Note detail names the source: "(Loader)") |
-  | `bRearReadyForPick (Loader latch)` | logic | true - published only at DoDischargeTray case-4000 success (carriage retreated to feed Y, Push/Lean clamps Pop-confirmed at cases 2000/3000); IsRearReadyForPick()=IsRearOccupied() && bRearReadyForPick (aLoader.cpp:738-749) | false - discharge ladder never completed / was interrupted (e.g. by a HOME) or the rear went empty and re-armed it false (aLoader.cpp:710), so TrayArm never gets clearance | State Record / EventLog (Loader DescribeState / DumpStatus) |
-  | `PickWaitTimer / bPickWaitArmed` | logic | cleared - gate passes and DoPick advances (PickWaitTimer.Clear(); bPickWaitArmed=false at aTrayArm.cpp:722-724) before the 60s window elapses | armed and expired (bPickWaitArmed==true and PickWaitTimer.Off()==true still blocked, aTrayArm.cpp:259) - the direct trigger of the alarm | State Record / EventLog (snapshot TrayArmPickBlocked_<Source>; FeederDecision.txt carries every gate input incl. RearPickReady and the clamp out-bits) |
-- **操作員處置**：Note offers Retry (K_RETRY). Read the source named in the Note detail (Empty or Loader). Confirm an empty tray is physically present and fully settled on that rear. If the carrier is mid-delivery, wait and Retry; if a leftover tray is jammed on the rear, clear it, then Retry.
-- **工程師處置**：In IOsetview watch SnEmpty_OutputBottomHasTray (or SnLoader_OutputBottomHasTray) toggle ON as a tray arrives, and confirm C_Empty_PushTray / C_Empty_LeanOnTray out-bits drop to OFF after the carrier releases (Empty path). For Loader, confirm DoDischargeTray reaches case 4000 so bRearReadyForPick latches true. Open the State Record snapshot TrayArmPickBlocked_<Source> and FeederDecision.txt for the exact gate inputs (RearPickReady, RearLeanOut, RearPushOut, FeedTask) at the moment of the stall. Window = TRAYARM_PICK_GATE_ALARM_MS (60000ms), aTrayArm.cpp:24; poll-gap re-arm = TRAYARM_PICK_GATE_SCAN_GAP_MS (1500ms), aTrayArm.cpp:23.
+  | `SnEmpty_OutputBottomHasTray` | sensor | 料源=Empty 時讀到 ON（有空盤穩定停在 Empty 後方、等待交接） | 讀到 OFF（後方還沒送到盤，取盤放行條件不成立） | IOsetview（Note 括號會標示料源「(Empty)」） |
+  | `C_Empty_PushTray` | cylinder | 取盤當下輸出關（縮回）——搬運端已把盤釋放到後方 | 輸出仍開（仍在夾持）——搬運夾爪還抓著盤，後方取盤條件不成立 | IOsetview |
+  | `C_Empty_LeanOnTray` | cylinder | 取盤當下輸出關（縮回）——搬運端已放手 | 輸出仍開（仍在夾持）——盤仍被搬運端佔住，放行閘卡住 | IOsetview |
+  | `SnLoader_OutputBottomHasTray` | sensor | 料源=Loader 時讀到 ON（卸出的空盤已穩定停在 Loader 後方） | 讀到 OFF（Loader 後方未佔用，取盤放行條件不成立） | IOsetview（Note 括號會標示料源「(Loader)」） |
+  | `bRearReadyForPick`(邏輯)（Loader 放行閂） | logic | 為真——只有 Loader 卸盤流程完整走完（車體退回進料 Y、Push/Lean 夾爪確認）才會亮起 | 為否——卸盤流程沒走完或被中途打斷（例如中途 HOME），或後方變空又把它重置，手臂始終拿不到放行 | State Record・EventLog |
+  | `PickWaitTimer / bPickWaitArmed`(邏輯) | logic | 已清除——放行通過、取盤在 60 秒窗內順利前進 | 已武裝且逾時仍受阻——這是本警報的直接觸發點 | State Record・EventLog（快照 TrayArmPickBlocked_<料源>；FeederDecision.txt 記錄每個閘門輸入） |
+- **處置**：Note 提供 RETRY。先看 Note 括號標示的料源（Empty 或 Loader），到該後方確認實體確實有一片空盤且完全就定位。若搬運還在送盤途中，稍候再按 RETRY；若後方卡住殘留盤，先清除卡料再按 RETRY。也可在 IOsetview 觀察 `SnEmpty_OutputBottomHasTray`（或 `SnLoader_OutputBottomHasTray`）在盤到位時是否轉 ON，並確認 `C_Empty_PushTray` / `C_Empty_LeanOnTray` 在搬運端放手後輸出是否降到關。
 
-#### `MES1722` — TrayArm holds an unidentified tray ✳️已校正
-- **觸發條件**：Two REAL-only raise sites, both inside #ifndef SOFT_SIMULATE and gated HSys.LastSet.iRealDummy!=DUMMY, both call ShowMyError("MES1722", ..., K_RETRY). (1) PICK GATE, aTrayArm.cpp:734-739 (in DoPick, immediately before PickTask=1000 / DoLowerClampRaise): if(iRealDummy!=DUMMY && ((C_TrayArm_FrontClamp.OnSensor.Enable && .IsOn()) || (C_TrayArm_RearClamp.OnSensor.Enable && .IsOn()))) -> ShowMyError at :738, return false at :739. The if() reads ONLY the two clamp On reeds - it does NOT read bHasTray; the arm was dispatched to a fresh pick (so the carry latch was empty) yet a clamp reed reads closed-on-a-tray, and diving would double-stack. (2) RESIDUE NOTIFY, DoTrayArm case 100 (case label :1179), aTrayArm.cpp:1239-1242: else if(bResiduePendingNotify) one-shot, ShowMyError at :1242. bResiduePendingNotify is set in TTrayArmModule::InitialFlag (aTrayArm.cpp:58-69, flag set at :68) - the residue-adopt block that InitialAllTask -> TrayArmModule->InitialFlag (database.cpp:66) runs during a full-machine HOME - when bHasTray==false (checked at :59) yet BOTH clamp On reeds read On; the arm is adopted as residue (bHasTray=true, bResiduePendingNotify=true). The sibling un-adopt branch at :1232 [(bFrontEn||bRearEn) && bAnyOn==false] clears the latch once no reed reads On, so the notify only fires while a reed is still On.
-- **主因**：Arm reached a fresh pick already gripping a tray the bHasTray / MMTrayArmX->fHasTray carry latch never recorded - aborted carry, power loss mid-carry, or an ASYMMETRIC single-reed HOME: uHome keeps clamps closed on EITHER clamp On reed but InitialFlag residue-adopt needs BOTH On, so a one-reed-On arm is NOT adopted and is dispatched to a fresh pick closed-jawed (comment aTrayArm.cpp:726-733)；Full-machine HOME with a tray in the jaws: TTrayArmModule::InitialFlag (invoked by InitialAllTask, csystem.cpp:1018 / database.cpp:42-66) adopts it as residue when BOTH clamp On reeds read On, setting bResiduePendingNotify (aTrayArm.cpp:58-69, flag :68) - NOTE: the draft's 'InitialAllTask (aTrayArm.cpp:59-68)' misnamed this; the adopt code lives in InitialFlag, InitialAllTask is only the HOME driver that calls it；A TrayArm clamp On reed (C_TrayArm_FrontClamp.OnSensor / C_TrayArm_RearClamp.OnSensor) stuck or mis-adjusted On, faking a held tray the carry latch never recorded and re-firing the alarm with no tray present
-- **裝置狀態**：
+#### `MES1722` — TrayArm 夾著一片來歷不明的盤
+- **意義**：送盤手臂被派去空手取盤（照理夾爪應是空的），但夾爪的閉合到位感測讀到「已夾著盤」，若繼續下夾會疊盤，因此停機發此警報。此警報只在真機（非 DUMMY、非模擬）模式下才會啟動。
+- **常見原因**：
+  - 手臂帶著一片盤走到取盤點，但 `bHasTray` / `fHasTray`(邏輯) 這個攜帶閂從沒記錄到——可能是搬運中途被中斷、中途斷電，或是「單邊到位」的 HOME（HOME 只要任一側夾爪到位就保持閉合，但殘料認養需要兩側都到位，所以只有一側到位的手臂不會被認養，卻仍被派去空手取盤而夾著閉合）。
+  - 整機 HOME 時夾爪裡就有一片盤：HOME 時若兩側夾爪到位感測都讀到 ON，手臂會被認養為殘料（`bHasTray`(邏輯) 設為真、`bResiduePendingNotify`(邏輯) 設為真）並一次性提示。
+  - 某側夾爪到位感測（`C_TrayArm_FrontClamp` / `C_TrayArm_RearClamp` 的到位感測）卡在 ON 或調整不良，假造出「夾著盤」的假象，在實體無盤下反覆觸發此警報。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `C_TrayArm_FrontClamp.OnSensor` | sensor | OFF at a fresh pick / at HOME when the arm is truly empty (jaws open, no tray gripped) | ON (clamp-closed reed reads a tray gripped). At site 1 EITHER clamp On reed fires the alarm; at the HOME residue-adopt (site 2, InitialFlag :61) BOTH must read On | IOsetview (TrayArm front-clamp On/closed reed) |
-  | `C_TrayArm_RearClamp.OnSensor` | sensor | OFF at a fresh pick / at HOME when the arm is truly empty (jaws open) | ON (clamp-closed reed reads a tray gripped). Same as front: either reed On fires site 1, both required for the HOME residue-adopt (InitialFlag :62) | IOsetview (TrayArm rear-clamp On/closed reed) |
-  | `bHasTray / MMTrayArmX->fHasTray (TrayArm carry latch)` | logic | consistent with the reeds - false only when the clamp On reeds read OFF (arm truly empty) | false (no known carry) while a clamp On reed reads ON - the desync. Read literally at InitialFlag adopt (aTrayArm.cpp:59, requires bHasTray==false). At pick-gate site 1 the if() does NOT read it, but the arm only reaches a fresh pick when the latch is empty | State Record / EventLog (TrayArm status dump: bHasTray / fHasTray) |
-  | `bResiduePendingNotify` | logic | false (no adopted residue pending notify) | true - TTrayArmModule::InitialFlag adopted a both-reeds-On residue during HOME (aTrayArm.cpp:68) and pends a one-shot notify; drives the case-100 raise at aTrayArm.cpp:1242 (site 2 only) | State Record / EventLog |
-- **操作員處置**：Open the TrayArm clamps in Teach and physically remove the tray the arm is holding, then Retry (K_RETRY). No application restart is needed: once no clamp On reed reads On, DoTrayArm case 100 un-adopts (aTrayArm.cpp:1232) and clears bHasTray / MMTrayArmX->fHasTray / bResiduePendingNotify, so production resumes.
-- **工程師處置**：In IOsetview confirm C_TrayArm_FrontClamp.OnSensor and C_TrayArm_RearClamp.OnSensor On/closed reeds are correctly adjusted and not stuck On - a mis-latched reed both false-adopts a phantom residue at HOME (InitialFlag, aTrayArm.cpp:58-69) and re-fires the pick gate (site 1) with no tray present. The fault is a mismatch between the carry latch (bHasTray=false) and the clamp On reeds (=tray gripped), typically after an aborted/interrupted carry or a full-machine HOME. Confirm bHasTray / fHasTray in the TrayArm status dump (State Record / EventLog). Only REAL (non-DUMMY) tier and non-SOFT_SIMULATE builds arm either gate.
+  | `C_TrayArm_FrontClamp` 到位感測 | sensor | 手臂真的空的時候（取盤前或 HOME 時，夾爪張開、沒夾盤）讀到 OFF | 讀到 ON（夾爪閉合感測認為夾著盤）。取盤閘門：任一側到位感測 ON 就會觸發；HOME 殘料認養：兩側都要 ON | IOsetview（TrayArm 前夾爪閉合到位感測） |
+  | `C_TrayArm_RearClamp` 到位感測 | sensor | 手臂真的空的時候讀到 OFF（夾爪張開） | 讀到 ON（夾爪閉合感測認為夾著盤）。與前夾爪相同：任一側 ON 觸發取盤閘門，HOME 認養需兩側都 ON | IOsetview（TrayArm 後夾爪閉合到位感測） |
+  | `bHasTray / fHasTray`(邏輯)（TrayArm 攜帶閂） | logic | 與感測一致——只有夾爪到位感測都讀 OFF（手臂真的空）時才為否 | 為否（系統認為沒帶盤）但某側夾爪到位感測卻讀 ON——這就是不同步的癥結 | State Record・EventLog（TrayArm 狀態傾印） |
+  | `bResiduePendingNotify`(邏輯) | logic | 為否（沒有待提示的認養殘料） | 為真——HOME 時把兩側都到位的殘料認養了並排入一次性提示 | State Record・EventLog |
+- **處置**：在 Teach 打開 TrayArm 夾爪，實體把手臂夾著的那片盤取下，再按 RETRY。不需要重開程式：只要夾爪到位感測都不再讀 ON，系統會自動解除認養，清掉 `bHasTray` / `fHasTray` / `bResiduePendingNotify`，生產即可恢復。若在實體無盤下警報仍反覆出現，到 IOsetview 確認 `C_TrayArm_FrontClamp` 與 `C_TrayArm_RearClamp` 的閉合到位感測是否調整正確、有沒有卡在 ON——調整不良的感測會在 HOME 時誤認幻影殘料、並在取盤時反覆誤觸此警報。
 
-#### `MES1723` — TrayArm place blocked ✳️已校正
-- **觸發條件**：aTrayArm.cpp:306 in TTrayArmModule::OnPlaceGateBlocked(Dest) (aTrayArm.cpp:277-307), the place-side mirror of the pick watchdog. First blocked tick arms PlaceWaitTimer.SetMS(TRAYARM_PLACE_GATE_ALARM_MS=60000) at aTrayArm.cpp:292-294 (or re-arms on a >1500ms poll gap, TRAYARM_PICK_GATE_SCAN_GAP_MS, aTrayArm.cpp:286-295 - so it fires late, never early). Once bPlaceWaitArmed==true and PlaceWaitTimer.Off()==true (still blocked, aTrayArm.cpp:297-298) it does ClearPlaceGateWatch(); HSys.DecStopAllMotor(); HSys.Sys.SystemStart=false; gStateRecord->TriggerSnapshot("TrayArmPlaceBlocked_"+Dest); then ShowMyError("MES1723", LangT(...)+" ("+Dest+")", K_RETRY) at aTrayArm.cpp:302-306. THREE distinct block sources tick this watchdog: (1) Dest="Auto" - after X-in-position, aTrayArm.cpp:882-887: if(IsSoftSimulate()==false && AutoModule!=NULL && iAutoTarget>=0 && AutoModule->IsRearHasTray(iAutoTarget)) OnPlaceGateBlocked("Auto"); the target Auto rear is still occupied. (2) Dest="Empty"/"Color" rear-clear wait, DoPlaceToEmpty/DoPlaceToColor case 500, aTrayArm.cpp:1062-1069 / 1135-1142: proceeds only when IsRearHasTray()==false; else OnPlaceGateBlocked. (3) Dest="Empty"/"Color" anti-collision gate, aTrayArm.cpp:1056-1060 / 1129-1133: if the receiver GetStatus()==ES_FEEDING / CS_FEEDING (carrier actively feeding a tray to its rear) OnPlaceGateBlocked. ShowMyError passes NO sensor pointer, so the Note prints only the free string + "(Dest)" - the specific IO must be read in IOsetview.
-- **主因**：Dest=Auto: target Auto rear physically holds a tray - SnAuto<n>_OutputBottomHasTray ON drives State[Index].bRearHasTray true via RefreshAutoState (aAuto1To6.cpp:404-423), so IsRearHasTray(iAutoTarget) true (aAuto1To6.cpp:494-499)；Dest=Auto: OR the delivered-but-unconsumed latch bRearDeliveredPending[iAutoTarget] pins bRearHasTray true even with the sensor OFF (aAuto1To6.cpp:421-422)；Dest=Empty/Color: receiver rear not cleared - SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) or SnColor_OutputBottomHasTray/SnColor_TrayPos1 (aColor.cpp:274-289) still ON keeps IsRearHasTray()==true through the case-500 rear-clear wait；Dest=Empty/Color: receiver stuck in the feed state - EmptyModule->GetStatus()==ES_FEEDING / ColorModule->GetStatus()==CS_FEEDING for the full 60s window (anti-collision gate, aTrayArm.cpp:1056-1060 / 1129-1133), independent of the rear sensor；Mid-carry full-machine HOME wiped the receiver's bReturnTray handshake; resume re-signs RequestReturnTray at aTrayArm.cpp:1208-1214 only when IsCarriedTrayAlreadyDeposited()==false, so if that heal did not run the receiver kept/refilled its rear while the arm waited at case 500；A destination rear sensor stuck/mis-adjusted ON with no physical tray, or receiver GoUp-clear never completed within TRAYARM_PLACE_GATE_ALARM_MS (60s)
-- **裝置狀態**：
+#### `MES1723` — TrayArm 放盤受阻
+- **意義**：送盤手臂帶著盤要放到目的站，但目的站後方在整個等待窗（60 秒）內始終沒讓出位置，手臂只能等，逾時後停機發此警報。目的地會標在 Note 括號內（Auto / Empty / Color）。
+- **常見原因**：
+  - 目的地=Auto：目標 Auto 站後方實體還壓著一片盤（`SnAuto<n>_OutputBottomHasTray` 為 ON，使該站後方判定為佔用）。
+  - 目的地=Auto：或雖然感測 OFF，但「已送達未消耗」的閂 `bRearDeliveredPending`(邏輯) 仍把後方鎖為佔用。
+  - 目的地=Empty/Color：接收站後方沒清空——`SnEmpty_OutputBottomHasTray`（Empty），或 `SnColor_OutputBottomHasTray` / `SnColor_TrayPos1`（Color）仍為 ON，使清後方的等待一直不通過。
+  - 目的地=Empty/Color：接收站卡在供料中（Empty 供料中 / Color 供料中）持續整個 60 秒窗，觸發防撞閘，與後方感測狀態無關。
+  - 帶盤途中發生整機 HOME，把接收站的「回盤」交握清掉了；恢復時只有在「所攜帶盤尚未放下」的情況才會重新簽署回盤請求，若這步沒跑到，接收站就保留或重新填滿了後方而手臂還在等。
+  - 目的地後方感測卡住或調整不良、在實體無盤下維持 ON，或接收站抬升清後方的動作在 60 秒內始終沒完成。
+- **檢查點**：
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `SnAuto<n>_OutputBottomHasTray (n=iAutoTarget+1, Auto1..Auto6)` | sensor | OFF - the target Auto rear is free to receive the placed tray. Destination station is dynamic (iAutoTarget); the same gate covers all 6 Auto stations, so read the matching SnAuto1..SnAuto6_OutputBottomHasTray | ON - the Auto rear still holds a tray, RefreshAutoState sets State[iAutoTarget].bRearHasTray=true so IsRearHasTray(iAutoTarget) returns true (aAuto1To6.cpp:404-423,494-499) | IOsetview (Note detail prints "(Auto)"; the target index iAutoTarget comes from the TrayArm DumpStatus in the snapshot, not from the Note) |
-  | `SnEmpty_OutputBottomHasTray` | sensor | OFF at place time when Dest=Empty (Empty raised and freed its rear); RefreshStateFromSensors then reports IsRearHasTray()==false (aEmpty.cpp:220-237) | ON - Empty rear still occupied, the case-500 rear-clear wait never passes (aTrayArm.cpp:1062-1069) | IOsetview (Note detail prints "(Empty)") |
-  | `SnColor_OutputBottomHasTray (and SnColor_TrayPos1)` | sensor | OFF at place time when Dest=Color (Color raised and freed its rear). Color's bRearHasTray is set true by EITHER SnColor_OutputBottomHasTray OR SnColor_TrayPos1 (aColor.cpp:274-289), so both must read OFF | ON - Color rear still occupied on one of the two sensors, IsRearHasTray()==true so the case-500 rear-clear wait never passes (aTrayArm.cpp:1135-1142) | IOsetview (Note detail prints "(Color)") |
-  | `Receiver Status ES_FEEDING / CS_FEEDING (EmptyModule/ColorModule GetStatus)` | logic | Not FEEDING at place time - the receiver's tray-feed motion has completed, so the anti-collision gate lets the deposit proceed | Stuck in ES_FEEDING (Empty, aTrayArm.cpp:1056-1060) / CS_FEEDING (Color, aTrayArm.cpp:1129-1133) for the whole 60s window - a real-machine-only block source that fires MES1723 even with the rear sensor OFF (bRearHasTray not yet latched mid-feed) | State Record / EventLog (Empty/Color DumpStatus Status field) |
-  | `bRearDeliveredPending (Auto latch) / bReturnTray (Empty/Color receiver handshake)` | logic | Auto rear signed free (bRearHasTray false, no delivered-pending latch) and the receiver's return handshake present (bReturnTray set by RequestReturnTray) so it GoUp-clears its rear | Auto rear latched occupied by bRearDeliveredPending (aAuto1To6.cpp:421-422), OR after a mid-carry HOME the receiver's bReturnTray was wiped and only re-signed on resume via RequestReturnTray when IsCarriedTrayAlreadyDeposited()==false (aTrayArm.cpp:1208-1214) - if that heal was skipped the receiver kept/refilled its rear | State Record / EventLog (Auto DumpStatus RearHasTray/DeliveredPending; Empty/Color DumpStatus bReturnTray/bRearHasTray) |
-  | `PlaceWaitTimer / bPlaceWaitArmed` | logic | cleared - the rear frees (or feed completes) and DoPlace advances, ClearPlaceGateWatch() closes the window (aTrayArm.cpp:299,309-314,888,1064,1137) | armed and expired (bPlaceWaitArmed==true, PlaceWaitTimer.Off()==true) with the destination still blocked - this is the exact fire condition of the alarm (aTrayArm.cpp:289-306) | State Record / EventLog (snapshot TrayArmPlaceBlocked_<Dest>) |
-- **操作員處置**：The Note offers Retry (K_RETRY). Read the destination named in parentheses in the Note (Auto / Empty / Color). A tray is still sitting on that receiver's rear (or the receiver is mid-feed). Clear/remove the blocking tray so the rear is free, then Retry.
-- **工程師處置**：In IOsetview confirm the destination rear sensor reads OFF when the rear is empty: for Dest=Auto that is SnAuto<n>_OutputBottomHasTray of the target station (get iAutoTarget from the TrayArm DumpStatus in the TrayArmPlaceBlocked_Auto snapshot); for Dest=Empty that is SnEmpty_OutputBottomHasTray; for Dest=Color check BOTH SnColor_OutputBottomHasTray and SnColor_TrayPos1. If a sensor stays ON with no physical tray it is stuck/mis-adjusted. If the rear reads clear but the alarm still fired for Empty/Color, check the receiver Status in the snapshot - a stuck ES_FEEDING/CS_FEEDING trips the anti-collision gate independently of the sensor. If the block followed a mid-carry full-machine HOME, the receiver's bReturnTray handshake was torn and only re-signed on resume when the carried tray was not already deposited (aTrayArm.cpp:1208-1214) - verify the receiver actually GoUp-clears its rear. Window = TRAYARM_PLACE_GATE_ALARM_MS (60s), aTrayArm.cpp:25.
+  | `SnAuto<n>_OutputBottomHasTray`（n 為目標站，Auto1..Auto6） | sensor | 讀到 OFF——目標 Auto 站後方空著、可接收放下的盤。目的站是動態的，同一閘門涵蓋 6 個 Auto 站，請看對應的那一個 | 讀到 ON——Auto 後方仍壓著盤，該站後方判定為佔用 | IOsetview（Note 括號印「(Auto)」；目標站序號要看快照裡 TrayArm 狀態傾印，不在 Note 上） |
+  | `SnEmpty_OutputBottomHasTray` | sensor | 目的地=Empty 放盤時讀到 OFF（Empty 已抬升、讓出後方） | 讀到 ON——Empty 後方仍被佔用，清後方的等待始終不通過 | IOsetview（Note 括號印「(Empty)」） |
+  | `SnColor_OutputBottomHasTray`（與 `SnColor_TrayPos1`） | sensor | 目的地=Color 放盤時兩者都讀 OFF（Color 已抬升、讓出後方）。Color 後方只要任一感測 ON 就算佔用，故兩者須都 OFF | 其中一個讀到 ON——Color 後方仍被佔用，清後方的等待始終不通過 | IOsetview（Note 括號印「(Color)」） |
+  | 接收站狀態（Empty 供料中 / Color 供料中） | logic | 放盤時非供料中——接收站的送盤動作已完成，防撞閘放行 | 卡在供料中（Empty / Color）整個 60 秒窗——這是真機才有的阻擋來源，即使後方感測 OFF 也會觸發本警報 | State Record・EventLog（Empty/Color 狀態傾印的 Status 欄） |
+  | `bRearDeliveredPending`(邏輯)（Auto 閂）/ `bReturnTray`(邏輯)（Empty/Color 接收站交握） | logic | Auto 後方簽為空（無已送達未消耗閂），且接收站的回盤交握存在，故會抬升清後方 | Auto 後方被 `bRearDeliveredPending` 鎖為佔用；或帶盤途中 HOME 後 `bReturnTray` 被清掉、恢復時該癒合步驟被跳過，接收站保留或重新填滿後方 | State Record・EventLog（Auto 傾印 RearHasTray/DeliveredPending；Empty/Color 傾印 bReturnTray/bRearHasTray） |
+  | `PlaceWaitTimer / bPlaceWaitArmed`(邏輯) | logic | 已清除——後方讓出（或供料完成）、放盤前進，等待窗關閉 | 已武裝且逾時、目的地仍受阻——這是本警報的確切觸發條件 | State Record・EventLog（快照 TrayArmPlaceBlocked_<目的地>） |
+- **處置**：Note 提供 RETRY。先看 Note 括號標示的目的地（Auto / Empty / Color）。該接收站後方還壓著一片盤（或接收站正在供料中）。清除／移走擋住的那片盤讓後方空出來，再按 RETRY。也可在 IOsetview 確認目的地後方感測在後方空著時讀 OFF：Auto 看目標站的 `SnAuto<n>_OutputBottomHasTray`（站序號查快照 TrayArmPlaceBlocked_Auto 內的 TrayArm 傾印），Empty 看 `SnEmpty_OutputBottomHasTray`，Color 要同時看 `SnColor_OutputBottomHasTray` 與 `SnColor_TrayPos1`。若感測在實體無盤下仍維持 ON，即為卡住／調整不良。若後方已讀空但 Empty/Color 仍觸發，多半是接收站卡在供料中而觸發防撞閘；若阻擋發生在帶盤途中整機 HOME 之後，請確認接收站確實有抬升清出後方。
 
 ### 6.6 CCD / 視覺
 
-#### `WAR0330` — Top CCD API not ready ✳️已校正
-- **觸發條件**：aLoader.cpp:1722 ShowMyError("WAR0330", LangT("Top CCD API not ready"), K_SKIP|K_RETRY|K_TRAY_END). Raised in TLoaderModule::DoCcdCheck (aLoader.cpp:1611) case 5000: after BinData=ReadTopCcdBin(LoaderNo, State->CcdX, State->CcdY, bCcdOk) at aLoader.cpp:1681 returns bCcdOk==false -- the else (aLoader.cpp:1720) of `if(bCcdOk)` (aLoader.cpp:1682). ReadTopCcdBin (aLoader.cpp:1061-1071) is a STUB: it sets bOk=true and returns HAS_OK_IC only when `tFunction.UseCCD==false || IsSoftSimulate() || tSimuData.bRunSimulation` (aLoader.cpp:1067); otherwise (UseCCD ON, real build, not run-simulation) it sets bOk=false and returns EMPTY_IC (aLoader.cpp:1069-1070). It never queries any socket/API -- on real hardware it always fails, so this is a readiness/not-implemented fault, NOT an API-timeout.
-- **主因**：tFunction.UseCCD is ON but ReadTopCcdBin (aLoader.cpp:1061-1071) is a stub: on a real build with run-simulation off it unconditionally sets bOk=false and returns EMPTY_IC (aLoader.cpp:1069). There is no socket/API read attempted in this path.；Machine is running a real (non-SOFT_SIMULATE) build with tSimuData.bRunSimulation==false, so the bOk=false branch of ReadTopCcdBin is always taken while UseCCD is enabled.；The Top-CCD Bin-classification read integration is not wired for HT160S real hardware -- only the separate 2D-code path (state 5500 via ReadTopCcd2DCode / TopCcdSocket) is implemented; the bin read returns a placeholder failure.
-- **裝置狀態**：
+#### `WAR0330` — Top CCD Bin 分類讀取尚未就緒
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：Loader 站要做 Top CCD 的 Bin 分類讀取，但在真機生產模式下這個讀取一律回報失敗，於是跳出此警示。目前 Top CCD 的「Bin 分類讀取」在 HT160S 真機上尚未接通（只有另一條「2D 條碼讀取」是實作好的），所以只要開啟 `tFunction.UseCCD`（設定：使用 CCD Bin 分類讀取）就會固定失敗。
+- **常見原因**：
+  - `tFunction.UseCCD` 被開成 ON，但機台實際上沒有可用的 Top CCD Bin 分類讀取功能；
+  - 機台跑的是真機生產模式（非 SOFT_SIMULATE、也不是模擬跑料），此時 Bin 分類讀取一律回報「讀不到」。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `tFunction.UseCCD` | logic | OFF when no Bin-classification CCD read is available -- ReadTopCcdBin then hits the `UseCCD==false` gate (aLoader.cpp:1067), returns HAS_OK_IC with bOk=true, and WAR0330 never fires. ON only if a working bin-classification read exists. | ON, so on a real build ReadTopCcdBin falls through to bOk=false / EMPTY_IC (aLoader.cpp:1069-1070) and raises WAR0330. | State Record / EventLog |
-  | `tSimuData.bRunSimulation` | logic | ON during run-simulation makes ReadTopCcdBin return HAS_OK_IC with bOk=true (aLoader.cpp:1067), suppressing this alarm. | OFF (production run), so the real-hardware stub branch (bOk=false) is taken. | State Record / EventLog |
-  | `IsSoftSimulate()` | logic | true on the SOFT_SIMULATE dev/laptop build -> ReadTopCcdBin returns bOk=true (aLoader.cpp:1067) and the alarm is suppressed. | false on a real-machine build, so with tFunction.UseCCD ON and run-simulation off the bOk=false branch always fires. | State Record / EventLog |
-- **操作員處置**：Note offers Retry / Skip / Tray End (K_RETRY|K_SKIP|K_TRAY_END). Retry sets CcdTask=3000 to re-move to the cell and re-read (aLoader.cpp:1723-1724) -- on real hardware this re-fails, since ReadTopCcdBin is a stub. Skip bumps iTopCcdCount, marks the cell EMPTY_IC via SetTraySingleData, and resets CcdTask=1 (aLoader.cpp:1725-1730). Tray End wipes remaining UNCHECK cells of the active tray to EMPTY via ChangeActiveTrayData(LoaderNo, UNCHECK_IC, EMPTY_IC) and resets CcdTask=1 (aLoader.cpp:1731-1735).
-- **工程師處置**：This is a logic/readiness fault with no single IO LED -- do NOT look for a sensor or motor. The raise path (ReadTopCcdBin, aLoader.cpp:1061-1071) never queries a socket/API, so checking that a vision PC 'is responding' will not help. Confirm tFunction.UseCCD in State Record: because ReadTopCcdBin's real-hardware branch always returns bOk=false, if no bin-classification CCD read is installed then UseCCD must be OFF (which routes cells as HAS_OK_IC and stops the alarm). If a bin CCD read IS expected, note that ReadTopCcdBin is currently a stub -- the bin-classification integration must be implemented in firmware before UseCCD can be enabled on real hardware.
+  | `tFunction.UseCCD` | 設定(邏輯) | 沒有可用的 Bin 分類 CCD 讀取時應設 OFF（此時盤格直接當成合格 IC，不會跳警示） | ON，於是真機生產模式下 Bin 讀取固定失敗並跳 WAR0330 | State Record・EventLog |
+  | `tSimuData.bRunSimulation` | 邏輯 | 模擬跑料時為 ON，可讓 Bin 讀取視為成功而抑制此警示 | OFF（正式生產），走真機失敗分支 | State Record・EventLog |
+  | SOFT_SIMULATE 開發／筆電模式 | 邏輯 | 開發／筆電模式成立時可抑制此警示 | 真機建置不成立，配合 UseCCD ON 就會固定跳警示 | State Record・EventLog |
+- **處置**：本項是「功能尚未就緒」的邏輯警示，機台上沒有對應的感測器或馬達 LED 可查，不需要去找 IO。若機台沒有安裝 Bin 分類 CCD 讀取功能，請維修人員把設定 `tFunction.UseCCD` 關成 OFF，盤格就會被當成合格 IC、警示不再出現。若真的需要 Bin 分類讀取，需先由韌體把該功能接通後才能啟用。畫面 Note 可按 RETRY（重新移到該格再讀，真機上仍會再失敗）、SKIP（把該格標記為空 IC 後繼續）、或 TRAY END（把目前盤剩餘未檢的格子全部清為空後結束該盤）。
 
-#### `WAR0462` — Top CCD 2D no response (2DID communication time out) ✳️已校正
-- **觸發條件**：aLoader.cpp:1815 ShowSystemError("TopCCD_2D", K_RETRY|K_SKIP|K_MANUAL_2D). The key TopCCD_2D maps to code WAR0462 via the paired arrays CcdName[1]/CcdCode[1] at database.cpp:931-932 (message string database.cpp:935). Raised inside DoCcdCheck (function starts aLoader.cpp:1611), case 5500, in the else-if branch at aLoader.cpp:1813 'else if(State->CcdDelay.Off())'. It fires when the 3000ms poll window State->CcdDelay (armed SetMS(3000) at aLoader.cpp:1713 on entering state 5500) expires while ReadTopCcd2DCode(LoaderNo,CcdX,CcdY,b2DOk) at aLoader.cpp:1745 has kept returning b2DOk==false. On the real-hardware path (aLoader.cpp:1099-1104) that means TopCcdSocket->TopCcdPoll()/TopCcdGetResult(sCode) never buffered a decoded 2D reply before the timer ran out.
-- **主因**：Top CCD vision PC received the trigger shot (TopCcdTriggerShot issued at aLoader.cpp:1712 before entering the poll state) but did not return a decoded 2D string within the 3000ms window；TCP/socket link to the Top CCD reader (TopCcdSocket) dropped or stalled after the shot was triggered so TopCcdGetResult never returns true；IC 2D barcode unreadable at the taught read position (blurred/rotated/absent/poor lighting) so the reader has nothing to reply with
-- **裝置狀態**：
+#### `WAR0462` — Top CCD 2D 無回應（2DID 通訊逾時）
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：Loader 站對 Top CCD 讀碼器發出拍照觸發後，在 3000 毫秒的等待視窗內始終沒有收到解碼完成的 2D 字串，逾時而跳出此警示。
+- **常見原因**：
+  - Top CCD 視覺 PC 有收到拍照觸發，但沒在 3000 毫秒內回傳解碼後的 2D 字串；
+  - 觸發後 Top CCD 讀碼器的網路／連線斷掉或卡住，一直收不到回覆；
+  - IC 上的 2D 條碼在教導的讀取位置讀不到（模糊、旋轉、缺件、打光不良）。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `TopCcdSocket (Top CCD 2D reader socket link)` | logic | TopCcdSocket->TopCcdGetResult(sCode) returns true with a decoded 2D code within the 3000ms poll window (b2DOk becomes true at aLoader.cpp:1746) | no reply buffered - TopCcdGetResult keeps returning false, so b2DOk stays false and control falls to the CcdDelay.Off() timeout branch | State Record / EventLog (also the maintenance-page Top CCD connect indicator / CosFunction.bUseTopCcd flag) |
-  | `State->CcdDelay (Top CCD 3000ms poll timer)` | logic | cleared/re-armed by a successful 2D read (b2DOk true) before it expires; while running, .Off() returns false | expired - State->CcdDelay.Off() returns true (aLoader.cpp:1813) with b2DOk still false, which raises the alarm | State Record / EventLog |
-- **操作員處置**：The Note offers Retry / Skip / Manual 2D. Retry (K_RETRY) re-triggers the shot via TopCcdSocket->TopCcdTriggerShot() and re-arms the 3000ms poll (SetMS(3000)+On(), aLoader.cpp:1818-1821). Manual 2D (K_MANUAL_2D) calls BindManual2D so the operator hand-enters the IC 2D code, which is then resolved through the normal Bin/Lot bind path. Skip (else branch, aLoader.cpp:1826-1833) routes the IC to the Error bin (SetTrayBin HT160_BIN_ERROR_NO_BIN_SETTING), sets Lot=-1 and an empty 2D code, calls TopCcdEndShot() and returns to CcdTask=1. Note: unlike the sibling WAR0475 'not found in any lot' branch, this WAR0462 Skip path does NOT increment iUnknown2D or any counter.
-- **工程師處置**：Confirm the Top CCD link is connected (maintenance-page Top CCD connect indicator; the CosFunction.bUseTopCcd flag gates the real poll) and the vision PC program is running and decoding. Verify the read position - MoveToCcdCell (aLoader.cpp:440, driven in DoCcdCheck case 3000 at aLoader.cpp:1667) actually presents the IC 2D code to the reader - and check camera focus/lighting and that the barcode is present and legible. If a companion WAR16120 (TopCCD_Connect) is also firing, treat the socket/cable/power as the primary fault.
+  | Top CCD 2D 讀碼連線 | 邏輯 | 在 3000 毫秒視窗內回傳一組解碼成功的 2D 字碼 | 沒有回覆進來，一直讀不到，於是落入逾時分支 | State Record・EventLog（另可看維護頁 Top CCD 連線指示、`CosFunction.bUseTopCcd` 旗標） |
+  | Top CCD 3000 毫秒等待計時 | 邏輯 | 在計時到期前被一次成功讀碼清除／重置 | 計時到期而仍未讀到 2D，觸發警示 | State Record・EventLog |
+- **處置**：先確認 IC 是否確實停在教導的讀取位置、2D 條碼是否有出現且清晰（檢查對焦與打光、條碼有無缺件或歪斜）。確認 Top CCD 視覺 PC 有開機、程式在跑並能正常解碼，網路線／交換器接妥。若同時出現 `WAR16120`（TopCCD_Connect），請先把連線／線材／電源當成主因處理。畫面 Note 可按 RETRY（重新拍照並重新等待 3 秒）、MANUAL 2D（由操作員手動輸入該 IC 的 2D 碼，再走正常 Bin/Lot 綁定）、或 SKIP（把該 IC 送到 Error bin 後繼續，此路徑不會累計任何計數）。
 
-#### `WAR0475` — 2D code not found in any lot ✅已驗證
-- **觸發條件**：aLoader.cpp:1790 ShowMyError("WAR0475", LangT("2D code not found in any lot : ")+sCode, K_RETRY|K_SKIP|K_MANUAL_2D). Enclosing function is TLoaderModule::DoCcdCheck (aLoader.cpp:1611), case 5500 (5500 body aLoader.cpp:1739-1837). Fires when the Top-CCD 2D code WAS read (b2DOk==true at aLoader.cpp:1746) BUT the reverse lookup LotRegistry.FindByCode2D(sCode, HitLot, Bin, HitLotIndex) returns false (if() at aLoader.cpp:1756, else branch at 1788, raise at 1790). Same alarm re-raised in the manual-entry helper TLoaderModule::BindManual2D at aLoader.cpp:1883 when a hand-entered code also fails FindByCode2D (guard at 1858).
-- **主因**：The scanned IC 2D code is not present in any loaded Lot's 2D-Bin registry (wrong or incomplete WorkOrder/Lot loaded into LotRegistry)；Correct lot data not downloaded/loaded into LotRegistry before production started；Top CCD misread the code into a value that does not exist in any registered lot
-- **裝置狀態**：
+#### `WAR0475` — 2D 碼在所有 Lot 中都查不到
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：Top CCD 已成功讀到 IC 的 2D 碼，但拿這個碼去反查所有已載入的 Lot 都找不到對應資料，於是跳出此警示。
+- **常見原因**：
+  - 掃到的 2D 碼不在任何已載入 Lot 的 2D-Bin 對照表內（載入了錯的或不完整的 WorkOrder/Lot）；
+  - 開始生產前沒有把正確的 Lot 資料下載／載入；
+  - Top CCD 誤讀成一個不存在於任何已註冊 Lot 的值。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `LotRegistry (loaded Lot 2D->Bin reverse lookup)` | logic | Contains the scanned 2D code so FindByCode2D resolves owning Lot (HitLotIndex) + Bin | FindByCode2D(sCode,...) returns false - code absent from every loaded lot (aLoader.cpp:1756 takes the else at 1788) | State Record / EventLog |
-  | `sCode (the 2D string returned by ReadTopCcd2DCode)` | logic | Matches a code registered in some loaded lot | Appended to the Note message as the unresolved value; in BindManual2D the equivalent is the hand-entered 'code' | Note detail line |
-- **操作員處置**：Note offers Retry / Skip / Manual 2D. Retry (K_RETRY) re-triggers a Top-CCD shot (TopCcdTriggerShot) + 3s delay and re-reads. Manual 2D (K_MANUAL_2D) opens hand-entry via BindManual2D, which reuses the SAME FindByCode2D lookup. Skip (else branch, effectively K_SKIP) routes the IC to the Error Auto: SetTrayBin(HT160_BIN_ERROR_NO_BIN_SETTING), SetTrayLot(-1), and increments MachineRun.iUnknown2D.
-- **工程師處置**：Pure logic/data fault - there is no single physical device to read at this raise site. Confirm the correct Lot / WorkOrder 2D-Bin data is loaded into LotRegistry: compare the 2D code printed in the Note detail line against the loaded lots. If the lot is right but this one code misses, suspect a Top-CCD misread (check the read chain / lighting). If many codes miss, the wrong or an incomplete lot/WorkOrder was loaded before Start.
+  | 已載入 Lot 的 2D→Bin 反查表 | 邏輯 | 含有掃到的 2D 碼，可查出所屬 Lot 與 Bin | 查不到，該碼不在任何已載入的 Lot 內 | State Record・EventLog |
+  | 掃到的 2D 字碼 | 邏輯 | 對應到某個已載入 Lot 中已註冊的碼 | 作為查不到的值附在 Note 訊息上；手動輸入時同理 | Note 備註列 |
+- **處置**：先比對 Note 備註列印出的 2D 碼與目前載入的 Lot 是否相符。若 Lot 是對的、只有這一顆碼查不到，多半是 Top CCD 誤讀（檢查讀取位置、對焦與打光）。若很多顆都查不到，通常是開始生產前載入了錯的或不完整的 Lot／WorkOrder，請重新載入正確資料。畫面 Note 可按 RETRY（重新拍照重讀）、MANUAL 2D（手動輸入該碼，仍走同一套反查）、或 SKIP（把該 IC 送到 Error Auto 並累計未知 2D 計數）。
 
-#### `WAR0970` — Color CCD 2D no response (Tray ID communication time out) ✅已驗證
-- **觸發條件**：aColor.cpp:1214 ShowSystemError("ColorCCD_2D", K_RETRY|K_SKIP|K_MANUAL_2D); the name "ColorCCD_2D" maps to code WAR0970 at database.cpp:931-932/943 (message at database.cpp:937). Raised inside TColorModule::DoReadColor2D(int Flag) (function at aColor.cpp:1128), switch case 200: line 1201 'if(ColorCcdSocket!=NULL && ColorCcdSocket->ColorCcdGetResult(sCode))' is false (no decoded tray-ID returned) AND the else-if at line 1210 'ScanDelay.Off()' is true - the 3000ms shot timer armed in case 100 (ScanDelay.SetMS(3000);ScanDelay.On() at aColor.cpp:1193-1194, right after ColorCcdTriggerShot at 1192) has expired. ColorCcdEndShot (LOFF) fires at 1213, then the alarm. The socket was already confirmed connected in case 100 (a drop there raises the separate ColorCCD_Connect/WAR16121), so WAR0970 is specifically shot-triggered-but-no-decode-within-3000ms.
-- **主因**：Color CCD vision PC received the trigger (LON) but did not return a decoded tray-ID 2D within the 3000ms window；Socket link to the Color reader dropped AFTER the shot was triggered (case 100 connect check had already passed), so ColorCcdGetResult keeps returning false until the timeout；Identity-tray 2D barcode unreadable at the taught ColorRead2DXPosition (missing / blurred / misaligned / poor lighting) so the reader never produces a code
-- **裝置狀態**：
+#### `WAR0970` — Color CCD 2D 無回應（Tray ID 通訊逾時）
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：Color 站對 Color CCD 讀碼器發出拍照觸發後，在 3000 毫秒視窗內始終沒有收到解碼後的身分盤 Tray-ID 2D 字串，逾時而跳出此警示（連線在拍照前已確認正常，屬於「已觸發但逾時未解碼」）。
+- **常見原因**：
+  - Color CCD 視覺 PC 有收到觸發，但沒在 3000 毫秒內回傳解碼後的 Tray-ID 2D；
+  - 觸發之後 Color 讀碼器連線才斷掉，導致一直收不到結果直到逾時；
+  - 身分盤的 2D 條碼在教導的 `ColorRead2DXPosition` 讀不到（缺件／模糊／歪斜／打光不良）。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `ColorCcdSocket (Color CCD reader link)` | logic | ColorCcdGetResult(sCode) returns true with a non-empty tray-ID string inside the 3000ms window (aColor.cpp:1201) | keeps returning false; no decoded code arrives, so control falls to the ScanDelay.Off() timeout branch (aColor.cpp:1210) which runs ColorCcdEndShot then raises the alarm | State Record / EventLog |
-  | `ScanDelay (3000ms shot poll timer)` | logic | a successful ColorCcdGetResult returns (case 200 -> ScanTask=1, aColor.cpp:1207-1208) before ScanDelay.Off() ever evaluates true | timer expired: ScanDelay.Off() returns true at aColor.cpp:1210 with no result yet, which is the exact condition that fires WAR0970 | State Record / EventLog |
-  | `MTopCCDX_Color` | motor | moved to and resting at Teach.ColorRead2DXPosition (commanded in the same ladder, case 10, aColor.cpp:1166-1172) so the 2D reader physically faces the identity-tray barcode | reported in position, but the reader still returned no code within the window (confirm it truly reached the taught position and the code is under the reader) | MotionView |
-- **操作員處置**：The Note offers Retry / Skip / Manual 2D. Retry (K_RETRY) re-issues ColorCcdTriggerShot and re-arms the 3000ms timer (aColor.cpp:1215-1221). Manual 2D (K_MANUAL_2D) adopts the operator-typed identity: sTrayID2D=fNote->ManualText, stamps it onto the carried identity tray, returns the ladder to idle (aColor.cpp:1222-1228). Skip sets an empty identity (sTrayID2D="") and returns to idle (aColor.cpp:1230-1236).
-- **工程師處置**：Confirm the Color CCD link is up and the vision program is decoding: CosFunction.bUseColorCcd must be enabled (otherwise the flow fabricates a COLOR2D_ id and never reaches this alarm - aColor.cpp:1146), and the socket must stay connected through the shot (a drop after case 100 surfaces as this timeout, not as ColorCCD_Connect). Verify MTopCCDX_Color reaches the taught ColorRead2DXPosition in MotionView so the reader faces the identity-tray 2D; then check camera focus/lighting and that the tray-ID barcode is present and legible.
+  | Color CCD 讀碼連線 | 邏輯 | 在 3000 毫秒視窗內回傳一組非空的 Tray-ID 字串 | 一直讀不到，逾時後結束拍照並跳警示 | State Record・EventLog |
+  | Color CCD 3000 毫秒拍照等待計時 | 邏輯 | 在計時到期前先取得成功結果 | 計時到期仍無結果，正是觸發 WAR0970 的條件 | State Record・EventLog |
+  | `MTopCCDX_Color` | 馬達 | 已移動並停在教導的 `ColorRead2DXPosition`，讓讀碼器正對身分盤條碼 | 回報已到位，但仍讀不到碼（請確認確實到達教導位置、且條碼在讀碼器下方） | MotionView |
+- **處置**：先確認 `MTopCCDX_Color` 在 MotionView 有確實到達教導的 `ColorRead2DXPosition`、讀碼器正對身分盤 2D，再檢查對焦／打光與條碼有無出現且清晰。確認 Color CCD 視覺 PC 已開機、讀碼程式在解碼；若機台沒有安裝 Color 讀碼器，可把設定 `CosFunction.bUseColorCcd`（[ColorCCD] Enable）關掉，改用模擬身分而不跳警示。畫面 Note 可按 RETRY（重新觸發並重新計時 3 秒）、MANUAL 2D（採用操作員手動輸入的身分並蓋到身分盤上）、或 SKIP（設定空身分後回到待機）。
 
-#### `WAR16120` — Top CCD connect not ready (Loader Tray ID no respond) ✳️已校正
-- **觸發條件**：aLoader.cpp:1701 `Ret=ShowSystemError("TopCCD_Connect", K_RETRY|K_SKIP);`. Key TopCCD_Connect -> code WAR16120 via database.cpp:931-932 (CcdName[0]/CcdCode[0]) and mapNameToAlarm at database.cpp:943; message string is CcdEng[0] at database.cpp:934. Raised in DoCcdCheck case 5000. First the enclosing gate at aLoader.cpp:1694 must hold: `if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)` (i.e. after a good Top-CCD bin read that returned HAS_OK_IC, with 2D-bin-map enabled). Inside it, the alarm fires when the inner if at aLoader.cpp:1696-1700 is true: `HSys.LastSet.iRealDummy==REALLY && TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected()==false && CosFunction.bUseTopCcd && IsSoftSimulate()==false`. IsTopCcdConnected() returns (iState==TOPCCD_CONNECTED) after re-polling (TopCcdSocket.cpp:280-284), so false means the socket is not in the connected state.
-- **主因**：TCP socket to the Top CCD vision PC is not in TOPCCD_CONNECTED state (cable unplugged, vision PC off, wrong IP/port, program not listening)；CosFunction.bUseTopCcd (General.ini [TopCCD] Enable) is ON on a REALLY machine but the reader is not reachable；Network/socket dropped between init and this scan; TopCcdPoll reconnect (2s throttle) has not yet re-established the link
-- **裝置狀態**：
+#### `WAR16120` — Top CCD 連線尚未就緒（Loader Tray ID 無回應）
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：在 Top CCD 2D-Bin 對照路徑下、且是真機（REALLY）並啟用 Top CCD 的情況下，發現與 Top CCD 視覺 PC 的連線不在「已連線」狀態，於是跳出此警示。
+- **常見原因**：
+  - 到 Top CCD 視覺 PC 的網路連線不在已連線狀態（網路線沒插、視覺 PC 沒開、IP/Port 錯、程式沒在監聽）；
+  - `CosFunction.bUseTopCcd`（[TopCCD] Enable）在真機上開著，但讀碼器連不上；
+  - 初始化後到本次掃描之間連線斷掉，自動重連（約每 2 秒節流一次）還沒接回。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `TopCcdSocket (TCP link, iState)` | logic | iState==TOPCCD_CONNECTED, so IsTopCcdConnected() returns true (TopCcdSocket.cpp:283) | iState != TOPCCD_CONNECTED; IsTopCcdConnected() returns false (aLoader.cpp:1698) — this is the actual fault | State Record / EventLog |
-  | `CosFunction.bUseTopCcd` | logic | reflects General.ini [TopCCD] Enable; ON only when a Top CCD reader is present and reachable | ON while the socket is disconnected (gate at aLoader.cpp:1698) | State Record / EventLog |
-  | `CosFunction.bUse2DBinMap` | logic | ON to run the Top-CCD 2D bin-map path; this alarm is only reachable when it is ON (enclosing gate aLoader.cpp:1694) | ON (path entered) | State Record / EventLog |
-  | `HSys.LastSet.iRealDummy` | logic | REALLY only on a real machine with the reader wired | REALLY with no live Top CCD connection (gate at aLoader.cpp:1696) | State Record / EventLog |
-- **操作員處置**：Note offers Retry / Skip. On Retry (aLoader.cpp:1701-1707) the ladder simply breaks with CcdTask left at 5000, so case 5000 re-runs: ReadTopCcdBin then the connect check run again, and the reconnect is implicit inside IsTopCcdConnected() -> TopCcdPoll(), which re-calls TopCcdConnect() throttled to once per 2s (TopCcdSocket.cpp:272-276). There is NO explicit reconnect call in the retry path (the draft's EnsureColorCcdSocketCreated is a Color-CCD helper, ColorCcdSocket.cpp:22, and is never called here; the Top-CCD equivalent EnsureTopCcdSocketCreated is likewise not called on Retry). On Skip the cell bin is set to HT160_BIN_ERROR_2D_SCAN_FAIL and the ladder returns to idle (CcdTask=1, aLoader.cpp:1702-1706).
-- **工程師處置**：Verify the Top CCD vision PC is powered and its program listening, and that the machine's [TopCCD] Address/Port (General.ini) match. Check the network cable/switch. On the maintenance page use the Top CCD connect control (btnTopCcdConnect, maintenance.cpp:488-491 calls TopCcdSocket->TopCcdConnect via EnsureTopCcdSocketCreated) to force a reconnect and confirm the socket reaches TOPCCD_CONNECTED. If no Top CCD is installed, turn [TopCCD] Enable OFF so CosFunction.bUseTopCcd is false and the 2D path is bypassed; or turn [2DBinMap] off (bUse2DBinMap) if the whole 2D bin-map feature is not used.
+  | Top CCD 連線 | 邏輯 | 處於「已連線」狀態 | 未處於已連線狀態，即為本項的實際故障 | State Record・EventLog |
+  | `CosFunction.bUseTopCcd` | 設定(邏輯) | 對應 [TopCCD] Enable；僅在有 Top CCD 讀碼器且連得上時才開 ON | ON，但連線是斷的 | State Record・EventLog |
+  | `CosFunction.bUse2DBinMap` | 設定(邏輯) | 開 ON 才會走 Top CCD 2D 對照路徑；本警示只有在此為 ON 時才會到達 | ON（已進入該路徑） | State Record・EventLog |
+  | `HSys.LastSet.iRealDummy` | 邏輯 | 只有在真機且讀碼器已接線時為 REALLY | REALLY，但沒有實際連上 Top CCD | State Record・EventLog |
+- **處置**：確認 Top CCD 視覺 PC 已開機、程式在監聽，且機台設定的 [TopCCD] Address/Port 與讀碼器相符，並檢查網路線／交換器。可在維護頁用 Top CCD 連線鈕強制重連，確認連線回到「已連線」狀態。若機台沒有安裝 Top CCD，請把 [TopCCD] Enable 關掉（讓 `CosFunction.bUseTopCcd` 為 false）以略過 2D 路徑；或在整個 2D-Bin 對照功能不使用時，把 `bUse2DBinMap` 關掉。畫面 Note 可按 RETRY（重跑本步，內含隱式重連）或 SKIP（把該格 Bin 標記為 2D 掃描失敗後回到待機）。
 
-#### `WAR16121` — Color CCD connect not ready (Color Tray ID no respond) ✳️已校正
-- **觸發條件**：aColor.cpp:1179 ShowSystemError("ColorCCD_Connect", K_RETRY|K_SKIP); the key ColorCCD_Connect maps to WAR16121 at database.cpp:931-932 (message confirmed at database.cpp:936). Raised in TColorModule::DoReadColor2D case 100 when the real if() at aColor.cpp:1177 is true: `ColorCcdSocket==NULL || ColorCcdSocket->IsColorCcdConnected()==false`. IsColorCcdConnected() returns (iState==COLORCCD_CONNECTED) (ColorCcdSocket.cpp:283), so ==false means the link is not in the connected state. This path is only reached on real hardware with the reader enabled: case 1 (aColor.cpp:1146) short-circuits and fabricates a TrayID when `IsSoftSimulate() || tSimuData.bRunSimulation || CosFunction.bUseColorCcd==false`.
-- **主因**：TCP socket to the Color CCD vision PC not connected (ColorCcdSocket is NULL, or IsColorCcdConnected() reports iState != COLORCCD_CONNECTED)；bUseColorCcd (General.ini [ColorCCD] Enable) is ON but the reader is unreachable (vision PC off, wrong Address/Port, cable/switch fault)；Color reader program not started or not listening on the configured port
-- **裝置狀態**：
+#### `WAR16121` — Color CCD 連線尚未就緒（Color Tray ID 無回應）
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：在真機且啟用 Color 讀碼器的情況下，Color 站要讀身分盤 2D 前發現與 Color CCD 視覺 PC 的連線不存在或不在「已連線」狀態，於是跳出此警示。
+- **常見原因**：
+  - 到 Color CCD 視覺 PC 的連線沒建立（連線物件為空，或狀態不是已連線）；
+  - `bUseColorCcd`（[ColorCCD] Enable）開著但讀碼器連不上（視覺 PC 沒開、Address/Port 錯、線材／交換器故障）；
+  - Color 讀碼器程式沒啟動或沒在設定的埠監聽。
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `ColorCcdSocket (Color CCD TCP link)` | logic | non-null AND IsColorCcdConnected()==true (iState==COLORCCD_CONNECTED) | NULL, or IsColorCcdConnected()==false (iState != COLORCCD_CONNECTED) | State Record / EventLog |
-  | `CosFunction.bUseColorCcd` | logic | reflects General.ini [ColorCCD] Enable (default true, CosFunction.cpp:1846); should be ON only when a Color reader is physically present and reachable (OFF makes case 1 fabricate a TrayID and this alarm is never reached) | ON while the socket is disconnected, so execution reaches case 100 and alarms | State Record / EventLog |
-- **操作員處置**：Note offers Retry / Skip. Retry (else branch, aColor.cpp:1187-1189) re-runs EnsureColorCcdSocketCreated() and ColorCcdSocket->ColorCcdConnect(), then re-checks case 100. Skip (aColor.cpp:1180-1185) sets an empty tray identity (sTrayID2D="", StampReadIdentity2D()) and returns the scan ladder to idle (ScanTask=1).
-- **工程師處置**：This is a link fault, not a motion fault. Verify the Color CCD vision PC is powered and its reader program is listening, and that [ColorCCD] Address and Port in system\General.ini match the reader (ColorCcdSocket::LoadConfig, ColorCcdSocket.cpp:64-65); check the cable/switch between the controller and the vision PC. If no Color reader is installed on this machine, set [ColorCCD] Enable = false (drives CosFunction.bUseColorCcd) so the identity-2D path is simulated instead of alarming.
+  | Color CCD 連線 | 邏輯 | 存在且處於「已連線」狀態 | 不存在，或不在已連線狀態 | State Record・EventLog |
+  | `CosFunction.bUseColorCcd` | 設定(邏輯) | 對應 [ColorCCD] Enable（預設開啟）；僅在實體有 Color 讀碼器且連得上時才該開 ON（關 OFF 時會改用模擬身分、不會到本警示） | ON，但連線是斷的，於是走到連線檢查而跳警示 | State Record・EventLog |
+- **處置**：這是連線故障、不是動作故障。確認 Color CCD 視覺 PC 已開機、讀碼程式在監聽，且 system\General.ini 內 [ColorCCD] 的 Address 與 Port 與讀碼器相符，並檢查控制器與視覺 PC 之間的線材／交換器。若機台沒有安裝 Color 讀碼器，把 [ColorCCD] Enable 設為 false（連動 `CosFunction.bUseColorCcd`），身分 2D 路徑就改用模擬而不跳警示。畫面 Note 可按 RETRY（重建連線並重新檢查）或 SKIP（設定空身分後讓掃描回到待機）。
 
 ### 6.7 SortArm 分類手臂
 
-#### `WAR0154` — Sorting Arm X motor will out of limit ✅已驗證
-- **觸發條件**：aSortArm.cpp:677 MoveSortArmX(): if(HSys.Mot.MSortingArmX->CheckSoftLimit(Position)==false) -> raise at aSortArm.cpp:679 ShowMotorLimitError("WAR0154","Sorting Arm X motor will out of limit", HSys.Mot.MSortingArmX->SoftLimitDetail(Position)). CheckSoftLimit is a pure numeric compare: return (p<=Motor->SoftLimitP && p>=Motor->SoftLimitN) at MyMotor.cpp:506. This is a PRE-MOVE software soft-limit guard, not a physical limit-switch trip; it fires before the motor is commanded, when the requested X target falls outside the configured band. SoftLimitDetail (MyMotor.cpp:512-516) prints the numeric line 'target=%d  now=%d  soft limit N=%d ~ P=%d  (unit:1/100mm)'. VERIFIED sole WAR0154 raise site (grep: only aSortArm.cpp:679). The XY pre-check at aSortArm.cpp:2250 runs the same CheckSoftLimit but returns Err="Sorting Arm X target over soft limit" instead of raising this code.
-- **主因**：A SortArm X destination teach value (e.g. an Auto/Loader sort-column X, or a Pitch X target) is set beyond the configured soft-limit band [SoftLimitN, SoftLimitP].；Computed cell/slot X target (GetSortArmCellX from base X + column/pitch, aSortArm.cpp:2248) overshoots the physical range for a given tray geometry or column index; this XPosition flows into MoveSortArmX (aSortArm.cpp:810/819/2319).；SoftLimitN/SoftLimitP in the motor table for MSortingArmX configured too tight to cover the required travel.；Arm home/origin offset shifted from lost steps or a bad home, so 'now' is out of calibration and an otherwise-valid target resolves outside the band.；The SortArm teach-advanced test path (uteach case 30 -> MoveSuckerToCell -> MoveSortArmX, aSortArm.cpp:2319; see uteach.cpp:1421) commanded an X target outside the band and re-raised WAR0154. NOTE: the generic Motor Test / Teach jog (uMotorTest.cpp:2560 / uteach.cpp:870) uses the SAME CheckSoftLimit guard but raises its own per-motor over-limit code, NOT WAR0154.
-- **裝置狀態**：
+#### `WAR0154` — Sorting Arm X 軸即將超出行程
 
-  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 查看 |
+- **意義**：分類手臂 X 軸（`MSortingArmX`）在移動前的軟體行程檢查沒過──系統要它去的 X 目標位置，落在允許的軟體行程範圍（`SoftLimitN` ~ `SoftLimitP`）之外，所以在馬達還沒開始動之前就先擋下、發出警報。這是「移動前」的軟體保護，不是撞到實體限位開關。
+
+- **常見原因**：
+  - 某個分類手臂 X 的教導位置（例如某 Auto/Loader 分類欄的 X、或 Pitch 間距目標）被設在軟體行程範圍之外；
+  - 由基準 X 加上欄位/間距算出的格位 X 目標，對目前這種盤型或欄位索引來說超出實體行程；
+  - `MSortingArmX` 馬達參數裡的 `SoftLimitN` / `SoftLimitP` 設得太窄，蓋不住實際需要的行程；
+  - 手臂因失步或原點回不準，導致目前位置偏掉，使得原本合理的目標算出來變成超出範圍；
+  - 在教導的進階測試流程中，下達了一個超出範圍的 X 目標。
+
+- **檢查點**：
+
+  | 裝置 | 類型 | 應該狀態 | 目前狀態(故障) | 在哪看 |
   |---|---|---|---|---|
-  | `MSortingArmX` | motor | Requested X target within the configured soft-limit band, i.e. SoftLimitN <= target <= SoftLimitP, so CheckSoftLimit() returns true and the move is allowed. | Requested target is below SoftLimitN or above SoftLimitP, so CheckSoftLimit() (MyMotor.cpp:506) returns false and the move is refused before any motion is commanded. | MotionView (live MSortingArmX position + configured soft-limit N/P band); the target/now/N~P values are also printed on the Note detail line. |
-  | `Requested X target (Position arg to MoveSortArmX)` | logic | The caller-computed destination (Teach SortArm X position or GetSortArmCellX-derived slot target, or a teach-advanced-test target) lands inside SoftLimitN..SoftLimitP. | The computed target is out of range for the current calibration; SoftLimitDetail shows 'target=' outside the 'soft limit N=.. ~ P=..' band. | Note detail line (SoftLimitDetail: target vs now vs N~P, unit 1/100mm); State Record / EventLog for the preceding move-decision context. |
-  | `MSortingArmX SoftLimitN / SoftLimitP` | logic | Soft-limit band wide enough to cover every valid SortArm X destination (all Auto/Loader sort-column teach positions plus slot pitch spread). | Band set too tight (or shifted), clipping a legitimate destination and rejecting the move. | MotionView soft-limit fields for MSortingArmX; motor-table config values that seed Motor->SoftLimitN/SoftLimitP. |
-- **操作員處置**：Read the Note detail line: it shows target, now, and the soft-limit band N ~ P (unit 1/100mm). Alarm is RETRY (K_RETRY, note.cpp:857). Only press Retry after the arm position / teach has been corrected; if it recurs immediately on Retry, stop and call an engineer rather than repeatedly retrying (the target is genuinely out of band).
-- **工程師處置**：Open MSortingArmX in MotionView and compare the 'target' from the Note detail line against SoftLimitN/SoftLimitP. If a teach position (SortArm X sort-column) or a computed slot target (GetSortArmCellX) exceeds the band, correct the teach value; if the travel is legitimately required, widen SoftLimitN/P in the motor table. Rule out lost-steps / bad home offset that shifted 'now' out of calibration by re-homing SortArm X. Remember this is a software CheckSoftLimit guard (MyMotor.cpp:506), not a hardware limit switch, so there is no IO LED to read in IOsetview - verify against the numeric detail line and MotionView only.
+  | `MSortingArmX` | motor | 要去的 X 目標落在軟體行程範圍內（`SoftLimitN` ~ `SoftLimitP` 之間），允許移動 | 目標低於 `SoftLimitN` 或高於 `SoftLimitP`，移動在啟動前被拒絕 | MotionView（即時位置 + 設定的軟體行程 N/P 範圍）；Note 備註列上也會印出 target/now/N~P 數值 |
+  | `Requested X target`（要求的 X 目標，邏輯） | logic | 上游算出的目的地（教導的分類手臂 X、或由格位推算的目標、或進階測試目標）落在 `SoftLimitN` ~ `SoftLimitP` 之內 | 以目前校正狀態算出的目標超出範圍；備註列會顯示 target 落在 N~P 範圍之外 | Note 備註列（target / now / N~P，單位 1/100mm）；State Record・EventLog 看前一步的移動判斷背景 |
+  | `MSortingArmX SoftLimitN / SoftLimitP` | logic | 軟體行程範圍夠寬，能涵蓋所有合法的分類手臂 X 目的地（各 Auto/Loader 分類欄教導位置加上格位間距展開） | 範圍設得太窄（或整體偏移），把合法目的地卡掉、拒絕移動 | MotionView 的 `MSortingArmX` 軟體行程欄位；馬達參數表中設定的行程上下限值 |
+
+- **處置**：先看 Note 備註列，上面會顯示 target（要去的位置）、now（目前位置）與軟體行程範圍 N ~ P（單位 1/100mm）。用這三個數值判斷：如果是某個教導位置或算出的格位目標超出範圍，需先修正該教導值；如果 now 明顯偏掉、疑似失步或原點跑掉，先讓分類手臂重新回原點使 now 回到校正狀態。修正之後才按 RETRY。若一按 RETRY 又立刻重跳同一警報，代表目標確實超出範圍，不要一直重試，請停機找維修人員（可能需放寬馬達行程上下限）。這是純軟體行程保護，IOsetview 上沒有對應的 IO 燈可看，只能對照 Note 數值與 MotionView 判讀。
 
 ---
 
@@ -719,15 +809,14 @@
 | `6000x` | 五、真空吸嘴類 |
 | `JAM…` / `MES…` / `WAR…` | 六、系統流程類（依模組分節） |
 
-
 ### 7.2 IO 位址欄位說明
-位址格式 `L<環號>/IP<節點>/P<埠>/b<位元>` 直接對應 MotionNet 讀取 `gMnGetPortBit(Lane,IP,Port,Bit)`。
+位址格式 `L<環號>/IP<節點>/P<埠>/b<位元>`，代表這個訊號點在 MotionNet 上的位置：第幾條環、第幾個節點、第幾個埠、第幾個位元。機台就是照這四個數字去讀取該點是 ON 還是 OFF。
 
-- **環號 Lane**：0 起算，本機 Rings=2（僅 Lane 0、1 存在，Lane 2 會讀取失敗）。
-- **InType 極性**：0=常開(NO)、1=常閉(NC)；判讀 ON/OFF 時務必對照。
-- **Enable**：0=停用（該點不讀、不發到位警報）。
-- ⚠️ IOsetview hover 顯示的位址對 IP/Port 另有編碼轉換，與本表原始值不一定逐字相同；**請以 Alias 名稱為準**搜尋，位址僅作輔助。
+- **環號 Lane**：0 起算，本機共 2 條環（只有 Lane 0、Lane 1 存在；若看到 Lane 2 表示該點讀不到）。
+- **InType 極性**：0=常開(NO)、1=常閉(NC)；判讀 ON/OFF 時務必對照極性，否則會判反。
+- **Enable**：0=停用（該點不讀、也不會發到位警報）。
+- ⚠️ IOsetview 滑鼠停留時顯示的位址，其 IP/埠部分經過另一層編碼轉換，與本表的原始數值不一定逐字相同；**搜尋時請以 Alias 名稱為準**，位址僅作輔助。
 
 ---
 
-*本手冊由 `system/AlarmList.csv`（開機自動由 `mapAlarmCodeList` 匯出）與 `system/IO_Table.csv` 交叉比對、並實讀 `mycylin.cpp` / `MyMotor.cpp` / `MyKitSuck.cpp` / 各模組 `a*.cpp` 產生。生成日期 2026-07-13。*
+*本手冊由 `system/AlarmList.csv`（開機時自動匯出）與 `system/IO_Table.csv` 交叉比對，並參照機台實際運行行為整理而成。生成日期 2026-07-13。*
