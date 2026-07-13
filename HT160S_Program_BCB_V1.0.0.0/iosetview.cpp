@@ -2203,5 +2203,29 @@ void __fastcall Tfiosetview::FormClose(TObject *Sender,
     fShow=false;
 }
 //---------------------------------------------------------------------------
-
-
+//AI 20260713 : ts_IOSelfTest skeleton - empty event stubs, detection logic TBD.
+void __fastcall Tfiosetview::rgSelfTestModeClick(TObject *Sender)
+{
+    (void)Sender;
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestSelectAllClick(TObject *Sender)
+{
+    (void)Sender;
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestSelectNoneClick(TObject *Sender)
+{
+    (void)Sender;
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestStartClick(TObject *Sender)
+{
+    (void)Sender;
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestStopClick(TObject *Sender)
+{
+    (void)Sender;
+}
+//---------------------------------------------------------------------------

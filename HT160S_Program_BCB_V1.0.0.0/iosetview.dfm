@@ -9979,6 +9979,143 @@ object fiosetview: Tfiosetview
         TabOrder = 0
       end
     end
+    object ts_IOSelfTest: TTabSheet
+      Caption = 'SelfTest'
+      object rgSelfTestMode: TRadioGroup
+        Left = 8
+        Top = 8
+        Width = 320
+        Height = 44
+        Caption = 'Mode'
+        Columns = 2
+        ItemIndex = 0
+        Items.Strings = (
+          'Cylinder'
+          'Sensor')
+        TabOrder = 0
+        OnClick = rgSelfTestModeClick
+      end
+      object pnSelfTestPrecond: TPanel
+        Left = 336
+        Top = 8
+        Width = 496
+        Height = 44
+        BevelInner = bvLowered
+        Caption = 'Precondition :  Machine Stopped   /   EMG Normal   /   Air OK'
+        TabOrder = 1
+      end
+      object pnSelfTestDetect: TPanel
+        Left = 8
+        Top = 58
+        Width = 270
+        Height = 560
+        BevelInner = bvLowered
+        TabOrder = 2
+        object lblSelfTestDetectHdr: TLabel
+          Left = 8
+          Top = 8
+          Width = 254
+          Height = 18
+          AutoSize = False
+          Caption = 'Detection - select items'
+        end
+        object lblSelfTestProgress: TLabel
+          Left = 8
+          Top = 536
+          Width = 254
+          Height = 16
+          AutoSize = False
+          Caption = 'Progress : -'
+        end
+        object clbSelfTestItems: TCheckListBox
+          Left = 8
+          Top = 30
+          Width = 254
+          Height = 400
+          ItemHeight = 16
+          TabOrder = 0
+        end
+        object btnSelfTestSelectAll: TButton
+          Left = 8
+          Top = 436
+          Width = 123
+          Height = 25
+          Caption = 'Select All'
+          TabOrder = 1
+          OnClick = btnSelfTestSelectAllClick
+        end
+        object btnSelfTestSelectNone: TButton
+          Left = 139
+          Top = 436
+          Width = 123
+          Height = 25
+          Caption = 'Select None'
+          TabOrder = 2
+          OnClick = btnSelfTestSelectNoneClick
+        end
+        object btnSelfTestStart: TButton
+          Left = 8
+          Top = 467
+          Width = 254
+          Height = 30
+          Caption = 'Start Test'
+          TabOrder = 3
+          OnClick = btnSelfTestStartClick
+        end
+        object btnSelfTestStop: TButton
+          Left = 8
+          Top = 501
+          Width = 254
+          Height = 28
+          Caption = 'Stop'
+          TabOrder = 4
+          OnClick = btnSelfTestStopClick
+        end
+      end
+      object pnSelfTestResult: TPanel
+        Left = 286
+        Top = 58
+        Width = 546
+        Height = 560
+        BevelInner = bvLowered
+        TabOrder = 3
+        object lblSelfTestResultHdr: TLabel
+          Left = 8
+          Top = 8
+          Width = 530
+          Height = 18
+          AutoSize = False
+          Caption = 'Result'
+        end
+        object lblSelfTestSummary: TLabel
+          Left = 8
+          Top = 534
+          Width = 530
+          Height = 18
+          AutoSize = False
+          Caption = 'PASS 0    FAIL 0    SKIP 0'
+        end
+        object grdSelfTest: TStringGrid
+          Left = 8
+          Top = 30
+          Width = 530
+          Height = 498
+          ColCount = 6
+          DefaultRowHeight = 20
+          FixedCols = 0
+          RowCount = 2
+          TabOrder = 0
+        end
+      end
+      object memSelfTestLog: TMemo
+        Left = 8
+        Top = 624
+        Width = 824
+        Height = 68
+        ScrollBars = ssVertical
+        TabOrder = 4
+      end
+    end
   end
   object plIOForm: TPanel
     Left = 0

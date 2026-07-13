@@ -10,6 +10,7 @@
 #include <ComCtrls.hpp>
 #include <Grids.hpp>
 #include <Buttons.hpp>
+#include <CheckLst.hpp>
 #include <Dialogs.hpp>
 #include <Menus.hpp>
 #include <Db.hpp>
@@ -554,6 +555,22 @@ __published:
     TLabel *lb_PanelFrontRear;
     TPanel *plIOForm;
     TMenuItem *SaveOutputMap1;
+    TTabSheet *ts_IOSelfTest;
+    TRadioGroup *rgSelfTestMode;
+    TPanel *pnSelfTestPrecond;
+    TPanel *pnSelfTestDetect;
+    TLabel *lblSelfTestDetectHdr;
+    TCheckListBox *clbSelfTestItems;
+    TButton *btnSelfTestSelectAll;
+    TButton *btnSelfTestSelectNone;
+    TButton *btnSelfTestStart;
+    TButton *btnSelfTestStop;
+    TLabel *lblSelfTestProgress;
+    TPanel *pnSelfTestResult;
+    TLabel *lblSelfTestResultHdr;
+    TStringGrid *grdSelfTest;
+    TLabel *lblSelfTestSummary;
+    TMemo *memSelfTestLog;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall BtnPanelClick(TObject *Sender);
     void __fastcall ComboBox1Change(TObject *Sender);
@@ -579,6 +596,11 @@ __published:
     void __fastcall edtSearchIOChange(TObject *Sender);
     void __fastcall strngrdIoTableDblClick(TObject *Sender);
     void __fastcall strngrdIoTableSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
+    void __fastcall rgSelfTestModeClick(TObject *Sender);
+    void __fastcall btnSelfTestSelectAllClick(TObject *Sender);
+    void __fastcall btnSelfTestSelectNoneClick(TObject *Sender);
+    void __fastcall btnSelfTestStartClick(TObject *Sender);
+    void __fastcall btnSelfTestStopClick(TObject *Sender);
 private:
     TStringList *IOTableDeletedTags;
     TStringList *ManualOutputLog;
