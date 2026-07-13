@@ -153,5 +153,23 @@ finally {
 if (-not $SkipPackage) {
     $pkg = Get-ChildItem -LiteralPath (Join-Path $InstallerDir "build") -Filter "*.exe" -ErrorAction SilentlyContinue |
            Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($pkg) { Write-Host "`n[OK] installer package: $($pkg.FullName)" -ForegroundColor Green }
+    if ($pkg) {
+        Write-Host "`n[OK] installer package: $($pkg.FullName)" -ForegroundColor Green
+        # installer.nsi tags the output filename with the packaged source mode:
+        #   _MC  = real-machine (SOFT_SIMULATE off + door bypass) -> SHIPPABLE
+        #   _SIM = simulation source                              -> NOT shippable
+        # This script patches to machine mode before packaging, so a correct run
+        # must yield _MC. A _SIM tag means the patch did not reach the packaged source.
+        if ($pkg.Name -match "_MC\.exe$") {
+            Write-Host "  mode: _MC (real-machine)  -> SHIPPABLE" -ForegroundColor Green
+        }
+        elseif ($pkg.Name -match "_SIM\.exe$") {
+            Write-Host "  mode: _SIM (simulation)   -> NOT shippable" -ForegroundColor Red
+            Write-Host "  WARNING: expected a machine-mode (_MC) package. The SOFT_SIMULATE" -ForegroundColor Red
+            Write-Host "           patch did not land in the packaged source -- do NOT ship this." -ForegroundColor Red
+        }
+        else {
+            Write-Host "  mode: (untagged) -- installer.nsi mode tag not found in filename." -ForegroundColor Yellow
+        }
+    }
 }
