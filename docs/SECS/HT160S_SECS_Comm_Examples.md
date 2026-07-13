@@ -10,13 +10,15 @@
 |---|---|
 | 來源 Run | State Record `2026-06-26 00_01_18`（已驗證的乾淨量產 lot run） |
 | 時間窗 | Start Lot `2026/06/25 23:59:27` → Clean Out 結束 `00:01:11` |
-| 文件日期 | 2026-06-26 |
+| 文件日期 | 2026-06-26（**2026-07-13 修訂**：依現行韌體更新格式／行為描述，見下方「修訂說明」） |
 | Conformance 結果 | 50/50 checkpoints PASS，0 real defects |
 | Protocol Stack | HSMS-SS (SEMI E37) over TCP + SECS-II (SEMI E5) + GEM (SEMI E30) |
 | 裝置版本 | HT160S 1.0.0.0 |
 | 設備角色 | EQUIPMENT，PASSIVE（`ActiveMode=0`），等待 Host 連入 |
 | Host 角色 | HOST/EAP（本範例為 SECS Host Simulator），ACTIVE，發出 Select.req |
 
+> **修訂說明（2026-07-13）**：本手冊原始 case log 仍逐字保留 **2026-06-26 來源 run** 的實況（timestamp／sys／len 皆未更動）。但該 run 之後韌體有數項通訊層變更，為使本手冊繼續作為**現況介面合約**可用，凡「格式／行為描述」與現行程式碼不符處已就地修正，並以 **「自 2026-07 起…／本 run 為舊版故未涵蓋」** 之字樣標示；讀到此類字樣時，代表該項為 run 之後新增、歷史 log 不會出現，請以現行韌體行為為對接依據。主要變更集中在 **§3.4 AGV 握手**（CEID 272／274 加掛 Report 6 的 Tray/Device Count、LoaderTrayCount 改為 work-only）。
+>
 > **如何閱讀本手冊**：
 > - 想快速掌握全貌 → 先看 **第 2 章** 的 Mermaid 序列圖（一張圖看完整個 lot run 的訊息往返）。
 > - 想對接某一類訊息 → 直接跳到 **第 3 章** 對應小節（每節都有「用途 / 格式 / 實際 log / 欄位 FIELD TABLE」四段式結構）。
@@ -224,7 +226,7 @@ L[2]
 | RCMD | body 結構 | 語意 |
 |---|---|---|
 | `SET_LOT_INFO` | `L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }` | lot 清單；**CLEARS+overwrites** LotRegistry（清空並覆寫，非附加） |
-| `LOTSTART` | `L[2]{ A "LOTSTART", L[n]{ A lotID } }` | additive（附加）；觸發 HT160 Lot WebAPI pull 做 2D/Bin reconcile；**不啟動 motion**（仍需 operator Start 才動作） |
+| `LOTSTART` | `L[2]{ A "LOTSTART", L[n]{ A lotID } }` | additive（附加，不 Clear）；觸發 HT160 Lot WebAPI pull（`StartLotWebApiPullAll`，拉取全部已註冊 lot）做 2D/Bin reconcile；**不啟動 motion**（仍需 operator Start 才動作）。**自 2026-07 起**，LOTSTART 亦視為「host 端的 Lot Start」：接受後會清零 per-run 生產計數、開啟 UPH log、清空 ProductInfo 並回填 active lot（`uHGemHT160.cpp:843-863`）；本 run 為舊版故未涵蓋此行為 |
 | `START` | `L[2]{ A "START", L[0] }` | start/resume 生產；與 START_AGV 刻意分開（原因見 3.4）；於 CEID 274 Finish 後送出 |
 
 > `SET_LOT_INFO` 由 `ht160s_presets._set_lot_info` 建構，預設 5 個 lot `SIMU_LOT_A..E`；`LOTSTART` 由 `_lot_start` 建構；`START` 由 `_start` 建構。
@@ -319,7 +321,7 @@ W-bit=1（要求回覆）。
 | `CEID` | U4 | 事件識別碼 | `136`（Auto 卸盤）／`272`（AGV）／`35`（car full） |
 | `L[reports]` | L[n] | report 串列；可為空（無 SV 註冊時 `L[0]`） | 空（136–142，len=30）／13 SV（CEID 35，len=144） |
 | `W`-bit | header | 要求回覆 | `1`（S6F11W） |
-| `len` | bytes | S6F11 body 長度 | `30`（EMPTY）／`86`（CEID 272）／`144`（CEID 35） |
+| `len` | bytes | S6F11 body 長度 | `30`（EMPTY，136–142）／`144`（CEID 35，Report 1＝13 SV）／`86`（CEID 272，**本 run 舊版**；**自 2026-07-13 起**，CEID 272／274 除原有 bitmap report 外另追加 report 6＝9 站 Tray Count＋9 站 Device Count 共 18 個 SV，body 長度已大於 86，本 run 早於此改動故仍顯示 86） |
 | `sys` | header（模擬器序號） | S6F11 上報序號池 | `1`（本 run S6F11 sys 為 1..53） |
 
 **FIELD TABLE — S6F12 回覆（收到）**：
@@ -346,9 +348,9 @@ W-bit=1（要求回覆）。
 | 140 | 4 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
 | 141 | 3 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
 | 142 | 3 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
-| 272 | 6 | AGV AGVSupplement | `len=86` | 見 3.4 |
-| 273 | 6 | AGV AGVLDUnLDStatus | — | 見 3.4 |
-| 274 | 6 | AGV AGVLDUnLDFinish | — | 見 3.4 |
+| 272 | 6 | AGV AGVSupplement | 本 run `len=86`（僅 Report 2＝SVID 38219 bitmap） | 見 3.4。**自 2026-07-13 起（commit d10b9be）272 額外掛載 Report 6（全 9 站 TrayCount＋DeviceCount 共 18 個 SVID），body 較本 run 增大；本 run 為舊版故僅含 bitmap** |
+| 273 | 6 | AGV AGVLDUnLDStatus | Report 3（SVID 38220 bitmap） | 見 3.4。273 僅帶 StatusBitmap（Ready 階段尚未計數，故不掛 Report 6） |
+| 274 | 6 | AGV AGVLDUnLDFinish | Report 4（SVID 38221 bitmap）；自 2026-07-13 起另含 Report 6 | 見 3.4。**自 2026-07-13 起（commit d10b9be）274 除 bitmap 外額外掛載 Report 6，關帳回報該站實際盤數／IC 數；本 run 為舊版故未涵蓋** |
 | 35 | 1 | Auto1 "car full" edge | `len=144` | `AutoFullCeid[0]=35`，在 Report 1 註冊 13 個 SV |
 
 > **為什麼 136–142 的 report body 是空的（len=30）？** 這 6 個 CEID 是 **Auto 卸盤（unload-tray / discharge）事件**——設備在 `aAuto1To6` 的 `DoDischargeTray` 流程以 `AutoCeid[6]={136,137,138,140,141,142}` 發出。它們在設計上 **刻意不註冊任何 report SV**（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位。host 只需依 CEID 認得「發生了哪個事件」即可，這是 by design，不是漏帶資料。
@@ -373,8 +375,8 @@ W-bit=1（要求回覆）。
 |---|---|---|
 | 272 | AGVSupplement | 呼叫 AGV：缺料／Auto full。SVID `38219` bitmap 標記目標站 |
 | 273 | AGVLDUnLDStatus | Ready：機構就位 |
-| 274 | AGVLDUnLDFinish | Finish：sensor 確認 load/unload 完成 |
-| 275 | AGVLdID | carrier ID |
+| 274 | AGVLDUnLDFinish | Finish：sensor 確認 load/unload 完成。除 SVID `38221` bitmap 外，自 2026-07-13 起（commit d10b9be）額外掛載 Report 6（全 9 站 TrayCount＋DeviceCount），關帳回報實際盤數／IC 數 |
+| 275 | AGVLdID | carrier ID（現行韌體已於 CEID registry 定義 275→Report 5＝9 站 carrier-ID SVID `38202`–`38210`，但尚無程式路徑觸發發送，故仍不會出現） |
 
 > **關於 CEID 275（AGVLdID）**：275 是 AGV CEID 集合中定義的 carrier ID 事件，但**本 run 並未發出 275**——本範例的 6 個 AGV cycle 只出現 272／273／274，因此 275 **沒有對應的 FIELD TABLE（沒有 evidence row 可引用）**。這與 P3（Color）的缺席性質相同：屬本 run 未觸發的情境，並非漏列或失敗。host 端不應預期每個 run 都一定看到 275。
 
@@ -454,8 +456,9 @@ L[2]
 |---|---|---|---|
 | `DataID` | U4 | AGV 事件資料識別 | `0` |
 | `CEID` | U4 | 事件識別碼 | `272` |
-| SVID `38219` | （report SV） | bitmap 標記目標站（被設為 `1` 的位置即目標站，其餘 0） | `"P1:1,P2:0,...,P9:0"`（**依格式推得；非逐字 log 值**——本 run @00:00:13 的 log 僅記錄 `target=P1 Loader`，未逐字記錄 bitmap 字串，此處依「單一站 P=1」格式推得 `P1=1`） |
-| `len` | bytes | S6F11 body 長度 | `86` |
+| SVID `38219`（Report 2） | A（report SV） | bitmap 標記目標站（被設為 `1` 的位置即目標站，其餘 0） | `"P1:1,P2:0,...,P9:0"`（**依格式推得；非逐字 log 值**——本 run @00:00:13 的 log 僅記錄 `target=P1 Loader`，未逐字記錄 bitmap 字串，此處依「單一站 P=1」格式推得 `P1=1`） |
+| Report 6（18 個 SVID） | U4×18 | **自 2026-07-13 起（commit d10b9be）新增**：全 9 站 TrayCount（`38222/38223/38224/38225/38226/38227/38237/38238/38239`）＋全 9 站 DeviceCount（`38228/38229/38230/38231/38232/38233/38240/38241/38242`），依 P1–P9 固定順序排列；目標站帶實際盤數／IC 數，其餘站為當下快照 | 本 run 為舊版故未涵蓋 |
+| `len` | bytes | S6F11 body 長度 | 本 run `86`（舊版僅 Report 2）；自 2026-07-13 起因加掛 Report 6 而增大 |
 
 **FIELD TABLE — START_AGV（S2F41 收到 / 由 host 送出）**：
 
@@ -464,7 +467,7 @@ L[2]
 | `RCMD` | A | 命令名稱 | `"START_AGV"` |
 | `station` | A | 目標站（CPNAME 位置） | `"Loader"` / `"Empty"` / `"Color"` / `"AUTO1".."AUTO6"` |
 | `"Action"` | A | station 對應的動作值（CPVAL 位置） | `"Action"` |
-| `"LoaderTrayCount"` / `n` | A / A | 選用第二參數對：盤數 | （選用；Loader 站可帶） |
+| `"LoaderTrayCount"` / `n` | A / A | 選用第二參數對：Loader 補料盤數。**此為 WORK（工作盤）數，不含 cover／identity 表頭盤**（9045 `iSECSSetTrayCount` 對齊，commit 111b976）；韌體再依 `General.ini [AMR] CoverTray0`＋`IdentityTray0` 補上表頭盤，得出實際 magazine 總盤數（`iCarTrayTotal = 工作盤數 + 表頭盤數`，見 `aLoader.cpp` RefillSimInfeed／SetExpectedCarTrayCount） | （選用；僅 Loader 站帶） |
 | 回覆 `HCACK` | B（S2F42） | 接受 | `0`（全部 6 次 START_AGV 皆 0） |
 
 **FIELD TABLE — CEID 273 / 274（S6F11 送出）**：
@@ -473,6 +476,8 @@ L[2]
 |---|---|---|---|
 | `DataID` | U4 | AGV 事件資料識別 | `0` |
 | `CEID` | U4 | 273=Ready（機構就位）／274=Finish（sensor 確認完成） | `273` / `274` |
+| 273 report SV | A | Report 3＝StatusBitmap（SVID `38220`），bitmap 標記目標站 | `"P1:1,...,P9:0"` |
+| 274 report SV | A ＋ U4×18 | Report 4＝FinishBitmap（SVID `38221`）；**自 2026-07-13 起（commit d10b9be）274 另加掛 Report 6**（全 9 站 TrayCount＋DeviceCount，SVID 同 272 之 Report 6），關帳回報該站實際盤數／IC 數（本 run 為舊版故未涵蓋） | bitmap＋counts |
 | target | （log 標註） | 對應目標站 | `P1 Loader`（本 cycle） |
 
 **本 run 的 6 個 AGV cycle（依目標站）**：
@@ -487,6 +492,8 @@ L[2]
 | 00:00:51 | P2 Empty |
 
 **CEID=35 雙重發送（與 272 同時 @ 00:00:41）**：當 Auto1 工位「車滿（car full）」的邊緣事件觸發時，設備會在同一時刻同時送出 272（呼叫 AGV）與 35（car-full 事件）。兩者目的不同：272 是叫車、35 是上報車滿狀態（攜帶 13 個 SV，故 len=144）。
+
+> **離散 Auto-Full CEID 完整集合**：本 run 只有 Auto1 車滿，故僅出現 `35`；現行韌體的離散 Auto-Full CEID（9045 對齊）為 **Auto1–3＝`35`／`36`／`37`、Auto4–6＝`148`／`149`／`150`**（`uHGemHT160.cpp:273` 的 `AutoFullCeid[6]`；於 `uAgvStation.cpp` 車滿邊緣與對應 272 同時發出），皆掛 Report 1（13 個 SV）。host 端應對這 6 個 CEID 一致處理，不應只認得 35。
 
 ```
 00:00:41.586  [SECS][TX] S6F11 EventReport DataID=0 CEID=272
@@ -510,7 +517,7 @@ L[2]
 | 命令 | HCACK | 說明 |
 |---|---|---|
 | `START_AGV`（全部 6 次） | `0` | OK，正常接受 |
-| resume `START`（全部 6 次） | `4` | **By design**。此時 `SystemStart` 已為 true → MachineStart() 回 `msRejBusy`，機台誠實回報「已在運行」（`uHGemHT160.cpp:826-832`，case `msRejBusy: HCACK=4`）。這 **不是失敗**，而是誠實互鎖（honest interlock），非假成功（not a fake-success）。 |
+| resume `START`（全部 6 次） | `4` | **By design**。此時 `SystemStart` 已為 true → MachineStart() 回 `msRejBusy`，機台誠實回報「已在運行」（`uHGemHT160.cpp:883-889`，其中行 886 `case msRejBusy: HCACK = 4; break;`；`MachineStart()` 的 `msRejBusy` 條件為 `SystemStart!=false`，見 `csystem.cpp:1133-1134`）。這 **不是失敗**，而是誠實互鎖（honest interlock），非假成功（not a fake-success）。 |
 
 > **為什麼 resume START 回 HCACK=4（busy）而不是 0？這算失敗嗎？** 不算失敗。HCACK=4 的定義是「busy（機台已在運行 **或** ICs 仍在機內）」。AGV 交接期間機台其實**並未真正停機**，整機生產狀態仍是運行中；因此當 host 在 274 之後送 resume START 時，機台「誠實地」回報「我本來就在跑了，這個 START 無需再啟動」（HCACK=4）。
 >
@@ -658,7 +665,7 @@ SIMU_LOT_A, SIMU_LOT_B, SIMU_LOT_C, SIMU_LOT_D, SIMU_LOT_E
       "Substage": "BI1",
       "ProductCode": "SIMU/DEVICE-A",
       "ICIInfo": [
-        { "QRCodeID": "...", "RetestCode": "R0", "HBin": "HBin1", "SBin": "SBin1", "DiePass": "DiePass1" },
+        { "QRCodeID": "...", "RetestCode": "R0", "HBin": "1", "SBin": "1", "DiePass": "1" },
         ...
       ]
     },
@@ -675,19 +682,19 @@ SIMU_LOT_A, SIMU_LOT_B, SIMU_LOT_C, SIMU_LOT_D, SIMU_LOT_E
 | `RetestCode` | string | 重測碼（如 R0 / R1） |
 | `HBin` | string | Hardware Bin |
 | `SBin` | string | Software Bin |
-| `DiePass` | string | Die 通過判定（DiePass0/1） |
+| `DiePass` | string | Die 通過判定（值為字串 "0"／"1"） |
 
 **範例 row（SIMU_LOT_A，Substage `BI1`，ProductCode `SIMU/DEVICE-A`）**：
 
 | QRCodeID | RetestCode | HBin | SBin | DiePass |
 |---|---|---|---|---|
-| SIMU_A_0001 | R0 | HBin1 | SBin1 | DiePass1 |
-| SIMU_A_0002 | R0 | HBin1 | SBin1 | DiePass1 |
-| SIMU_A_0003 | R0 | HBin2 | SBin2 | DiePass1 |
-| SIMU_A_0004 | R1 | HBin3 | SBin3 | DiePass1 |
-| SIMU_A_0005 | R0 | HBin4 | SBin5 | DiePass0 |
+| SIMU_A_0001 | R0 | 1 | 1 | 1 |
+| SIMU_A_0002 | R0 | 1 | 1 | 1 |
+| SIMU_A_0003 | R0 | 2 | 2 | 1 |
+| SIMU_A_0004 | R1 | 3 | 3 | 1 |
+| SIMU_A_0005 | R0 | 4 | 5 | 0 |
 
-> **真實客戶格式 lot（real-customer-format）**：此檔同時保留真實客戶格式 lot `A5921.RCS.TEST99` / `TEST88`（ProductCode `MT3781Q` / `ZAHJA32-ETTTT-H`，含長 QRCodeID 如 `MT3781Q-ZAHJA32-EMFMT-H_N8R124.LR_011`），供真實格式測試。host/EAP 對接時應同時驗證短格式（SIMU_*）與長格式（真實客戶）兩種 QRCodeID。
+> **真實客戶格式 lot（real-customer-format）**：此檔同時保留真實客戶格式 lot `A5921.RCS.TEST99` / `TEST88`（兩者 ProductCode 皆為同一組單一字串 `MT3781Q/ZAHJA32-ETTTT-H`，含長 QRCodeID 如 `MT3781Q-ZAHJA32-EMFMT-H_N8R124.LR_011`），供真實格式測試。host/EAP 對接時應同時驗證短格式（SIMU_*）與長格式（真實客戶）兩種 QRCodeID。
 
 ### 4.3 WebAPI endpoint
 
@@ -731,7 +738,7 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 | 值 | 意義 | 本 run 出現 |
 |---|---|---|
 | 0 | OK | SET_LOT_INFO、LOTSTART、initial START(23:59:27)、START_AGV(×6) |
-| 1 | command does not exist | （本 run 未出現；舊文件誤稱 START_AGV/START 回 1，已更正） |
+| 1 | command does not exist **或 body/list 格式錯誤**（unknown command 走此碼；亦為預設值，outer L[2] 解析失敗、內層 L[n] 格式錯誤、CP pair 非 list 皆回 1） | （本 run 未出現；舊文件誤稱 START_AGV/START 回 1，已更正） |
 | 2 | cannot perform now / param | （本 run 未出現） |
 | 4 | busy（machine already running **OR** ICs still inside） | resume-START(×6)，by design honest interlock（見 3.4） |
 
@@ -741,10 +748,10 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 |---|---|---|---|---|
 | ACKC5 | S5F2（Alarm ACK） | 0=accepted / >0=error | 0 | 警報已收到 |
 | ACKC6 | S6F12（Event Report ACK） | 0=accepted / >0=error | 0 | 事件已收到 |
-| COMMACK | S1F14（Establish Communications Request Acknowledge / S1F13→S1F14） | 0=accepted / 1=denied | — | 本文件來源 Run evidence 未涵蓋具體值，故僅列名不臆造 |
+| COMMACK | S1F14（Establish Communications Request Acknowledge；S1F13→S1F14） | 0=accepted / 1=denied | `0`（見下註） | 現行韌體已實作 S1F13→S1F14：COMMACK 於程式中恆設為 `0`（always accept），body 為 `L[2]{ B:COMMACK=0, L[2]{ A:MDLN="HT-160S", A:SOFTREV="1.0.0.0" } }`（`uHGemHT160.cpp:1007-1023`，程式碼註記 20260625）。本來源 Run（2026-06-26）未發出 S1F13，故無逐字 log；此值係由程式碼確定，非臆造。 |
 | EAC | S2F38（Enable/Disable Event Report ACK，Equipment Acknowledge Code） | 0=accepted / 1=denied / 2=at least one CEID 不存在 / 3=at least one CEID 已 enabled | — | 本文件來源 Run evidence 未涵蓋具體值，故僅列名不臆造 |
 
-> 註：COMMACK / EAC 屬標準 GEM 代碼，其「標準值域」欄為 SEMI E5/E30 通用定義（供 host 對接參考）；但本來源 Run evidence 未提供其實際數值，依接地規則「本 run 值」不臆造。
+> 註：COMMACK / EAC 屬標準 GEM 代碼，其「標準值域」欄為 SEMI E5/E30 通用定義（供 host 對接參考）。其中 COMMACK 之數值已可由程式碼確定——現行韌體 S1F13→S1F14 已實作、COMMACK 恆為 `0`（見上表註，`uHGemHT160.cpp:1007-1023`）；EAC（S2F38）則因本來源 Run evidence 未提供實際數值，依接地規則「本 run 值」不臆造。
 
 ---
 
@@ -838,7 +845,7 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 | ACKC6 | Event Report ACK（S6F12 回覆碼） |
 | COMMACK | Establish Communications Request Acknowledge（S1F14 回覆碼；S1F13→S1F14，0=accepted/1=denied） |
 | EAC | Equipment Acknowledge Code（S2F38 Enable/Disable Event Report ACK） |
-| RCMD | Remote Command（S2F41 命令名稱，如 SET_LOT_INFO/LOTSTART/START/START_AGV） |
+| RCMD | Remote Command（S2F41 命令名稱）。現行設備 S2F41 dispatch 接受：`SET_LOT_INFO`、`LOTSTART`、`START`、`START_AGV`、`STOP`、`PAUSE`、`HOME`、`CLEARCOUNT`、`ONLINE_REMOTE`/`ONLINE`、`ONLINE_LOCAL`；未列於此者回 `HCACK=1`（unknown command）。本手冊來源 run 僅觸發 trio + START_AGV，其餘命令未於本 run 出現（`uHGemHT160.cpp:681-967`） |
 | CPNAME / CPVAL | Command Parameter Name / Value（S2F41 參數名稱／值） |
 | AGV / AMR | Automated Guided Vehicle / Autonomous Mobile Robot；自動物料搬運車 |
 | EAP | Equipment Automation Program；客戶端 host 自動化程式 |
