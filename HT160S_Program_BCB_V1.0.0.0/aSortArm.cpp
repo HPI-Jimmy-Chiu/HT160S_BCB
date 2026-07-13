@@ -1513,6 +1513,14 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
 
     if(HSys.LastSet.iRealDummy!=REALLY)
         return false;
+    //AI(ht160s-simfalldrop) 20260713 : a SOFT_SIMULATE laptop build can still run with
+    //iRealDummy==REALLY (to exercise real fault paths / SIM 2D injection), so the REALLY
+    //guard above does NOT stop this on a laptop. There is no real vacuum sensor there, so
+    //the held-nozzle re-read below reads OFF and false-fires SUC0013 "Suck2 Sucker Error"
+    //(SortArm IC Dropped In Transit). IsSoftSimulate() is compile-time true under
+    //SOFT_SIMULATE; the real build keeps full detection.
+    if(IsSoftSimulate())
+        return false;
 
     //any holding nozzle currently reading vacuum-OFF ? (raw scan)
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
