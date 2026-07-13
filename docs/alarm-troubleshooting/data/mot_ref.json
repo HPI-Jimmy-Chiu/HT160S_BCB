@@ -1,0 +1,122 @@
+[
+ {
+  "idx": 0,
+  "num": "01",
+  "alias": "MSortingArmX",
+  "base": 50000
+ },
+ {
+  "idx": 1,
+  "num": "02",
+  "alias": "MTrayArmX",
+  "base": 50010
+ },
+ {
+  "idx": 2,
+  "num": "03",
+  "alias": "MEmptyY",
+  "base": 50020
+ },
+ {
+  "idx": 3,
+  "num": "04",
+  "alias": "MLoaderY_1",
+  "base": 50030
+ },
+ {
+  "idx": 4,
+  "num": "05",
+  "alias": "MLoaderY_2",
+  "base": 50040
+ },
+ {
+  "idx": 5,
+  "num": "06",
+  "alias": "MAutoY_1",
+  "base": 50050
+ },
+ {
+  "idx": 6,
+  "num": "07",
+  "alias": "MAutoY_2",
+  "base": 50060
+ },
+ {
+  "idx": 7,
+  "num": "08",
+  "alias": "MAutoY_3",
+  "base": 50070
+ },
+ {
+  "idx": 8,
+  "num": "09",
+  "alias": "MAutoY_4",
+  "base": 50080
+ },
+ {
+  "idx": 9,
+  "num": "10",
+  "alias": "MAutoY_5",
+  "base": 50090
+ },
+ {
+  "idx": 10,
+  "num": "11",
+  "alias": "MAutoY_6",
+  "base": 50100
+ },
+ {
+  "idx": 11,
+  "num": "12",
+  "alias": "MTopCCDX",
+  "base": 50110
+ },
+ {
+  "idx": 12,
+  "num": "13",
+  "alias": "MBottomCCDY",
+  "base": 50120
+ },
+ {
+  "idx": 13,
+  "num": "14",
+  "alias": "MSuckZ_1",
+  "base": 50130
+ },
+ {
+  "idx": 14,
+  "num": "15",
+  "alias": "MSuckZ_2",
+  "base": 50140
+ },
+ {
+  "idx": 15,
+  "num": "16",
+  "alias": "MSuckZ_3",
+  "base": 50150
+ },
+ {
+  "idx": 16,
+  "num": "17",
+  "alias": "MSuckZ_4",
+  "base": 50160
+ },
+ {
+  "idx": 17,
+  "num": "18",
+  "alias": "MPitchX",
+  "base": 50170
+ },
+ {
+  "idx": 18,
+  "num": "19",
+  "alias": "MColorY",
+  "base": 50180
+ },
+ {
+  "idx": 19,
+  "num": "20",
+  "alias": "MTopCCDX_Color",
+  "base": 50190
+ }
+]
