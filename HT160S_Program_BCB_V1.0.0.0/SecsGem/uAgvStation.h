@@ -65,6 +65,7 @@ public:
     // Phase B/C/D entry points (Gem = SECS transport used to fire S6F11):
     void PollAndCall(THGem *Gem);                // Phase B : shortage/full -> CEID272
     void ServiceHandshake(THGem *Gem);           // Phase D : drive CEID273 / CEID274
+    void ReportLoaderIdentity(THGem *Gem, AnsiString id2D); //AI(ht160s-agv-identity2d) 20260713 : S6F11 CEID275 AGVLdID, SVID38202 = identity-tray 2D (9045-aligned)
     bool BeginPrep(AnsiString cpName);           // Phase C : START_AGV -> prep
     void ReassertLocks();                        //AI(ht160s-home-resume-w5) 20260711 : post-HOME lock re-assert (InitialAllTask tail)
 

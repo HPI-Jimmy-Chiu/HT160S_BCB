@@ -259,7 +259,7 @@ void HT160Gem::AddCEID()
     unsigned rptSup[2]; rptSup[0] = 2; rptSup[1] = 6;
     unsigned rptSta[1]; rptSta[0] = 3;
     unsigned rptFin[2]; rptFin[0] = 4; rptFin[1] = 6;
-    unsigned rptCid[1]; rptCid[0] = 5;
+    unsigned rptCid[1]; rptCid[0] = 7;   //AI(ht160s-agv-identity2d) 20260713 : CEID275 -> dedicated report 7 ([38202] only), NOT the 9-wide report 5 (AGVLdID must not ship 8 stale carrier ids)
     HGemPtr->SetCEIDContent(272, "AGVSupplement",   2, rptSup, EquDefault);
     HGemPtr->SetCEIDContent(273, "AGVLDUnLDStatus", 1, rptSta, EquDefault);
     HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 2, rptFin, EquDefault);
@@ -325,6 +325,15 @@ void HT160Gem::AddReprot()
     for(int ni = 0; ni < AGV_STATION_COUNT; ni++)
         rCnt[AGV_STATION_COUNT + ni] = AgvStation[ni].SvidDeviceCnt;
     HGemPtr->SetReportIDContent(6, AGV_STATION_COUNT * 2, rCnt, EquDefault);
+
+    //AI(ht160s-agv-identity2d) 20260713 : report 7 = ONLY SVID38202 (Load Port Carrier ID).
+    // CEID275 (AGVLdID) links to THIS (AddCEID rptCid[0]=7), so the AGVLdID event carries just
+    // the freshly-picked identity-tray 2D and does NOT ship the 8 other per-station carrier ids
+    // (38203-38210, which may be stale). The Auto-stack carrier ids stay host-pollable via S1F3,
+    // and if the host wants them evented it can link report 5 via S2F35. Matches HT9045, where
+    // AGVLdID carries the load-port id and the Auto carrier ids are poll-only (no event push).
+    unsigned rLdId[1]; rLdId[0] = 38202;
+    HGemPtr->SetReportIDContent(7, 1, rLdId, EquDefault);
 
     HGemPtr->SaveEventReportData();
 }

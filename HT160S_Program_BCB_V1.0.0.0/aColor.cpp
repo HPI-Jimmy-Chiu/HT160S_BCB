@@ -1442,6 +1442,21 @@ AnsiString TColorModule::GetTrayID()
     return sTrayID2D;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260713 : is the last identity 2D a GENUINE value that may be
+// uploaded to the host as SVID38202 (CEID275 AGVLdID)? True for a real Color-reader read, a
+// manual operator entry, OR any simulation context (laptop SOFT_SIMULATE / runtime
+// bRunSimulation) where the seeded "COLOR2D_" IS the intended test id and SHOULD reach the
+// SECS host simulator. FALSE only when a REAL machine runs with the Color CCD disabled
+// (bUseColorCcd==false), where DoReadColor2D fabricates a throwaway "COLOR2D_" placeholder
+// purely to keep the AMR pull flow moving -- that must NOT masquerade as a real carrier id.
+// Mirrors the fabricate condition in DoReadColor2D case 1 (keep the two in sync).
+bool TColorModule::IsTrayID2DGenuine()
+{
+    if(IsSoftSimulate() || tSimuData.bRunSimulation)
+        return true;
+    return CosFunction.bUseColorCcd;
+}
+//---------------------------------------------------------------------------
 //AI(general) 20260617 : Teach Advanced destacker test. Color has no production GoUp;
 //these cylinder-only GoDown/GoUp drive the front destacker (FrontRiseTray_1/_2/Separate)
 //in isolation, mirroring Empty's rise/separate choreography. No Y-motor / push / lean.

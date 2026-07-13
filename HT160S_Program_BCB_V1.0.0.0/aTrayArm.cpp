@@ -14,6 +14,8 @@
 #include "aSortArm.h"          //AI(cleanout) 20260701 : SortArmModule->IsCleanOutFinish() = drain-boundary signal for the DoPlace in-flight divert
 #include "GeneralSetting.h"    //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
 #include "cStateRecordHT160.h" //AI(ht160s-rearready-p0) 20260705 : gStateRecord->TriggerSnapshot on blocked-pick watchdog expiry
+#include "SecsGem\uHGemEquipment.h" //AI(ht160s-agv-identity2d) 20260713 : HGem->EventReport for CEID275
+#include "SecsGem\uAgvStation.h"    //AI(ht160s-agv-identity2d) 20260713 : AgvCoord.ReportLoaderIdentity (SVID38202)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -916,6 +918,19 @@ bool TTrayArmModule::DoPlace(int Flag)
                     AutoModule->NotifyTrayArmDelivered(iAutoTarget, iDeliverKind, iDeliverTrayID);
                 else
                     AutoModule->SetRearHasTrayFromTrayArm(iAutoTarget, true);
+
+                //AI(ht160s-agv-identity2d) 20260713 : port of HT9045 AGVLdID (S6F11 CEID275).
+                //When an identity tray (its 2D read earlier by the Color CCD, carried here as
+                //iDeliverTrayID) is placed onto the Auto stack, upload that 2D via SVID38202.
+                //Guards: (a) non-empty -- a blank means an operator-skipped/failed Color read
+                //(matches HT9045 which never uploads a blank id); (b) IsTrayID2DGenuine() --
+                //suppresses the throwaway "COLOR2D_" placeholder a REAL machine fabricates when
+                //the Color CCD is disabled (that must not masquerade as a carrier id to the MES);
+                //laptop sim seeds still upload so the SECS host simulator can exercise CEID275.
+                //ReportLoaderIdentity/EventReport self-gate on HSMS SELECTED -> no-op with no host.
+                if(Job==TAJOB_AMR_SUPPLY && iDeliverKind==eTrayKindIdentity && iDeliverTrayID!="" &&
+                   ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
+                    AgvCoord.ReportLoaderIdentity(HGem, iDeliverTrayID);
             }
             if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.Clear();   //AI(ht160s-tray-source) : arm is now empty
             if(HSys.VMot.MMTrayArmX!=NULL)

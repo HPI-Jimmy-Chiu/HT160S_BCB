@@ -118,6 +118,7 @@ public:
     void RefillSimInfeed();
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the supply car (PanelMain6 Motion View header)
     AnsiString GetTrayID();   //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray Color is presenting
+    bool IsTrayID2DGenuine();   //AI(ht160s-agv-identity2d) 20260713 : true if the 2D may upload as SVID38202 (real read/manual/sim; false only on real machine with Color CCD disabled)
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the presented identity tray
 
     int GetHomeHaulTargetY();
