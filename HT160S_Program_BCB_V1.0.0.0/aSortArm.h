@@ -124,6 +124,7 @@ private:
     bool HasPickSuckError();      //AI(ht160s-pick-retry) 20260702 : any slot latched a pick suck error
     void ClearPickSuckErrors();   //AI(ht160s-pick-retry) 20260702 : clear latches + sucker Error for a fresh retry round
     void SkipErroredPickCells();  //AI(ht160s-pick-retry) 20260702 : K_SKIP - write failed cells off (EMPTY_IC) and drop them
+    void RecordAutoSkippedCells();  //AI(ht160s-autoskip) 20260714 : one Reject Production_Log line + skip count per SKIPped cell; MUST run before SkipErroredPickCells
     void MarkResidueTargets();    //AI(ht160s-residue) 20260624 : tag this place's slots before ClearSlot
     bool CheckPlaceResidue();     //AI(ht160s-residue) 20260624 : HT172 re-suck residue verify (REALLY only)
     bool IsResidueCheckBusy();    //AI(ht160s-residue) 20260624 : pick gate - true while any nozzle re-suck pending

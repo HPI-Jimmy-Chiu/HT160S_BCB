@@ -149,7 +149,7 @@ __published:
     TTabSheet *tsMaintIO;
     TTabSheet *tsMaintSECS;
     TTabSheet *tsMaintCOM;
-    TPageControl *PageControl1;
+    TPageControl *pgcMaintHardware;
     TTabSheet *tsLoaderUnloader;
     TPanel *pnlHardwareOptionBox;
     TLabel *lblHardwareColorHint;
@@ -282,6 +282,9 @@ __published:
     TCheckBox *chkSuckEnable2;
     TCheckBox *chkSuckEnable3;
     TCheckBox *chkSuckEnable4;
+    TPanel *pnlAutoSkipBox;
+    TLabel *lblAutoSkipHint;
+    TCheckBox *chkSortArmAutoSkip;
     TTabSheet *tsOption;
     TPanel *pnlBinDisplayBox;
     TLabel *lblBinPanelType;
@@ -380,6 +383,7 @@ __published:
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
     void __fastcall chkSuck2QuadVacuumClick(TObject *Sender);
+    void __fastcall chkSortArmAutoSkipClick(TObject *Sender);
     void __fastcall edLoaderSafeDistanceClick(TObject *Sender);
     void __fastcall edSettleDelayClick(TObject *Sender);
     void __fastcall edUphMinSampleICClick(TObject *Sender);

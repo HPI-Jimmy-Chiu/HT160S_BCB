@@ -1211,7 +1211,7 @@ object fMaintenance: TfMaintenance
           BevelInner = bvLowered
           Color = 12761254
           TabOrder = 1
-          object PageControl1: TPageControl
+          object pgcMaintHardware: TPageControl
             Left = 2
             Top = 2
             Width = 937
@@ -1989,6 +1989,48 @@ object fMaintenance: TfMaintenance
                   State = cbChecked
                   TabOrder = 3
                   OnClick = chkSuckEnableClick
+                end
+              end
+              object pnlAutoSkipBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 84
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblAutoSkipHint: TLabel
+                  Left = 16
+                  Top = 10
+                  Width = 905
+                  Height = 32
+                  AutoSize = False
+                  Caption =
+                    'Auto-skip a cell after pick-retries are exhausted, instead of s' +
+                    'topping for the operator. Each skipped IC is logged as a Reject ' +
+                    'and counted on the main screen (Auto Skip). Default OFF.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkSortArmAutoSkip: TCheckBox
+                  Left = 16
+                  Top = 50
+                  Width = 400
+                  Height = 20
+                  Caption = 'Auto-skip cell on pick fail'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkSortArmAutoSkipClick
                 end
               end
             end

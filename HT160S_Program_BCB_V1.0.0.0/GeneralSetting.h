@@ -119,6 +119,12 @@ public:
 	// Stored in General.ini [SortArm] PickRetryCount.
 	int iSortArmPickRetryCount;
 
+	// AI(ht160s-autoskip) 20260714 : when true, a SortArm cell that still fails to pick
+	// after iSortArmPickRetryCount retries is auto-skipped (written off EMPTY_IC, the arm
+	// carries on) instead of raising the operator pick-error alarm. Read live each pick
+	// cycle, so no restart needed. Default OFF. Stored in General.ini [SortArm] AutoSkipOnPickFail.
+	bool bSortArmAutoSkipOnPickFail;
+
 	// Safety : minimum encoder gap (motor counts) the two Loader-Y cars must keep
 	// from each other before either car is allowed to move, used only when the
 	// opposite car is clamping a tray. Larger = more conservative. Per-machine

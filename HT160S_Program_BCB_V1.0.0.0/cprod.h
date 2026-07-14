@@ -21,6 +21,7 @@ struct TRunData
     int JamCount;
     int UPH;
     int iEjectionPinCT; // Ejection pin count
+    int iAutoSkipCount; // AI(ht160s-autoskip) cells auto-skipped on SortArm pick fail (this lot)
     double JamRate;
     int JamRateDenom;
     int iTotalQuantity;
@@ -46,6 +47,7 @@ struct TRunData
         ZeroMemory(BinICCnt, sizeof(BinICCnt));
         ZeroMemory(TrayICCnt, sizeof(TrayICCnt));
         iEjectionPinCT=0;
+        iAutoSkipCount=0;
         JamRate=0.0;
         JamRateDenom=10000;
         iTotalQuantity=0;

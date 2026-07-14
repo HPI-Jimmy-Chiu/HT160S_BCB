@@ -1230,6 +1230,45 @@ void TSortArmModule::ClearPickSuckErrors()
     }
 }
 //---------------------------------------------------------------------------
+void TSortArmModule::RecordAutoSkippedCells()
+{
+    //AI(ht160s-autoskip) 20260714 : one Production_Log "Reject" line (Which Auto="Reject",
+    //Error log="AutoSkip") per pick-vacuum errored cell the AutoSkipOnPickFail opt-in writes
+    //off, plus a running tRunData.iAutoSkipCount and an EventLog PROCESS audit line. MUST run
+    //BEFORE SkipErroredPickCells: that helper ClearSlot()s each errored nozzle (bCanPick=0,
+    //PickX/PickY/Lot/Code2D wiped), and the normal TransferPickDataFromLoader->AddInputInfo
+    //path (the only setter of SICRecord.bActive) is gated on bCanPick, so a skipped slot would
+    //never open a record and SaveRejectRecord would early-out. Open the record here while the
+    //FindPickCells identity is still live, then flush an immediate reject (the cell is never placed).
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        if(bPickSuckErr[s]==false)
+            continue;
+
+        g_DeviceInfo.AddInputInfo(s, Slot[s].PickY, Slot[s].PickX, "");
+
+        AnsiString sLotID="";
+        TLotRunInfo *Lot=LotRegistry.GetLot(Slot[s].LotIndex);
+        if(Lot!=NULL)
+            sLotID=Lot->sLotID;
+        g_DeviceInfo.AddIcIdentity(s, sLotID, Slot[s].Code2D, Slot[s].bManual2D);
+
+        int iTrace2D=0;
+        if(Slot[s].Code2D=="")
+            iTrace2D=999;
+        else if(Slot[s].LotIndex<0)
+            iTrace2D=1000;
+        g_DeviceInfo.AddTraceInfo(s, iTrace2D);
+
+        g_DeviceInfo.SaveRejectRecord(s, "AutoSkip");
+
+        tRunData.iAutoSkipCount++;
+        RecordProcess("SortArm auto-skip cell (Loader"+IntToStr(iActiveLoaderNo)
+            +" X="+IntToStr(Slot[s].PickX)+" Y="+IntToStr(Slot[s].PickY)
+            +") total="+IntToStr(tRunData.iAutoSkipCount));
+    }
+}
+//---------------------------------------------------------------------------
 void TSortArmModule::SkipErroredPickCells()
 {
     //AI(ht160s-pick-retry) 20260702 : operator chose SKIP. Write each failed cell off as
@@ -1732,19 +1771,31 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             //discarded, making SKIP behave like RETRY).
             int iKey=K_RETRY;
 
-            for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            //AI(ht160s-autoskip) 20260714 : opt-in [SortArm] AutoSkipOnPickFail. ON -> write the
+            //cell off automatically with no operator modal (log + count each skip); OFF -> the
+            //operator recovery modal decides RETRY / SKIP / TRAY_END (unchanged behaviour).
+            if(GeneralSetting.bSortArmAutoSkipOnPickFail)
             {
-                if(bPickSuckErr[s])
+                iKey=K_SKIP;
+            }
+            else
+            {
+                for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
                 {
-                    TMySucker *Sucker=GetSucker(s);
-                    if(Sucker!=NULL)
-                        iKey=ShowSuckError(*Sucker, 1, K_RETRY|K_SKIP|K_TRAY_END, "SortArm Pick");
-                    break;
+                    if(bPickSuckErr[s])
+                    {
+                        TMySucker *Sucker=GetSucker(s);
+                        if(Sucker!=NULL)
+                            iKey=ShowSuckError(*Sucker, 1, K_RETRY|K_SKIP|K_TRAY_END, "SortArm Pick");
+                        break;
+                    }
                 }
             }
             iPickRetryCount=0;
             if(iKey==K_SKIP)
             {
+                if(GeneralSetting.bSortArmAutoSkipOnPickFail)
+                    RecordAutoSkippedCells();   //AI(ht160s-autoskip) 20260714 : reject-log + count, auto path only (before ClearSlot wipe)
                 SkipErroredPickCells();
                 TransferPickDataFromLoader();
                 PickTask=60;

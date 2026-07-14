@@ -1124,6 +1124,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         for(s=0; s<4; s++)
             if(SuckChk[s]!=NULL)
                 SuckChk[s]->Checked=GeneralSetting.bSuckerEnabled[s];
+        if(chkSortArmAutoSkip!=NULL)
+            chkSortArmAutoSkip->Checked=GeneralSetting.bSortArmAutoSkipOnPickFail;
     }
     //AI(ht160s-maintainer) 20260624 : Loader safe distance is stored as 1/100mm
     //(teach/encoder domain) but edited in mm; show mm = stored/100. Existing
@@ -1199,6 +1201,8 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         for(s=0; s<4; s++)
             if(SuckChk[s]!=NULL)
                 GeneralSetting.bSuckerEnabled[s]=SuckChk[s]->Checked;
+        if(chkSortArmAutoSkip!=NULL)
+            GeneralSetting.bSortArmAutoSkipOnPickFail=chkSortArmAutoSkip->Checked;
     }
     //AI(ht160s-statusbar) 20260624 : capture machine identity from the edits before
     //GeneralSetting.Save(), then push it to the cmydef globals + status-bar panels.
@@ -2033,6 +2037,19 @@ void __fastcall TfMaintenance::chkSuckEnableClick(TObject *Sender)
     for(s=0; s<4; s++)
         if(SuckChk[s]!=NULL)
             GeneralSetting.bSuckerEnabled[s]=SuckChk[s]->Checked;
+    GeneralSetting.Save();
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-autoskip) 20260714 : opt-in SortArm auto-skip on pick fail. Persists on click
+//(mirrors chkSuckEnableClick); read live by aSortArm each pick, page locked mid-lot.
+void __fastcall TfMaintenance::chkSortArmAutoSkipClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkSortArmAutoSkip!=NULL)
+        GeneralSetting.bSortArmAutoSkipOnPickFail=chkSortArmAutoSkip->Checked;
     GeneralSetting.Save();
     RefreshHardwareSettingsStatus();
 }

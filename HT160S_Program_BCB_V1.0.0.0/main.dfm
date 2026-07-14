@@ -2290,9 +2290,9 @@ object fMain: TfMain
               end
               object Panel1: TPanel
                 Left = 4
-                Top = 604
+                Top = 598
                 Width = 566
-                Height = 116
+                Height = 122
                 Align = alBottom
                 TabOrder = 4
                 object sgProductInfo: TStringGrid

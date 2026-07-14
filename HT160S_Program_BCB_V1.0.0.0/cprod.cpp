@@ -144,6 +144,7 @@ void ResetPerLotProductionCounters()
     tRunData.UPH=0;
     tRunData.LoaderIC=0;
     tRunData.JamCount=0;
+    tRunData.iAutoSkipCount=0;
     tRunData.StartTime=Now();
 
     bFirstRun=true;

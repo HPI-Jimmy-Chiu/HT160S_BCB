@@ -809,7 +809,7 @@ static AnsiString FmtCarKinds(int t, int id0, int cv0)
 //AI(ht160s-uph) 20260707 : sgProductInfo row indices (mirror HT172 IncludeAllHeader
 // e-enum: Lot Start / Lot End / Alarm Time / Pause Time / UPH). File-scope enum
 // (this is a .cpp, not the form class body).
-enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH, PI_TotalTime };
+enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH, PI_TotalTime, PI_AutoSkip };
 //AI(ht160s-uph) 20260708 : Lot End time + final UPH + UPH-denominator time are shown only
 //AFTER a lot ends (blank during a running lot). false at Lot Start, true at Lot End finalize.
 static bool bLotEnded=false;
@@ -874,11 +874,15 @@ void __fastcall TfMain::ShowProductInfo()
         sgProductInfo->Cells[0][PI_UPH      ]="UPH :";
         sgProductInfo->Cells[2][PI_UPH      ]="Unit / Hr";
         sgProductInfo->Cells[0][PI_TotalTime]="UPH Time :";
+        sgProductInfo->RowCount=7;
+        sgProductInfo->Cells[0][PI_AutoSkip]="Auto Skip :";
+        sgProductInfo->Cells[2][PI_AutoSkip]="pcs";
     }
     sgProductInfo->Cells[1][PI_LotStart ]=FormatDateTime("hh:nn:ss", tRunData.StartTime);
     sgProductInfo->Cells[1][PI_LotEnd   ]=bLotEnded ? FormatDateTime("hh:nn:ss", tRunData.LotEndTime) : AnsiString("");
     sgProductInfo->Cells[1][PI_AlarmTime]=FormatDateTime("hh:nn:ss", tRunData.AlarmTime);
     sgProductInfo->Cells[1][PI_PauseTime]=tUPH_PauseTime.FormatString("hh:nn:ss");
+    sgProductInfo->Cells[1][PI_AutoSkip]=IntToStr(tRunData.iAutoSkipCount);
     if(HSys.Sys.SystemStart && bFirstRun==false && tRunData.TotalIC>0)
     {
         // AI(ht160s-uph) 20260709 : small-sample warm-up guard. Early in a lot the
