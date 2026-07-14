@@ -376,12 +376,13 @@ W-bit=1（要求回覆）。
 | 272 | AGVSupplement | 呼叫 AGV：缺料／Auto full。SVID `38219` bitmap 標記目標站 |
 | 273 | AGVLDUnLDStatus | Ready：機構就位 |
 | 274 | AGVLDUnLDFinish | Finish：sensor 確認 load/unload 完成。除 SVID `38221` bitmap 外，自 2026-07-13 起（commit d10b9be）額外掛載 Report 6（全 9 站 TrayCount＋DeviceCount），關帳回報實際盤數／IC 數 |
-| 275 | AGVLdID | 身分盤（identity/cover tray）2D 上傳。**自 2026-07-13 起（commit 21ecb0f）已實作發報**：當 AMR 身分盤（其 2D 由 Color CCD 讀取）經 TrayArm 送上 Auto 堆疊時以 S6F11 CEID275 上報，SVID `38202`（Load Port Carrier ID）帶該 2D，走**專屬 report 7＝僅 `38202`**（非 9 站全帶的 report 5）。本 run（2026-06-26）早於此實作故未出現 |
+| 275 | AGVLdID | 身分盤（identity/cover tray）2D 上傳。**自 2026-07-14 起（commit c389e3f）已實作發報**：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取 2D **後立即**發 S6F11 CEID275，SVID `38204`（Color 站 P3 carrier id）帶該 2D，走**專屬 report 7＝僅 `38204`**（非 9 站全帶的 report 5）。本 run（2026-06-26）早於此實作故未出現 |
 
 > **關於 CEID 275（AGVLdID）**：275 是身分盤（identity/cover tray）2D 的上傳事件。**本 run（2026-06-26）並未發出 275**——當時韌體尚未實作發報，且本範例的 6 個 AGV cycle 只出現 272／273／274，故 275 **沒有對應的 evidence row 可引用**。
 >
-> **自 2026-07-13 起（commit 21ecb0f）275 已實作並會實際發報**：韌體在 AMR 身分盤經 TrayArm 送達 Auto 堆疊、且其 2D 為真實讀值時，發出 S6F11 CEID275，SVID `38202`（Load Port Carrier ID）帶該 2D（對齊 HT9045 AGVLdID）。要點：
-> - 只上報**剛取放的 Loader 身分盤**單一 2D——用**專屬 report 7（僅 `38202`）**，不夾帶其餘 8 站的 carrier id；Auto 各站的 carrier id（`38205`–`38210`）改由 host 以 **S1F3 輪詢**取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
+> **自 2026-07-14 起（commit c389e3f）275 已實作並會實際發報**：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取其 2D **後立即**發出 S6F11 CEID275（且該 2D 為真實讀值時），SVID `38204` 帶該 2D。要點：
+> - 每次身分盤進料**只上報一次**單一 2D——用**專屬 report 7（僅 `38204`）**，不夾帶其餘 8 站的 carrier id；Auto 各站的 carrier id（`38205`–`38210`）改由 host 以 **S1F3 輪詢**取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
+> - **SVID `38204` 為實際讀取站（Color 站 P3）的 carrier id**（HT160S 客戶選用）；9045 原本用 Loader load-port 的 `38202`。若日後要對齊 9045 編號，韌體有單一改動點（`AMR_IDENTITY_CARRIER_INDEX`）可切回 `38202`。
 > - 作業員略過／讀取失敗（空 2D）者**不上報**（與 9045 一致，不送空碼）。
 > - 真機關閉 Color CCD 時韌體產生的暫代碼（`COLOR2D_…`）**不上報**（避免假碼進 MES）；筆電模擬（SOFT_SIMULATE）的種子碼則會上報，供 SECS 模擬器對測。
 > - `EventReport` 於 HSMS **SELECTED** 才送（未連線時為 no-op）。
