@@ -326,13 +326,15 @@ void HT160Gem::AddReprot()
         rCnt[AGV_STATION_COUNT + ni] = AgvStation[ni].SvidDeviceCnt;
     HGemPtr->SetReportIDContent(6, AGV_STATION_COUNT * 2, rCnt, EquDefault);
 
-    //AI(ht160s-agv-identity2d) 20260713 : report 7 = ONLY SVID38202 (Load Port Carrier ID).
-    // CEID275 (AGVLdID) links to THIS (AddCEID rptCid[0]=7), so the AGVLdID event carries just
-    // the freshly-picked identity-tray 2D and does NOT ship the 8 other per-station carrier ids
-    // (38203-38210, which may be stale). The Auto-stack carrier ids stay host-pollable via S1F3,
-    // and if the host wants them evented it can link report 5 via S2F35. Matches HT9045, where
-    // AGVLdID carries the load-port id and the Auto carrier ids are poll-only (no event push).
-    unsigned rLdId[1]; rLdId[0] = 38202;
+    //AI(ht160s-agv-identity2d) 20260714 : report 7 = ONLY the identity carrier SVID
+    // (AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID = Color P3 / SVID 38204). CEID275
+    // (AGVLdID) links to THIS (AddCEID rptCid[0]=7), so the AGVLdID event carries just the
+    // freshly-scanned identity-tray 2D and does NOT ship the 8 other per-station carrier ids
+    // (which may be stale). The Auto-stack carrier ids stay host-pollable via S1F3; if the host
+    // wants them evented it can link report 5 via S2F35. Matches HT9045 (AGVLdID = load id; Auto
+    // carrier ids poll-only). SVID derived from the single change-point constant so the stamped
+    // CarrierID[] index and the reported SVID stay locked to one edit.
+    unsigned rLdId[1]; rLdId[0] = AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID;
     HGemPtr->SetReportIDContent(7, 1, rLdId, EquDefault);
 
     HGemPtr->SaveEventReportData();

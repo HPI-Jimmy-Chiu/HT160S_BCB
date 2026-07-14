@@ -171,23 +171,25 @@ int TAgvCoordinator::LookupByName(AnsiString cpName)
     return -1;
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-agv-identity2d) 20260713 : HT9045 AGVLdID port. The identity tray's 2D is
-// read by the Color CCD (DoReadColor2D) and carried through the TrayArm; when it is
-// delivered onto the Auto stack, upload it as S6F11 CEID275 with SVID38202 (Load Port
-// Carrier ID). SVID38202 is bound to CarrierID[0] (P1 Loader), so stamp it here then
-// fire. EventReport self-gates on HSMS SELECTED, so this is a no-op when no host is
-// connected (incl. laptop SOFT_SIMULATE without the SECS simulator attached). DataID=0 matches
-// HT160S's own AGV/E87 events (272/273/274) and is host-informational (host dispatches on CEID,
-// not DataID). NOTE: this intentionally DIVERGES from HT9045, which fires AGVLdID with DataID=1;
-// HT160S standardizes all AGV events on DataID=0. Do NOT use the 1-arg EventReport wrapper -- it
-// hardcodes DataID=1.
-void TAgvCoordinator::ReportLoaderIdentity(THGem *Gem, AnsiString id2D)
+//AI(ht160s-agv-identity2d) 20260714 : HT9045 AGVLdID port. The identity tray's 2D is read by the
+// Color CCD (DoReadColor2D) at the Loader-recovery intake; when the scan completes, upload it as
+// S6F11 CEID275. The value rides SVID AgvStation[stationIndex].SvidCarrierID via the dedicated
+// single-SVID report 7 (stationIndex = AMR_IDENTITY_CARRIER_INDEX = Color P3 / SVID 38204). Stamp
+// CarrierID[stationIndex] then fire. EventReport self-gates on HSMS SELECTED, so this is a no-op
+// when no host is connected (incl. laptop SOFT_SIMULATE without the SECS simulator attached).
+// DataID=0 matches HT160S's own AGV/E87 events (272/273/274) and is host-informational (host
+// dispatches on CEID, not DataID). NOTE: this intentionally DIVERGES from HT9045, which fires
+// AGVLdID with DataID=1; HT160S standardizes all AGV events on DataID=0. Do NOT use the 1-arg
+// EventReport wrapper -- it hardcodes DataID=1.
+void TAgvCoordinator::ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiString id2D)
 {
     if(Gem == NULL)
         return;
     if(id2D == "")
         return;                    // never upload a blank carrier id (skipped/failed 2D read)
-    CarrierID[0] = id2D;           // SVID38202 (P1 Loader); CEID275 ships it via the dedicated report 7
+    if(stationIndex < 0 || stationIndex >= AGV_STATION_COUNT)
+        return;                    // guard the index (single change-point AMR_IDENTITY_CARRIER_INDEX)
+    CarrierID[stationIndex] = id2D;   // SVID = AgvStation[stationIndex].SvidCarrierID; CEID275 ships it via report 7
     Gem->EventReport(0, 275);      // CEID275 AGVLdID
 }
 //---------------------------------------------------------------------------

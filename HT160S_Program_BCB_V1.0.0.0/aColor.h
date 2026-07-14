@@ -67,6 +67,15 @@ private:
     int iReturnedCount;
     HTimer GoUpDelay;
 
+    //AI(ht160s-agv-identity2d) 20260714 : Loader-recovery identity-tray intake -- receive at rear,
+    //carry to the middle CCD, read 2D, upload S6F11 CEID275/SVID38204 (cloud reconciliation), then
+    //retreat to the front car. Distinct from the recycle return (bReturnTray -> DoGoUpTray 1700).
+    int  ReadIdentityTask;      //DoReadIdentityRetreat sub-ladder state
+    int  RaiseFrontTask;        //RaiseFrontStackClear helper sub-ladder state (extracted front-raise)
+    int  ReadClampSub;          //DoClampTray sub-state for the identity intake clamp
+    bool bReadIdentityPending;  //TrayArm reserved a Loader identity intake -> Color dedicates to receive
+    HTimer ReadIdentityDelay;   //identity intake clamp settle
+
     bool IsSoftSimulate();
     bool IsInstalled();
     void RefreshStateFromSensors();
@@ -76,6 +85,8 @@ private:
     bool MoveColorCcdX(int Position);   //AI(ht160s-color-ccd-xy) 20260628 : move Color CCD reader X (shared by scan-move + DoReadColor2D)
     bool DoGoDownTray(int Flag);   //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack -> front staging (like Empty)
     bool DoGoUpTray(int Flag);     //AI(phase6-loader-recycle) 20260625 : stack a returned tray back onto the front supply car (mirrors TEmptyModule::DoGoUpTray)
+    bool DoReadIdentityRetreat(int Flag);  //AI(ht160s-agv-identity2d) 20260714 : Loader identity at rear -> CCD scan -> upload CEID275 -> retreat to front
+    bool RaiseFrontStackClear(int Flag);   //AI(ht160s-agv-identity2d) 20260714 : lift front stack clear of the rest (extracted DoGoUpTray front-raise; self-terminating)
     bool DoFeedTray(int Flag);
     bool DoSortBin(int Flag);
     bool DoReadColor2D(int Flag);  //AI(HT160S-Maintainer) 20260608 : move CCD X, LON shot, read 2D, LOFF
@@ -102,6 +113,9 @@ public:
     bool IsRearHasTray();            //AI(phase6-loader-recycle) 20260625 : Color rear handoff position occupied (same contract name as Empty)
     bool IsCleanOutFinish();         //AI(cleanout) 20260701 : Color CleanOut-drain finish (installed? + TrayArm done + flow clear + rise cylinders home)
     void NotifyTrayXToEmptyFinish(); //AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing onto Color's rear (same contract name as Empty)
+    void RequestReadIdentityTray();  //AI(ht160s-agv-identity2d) 20260714 : TrayArm reserves a Loader identity intake (scan+upload), distinct from the recycle return
+    bool IsReadyToReceiveIdentity(); //AI(ht160s-agv-identity2d) 20260714 : Color fully idle -> safe for TrayArm to deposit a Loader identity at rear (pick-time interlock)
+    bool IsReceivingIdentity();      //AI(ht160s-agv-identity2d) 20260714 : an identity intake is reserved/in-progress (TrayArm case-500 gate discriminator)
     void NotifyICPlaced(int Count);
     void SetSupplyThreshold(int Count);
     int GetSupplyThreshold();

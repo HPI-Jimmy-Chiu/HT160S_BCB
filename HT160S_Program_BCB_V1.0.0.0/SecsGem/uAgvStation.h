@@ -25,6 +25,13 @@ enum eAgvStationKind { ASK_LOADER = 0, ASK_EMPTY = 1, ASK_COLOR = 2, ASK_AUTO = 
 // per-station latched handshake status (replaces an FSM with a small enum)
 enum eAgvHandshake { AGV_IDLE = 0, AGV_CALLED = 1, AGV_PREP = 2, AGV_READY = 3, AGV_FINISH = 4 };
 
+// AI(ht160s-agv-identity2d) 20260714 : SINGLE change-point for the identity-tray carrier SVID/station.
+// 2 = Color (P3, SVID 38204, the actual 2D reading station; customer-chosen). The identity 2D is
+// uploaded via CEID275 with AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID. To revert to the
+// 9045 Loader load-port id (SVID 38202) change ONLY this to 0 (both the stamped CarrierID[] index and
+// report 7's SVID derive from it, so one edit keeps them locked together).
+#define AMR_IDENTITY_CARRIER_INDEX 2
+
 struct TAgvStationDesc
 {
     int         PIndex;        // 1..9
@@ -65,7 +72,7 @@ public:
     // Phase B/C/D entry points (Gem = SECS transport used to fire S6F11):
     void PollAndCall(THGem *Gem);                // Phase B : shortage/full -> CEID272
     void ServiceHandshake(THGem *Gem);           // Phase D : drive CEID273 / CEID274
-    void ReportLoaderIdentity(THGem *Gem, AnsiString id2D); //AI(ht160s-agv-identity2d) 20260713 : S6F11 CEID275 AGVLdID, SVID38202 = identity-tray 2D (9045-aligned)
+    void ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiString id2D); //AI(ht160s-agv-identity2d) 20260714 : S6F11 CEID275 AGVLdID; SVID = AgvStation[stationIndex].SvidCarrierID (identity-tray 2D)
     bool BeginPrep(AnsiString cpName);           // Phase C : START_AGV -> prep
     void ReassertLocks();                        //AI(ht160s-home-resume-w5) 20260711 : post-HOME lock re-assert (InitialAllTask tail)
 

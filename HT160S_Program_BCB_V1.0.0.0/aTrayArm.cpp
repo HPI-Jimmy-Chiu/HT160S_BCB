@@ -14,8 +14,6 @@
 #include "aSortArm.h"          //AI(cleanout) 20260701 : SortArmModule->IsCleanOutFinish() = drain-boundary signal for the DoPlace in-flight divert
 #include "GeneralSetting.h"    //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
 #include "cStateRecordHT160.h" //AI(ht160s-rearready-p0) 20260705 : gStateRecord->TriggerSnapshot on blocked-pick watchdog expiry
-#include "SecsGem\uHGemEquipment.h" //AI(ht160s-agv-identity2d) 20260713 : HGem->EventReport for CEID275
-#include "SecsGem\uAgvStation.h"    //AI(ht160s-agv-identity2d) 20260713 : AgvCoord.ReportLoaderIdentity (SVID38202)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -561,13 +559,37 @@ int TTrayArmModule::DecideJob()
     //DecidePlaceDestAfterPick(), so the arm reacts to the live Auto demand at that moment.
     if(LoaderModule!=NULL && LoaderModule->IsRearHasTray())
     {
-        iAutoTarget=-1;
         //AI(HT160S-Maintainer) 20260625 : carry the REAL kind/2D the Loader stamped on the
         //tray at feed (Phase 6 A : GetRearTrayKind/GetRearTrayID), so an identity tray is
         //routed back to Color while empty/cover trays keep the existing Empty path.
-        iDeliverKind=(int)LoaderModule->GetRearTrayKind();
-        iDeliverTrayID=LoaderModule->GetRearTrayID();
-        return TAJOB_LOADER_RECOVERY;
+        int iRearKind=(int)LoaderModule->GetRearTrayKind();
+        //AI(ht160s-agv-identity2d) 20260714 : PICK-TIME interlock (owner). A Loader IDENTITY tray
+        //goes to Color to be scanned + uploaded (CEID275/SVID38204); do NOT pick it until Color is
+        //FULLY idle, else the Color-rear handoff collides with a Color carriage move. Reserve Color
+        //(RequestReadIdentityTray -> Color drains to idle, starts no new supply/destack) and, if it
+        //is not idle yet, FALL THROUGH to the lower-priority jobs so TrayArm keeps servicing (incl.
+        //picking Color's presented tray) -> Color can reach idle. Deadlock-safe: we do NOT return
+        //TAJOB_NONE here (which would freeze TrayArm into a mutual wait with a Color that cannot idle).
+        bool bDeferIdentity=false;
+        if(iRearKind==eTrayKindIdentity && ColorModule!=NULL)
+        {
+            ColorModule->RequestReadIdentityTray();
+            //AI(ht160s-agv-identity2d) 20260714 : defer in BOTH sim and real until Color is idle.
+            //IsReadyToReceiveIdentity is sim-reachable (task/latch based, cylinder check skipped in
+            //sim), so a headless intake still lands on an EMPTY carriage -- no case-1
+            //carriageNotClear stall/log-spam. Deadlock-safe via the fall-through below.
+            if(ColorModule->IsReadyToReceiveIdentity()==false)
+                bDeferIdentity=true;
+        }
+        if(bDeferIdentity==false)
+        {
+            iAutoTarget=-1;
+            iDeliverKind=iRearKind;
+            iDeliverTrayID=LoaderModule->GetRearTrayID();
+            return TAJOB_LOADER_RECOVERY;
+        }
+        //bDeferIdentity : Color still draining to idle -> fall through to the branches below so
+        //TrayArm services other work this cycle; the Loader identity tray is retried next cycle.
     }
 
     //AI(HT160S-Maintainer) 20260605 : AMR mode builds each Auto output stack in a fixed
@@ -918,19 +940,10 @@ bool TTrayArmModule::DoPlace(int Flag)
                     AutoModule->NotifyTrayArmDelivered(iAutoTarget, iDeliverKind, iDeliverTrayID);
                 else
                     AutoModule->SetRearHasTrayFromTrayArm(iAutoTarget, true);
-
-                //AI(ht160s-agv-identity2d) 20260713 : port of HT9045 AGVLdID (S6F11 CEID275).
-                //When an identity tray (its 2D read earlier by the Color CCD, carried here as
-                //iDeliverTrayID) is placed onto the Auto stack, upload that 2D via SVID38202.
-                //Guards: (a) non-empty -- a blank means an operator-skipped/failed Color read
-                //(matches HT9045 which never uploads a blank id); (b) IsTrayID2DGenuine() --
-                //suppresses the throwaway "COLOR2D_" placeholder a REAL machine fabricates when
-                //the Color CCD is disabled (that must not masquerade as a carrier id to the MES);
-                //laptop sim seeds still upload so the SECS host simulator can exercise CEID275.
-                //ReportLoaderIdentity/EventReport self-gate on HSMS SELECTED -> no-op with no host.
-                if(Job==TAJOB_AMR_SUPPLY && iDeliverKind==eTrayKindIdentity && iDeliverTrayID!="" &&
-                   ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
-                    AgvCoord.ReportLoaderIdentity(HGem, iDeliverTrayID);
+                //AI(ht160s-agv-identity2d) 20260714 : the CEID275/SVID38204 upload MOVED to the
+                //Color scan point (aColor::DoReadIdentityRetreat case 300) per the finalized plan.
+                //The former upload hook here (21ecb0f, TrayArm->Auto delivery) is removed so 275 is
+                //fired exactly once at the Loader-recovery intake scan, not double-fired here.
             }
             if(HSys.VMot.MMTrayArmX!=NULL) HSys.VMot.MMTrayArmX->Tray.Clear();   //AI(ht160s-tray-source) : arm is now empty
             if(HSys.VMot.MMTrayArmX!=NULL)
@@ -954,10 +967,15 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
     //fall through to the existing Auto-vs-Empty logic below unchanged (D3).
     if(iDeliverKind==eTrayKindIdentity)
     {
+        //AI(ht160s-agv-identity2d) 20260714 : a Loader-recovered identity tray goes to Color to be
+        //SCANNED + uploaded (CEID275/SVID38204), NOT recycled. Arm the identity-intake contract
+        //(RequestReadIdentityTray -> bReadIdentityPending) rather than the recycle return; the
+        //pick-time interlock in DecideJob already reserved Color (idempotent). Color->IsReceivingIdentity()
+        //then makes DoPlaceToColor use the Color-idle deposit gate instead of the plain rear-free gate.
         PlaceDest=TAPLACE_COLOR;
         iAutoTarget=-1;
         if(ColorModule!=NULL)
-            ColorModule->RequestReturnTray();
+            ColorModule->RequestReadIdentityTray();
         return;
     }
     bool bSupplyAuto=false;
@@ -1146,8 +1164,16 @@ bool TTrayArmModule::DoPlaceToColor(int Flag)
                 OnPlaceGateBlocked("Color");   //AI(ht160s-home-resume-p0) 20260710 : watchdog tick while blocked
                 break;
             }
-            //Wait until Color has raised and cleared its rear before depositing.
-            if(ColorModule==NULL || ColorModule->IsRearHasTray()==false || IsSoftSimulate())
+            //AI(ht160s-agv-identity2d) 20260714 : CONDITIONAL deposit gate. If Color is running the
+            //identity INTAKE contract (IsReceivingIdentity) the deposit must wait for Color FULLY idle
+            //(IsReadyToReceiveIdentity) so the rear handoff cannot collide with a Color carriage move.
+            //A recycle deposit (bReturnTray path, IsReceivingIdentity false) keeps the plain rear-free
+            //gate -- recycle REQUIRES Color busy at case 1700, so applying the idle gate would deadlock
+            //it. Sim escapes both. (Was: IsRearHasTray()==false || IsSoftSimulate().)
+            if( ( (ColorModule!=NULL && ColorModule->IsReceivingIdentity())
+                    ? (ColorModule!=NULL && ColorModule->IsReadyToReceiveIdentity())
+                    : (ColorModule==NULL || ColorModule->IsRearHasTray()==false) )
+                || IsSoftSimulate())
             {
                 ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : gate passed -- close the watchdog window
                 Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts
@@ -1225,7 +1251,15 @@ void TTrayArmModule::DoTrayArm(int &Task)
                         if(PlaceDest==TAPLACE_EMPTY && EmptyModule!=NULL)
                             EmptyModule->RequestReturnTray();
                         if(PlaceDest==TAPLACE_COLOR && ColorModule!=NULL)
-                            ColorModule->RequestReturnTray();
+                        {
+                            //AI(ht160s-agv-identity2d) 20260714 : preserve an interrupted identity
+                            //INTAKE (scan+upload) across HOME -- re-arm the intake contract, not the
+                            //recycle, so CEID275/SVID38204 is not silently dropped for this tray.
+                            if(iDeliverKind==eTrayKindIdentity)
+                                ColorModule->RequestReadIdentityTray();
+                            else
+                                ColorModule->RequestReturnTray();
+                        }
                     }
                     DoPlace(0);
                     Task=2000;

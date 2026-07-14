@@ -13,6 +13,8 @@
 #include "uteach.h"
 #include "ColorCcdSocket.h"
 #include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() gates the Color CleanOut drain/finish
+#include "SecsGem\uHGemEquipment.h" //AI(ht160s-agv-identity2d) 20260714 : HGem->EventReport for CEID275
+#include "SecsGem\uAgvStation.h"    //AI(ht160s-agv-identity2d) 20260714 : AgvCoord.ReportLoaderIdentity + AMR_IDENTITY_CARRIER_INDEX
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -66,6 +68,13 @@ void TColorModule::InitialFlag(bool bKeepMaterial)
     GoDownTask=1;
     //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow (mirrors Empty).
     GoUpTask=1;
+    //AI(ht160s-agv-identity2d) 20260714 : identity intake sub-ladders idle; drop any pending
+    //reservation on init/HOME (a mid-flight intake safely reverts to the recycle path).
+    ReadIdentityTask=1;
+    RaiseFrontTask=1;
+    ReadClampSub=0;
+    bReadIdentityPending=false;
+    ReadIdentityDelay.Clear();
     //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the return
     //handshake (mirror of Empty; the TrayArm sender keeps Job/PlaceDest) and the
     //return-history counter. sTrayID2D rides with the presented-tray keep above.
@@ -354,6 +363,32 @@ void TColorModule::DoColor(int &Task)
 
         case 100:
             RefreshStateFromSensors();
+            //AI(ht160s-agv-identity2d) 20260714 : Loader identity intake has TOP priority once
+            //reserved (mirrors bReturnTray reserve-on-set). Park idle on the pending flag ALONE
+            //(before the tray lands) so Color starts no new supply/destack during the receive
+            //window and IsReadyToReceiveIdentity() can reach true for the pick-time interlock.
+            //Run the scan+upload+retreat ladder once the TrayArm deposit lands (bRearHasTray).
+            //Held off while AMR-locked (same as the return path) so the front stack stays home.
+            if(bReadIdentityPending)
+            {
+                if(bAmrLocked)
+                {
+                    Task=1;
+                    break;
+                }
+                if(IsRearHasTray())
+                {
+                    Status=CS_RETURNING;
+                    DoReadIdentityRetreat(0);
+                    Task=1800;
+                }
+                else
+                {
+                    Status=CS_IDLE;
+                    Task=1;
+                }
+                break;
+            }
             //AI(phase6-loader-recycle) 20260625 : single-MColorY arbitration (CRITICAL).
             //The receive (return) dispatch is placed BEFORE the supply godown/supply
             //branches. Under sim IsSoftSimulate() is always true, so the godown branch
@@ -418,7 +453,7 @@ void TColorModule::DoColor(int &Task)
             //DoGoDownTray). Stage 2 pushes that staged tray to the output and reads
             //its 2D code, but only when an AMR supply was actually requested (or
             //simulating), so the identity tray is not presented / scanned early.
-            if(bFrontHasTray==false && bReturnTray==false)
+            if(bFrontHasTray==false && bReturnTray==false && bReadIdentityPending==false)
             {
                 //AI(ht160s-agv) 20260625 : NARROW AMR lock. The FRONT-stack branches that
                 //raise C_Color_FrontRise*/Separate (this DoGoDownTray, and the bReturnTray
@@ -442,7 +477,7 @@ void TColorModule::DoColor(int &Task)
                 Task=1200;
                 break;
             }
-            if(bSupplyRequested && bReturnTray==false)
+            if(bSupplyRequested && bReturnTray==false && bReadIdentityPending==false)
             {
                 Status=CS_FEEDING;   //AI(ht160s-status) 20260703 : carrier will own the rear
                 DoFeedTray(0);
@@ -499,6 +534,17 @@ void TColorModule::DoColor(int &Task)
                 iReturnedCount++;
                 iSimInfeedCount++;
                 Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);   //AI(ht160s-status) 20260703
+                Task=1;
+            }
+            break;
+
+        case 1800:
+            //AI(ht160s-agv-identity2d) 20260714 : Loader identity intake ladder -- receive at rear,
+            //carry to the CCD, read 2D, upload CEID275/SVID38204, retreat to the front car. Clears
+            //bReadIdentityPending on completion (inside DoReadIdentityRetreat).
+            if(DoReadIdentityRetreat(1))
+            {
+                Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);
                 Task=1;
             }
             break;
@@ -1352,8 +1398,287 @@ void TColorModule::RequestReturnTray()
 {
     bReturnTray=true;
     bTrayXToEmptyFinish=false;
+    //AI(ht160s-agv-identity2d) 20260714 : a recycle return SUPERSEDES a pending identity intake
+    //(e.g. a CleanOut in-flight divert re-routing an intake tray). Clearing bReadIdentityPending
+    //keeps the DoColor case-100 arbitration + the DoPlaceToColor gate consistent (recycle path).
+    bReadIdentityPending=false;
 }
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : TrayArm reserves a Loader identity-tray intake (Color CCD
+//scan + S6F11 CEID275/SVID38204 upload for cloud reconciliation). Distinct from RequestReturnTray
+//(recycle): this arms the pick-time interlock + the DoReadIdentityRetreat ladder, NOT the GoUp-1700
+//return. Setting it makes DoColor case 100 drop to idle (start no new supply/destack) until the
+//intake completes.
+void TColorModule::RequestReadIdentityTray()
+{
+    //AI(ht160s-agv-identity2d) 20260714 : subordinate the intake to an in-flight recycle -- if a
+    //recycle return is already armed (e.g. a CleanOut divert), do NOT hijack it into the intake
+    //ladder (RequestReturnTray also clears bReadIdentityPending, so recycle wins symmetrically).
+    if(bReturnTray==false)
+        bReadIdentityPending=true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : an identity intake is reserved / in progress. TrayArm's
+//DoPlaceToColor uses this to pick the CONDITIONAL deposit gate: identity intake -> wait Color idle
+//(IsReadyToReceiveIdentity); recycle (bReturnTray) -> the plain rear-free gate. Applying the idle
+//gate to a bReturnTray recycle would deadlock (the recycle REQUIRES Color busy at case 1700).
+bool TColorModule::IsReceivingIdentity()
+{
+    return bReadIdentityPending;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : pick-time interlock (owner). TrayArm must NOT pick the Loader
+//identity tray / deposit it at Color's rear until Color is FULLY idle -- else the rear handoff can
+//collide with a Color carriage move. Idle = no sub-ladder stepping, status idle, carriage empty,
+//rear/present latches clear, cylinders home, not AMR-locked. Real machine also requires the clamp
+//cylinders released; sim skips the out-bit check (RefreshStateFromSensors is latch-only there, and
+//IsReadyForAmrHandoff is sim-true) so a headless intake can still reach ready.
+bool TColorModule::IsReadyToReceiveIdentity()
+{
+    RefreshStateFromSensors();
+    if(Status==CS_FEEDING || Status==CS_DESTACK || Status==CS_RETURNING)
+        return false;
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1 || ReadIdentityTask!=1)
+        return false;
+    if(bRearHasTray || bTrayReady)
+        return false;
+    if(HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray)
+        return false;
+    if(bAmrLocked)
+        return false;
+    if(IsReadyForAmrHandoff()==false)
+        return false;
+    if(IsSoftSimulate()==false &&
+       (HSys.Cyn.C_Color_LeanOnTray.GetOutBit() || HSys.Cyn.C_Color_PushTray.GetOutBit()))
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : lift the FRONT stack clear of the rest position so the just-
+//scanned identity tray can be set down at the front rest without a two-tray collision (owner:
+//"front has tray -> GoUp first"). Self-terminating EXTRACTION of DoGoUpTray's front-raise
+//(cases 100-600); NOT a range-poke of DoGoUpTray (whose case 600 tail-jumps to the rear-grab).
+//Returns true when the rest is clear (front empty, or after the raise). Physical order identical
+//to DoGoUpTray; uses ReadIdentityDelay (DoGoUpTray is never co-running under this DoColor Task).
+bool TColorModule::RaiseFrontStackClear(int Flag)
+{
+    if(Flag==0)
+    {
+        RaiseFrontTask=1;
+        ReadIdentityDelay.Clear();
+        return true;
+    }
+    switch(RaiseFrontTask)
+    {
+        case 1:
+            RefreshStateFromSensors();
+            if(bFrontHasTray==false)
+                return true;   // rest already clear -> nothing to lift
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+            RaiseFrontTask=110;
+            break;
+        case 110:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                RaiseFrontTask=210;
+            }
+            break;
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                ReadIdentityDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                ReadIdentityDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                RaiseFrontTask=310;
+            }
+            break;
+        case 310:
+            if(ReadIdentityDelay.Off())
+            {
+                if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                    RaiseFrontTask=410;
+            }
+            break;
+        case 410:
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            RaiseFrontTask=420;
+            break;
+        case 420:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                ReadIdentityDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                ReadIdentityDelay.On();
+                RaiseFrontTask=510;
+            }
+            break;
+        case 510:
+            if(ReadIdentityDelay.Off())
+            {
+                if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                {
+                    HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                    RaiseFrontTask=600;
+                }
+            }
+            break;
+        case 600:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                bFrontHasTray=false;
+                return true;
+            }
+            break;
+        default:
+            LogLadderFault("Color.RaiseFrontStackClear", RaiseFrontTask);
+            RaiseFrontTask=1;
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : Loader identity-tray intake. TrayArm has deposited a Loader
+//identity tray at Color's REAR (rear->middle->front is the reverse of the supply feed). Clamp it,
+//carry to the middle CCD, read the 2D, upload S6F11 CEID275/SVID38204 RIGHT AFTER the scan (cloud
+//reconciliation, once per intake), then retreat to the front car (raise the front stack clear if
+//occupied, to avoid a two-tray collision) and set it down as an Identity tray for later supply.
+bool TColorModule::DoReadIdentityRetreat(int Flag)
+{
+    int Ret;
+    if(Flag==0)
+    {
+        ReadIdentityTask=1;
+        ReadClampSub=0;
+        ReadIdentityDelay.Clear();
+        RaiseFrontStackClear(0);
+        HSys.Cyn.C_Color_LeanOnTray.Reset();
+        HSys.Cyn.C_Color_PushTray.Reset();
+        return true;
+    }
+    switch(ReadIdentityTask)
+    {
+        case 1:
+            //owner #1 : receive at the rear handoff. Wait the TrayArm deposit (bRearHasTray via
+            //NotifyTrayXToEmptyFinish), park at the pick Y, then clamp. Carriage MUST be empty first
+            //(guaranteed by IsReadyToReceiveIdentity before deposit); a tray already on it is a
+            //can't-happen state -> log (not a silent stall) and hold rather than clamp a second tray.
+            RefreshStateFromSensors();
+            if(bRearHasTray==false)
+                break;
+            if(HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray)
+            {
+                LogLadderFault("Color.ReadIdentity.carriageNotClear", ReadIdentityTask);
+                break;
+            }
+            if(MoveColorY(Teach.ColorTrayArmPickYPosition)==false)
+                break;
+            {
+                //clamp rule (project-wide): front-stop LeanOnTray first, rear-hook PushTray last.
+                int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray,
+                                      ReadClampSub, ReadIdentityDelay, IsSoftSimulate(), GeneralSetting.iColorFeedClampSettleMs);
+                if(Clamp==1)
+                {
+                    //the intake tray arrived with NO software grid (came from the Loader via TrayArm),
+                    //so BIRTH it as Identity here; the CCD scan then fills the real 2D TrayID. This is
+                    //the B-4 fix: the front deposit later MoveFrom's this grid, keeping Kind=Identity.
+                    if(HSys.VMot.MMColorY!=NULL)
+                    {
+                        HSys.VMot.MMColorY->Tray.Birth(EMPTY_IC, eTrayKindIdentity, "");
+                        HSys.VMot.MMColorY->fHasTray=true;
+                        HSys.VMot.MMColorY->Refresh();
+                    }
+                    bRearHasTray=false;   //carried onto the carriage -> rear free (mirror GoUp case7000; re-arms a repeat intake)
+                    bTrayXToEmptyFinish=false;   //AI(ht160s-agv-identity2d) 20260714 : clear the deposit handshake latch (hygiene; matches the recycle path)
+                    ReadIdentityTask=100;
+                }
+                else if(Clamp==2)
+                {
+                    Ret=ShowMyError("MES1422", LangT("Color Push Tray Miss"), &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
+                    if(Ret==K_RETRY)
+                        ReadClampSub=0;
+                }
+            }
+            break;
+
+        case 100:
+            if(MoveColorCcdToScan())
+            {
+                DoReadColor2D(0);
+                ReadIdentityTask=200;
+            }
+            break;
+
+        case 200:
+            if(DoReadColor2D(1))   //fills sTrayID2D + StampReadIdentity2D (the 2D on the Identity grid)
+                ReadIdentityTask=300;
+            break;
+
+        case 300:
+            //upload S6F11 CEID275 right after the scan. Genuine + non-empty only: IsTrayID2DGenuine
+            //suppresses the real-machine reader-off "COLOR2D_" placeholder; a blank (operator-skipped
+            //read) is never uploaded (9045-faithful). EventReport self-gates on HSMS SELECTED.
+            if(sTrayID2D!="" && IsTrayID2DGenuine() && HGem!=NULL)
+                AgvCoord.ReportLoaderIdentity(HGem, AMR_IDENTITY_CARRIER_INDEX, sTrayID2D);
+            ReadIdentityTask=400;
+            break;
+
+        case 400:
+            //owner : before setting the tray down at the front rest, if the front already holds a
+            //tray, GoUp (lift the stack clear) first to avoid a two-tray collision; then deposit.
+            if(RaiseFrontStackClear(1))
+            {
+                RaiseFrontStackClear(0);   //re-arm; a still-occupied rest re-lifts next pass
+                RefreshStateFromSensors();
+                if(bFrontHasTray)
+                    break;
+                ReadIdentityTask=410;
+            }
+            break;
+
+        case 410:
+            //rest clear -> carry the clamped, scanned tray to the FRONT receive Y and set it down.
+            if(MoveColorY(Teach.ColorReceiveTrayYPosition))
+            {
+                HSys.Cyn.C_Color_PushTray.Reset();   //one-shot re-arm before the release Pop
+                ReadIdentityTask=420;
+            }
+            break;
+
+        case 420:
+            if(PopCylinder(HSys.Cyn.C_Color_PushTray))   //release rear-hook (PushTray) first
+            {
+                HSys.Cyn.C_Color_LeanOnTray.Reset();
+                ReadIdentityTask=430;
+            }
+            break;
+
+        case 430:
+            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))   //release front-stop (LeanOnTray) last
+            {
+                //identity tray is now on the front rest; hand its scanned grid (Kind=Identity + real
+                //2D) to the front-staging holder so the later supply routes it correctly (B-4).
+                if(HSys.VMot.MMColorY!=NULL)
+                {
+                    FrontSourceTray.MoveFrom(HSys.VMot.MMColorY->Tray);
+                    HSys.VMot.MMColorY->fHasTray=false;
+                    HSys.VMot.MMColorY->Refresh();
+                }
+                bFrontHasTray=true;
+                bReadIdentityPending=false;   //intake complete -> release the receive lock; supply resumes
+                Status=CS_IDLE;
+                ReadIdentityTask=1;
+                return true;
+            }
+            break;
+
+        default:
+            LogLadderFault("Color.DoReadIdentityRetreat", ReadIdentityTask);
+            ReadIdentityTask=1;
+            break;
+    }
+    return false;
+}
 //AI(ht160s-color-align-empty) 20260627 : Color's rear-occupied latch is bRearHasTray (the
 //output/read position = Color's rear handoff slot). TrayArm waits IsRearHasTray()==false
 //before depositing, exactly as it waits on Empty's rear.
@@ -1443,7 +1768,8 @@ AnsiString TColorModule::GetTrayID()
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv-identity2d) 20260713 : is the last identity 2D a GENUINE value that may be
-// uploaded to the host as SVID38202 (CEID275 AGVLdID)? True for a real Color-reader read, a
+// uploaded to the host as the identity-carrier SVID (AgvStation[AMR_IDENTITY_CARRIER_INDEX], 38204)
+// on CEID275 AGVLdID? True for a real Color-reader read, a
 // manual operator entry, OR any simulation context (laptop SOFT_SIMULATE / runtime
 // bRunSimulation) where the seeded "COLOR2D_" IS the intended test id and SHOULD reach the
 // SECS host simulator. FALSE only when a REAL machine runs with the Color CCD disabled
