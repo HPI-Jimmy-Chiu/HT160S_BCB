@@ -1,0 +1,129 @@
+{
+  "Maps": [
+    {
+      "LotNumber": "SIMU_LOT_A",
+      "Items": [
+        { "Code2D": "2D_Simu_1", "Bin": 1 },
+        { "Code2D": "2D_Simu_2", "Bin": 2 },
+        { "Code2D": "2D_Simu_3", "Bin": 3 },
+        { "Code2D": "2D_Simu_4", "Bin": 4 },
+        { "Code2D": "2D_Simu_5", "Bin": 5 },
+        { "Code2D": "2D_Simu_6", "Bin": 6 },
+        { "Code2D": "2D_Simu_7", "Bin": 1 },
+        { "Code2D": "2D_Simu_8", "Bin": 2 },
+        { "Code2D": "2D_Simu_9", "Bin": 3 },
+        { "Code2D": "2D_Simu_10", "Bin": 4 },
+        { "Code2D": "2D_Simu_11", "Bin": 5 },
+        { "Code2D": "2D_Simu_12", "Bin": 6 },
+        { "Code2D": "2D_Simu_13", "Bin": 1 },
+        { "Code2D": "2D_Simu_14", "Bin": 2 },
+        { "Code2D": "2D_Simu_15", "Bin": 3 },
+        { "Code2D": "2D_Simu_16", "Bin": 4 },
+        { "Code2D": "2D_Simu_17", "Bin": 5 },
+        { "Code2D": "2D_Simu_18", "Bin": 6 },
+        { "Code2D": "2D_Simu_19", "Bin": 1 },
+        { "Code2D": "2D_Simu_20", "Bin": 2 }
+      ]
+    },
+    {
+      "LotNumber": "SIMU_LOT_B",
+      "Items": [
+        { "Code2D": "2D_Simu_21", "Bin": 3 },
+        { "Code2D": "2D_Simu_22", "Bin": 4 },
+        { "Code2D": "2D_Simu_23", "Bin": 5 },
+        { "Code2D": "2D_Simu_24", "Bin": 6 },
+        { "Code2D": "2D_Simu_25", "Bin": 1 },
+        { "Code2D": "2D_Simu_26", "Bin": 2 },
+        { "Code2D": "2D_Simu_27", "Bin": 3 },
+        { "Code2D": "2D_Simu_28", "Bin": 4 },
+        { "Code2D": "2D_Simu_29", "Bin": 5 },
+        { "Code2D": "2D_Simu_30", "Bin": 6 },
+        { "Code2D": "2D_Simu_31", "Bin": 1 },
+        { "Code2D": "2D_Simu_32", "Bin": 2 },
+        { "Code2D": "2D_Simu_33", "Bin": 3 },
+        { "Code2D": "2D_Simu_34", "Bin": 4 },
+        { "Code2D": "2D_Simu_35", "Bin": 5 },
+        { "Code2D": "2D_Simu_36", "Bin": 6 },
+        { "Code2D": "2D_Simu_37", "Bin": 1 },
+        { "Code2D": "2D_Simu_38", "Bin": 2 },
+        { "Code2D": "2D_Simu_39", "Bin": 3 },
+        { "Code2D": "2D_Simu_40", "Bin": 4 }
+      ]
+    },
+    {
+      "LotNumber": "SIMU_LOT_C",
+      "Items": [
+        { "Code2D": "2D_Simu_41", "Bin": 5 },
+        { "Code2D": "2D_Simu_42", "Bin": 6 },
+        { "Code2D": "2D_Simu_43", "Bin": 1 },
+        { "Code2D": "2D_Simu_44", "Bin": 2 },
+        { "Code2D": "2D_Simu_45", "Bin": 3 },
+        { "Code2D": "2D_Simu_46", "Bin": 4 },
+        { "Code2D": "2D_Simu_47", "Bin": 5 },
+        { "Code2D": "2D_Simu_48", "Bin": 6 },
+        { "Code2D": "2D_Simu_49", "Bin": 1 },
+        { "Code2D": "2D_Simu_50", "Bin": 2 },
+        { "Code2D": "2D_Simu_51", "Bin": 3 },
+        { "Code2D": "2D_Simu_52", "Bin": 4 },
+        { "Code2D": "2D_Simu_53", "Bin": 5 },
+        { "Code2D": "2D_Simu_54", "Bin": 6 },
+        { "Code2D": "2D_Simu_55", "Bin": 1 },
+        { "Code2D": "2D_Simu_56", "Bin": 2 },
+        { "Code2D": "2D_Simu_57", "Bin": 3 },
+        { "Code2D": "2D_Simu_58", "Bin": 4 },
+        { "Code2D": "2D_Simu_59", "Bin": 5 },
+        { "Code2D": "2D_Simu_60", "Bin": 6 }
+      ]
+    },
+    {
+      "LotNumber": "SIMU_LOT_D",
+      "Items": [
+        { "Code2D": "2D_Simu_61", "Bin": 1 },
+        { "Code2D": "2D_Simu_62", "Bin": 2 },
+        { "Code2D": "2D_Simu_63", "Bin": 3 },
+        { "Code2D": "2D_Simu_64", "Bin": 4 },
+        { "Code2D": "2D_Simu_65", "Bin": 5 },
+        { "Code2D": "2D_Simu_66", "Bin": 6 },
+        { "Code2D": "2D_Simu_67", "Bin": 1 },
+        { "Code2D": "2D_Simu_68", "Bin": 2 },
+        { "Code2D": "2D_Simu_69", "Bin": 3 },
+        { "Code2D": "2D_Simu_70", "Bin": 4 },
+        { "Code2D": "2D_Simu_71", "Bin": 5 },
+        { "Code2D": "2D_Simu_72", "Bin": 6 },
+        { "Code2D": "2D_Simu_73", "Bin": 1 },
+        { "Code2D": "2D_Simu_74", "Bin": 2 },
+        { "Code2D": "2D_Simu_75", "Bin": 3 },
+        { "Code2D": "2D_Simu_76", "Bin": 4 },
+        { "Code2D": "2D_Simu_77", "Bin": 5 },
+        { "Code2D": "2D_Simu_78", "Bin": 6 },
+        { "Code2D": "2D_Simu_79", "Bin": 1 },
+        { "Code2D": "2D_Simu_80", "Bin": 2 }
+      ]
+    },
+    {
+      "LotNumber": "SIMU_LOT_E",
+      "Items": [
+        { "Code2D": "2D_Simu_81", "Bin": 3 },
+        { "Code2D": "2D_Simu_82", "Bin": 4 },
+        { "Code2D": "2D_Simu_83", "Bin": 5 },
+        { "Code2D": "2D_Simu_84", "Bin": 6 },
+        { "Code2D": "2D_Simu_85", "Bin": 1 },
+        { "Code2D": "2D_Simu_86", "Bin": 2 },
+        { "Code2D": "2D_Simu_87", "Bin": 3 },
+        { "Code2D": "2D_Simu_88", "Bin": 4 },
+        { "Code2D": "2D_Simu_89", "Bin": 5 },
+        { "Code2D": "2D_Simu_90", "Bin": 6 },
+        { "Code2D": "2D_Simu_91", "Bin": 1 },
+        { "Code2D": "2D_Simu_92", "Bin": 2 },
+        { "Code2D": "2D_Simu_93", "Bin": 3 },
+        { "Code2D": "2D_Simu_94", "Bin": 4 },
+        { "Code2D": "2D_Simu_95", "Bin": 5 },
+        { "Code2D": "2D_Simu_96", "Bin": 6 },
+        { "Code2D": "2D_Simu_97", "Bin": 1 },
+        { "Code2D": "2D_Simu_98", "Bin": 2 },
+        { "Code2D": "2D_Simu_99", "Bin": 3 },
+        { "Code2D": "2D_Simu_100", "Bin": 4 }
+      ]
+    }
+  ]
+}
