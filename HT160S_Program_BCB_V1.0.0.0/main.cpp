@@ -2213,6 +2213,12 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     //the next power-on can restore it (see RestoreLastWorkOrder / FormShow).
     SaveWorkOrder();
     RecordProcess("LOT START pressed");
+
+    //AI(ht160s-secsgem) 20260714 : notify host a new lot has started (S6F11 CEID 11).
+    // Pairs with the Lot End event in btnLotEndClick. Report 1 carries the new Current
+    // Lot ID. Registry is already populated (GetLotListCount()==0 returned early above),
+    // so no guard is needed. EventReport self-gates on USE_SECS_GEM + HSMS SELECTED.
+    EventReport(SECS_EVENT.PressLotStart);
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : total attempts allowed per lot during a pull-all
@@ -2417,6 +2423,14 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     TrayUphLog_OnLotEnd(edLotNo->Text, tRunData.TotalIC, tRunData.UPH);
     FreezeProductInfoAtLotEnd();
     WriteLastDataIni();
+
+    //AI(ht160s-secsgem) 20260714 : notify host this lot has ended (S6F11 CEID 12).
+    // Fire BEFORE LotRegistry.Clear() below so report 1's snapshot still carries the
+    // ending lot (Current Lot ID / Total IC / UPH). EventReport self-gates on
+    // USE_SECS_GEM + HSMS SELECTED (no-op when SECS off or link down). The lot-count
+    // guard mirrors HT9045's bLotStart gate : an empty Lot End press sends nothing.
+    if(LotRegistry.GetLotCount()>0)
+        EventReport(SECS_EVENT.PressLotEnd);
 
     //AI(ht160s-lot-webapi) 20260612 : stop any in-flight "pull all lots" sweep so
     // it does not walk the registry we are about to clear.
