@@ -4,6 +4,7 @@
 
 #include "deviceinfo.h"
 #include "database.h"
+#include "cCsvDailyLog.h"    // cCsvDailyLog::CsvQuote for Production_Log fields
 #include <stdio.h>
 #include <FileCtrl.hpp>
 //---------------------------------------------------------------------------
@@ -76,6 +77,18 @@ AnsiString TDeviceInfo::GetTitleLine()
 }
 
 //---------------------------------------------------------------------------
+//AI(ht160s-2dbin-import) 20260714 : RFC-4180 quote-if-needed for one
+//Production_Log field. A 2D code (Code2D/Manual2D) or free-text error may
+//contain a comma; quote it (doubling embedded ") so the comma cannot break the
+//column layout. Plain values stay bare so existing rows/consumers are
+//byte-identical. Mirrors cSoterOutput::CsvField. Production_Log is write-only.
+static AnsiString ProdCsvField(const AnsiString& s)
+{
+    if (s.Pos(",") > 0 || s.Pos("\"") > 0 || s.Pos("\n") > 0 || s.Pos("\r") > 0)
+        return cCsvDailyLog::CsvQuote(s);
+    return s;
+}
+//---------------------------------------------------------------------------
 AnsiString TDeviceInfo::GetDataLine(int iNozzle)
 {
     if (iNozzle < 0 || iNozzle >= 4)
@@ -86,7 +99,7 @@ AnsiString TDeviceInfo::GetDataLine(int iNozzle)
     {
         if (i > 0)
             sLine += ",";
-        sLine += m_records[iNozzle].sField[i];
+        sLine += ProdCsvField(m_records[iNozzle].sField[i]);
     }
     return sLine;
 }
