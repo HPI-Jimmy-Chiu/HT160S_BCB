@@ -3023,25 +3023,86 @@ void __fastcall TfMain::btn2DClearClick(TObject *Sender)
     SaveWorkOrder();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-2dbin-import) 20260714 : RFC-4180 field unquote. A field wrapped in
+//double quotes may contain a comma/space; a doubled "" inside is one literal
+//quote. An unquoted field is Trim()'d (legacy behavior); a quoted field keeps
+//its inner spaces verbatim. 2D codes never contain CR/LF (stripped at CCD
+//capture) so a single-line tokenizer suffices - embedded newlines are out of scope.
+static AnsiString CsvUnquoteField(AnsiString Field)
+{
+    Field=Field.Trim();
+    int Len=Field.Length();
+    if(Len>=2 && Field[1]=='"' && Field[Len]=='"')
+    {
+        AnsiString Inner=Field.SubString(2, Len-2);
+        AnsiString Out="";
+        int Pos=1;
+        int InnerLen=Inner.Length();
+        while(Pos<=InnerLen)
+        {
+            char Ch=Inner[Pos];
+            if(Ch=='"' && Pos<InnerLen && Inner[Pos+1]=='"')
+            {
+                Out+=Ch;
+                Pos+=2;
+            }
+            else
+            {
+                Out+=Ch;
+                Pos++;
+            }
+        }
+        return Out;
+    }
+    return Field;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-2dbin-manual) 20260628 : split one pasted/imported line into code+bin.
-//Accepts comma OR tab as the field separator. Staging only (operator reviews,
-//then Commit). Returns false for a blank line.
+//AI(ht160s-2dbin-import) 20260714 : now RFC-4180 quote-aware so a 2D code may
+//contain a comma/space when wrapped in double quotes. Splits on the FIRST
+//UNQUOTED comma; if none, falls back to the first unquoted tab (legacy .tab.txt).
+//Staging only (operator reviews, then Commit). Returns false for a blank line.
 static bool Split2DBinLine(AnsiString Line, AnsiString &Code, AnsiString &Bin)
 {
     Line=Line.Trim();
     if(Line==AnsiString(""))
         return false;
-    int Sep=Line.Pos(",");
-    if(Sep<=0)
-        Sep=Line.Pos("\t");
-    if(Sep>0)
+    int Len=Line.Length();
+    bool InQuotes=false;
+    int SepPos=0;
+    int TabPos=0;
+    for(int Pos=1; Pos<=Len; Pos++)
     {
-        Code=Line.SubString(1, Sep-1).Trim();
-        Bin=Line.SubString(Sep+1, Line.Length()-Sep).Trim();
+        char Ch=Line[Pos];
+        if(Ch=='"')
+        {
+            if(InQuotes && Pos<Len && Line[Pos+1]=='"')
+            {
+                Pos++;
+                continue;
+            }
+            InQuotes=!InQuotes;
+        }
+        else if(!InQuotes && Ch==',')
+        {
+            SepPos=Pos;
+            break;
+        }
+        else if(!InQuotes && Ch=='\t' && TabPos==0)
+        {
+            TabPos=Pos;
+        }
+    }
+    if(SepPos==0 && TabPos!=0)
+        SepPos=TabPos;
+    if(SepPos>0)
+    {
+        Code=CsvUnquoteField(Line.SubString(1, SepPos-1));
+        Bin=CsvUnquoteField(Line.SubString(SepPos+1, Line.Length()-SepPos));
     }
     else
     {
-        Code=Line;
+        Code=CsvUnquoteField(Line);
         Bin="";
     }
     return (Code!=AnsiString(""));
@@ -3088,19 +3149,70 @@ void __fastcall TfMain::btn2DImportClick(TObject *Sender)
     TStringList *Lines=new TStringList;
     try
     {
-        Dlg->Filter="CSV/Text|*.csv;*.txt|All|*.*";
+        Dlg->Filter="2D Import|*.csv;*.txt;*.json|CSV/Text|*.csv;*.txt|JSON|*.json|All|*.*";
         if(Dlg->Execute())
         {
-            Lines->LoadFromFile(Dlg->FileName);
-            for(int Index=0; Index<Lines->Count; Index++)
+            //AI(ht160s-2dbin-import) 20260714 : .json bypasses grid staging and
+            //loads straight into the registry via the existing cJSON parser
+            //(comma/space/quote in a code are handled). Replace semantics : Clear()
+            //first so re-import is idempotent (confirmed when work order non-empty).
+            AnsiString Ext=ExtractFileExt(Dlg->FileName).LowerCase();
+            if(Ext==AnsiString(".json"))
             {
-                AnsiString Code;
-                AnsiString Bin;
-                if(!Split2DBinLine(Lines->Strings[Index], Code, Bin))
-                    continue;
-                sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
-                sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]=Code;
-                sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]=Bin;
+                if(LotRegistry.GetLotCount()>0)
+                {
+                    if(ShowMyMessageBox_YES_NO(LangT("Import JSON will REPLACE the current work order. Continue ?"))!=TMyMessageBox::msgrtnYES)
+                        return;
+                }
+                //AI(ht160s-2dbin-import) 20260714 : work-order destroy point -
+                //back up to LotStory Discarded first (mirror Remove Lot / fresh
+                //start) and abort if the backup write fails.
+                if(ArchiveDiscardedWorkOrder("JSON_IMPORT")==false)
+                {
+                    ShowMyMessage(LangT("Backup failed : import aborted. Check disk / log path."));
+                    RecordProcess("JSON import aborted : work-order backup failed");
+                    return;
+                }
+                LotRegistry.Clear();
+                bool HasDup=false;
+                AnsiString FirstDup="";
+                bool bJsonOk=LotRegistry.LoadFromJsonFile(Dlg->FileName, HasDup, FirstDup);
+                if(bJsonOk==false || LotRegistry.GetLotCount()<=0)
+                {
+                    //AI(ht160s-2dbin-import) 20260714 : LoadFromJsonString returns
+                    //true for ANY parseable JSON, even one with no Maps/2DIDHistory
+                    //(0 lots). Do NOT persist that empty state - restore the prior
+                    //order from the still-intact on-disk WorkOrder.json.
+                    ShowMyMessage(LangT("JSON load produced no lots (wrong format or empty). Work order was NOT changed."));
+                    LotRegistry.Clear();
+                    LoadWorkOrder();
+                    RefreshLotListFromRegistry();
+                    if(LotRegistry.GetLotCount()<=0 && edLotNo!=NULL)
+                        edLotNo->Text="";
+                    Reload2DBinGridFromRegistry();
+                }
+                else
+                {
+                    RefreshLotListFromRegistry();
+                    Reload2DBinGridFromRegistry();
+                    SaveWorkOrder();
+                    if(HasDup)
+                        ShowMyMessage(Format(LangT("Duplicate 2D code across lots (first): %s"), ARRAYOFCONST((FirstDup))));
+                }
+            }
+            else
+            {
+                Lines->LoadFromFile(Dlg->FileName);
+                for(int Index=0; Index<Lines->Count; Index++)
+                {
+                    AnsiString Code;
+                    AnsiString Bin;
+                    if(!Split2DBinLine(Lines->Strings[Index], Code, Bin))
+                        continue;
+                    sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
+                    sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]=Code;
+                    sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]=Bin;
+                }
             }
         }
     }
