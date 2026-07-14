@@ -12,7 +12,7 @@
       cSelfCheck.obj cStepTrace.obj cStateRecordHT160.obj database.obj 
       aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj aSortArm.obj aColor.obj 
       csystem.obj uruncontrol.obj HTimer.obj myio.obj myio_MN200.obj 
-      mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj deviceinfo.obj 
+      mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj deviceinfo.obj cSoterOutput.obj 
       MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj 
       MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj 
       MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj 
@@ -122,6 +122,7 @@
       <FILE FILENAME="mycylin.cpp" FORMNAME="" UNITNAME="mycylin" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="MyKitSuck.cpp" FORMNAME="" UNITNAME="MyKitSuck" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="deviceinfo.cpp" FORMNAME="" UNITNAME="deviceinfo" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="cSoterOutput.cpp" FORMNAME="" UNITNAME="cSoterOutput" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="MotorAndIO\HTMotor.cpp" FORMNAME="" UNITNAME="HTMotor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="MotorAndIO\MyMotor.cpp" FORMNAME="" UNITNAME="MyMotor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="MotorAndIO\mySMCmotor.cpp" FORMNAME="" UNITNAME="mySMCmotor" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>

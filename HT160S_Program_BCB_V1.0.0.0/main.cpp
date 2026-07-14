@@ -29,6 +29,7 @@
 #include "uspeed.h"
 #include "systools.h"
 #include "deviceinfo.h"
+#include "cSoterOutput.h"
 #include "aLoader.h"
 #include "aEmpty.h"    //AI(ht160s-agv) 20260624 : EmptyModule->GetCarTrayCount for PanelMain6 header
 #include "aColor.h"    //AI(ht160s-agv) 20260624 : ColorModule->GetCarTrayCount for PanelMain6 header
@@ -1977,6 +1978,7 @@ void TfMain::DoStartArm()
             SoftStart=true;
             g_DeviceInfo.OnLotStart(edLotNo->Text, Now());                          //AI(HT160S-Maintainer) 20260603 : start per-IC production trace batch
             TrayUphLog_EnsureActive(edLotNo->Text);   //AI(ht160s-uph) 20260708 : 172-aligned arm-on-run (idempotent; skips if Lot Start/SECS already armed or on resume)
+            g_SoterOutput.EnsureActive(edLotNo->Text);
             if(LoaderModule!=NULL)
                 LoaderModule->SetCurrentLotNumber(edLotNo->Text);                   //AI(HT160S-Maintainer) 20260604 : P3 2D->Bin lookup keyed by lot number
 //        }
@@ -2203,6 +2205,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     ResetPerLotProductionCounters();
     //AI(ht160s-uph) 20260706 : open this work order's per-tray/lot UPH log folder.
     TrayUphLog_OnLotStart(FirstLot);
+    g_SoterOutput.OnLotStart(FirstLot);
     ClearProductInfoAtLotStart();
 
     MachineRun.bRunning=true;
@@ -2425,6 +2428,7 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
     RecordProcess("End of Lot: Lot="+edLotNo->Text+", TotalIC="+IntToStr(tRunData.TotalIC)+", UPH="+IntToStr(tRunData.UPH));
     TrayUphLog_OnLotEnd(edLotNo->Text, tRunData.TotalIC, tRunData.UPH);
+    g_SoterOutput.OnLotEnd();
     FreezeProductInfoAtLotEnd();
     WriteLastDataIni();
 

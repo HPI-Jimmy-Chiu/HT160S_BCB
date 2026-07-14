@@ -23,13 +23,14 @@ OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uHome.obj
     aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj aSortArm.obj aColor.obj \
     csystem.obj uruncontrol.obj HTimer.obj myio.obj myio_MN200.obj \
     mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj deviceinfo.obj \
-    MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj \
-    MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj \
-    MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj \
-    ColorCcdSocket.obj LotWebApiClient.obj ComPort.obj MyComm.obj \
-    MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj \
-    SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj \
-    SecsGem\uAgvStation.obj SecsGem\uHGemLogForm.obj
+    cSoterOutput.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj \
+    MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj \
+    MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj \
+    AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj \
+    LotWebApiClient.obj ComPort.obj MyComm.obj MyBinDisp.obj uPadInterface.obj \
+    SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj \
+    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uAgvStation.obj \
+    SecsGem\uHGemLogForm.obj
 RESFILES = ht160s.res
 MAINSOURCE = ht160s.cpp
 RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm \

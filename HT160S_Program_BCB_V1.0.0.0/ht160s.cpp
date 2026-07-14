@@ -69,6 +69,7 @@ USEFORM("iosetview.cpp", fiosetview);
 #include "cCommLog.h"
 #include "GeneralSetting.h"
 #include "deviceinfo.h"
+#include "cSoterOutput.h"
 #include "cSelfCheck.h"
 #include "SecsGem\uHGemEquipment.h"
 #include "SecsGem\UsecegemMainFrom.h"
@@ -266,6 +267,7 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          g_BinDispCommLog.Init("BindisplayLog");
          g_BinDispCommLog.SetRetentionDays(GeneralSetting.iLogRetentionCommDays);
          g_DeviceInfo.Init();
+         g_SoterOutput.Init();
          InitializeLoaderModule();
          InitializeEmptyModule();
          InitializeAutoModule();

@@ -18,6 +18,7 @@
 #include "aEmpty.h"   //AI(ht160s-actuator-timer) 20260627 : EmptyModule->PauseTimeoutTimers (AmrFeedWaitTimer freeze)
 #include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() in CheckCleanOutFinish
 #include "cprod.h"
+#include "cSoterOutput.h"
 #include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject test mode on machine start
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
@@ -1410,6 +1411,7 @@ void ProcessMotion()
 			tRunData.LotEndTime=Now();
 			tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
 			if(fMain!=NULL) fMain->FreezeProductInfoAtLotEnd();
+			g_SoterOutput.OnLotEnd();
 			InitialAllTask();
 			HSys.Sys.bCleanOut=false;   //AI(HT160S-Maintainer) 20260605 : CleanOut fully done, drop nested latch
 			//AI(HT160S-Maintainer) 20260612 : pop a "CleanOut finish" note (ref HT172

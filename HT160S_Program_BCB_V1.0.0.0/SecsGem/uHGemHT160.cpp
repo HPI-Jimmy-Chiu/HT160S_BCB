@@ -10,6 +10,7 @@
 #include "CosFunction.h"   // LotRegistry, HT160_LOT_SOURCE_SECS, HT160_MAX_LOT
 //AI(ht160s-secsgem) 20260611 : includes for live SV snapshot sources
 #include "cprod.h"         // tRunData (TotalIC/UPH), MachineRun (iTotalSorted)
+#include "cSoterOutput.h"
 #include "note.h"          // fNote (alarm dialog : fShow / Code)
 #include "cmydef.h"        // SoftStop (S2F42 PAUSE host command)
 #include "uAgvStation.h"   // AI(ht160s-agv) 20260615 : E87/AGV station table + AgvCoord
@@ -859,6 +860,9 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         ResetPerLotProductionCounters();
                         //AI(ht160s-uph) 20260706 : open the per-tray/lot UPH log folder.
                         TrayUphLog_OnLotStart(FirstLot);
+                        //AI(ht160s-soter) 20260714 : host LOTSTART is the SECS analog of the manual Lot
+                        //Start button; force clear+arm a fresh Soter buffer for the new lot (mirrors main.cpp).
+                        g_SoterOutput.OnLotStart(FirstLot);
                         fMain->ClearProductInfoAtLotStart();
                         fMain->edLotNo->Text = FirstLot;         // active lot backfill
                         fMain->RefreshLotListFromRegistry();

@@ -16,6 +16,8 @@
 #include "setup.h"
 #include "uteach.h"
 #include "deviceinfo.h"
+#include "cSoterOutput.h"
+#include "aColor.h"
 #include "aAuto1To6.h"     //AI(HT160S-Maintainer) 20260605 : AMR SortArm fill gate
 #include "GeneralSetting.h"  //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR
 #include "MyLed.h"           //AI(ht172-to-ht160-porting) 20260609 : drive sucker LED on Motion View
@@ -1261,6 +1263,29 @@ void TSortArmModule::RecordAutoSkippedCells()
         g_DeviceInfo.AddTraceInfo(s, iTrace2D);
 
         g_DeviceInfo.SaveRejectRecord(s, "AutoSkip");
+        //AI(ht160s-soter) 20260714 : emit a Soter reject row for a genuine-2D die
+        //written off on pick-vacuum failure. OpenRow is mandatory here : the pick-time
+        //OpenRow is bypassed for errored cells, so open then commit the row now.
+        {
+            TLotIcInfo SoterIc;
+            if(Slot[s].Code2D!="" && LotRegistry.FindIcInfo(Slot[s].Code2D, SoterIc))
+            {
+                AnsiString sSoterProd="";
+                AnsiString sSoterSub="";
+                if(Lot!=NULL)
+                {
+                    sSoterProd=Lot->sProductCode;
+                    sSoterSub=Lot->sSubstage;
+                }
+                AnsiString sSoterLoad="";
+                if(ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
+                    sSoterLoad=ColorModule->GetTrayID();
+                g_SoterOutput.OpenRow(s, sSoterProd, sSoterSub,
+                    Slot[s].Code2D, sSoterLoad,
+                    SoterIc.sRetestCode, SoterIc.iHBin, SoterIc.iSBin, SoterIc.sDiePass);
+                g_SoterOutput.CommitRejectRow(s);
+            }
+        }
 
         tRunData.iAutoSkipCount++;
         RecordProcess("SortArm auto-skip cell (Loader"+IntToStr(iActiveLoaderNo)
@@ -1465,6 +1490,28 @@ void TSortArmModule::TransferPickDataFromLoader()
                 else if(Slot[SlotIndex].LotIndex<0)
                     iTrace2D=1000;
                 g_DeviceInfo.AddTraceInfo(SlotIndex, iTrace2D);
+                //AI(ht160s-soter) 20260714 : open a Soter per-die output row at pick, only for
+                //a die with a genuine 2D identity resolved in the 2D map. Snapshot the fields
+                //now so a lot unload cannot lose them before the single LotEnd flush.
+                {
+                    TLotIcInfo SoterIc;
+                    if(Slot[SlotIndex].Code2D!="" && LotRegistry.FindIcInfo(Slot[SlotIndex].Code2D, SoterIc))
+                    {
+                        AnsiString sSoterProd="";
+                        AnsiString sSoterSub="";
+                        if(Lot!=NULL)
+                        {
+                            sSoterProd=Lot->sProductCode;
+                            sSoterSub=Lot->sSubstage;
+                        }
+                        AnsiString sSoterLoad="";
+                        if(ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
+                            sSoterLoad=ColorModule->GetTrayID();
+                        g_SoterOutput.OpenRow(SlotIndex, sSoterProd, sSoterSub,
+                            Slot[SlotIndex].Code2D, sSoterLoad,
+                            SoterIc.sRetestCode, SoterIc.iHBin, SoterIc.iSBin, SoterIc.sDiePass);
+                    }
+                }
             }
             Slot[SlotIndex].bHasIC=true;
             Slot[SlotIndex].bCanPick=false;
@@ -1516,6 +1563,15 @@ void TSortArmModule::TransferPlaceDataToAuto()
                     g_DeviceInfo.AddTraceInfo(SlotIndex, 1004);
             }
             g_DeviceInfo.AddOutputInfo(SlotIndex, "Auto"+IntToStr(iActiveAutoIndex+1), "", Slot[SlotIndex].PlaceY, Slot[SlotIndex].PlaceX);
+            //AI(ht160s-soter) 20260714 : complete + buffer this placed IC row. col9 Unload
+            //Cover Tray = the Auto flow-lane identity tray 2D. Must run BEFORE ClearSlot
+            //below (which wipes the slot); the pending Soter row is keyed by nozzle.
+            {
+                AnsiString sSoterUnload="";
+                if(AutoModule!=NULL)
+                    sSoterUnload=AutoModule->GetWorkingTrayID(iActiveAutoIndex);
+                g_SoterOutput.CommitPlaceRow(SlotIndex, sSoterUnload);
+            }
             ClearSlot(SlotIndex);
         }
     }
@@ -1649,6 +1705,10 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
                 LoaderTray->SetTraySingleData(Slot[s2].PickX, Slot[s2].PickY, (iKey==K_SKIP)?EMPTY_IC:Slot[s2].TrayData);
             Sk->Normal();     //drop the now-meaningless vacuum/blow outputs on this nozzle
             ClearSlot(s2);    //write the SortArm slot off : not held, not place-selected, never counted
+            //AI(ht160s-soter) 20260714 : drop the leaked Soter pending row for this abandoned
+            //nozzle. A fall-down is not recorded in Production_Log, so emit no Soter row either;
+            //this also stops a later non-genuine IC on this nozzle being mis-committed as placed.
+            g_SoterOutput.DiscardRow(s2);
         }
     }
     UpdateKitSuckState();
