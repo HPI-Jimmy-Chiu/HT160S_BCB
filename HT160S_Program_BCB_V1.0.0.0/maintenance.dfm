@@ -2112,7 +2112,7 @@ object fMaintenance: TfMaintenance
                 Left = 0
                 Top = 0
                 Width = 929
-                Height = 80
+                Height = 104
                 Align = alTop
                 BevelInner = bvLowered
                 TabOrder = 0
@@ -2120,13 +2120,15 @@ object fMaintenance: TfMaintenance
                   Left = 240
                   Top = 8
                   Width = 609
-                  Height = 64
+                  Height = 92
                   AutoSize = False
                   Caption =
                     'Normal = static Bin->Auto recipe table.  By Lot+Bin = each (Lot,B' +
                     'in) pair binds to an Auto dynamically.  By Lot+PassFail = PASS/FAI' +
                     'L (vs the Pass Bin set on the Bin Setting page) binds to an Auto p' +
-                    'er lot.  Changing the mode needs a software restart.'
+                    'er lot.  By WhiteList = only 2D codes listed in HT160S_WhiteList\W' +
+                    'hiteList.json are sorted (by the file Bin); others go to Error.  M' +
+                    'ode takes effect at the next Lot Start.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -2139,7 +2141,7 @@ object fMaintenance: TfMaintenance
                   Left = 8
                   Top = 2
                   Width = 224
-                  Height = 74
+                  Height = 98
                   Caption = 'Sort Mode'
                   Columns = 1
                   Font.Charset = DEFAULT_CHARSET
@@ -2151,7 +2153,8 @@ object fMaintenance: TfMaintenance
                   Items.Strings = (
                     'Normal'
                     'By Lot+Bin'
-                    'By Lot+PassFail')
+                    'By Lot+PassFail'
+                    'By WhiteList')
                   ParentFont = False
                   TabOrder = 0
                   OnClick = rgSortModeClick

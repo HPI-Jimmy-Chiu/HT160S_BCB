@@ -1805,6 +1805,21 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                             TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                         State->CcdTask=1;
                     }
+                    else if(GeneralSetting.IsWhiteListSortMode())
+                    {
+                        //AI(ht160s-whitelist) 20260715 : WhiteList mode - a 2D code that reads OK
+                        // but is NOT in the whitelist file is an EXPECTED reject (customer semantic),
+                        // NOT an operator exception, so route it silently to the Error Auto with NO
+                        // modal. Mirrors the K_SKIP body below. The 2D-unreadable (scan-fail) branch
+                        // below is a separate path and stays operator-retry (misread != foreign part).
+                        MachineRun.iUnknown2D++;
+                        TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+                        TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+                        TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
+                        if(TopCcdSocket!=NULL)
+                            TopCcdSocket->TopCcdEndShot();
+                        State->CcdTask=1;
+                    }
                     else
                     {
                         Ret=ShowMyError("WAR0475", LangT("2D code not found in any lot : ")+sCode, K_RETRY|K_SKIP|K_MANUAL_2D);

@@ -16,6 +16,7 @@
 #include "uAgvStation.h"   // AI(ht160s-agv) 20260615 : E87/AGV station table + AgvCoord
 #include "uAmrInject.h"   // AI(ht160s-agv) 20260708 : AMR manual-inject alert (HCACK!=0 surfacing)
 #include "UsecegemMainFrom.h" // AI(ht160s-secsgem) 20260715 : ComputeAlarmAlid (S5 ALID SSOT)
+#include "GeneralSetting.h" // AI(ht160s-whitelist) 20260715 : IsWhiteListSortMode()
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -882,7 +883,11 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         // 2D/Bin data (matches the manual LotStart path). Previously
                         // only the first lot was pulled, so SET_LOT_INFO/LOTSTART lots
                         // 2..n arrived with no 2D items.
-                        fMain->StartLotWebApiPullAll();            // async, no modal
+                        //AI(ht160s-whitelist) 20260715 : WhiteList mode loads the local WhiteList.json instead of the WebAPI pull.
+                        if(GeneralSetting.IsWhiteListSortMode())
+                            fMain->LoadWhiteListFile();
+                        else
+                            fMain->StartLotWebApiPullAll();            // async, no modal
                     }
                 }
             }

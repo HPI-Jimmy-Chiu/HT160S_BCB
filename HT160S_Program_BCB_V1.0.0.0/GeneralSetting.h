@@ -11,7 +11,7 @@
 //---------------------------------------------------------------------------
 // AI(ht160s-lotpassfail) 20260709 : sort-mode selector values. Top-level enum (no
 // enum class - BCB6). Replaces the old bool bUseLotBinSortMode two-way toggle.
-enum THT160SortMode { smNormal=0, smLotBin=1, smLotPassFail=2 };
+enum THT160SortMode { smNormal=0, smLotBin=1, smLotPassFail=2, smWhiteList=3 };
 //---------------------------------------------------------------------------
 class THT160GeneralSetting
 {
@@ -62,6 +62,9 @@ public:
 	bool IsNormalSortMode()      { return iSortMode==smNormal; }
 	bool IsLotBinSortMode()      { return iSortMode==smLotBin; }
 	bool IsLotPassFailSortMode() { return iSortMode==smLotPassFail; }
+	//AI(ht160s-whitelist) 20260715 : 4th mode. Static Bin->Auto table (like Normal), but the
+	// 2D->Bin source is a local WhiteList.json loaded at Lot Start; codes not in the list -> Error.
+	bool IsWhiteListSortMode()   { return iSortMode==smWhiteList; }
 	bool IsDynamicBindingMode()  { return iSortMode==smLotBin || iSortMode==smLotPassFail; }
 
 	// AI(ht160s-predictive-supply) 20260707 : demand-aware TrayArm replenish order.

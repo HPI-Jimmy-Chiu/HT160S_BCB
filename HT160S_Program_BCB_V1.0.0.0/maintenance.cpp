@@ -4,6 +4,7 @@
 #include "language.h"
 
 #include "database.h"
+#include "csystem.h"   //AI(ht160s-whitelist) 20260715 : HasICUnderMachine() guard for Sort-mode change
 #include "maintenance.h"
 #include "ComPort.h"
 #include "CosFunction.h"
@@ -1180,7 +1181,7 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     if(rgSortMode!=NULL)
     {
         int idx=rgSortMode->ItemIndex;   //AI(ht160s-lotpassfail) 20260709 : -1 (unselected) -> Normal
-        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smWhiteList)?idx:smNormal;
     }
     if(chkUsePredictiveAutoSupply!=NULL)
         GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
@@ -1925,14 +1926,30 @@ void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
     if(bLoadingHardwareSettings)
         return;
     (void)Sender;
+    //AI(ht160s-whitelist) 20260715 : refuse to switch mode while ICs are still under the
+    // machine (would mix classification models on in-flight product) - revert the radio to
+    // the live value and warn. Same-source guard as the SECS LOTSTART SORTMODE path.
+    if(HasICUnderMachine())
+    {
+        if(rgSortMode!=NULL)
+        {
+            bLoadingHardwareSettings=true;              // suppress the re-entrant OnClick
+            rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+            bLoadingHardwareSettings=false;
+        }
+        ShowMyMessage("Cannot change Sort mode while ICs are still under the machine. "
+                      "Finish or clear the current material first.");
+        return;
+    }
     if(rgSortMode!=NULL)
     {
         int idx=rgSortMode->ItemIndex;
-        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smWhiteList)?idx:smNormal;
     }
     RefreshHardwareSettingsStatus();
-    ShowMyMessage("Sort mode changed. Please restart the software so the new "
-                  "classification mode takes effect cleanly.");
+    //AI(ht160s-whitelist) 20260715 : mode is a live value consumed at the next Lot Start
+    // (2D->Bin load) + per-scan routing; no software restart needed.
+    ShowMyMessage("Sort mode changed. It takes effect at the next Lot Start.");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkUsePredictiveAutoSupplyClick(TObject *Sender)

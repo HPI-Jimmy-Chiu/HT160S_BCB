@@ -457,6 +457,7 @@ public:		// User declarations
     void __fastcall RefreshLotListFromRegistry();
     void __fastcall SaveWorkOrder();
     bool __fastcall LoadWorkOrder();
+    bool __fastcall LoadWhiteListFile();   //AI(ht160s-whitelist) 20260715 : WhiteList mode 2D->Bin loader
     void __fastcall ArchiveWorkOrderToLotStory();
     bool __fastcall ArchiveDiscardedWorkOrder(AnsiString Reason);
     void __fastcall RequestLotDataFromWebApi(AnsiString LotID);

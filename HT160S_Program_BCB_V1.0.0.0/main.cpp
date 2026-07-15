@@ -1896,6 +1896,14 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
         Reason="Please Enter LotID !";
         return false;
     }
+    //AI(ht160s-whitelist) 20260715 : WhiteList mode loads its 2D->Bin list from the local
+    // file at Lot Start (LoadWhiteListFile). Give a mode-specific reason before the generic
+    // 2D-data gates below so a missing/empty whitelist file is obvious.
+    if(GeneralSetting.IsWhiteListSortMode() && LotRegistry.GetItemCount()<=0)
+    {
+        Reason="WhiteList mode is ON but HT160S_WhiteList\\WhiteList.json is missing or empty !";
+        return false;
+    }
     //AI(ht160s-lot-webapi) 20260612 : Start safety gate. Refuse to start the
     // machine unless (a) at least one Lot is registered AND (b) at least one
     // 2D/Bin record is loaded. A lot name alone (e.g. SECS SET_LOT_INFO that
@@ -2215,7 +2223,12 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     //AI(ht160s-lot-webapi) 20260612 : Stage 4 : at lot start, pull EVERY lot's
     // 2D/Bin data from the customer WebAPI (async, no modal). Shared helper so the
     // SECS S2F42 LOTSTART handler pulls every lot too (not just the first).
-    StartLotWebApiPullAll();
+    //AI(ht160s-whitelist) 20260715 : WhiteList mode substitutes the local WhiteList.json
+    // for the WebAPI pull (same LotRegistry, same downstream). See LoadWhiteListFile.
+    if(GeneralSetting.IsWhiteListSortMode())
+        LoadWhiteListFile();
+    else
+        StartLotWebApiPullAll();
     //AI(HT160S-Maintainer) 20260608 : need1 : persist the started work order so
     //the next power-on can restore it (see RestoreLastWorkOrder / FormShow).
     SaveWorkOrder();
@@ -2273,6 +2286,55 @@ void __fastcall TfMain::StartNextLotApiPull()
 // manual LotStart button and the SECS S2F42 LOTSTART handler so both fetch every
 // lot's 2D/Bin data, not just the first lot. Non-blocking, no modal (the SECS path
 // runs on the HSMS/VCL receive thread). Gated by the Lot WebAPI "UsePull" toggle.
+//AI(ht160s-whitelist) 20260715 : WhiteList mode 2D->Bin source. In place of the WebAPI pull,
+// load HT160S_WhiteList\WhiteList.json into LotRegistry through the SAME parser the WebAPI uses
+// (LoadFromJsonString, "Maps" schema). Clear() FIRST so the local file is AUTHORITATIVE : only
+// listed codes become routable, and any boot-restored / stale WorkOrder 2D data cannot leak
+// through in WhiteList mode. On success mirror PollLotDataWebApi (RefreshLotListFromRegistry +
+// SaveWorkOrder). Runs on the same VCL thread as the WebAPI helpers; never shows a modal.
+bool __fastcall TfMain::LoadWhiteListFile()
+{
+    AnsiString fn = HSys.CurrentDir + "\\HT160S_WhiteList\\WhiteList.json";
+    ForceDirectories(ExtractFilePath(fn));   // guide the FE : create the folder if absent
+    //AI(ht160s-whitelist) 20260715 : Clear FIRST - unconditionally, BEFORE the file checks.
+    // WhiteList is authoritative: if the file is missing/unreadable the registry MUST end up
+    // EMPTY so CheckLotDataReady blocks Start with the right reason, and NO boot-restored /
+    // stale WorkOrder 2D data can survive to be mis-sorted as if whitelisted. (Only reached in
+    // WhiteList mode at Lot Start, where clearing the registry is the intended fresh-lot action.)
+    LotRegistry.Clear();
+    if(!FileExists(fn))
+    {
+        RecordProcess("WhiteList: file missing - "+fn);
+        RefreshLotListFromRegistry();         // reflect the now-empty registry in the UI
+        return false;
+    }
+    AnsiString text="";
+    TStringList *raw = new TStringList;
+    try { raw->LoadFromFile(fn); text = raw->Text; }
+    catch(...)
+    {
+        delete raw;
+        RecordProcess("WhiteList: read failed - "+fn);
+        RefreshLotListFromRegistry();
+        return false;
+    }
+    delete raw;
+
+    bool bDup=false; AnsiString dupCode="";
+    bool ok = LotRegistry.LoadFromJsonString(text, bDup, dupCode);
+    RefreshLotListFromRegistry();
+    if(ok)
+    {
+        SaveWorkOrder();                       // persist only a VALID whitelist load
+        RecordProcess("WhiteList loaded: "+fn+"  (2D="+IntToStr(LotRegistry.GetItemCount())+")");
+        if(bDup)
+            RecordProcess("WhiteList duplicate 2D ignored: "+dupCode);
+    }
+    else
+        RecordProcess("WhiteList: JSON parse failed - "+fn);
+    return ok;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::StartLotWebApiPullAll()
 {
     EnsureLotWebApiClientCreated();

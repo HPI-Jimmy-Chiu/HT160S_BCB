@@ -1,0 +1,13 @@
+{
+  "_comment": "HT160S WhiteList sort-mode sample. Deploy as HT160S_WhiteList\\WhiteList.json under the HT160S working dir (fixed folder + fixed file name). In By WhiteList mode this file is the authoritative 2D->Bin source (loaded at Lot Start, replacing the WebAPI pull). Only 2D codes listed here are sorted, each to its listed Bin (routed through the static Bin->Auto recipe table, same as Normal mode); any scanned 2D code NOT in this list is sent silently to the Error bin. LotNumber MUST match the lot declared by the host (SET_LOT_INFO/LOTSTART) or entered by the operator, else Start is blocked. 2D codes are byte-exact (case-sensitive) and must be unique across the file. The _comment key is ignored by the parser.",
+  "Maps": [
+    {
+      "LotNumber": "LOT001",
+      "Items": [
+        { "Code2D": "A1B2C3D4E5", "Bin": 1 },
+        { "Code2D": "F6G7H8I9J0", "Bin": 2 },
+        { "Code2D": "K1L2M3N4O5", "Bin": 1 }
+      ]
+    }
+  ]
+}

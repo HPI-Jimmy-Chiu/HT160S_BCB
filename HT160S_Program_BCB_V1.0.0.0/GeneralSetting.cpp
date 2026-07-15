@@ -122,7 +122,7 @@ void THT160GeneralSetting::Load()
 	{
 		int LegacyMode=Ini->ReadBool("SortMode", "UseLotBinMode", false)?smLotBin:smNormal;
 		iSortMode=Ini->ReadInteger("SortMode", "Mode", LegacyMode);
-		if(iSortMode<smNormal || iSortMode>smLotPassFail)
+		if(iSortMode<smNormal || iSortMode>smWhiteList)
 			iSortMode=smNormal;
 	}
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
