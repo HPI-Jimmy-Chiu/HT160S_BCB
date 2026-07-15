@@ -1,6 +1,6 @@
 # Plan — Operator-editable mechanism settle-time panel (tsLoaderUnloader)
 
-Status: **PLAN ONLY — awaiting user confirmation. No code changed.**
+Status: **IMPLEMENTED & COMMITTED (commit 4c56123, feat/iosetview-172-refactor) — 2026-07-15 verified: GeneralSetting members `iEmptyDestackSettleMs` / `iColorDestackSettleMs` / `iLoaderDestackSettleMs` / `iAutoPushConfirmSettleMs` / `iTrayArmClampSettleMs` etc. wired at ~230 call sites; `pnlSettleDelay` + `edSettle0..N` panel present in maintenance.h/.dfm/.cpp. On-machine verify pending. (This header previously read "PLAN ONLY — No code changed", which was stale.)**
 Date: 2026-06-28
 Origin: follow-up to the actuator-timer pause-freeze work. User wants the hard-coded
 "expires-without-alarm" settle/step delays exposed for editing, defaults = current values,
