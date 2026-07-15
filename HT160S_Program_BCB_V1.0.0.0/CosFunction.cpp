@@ -1422,7 +1422,7 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 	// { LOTID, Substage, ProductCode, ICIInfo[] } -> IC
 	// { QRCodeID, RetestCode, HBin(str), SBin(str), DiePass }. HBin/SBin are
 	// strings; the routing Bin is SBin or HBin per CosFunction.iSortBinSource.
-	cJSON *Hist=cJSON_GetObjectItem(Root, "2DIDHistory");
+	cJSON *Hist=cJSON_GetObjectItem(Root, "2DIDHistory"); if(Hist==NULL) Hist=cJSON_GetObjectItem(Root, "QRCodeIDHis"); /*AI(ht160s-lot-webapi) 20260715: accept real KYEC root key QRCodeIDHis*/
 	if(Hist!=NULL && cJSON_IsArray(Hist))
 	{
 		cJSON *LotNode=Hist->child;
@@ -1454,7 +1454,7 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 				}
 			}
 
-			cJSON *ICIInfo=cJSON_GetObjectItem(LotNode, "ICIInfo");
+			cJSON *ICIInfo=cJSON_GetObjectItem(LotNode, "ICIInfo"); if(ICIInfo==NULL) ICIInfo=cJSON_GetObjectItem(LotNode, "ICInfo"); /*AI(ht160s-lot-webapi) 20260715: accept real KYEC IC array ICInfo*/
 			if(LotIndex>=0 && ICIInfo!=NULL && cJSON_IsArray(ICIInfo))
 			{
 				cJSON *IcNode=ICIInfo->child;
@@ -1481,7 +1481,7 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 							RetestCode=AnsiString(RetNode->valuestring);
 						AnsiString DiePass="";
 						if(DieNode!=NULL && cJSON_IsString(DieNode) && DieNode->valuestring!=NULL)
-							DiePass=AnsiString(DieNode->valuestring);
+							DiePass=AnsiString(DieNode->valuestring); else if(DieNode!=NULL && cJSON_IsNumber(DieNode)) DiePass=AnsiString((int)DieNode->valuedouble); /*AI(ht160s-lot-webapi) 20260715: KYEC DiePass is a JSON number*/
 
 						int HBin=StrToIntDef(HBinStr.Trim(), 0);
 						int SBin=StrToIntDef(SBinStr.Trim(), 0);

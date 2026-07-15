@@ -2413,11 +2413,11 @@ void __fastcall TfMain::PollLotDataWebApi()
     {
         bDuplicate=false;
         DupCode="";
-        if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode))
+        int iLotsBefore=LotRegistry.GetLotCount(); /*AI(ht160s-lot-webapi) 20260715: snapshot before parse*/ if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode))
         {
             RefreshLotListFromRegistry();
             SaveWorkOrder();
-            RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot);
+            if(LotRegistry.GetLotCount()==iLotsBefore) RecordProcess("Lot WebAPI parsed 0 lots (schema mismatch?): "+sLotApiPullLot); else RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot); /*AI(ht160s-lot-webapi) 20260715: break silent-empty parse*/
             if(bDuplicate==true)
                 RecordProcess("Lot WebAPI duplicate 2D ignored: "+DupCode);
             bAttemptOk=true;
