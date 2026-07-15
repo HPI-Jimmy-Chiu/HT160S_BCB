@@ -575,7 +575,13 @@ W-bit=1。
 
 > **為什麼 ALID 用字串 hash、而不是固定編號？host 該以什麼為準？** 因為 ALID 由字串確定性地算出，可避免維護一張人工編號表；但這也代表 **ALID 本身對 host 不直觀**。整合時建議 host 端 **以 ALTX 的 leading code token 作為警報的辨識依據**（ALID 用於去重／配對 SET↔CLEAR 即可），因為 code token 才是人類可讀、語意明確的代碼。
 >
-> 另注：`AddAlarmList()` 目前為空 → 設備對 S5F5/F6 警報目錄查詢會回覆空 catalog（記錄為目前狀態）。
+> **S5F5/F6 + S5F7/F8 警報目錄查詢（2026-07-15 更新，commit `4ae0cce`）**：`AddAlarmList()`／`S5F6_ListAlarmData()` 過去為空 stub、只回空 `L,0`。現已改為從 `mapAlarmCodeList`（同一份 alarm SSOT，也餵 AlarmList.csv 與 S5F1）**即時輸出完整警報目錄**：
+>
+> - **S5F5**（host「List Alarm Request」）→ 設備回 **S5F6**「List Alarm Data」。
+> - **S5F7**（host「List Enabled Alarm Request」）→ 設備回 **S5F8**。本機所有警報恆為 enabled，故 enabled list = 完整目錄（內容與 S5F6 相同）。
+> - body 格式：`L[n] { L[3] { B ALCD, U4 ALID, A ALTX } }`，每筆 = 一個警報定義。`ALID` 用與 S5F1 **相同**的 `ComputeAlarmAlid()`（故上報警報的 ALID 必等於目錄中同一警報的 ALID，可交叉對位）；`ALCD` = 警報分類（`AlarmType & 0x7F`；目錄為「定義列」故 bit7 SET/CLEAR = 0）；`ALTX` = `code`（有 message 時為 `code + 空白 + message`，同 S5F1）。
+> - **已知取捨**：S5F5／S5F7 body 內的 ALID 過濾清單**未實作**——設備一律回完整目錄（對常見的 `L,0` = 查全部等價；host 若送特定 ALID 子集需自行過濾）。
+> - S5F5→S5F6／S5F7→S5F8 的**實測 round-trip log 待以 `HT160S_SECS_Simulator` 補跑**（本節不偽造 log；現況為程式碼已實作並雙建置 EXIT 0，上機/host 驗證 pending）。
 
 **實際 case log 節錄（設備端 Equipment）**：
 

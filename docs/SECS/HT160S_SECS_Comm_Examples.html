@@ -1139,7 +1139,14 @@ sequenceDiagram
 <p><strong>ALTX 的內容範圍（重要）</strong>：實際 handler（<code>UsecegemMainFrom.cpp:154-156</code>）在 <strong>沒有附加 Message 時</strong> 設 <code>altx = Code</code>（即純 alarm code 字串），在 <strong>有 Message 時</strong> 設 <code>altx = Code + ' ' + Message</code>（即 code、一個空白、再接人類可讀訊息）。換言之，<strong>ALTX 不保證恆等於 alarm code</strong>——可能是 <code>code</code> 或 <code>code + 空白 + message</code>。本 run 觀察到的 ALTX 皆為純 alarm code（<code>"Loader Tray Empty"</code>／<code>"SnFKCleanOut"</code>，無附加 Message）。</p>
 <p><strong>整合建議</strong>：host 端若要以 ALTX 辨識警報，請 <strong>以開頭的 code token（第一個空白前的字串）作為比對鍵</strong>，而非整段 ALTX 字串，以免日後附加 Message 時比對失敗。</p>
 <p><strong>為什麼 ALID 用字串 hash、而不是固定編號？host 該以什麼為準？</strong> 因為 ALID 由字串確定性地算出，可避免維護一張人工編號表；但這也代表 <strong>ALID 本身對 host 不直觀</strong>。整合時建議 host 端 <strong>以 ALTX 的 leading code token 作為警報的辨識依據</strong>（ALID 用於去重／配對 SET↔CLEAR 即可），因為 code token 才是人類可讀、語意明確的代碼。</p>
-<p>另注：<code>AddAlarmList()</code> 目前為空 → 設備對 S5F5/F6 警報目錄查詢會回覆空 catalog（記錄為目前狀態）。</p>
+<p><strong>S5F5/F6 + S5F7/F8 警報目錄查詢（2026-07-15 更新，commit <code>4ae0cce</code>）</strong>：<code>AddAlarmList()</code>／<code>S5F6_ListAlarmData()</code> 過去為空 stub、只回空 <code>L,0</code>。現已改為從 <code>mapAlarmCodeList</code>（同一份 alarm SSOT，也餵 AlarmList.csv 與 S5F1）<strong>即時輸出完整警報目錄</strong>：</p>
+<ul>
+<li><strong>S5F5</strong>（host「List Alarm Request」）→ 設備回 <strong>S5F6</strong>「List Alarm Data」。</li>
+<li><strong>S5F7</strong>（host「List Enabled Alarm Request」）→ 設備回 <strong>S5F8</strong>。本機所有警報恆為 enabled，故 enabled list = 完整目錄（內容與 S5F6 相同）。</li>
+<li>body 格式：<code>L[n] { L[3] { B ALCD, U4 ALID, A ALTX } }</code>，每筆 = 一個警報定義。<code>ALID</code> 用與 S5F1 <strong>相同</strong>的 <code>ComputeAlarmAlid()</code>（故上報警報的 ALID 必等於目錄中同一警報的 ALID，可交叉對位）；<code>ALCD</code> = 警報分類（<code>AlarmType &amp; 0x7F</code>；目錄為「定義列」故 bit7 SET/CLEAR = 0）；<code>ALTX</code> = <code>code</code>（有 message 時為 <code>code + 空白 + message</code>，同 S5F1）。</li>
+<li><strong>已知取捨</strong>：S5F5／S5F7 body 內的 ALID 過濾清單<strong>未實作</strong>——設備一律回完整目錄（對常見的 <code>L,0</code> = 查全部等價；host 若送特定 ALID 子集需自行過濾）。</li>
+<li>S5F5→S5F6／S5F7→S5F8 的<strong>實測 round-trip log 待以 <code>HT160S_SECS_Simulator</code> 補跑</strong>（本節不偽造 log；現況為程式碼已實作並雙建置 EXIT 0，上機/host 驗證 pending）。</li>
+</ul>
 </blockquote>
 <p><strong>實際 case log 節錄（設備端 Equipment）</strong>：</p>
 <pre><code>00:01:00.388  [SECS][TX] S5F1 Alarm ALID=4045923824 ALCD=128   (SET   &quot;Loader Tray Empty&quot;)
