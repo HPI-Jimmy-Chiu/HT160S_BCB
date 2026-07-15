@@ -25,6 +25,7 @@
 #include "aEmpty.h"           // EmptyModule  (P2 infeed handoff)
 #include "aColor.h"           // ColorModule  (P3 infeed handoff)
 #include "uAmrInject.h"      // AI(ht160s-agv) 20260708 : AMR manual-inject test facility
+#include "CosFunction.h"     // AI(ht160s-agv-binsetting) 20260713 : BinAreaMap / LotBinBinding routing model (bin setting source)
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 TAgvCoordinator AgvCoord;
@@ -535,12 +536,81 @@ AnsiString TAgvCoordinator::DescribeAgvState()
             iLock  = InfeedLocked(i) ? 1 : 0;
             iReady = InfeedReady(i)  ? 1 : 0;
         }
+        AnsiString sBins = "";   //AI(ht160s-agv-binsetting) 20260713 : live SVID 38234-45 value per Auto
+        if(AgvStation[i].Kind==ASK_AUTO && AgvStation[i].AutoIndex>=0)
+            sBins = " bins=[" + DescribeAutoBins(AgvStation[i].AutoIndex) + "]";
         s += "P" + IntToStr(AgvStation[i].PIndex) + " " + AnsiString(AgvStation[i].Name)
            + ": lock=" + IntToStr(iLock)
            + " hs="    + AnsiString(AgvHsName(Handshake[i]))
-           + " ready=" + IntToStr(iReady) + "\r\n";
+           + " ready=" + IntToStr(iReady) + sBins + "\r\n";
     }
     s += AmrInject.Describe();   //AI(ht160s-agv) 20260708 : test-mode + armed-latch state
     return s;
+}
+//---------------------------------------------------------------------------
+// AI(ht160s-agv-binsetting) 20260713 : build the "bin setting" string for one Auto
+// (SVID 38234-38236 / 38243-38245). Semantics mirror HT9045 AMRUnloadBin : it tells the
+// AMR/host which sort-result bin(s) land in that Auto's output car. HT160 has three
+// routing models (GeneralSetting.iSortMode) :
+//   smNormal      : BinAreaMap is a 1:1 Bin<->Area bijection, so each Auto carries
+//                   exactly one bin (GetBinByArea). If this Auto is also the Error /
+//                   overflow area, append an "ERR" marker (it additionally collects
+//                   2D-scan-fail / no-bin-setting ICs plus any overflow).
+//   smLotBin      : dynamic (LotID,Bin)->Auto bindings; emit "LotID:Bin" tokens.
+//   smLotPassFail : dynamic (LotID,PASS/FAIL)->Auto bindings; emit "LotID:PASS"/":FAIL".
+// A bin number alone is meaningless in the dynamic modes (the same Auto means a
+// different grade per lot), hence the LotID prefix (user-confirmed 20260713). Read-only.
+AnsiString TAgvCoordinator::DescribeAutoBins(int AutoIndex)
+{
+    if(AutoIndex < 0 || AutoIndex >= AGV_AUTO_COUNT)
+        return "";
+
+    if(GeneralSetting.IsDynamicBindingMode())
+    {
+        AnsiString s = "";
+        int n = LotBinBinding.GetBindingCount();
+        for(int i = 0; i < n; i++)
+        {
+            AnsiString LotID;
+            int Key;
+            int BoundAuto;
+            if(LotBinBinding.GetBindingByIndex(i, LotID, Key, BoundAuto) == false)
+                continue;
+            if(BoundAuto != AutoIndex)
+                continue;
+            AnsiString token;
+            if(GeneralSetting.IsLotPassFailSortMode())
+                token = LotID + ":" + (Key == 1 ? AnsiString("PASS")
+                                     : Key == 2 ? AnsiString("FAIL")
+                                     :            IntToStr(Key));
+            else
+                token = LotID + ":" + IntToStr(Key);
+            s = (s == "") ? token : (s + "," + token);
+        }
+        return s;
+    }
+
+    // smNormal : the single bin mapped to this Auto area, plus an Error marker if this
+    // Auto is the configured error / overflow target.
+    int Area = eHT160BinAreaAuto1 + AutoIndex;
+    AnsiString s = "";
+    int Bin = BinAreaMap.GetBinByArea(Area);
+    if(Bin > 0)
+        s = IntToStr(Bin);
+    if(BinAreaMap.GetErrorBinArea() == Area)
+        s = (s == "") ? AnsiString("ERR") : (s + ",ERR");
+    return s;
+}
+//---------------------------------------------------------------------------
+// AI(ht160s-agv-binsetting) 20260713 : repopulate all six Auto BinSetting snapshots from
+// the live routing config. Called every 1s from HT160Gem::ServiceAgv, ungated by RunMode
+// / link so a host config-time S1F3 read while the machine is idle still sees a current
+// value. Gated on bUseAMR : no point maintaining AMR SVIDs when AMR is off.
+void TAgvCoordinator::RefreshBinSettings()
+{
+    if(GeneralSetting.bUseAMR == false)
+        return;
+    for(int a = 0; a < AGV_AUTO_COUNT; a++)
+        BinSetting[a] = DescribeAutoBins(a);
 }
 //---------------------------------------------------------------------------

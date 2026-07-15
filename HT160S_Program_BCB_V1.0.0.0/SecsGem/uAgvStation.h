@@ -52,6 +52,12 @@ public:
     AnsiString StatusBitmap;                     // 38220  set at CEID273 fire time
     AnsiString FinishBitmap;                     // 38221  set at CEID274 fire time
     AnsiString CarrierID[AGV_STATION_COUNT];     // 38202..38210 (index P-1)
+    // AI(ht160s-agv-binsetting) 20260713 : TrayCount[0]=Loader is host-supplied
+    // (START_AGV LoaderTrayCount CP) because only the Loader consumes it (tray-kind
+    // boundary tagging). [1]/[2] (Empty/Color, SVID 38223/38224) stay RESERVED 0 :
+    // HT9045/KYEC drive Empty/Color purely by sensor+TrayArm with zero SECS, and
+    // HT160 has no stack-depth counting hardware (only a present/empty InputEnd
+    // sensor). [3..8]=Auto are refreshed live from TMyCar. See uHGemHT160 START_AGV.
     int        TrayCount[AGV_STATION_COUNT];     // (index P-1)
     int        DeviceCount[AGV_STATION_COUNT];   // (index P-1)
     AnsiString BinSetting[AGV_AUTO_COUNT];       // Auto1..6 (index AutoIndex)
@@ -75,6 +81,14 @@ public:
     void ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiString id2D); //AI(ht160s-agv-identity2d) 20260714 : S6F11 CEID275 AGVLdID; SVID = AgvStation[stationIndex].SvidCarrierID (identity-tray 2D)
     bool BeginPrep(AnsiString cpName);           // Phase C : START_AGV -> prep
     void ReassertLocks();                        //AI(ht160s-home-resume-w5) 20260711 : post-HOME lock re-assert (InitialAllTask tail)
+
+    // AI(ht160s-agv-binsetting) 20260713 : per-Auto "bin setting" string for SVID
+    // 38234-38236 / 38243-38245 (host reads via S1F3; not on any event report). Mirrors
+    // HT9045 AMRUnloadBin : describes which sort-result bin(s)/category land in that
+    // Auto's output car, so the AMR/host knows what grade the car it collects holds.
+    // RefreshBinSettings() repopulates all six from the live routing config each tick.
+    AnsiString DescribeAutoBins(int AutoIndex);
+    void       RefreshBinSettings();
 
     // AI(ht160s-agv) 20260627 : station-side timeout release. Auto-full waited
     // iAmrFullWaitSec for the AGV; drop THIS Auto's handshake (lock + state) so

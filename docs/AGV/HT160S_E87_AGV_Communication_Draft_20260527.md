@@ -134,6 +134,21 @@ SVID38221 = P1:0,P2:0,P3:0,P4:1,P5:0,P6:0,P7:0,P8:0,P9:0
 | 38244 | ASCII | `AMR Auto5 Bin Setting` | P8 bin setting，新增 |
 | 38245 | ASCII | `AMR Auto6 Bin Setting` | P9 bin setting，新增 |
 
+### 6.1 實作註記（2026-07-13）
+
+**Bin Setting（38234-38236 / 38243-38245，僅 Auto）— 已實作。**
+語意對齊 HT9045 `AMRUnloadBin`：描述該 Auto 出料車裝的是哪些分選 bin/類別，供 AMR/host 得知車內等級。HT160 依 `GeneralSetting.iSortMode` 產生字串：
+
+- `smNormal`：`BinAreaMap` 為 Bin↔Area **1:1 雙射**，每個 Auto 恰一個 bin → 純 bin 號（如 `5`）。若該 Auto 同時是 Error/溢位站，額外附 `ERR`（如 `6,ERR`）。
+- `smLotBin`：動態 `(LotID,Bin)→Auto` 綁定 → `LotID:Bin`（逗號串多筆）。
+- `smLotPassFail`：動態 `(LotID,PASS/FAIL)→Auto` → `LotID:PASS` / `LotID:FAIL`。
+
+動態模式加 LotID 前綴，因為同一 Auto 在不同 lot 代表不同等級，裸 bin 號無意義。
+本欄不掛在任何 event report（reports 2-6 皆無），僅供 host **S1F3** 主動查詢；由 `HT160Gem::ServiceAgv` 每 1s 呼叫 `AgvCoord.RefreshBinSettings()` 刷新（不受 RunMode/連線 gate，故 host 於機台 idle 的 config-time 查詢仍為即時值）。
+
+**Empty / Color Tray Count（38223 / 38224）— 保留 0（不實作供數）。**
+與 Loader（38222，由 host `START_AGV` 的 `LoaderTrayCount` CP 灌入且被 tray-kind 邏輯消費）不同，Empty/Color **刻意無** host CP、也無本地量測：HT9045/KYEC 對 Empty/Color 為純 sensor+TrayArm、**零 SECS**（見 `docs/AGV/HT9045_vs_HT160_SECS_Diff_20260625.md`），且 HT160 無堆疊計數硬體（僅 present/empty 的 InputEnd sensor）。此二 SVID 保留 0，待客戶確認需求或計數硬體到位再議。
+
 ## 7. Auto4-Auto6 順移延伸評估
 
 結論：**可以延伸，而且建議以 AutoNo / PIndex 資料表化處理，不建議手動複製三段 Auto3 程式。**

@@ -189,6 +189,10 @@ void HT160Gem::RefreshSecsBadge()
 // this is safe to call every tick regardless of link state.
 void HT160Gem::ServiceAgv()
 {
+    //AI(ht160s-agv-binsetting) 20260713 : keep SVID 38234-45 (per-Auto bin setting) live
+    // for host S1F3. Config-derived + RunMode/link-independent, so it runs BEFORE the
+    // RunMode-gated PollAndCall (a host reads bin setting at config time, machine idle).
+    AgvCoord.RefreshBinSettings();
     AgvCoord.PollAndCall(HGemPtr);
     AgvCoord.ServiceHandshake(HGemPtr);
 }
@@ -935,6 +939,13 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
                             HGemPtr->DataItemIn(len, Type, cpVal);
 
+                        //AI(ht160s-agv-binsetting) 20260713 : ONLY the Loader has a
+                        // host tray-count CP. There is deliberately NO EmptyTrayCount /
+                        // ColorTrayCount CP : SVID 38223/38224 (AMR Empty/Color Tray
+                        // Count) stay reserved 0. HT9045/KYEC drive Empty/Color purely by
+                        // sensor+TrayArm with zero SECS (docs/AGV/HT9045_vs_HT160_SECS_Diff)
+                        // and HT160 has no stack-depth counting hardware. Loader is host-
+                        // supplied because only it consumes the value (tray-kind tagging).
                         if(cpName.Trim().UpperCase()=="LOADERTRAYCOUNT")
                             AgvCoord.TrayCount[0] = StrToIntDef(cpVal, 0);  // P1 Loader expected trays
                         else if(AgvCoord.BeginPrep(cpName)==false)
