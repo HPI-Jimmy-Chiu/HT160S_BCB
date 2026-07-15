@@ -199,6 +199,7 @@ public:
 	int iLogRetentionDiscardedDays; // LotStory Discarded (work-order backups)
 	//AI(ht160s-uph) 20260706 : per-tray/lot UPH logs under UPHLog (month buckets).
 	int iLogRetentionUPHLogDays;    // UPHLog per-lot folders
+	int iLogRetentionProdDailyDays; // Production_Log Daily aggregate (per-day prod CSV)
 
 	// AI(ht160s-uph) 20260709 : min-sample warm-up guard for the on-screen + SECS UPH.
 	// Early in a lot the elapsed window is tiny, so TotalIC*3600/sec spikes to a huge

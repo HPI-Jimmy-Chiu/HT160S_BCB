@@ -267,6 +267,8 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          g_BinDispCommLog.Init("BindisplayLog");
          g_BinDispCommLog.SetRetentionDays(GeneralSetting.iLogRetentionCommDays);
          g_DeviceInfo.Init();
+         //AI(ht160s-prodlog) 20260716 : per-day Production aggregate retention (General.ini [LogRetention] ProdDailyDays)
+         g_DeviceInfo.SetDailyRetentionDays(GeneralSetting.iLogRetentionProdDailyDays);
          g_SoterOutput.Init();
          InitializeLoaderModule();
          InitializeEmptyModule();

@@ -38,6 +38,13 @@ void TDeviceInfo::Init()
     // Central log root constant (HSys.LogRootDir = "D:\\HT160S_Log")
     m_sBaseDir = HSys.LogRootDir + "\\Production_Log";
     ForceDirectories(m_sBaseDir);
+
+    //AI(ht160s-prodlog) 20260716 : ALSO open a per-DAY aggregate CSV so a full calendar
+    //day is one readable file (the per-lot file above is unchanged). Resolves to
+    //Production_Log/Daily/YYYY_MM/Production_YYYY_MM_DD.csv under HSys.LogRootDir. Same
+    //21-column header as the per-lot files (GetTitleLine). Retention set from ht160s.cpp.
+    m_dailyProd.InitLog("Production_Log\\Daily", "Production", GetTitleLine(),
+                        cCsvDailyLog::lgMonthlyFolder, ".csv");
 }
 
 //---------------------------------------------------------------------------
@@ -256,8 +263,13 @@ void TDeviceInfo::AddOutputInfo(int iNozzle, const AnsiString& sAutoName,
     m_records[iNozzle].sField[eUnloadY]     = IntToStr(iRow);
     m_records[iNozzle].sField[eUnloadTime]  = NowTimeStr();
 
+    //AI(ht160s-prodlog) 20260716 : build the row ONCE and write it to BOTH the per-lot
+    //file and the per-DAY aggregate so the two stay byte-identical (m_records is not
+    //locked between the two appends).
     AnsiString sPath = GetLogFilePath();
-    AppendLine(sPath, GetDataLine(iNozzle));
+    AnsiString sLine = GetDataLine(iNozzle);
+    AppendLine(sPath, sLine);
+    m_dailyProd.AppendLine(sLine);
 }
 
 //---------------------------------------------------------------------------
@@ -275,8 +287,11 @@ void TDeviceInfo::SaveRejectRecord(int iNozzle, const AnsiString& sError)
     m_records[iNozzle].sField[eUnloadTime]  = NowTimeStr();
     m_records[iNozzle].sField[eErrorCode]   = sError;
 
+    //AI(ht160s-prodlog) 20260716 : build the row ONCE; write to per-lot + per-DAY (see AddOutputInfo).
     AnsiString sPath = GetLogFilePath();
-    AppendLine(sPath, GetDataLine(iNozzle));
+    AnsiString sLine = GetDataLine(iNozzle);
+    AppendLine(sPath, sLine);
+    m_dailyProd.AppendLine(sLine);
 }
 
 //---------------------------------------------------------------------------
@@ -284,5 +299,14 @@ void TDeviceInfo::ClearBatch()
 {
     for (int i = 0; i < 4; ++i)
         m_records[i].Clear();
+}
+
+//---------------------------------------------------------------------------
+//AI(ht160s-prodlog) 20260716 : set the per-day aggregate log retention. Called from the
+//ht160s.cpp boot block (same place as the other channels SetRetentionDays), so deviceinfo
+//need not depend on GeneralSetting. 0 = keep forever.
+void TDeviceInfo::SetDailyRetentionDays(int nDays)
+{
+    m_dailyProd.SetRetentionDays(nDays);
 }
 //---------------------------------------------------------------------------

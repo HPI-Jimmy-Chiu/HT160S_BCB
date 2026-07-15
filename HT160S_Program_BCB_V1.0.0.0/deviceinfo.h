@@ -9,6 +9,8 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #include <SyncObjs.hpp>
+//AI(ht160s-prodlog) 20260716 : full type needed for the by-value m_dailyProd member below
+#include "cCsvDailyLog.h"
 //---------------------------------------------------------------------------
 
 #define PROD_LOG_FIELD_COUNT    21
@@ -58,6 +60,12 @@ private:
 
     SICRecord m_records[4];         // One per nozzle (SORT_ARM_NOZZLE_COUNT=4)
 
+    //AI(ht160s-prodlog) 20260716 : ALSO mirror every production row into a per-DAY
+    //aggregate CSV so one calendar day is one readable file. The per-lot files above
+    //stay the untouched HT172-parity source of truth; this is a coexisting convenience
+    //view with its own critical section + own day/month rollover (Production_Log/Daily).
+    cCsvDailyLog m_dailyProd;
+
     AnsiString GetLogFilePath();
     AnsiString GetTitleLine();
     AnsiString GetDataLine(int iNozzle);
@@ -70,6 +78,10 @@ public:
     ~TDeviceInfo();
 
     void Init();
+
+    //AI(ht160s-prodlog) 20260716 : set the per-day aggregate log retention (called from
+    //the ht160s.cpp boot block, same place as the other channels SetRetentionDays)
+    void SetDailyRetentionDays(int nDays);
 
     // Called at lot start
     void OnLotStart(const AnsiString& sLotID, TDateTime dtStart);
