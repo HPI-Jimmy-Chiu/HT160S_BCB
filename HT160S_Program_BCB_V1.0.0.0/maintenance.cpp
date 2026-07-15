@@ -1952,6 +1952,21 @@ void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
     ShowMyMessage("Sort mode changed. It takes effect at the next Lot Start.");
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-whitelist) 20260716 : re-sync the Sort-mode radio to GeneralSetting.iSortMode
+//after a host (SECS LOTSTART SORTMODE) switch, WITHOUT firing rgSortModeClick : the
+//bLoadingHardwareSettings guard suppresses the re-entrant OnClick and its modal (which would
+//stall the HSMS receive path). Prevents a stale hardware-page selector from silently
+//reverting the host's change on the next SaveHardwareSettings.
+void __fastcall TfMaintenance::SyncSortModeSelectorFromSetting()
+{
+    if(rgSortMode==NULL)
+        return;
+    bool bSaved=bLoadingHardwareSettings;
+    bLoadingHardwareSettings=true;
+    rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+    bLoadingHardwareSettings=bSaved;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkUsePredictiveAutoSupplyClick(TObject *Sender)
 {
     if(bLoadingHardwareSettings)

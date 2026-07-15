@@ -1259,7 +1259,7 @@ void TSortArmModule::RecordAutoSkippedCells()
         if(Slot[s].Code2D=="")
             iTrace2D=999;
         else if(Slot[s].LotIndex<0)
-            iTrace2D=1000;
+            iTrace2D = GeneralSetting.IsWhiteListSortMode() ? 1005 : 1000;   //AI(ht160s-whitelist) 20260716 : code read OK but no owning lot -> WhiteList = not-in-list reject (1005), else generic NoMap (1000)
         g_DeviceInfo.AddTraceInfo(s, iTrace2D);
 
         g_DeviceInfo.SaveRejectRecord(s, "AutoSkip");
@@ -1488,7 +1488,7 @@ void TSortArmModule::TransferPickDataFromLoader()
                 if(Slot[SlotIndex].Code2D=="")
                     iTrace2D=999;
                 else if(Slot[SlotIndex].LotIndex<0)
-                    iTrace2D=1000;
+                    iTrace2D = GeneralSetting.IsWhiteListSortMode() ? 1005 : 1000;   //AI(ht160s-whitelist) 20260716 : code read OK but no owning lot -> WhiteList = not-in-list reject (1005), else generic NoMap (1000)
                 g_DeviceInfo.AddTraceInfo(SlotIndex, iTrace2D);
                 //AI(ht160s-soter) 20260714 : open a Soter per-die output row at pick, only for
                 //a die with a genuine 2D identity resolved in the 2D map. Snapshot the fields

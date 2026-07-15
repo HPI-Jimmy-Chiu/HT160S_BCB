@@ -453,6 +453,7 @@ public:
     void __fastcall OpenWorkFile();
     void __fastcall SaveWorkFile(AnsiString S);
     void __fastcall UpdateRunStateLock();
+    void __fastcall SyncSortModeSelectorFromSetting();
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfMaintenance *fMaintenance;

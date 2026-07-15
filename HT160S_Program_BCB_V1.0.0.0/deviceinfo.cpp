@@ -241,6 +241,7 @@ void TDeviceInfo::AddTraceInfo(int iNozzle, int iTraceCode)
         case 1002: sLabel = "ParseFail";     break;
         case 1003: sLabel = "SortFail";      break;
         case 1004: sLabel = "PFOverflow";    break;   //AI(ht160s-lotpassfail) 20260709 : PASS/FAIL product forced to Error Auto (all non-Error Autos taken)
+        case 1005: sLabel = "NotWhitelisted";break;   //AI(ht160s-whitelist) 20260716 : 2D read OK but code not in WhiteList.json (WhiteList sort mode)
         default:   sLabel = "TraceCode_" + IntToStr(iTraceCode); break;
     }
     m_records[iNozzle].sField[eErrorType] = sLabel;

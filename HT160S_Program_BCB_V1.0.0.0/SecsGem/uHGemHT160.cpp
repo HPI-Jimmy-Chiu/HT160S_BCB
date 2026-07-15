@@ -17,6 +17,7 @@
 #include "uAmrInject.h"   // AI(ht160s-agv) 20260708 : AMR manual-inject alert (HCACK!=0 surfacing)
 #include "UsecegemMainFrom.h" // AI(ht160s-secsgem) 20260715 : ComputeAlarmAlid (S5 ALID SSOT)
 #include "GeneralSetting.h" // AI(ht160s-whitelist) 20260715 : IsWhiteListSortMode()
+#include "maintenance.h"    // AI(ht160s-whitelist) 20260716 : SyncSortModeSelectorFromSetting (SECS SORTMODE UI sync)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -120,6 +121,10 @@ void HT160Gem::AddSV()
     // -- Current Lot (66030-66039) --
     HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
     HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
+    //AI(ht160s-whitelist) 20260716 : Q6 host read-back of the active sort mode. Bound to the
+    // live config int (stable global address, read at serialize time) so a SORTMODE switch via
+    // S2F41 LOTSTART is confirmable by S1F3. No RefreshSVData mirror : not a per-cycle snapshot.
+    HGemPtr->SetSVDataPointer(66032, HType.INT_4_TYPE, "Sort Mode", "", &GeneralSetting.iSortMode, "0=Normal 1=LotBin 2=LotPassFail 3=WhiteList");
 
     //AI(ht160s-agv) 20260615 : E87/AGV SVIDs (draft 38202-38245), bound to the
     // AgvCoord snapshot block (stable addresses). Bitmaps 38219-38221 are written
@@ -835,30 +840,100 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                 }
                 else
                 {
+                    //AI(ht160s-whitelist) 20260716 : Phase 2 -- the inner list carries ASCII
+                    // lot ids (as before) plus at most one optional L[2]{ A"SORTMODE", A value }
+                    // pair (value NORMAL|WHITELIST) that switches the sort mode for this lot.
+                    // Lots are buffered (not committed) until the whole list parses AND the busy
+                    // guard passes, so a malformed pair or a mode-change-while-running rejects the
+                    // entire packet with no ghost lot left registered. A plain lot-only list
+                    // behaves exactly as before (same lots, same order, same HCACK).
                     AnsiString FirstLot = "";
+                    AnsiString bufLots[HT160_MAX_LOT];
+                    int nBuf = 0;
+                    int pairLen;
+                    AnsiString PendingSortMode = "";      // "" = no SORTMODE pair seen
                     HCACK = 0;
                     for(i=0; i<n; i++)
                     {
-                        HGemPtr->GetDataItemLenAndType(len, Type);
-                        if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
+                        if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
                         {
-                            if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)==1)
+                            HCACK = 2;                       // truncated list -> param error
+                            break;
+                        }
+                        if(Type==HType.LIST_TYPE)
+                        {
+                            if(HGemPtr->GetDataItemLenAndTypeAndDelete(pairLen, HType.LIST_TYPE)!=1 || pairLen!=2)
                             {
-                                AnsiString lot = str;
-                                LotRegistry.AddLot(lot, HT160_LOT_SOURCE_SECS, "", "");
-                                if(FirstLot=="")
-                                    FirstLot = lot;
-                            }
-                            else
-                            {
-                                HCACK = 2;                       // read failure -> param error
+                                HCACK = 2;                   // malformed SORTMODE pair -> param error
                                 break;
                             }
+                            AnsiString cpName="", cpVal="";
+                            if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                                HGemPtr->DataItemIn(len, Type, cpName);
+                            if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                                HGemPtr->DataItemIn(len, Type, cpVal);
+                            if(cpName.Trim().UpperCase()!="SORTMODE")
+                            {
+                                HCACK = 2;                   // only the SORTMODE pair is recognized
+                                break;
+                            }
+                            AnsiString sMode = cpVal.Trim().UpperCase();
+                            if(sMode!="NORMAL" && sMode!="WHITELIST")
+                            {
+                                HCACK = 2;                   // value out of domain
+                                break;
+                            }
+                            PendingSortMode = sMode;         // duplicate pair -> last one wins
+                        }
+                        else if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
+                        {
+                            if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)!=1)
+                            {
+                                HCACK = 2;                   // read failure -> param error
+                                break;
+                            }
+                            if(nBuf>=HT160_MAX_LOT)
+                            {
+                                HCACK = 2;                   // more lots than capacity -> param error
+                                break;
+                            }
+                            bufLots[nBuf++] = AnsiString(str);
+                            if(FirstLot=="")
+                                FirstLot = AnsiString(str);
                         }
                         else
                         {
-                            HCACK = 2;                           // type mismatch -> param error
+                            HCACK = 2;                       // type mismatch -> param error
                             break;
+                        }
+                    }
+                    //AI(ht160s-whitelist) 20260716 : a SORTMODE pair with no lot is malformed
+                    // (the switch rides along with a Lot Start, per the customer spec).
+                    if(HCACK==0 && PendingSortMode!="" && nBuf==0)
+                        HCACK = 2;
+                    //AI(ht160s-whitelist) 20260716 : a SORTMODE change is only safe fully idle. The
+                    // command-level guard above (SystemStart/HasICUnderMachine) is weaker than the
+                    // UI Sort-mode lock : a lot can be Started (bRunning) with no IC yet under the
+                    // machine. Reject the whole packet as busy rather than switch the classification
+                    // model mid-lot. (No pair -> unchanged additive lot-registration behavior.)
+                    if(HCACK==0 && PendingSortMode!="" && MachineRun.bRunning==true)
+                        HCACK = 4;
+                    if(HCACK==0)
+                    {
+                        //AI(ht160s-whitelist) 20260716 : list parsed + guards passed -> commit the
+                        // buffered lots (order preserved), then apply the host sort-mode switch
+                        // BEFORE the 2D-source load decision below so this lot loads via the newly
+                        // selected mode. Persist it (sticky across restarts) and keep the maintenance
+                        // selector in sync so a later hardware-page Save cannot revert it.
+                        int k;
+                        for(k=0; k<nBuf; k++)
+                            LotRegistry.AddLot(bufLots[k], HT160_LOT_SOURCE_SECS, "", "");
+                        if(PendingSortMode!="")
+                        {
+                            GeneralSetting.iSortMode = (PendingSortMode=="WHITELIST") ? smWhiteList : smNormal;
+                            GeneralSetting.Save();
+                            if(fMaintenance!=NULL)
+                                fMaintenance->SyncSortModeSelectorFromSetting();
                         }
                     }
                     if(HCACK==0 && FirstLot!="" && fMain!=NULL)
