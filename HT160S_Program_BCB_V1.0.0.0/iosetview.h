@@ -723,6 +723,29 @@ private:
     void SelfTestUpdateSummary();
     void SelfTestSetButtonsRunning(bool Running);
     void SelfTestLog(AnsiString Line);
+    int  iSelfTestActiveMode;   // 0=cylinder, 1=sensor : the mode the running test uses
+
+    //AI 20260713 : ts_IOSelfTest Feature B - sensor guided (dual-edge dwell) verify. Watches
+    //every selected sensor in parallel; each PASSES once it has been held in BOTH states
+    //(ON and OFF) continuously for SELFTEST_SENSOR_HOLD_MS (ion-fan absolute-time latch idiom,
+    //csystem.cpp UpdateIonFanDebounce). Operator actuates sensors in any order; the grid
+    //fills live. It READS ONLY and drives NO output, so unlike cylinder mode it does NOT gate
+    //on EMG/door/air (the operator must open the door / reach in to trigger sensors) and has
+    //no mid-run safety abort. No physical actuation is possible under SOFT_SIMULATE -> SKIP.
+    enum { SELFTEST_MAX_SENSOR = 256 };
+    int  iSensorArrayCount;     // min(HSys.iTotalSensor, SELFTEST_MAX_SENSOR) for the run
+    int  iSensorSelTotal;       // number of selected sensors (grid rows)
+    int  iSensorSelCapable;     // selected AND confirm-capable (real IO + Enable)
+    unsigned long dwSensorLastTick;                        // gap re-arm (modal suspended the tick)
+    int  iSensorGridRow[SELFTEST_MAX_SENSOR];              // sensor index -> grid row, -1 if not selected
+    int  iSensorLastRaw[SELFTEST_MAX_SENSOR];              // last raw IsOn() (1/0), -1 = unsampled
+    unsigned long dwSensorStateSince[SELFTEST_MAX_SENSOR]; // tick the current raw state began
+    bool bSensorSeenOn[SELFTEST_MAX_SENSOR];               // observed a >=HOLD_MS ON hold
+    bool bSensorSeenOff[SELFTEST_MAX_SENSOR];              // observed a >=HOLD_MS OFF hold
+    bool SelfTestHasRealIO();
+    void SelfTestSensorStart(int SelCount);
+    void SelfTestSensorTick();
+    void SelfTestSensorFinalize();
 public:
     __fastcall Tfiosetview(TComponent* Owner);
     __fastcall ~Tfiosetview();

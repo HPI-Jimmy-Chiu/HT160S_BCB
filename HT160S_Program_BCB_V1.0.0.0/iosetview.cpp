@@ -153,6 +153,11 @@ __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     bStExtendTimeout=false;
     bStRetractConfirmed=false;
     bStRetractTimeout=false;
+    iSelfTestActiveMode=0;
+    iSensorArrayCount=0;
+    iSensorSelTotal=0;
+    iSensorSelCapable=0;
+    dwSensorLastTick=0;
     CreateSuckerGroupButtons();
 }
 //---------------------------------------------------------------------------
@@ -2192,7 +2197,12 @@ void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)
     //here (this timer is the sole cylinder driver while the view is open - MainProc is
     //suspended by csystem.cpp fiosetview->Visible early-return).
     if(bSelfTestRunning)
-        SelfTestCylinderTick();
+    {
+        if(iSelfTestActiveMode==1)
+            SelfTestSensorTick();
+        else
+            SelfTestCylinderTick();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormClose(TObject *Sender,
@@ -2347,8 +2357,17 @@ void Tfiosetview::SelfTestPopulateItems()
     }
     else
     {
+        for(int i=0; i<HSys.iTotalSensor && i<SELFTEST_MAX_SENSOR; i++)
+        {
+            AnsiString nm=HSys.SenPtr[i].Name;
+            if(nm==AnsiString(""))
+                nm=AnsiString("Sen#")+IntToStr(i);
+            clbSelfTestItems->Items->Add(nm);
+        }
+        for(int i=0; i<clbSelfTestItems->Items->Count && i<HSys.iTotalSensor && i<SELFTEST_MAX_SENSOR; i++)
+            clbSelfTestItems->Checked[i]=HSys.SenPtr[i].Enable;
         if(lblSelfTestDetectHdr!=NULL)
-            lblSelfTestDetectHdr->Caption=LangT("Detection - sensors (not implemented)");
+            lblSelfTestDetectHdr->Caption=LangT("Detection - sensors (select items)");
     }
     clbSelfTestItems->Items->EndUpdate();
     SelfTestUpdateProgress();
@@ -2370,11 +2389,20 @@ void Tfiosetview::SelfTestSetupGrid(int SelCount)
     grdSelfTest->ColWidths[4]=72;
     grdSelfTest->ColWidths[5]=76;
     grdSelfTest->Cells[0][0]=AnsiString("#");
-    grdSelfTest->Cells[1][0]=LangT("Cylinder");
     grdSelfTest->Cells[2][0]=LangT("Tier");
-    grdSelfTest->Cells[3][0]=LangT("Extend");
-    grdSelfTest->Cells[4][0]=LangT("Retract");
     grdSelfTest->Cells[5][0]=LangT("Result");
+    if(iSelfTestActiveMode==1)
+    {
+        grdSelfTest->Cells[1][0]=LangT("Sensor");
+        grdSelfTest->Cells[3][0]=LangT("ON-hold");
+        grdSelfTest->Cells[4][0]=LangT("OFF-hold");
+    }
+    else
+    {
+        grdSelfTest->Cells[1][0]=LangT("Cylinder");
+        grdSelfTest->Cells[3][0]=LangT("Extend");
+        grdSelfTest->Cells[4][0]=LangT("Retract");
+    }
     for(int r=1; r<grdSelfTest->RowCount; r++)
         for(int c=0; c<grdSelfTest->ColCount; c++)
             grdSelfTest->Cells[c][r]=AnsiString("");
@@ -2387,20 +2415,26 @@ bool Tfiosetview::SelfTestPrecondition(AnsiString *Why)
         if(Why!=NULL) *Why=LangT("Machine is running. Stop the machine before self-test.");
         return false;
     }
-    if(IsEMGPressed()>0)
+    //Only cylinder mode drives actuators, so only it requires the physical-safety inputs
+    //clear. Sensor mode reads only and REQUIRES the operator to open the door / reach in to
+    //trigger sensors, so gating it on EMG/door/air would defeat its own purpose.
+    if(rgSelfTestMode!=NULL && rgSelfTestMode->ItemIndex==0)
     {
-        if(Why!=NULL) *Why=LangT("Emergency stop is pressed.");
-        return false;
-    }
-    if(IsSafeDoorOpen()>0)
-    {
-        if(Why!=NULL) *Why=LangT("Safety door is open.");
-        return false;
-    }
-    if(IsAirCheck())
-    {
-        if(Why!=NULL) *Why=LangT("Air pressure is not ready.");
-        return false;
+        if(IsEMGPressed()>0)
+        {
+            if(Why!=NULL) *Why=LangT("Emergency stop is pressed.");
+            return false;
+        }
+        if(IsSafeDoorOpen()>0)
+        {
+            if(Why!=NULL) *Why=LangT("Safety door is open.");
+            return false;
+        }
+        if(IsAirCheck())
+        {
+            if(Why!=NULL) *Why=LangT("Air pressure is not ready.");
+            return false;
+        }
     }
     return true;
 }
@@ -2409,11 +2443,7 @@ void Tfiosetview::SelfTestStart()
 {
     if(bSelfTestRunning)
         return;
-    if(rgSelfTestMode!=NULL && rgSelfTestMode->ItemIndex!=0)
-    {
-        ShowMyOKMessageNoStop(LangT("Sensor self-test is not implemented yet."));
-        return;
-    }
+    iSelfTestActiveMode=(rgSelfTestMode!=NULL)?rgSelfTestMode->ItemIndex:0;
     AnsiString Why;
     if(!SelfTestPrecondition(&Why))
     {
@@ -2423,7 +2453,7 @@ void Tfiosetview::SelfTestStart()
     int sel=SelfTestCountSelected();
     if(sel<=0)
     {
-        ShowMyOKMessageNoStop(LangT("No cylinder selected."));
+        ShowMyOKMessageNoStop((iSelfTestActiveMode==1)?LangT("No sensor selected."):LangT("No cylinder selected."));
         return;
     }
     iSelfTestPass=0;
@@ -2431,16 +2461,27 @@ void Tfiosetview::SelfTestStart()
     iSelfTestSkip=0;
     iSelfTestRow=1;
     SelfTestSetupGrid(sel);
-    iSelfTestCursor=0;
-    iSelfTestPhase=0;
-    bStExtendConfirmed=false;
-    bStExtendTimeout=false;
-    bStRetractConfirmed=false;
-    bStRetractTimeout=false;
-    bOutDataChange=true;   //outputs will be driven -> restore-on-close path applies
+    if(iSelfTestActiveMode==1)
+    {
+        //Sensor mode reads only and drives nothing, so it neither needs nor forces a restore.
+        //Do NOT clear bOutDataChange : a prior cylinder run or manual output toggle may have
+        //set it, and that pending restore must survive an intervening sensor test.
+        SelfTestSensorStart(sel);
+    }
+    else
+    {
+        iSelfTestCursor=0;
+        iSelfTestPhase=0;
+        bStExtendConfirmed=false;
+        bStExtendTimeout=false;
+        bStRetractConfirmed=false;
+        bStRetractTimeout=false;
+        bOutDataChange=true;    //outputs will be driven -> restore-on-close path applies
+    }
     bSelfTestRunning=true;
     SelfTestSetButtonsRunning(true);
-    SelfTestLog(AnsiString("=== cylinder self-test start (")+IntToStr(sel)+
+    SelfTestLog(AnsiString("=== ")+((iSelfTestActiveMode==1)?AnsiString("sensor"):AnsiString("cylinder"))+
+                AnsiString(" self-test start (")+IntToStr(sel)+
                 AnsiString(" items, tier=")+SelfTestTierName()+AnsiString(") ==="));
     SelfTestUpdateSummary();
     SelfTestUpdateProgress();
@@ -2450,9 +2491,12 @@ void Tfiosetview::SelfTestStop(bool bByOperator)
 {
     bool bWasRunning=bSelfTestRunning;
     bSelfTestRunning=false;
-    //Bring the in-flight cylinder back to the retracted (safe) state on an operator abort.
-    if(bByOperator && iSelfTestCursor>=0 && iSelfTestCursor<HSys.iTotalCylinder)
+    //Cylinder mode only : bring the in-flight cylinder back to retracted (safe) on abort.
+    //Sensor mode drives nothing, so never toggle a cylinder output here.
+    if(iSelfTestActiveMode==0 && bByOperator && iSelfTestCursor>=0 && iSelfTestCursor<HSys.iTotalCylinder)
         HSys.CynPtr[iSelfTestCursor].Off();
+    if(iSelfTestActiveMode==1)
+        SelfTestSensorFinalize();
     SelfTestSetButtonsRunning(false);
     if(bWasRunning)
         SelfTestLog(bByOperator?AnsiString("=== stopped by operator ==="):AnsiString("=== complete ==="));
@@ -2639,7 +2683,14 @@ void Tfiosetview::SelfTestUpdateProgress()
 {
     if(lblSelfTestProgress==NULL)
         return;
-    if(bSelfTestRunning && iSelfTestCursor<HSys.iTotalCylinder)
+    if(bSelfTestRunning && iSelfTestActiveMode==1)
+    {
+        lblSelfTestProgress->Caption=LangT("Verify sensors")+AnsiString(" : ")+
+            IntToStr(iSelfTestPass)+AnsiString(" / ")+IntToStr(iSensorSelTotal)+
+            AnsiString(" ")+LangT("passed")+AnsiString("   (")+
+            LangT("actuate each ON then OFF, hold ~2s")+AnsiString(")");
+    }
+    else if(bSelfTestRunning && iSelfTestCursor<HSys.iTotalCylinder)
     {
         //Count against the SELECTED subset, not the whole cylinder array : iSelfTestRow is
         //the 1-based position of the item currently under test (it increments once per
@@ -2685,5 +2736,165 @@ void Tfiosetview::SelfTestLog(AnsiString Line)
     memSelfTestLog->Lines->Add(FormatDateTime("hh:nn:ss  ", Now())+Line);
     while(memSelfTestLog->Lines->Count>200)
         memSelfTestLog->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------
+//AI 20260713 : ts_IOSelfTest Feature B - sensor guided dual-edge dwell verify.
+//SELFTEST_SENSOR_HOLD_MS : a sensor must read a state CONTINUOUSLY this long for that edge
+//to count (rejects bounce + proves a deliberate actuation, not the resting state alone).
+//GAP re-arm : if the Timer1 tick was suspended (a modal) longer than this, restart every
+//hold clock so suspended time is not charged as a continuous hold (ion-fan idiom).
+static const unsigned long SELFTEST_SENSOR_HOLD_MS=2000;
+static const unsigned long SELFTEST_SENSOR_GAP_MS =1500;
+//---------------------------------------------------------------------------
+bool Tfiosetview::SelfTestHasRealIO()
+{
+    //Sensor readings are real hardware on ANY non-sim build (REALLY/HAS_TRAY/DUMMY) -
+    //unlike cylinder confirm, DUMMY is NOT excluded : the machine ignores sensors in DUMMY
+    //logic, but the physical sensor still reads and verifying it is the whole point here.
+    #ifdef SOFT_SIMULATE
+    return false;
+    #else
+    return true;
+    #endif
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSensorStart(int SelCount)
+{
+    (void)SelCount;
+    iSensorArrayCount=HSys.iTotalSensor;
+    if(iSensorArrayCount>SELFTEST_MAX_SENSOR)
+    {
+        SelfTestLog(AnsiString("WARN : sensor count ")+IntToStr(HSys.iTotalSensor)+
+                    AnsiString(" exceeds cap ")+IntToStr((int)SELFTEST_MAX_SENSOR)+
+                    AnsiString(" ; only the first are tested."));
+        iSensorArrayCount=SELFTEST_MAX_SENSOR;
+    }
+    bool bRealIO=SelfTestHasRealIO();
+    AnsiString tier=SelfTestTierName();
+    iSensorSelTotal=0;
+    iSensorSelCapable=0;
+    int row=1;
+    for(int i=0; i<iSensorArrayCount; i++)
+    {
+        iSensorGridRow[i]=-1;
+        iSensorLastRaw[i]=-1;
+        dwSensorStateSince[i]=0;
+        bSensorSeenOn[i]=false;
+        bSensorSeenOff[i]=false;
+
+        bool bSelected=(clbSelfTestItems!=NULL && i<clbSelfTestItems->Items->Count &&
+                        clbSelfTestItems->Checked[i]);
+        if(!bSelected)
+            continue;
+
+        TMySensor *Sen=&HSys.SenPtr[i];
+        bool bCapable=(bRealIO && Sen->Enable);
+        iSensorGridRow[i]=row;
+        iSensorSelTotal++;
+        if(bCapable)
+            iSensorSelCapable++;
+        if(grdSelfTest!=NULL && row<grdSelfTest->RowCount)
+        {
+            grdSelfTest->Cells[0][row]=IntToStr(i);
+            grdSelfTest->Cells[1][row]=Sen->Name;
+            grdSelfTest->Cells[2][row]=tier;
+            grdSelfTest->Cells[3][row]=bCapable?LangT("wait"):AnsiString("--");
+            grdSelfTest->Cells[4][row]=bCapable?LangT("wait"):AnsiString("--");
+            grdSelfTest->Cells[5][row]=bCapable?AnsiString("..."):AnsiString("SKIP");
+        }
+        row++;
+    }
+    dwSensorLastTick=GetTickCount();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSensorTick()
+{
+    unsigned long now=GetTickCount();
+    //Re-arm every hold clock if the tick was suspended (a modal) longer than the gap.
+    bool bGap=(dwSensorLastTick!=0 && (now-dwSensorLastTick)>SELFTEST_SENSOR_GAP_MS);
+    dwSensorLastTick=now;
+
+    bool bRealIO=SelfTestHasRealIO();
+    int pass=0;
+    for(int i=0; i<iSensorArrayCount; i++)
+    {
+        if(iSensorGridRow[i]<0)
+            continue;   //not selected
+        TMySensor *Sen=&HSys.SenPtr[i];
+        if(!(bRealIO && Sen->Enable))
+            continue;   //not confirm-capable -> stays SKIP (set at start)
+        if(bSensorSeenOn[i] && bSensorSeenOff[i])
+        {
+            pass++;
+            continue;   //already passed; row already final
+        }
+
+        int raw=Sen->IsOn()?1:0;
+        int prevRaw=iSensorLastRaw[i];
+        bool prevOn=bSensorSeenOn[i];
+        bool prevOff=bSensorSeenOff[i];
+
+        if(bGap || prevRaw<0 || raw!=prevRaw)
+        {
+            iSensorLastRaw[i]=raw;
+            dwSensorStateSince[i]=now;   //(re)start the continuous-hold clock
+        }
+        if((now-dwSensorStateSince[i])>=SELFTEST_SENSOR_HOLD_MS)
+        {
+            if(raw==1)
+                bSensorSeenOn[i]=true;
+            else
+                bSensorSeenOff[i]=true;
+        }
+        bool bNowPass=(bSensorSeenOn[i] && bSensorSeenOff[i]);
+        if(bNowPass)
+            pass++;
+
+        bool bDirty=(raw!=prevRaw) || (bSensorSeenOn[i]!=prevOn) || (bSensorSeenOff[i]!=prevOff);
+        if(bDirty && grdSelfTest!=NULL)
+        {
+            int row=iSensorGridRow[i];
+            if(row>=1 && row<grdSelfTest->RowCount)
+            {
+                grdSelfTest->Cells[3][row]=bSensorSeenOn[i]?AnsiString("OK"):(raw==1?LangT("hold"):LangT("wait"));
+                grdSelfTest->Cells[4][row]=bSensorSeenOff[i]?AnsiString("OK"):(raw==0?LangT("hold"):LangT("wait"));
+                grdSelfTest->Cells[5][row]=bNowPass?AnsiString("PASS"):AnsiString("...");
+            }
+        }
+    }
+    iSelfTestPass=pass;
+    iSelfTestFail=0;
+    iSelfTestSkip=iSensorSelTotal-pass;   //pending + not-capable, lumped as "not verified"
+    SelfTestUpdateSummary();
+    SelfTestUpdateProgress();
+
+    //Finish once every confirm-capable selected sensor has passed (or none are capable).
+    if(pass>=iSensorSelCapable)
+        SelfTestStop(false);
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSensorFinalize()
+{
+    //Freeze the grid on stop : any selected capable sensor not yet passed becomes SKIP (we
+    //cannot tell "faulty" from "operator never actuated it"), then settle the PASS/SKIP tally.
+    int pass=0;
+    for(int i=0; i<iSensorArrayCount; i++)
+    {
+        int row=iSensorGridRow[i];
+        if(row<0)
+            continue;
+        bool bPassed=(bSensorSeenOn[i] && bSensorSeenOff[i]);
+        if(bPassed)
+            pass++;
+        else if(grdSelfTest!=NULL && row>=1 && row<grdSelfTest->RowCount)
+        {
+            if(grdSelfTest->Cells[5][row]!=AnsiString("SKIP"))
+                grdSelfTest->Cells[5][row]=AnsiString("SKIP");
+        }
+    }
+    iSelfTestPass=pass;
+    iSelfTestFail=0;
+    iSelfTestSkip=iSensorSelTotal-pass;
+    SelfTestUpdateSummary();
 }
 //---------------------------------------------------------------------------
