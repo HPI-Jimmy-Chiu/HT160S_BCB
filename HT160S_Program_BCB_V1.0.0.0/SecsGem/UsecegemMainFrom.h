@@ -25,5 +25,7 @@ extern TFSECS *FSECS;
 void EventReport(unsigned Ceid);
 //AI(ht160s-secsgem) 20260625 : S5F1 alarm report (set/clear) glue, mirrors EventReport.
 void AlarmReport(AnsiString Code, AnsiString Message, bool bSet);
+//AI(ht160s-secsgem) 20260715 : SSOT ALID hash shared by S5F1 + the S5F6/S5F8 alarm catalog.
+unsigned ComputeAlarmAlid(AnsiString Code);
 //---------------------------------------------------------------------------
 #endif

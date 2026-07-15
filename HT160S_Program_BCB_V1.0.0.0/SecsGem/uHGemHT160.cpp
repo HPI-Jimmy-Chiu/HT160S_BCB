@@ -15,6 +15,7 @@
 #include "cmydef.h"        // SoftStop (S2F42 PAUSE host command)
 #include "uAgvStation.h"   // AI(ht160s-agv) 20260615 : E87/AGV station table + AgvCoord
 #include "uAmrInject.h"   // AI(ht160s-agv) 20260708 : AMR manual-inject alert (HCACK!=0 surfacing)
+#include "UsecegemMainFrom.h" // AI(ht160s-secsgem) 20260715 : ComputeAlarmAlid (S5 ALID SSOT)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -237,6 +238,9 @@ void HT160Gem::AddEC()
 //---------------------------------------------------------------------------
 void HT160Gem::AddAlarmList()
 {
+    //AI(ht160s-secsgem) 20260715 : HT160 has no alarm StringGrid and needs no pre-built
+    // store - the S5F6/S5F8 catalog is emitted LIVE from HSys.mapAlarmCodeList (the SSOT
+    // populated by CreateSystemAlarmCode). Nothing to build here; kept for framework parity.
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddCEID()
@@ -1081,15 +1085,49 @@ void HT160Gem::S5F4_EnableDisableAlarmAcknowledge()
 //---------------------------------------------------------------------------
 void HT160Gem::S5F6_ListAlarmData()
 {
-    //AI(ht160s-maintainer) 20260619 : reply to S5F5 with a well-formed (empty)
-    //S5F6 alarm list so a W-bit host request does not hit a T3 timeout. HT160
-    //has no alarm catalog store yet; emit an empty L,0 until one exists.
+    //AI(ht160s-secsgem) 20260715 : reply to S5F5 (List Alarm Request) with the real alarm
+    // catalog built live from HSys.mapAlarmCodeList (the SSOT). See EmitAlarmCatalog.
+    EmitAlarmCatalog(6);
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S5F8_ListEnableAlarmAcknowledge()
+{
+    //AI(ht160s-secsgem) 20260715 : reply to S5F7 (List Enabled Alarm Request) with S5F8.
+    // HT160 keeps every registered alarm enabled (no per-ALID enable/disable), so the
+    // enabled-alarm list is identical to the full catalog.
+    EmitAlarmCatalog(8);
+}
+//---------------------------------------------------------------------------
+void HT160Gem::EmitAlarmCatalog(int Func)
+{
+    //AI(ht160s-secsgem) 20260715 : emit an alarm catalog as S5F<Func> from the SSOT map.
+    // Body: L[n]{ L[3]{ B ALCD, U4 ALID, A ALTX } }. ALCD = alarm category (AlarmType
+    // low 7 bits; the set/clear bit 7 is 0 for a definition listing); ALID = ComputeAlarmAlid()
+    // so it matches the S5F1 report ALID; ALTX = "<code> <english message>".
+    // NOTE: the S5F5/S5F7 ALID filter is NOT applied - the full catalog is always returned
+    // (a safe superset; catalog requests normally send L,0 = all).
     if(HGemPtr==NULL)
         return;
-    HGemPtr->InitLocalHead(5, 6, 0);
-    HGemPtr->DataItemOut(0, HType.LIST_TYPE, NULL);
+    int n = (int)HSys.mapAlarmCodeList.size();
+    HGemPtr->InitLocalHead(5, Func, 0);
+    HGemPtr->DataItemOut(n, HType.LIST_TYPE, NULL);
+    std::map<AnsiString, MyAlarmCodeStruct>::iterator it;
+    for(it=HSys.mapAlarmCodeList.begin(); it!=HSys.mapAlarmCodeList.end(); it++)
+    {
+        unsigned char alcd  = (unsigned char)(it->second.AlarmType & 0x7F);
+        unsigned      uAlid = ComputeAlarmAlid(it->second.AlarmCode);
+        AnsiString    altx  = it->second.AlarmCode;
+        if(it->second.E_ErrMessage!="")
+            altx = it->second.AlarmCode + " " + it->second.E_ErrMessage;
+        HGemPtr->DataItemOut(3, HType.LIST_TYPE, NULL);
+        HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &alcd);
+        HGemPtr->DataItemOut(1, HType.UINT_4_TYPE, &uAlid);
+        HGemPtr->DataItemOut(HType.ASCII_TYPE, altx);
+    }
     HGemPtr->SendLocalData();
-    HGemPtr->StringOut("[SECS] S5F6 sent empty alarm list (HT160 has no alarm catalog yet)");
+    AnsiString msg;
+    msg.sprintf("[SECS][TX] S5F%d alarm catalog sent (%d entries)", Func, n);
+    HGemPtr->StringOut(msg);
 }
 //---------------------------------------------------------------------------
 int HT160Gem::S7F2_ProcessProgramLoadGrant()

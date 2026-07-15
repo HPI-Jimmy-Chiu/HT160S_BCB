@@ -95,6 +95,7 @@ void HTGem::Dispatch(int S, int F)
         {
         case 3: S5F4_EnableDisableAlarmAcknowledge(); return;
         case 5: S5F6_ListAlarmData();                 return;
+        case 7: S5F8_ListEnableAlarmAcknowledge();    return;
         }
         break;
     case 7:

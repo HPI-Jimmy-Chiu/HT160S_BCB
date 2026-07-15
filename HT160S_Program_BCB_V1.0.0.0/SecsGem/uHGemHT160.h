@@ -99,6 +99,9 @@ public:
     //AI(ht160s-secsgem) 20260625 : S5F3 enable/disable alarm -> S5F4 ack
     virtual void S5F4_EnableDisableAlarmAcknowledge();
     virtual void S5F6_ListAlarmData();
+    //AI(ht160s-secsgem) 20260715 : S5F7 List Enabled Alarm Request -> S5F8 data (all enabled)
+    virtual void S5F8_ListEnableAlarmAcknowledge();
+    void EmitAlarmCatalog(int Func);   // shared S5F6/S5F8 catalog emitter from mapAlarmCodeList
     virtual int  S7F2_ProcessProgramLoadGrant();
     virtual void S7F4_ProcessProgramAcknowledge();
     virtual void S7F6_ProcessProgramData();

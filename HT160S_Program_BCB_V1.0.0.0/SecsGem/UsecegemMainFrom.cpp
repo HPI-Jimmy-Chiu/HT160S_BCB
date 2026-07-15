@@ -139,6 +139,18 @@ void EventReport(unsigned Ceid)
     HGem->EventReport(1, Ceid);
 }
 //---------------------------------------------------------------------------
+unsigned ComputeAlarmAlid(AnsiString Code)
+{
+    //AI(ht160s-secsgem) 20260715 : SSOT for the S5 ALID. 31-polynomial hash of the alarm
+    // code string, shared by S5F1 (AlarmReport) and the S5F6/S5F8 catalog so a reported
+    // alarm's ALID always equals its catalog-entry ALID. Registered and free-string codes
+    // hash identically, so no map lookup is needed to stay consistent.
+    unsigned alid = 0;
+    for(int i=1; i<=Code.Length(); i++)
+        alid = alid*31u + (unsigned char)Code[i];
+    return alid;
+}
+//---------------------------------------------------------------------------
 void AlarmReport(AnsiString Code, AnsiString Message, bool bSet)
 {
     if(USE_SECS_GEM<=0 || HGem==NULL)
@@ -147,9 +159,7 @@ void AlarmReport(AnsiString Code, AnsiString Message, bool bSet)
     // 31-polynomial hash of the unique alarm code string (host gets a stable numeric
     // key; the readable code+message rides in ALTX). ALCD bit7 = alarm set(1)/clear(0),
     // category bits 0 (unspecified). Mirrors the global EventReport glue above.
-    unsigned alid = 0;
-    for(int i=1; i<=Code.Length(); i++)
-        alid = alid*31u + (unsigned char)Code[i];
+    unsigned alid = ComputeAlarmAlid(Code);
     unsigned char alcd = bSet ? 0x80 : 0x00;
     AnsiString altx = Code;
     if(Message!="")
