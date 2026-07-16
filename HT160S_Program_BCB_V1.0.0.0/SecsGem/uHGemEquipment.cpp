@@ -13,6 +13,12 @@
 //---------------------------------------------------------------------------
 THGem *HGem = NULL;
 HTypeStruct HType = {0x00, 0x40, 0x44, 0x20, 0x24, 0xA4, 0xA8, 0xB0, 0xA0, 0x64, 0x68, 0x70, 0x60, 0x90, 0x80, 0xFF};
+//AI(ht160s-secsgem) 20260716 : caps for the SML body dump so a pathological item
+//  (huge process-program / XML blob) cannot flood the disk log. Host commands are
+//  small, so these bounds never truncate a normal S2F41; they only guard outliers.
+#define SECS_SML_ASCII_CAP 4096   // max ASCII bytes rendered per item
+#define SECS_SML_BIN_CAP     64   // max binary bytes rendered per item
+#define SECS_SML_RAW_CAP    512   // max raw bytes in the hex fallback on parse error
 //---------------------------------------------------------------------------
 __fastcall THGem::THGem(TComponent *Owner)
     : TComponent(Owner)
@@ -73,6 +79,7 @@ __fastcall THGem::THGem(TComponent *Owner)
     iLinktestCountdown = 0;
     iT6Timeout         = 6;                   // seconds to wait for Linktest.rsp
     bLogLinktest       = false;               //AI(ht160s-secsgem) 20260612 : quiet heartbeat by default
+    bLogSmlBody        = true;                //AI(ht160s-secsgem) 20260716 : full SML body dump on by default (gated by [SECS] LogSmlBody)
     iT6Countdown       = 0;
     bAwaitLinktestRsp  = false;
     uControlSystemByte = 1;
@@ -1033,6 +1040,10 @@ void THGem::SendLocalData()
               (unsigned)Local.W_Bit, (unsigned)LocalLength_4,
               bSent ? "(sent)" : "(not connected)");
     StringOut(S);
+    //AI(ht160s-secsgem) 20260716 : full SML dump of the outgoing body (reply/event
+    //  visibility, symmetric with the RX dump). LocalBuffer holds the framed message.
+    LogSmlBody("TX", LocalBuffer, (int)LocalLength_4,
+               (int)(Local.MessageID_S & 0x7f), (int)Local.MessageID_F, (int)Local.W_Bit);
 }
 //---------------------------------------------------------------------------
 const unsigned char *THGem::GetLocalBuffer()
@@ -1169,6 +1180,12 @@ void THGem::SetT6Timeout(int Seconds)
 void THGem::SetLogLinktest(bool On)
 {
     bLogLinktest = On;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-secsgem) 20260716 : enable/disable the full SECS-II body SML dump.
+void THGem::SetLogSmlBody(bool On)
+{
+    bLogSmlBody = On;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : SECS communication file logging. Layout aligned
@@ -1443,6 +1460,10 @@ void THGem::HandleDataMessage(unsigned char *Ptr, int Len)
     L.sprintf("[SECS][RX] S%dF%d decoded rc=%d items=%d", S, F, rc,
               (SReceiveData!=NULL) ? SReceiveData->Count : 0);
     StringOut(L);
+    //AI(ht160s-secsgem) 20260716 : full SML dump of the received body (host command
+    //  visibility). Reads the raw frame bytes, so it is unaffected by Dispatch()
+    //  consuming SReceiveData right after this.
+    LogSmlBody("RX", Ptr, Len, S, F, (Ptr[6] & 0x80) ? 1 : 0);
 
     if(GemLogic!=NULL)
         GemLogic->Dispatch(S, F);
@@ -1544,6 +1565,264 @@ int THGem::GetSMLLenthByte(unsigned char TypeChar, unsigned char *Ptr, int RunLe
         ct += Ptr[RunLength+i];
     }
     return ct;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-secsgem) 20260716 : read-only recursive SECS-II body pretty-printer.
+//  Renders one item at Ptr[RunLength..] as an indented SML subtree appended to Out,
+//  in the HT9045/HT172 log format, then advances RunLength past it. It NEVER stores
+//  into SReceiveData, so it is immune to the destructive token consumption done by
+//  the S/F handlers (DataItemInSub Delete(0)) and can dump the true wire bytes even
+//  after a handler has read them. Every byte access is bounds-checked against Len.
+//  Returns 0 on success; <0 on a bounds/format error (Out still holds the partial
+//  decode). ASCII/binary payloads are capped so a giant blob cannot flood the log.
+int THGem::RenderSmlItem(unsigned char *Ptr, int Len, int &RunLength, int Depth,
+                         AnsiString &Out)
+{
+    int j, k, ItemSize, TypeSize, ValueCount;
+    unsigned char TypeChar, c;
+    unsigned int ct, i;
+    AnsiString Indent, S;
+
+    if(Ptr==NULL || RunLength<0 || RunLength>=Len || Depth>64)
+        return -1;
+
+    for(j=0; j<Depth; j++)
+        Indent += "  ";
+
+    TypeChar = Ptr[RunLength];
+    c = (unsigned char)(TypeChar & 0xfc);
+
+    if(c==HType.LIST_TYPE)
+    {
+        RunLength++;
+        if(RunLength + (TypeChar & 0x03) > Len)   // truncated length field
+            return -1;
+        ct = (unsigned int)GetSMLLenthByte(TypeChar, Ptr, RunLength);
+        RunLength += TypeChar & 0x03;
+        S.sprintf("%s<L[%u]", Indent.c_str(), ct);
+        Out += S + "\n";
+        for(i=0; i<ct; i++)
+        {
+            if(RenderSmlItem(Ptr, Len, RunLength, Depth+1, Out) < 0)
+                return -2;
+        }
+        Out += Indent + ">\n";
+        return 0;
+    }
+
+    // scalar item : one type byte + length byte(s) + payload
+    RunLength++;
+    if(RunLength + (TypeChar & 0x03) > Len)   // truncated length field
+        return -1;
+    ItemSize = GetSMLLenthByte(TypeChar, Ptr, RunLength);
+    RunLength += TypeChar & 0x03;
+    if(ItemSize < 0 || RunLength + ItemSize > Len)
+    {
+        S.sprintf("%s<0x%02X[%d] TRUNCATED>", Indent.c_str(), (unsigned)c, ItemSize);
+        Out += S + "\n";
+        return -3;
+    }
+
+    if(c==HType.ASCII_TYPE || c==HType.JIS_TYPE)
+    {
+        int cap = (ItemSize > SECS_SML_ASCII_CAP) ? SECS_SML_ASCII_CAP : ItemSize;
+        S.sprintf("%s<A[%d] \"", Indent.c_str(), ItemSize);
+        for(j=0; j<cap; j++)
+        {
+            unsigned char ch = Ptr[RunLength+j];
+            if(ch>=0x20 && ch<0x7f)
+                S += (char)ch;               // printable ASCII as-is
+            else
+            {
+                AnsiString e;                // escape control/high bytes so the log stays one tree
+                e.sprintf("\\x%02X", (unsigned)ch);
+                S += e;
+            }
+        }
+        if(ItemSize > SECS_SML_ASCII_CAP)
+        {
+            AnsiString t;
+            t.sprintf("...(+%d bytes)", ItemSize - SECS_SML_ASCII_CAP);
+            S += t;
+        }
+        RunLength += ItemSize;
+        S += "\">";
+        Out += S + "\n";
+        return 0;
+    }
+
+    if(c==HType.BINARY_TYPE)
+    {
+        int cap = (ItemSize > SECS_SML_BIN_CAP) ? SECS_SML_BIN_CAP : ItemSize;
+        S.sprintf("%s<B[%d]", Indent.c_str(), ItemSize);
+        for(j=0; j<cap; j++)
+        {
+            AnsiString h;
+            h.sprintf(" 0x%02X", (unsigned)Ptr[RunLength+j]);
+            S += h;
+        }
+        if(ItemSize > SECS_SML_BIN_CAP)
+        {
+            AnsiString t;
+            t.sprintf(" ...(+%d)", ItemSize - SECS_SML_BIN_CAP);
+            S += t;
+        }
+        RunLength += ItemSize;
+        S += ">";
+        Out += S + "\n";
+        return 0;
+    }
+
+    if(c==HType.BOOLEAN_TYPE)
+    {
+        S.sprintf("%s<Boolean[%d]", Indent.c_str(), ItemSize);
+        for(j=0; j<ItemSize; j++)
+        {
+            unsigned char b = (Ptr[RunLength+j]==0) ? 0 : 1;
+            AnsiString h;
+            h.sprintf(" 0x%02X", (unsigned)b);
+            S += h;
+        }
+        RunLength += ItemSize;
+        S += ">";
+        Out += S + "\n";
+        return 0;
+    }
+
+    // numeric item : pick element width + label, then render each value
+    AnsiString label;
+    int isFloat = 0, isUnsigned = 0;   // signed is the default (label encodes exact type)
+    TypeSize = 1;
+    if(c==HType.UINT_1_TYPE)      { TypeSize=1; label="U1"; isUnsigned=1; }
+    else if(c==HType.UINT_2_TYPE) { TypeSize=2; label="U2"; isUnsigned=1; }
+    else if(c==HType.UINT_4_TYPE) { TypeSize=4; label="U4"; isUnsigned=1; }
+    else if(c==HType.UINT_8_TYPE) { TypeSize=8; label="U8"; isUnsigned=1; }
+    else if(c==HType.INT_1_TYPE)  { TypeSize=1; label="I1"; }
+    else if(c==HType.INT_2_TYPE)  { TypeSize=2; label="I2"; }
+    else if(c==HType.INT_4_TYPE)  { TypeSize=4; label="I4"; }
+    else if(c==HType.INT_8_TYPE)  { TypeSize=8; label="I8"; }
+    else if(c==HType.FT_4_TYPE)   { TypeSize=4; label="F4"; isFloat=1; }
+    else if(c==HType.FT_8_TYPE)   { TypeSize=8; label="F8"; isFloat=1; }
+    else
+    {
+        // unknown format code : dump raw hex so nothing is silently swallowed
+        int cap = (ItemSize > SECS_SML_BIN_CAP) ? SECS_SML_BIN_CAP : ItemSize;
+        S.sprintf("%s<0x%02X[%d]", Indent.c_str(), (unsigned)c, ItemSize);
+        for(j=0; j<cap; j++)
+        {
+            AnsiString h;
+            h.sprintf(" 0x%02X", (unsigned)Ptr[RunLength+j]);
+            S += h;
+        }
+        if(ItemSize > SECS_SML_BIN_CAP)
+        {
+            AnsiString t;
+            t.sprintf(" ...(+%d)", ItemSize - SECS_SML_BIN_CAP);
+            S += t;
+        }
+        RunLength += ItemSize;
+        S += ">";
+        Out += S + "\n";
+        return 0;
+    }
+
+    ValueCount = (TypeSize>0) ? (ItemSize/TypeSize) : 0;
+    S.sprintf("%s<%s[%d]", Indent.c_str(), label.c_str(), ValueCount);
+    for(j=0; j<ValueCount; j++)
+    {
+        AnsiString v;
+        if(isFloat && TypeSize==4)
+        {
+            float f;
+            unsigned char *pf = (unsigned char *)&f;
+            for(k=0; k<4; k++) pf[k] = Ptr[RunLength+3-k];   // MSB-first on the wire
+            v = " " + FloatToStr((double)f);                 // full precision (matches HT172); %g lost digits
+        }
+        else if(isFloat && TypeSize==8)
+        {
+            double d;
+            unsigned char *pd = (unsigned char *)&d;
+            for(k=0; k<8; k++) pd[k] = Ptr[RunLength+7-k];
+            v = " " + FloatToStr(d);
+        }
+        else if(TypeSize<=4)
+        {
+            if(isUnsigned)
+            {
+                unsigned u = 0;
+                for(k=0; k<TypeSize; k++) { u = (u<<8) | Ptr[RunLength+k]; }
+                v.sprintf(" %u", u);
+            }
+            else
+            {
+                int s = 0;
+                for(k=0; k<TypeSize; k++) { s = (s<<8) | Ptr[RunLength+k]; }
+                if(TypeSize<4)   // sign-extend from TypeSize bytes
+                {
+                    int signbit = 1 << (TypeSize*8 - 1);
+                    if(s & signbit)
+                        s -= (1 << (TypeSize*8));
+                }
+                v.sprintf(" %d", s);
+            }
+        }
+        else if(isUnsigned)   // U8 : IntToStr is signed, so render the true magnitude by hand
+        {
+            unsigned __int64 u = 0;
+            for(k=0; k<8; k++) { u = (u<<8) | (unsigned char)Ptr[RunLength+k]; }
+            if(u==0)
+                v = " 0";
+            else
+            {
+                AnsiString d = "";
+                while(u > 0) { d = AnsiString((int)(u%10)) + d; u /= 10; }
+                v = " " + d;
+            }
+        }
+        else   // I8 : IntToStr(__int64) dodges printf %I64/%L portability traps
+        {
+            __int64 q = 0;
+            for(k=0; k<8; k++) { q = (q<<8) | (unsigned char)Ptr[RunLength+k]; }
+            v = " " + IntToStr(q);
+        }
+        RunLength += TypeSize;
+        S += v;
+    }
+    S += ">";
+    Out += S + "\n";
+    return 0;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-secsgem) 20260716 : emit a full SML body dump for one HSMS frame when
+//  LogSmlBody is on. Dir = "RX"/"TX". Ptr[0..3]=len, [4..13]=header, [14..]=body.
+//  On a parse error the raw frame bytes are appended as hex so a malformed host
+//  command is never hidden -- exactly the "verify a format error" use case.
+void THGem::LogSmlBody(const char *Dir, unsigned char *Ptr, int Len, int S, int F, int W)
+{
+    if(!bLogSmlBody || Ptr==NULL || Len<14)
+        return;
+
+    AnsiString Block, Tree;
+    Block.sprintf("[SECS][%s] S%dF%d W=%d body:", Dir, S, F, W);
+    int RunLength = 14;
+    int rc = RenderSmlItem(Ptr, Len, RunLength, 0, Tree);
+    Block += "\n" + Tree;
+    if(rc < 0)
+    {
+        int cap = (Len > SECS_SML_RAW_CAP) ? SECS_SML_RAW_CAP : Len;
+        AnsiString Hex;
+        Hex.sprintf("[SML parse error rc=%d] RAW %d bytes:", rc, Len);
+        for(int n=0; n<cap; n++)
+        {
+            AnsiString h;
+            h.sprintf(" %02X", (unsigned)Ptr[n]);
+            Hex += h;
+        }
+        if(Len > SECS_SML_RAW_CAP)
+            Hex += " ...";
+        Block += Hex + "\n";
+    }
+    StringOut(Block);
 }
 //---------------------------------------------------------------------------
 void THGem::StoreToReceiveString(AnsiString S)

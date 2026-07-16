@@ -164,6 +164,12 @@ private:
     int  GetSMLLenthByte(unsigned char TypeChar, unsigned char *Ptr, int RunLength);
     void StoreToReceiveString(AnsiString S);
     int  ProcessSML(unsigned char *Ptr, int Len, int &RunLength);
+    //AI(ht160s-secsgem) 20260716 : read-only SML pretty-printer for the full body.
+    //  Walks raw frame bytes (never touches SReceiveData), renders one item as an
+    //  indented SML subtree into Out. 0=ok, <0=bounds/format error (Out keeps the
+    //  partial decode). LogSmlBody() wraps it with a header + hex fallback on error.
+    int  RenderSmlItem(unsigned char *Ptr, int Len, int &RunLength, int Depth, AnsiString &Out);
+    void LogSmlBody(const char *Dir, unsigned char *Ptr, int Len, int S, int F, int W);
     int  DataItemInSub(int len, unsigned char Type, void *P);
     int  GetDataItemLenAndTypeSub(int &len, unsigned char &Type);
     int  GetDataItemLenAndTypeAndDeleteSub(int &len, unsigned char Type);
@@ -199,6 +205,7 @@ private:
     int  iT6Countdown;                // seconds left while awaiting Linktest.rsp
     bool bAwaitLinktestRsp;           // a Linktest.req is outstanding
     bool bLogLinktest;                // log routine Linktest req/rsp (default off : avoid log flooding)
+    bool bLogSmlBody;                 //AI(ht160s-secsgem) 20260716 : dump full SECS-II body as SML tree (RX+TX, default on)
     unsigned uControlSystemByte;      // SystemBytes generator for our control msgs
     void SendLinktestReq();           // actively send Linktest.req (heartbeat)
     void DropConnection(AnsiString Reason);  // close socket + OnPeerDisconnected
@@ -321,6 +328,7 @@ public:
     void SetLinktestInterval(int Seconds);     // <=0 disables heartbeat
     void SetT6Timeout(int Seconds);            // <=0 falls back to a safe minimum
     void SetLogLinktest(bool On);              //AI(ht160s-secsgem) 20260612 : show routine Linktest in log (default off)
+    void SetLogSmlBody(bool On);               //AI(ht160s-secsgem) 20260716 : dump full SECS-II body as SML tree (default on)
 
     //AI(ht160s-secsgem) 20260611 : SECS communication on-disk logging control.
     void SetLogToFile(bool On);                // enable/disable disk logging
