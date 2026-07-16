@@ -273,6 +273,7 @@ bool __fastcall THT160LotWebApiClient::StartLotRequest(AnsiString LotID)
     {
         sLastError = AnsiString("bad BaseUrl: ") + sBaseUrl;
         iState = LOTWEBAPI_FAILED;
+        SaveWebApiLog(AnsiString("Failed Lot=") + LotID.Trim() + AnsiString(" err=") + sLastError);
         return false;
     }
 
