@@ -56,6 +56,13 @@ private:
     // (LotStart / SECS LOTSTART).  Default false so the machine never tries to
     // connect to the WebAPI until the real customer endpoint is wired in.
     bool bUsePull;
+    //AI(ht160s-lot-webapi) 20260716 : dump the full HTTP request/response body to
+    // the WebAPI log so a host command / JSON schema mismatch can be verified from
+    // the log alone (mirrors SECS LogSmlBody). bLogBody gated by [LotWebApi]
+    // LogBody (default on); iLogBodyCap = max bytes dumped, [LotWebApi] LogBodyCap
+    // (<=0 = unlimited).
+    bool bLogBody;
+    int  iLogBodyCap;
 
     bool __fastcall StartWinsock();
     void __fastcall CloseSocket();
@@ -68,6 +75,13 @@ private:
     void __fastcall FinishResponse();
     bool __fastcall IsTimedOut();
     void __fastcall SaveWebApiLog(AnsiString sMessage);
+    //AI(ht160s-lot-webapi) 20260716 : capped verbatim dump of a request/response.
+    void __fastcall LogHttpDump(AnsiString Tag, AnsiString Raw);
+    //AI(ht160s-lot-webapi) 20260716 : sanitize a raw dump for the text-mode log:
+    // strip CR (text mode re-adds one per LF, else CRLF would double) and map
+    // NUL to '.' (fprintf %s stops at NUL and would silently truncate).
+    AnsiString __fastcall SanitizeForLog(AnsiString Raw);
+    void __fastcall LogTransportFailure();
 
 public:
     __fastcall THT160LotWebApiClient();

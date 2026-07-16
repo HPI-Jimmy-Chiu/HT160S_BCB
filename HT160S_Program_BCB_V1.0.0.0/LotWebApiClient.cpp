@@ -20,6 +20,7 @@
 //---------------------------------------------------------------------------
 static const char *DEFAULT_LOTWEBAPI_BASEURL = "http://127.0.0.1:8160/lot/";
 static const int   LOTWEBAPI_TIMEOUT_SEC     = 8;   // overall request timeout
+static const int   LOTWEBAPI_LOG_BODY_CAP_DEFAULT = 65536; // max bytes of req/resp dumped
 
 THT160LotWebApiClient *LotWebApiClient = NULL;
 
@@ -55,6 +56,8 @@ __fastcall THT160LotWebApiClient::THT160LotWebApiClient()
     sLastError    = "";
     dtRequestStart= 0;
     bUsePull      = false;      //AI(ht160s-lot-webapi) 20260612 : Stage 4 : auto-pull off until customer API wired
+    bLogBody      = true;       //AI(ht160s-lot-webapi) 20260716 : full body dump on by default (gated by [LotWebApi] LogBody)
+    iLogBodyCap   = LOTWEBAPI_LOG_BODY_CAP_DEFAULT;
 
     //AI(ht160s-lot-webapi) 20260615 : WebAPI log now shares cCsvDailyLog (thread-safe
     //append). lgDailyFolder + ".log" + empty header keeps the exact legacy path
@@ -85,6 +88,8 @@ void __fastcall THT160LotWebApiClient::LoadConfig()
         if(sBaseUrl.Trim() == "")
             sBaseUrl = DEFAULT_LOTWEBAPI_BASEURL;
         bUsePull = IniFile->ReadBool("LotWebApi", "UsePull", false);
+        bLogBody = IniFile->ReadBool("LotWebApi", "LogBody", true);
+        iLogBodyCap = IniFile->ReadInteger("LotWebApi", "LogBodyCap", LOTWEBAPI_LOG_BODY_CAP_DEFAULT);
     }
     __finally
     {
@@ -101,6 +106,8 @@ void __fastcall THT160LotWebApiClient::SaveConfig()
     {
         IniFile->WriteString("LotWebApi", "BaseUrl", sBaseUrl);
         IniFile->WriteBool("LotWebApi", "UsePull", bUsePull);
+        IniFile->WriteBool("LotWebApi", "LogBody", bLogBody);
+        IniFile->WriteInteger("LotWebApi", "LogBodyCap", iLogBodyCap);
     }
     __finally
     {
@@ -292,6 +299,7 @@ bool __fastcall THT160LotWebApiClient::StartLotRequest(AnsiString LotID)
 
     SaveWebApiLog(AnsiString("Request Lot=") + sCurrentLot +
         AnsiString(" URL=") + sBaseUrl + UrlEncodeLot(sCurrentLot));
+    LogHttpDump("Request raw", sSendBuffer);
 
     BeginConnect();
     return (iState != LOTWEBAPI_FAILED);
@@ -302,6 +310,7 @@ void __fastcall THT160LotWebApiClient::BeginConnect()
     if(StartWinsock() == false)
     {
         iState = LOTWEBAPI_FAILED;
+        LogTransportFailure();
         return;
     }
 
@@ -310,6 +319,7 @@ void __fastcall THT160LotWebApiClient::BeginConnect()
     {
         sLastError = AnsiString("socket error ") + IntToStr(WSAGetLastError());
         iState = LOTWEBAPI_FAILED;
+        LogTransportFailure();
         return;
     }
 
@@ -339,6 +349,7 @@ void __fastcall THT160LotWebApiClient::BeginConnect()
     sLastError = AnsiString("connect error ") + IntToStr(LastSocketError);
     CloseSocket();
     iState = LOTWEBAPI_FAILED;
+    LogTransportFailure();
 }
 //---------------------------------------------------------------------------
 void __fastcall THT160LotWebApiClient::PollConnecting()
@@ -366,6 +377,7 @@ void __fastcall THT160LotWebApiClient::PollConnecting()
         sLastError = "WebAPI connect failed";
         CloseSocket();
         iState = LOTWEBAPI_FAILED;
+        LogTransportFailure();
         return;
     }
 
@@ -393,6 +405,7 @@ void __fastcall THT160LotWebApiClient::PollSending()
             sLastError = AnsiString("send error ") + IntToStr(LastSocketError);
             CloseSocket();
             iState = LOTWEBAPI_FAILED;
+            LogTransportFailure();
         }
         return;   // try again next poll
     }
@@ -436,6 +449,7 @@ void __fastcall THT160LotWebApiClient::PollReceiving()
         sLastError = AnsiString("recv error ") + IntToStr(LastSocketError);
         CloseSocket();
         iState = LOTWEBAPI_FAILED;
+        LogHttpDump("Response raw(partial, recv error)", sRecvBuffer);
     }
 }
 //---------------------------------------------------------------------------
@@ -473,6 +487,7 @@ void __fastcall THT160LotWebApiClient::FinishResponse()
         AnsiString(" HTTP=") + IntToStr(iHttpStatus) +
         AnsiString(" bytes=") + IntToStr(sResponseBody.Length()) +
         AnsiString(" ok=") + (bRequestOk ? "1" : "0"));
+    LogHttpDump("Response raw", sRecvBuffer);
 }
 //---------------------------------------------------------------------------
 bool __fastcall THT160LotWebApiClient::IsTimedOut()
@@ -495,6 +510,7 @@ void __fastcall THT160LotWebApiClient::Poll()
         CloseSocket();
         iState = LOTWEBAPI_FAILED;
         SaveWebApiLog(AnsiString("Timeout Lot=") + sCurrentLot);
+        LogHttpDump("Response raw(partial, timeout)", sRecvBuffer);
         return;
     }
 
@@ -553,5 +569,58 @@ void __fastcall THT160LotWebApiClient::SaveWebApiLog(AnsiString sMessage)
     // thread-safe append). Path/format preserved exactly:
     //   D:\HT160S_Log\WebAPI\YYYYMMDD\WebAPI_YYYYMMDD.log , line "hh:nn:ss:zzz :<msg>".
     g_WebApiLog.AppendLine(Now().FormatString("hh:nn:ss:zzz :") + sMessage);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260716 : dump the full HTTP request/response verbatim
+// to the WebAPI log so a host command or JSON schema mismatch can be verified
+// from the log alone (mirrors the SECS LogSmlBody body dump). Gated by
+// [LotWebApi] LogBody (default on). Capped at iLogBodyCap ([LotWebApi]
+// LogBodyCap, <=0 = unlimited) so a large lot response cannot bloat the daily
+// log; the dump header always records the true byte count even when truncated.
+void __fastcall THT160LotWebApiClient::LogHttpDump(AnsiString Tag, AnsiString Raw)
+{
+    if(!bLogBody)
+        return;
+
+    int Total = Raw.Length();
+    AnsiString Body;
+    if(Total <= 0)
+        Body = "<empty>";
+    else if(iLogBodyCap > 0 && Total > iLogBodyCap)
+        Body = SanitizeForLog(Raw.SubString(1, iLogBodyCap)) +
+               AnsiString("\n...(truncated, total ") + IntToStr(Total) +
+               AnsiString(" bytes)");
+    else
+        Body = SanitizeForLog(Raw);
+
+    SaveWebApiLog(Tag + AnsiString(" Lot=") + sCurrentLot +
+        AnsiString(" (") + IntToStr(Total) + AnsiString(" bytes):\n") + Body);
+}
+//---------------------------------------------------------------------------
+AnsiString __fastcall THT160LotWebApiClient::SanitizeForLog(AnsiString Raw)
+{
+    // Strip CR so the text-mode log sink (fprintf on a fopen(a) stream) re-adds
+    // exactly one CR per LF instead of doubling an embedded CRLF into CR-CR-LF.
+    // Map NUL to '.' because fprintf(%s) stops at the first NUL and would
+    // silently truncate the dump (legit JSON never contains NUL).
+    int n = Raw.Length();
+    AnsiString Out;
+    Out.SetLength(n);
+    int k = 0;
+    for(int i = 1; i <= n; i++)
+    {
+        char c = Raw[i];
+        if(c == '\r')
+            continue;
+        Out[++k] = (c == '\0') ? '.' : c;
+    }
+    Out.SetLength(k);
+    return Out;
+}
+//---------------------------------------------------------------------------
+void __fastcall THT160LotWebApiClient::LogTransportFailure()
+{
+    SaveWebApiLog(AnsiString("Failed Lot=") + sCurrentLot +
+        AnsiString(" err=") + sLastError);
 }
 //---------------------------------------------------------------------------
