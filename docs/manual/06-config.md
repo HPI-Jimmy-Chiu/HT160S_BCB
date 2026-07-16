@@ -129,7 +129,7 @@ Tray Form 分頁定義料盤的座標起點、格位間距與分割數。每次�
 | `TrayForm.XDivision` | int，1..20，預設 1 | 料盤 X 格數（上限 `MAX_TRAY_X`=20） |
 | `TrayForm.YDivision` | int，1..50，預設 1 | 料盤 Y 格數（上限 `MAX_TRAY_Y`=50） |
 
-> 【待補：`TrayForm.XStart/XPitch/YStart/YPitch` 的工程單位（mm 或 1/100mm）無法由設定畫面原始碼判定；設定畫面只做 `ReadFloat/WriteFloat`。實際單位需確認 TrayForm 結構與 Loader/SortArm 使用端。】
+> 註（定案）：`TrayForm.XStart/XPitch/YStart/YPitch` 的**設定值單位＝mm**；消費端（SortArm `aSortArm.cpp:457-473`、Loader `aLoader.cpp:196-212`）取值時一律 **×100 轉成 1/100mm** 教導座標（原始碼註解明寫 "tray pitch is mm (setup.ini) but teach coords are 1/100mm"）。`XDivision/YDivision` 為格數（消費端 Clamp X:1–50、Y:1–20）。
 
 ### 6.3.3 操作步驟
 
@@ -350,14 +350,12 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 
 ---
 
-## 6.10 待補事項
+## 6.10 補充定案（原待補事項）
 
-> 本章下列項目無法由現有來源規格確定，標記為待補，須由現場或跨檔確認後補上：
-
-- 【待補】`TrayForm.XStart/XPitch/YStart/YPitch` 的工程單位（mm 或 1/100mm）：設定畫面只做 `ReadFloat/WriteFloat`，實際單位需看 TrayForm 結構與 Loader/SortArm 使用端確認（備忘錄記載位置類多為 1/100mm，但此處為配方幾何浮點值）。
-- 【待補】各 Area（Auto1..Auto6, Color）對應實體出料站/料盒的物理位置，與 enum 編號間隙（`eHT160BinAreaAuto1`=3..`Auto6`=8, `Color`=9，1/2 用途）需由 `CosFunction.h`/機構定義確認，本畫面未說明。
-- 【待補】畫面中文標籤：設定畫面可見文字皆為英文，未出現 Big5 中文標籤；硬體頁部分控制項標籤（`rgSortMode`、`chkAutoEnable*`、`chkSuckEnable*`、`chkHardwareColorBinArea`、`chkUseAMR`、`cbBinPanelType`、`edLotNo`）實際螢幕 Caption 需以 .dfm 或執行畫面確認。
-- 【待補】`SYSTEM_BIN_SELECT BinSelect[2]`（`iCategData`/`bStackDefFailCate`/`bCategoryFail`/`iCategoryFailCountLimit`/`iOpenBin`）在 cprod 內僅宣告未見讀寫，其填值來源與是否仍在使用（可能為舊機型遺留）需確認。
-- 【待補】Error Auto 的決定（`GetErrorBinArea` / `GetErrorAutoIndex`）依 `BinAreaMap.ErrorBinArea`；若 Error 區設為 Color（非 Auto）時 By Lot+Bin 會 fallback 到最後一個 Auto，此邊界行為的實機意圖需確認。
-- 【待補】By Lot+Bin 採「最低 index 先到先得」綁定；是否提供操作員手動指定/編輯特定 (Lot,Bin)→Auto 綁定的 UI，未在現有來源確認。
-- 【待補】是否存在獨立於 Product Setup 之外、供新增/複製/刪除/切換配方的另一配方選單畫面（form 名稱與按鈕）未在現有來源完全確認。
+- **工程單位（定案）**：`TrayForm.XStart/XPitch/YStart/YPitch` 設定值單位＝mm，消費端 ×100 轉 1/100mm 教導座標（見 6.3.2 註）。
+- **Area enum 編號 1/2（定案）**：`EHT160BinArea`＝NotUse=0、**Empty=1、Loader=2**（空盤站與進料站的區域代號，合法區域名但非分選目的地）、Auto1..6=3..8、Color=9。Bin 設定格與所有分選走訪一律從 `eHT160BinAreaAuto1`(=3) 起，1/2 純屬站別保留代號。
+- **畫面標籤（定案）**：byte-safe DFM 讀取確認全為英文——`rgSortMode`＝"Sort Mode"（選項 Normal / By Lot+Bin / By Lot+PassFail / By WhiteList）、`chkAutoEnable1~6`＝"Auto1"~"Auto6"、`chkSuckEnable1~4`＝"Nozzle1"~"Nozzle4"、`chkHardwareColorBinArea`＝"Color bin area installed"、`chkUseAMR`＝"Use AMR"、`cbBinPanelType`＝"LED (HT9046)" / "TFT (HT9011)"。（註：這些控制項實際位於 maintenance.dfm 硬體頁；`edLotNo` 位於 main.dfm 的 Lot 分頁 "Lot Manual Edit" 群組。）
+- **`SYSTEM_BIN_SELECT BinSelect[2]`（定性）**：cprod 內僅宣告、全程式未見讀寫——舊機型遺留宣告，不影響行為。
+- **Error 區設為 Color 的 fallback（定案）**：`GetErrorAutoIndex` 回傳最後一個 Auto（Auto6）；滿載溢流同。詳見第 15 章 15.12。
+- **手動綁定 UI（定案）**：不提供；綁定僅由 Loader CCD 掃碼路徑自動產生（最低 index 先到先得），UI 僅顯示。
+- **配方選單畫面（定案）**：不存在獨立 form；新增/複製/刪除/切換全在 Product Setup（`lstRecipe`＋`edRecipeName`），主畫面 `cb_WorkFile` 亦可切換。

@@ -40,7 +40,7 @@
 | `sbMotionView` | button | 切換至 Motion View 動作模擬分頁 (`tsMotionView`) |
 | `sbOther` | button | 切換至 Other 分頁 (`TabOther`)，含 Lock/IO/Suck 狀態 |
 
-> 【待補：頂部功能列與 MonitorView 選單多數採點陣圖示，且 DFM 內 Hint 統一為 Change Language；表中標籤名稱依處理函式語意推得，確切螢幕圖示文字待現場截圖確認。】
+> 註：頂部功能列實際螢幕文字已由截圖（`screenshots/main-overview.png`）與 DFM Caption 確認：**Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit**（圖示＋文字；「Maintance」為機上實際拼字）。DFM Hint「Change Language」為複製貼上遺留，非按鈕功能。
 
 ---
 
@@ -81,9 +81,13 @@
 | `iRealDummy` | DUMMY(0) / HAS_TRAY(1) / REALLY(2)，預設 DUMMY | 運轉模式，影響三層 IO/感測檢查層級；存於 INI `[System] RealDummy`。離子風扇警報等實機檢查僅 REALLY 模式生效 |
 | `iStartMode` | 0=Initial / 1=Continue，預設 0 | 起動模式；存於 INI `[System] iStartMode` |
 
-> 【待補：`iStartMode=Continue` 在 `Start()` 流程中的實際差異行為。`CheckContinusStartIsReady()` 已被註解停用，目前 Initial 與 Continue 在啟動路徑上看不出程式分支差異，其語意是否僅供記錄/SECS 待現場確認。】
+> 註（定案）：`iStartMode=Continue` **目前對執行流程無任何行為分支**——全原始碼追查結果：`Start()`／`DoStartArm()`／`ProcessStartMode()` 均不讀取 `iStartMode`，`CheckContinusStartIsReady()` 只剩被註解的呼叫（main.cpp:1968）且函式定義已不存在，SECS 端亦無鏡像；唯一對外出口是 Automation TCP `GET_STATUS` 的 `START_MODE=` 欄位。Initial/Continue 差異僅止於畫面圖示、ini 記錄與操作紀錄（RecordProcess）。
 
-> 【待補：DUMMY / HAS_TRAY / REALLY 三模式對機台實際 IO/動作的差異，本章僅見 REALLY 啟用離子風扇檢查；其餘差異需查各模組與三層 IO 檢查文件確認。】
+> 註（定案）：DUMMY / HAS_TRAY / REALLY 三模式差異——
+> - **DUMMY**：料流全虛擬。源乾以勾選框判斷、盤在席/遺失感測檢查全跳過、氣缸到位感測不確認（馬達/氣缸仍實際動作）。
+> - **HAS_TRAY**：走真實 IO——氣缸到位確認與 Empty/Color/Loader 的盤在席/遺失警報全部生效，但**真空吸嘴檢查跳過、Top CCD 2D 走模擬循環碼**（「真的搬盤，但不驗 IC 真值」）。
+> - **REALLY**：全真——真空感測故障會報警、Top CCD 實體觸發＋輪詢、離子風扇連鎖生效。
+> 詳見第 10 章 IO 自我測試（`iosetview.cpp` SelfTestTier 註解為此三層之權威定義）。
 
 ---
 
@@ -128,7 +132,7 @@
 | `GeneralSetting.bUseAMR` | true/false | AMR/AGV 模式啟用旗標，驅動 AMR 徽章 ON/OFF（此畫面唯讀顯示） |
 | `CosFunction.bUseSecsGem` | true/false | SECS/GEM 付費功能旗標，決定 SECS 徽章是否顯示與可點擊（此畫面唯讀） |
 
-> 【待補：SECS 徽章狀態碼 (0/1/2) 對應的實際 HSMS 連線語意，來源在 SECS 引擎，本章僅做顯示對應。】
+> 註：SECS 徽章狀態碼定義（`UpdateSecsFeatureBadge`，main.cpp）：0=**OFF**（未連線，灰）、1=**CONNECT**（TCP 已連但未 SELECTED，橄欖）、2=**ONLINE**（HSMS SELECTED，綠）；根源為 SECS 引擎 `iHsmsState`（`uHGemEquipment.cpp`），每秒刷新。
 
 ---
 
@@ -137,12 +141,12 @@
 | 控制項 | 類型 | 功能 |
 | --- | --- | --- |
 | `cb_WorkFile` | combobox | 選擇/顯示目前配方名稱 (`Recipe Name`)。有效則 `SetCurrentRecipeName`、存檔、重載 TrayForm 與各子畫面 WorkFile、刷新監看格線並記錄；空白/不存在/運轉中則還原並提示 |
-| `cbbUserSelect` | combobox | 切換操作者權限等級，選項 `Operation / Supervisor / Engineer / Honprec`。Operation 直接降權；其餘等級在 `SOFT_SIMULATE` 下強制切換，真機則提示尚未支援密碼登入並還原 |
+| `cbbUserSelect` | combobox | 切換操作者權限等級，選項 `Operation / Supervisor / Engineer / Honprec`。Operation 直接降權免密碼；其餘等級真機會跳出 **Login User ID / Login Password** 輸入框，經帳號驗證（`UserRoleManager.Login`）成功才切換，輸錯提示 `User ID or password is incorrect.`（`SOFT_SIMULATE` 建置則直接強制切換） |
 | `palloadingCount` | label | `Load` 上料計數值面板（預設 0） |
 | `palUnloadingCount` | label | `Total` 總下料計數值面板 |
 | `palloseCnt` | label | `Fail` 不良/遺失計數（`lblloseCnt` Visible=False，目前隱藏） |
-| `btnClearCount` | button | `Clear All` 清除計數按鈕 |
-| `sbPaperSummary` | button | `Summary` 產量彙總按鈕 |
+| `btnClearCount` | button | `Clear All` 清除計數按鈕：停機時可用，YES/NO 確認後清除本 Lot 生產計數並寫回 `lastdata`（運轉中提示先停機） |
+| `sbPaperSummary` | button | `Summary` 產量彙總按鈕：未綁定 OnClick＝**保留鈕（未啟用）** |
 | `palAuto01..06` + `plLotNumberAuto1..6` | grid | 下料 Auto1~6 即時資訊面板（Bin / Lot / ID / Cnt），由 `ShowUnloadAutoInfo` 填入 |
 
 | 參數 | 範圍/預設 | 說明 |
@@ -152,7 +156,7 @@
 
 > ⚠️ 注意：運轉中無法變更 Recipe（提示 `Can not change recipe while machine is running.`），須先停機。
 
-> 【待補：`btnClearCount` (Clear All) 與 `sbPaperSummary` (Summary) 在 main.dfm 中未綁定 OnClick，main.h 亦無對應處理函式宣告，實際功能/是否啟用待現場確認（疑為待接線或保留按鈕）。】
+> 註：`btnClearCount`（Clear All）已於 2026-07 接上功能（見上表）；`sbPaperSummary`（Summary）確認未綁定 OnClick、無處理函式，為保留鈕。
 
 ---
 
@@ -236,7 +240,7 @@
 | `Recipe does not exist.` | 輸入的配方名稱不存在 | 選擇清單中既有配方 |
 | `One Cycle is only allowed in Normal / Clean Out mode.` | 非 Normal/Clean Out 模式按 One Cycle | 切回 Normal/Clean Out 模式再執行 |
 | `State Record snapshot failed (check 7-Zip / disk).` | 手動快照打包失敗 | 檢查 7-Zip 是否安裝、磁碟空間/路徑 `D:\HT160S_StateRecord\` |
-| `User password login is not available yet.` | 真機切換非 Operation 權限尚未支援密碼登入 | 維持 Operation 等級（功能待實作） |
+| `User ID or password is incorrect.` | 切換權限時帳號或密碼輸入錯誤 | 確認帳號/密碼後重試（帳號管理見 Maintenance 帳號頁，需 Engineer 以上權限編輯） |
 | `Please add at least one Lot to the list !` | Lot Start 時清單為空 | 先用 `Add Lot` 加入 Lot |
 
-> 【待補：原始碼中 `cbbUserSelect` 選項、`pnStartMode` / `pnRealDummy` 的實際螢幕中文標籤因 Big5 編碼未直接讀出，UI 文字以程式設定的英文 Caption 為準（Initial/Continue/Real/Dummy）。】
+> 註：`cbbUserSelect` 選項與 `pnStartMode`／`pnRealDummy` 標籤已由 byte-safe DFM 讀取確認**全為英文**（Operation/Supervisor/Engineer/Honprec；Initial/Continue；Dummy/HasTray/Real），main.dfm 無任何中文 Caption/Hint，與截圖一致。

@@ -93,7 +93,7 @@
 
 > ⚠️ 注意：本畫面（Motor Test）**未套用**其他畫面（如 Teach）的「綠=使用中且觸發 / 灰=使用中閒置 / 紅=未使用」三色慣例。各 LED 確切顏色語意請以實機現場確認。
 
-> 【待補：`ledStatus5` / `ledStatus6`（Soft CW / Soft CCW）對應軟體極限燈，但 `RefreshOperateGrid` 與 `ScanMotorStatus` 是否實際驅動 `Motor->Led[5]` / `Led[6]`，原始碼未在本檔明確賦值，需確認來源。】
+> 註（定案）：`Led[5]`/`Led[6]`（Soft CW/CCW）**僅 MC88X1 驅動層會賦值**（`myMC88X1motor.cpp` `ScanMotorStatus`：取 MotionStatus bit0/bit1）；MN200 與 SMC 驅動的 `ScanMotorStatus` 只設 Inpos、其餘 LED 恆 false——**MN200/SMC 軸這兩顆燈永遠不亮屬預期行為，非故障**。
 
 ## 11.3 操作流程
 
@@ -153,7 +153,7 @@
 
 > ⚠️ 注意：有未存編輯時，Move / Servo 等動作會被擋下，關閉畫面也會先提示。
 
-> 【待補：HomeType 並非本畫面獨立欄位。與回原相關的可設定欄為 `Mot_Table` 的 `HomeDirectior`（方向，舊拼字）/ `HomeHighSpeed` / `HomeLowSpeed` / `HomeOrder`；各軸實際 HomeType / 回原方式（例如 type-7）定義於馬達驅動層，非本畫面顯示，需查 `Mot_Table` 與驅動文件確認。】
+> 註：回原相關可設定欄為 `Mot_Table.csv` 的 `HomeDirectior`（舊拼字）/`HomeHighSpeed`/`HomeLowSpeed`/`HomeOrder`。現行機台設定：**全部啟用軸 HomeDirectior=1（僅 M20 MTopCCDX_Color=0）**；HomeHighSpeed/LowSpeed 多數軸 100/10（M12/M20 CCD 軸 200/20、M14~M17 吸嘴 Z 軸 100/50）；**HomeOrder 欄全部空白**（回原順序由程式內建順序決定，非 CSV 控制）。實際回原方式（如 type-7）定義於馬達驅動層。
 
 ## 11.5 Information 分頁（硬體資訊）
 
@@ -200,7 +200,9 @@
 
 > ⚠️ 注意：本畫面的 SERVO ON / OFF 走 `SwServerON` 路徑。`SwServerON` Off→On 是否等同 `SwMotorRelay` 的 power-cycle、是否足以清除所有鎖存伺服警報，需實機確認。若 SERVO OFF→ON 無法解除警報，請改以 `SwMotorRelay`（馬達繼電）電源重置。
 
-> 【待補：伺服警報是否單靠 SERVO Off→On 即可清除，或部分需 `SwMotorRelay` 電源重置（專案記憶：MC88X1 latched servo alarm 需 `SwMotorRelay` Off→On power-cycle）。本畫面 Servo On/Off 走 `SwServerON`，是否等同 power-cycle，需實機確認。】
+> 註（既定結論）：MC88X1 的鎖存伺服警報 `SetServoOn` 清不掉（no-op），**必須 `SwMotorRelay` Off→On 電源重置**。本畫面 SERVO ON/OFF 走 `SwServerON`，與 `SwMotorRelay` 為不同輸出點，**不等同 power-cycle**——SERVO OFF→ON 無法解除鎖存警報時，請以馬達繼電（`SwMotorRelay`）電源重置處理。
+>
+> 【待補（現場）：實機驗證一次「SERVO OFF→ON 不能清除、SwMotorRelay 重置可清除」的完整操作動線，補上操作員步驟。】
 
 ## 11.8 參數範圍
 
@@ -216,7 +218,7 @@
 | Driver Register Offset | 支援 0x 十六進位；預設清單 0x00/0x02/0x04/0x08 | MC88X1 暫存器讀取 offset（唯讀） |
 | `MAX_MOTOR_TEST_MOTOR_COUNT` | 64（實際軸數取 min(`HSys.iTotalMotor`, 64)） | Motor Test 支援的最大馬達數上限 |
 
-> 【待補：`cbbLoopWait` 的等待時間具體選項清單 (ms 值) 由 `GetLoopWaitMS()` / DFM Items 決定，本次未讀取確切數值。】
+> 註（定案）：`cbbLoopWait` 下拉選項為 **0 / 0.05 / 0.1 / 0.2 / 0.5 / 1.0 / 2.0 / 5.0 / 10.0（秒）**，預設 0；`GetLoopWaitMS()` 以 `atof×1000` 換算為 0/50/100/200/500/1000/2000/5000/10000 ms，可手動輸入任意值，上限 100 秒。
 
 ## 11.9 安全連鎖總覽
 
@@ -252,4 +254,4 @@
 - **UpdateMotorMonitor**：`Motor->ScanMotorStatus` → `ReadPos()` 一次交易取得命令+編碼器 → 顯示 NumberAlias/NowPos/Encoder → 逐燈 `UpdateStatusLed(Motor->Led[i])`；EMG 燈額外或上系統 `IsEMGPressed()`。
 - **FormClose**：有未存參數則 `caNone` 取消關閉；否則停 `tmrUpdate` → `StopActiveMotor` → 寫 `SCREEN_CLOSE` log。
 
-> 【待補：DFM 內標籤確認 — 本畫面 Caption/Label 皆為 ASCII 英文，未見 Big5 中文標籤（依萃取結果）。】
+> 註（定案）：byte-safe DFM 讀取確認 `uMotorTest.dfm` 無任何中文字串，本畫面 Caption/Label 全為英文。

@@ -21,7 +21,7 @@
 ![速度畫面](screenshots/screen-speed.png)
 > 圖 9-1 Speed Setup 速度設定畫面。（擷取方式：自主畫面進入速度設定畫面後擷取整個 Speed Setup 視窗）
 
-> 【待補：進入本畫面的實際操作路徑（由哪個畫面／按鈕開啟 Speed Setup）需現場確認後補上。】
+> 註（定案）：本畫面由主畫面頂部功能列 **Speed** 按鈕開啟（`sbSpeedClick` → `ShowTopForm(fSpeed, sbSpeed)`，main.cpp:640-643）；無權限等級、無運轉中鎖定（運轉中僅實際套用被擋，見 9.7）。
 
 ---
 
@@ -52,7 +52,21 @@
 | 全部馬達（群組）— Speed + | 每按一次 +10%（上限 100%） | — | — | 群組加速步進。 |
 | 全部馬達（群組）— Speed - | 分段遞減：>20% 減 10、>10% 減 5、>1% 減 1（下限 1%） | — | — | 群組減速步進，依目前值分段。 |
 
-> 【待補：實際出現的軸名清單。原始碼對所有 `MotPtr` 非 NULL 的馬達一律建列，並無針對特定軸或條件的篩選；確切軸名 (Alias) 由機台 `Mot_Table` 設定決定，需以現場機台確認。】
+依現行 `system/Mot_Table.csv`，啟用（Enable=1）的 18 軸如下（M13 MBottomCCDY、M18 MPitchX 停用不建列）：
+
+| 軸 | Alias | 軸 | Alias |
+| --- | --- | --- | --- |
+| M01 | MSortingArmX（分類臂 X） | M10 | MAutoY_5 |
+| M02 | MTrayArmX（盤臂 X） | M11 | MAutoY_6 |
+| M03 | MEmptyY（空盤 Y） | M12 | MTopCCDX（頂部 CCD X） |
+| M04 | MLoaderY_1（Loader1 Y） | M14 | MSuckZ_1（吸嘴 1 Z） |
+| M05 | MLoaderY_2（Loader2 Y） | M15 | MSuckZ_2（吸嘴 2 Z） |
+| M06 | MAutoY_1 | M16 | MSuckZ_3（吸嘴 3 Z） |
+| M07 | MAutoY_2 | M17 | MSuckZ_4（吸嘴 4 Z） |
+| M08 | MAutoY_3 | M19 | MColorY（Color Y） |
+| M09 | MAutoY_4 | M20 | MTopCCDX_Color（Color CCD X） |
+
+> 註：畫面對所有 `MotPtr` 非 NULL 的馬達一律建列；最終清單依該機 `Mot_Table.csv` 為準（以機台 State Record 副本核對）。
 
 加速/減速兩欄在本畫面皆標示為「不提供」，係依 SPEC 屬實呈現，並非省略；說明見 9.6。
 
@@ -101,7 +115,7 @@
 
 本畫面**不提供**加速度 (accel)／減速度 (decel) 的編輯欄位。在本程式中 acc/dec 為馬達唯讀參數，不在 Speed Setup 畫面設定。
 
-> 【待補：accel/decel 可調設定的實際位置（可能在 Teach 或馬達參數設定處）需另行確認；本畫面原始碼確認不存在 acc/dec 編輯欄位。】
+> 註（定案）：accel/decel 定義於 `system/Mot_Table.csv` 的 **Acc / Dec 欄位**（機台設定檔，逐軸），程式啟動時載入——**無任何 UI 畫面可調**，需改值時直接編輯 CSV 後重啟軟體（工程師作業）。
 
 > 操作員在本畫面看到的僅是 1~100 的百分比，並無實際速度單位顯示；百分比的「實際速度基準」是各馬達的 `JogHighSpeed`（見 `MyMotor.cpp` `SetPersentSpeed`），非畫面內顯示值。
 
@@ -134,8 +148,8 @@
 
 ---
 
-## 9.9 本章待補項目
+## 9.9 本章補充定案
 
-- 進入本畫面的實際操作路徑（由哪個畫面／按鈕開啟 Speed Setup）。
-- 實際出現的軸名清單（`labMotorSpeed` 取自各馬達 `Motor->Alias`，依機台 `Mot_Table` 設定而定，需現場確認）。
-- accel/decel 可調設定的實際位置（可能在 Teach 或馬達參數設定處，本畫面不存在 acc/dec 編輯欄位）。
+- 進入路徑（定案）：主畫面頂部功能列 **Speed** 按鈕（見 9.1 註）。
+- 軸名清單（定案）：現行 `Mot_Table.csv` 啟用 18 軸（見 9.3 表）；最終以機台設定檔為準。
+- accel/decel（定案）：位於 `Mot_Table.csv` Acc/Dec 欄，無 UI 可調（見 9.6 註）。

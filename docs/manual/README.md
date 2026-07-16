@@ -24,14 +24,14 @@
 | 15 | 動態分流模式（By Lot+Bin / By Lot+PassFail） | [15-lotbin-mode.md](15-lotbin-mode.md) |
 | 16 | 常見問題 (FAQ) | [16-faq.md](16-faq.md) |
 
-## 附錄（自機台設定檔產生，用於補齊各章「待補」）
+## 附錄（自機台設定檔產生；B/C/D 可用 `scripts/ops/generate-manual-appendices.ps1` 重生）
 
 | 附錄 | 標題 | 檔案 | 來源 |
 | --- | --- | --- | --- |
-| A | 現場驗證清單（119 項待補彙整） | [A1-field-checklist.md](A1-field-checklist.md) | 各章 unknowns |
-| B | 全機 I/O 對照表（327 點） | [B1-io-table.md](B1-io-table.md) | `system/IO_Table.csv` |
-| C | 軸（馬達）對照表（20 軸） | [C1-motor-table.md](C1-motor-table.md) | `system/Mot_Table.csv` |
-| D | 警報碼一覽（516 筆） | [D1-alarm-list.md](D1-alarm-list.md) | `system/AlarmList.csv` |
+| A | 現場驗證清單（真實機驗證項，v0.2 收斂版） | [A1-field-checklist.md](A1-field-checklist.md) | 各章殘留待補 |
+| B | 全機 I/O 對照表（319 點） | [B1-io-table.md](B1-io-table.md) | `system/IO_Table.csv` |
+| C | 軸（馬達）對照表（20 軸，啟用 18） | [C1-motor-table.md](C1-motor-table.md) | `system/Mot_Table.csv` |
+| D | 警報碼一覽（576 筆＝數字碼 516＋JAM 14＋MES 33＋WAR 13） | [D1-alarm-list.md](D1-alarm-list.md) | `system/AlarmList.csv` |
 
 > 編輯審查意見見 [_review-notes.md](_review-notes.md)（workflow 完整性審查自動產生，含補完優先序建議）。
 
@@ -53,4 +53,5 @@ powershell -ExecutionPolicy Bypass -File scripts\ops\capture-ht160s-screens.ps1
 
 ## 校對狀態
 
-每章開頭如有 `> 【待補：...】` 標記，表示該處需現場確認。完成校對後請移除標記並更新封面版本。
+- **v0.2（2026-07-16）**：原 113 處正文待補已批次補完至剩 10 處——可由 repo 定案者（設定檔/AGV 草案/DFM byte-safe 讀取/原始碼定性）全數寫入各章「註（定案）」；殘留 `> 【待補（現場）：...】` 者皆為真實機驗證項，已收斂於附錄 A 分組清單。
+- 完成現場勾稽後請移除對應標記並更新封面版本/修訂紀錄。

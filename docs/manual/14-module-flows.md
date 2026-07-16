@@ -25,18 +25,12 @@
 | `grpLoaderR` | groupbox | 右側 Loader（Loader2）盤面區塊標題 |
 | `lblLoadCurrID_1` | panel/label | 左側 Loader 目前盤子的識別／盤號顯示 |
 | `lblLoaderCarID` | panel/label | 右側 Loader 目前盤子的識別／盤號顯示 |
-| `lblLoadCurrBin_1` | label | `Current Sorting Bin :` 目前正在分類的 Bin 別 |
-| `mtWorkArea` | grid (TTMyTray) | 左側盤面 4×5 格點，顯示每格 IC 掃描／分類狀態（UNCHECK/EMPTY/HAS_OK/錯誤碼） |
-| `mtSortRecv` | grid (TTMyTray) | 右側盤面 4×5 格點 |
+| `mtLoaderL` / `mtLoaderR` | grid (TTMyTray) | Tray Status 分頁左右盤面格點（預設 4×5），以 `SetSubHTrayPanel` 鏡射該 Loader 車道生產盤內容（每格 IC 掃描/分類狀態） |
 | `mtLoaderLTrayWork` | grid (TTMyTray) | 左側 Loader-Y 移動中盤面（綁定 MLoaderY_1/MMLoaderY_1） |
 | `mtLoaderRTrayWork` | grid (TTMyTray) | 右側 Loader-Y 移動中盤面（綁定 MLoaderY_2/MMLoaderY_2） |
 | `chkLoadTray` | checkbox | 模擬/DUMMY 下決定空料時是否持續供盤（勾選＝視為永遠有盤；未勾＝回報 `Loader Tray Empty`）。實機不使用，由推盤氣缸 On 感測器判定有無盤 |
 
-> 【待補：`lblLoadCurrBin_1`、`lblLoadCurrID_1`、`lblLoaderCarID` 三個顯示標籤在 `aLoader.cpp` 內未被寫入；實際更新來源（推測為 `SortArm`／分類流程或 `main` 顯示綁定）需查 `aSortArm`/`main` 確認顯示來源與格式。】
-
-> 【待補：`mtWorkArea`/`mtSortRecv`（4×5）與 `mtLoaderLTrayWork`/`mtLoaderRTrayWork` 的對應關係（哪個顯示生產盤面、哪個顯示移動盤面），需與 `main.cpp` 顯示綁定一併確認。】
-
-> 【待補：`Loader 2D Left/Right` 與物理 `Loader1/Loader2`（左/右）的對應由 DFM 版面推得（`grpLoaderL`=左、`grpLoaderR`=右），但程式未明示 `LoaderNo` 與左右文字標籤的綁定，需現場確認。】
+> 註（定案）：`lblLoadCurrID_1`／`lblLoaderCarID` 為靜態 Panel（Caption 固定 "Loader ID"），全程式**無任何寫入點**——HT172 靠 `SetIDPanel` 接線並掛 SVID 1080/1081，HT160S 移植時未接，屬**死 UI（保留）**；`lblLoadCurrBin_1` 元件在 HT160S 不存在（僅 DFM 有 "Current Sorting Bin :" 靜態文字）。HT160S 亦無 `mtWorkArea`/`mtSortRecv`（HT172 元件）——生產盤面＝`mtLoaderL/R`（鏡射），移動盤面＝`mtLoaderL/RTrayWork`（`BindMovingTrayPanel`）。左右對應：`LoaderNo==1`→Left（`grpLoaderL`）、`LoaderNo==2`→Right（`grpLoaderR`）。
 
 ### 14.1.3　動作時序
 
@@ -77,7 +71,7 @@
 4. `ReadTopCcdBin` 讀該格有無料（模擬/未啟用 CCD 回 `HAS_OK_IC`）；寫入盤面。若啟用 2D Bin Map 且為 `HAS_OK_IC`，觸發 Top CCD 拍照，設 3000ms 等待。
 5. `ReadTopCcd2DCode` 取 2D 條碼，`LotRegistry.FindByCode2D` 反查 Lot 與 Bin，寫入該格 Bin/Lot/2D 碼；By Lot+Bin 模式則 `LotBinBinding.ResolveAuto` 綁定 Auto；查不到 → 警報。
 
-> 【待補：`ReadTopCcdBin` 在實機（UseCCD 開啟、非模擬）路徑直接 `bOk=false` 回 `EMPTY_IC`，未見實際向 CCD 取有無料的實作；實機是否另有 Bin 讀取來源（或恆走 2D 路徑）需確認。】
+> 註（定案）：`ReadTopCcdBin` 實機路徑（UseCCD 開、非模擬）確為 stub（`bOk=false` 回 `EMPTY_IC`，呼叫端跳 `WAR0330 Top CCD API not ready`，可 SKIP/RETRY/TRAY_END）。實機的 IC 有無/Bin 判定**不靠此函式**：真正來源是 `ReadTopCcd2DCode`（僅 REALLY＋`bUseTopCcd` 才實連 TopCcdSocket）取得 2D 碼後，由 `LotRegistry.FindByCode2D` 反查匯入的 2D/Bin 資料——即實機恆走 2D 路徑。
 
 #### 空盤排出（DoDischargeTray）
 
@@ -236,7 +230,7 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | `ScanDelay 逾時` | 3000 ms | Color 2D CCD 一次拍攝/讀碼回應逾時 |
 | `破棧/夾盤延時` | 各段 5 tick | 分盤動作各段安定延時 |
 
-> 【待補：`iSupplyThreshold`（預設 100）與 `NotifyICPlaced/iICCount` 在供盤主流程未見實際判斷使用，用途/是否為遺留或外部讀取需確認。】
+> 註（定案）：`iSupplyThreshold`（預設 100）與 `NotifyICPlaced`/`iICCount` 為**遺留碼**——全程式無任何呼叫點（`iICCount` 僅出現在 FeederDecision 除錯 dump），不影響供盤行為。
 
 ### 14.2.6　警報與排除
 
@@ -248,7 +242,7 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | `Color Y motor will out of limit` | `MoveColorY` 目標超軟極限 | 檢查/修正 ColorRead2DYPosition 或 ColorTrayArmPickYPosition |
 | `Color CCD X motor will out of limit` | `MTopCCDX_Color` 目標超軟極限 | 檢查/修正 ColorRead2DXPosition |
 
-> 【待補：`SortBin` 模式（`DoSortBin`）目前僅 case 1 直接 return true，為空殼；分 Bin 實際行為是否規劃中需確認。`IsAcceptingIC()` 固定回 false，是否為預留介面需確認。】
+> 註（定案）：`DoSortBin`（Color 當 Bin 區收 IC）確為空殼（switch 僅 case 1 直接 return true）、`IsAcceptingIC()` 固定回 false——此功能**未實作，屬預留介面**；Color 站目前僅作身分/reject 盤供給，不收分選 IC。
 
 ---
 
@@ -350,7 +344,7 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | `Front Empty Tray Is Miss Error` | 拆堆完成後前段感測器讀不到料盤（非 DUMMY） | K_RETRY：回 case 1 重新拆堆 |
 | `Empty Y motor will out of limit` | `MoveEmptyY` 目標超軟體極限 | 資訊提示，拒絕該次移動 |
 
-> 【待補：`bLotFinish` 由何處設定/清除（本模組僅讀取），推測由外部批次結束流程設定，需查呼叫端。】
+> 註（定案）：`bLotFinish` 為 Empty 模組私有旗標，僅兩個寫入點：InitialTask 清 false；主 ladder case 100 每輪重算 `bLotFinish = (RunMode==Run_CleanOut && TrayArmModule->IsCleanOutFinish())`——即只在清機且 TrayArm 收尾完成時為 true（供 drain 分支判斷），與 Lot Start/End 流程無關。
 
 ---
 
@@ -472,7 +466,9 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | `Tray Arm X motor will out of limit` | 盤臂 X 目標超軟極限 | 修正教導位置 |
 | `ShowSuckError (SortArm Pick / Place)` | 吸取（Suck）或放料（Destroy）真空動作失敗 | K_RETRY|K_SKIP；隨後 `Sucker->Reset()` |
 
-> 【待補：`ArmDelay.Set(3)` 的 3 拍對應實際時間（取決於 HTimer 計時基準/主迴圈週期）未在本檔界定；`iHomeLed` 索引對應的實際 Home 感應器接點需對照馬達/IO 設定確認；真空吸嘴與夾爪實體 IO 點位（`C_TrayArm_FrontClamp`、`C_TrayArm_RearClamp`、`C_TrayArmZ_Up/Down`、`SortArmSuck`）需查 IO_Table/cylinder 設定。】
+> 註：夾爪/升降實體 IO 點位（`system/IO_Table.csv`，格式 Lane/IP/Port/Bit）：`C_TrayArm_FrontClamp`＝0/0/2/6、`C_TrayArm_RearClamp`＝0/0/2/7（兩者 OnDelay/OffDelay 500/500）、`C_TrayArmZ_Up`＝0/0/2/5、`C_TrayArmZ_Down`＝0/0/2/4（各自 On 感測在 Port1 同 Bit）。SortArm 吸嘴為 `Suck1~Suck4`（Sucker，0/0/1/0~3；`SuckN_On/Off` 為 IP=W 的寫出點）。`iHomeLed`=1（`HTMotor.h` LED 索引 enum）。
+>
+> 【待補（現場）：`ArmDelay.Set(3)` 的 3 拍對應實際毫秒數取決於主迴圈實際週期（標稱約 1ms/拍，即約 3ms），列入現場動態驗證清單量測。】
 
 ---
 
@@ -575,4 +571,6 @@ ColorY 軸幾何：Y=前/後（相對操作者）、X=左/右、Z=上/下。供�
 | `Auto%d output car full (%d trays) - change car then confirm` | 邏輯堆疊車盤數達 `MAX_TRAY_PER_CAR` | 操作員換車後 confirm；清車資料並重建堆疊角色 |
 | `Auto enable changed. Please restart the software ...` | 操作員變更 per-Auto 啟用後的提示 | 重啟軟體讓 Lot+Bin 路由生效 |
 
-> 【待補：實機「車已被取走」感測（`IsAmrTaken`）重用 `SnAutoX_InputEnd`；註解標示 sensor TBD/未接線時 Enable==false 會停在 Ready，實際是否已接線需現場確認。`DoDischargeTray` 的 CEID 陣列 `{136,137,138,140,141,142}` 跳過 139，原因需查 SECS 事件表確認。`tRunData.TrayICCnt[eAuto1+i]` 計數累加處（SortArm 放 IC 時）未在本檔。maintenance 畫面 chkAutoEnable1~6 的螢幕中文 caption 需現場確認。】
+> 註（定案）：`DoDischargeTray` 的 CEID 陣列 `{136,137,138,140,141,142}` 跳過 139，係因 **139 在 HT9045 CEID 空間已被占用**（`DoVisualSortLotStart`），HT160 為避免撞號刻意跳過（詳見第 12 章）。AMR 模式卸盤時另於 `iAmrDeviceCount[auto] += 工作盤CountIC()` 累計車上 IC 數供 SVID 38231-33/38240-42。maintenance 畫面 `chkAutoEnable1~6` 螢幕文字已由 DFM 確認為「**Auto1**」~「**Auto6**」（英文，無中文）。
+>
+> 【待補（現場）：實機「車已被取走」感測（`IsAmrTaken` 重用 `SnAutoX_InputEnd`，Lane0/IP2/Port1/Bit0~5）是否已最終接線——未接線（Enable==false）時 AMR 握手會停在 Ready。】

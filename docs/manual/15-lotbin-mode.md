@@ -189,12 +189,12 @@ By Lot+PassFail 把每顆 IC 依「是否為 Pass Bin」分成 PASS / FAIL 兩�
 
 ---
 
-## 15.12 待補項目
+## 15.12 補充定案與備註
 
-> 【待補：是否提供操作員手動指定/編輯特定 (Lot,Bin)->Auto 或 (Lot,PASS/FAIL)->Auto 綁定的 UI。`ResolveAuto` 採「最低 index 先到先得」自動綁定，本批檔案未見手動編輯介面，需確認。】
+> 註（定案）：**不提供**手動指定/編輯單筆 (Lot,Bin)→Auto 或 (Lot,PASS/FAIL)→Auto 綁定的 UI。綁定唯一產生點是 Loader CCD 掃碼路徑的 `LotBinBinding.ResolveAuto`（最低 index 先到先得）；UI 端僅讀取顯示（主畫面 Auto 標籤、State Record dump、SECS BinSetting），僅工單清除時整組 Clear。
 
 > ℹ️ By Lot+PassFail 多 Lot 併行時，可用非 Error Auto 少於「2 × 併行 Lot 數」會使某個 PASS/FAIL 桶溢位到 Error Auto。客戶接受此溢位行為（不跳 Note、不擋料），但溢位的每顆合法 PASS/FAIL 產品會於 `Production_Log` 以 `TraceCode=1004`、`ErrorType=PFOverflow` 記錄（PassFail 欄仍為 PASS/FAIL、Which Auto 為 Error Auto），以便追溯混入 Error Auto 的合格品。注意：此處 FAIL 是「合法產品等級（Bin）」，與 2D 讀碼失敗的 Error（走 Error Auto、無 PassFail 記錄）是兩回事。
 
-> 【待補：當 Error 區設為 Color（非 Auto）時，動態模式會 fallback 到最後一個 Auto 的邊界行為與實機意圖，需現場確認。】
+> 註（定案）：Error 區設為非 Auto（如 Color）時，動態模式 fallback 由 `GetErrorAutoIndex`（CosFunction.cpp）處理：註解明寫 "Error area is not an Auto (e.g. Color) : fall back to the last Auto"，回傳 **Auto6**（index 5）；`ResolveAuto` 滿載溢流亦用同一 Error Auto。此為程式定義行為；若現場希望 Error 走 Color 實體站，需另開發（Color 收 IC 的 `DoSortBin` 目前為未實作之預留介面，見第 14 章）。
 
-> 【待補：配方「選單畫面」（若有獨立 form 供新增/複製/刪除/切換配方）對應的表單名稱與按鈕，本批檔案未確認；詳見第 6 章。】
+> 註（定案）：**無獨立配方選單 form**。配方新增/複製/刪除/切換全在 Product Setup 畫面（`setup.cpp`：`lstRecipe`＋`edRecipeName`，禁刪現用配方），另主畫面 `cb_WorkFile` 可直接切換配方；後端為 `THT160RecipeManager`（`data\<配方>\setup.ini`）。

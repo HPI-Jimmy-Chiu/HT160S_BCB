@@ -216,11 +216,24 @@ Settings 分頁可編輯 `system\General.ini` 的 `[SECS]` 區段並回寫。
 | 274 | AGVLDUnLDFinish | AGV 取/放料完成 (Finish，見 12.3) |
 | 275 | AGVLdID | AGV carrier ID 回報 (見 12.3) |
 
-> 【待補：主機端實際使用的 SVID/ECID/CEID 對外名稱對應表。原始碼中 9045 對齊 band (1001/1003/1021/1027/2758-2763) 與 HT160 自訂高位 band (66000+/38xxx) 為程式內定義，客戶主機是否一致需與整合者文件比對。】
+### SVID/ECID band 對照（9045 對齊段 vs HT160 自訂段）
 
-> 【待補：完整 GEM 通訊/控制狀態機 (E30 COMMUNICATING/ONLINE/OFFLINE、LOCAL/REMOTE)。本程式僅以 SV 66002 鏡像值 (4=Local / 5=Remote) 表示，是否實作完整 GEM state model 需確認。】
+| 段 | ID | 語意 | 備註 |
+| --- | --- | --- | --- |
+| 9045 對齊（SVID） | 1001 / 1003 / 1021 / 1027 | Machine Model / Software Version / UPH / System Time | 與 HT9045 同號 |
+| 9045 對齊（ECID） | 1501 | Recipe Name | HT160 為唯讀 |
+| 9045 對齊（ECID） | 2758–2763 | Type1 Tray Pitch/Start/Division X&Y | S2F16 可寫（限停機）；Type2/3 預留 2771-2776 / 2784-2789 未註冊 |
+| HT160 自訂（66000+） | 66000 / 66001 / 66002 | Run Mode / System Running / Control State | 66002 鏡像 4=Local / 5=Remote |
+| HT160 自訂 | 66010 / 66011 | Alarm Active / Alarm Code | |
+| HT160 自訂 | 66020 / 66021 | Total IC / Total Sorted | |
+| HT160 自訂 | 66030 / 66031 / 66032 | Active Lot Count / Current Lot ID / Sort Mode | 66032：0=Normal、1=LotBin、2=LotPassFail、3=WhiteList（S1F3 查詢） |
+| AGV band（38xxx） | 38202–38245 | E87/AGV 站台資料 | 逐一定義見 12.3.9-2 |
 
-> 【待補：S5F1/S5F6 警報訊息與 S7Fx recipe 傳輸的完整支援範圍。原始碼僅確認分派函式存在，未逐一展開。】
+> 註：Report 1 的 13 個 SV 即「4 個 9045 對齊 + 9 個 66000 band」混編（66032 不在 Report 1 內，僅供 S1F3）。與 KYEC 主機對接的最大架構差異：9045 的報告為 host-dynamic（S2F33/35/37 動態定義），HT160 為 equipment-static 固定 7 個 report。完整對照見 `docs/AGV/HT9045_vs_HT160_SECS_Diff_20260625.md`、現況介面合約見 `docs/SECS/HT160S_SECS_Comm_Examples.md`。
+
+> 註：本程式未實作完整 E30 GEM 狀態機物件；控制狀態以 SV 66002 鏡像值（4=Local / 5=Remote）表示。警報介面：S5F1 事發即報、S5F5/S5F6 與 S5F7/S5F8 提供由警報登錄表（`mapAlarmCodeList`，SSOT）即時產生的完整警報目錄。
+
+> 【待補：S7Fx recipe 傳輸的完整支援範圍，原始碼僅確認分派函式存在，未逐一展開；與客戶主機對接前需雙方確認。】
 
 ---
 
@@ -342,19 +355,39 @@ Settings 分頁可編輯 `system\General.ini` 的 `[SECS]` 區段並回寫。
 | --- | --- | --- |
 | ServiceCarFull modal (`ShowMyError K_RETRY`) | 連線中斷 (非 SELECTED) 時的回退：Auto 滿車彈出操作員提示要求手動換車，直到 `InputFullTray` 感測器讀 OFF | 操作員手動清空料車後按 RETRY；感測器仍 ON 持續告警 |
 
-> 【待補：CEID272/273/274 與各 SVID (38202–38245) 的對外名稱/中文標籤。模組原始碼以 `EventReport(0, ceid)` 觸發，語意取自註解；完整 SECS 報告定義在 `docs/AGV/HT160S_E87_AGV_Communication_Draft_20260527.md` (本章未讀取)。】
+### 12.3.9-2　AGV SVID 38202–38245 完整對照
 
-> 【待補：DeviceCount (裝置數/IC 數) 目前固定為 0；per-tray IC count / AMR 上傳 payload 尚未設計。】
+（依 `docs/AGV/HT160S_E87_AGV_Communication_Draft_20260527.md` §6/§6.1 與 `uHGemHT160.cpp`/`uAgvStation.cpp` 現行實作）
 
-> 【待補：實機 car-taken 感測器點 (目前以 `SnAutoX_InputEnd` 的 OFF 代表車已取走) 是否為最終正式接線，需現場確認 (memory 註記為待硬體)。device id / count 等硬體相依規格亦待補。】
+| SVID | 型別 | 名稱 | 語意 |
+| --- | --- | --- | --- |
+| 38202 | ASCII | Load Port Carrier ID | P1 Loader carrier ID |
+| 38203 | ASCII | EmptyTray Carrier ID | P2（待客戶確認） |
+| 38204 | ASCII | ColorTray Carrier ID | P3；現為 CEID275 身分盤 2D 上傳欄 |
+| 38205–38207 | ASCII | Auto1–3 Carrier ID | P4–P6 |
+| 38208–38210 | ASCII | Auto4–6 Carrier ID | P7–P9 |
+| 38211–38218 | — | （未配置間隙） | |
+| 38219 / 38220 / 38221 | ASCII | Supplement / LD-UnLD-Check / LD-UnLD-Finish bitmap | CEID272/273/274 各自的 `P1:0,...,Px:1,...,P9:0` 位元圖 |
+| 38222 | INT4 | AMR Loader Tray Count | host `START_AGV` CP 灌入；**work-only**（表頭 cover/identity 盤由韌體依 `General.ini [AMR]` 另加） |
+| 38223 / 38224 | INT4 | AMR Empty / Color Tray Count | **保留 0 不實作**（無 host CP、無計數硬體；9045 該二站亦零 SECS） |
+| 38225–38227 / 38237–38239 | INT4 | AMR Auto1–3 / Auto4–6 Tray Count | 車上盤數簿記 |
+| 38228–38230 | INT4 | AMR Loader/Empty/Color Device Count | **恆 0**：上料只交換盤數、不給 IC 數（契約，與 9045 對齊） |
+| 38231–38233 / 38240–38242 | INT4 | AMR Auto1–3 / Auto4–6 Device Count | 車上 IC 數（卸盤時逐盤累計 `CountIC()`） |
+| 38234–38236 / 38243–38245 | ASCII | AMR Auto1–3 / Auto4–6 Bin Setting | 見下註 |
 
-> 【待補：BinSetting[Auto] (SVID 38234–38245) 的寫入來源/格式 (本模組 Reset 清空，實際填值處未確認)。】
+> 註（Report 定義）：RPTID 2/3/4 = 各單一 bitmap（38219/38220/38221）分掛 CEID272/273/274；**RPTID 6** = 18 個 SV（TrayCount P1–P9 ＋ DeviceCount P1–P9）同掛 CEID272（叫車快照）與 CEID274（關帳實值），273 不掛；RPTID 7 = 僅 38204，掛 CEID275（身分盤 2D，Color 站 CCD 讀碼成功即發，空碼/暫代碼不上報）；RPTID 5（9 站 carrier ID）目前無 CEID 連結、備援保留。CEID274 發送前先快照 TrayCount/DeviceCount，發完才清車歸零（populate-then-send-then-reset）。
 
-> 【待補：`ShortageDebounce[]`、`ReadyEntrySensor[]`、`PrepDone[]` 已宣告但本模組未見實際使用邏輯 (PrepDone 僅在 BeginPrep 清 0)，可能為保留或他處使用，需確認。】
+> 註（DeviceCount 現況）：舊版「固定 0」已於 2026-07-13 修正——Auto 卸盤時累計工作盤 `CountIC()` 供 SVID 38231-33/38240-42；上料側（38228-38230）依「上料只交換盤數、下料才給 IC 數」之契約**恆 0，為規格而非缺陷**。
 
-> 【待補：Empty 模組 (P2) 的 AMR 介面方法 (`IsInputShortageForAmr` 等) 未逐一讀取確認，假設與 Loader/Color 同型。】
+> 註（BinSetting 格式，2026-07-15 接線）：告知 host/AMR 該 Auto 出料車裝載的分選等級。`Normal`＝純 bin 號（兼 Error/溢位站附 `,ERR`）；`By Lot+Bin`＝`LotID:Bin` 逗號串；`By Lot+PassFail`＝`LotID:PASS`/`LotID:FAIL`；`By WhiteList`＝走 Normal 分支（純 bin 號）。不掛任何 report，僅供 S1F3 查詢，由 `ServiceAgv` 每 1 秒刷新。
 
-> 【待補：AGVSupplement 觸發要求 `RunMode==Run_Normal`，但握手 (ServiceHandshake) 未檢查 RunMode；交車途中模式改變的行為未明確界定。】
+> 註（CEID 跳號）：Auto1–6 卸盤完成事件為 {136,137,138,140,141,142}——**139 在 9045 CEID 空間已被占用**（`DoVisualSortLotStart`），HT160 為避免撞號刻意跳過。此 6 個 CEID 不掛 report（空 body，host 依 CEID 認事件）。另 Auto 車滿預告事件沿用 9045 保留號：Auto1–3=35/36/37、Auto4–6=148/149/150（掛 Report 1，與 CEID272 同時雙發）。
+
+> 【待補（現場）：實機 car-taken 感測器（目前以 `SnAutoX_InputEnd` 的 OFF 代表車已取走，IO 位址 Lane0/IP2/Port1/Bit0~5）是否為最終正式接線——未接線時真機握手會停在 Ready 不會 Finish。】
+
+> 註（定案）：`ShortageDebounce[]` **有實際邏輯**——`ServiceHandshake` 以 `++ShortageDebounce[] > GeneralSetting.iAmrHandshakeWaitSec` 作為 watchdog，強制解鎖卡死的 PREP/READY 站。`PrepDone[]`/`ReadyEntrySensor[]` 則為只寫不讀的**遺留殘骸**（僅清 0，全程式無讀取點），不影響行為。
+
+> 註（定案）：叫車與握手的 RunMode 不對稱為**有意設計**：`PollAndCall`（發 CEID272）要求 `RunMode==Run_Normal`（只有正常生產才發起新呼叫）；`ServiceHandshake` 不檢查 RunMode（已在途的交車在其他模式如 CleanOut 仍推進到完成），唯 HOME 期間例外凍結（`Run_Home` 或未歸原時 return，2026-07-11 修正）。P1–P3 三個進料站（Loader/Empty/Color）在 `uAgvStation` 內走同一組 infeed 處理路徑。
 
 ---
 
@@ -364,6 +397,4 @@ Settings 分頁可編輯 `system\General.ini` 的 `[SECS]` 區段並回寫。
 
 - SECS/GEM 為付費選配；各客戶現場是否啟用 (`bUseSecsGem` / `[SECS] Enable`) 需現場確認。
 - Settings 分頁編輯後 **必須重啟 `ht160s.exe`** 才生效，無熱套用。
-- 原始碼中文標籤/註解為 Big5；若現場 UI 另有中文字串，實際畫面文字以機台顯示為準。
-
-> 【待補：原始碼中文標籤若於現場 UI 另有顯示，實際畫面文字以機台為準 (本章依 SPEC 註解撰寫)。】
+- 原始碼中文**註解**為 Big5；byte-safe DFM 稽核已確認全機 UI 標籤為英文（唯一中文僅 IO 監看頁圖例），SECS 相關畫面無中文字串。

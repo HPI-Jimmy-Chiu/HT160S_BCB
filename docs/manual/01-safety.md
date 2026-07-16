@@ -55,7 +55,17 @@ HT160S 以機台頂部的三色塔燈（綠 / 黃 / 紅）搭配蜂鳴器，向�
 | SAFE DOOR | 安全門開啟 | 紅 |
 | AIR | 氣壓異常 | 紅 |
 
-> 【待補：每一狀態對應的「確切」塔燈燈色組合（綠/黃/紅 ON/OFF）與蜂鳴器音樂編號。塔燈組態由維護畫面 Tower Light 的 6 列（Running / Error-Jam / Pause / Message / Homing，Reserved 列隱藏）× 3 色設定，預設值由程式給定但本 SPEC 未列出逐格預設燈色，需於實機 Maintenance → Tower Light 分頁確認。】
+各狀態塔燈**程式預設值**（`DefaultTowerLightConfig`，maintenance.cpp）如下；現場可於 Maintenance → Tower Light 分頁逐格調整（設定存於號誌燈 ini，以現場設定為準）：
+
+| 狀態 | 綠 | 黃 | 紅 | 蜂鳴器預設 |
+| --- | --- | --- | --- | --- |
+| Running（運轉） | ON | — | — | [0] Mute |
+| Error/Jam（錯誤/卡料） | — | — | **閃爍** | [0] Mute |
+| Pause（暫停） | — | ON | — | [0] Mute |
+| Message（訊息） | — | 閃爍 | — | [0] Mute |
+| Homing（回原點） | — | 閃爍 | — | [0] Mute |
+
+> 註：通則＝**綠=正常運轉、黃=待人為介入（暫停/訊息/回原）、紅閃=錯誤**。蜂鳴器音樂預設全部靜音（[0] Mute），出貨/現場常會改設 Error/Jam 與 Message 的音樂編號——實際組合以該機 Tower Light 分頁當前設定為準。第 6 列 Reserved（程式內部名 Heating）為隱藏保留列，HT160 無加熱器、執行期不會進入該狀態。
 
 ### 1.3.2 蜂鳴器音樂
 
@@ -161,8 +171,10 @@ HT160S 的所有防碰撞 / 安全感測互鎖遵循一條鐵則：
 
 ## 1.7 待補事項
 
-本章下列項目因 SPEC 來源未涵蓋實體 / 現場資訊，待補齊：
+已定案（v0.2）：
+- 各狀態塔燈與蜂鳴器**程式預設值**已補入 1.3.1（Running=綠、Error/Jam=紅閃、Pause=黃、Message/Homing=黃閃、Music 全 Mute）。
+- `screenshots/tower-light.png` 已由模擬程式擷取完成（見 1.3 圖）。
 
-- 機台外殼各警告標籤（高壓、夾傷、移動部位、雷射/CCD 等）的圖示、位置與文字。
-- 各運轉/故障狀態對應的「確切」三色塔燈燈色組合與蜂鳴器音樂預設值（需於 Maintenance → Tower Light 分頁與實機確認）。
-- `screenshots/tower-light.png` 截圖檔尚未產生（目前為版位）。
+仍待現場（見附錄 A 第 A 組，**發行前硬阻擋**）：
+- 機台外殼各警告標籤（高壓、夾傷、移動部位、雷射/CCD 等）的圖示、位置與文字——現場拍照補齊。
+- 該機**實際**塔燈/蜂鳴器設定值記錄（現場可能已改離程式預設）。

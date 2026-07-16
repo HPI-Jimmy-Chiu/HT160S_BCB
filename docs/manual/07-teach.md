@@ -56,7 +56,7 @@ LED 顏色慣例：
 
 其中 EMG 燈另疊加系統 `IsEMGPressed` 狀態。
 
-> 【待補：ledStatus 標題列各位元與 `Motor->Led[]` 的逐一對應由 `ScanMotorStatus`/驅動層決定，未於本畫面原始碼確認；LED 索引常數（`iCwLed`/`iCcwLed`/`iEmgLed`/`iAlarmLed`/`iServoalarmLed` 等）定義於 `database.h`/`MachineType`，本畫面僅引用。】
+> 註（定案）：LED 索引常數定義於 `MotorAndIO/HTMotor.h`（非 database.h）：`iCwLed=0`、`iHomeLed=1`、`iCcwLed=2`、`iEmgLed=3`、`iAlarmLed=4`、`iSoftcwLed=5`、`iSoftccwLed=6`、`iServoalarmLed=7`、`iInposLed=8`、`iZPhaseLed=9`、`iServoOn=10`（共 11 顆）。實值由各驅動層 `ScanMotorStatus` 填入（MC88X1 全填；MN200/SMC 僅 Inpos）。
 
 ---
 
@@ -245,7 +245,7 @@ LED 顏色慣例：
 - **tech.ini 鍵名**：多數點位鍵 = `ed_` + Caption；`BottomCCDYCapturePosition` 例外用 `edt_` + Caption。讀取時先試 `ed_`/`edt_` 鍵，空白則回退用純 Caption 鍵（相容舊檔）。
 - **畫面生命週期**：開啟 (`FormShow`) 啟用 `tmrUpdate`、開啟 `MotorTaskLog` 一次性 home/limit 擷取；關閉 (`FormClose`) 停計時器、停軸與測試並關閉 `MotorTaskLog`。
 
-> 【待補：tech.ini 的完整節段名（`GroupName`，如 TeachEmptyAndTrayX/TeachLoader/TeachAuto）與所有鍵名、`ed_`/`edt_` 前綴回退相容，需現場核對既有檔案實況。】
+> 註（定案）：tech 檔節段名（`GroupName`）實際只有 **3 個**：`TeachEmptyAndTrayX`（Empty/TrayX 格線與 Others 一筆）、`TeachLoader`（Loader/Sort 格線＋SortZ 格線）、`TeachAuto`（Auto 格線）。鍵名一律 `ed_`＋Caption，唯一例外 `BottomCCDYCapturePosition` 用 `edt_` 前綴；讀檔先試前綴鍵、空白再回退裸 Caption（相容舊檔），存檔只寫前綴鍵。（`uteach.cpp` `AddTeachItem`/`GetTeachKey`）
 
 ---
 
@@ -269,12 +269,13 @@ LED 顏色慣例：
 
 ---
 
-## 7.13 待補與現場確認事項
+## 7.13 補充定案與現場確認事項
 
-> 下列項目原始碼未展開或須以實機/實檔核對：
+已定案（原待補）：
+- 狀態 LED 索引常數＝`HTMotor.h` 的 11 顆 LED enum（見 7.2 註）。
+- tech 檔節段名＝3 個 GroupName、鍵名 `ed_`/`edt_` 前綴規則（見 7.11 註）。
+- DFM 標籤：byte-safe 稽核確認全機 UI 為英文，無另外中文化字串。
 
-- 狀態 LED 索引常數與標題列各位元的逐一對應（定義於 `database.h`/`MachineType`，本畫面僅引用）。
-- `JOG +`=CW / `JOG -`=CCW 對應的實際物理方向（右/左、前/後、上/下）因軸而異，需現場確認。
-- `tech.ini` 完整節段名與鍵名、`ed_`/`edt_` 前綴回退相容性，須現場核對。
-- Advanced 分頁 SortArm cell 幾何（Column/Row → 實際盤格座標）與升降柱測試內部缸序/感測，屬各模組 (`aSortArm`/`aEmpty`/`aColor`/`aLoader`/`aAuto1To6`) 實作，未於本畫面展開。
-- 部分 DFM 標籤為英文，實機若中文化顯示不同需現場確認。
+仍需現場確認：
+- `JOG +`=CW / `JOG -`=CCW 對應的實際物理方向（右/左、前/後、上/下）因軸機構與 Direction 設定而異——現場逐軸低速確認一次並記入附錄 A。
+- Advanced 分頁 SortArm cell 幾何（Column/Row → 實際盤格座標）與升降柱測試內部缸序/感測，屬各模組實作，未於本畫面展開（見第 14 章）。

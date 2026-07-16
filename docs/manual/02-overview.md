@@ -141,12 +141,10 @@ Loader 內部狀態旗標序列：`LS_IDLE → LS_FEEDING → LS_CCD_SCAN → LS
 
 > 註：位置/教導值單位為 1/100mm（100 units/mm）；mm 與設定值換算為 ×100 / ÷100。
 
-## 2.6 待補項目
+## 2.6 補充定案（原待補項目）
 
-> 【待補：以下為本章導覽涉及、需現場/後續章節確認之項目】
-
-- 主畫面 `mtWorkArea`/`mtSortRecv`（4x5 盤面格點）與 `mtLoaderLTrayWork`/`mtLoaderRTrayWork`（移動盤面）的對應關係，以及哪個顯示生產中盤面、哪個顯示移動盤面，需與 `main.cpp` 顯示綁定一併確認。
-- 「Loader 2D Left/Right」文字標籤與物理 Loader1/Loader2（左/右）的程式綁定（`LoaderNo` 與左右標籤對應）未明示，需現場確認。
-- 主畫面頂部功能列與監看選單多採點陣圖示（DFM Hint 多統一為「Change Language」），實際螢幕圖示/標籤文字需以現場截圖確認。
-- 堆疊順序 identity/cover/normal 的盤種定義（`eTrayKindIdentity/Cover/Normal`）與 `MAX_TRAY_PER_CAR` 實際數值定義在外部標頭，需另行對照。
-- 各模組氣缸/感測器的實際 IO 點位與中文標籤須對照 IO_Table / 機構表確認（本章僅引用識別字）。
+- **盤面顯示對應（定案）**：HT160S 無 HT172 的 `mtWorkArea`/`mtSortRecv`。生產中盤面＝Tray Status 分頁 `mtLoaderL`/`mtLoaderR`（鏡射 Loader 車道內容盤）；移動盤面＝Motion View 的 `mtLoaderLTrayWork`/`mtLoaderRTrayWork`（`BindMovingTrayPanel`：位置取實體馬達、內容取虛擬馬達）。
+- **Loader 左右對應（定案）**：`LoaderNo==1` → `MMLoaderY_1` → 畫面左側「Loader 2D Left」（`grpLoaderL`）；`LoaderNo==2` → `MMLoaderY_2` → 右側「Loader 2D Right」（`grpLoaderR`）。（aLoader.cpp 綁定）
+- **頂部功能列文字（定案）**：Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit（截圖 `screenshots/main-overview.png` 與 DFM Caption 確認；Hint「Change Language」為複製遺留）。
+- **盤種與滿車上限（定案）**：`enum eTrayKind`＝Normal=0（工作盤，載 IC）／Identity=1（帶 2D TrayID 身分盤，不載 IC）／Cover=2（頂蓋空盤，不得載 IC），車內慣例 `Tray[0]`=identity、`Tray[1]`=cover、其餘 normal；`MAX_TRAY_PER_CAR=100`（`MotorAndIO/MyMotor.h`）。
+- **IO 點位對照**：各模組氣缸/感測器位址見附錄 B（自 `system/IO_Table.csv` 產生）。注意 IO_Table.csv **無中文標籤欄**，畫面顯示名稱由程式以「前綴＋Alias」慣例產生；最終位址以機台 State Record 內 `MachineConfig\system` 副本核對（repo 工作副本可能 drift）。

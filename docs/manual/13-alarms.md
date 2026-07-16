@@ -140,7 +140,7 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使 `SystemStart` 落下�
 
 `ShowSystemError(Name, ...)` 以 `mapNameToAlarm` 查名稱 → 代碼，再以 `mapAlarmCodeList` 取雙語訊息與面板；查無時走未定義分支，以代碼首碼判斷類型並顯示 `Xxx Code Undefine Error`，代碼前加 `-` 標示。
 
-> 【待補：`C_ErrMessage` / `C_Description` 目前以英文填入（原始碼註解說明為保持 ASCII），實機是否已切換中文語系字串需現場確認 `system\AlarmList.csv` 內容。】
+> 註（定案，2026-07-16 查核）：現行 `system\AlarmList.csv` 共 **576 筆**（數字碼 516＋JAM 14＋MES 33＋WAR 13），`C_ErrMessage`/`C_Description` **仍為英文**（與 E_ 欄逐字相同，全檔無任何中文位元組）；且無獨立處置（Remedy）欄，處置文字內嵌於 Description（JAM/MES/WAR 多數為空）。中文化為待辦工作，非現場確認事項。完整清單見附錄 D；操作員排除手冊另見 `docs/alarm-troubleshooting/`。
 
 ## 13.7 代表性警報訊息與排除（對照表）
 
@@ -183,7 +183,7 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使 `SystemStart` 落下�
 | No Lot data / No 2D data / By Lot+Bin no binding | Start 前缺 Lot 註冊、缺 2D/Bin 資料、或 Lot+Bin 模式無綁定（`CheckLotDataReady`） | `ShowMyMessage`；補齊資料／綁定後重按 Start |
 | `PROCESS`（`RecordProcess`） | **非警報**：操作員／流程動作紀錄（START/PAUSE/SKIP/RETRY/OFF BUZZER pressed 等），寫入 `g_EventLog` 並附加到 Note Memo | 不適用（紀錄用途） |
 
-> 【待補：`AlarmType` 列舉中 `eFunErr(2)`、`eSystemMess(3)`、`eRecordProcess(7)`、`eOther(8)` 的實際警報文字／觸發點未在本批檔案內定義；`ShowSystemError` 未定義分支僅以類型印出 `Xxx Code Undefine Error`，個別案例需現場確認。】
+> 註（定案）：`eFunErr(2)`／`eSystemMess(3)`／`eRecordProcess(7)` 三型**目前零警報掛載**——為對齊 HT172 值而保留的休眠列舉，唯一出現處是 `ShowSystemError` 未定義碼 fallback 的訊息字樣（"Function/System Message/Record Process Code Undefine Error"）。`eOther(8)` **有實際使用**：CCD 家族（如 `WAR16120` Top CCD connect not ready、`WAR0462`/`WAR0970` 2D no response）、種子碼（`WAR0330`、`WAR0475`、`WAR0154`）與 Auto 家族（`WAR%d30` Auto feed tray miss）。實際註冊使用的型別為 eJamErr/eMessageErr/eCynAlarm/eMotorAlarm/eSuckAlarm/eOther（`CreateSystemAlarmCode`，database.cpp）。
 
 ## 13.8 互鎖與設計要點
 
@@ -194,11 +194,11 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使 `SystemStart` 落下�
 - Off Buzzer 為鎖存（`bOffBuzzer`/`fBuzzerOff`），`DoSystemMessage` 對 `LED_ErrJam` 會檢查 `fNote->IsBuzzerOff()` 而停止重新驅動蜂鳴。
 - modal 對話框會暫停 `MainProc`，故每掃描蜂鳴驅動不執行，需靠 `FormShow` 的 `PlayAlarmBuzzer`/`PlayMessageBuzzer` 立即補聲；同一 `fShow` 已開時重複呼叫 `ShowNoteAlarm` 直接 `return 0`（避免重入）。
 
-> 【待補：`SwMusic1..4` 各音樣式（旋律／長短）對應的實際聲音，需現場聆聽確認；`tsMaintTowerLight` 各狀態的 Music Select 預設值由 Maintenance 畫面設定，未在本批檔案內固定。】
+> 註（定案）：各狀態 Music Select **程式預設值＝[0] Mute**（RadioGroup2~7 DFM ItemIndex=0），實際值由 Maintenance 塔燈頁設定並持久化於號誌燈 ini；套用鏈為 `GetMaintenanceMusicSelect` → `DriveSystemMusic`（0=全滅，1..4 → `SwMusic1..4` 互斥 ON）。
 
-> 【待補：`FlushPanelName` 對應到動態建立面板的命名是否與所有 `ShowXxxError` 呼叫端一致（找不到時退回 `pn_System`），個別機構面板閃爍正確性需實機確認。】
+> 註（定案）：byte-safe 讀取確認 `note.dfm` **全檔純 ASCII、無任何中文標籤**（fNote=Note、按鈕=HOME&RETRY/SKIP/RETRY/TRAY FEED/TRAY END/CLEAN OUT/START/PAUSE/Off Buzzer）；Memo 的中文警報訊息為 runtime 由 AlarmList 填入（現行為英文，見 13.6 註）。
 
-> 【待補：`note.dfm` 中文標籤（如 Memo 區與機構示意說明）以 Big5 顯示，部分中文字串未逐字確認。】
+> 【待補（現場）：`SwMusic1..4` 各音樣式（旋律/長短）的實際聲音需現場聆聽記錄；機構面板閃爍（`FlushPanelName` 對應動態面板）正確性建議現場逐類警報抽驗一次。】
 
 ---
 

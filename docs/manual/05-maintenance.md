@@ -77,7 +77,7 @@
 
 > ⚠️ 注意：LED 格已取消 BLINK，僅在 ON/OFF 間切換。Music 試聽為即時動作，不寫入 ini。
 
-> 【待補：RadioGroup6 對應狀態列在記憶體 enum 為 LED_Heating，DFM 列標題為 "Reserved" 且 Visible=False；Heating/Reserved 之實際語意需現場確認。】
+> 註：RadioGroup6 對應的狀態列（enum `LED_Heating`，畫面標題 "Reserved"，Visible=False）為**保留列**：HT172 有加熱器 Heating 狀態，HT160 無加熱器，`GetTowerLightRunState` 永遠不會回傳 Heating（蜂鳴 ladder 併入 Running）——設定值會被讀取但執行期永不套用。
 
 ---
 
@@ -90,7 +90,7 @@
 | Panel17 (Reserved 列標題) | Visible=False | 第 5 狀態列標題，隱藏 |
 | RadioGroup6 (該列 Music Select) | Visible=False | 該列蜂鳴器音樂選擇，隱藏 |
 
-> 【待補：Heating（記憶體 LED_Heating）與畫面 "Reserved" 標籤之間的對應與實際語意，需現場確認。】
+> 註：Heating（enum `LED_Heating`）＝畫面 "Reserved" 列。HT160 無加熱器，此狀態執行期不可達，屬 HT172 沿革保留位（見 5.2 註）。
 
 ---
 
@@ -159,7 +159,7 @@
 | --- | --- | --- |
 | GeneralSetting.iBinDispPanelType | 0=LED(HT9046)，1=TFT(HT9011)；預設 0 | Bin 顯示面板型號 |
 
-> 【待補：cbCommType（Option 分頁 "CommType" 勾選框）在 DFM 中存在，但 LoadHardwareSettings/SaveHardwareSettings 與其他 cpp 程式均未引用，實際作用無法從原始碼確認。】
+> 註：cbCommType（Option 分頁 "CommType" 勾選框）在 DFM 中存在，但載入/存檔與其他程式均未引用——**目前無作用（保留元件）**，勾選不影響任何行為。
 
 ### 5.4.4 ErrorMag 子頁（錯誤 Bin 對應顯示）
 
@@ -170,7 +170,7 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 | lblHardwareErrorCode1000 | 顯示 | 1000 = 2D scan fail -> [區域]（2D 掃描失敗對應的 BinArea，唯讀） |
 | lblHardwareErrorCode1001 | 顯示 | 1001 = no bin setting -> [區域]（無 Bin 設定對應的 BinArea，唯讀） |
 
-> 【待補：Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）；tsMaintPassword 分頁在 DFM 中為空白頁，實際內容/功能未在本檔出現。】
+> 註：Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）、tsMaintPassword 分頁為空白頁——皆為**保留頁（未實作）**，非故障。
 
 ---
 
@@ -220,8 +220,7 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 3. 在手動測試區輸入 **Address** / **Text** / **Color Code**，按 **Send Display** / **Send Code** / **Send Light** 即時對單元送出。
 4. 按 **Refresh Status** 刷新狀態。
 
-> 【待補：cbbMCUColor（Color 下拉 GREEN/RED）在送出按鈕程式中未被讀取（Send 動作改用 edMCULightValue 的 Color Code），此下拉是否仍生效需現場確認。】
-> 【待補：chkMCUCodeSymbol（"Symbol Code"）勾選框 DFM 有定義，但 btnMCUSend* 程式未引用，作用需現場確認。】
+> 註：cbbMCUColor（Color 下拉 GREEN/RED）在三個 Send 按鈕程式中均未被讀取，送色一律以 **Color Code（`edMCULightValue`）為準**——下拉**無作用（遺留元件）**。chkMCUCodeSymbol（"Symbol Code"）同樣未被 btnMCUSend* 引用，為**保留元件**。
 
 ---
 
@@ -253,7 +252,7 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 3. 按 **Connect** / **Disconnect** 連線或中斷。
 4. 按拍照鈕觸發一次取像，結果碼顯示於結果欄。
 
-> 【待補：btnTopCcdShot 的 DFM Caption 螢幕文字未逐字讀取（由 .h/.cpp 確認為拍照觸發鈕），確切螢幕文字以現場為準。】
+> 註：btnTopCcdShot 的 DFM Caption 已確認為「**Trigger Shot**」（byte-safe 讀取 maintenance.dfm）。
 
 ---
 
@@ -287,7 +286,7 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 > ⚠️ 注意：勾選 **Enable Color CCD** 為即時動作，會立即存檔並依勾選連線/斷線，同時同步設定 `CosFunction.bUseColorCcd`。
 
-> 【待補：btnColorCcdShot 的 DFM Caption 螢幕文字未逐字讀取（由 .h/.cpp 確認為拍照觸發鈕），確切螢幕文字以現場為準。】
+> 註：btnColorCcdShot 的 DFM Caption 已確認為「**Trigger Shot**」（byte-safe 讀取 maintenance.dfm）。
 
 ---
 

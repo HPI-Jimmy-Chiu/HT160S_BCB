@@ -29,18 +29,18 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 | `sbMonitor` | button | 切換 `pgcMain` 至 MonitorView 監看分頁（`tsMonitorView`）。 |
 | `sbExit` | button | 關閉主視窗（`Close()`）離開程式；`FormClose` 會先終止 `MyThread` 工作緒並釋放 Alarm 物件。 |
 
-> 【待補：頂部功能列各速度按鈕（Language / Maintance / Offset / Speed / Tools / Message / Monitor / Exit）多採點陣圖示，且 DFM 內 Hint 統一為 Change Language，實際螢幕標籤以圖示呈現；標籤名稱依處理函式語意推得，確切圖示文字未在 DFM 文字屬性中，待現場截圖確認。】
+> 註：頂部功能列實際螢幕文字已由截圖（`screenshots/main-overview.png`，模擬程式擷取、與實機 UI 相同）確認，由左至右為：**Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit**（各鈕為圖示＋文字；「Maintance」為機上實際拼字）。
 
 ### 4.1.2 Recipe Name 與 User 欄位
 
 | 控制項 | 類型 | 功能 |
 |---|---|---|
 | `cb_WorkFile` | combobox | 選擇／顯示目前配方名稱（標籤 `lbl_WorkFile` = Recipe Name）。`OnChange`：空白、不存在或運轉中則還原並提示；有效則 `SetCurrentRecipeName`、存檔、重載 TrayForm 與各子畫面（Setup / Teach / Maintenance / Offset）的 WorkFile、刷新 Monitor 格線、`RecordProcess(Change Recipe...)`、`EventReport(RecipeChange)`。`OnDropDown` 會重整清單。 |
-| `cbbUserSelect` | combobox | 切換操作者權限等級（`UserRoleManager`），標籤 `lblUserSelect` = User，選項 Operation / Supervisor / Engineer / Honprec。Operation 直接降權；其餘等級在 SOFT_SIMULATE 下強制切換，真機則提示尚未支援密碼登入並還原。變更成功 `RecordProcess(Change User...)`、`EventReport(ChangeUser)`。 |
+| `cbbUserSelect` | combobox | 切換操作者權限等級（`UserRoleManager`），標籤 `lblUserSelect` = User，選項 Operation / Supervisor / Engineer / Honprec。Operation 直接降權免密碼；其餘等級真機會跳出 Login User ID / Login Password 輸入框，帳號驗證成功才切換（SOFT_SIMULATE 建置直接強制切換）。變更成功 `RecordProcess(Change User...)`、`EventReport(ChangeUser)`。 |
 
 > ⚠️ 注意：Recipe Name（`cb_WorkFile`）在運轉中不可變更（提示「Can not change recipe while machine is running.」）；請先停機再變更配方。
 
-> ⚠️ 注意：真機（非 SOFT_SIMULATE）切換非 Operation 權限會被擋下（提示「User password login is not available yet.」）並還原為 Operation；此功能待後續實作。
+> ⚠️ 注意：真機（非 SOFT_SIMULATE）切換非 Operation 權限需輸入使用者 ID 與密碼；輸錯提示「User ID or password is incorrect.」並還原原等級。帳號管理於 Maintenance 帳號頁（需 Engineer 以上權限）。
 
 ### 4.1.3 生產計數區
 
@@ -51,13 +51,11 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 | `Label1` / `palloadingCount` | label | 上料計數標籤（Load）與數值面板，預設 0。 |
 | `lblUnloadingCount` / `palUnloadingCount` | label | 總下料計數標籤（Total）與數值面板。 |
 | `lblloseCnt` / `palloseCnt` | label | 不良／遺失計數標籤（Fail）；`lblloseCnt` 的 DFM `Visible=False`，目前隱藏。 |
-| `btnClearCount` | button | 清除計數按鈕（Clear All）。 |
-| `sbPaperSummary` | button | 產量彙總按鈕（Summary）。 |
+| `btnClearCount` | button | 清除計數按鈕（Clear All）。停機時可用：按下先跳 YES/NO 確認，確認後清除本 Lot 生產計數（TotalIC/Bin/Tray/UPH/Loader/Jam＋SECS Scanned/Sorted）、寫回 `lastdata` 並清空 Product Info 面板；運轉中按下會提示先停機（`btnClearCountClick`，main.cpp）。 |
+| `sbPaperSummary` | button | 產量彙總按鈕（Summary）。目前未綁定 `OnClick`、無處理函式＝**保留鈕（未啟用）**。 |
 | `UPH_StringGrid` | grid | 主畫面 UPH／產能統計表格（顯示用）。 |
 
-> 【待補：`btnClearCount`（Clear All）與 `sbPaperSummary`（Summary）在 main.dfm 中未綁定 `OnClick`，main.h 亦無對應處理函式宣告，實際功能／是否啟用待現場確認（疑為待接線或保留按鈕）。】
-
-> 【待補：Fail 計數標籤 `lblloseCnt` 的 DFM `Visible=False`，目前隱藏不顯示。】
+> 註：`btnClearCount`（Clear All）已於 2026-07 接上功能（見上表）；`sbPaperSummary`（Summary）經原始碼確認未綁定 `OnClick` 且無處理函式，為保留鈕。Fail 計數標籤 `lblloseCnt` 的 DFM `Visible=False`，目前隱藏不顯示（程式亦無寫入點）。
 
 #### Unload Auto1~6 下料即時資訊
 
@@ -99,9 +97,7 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 
 > ⚠️ 注意：LOCK / EMG / MOTOR OFF / SAFE DOOR / AIR 等狀態為安全／電源／氣壓條件的顯示結果；排除對應條件後狀態會自行恢復。
 
-> 【待補：`palMainStatus_En`（英文狀態面板）DFM `Visible=False`，目前隱藏不顯示。】
-
-> 【待補：SECS 徽章狀態碼（0/1/2）對應的實際 HSMS 連線語意（OFF/CONNECT/ONLINE）來源在 SECS 引擎，本畫面僅做顯示對應。】
+> 註：`palMainStatus_En`（英文狀態面板）DFM `Visible=False` 預設隱藏；`SetMainStatus`（csystem.cpp）會同步寫入相同狀態文字，屬鏡像面板。SECS 徽章狀態 0/1/2 = HSMS OFF／CONNECT／ONLINE，由 `UpdateSecsFeatureBadge` 依 SECS 引擎連線狀態設定（詳見第 12 章）。
 
 ### 4.1.6 開始生產（Start）操作步驟
 
@@ -152,11 +148,11 @@ Tray Status 分頁（`tsTrayStatus`）以視覺化方式呈現各區盤位狀態
 ![Tray Status 分頁](screenshots/main-traystatus.png)
 > 圖 4-3 Tray Status 分頁。（擷取方式：於主畫面下方 log-menu 點選 `spbTrayStatus` 按鈕切換至此分頁。）
 
-本分頁含 `grpLoaderR` / `grpLoaderL`（Loader 右／左側群組）與 `mtSortRecv` / `mtWorkArea`（分類接收／工作區）等盤位面板，屬視覺化盤位顯示。
+本分頁含 `grpLoaderL`（標題 **Loader 2D Left**，內含 `mtLoaderL`）與 `grpLoaderR`（**Loader 2D Right**，內含 `mtLoaderR`）兩組盤位面板。
 
-> 【待補：Tray Status 分頁（`grpLoaderR`/`grpLoaderL`、`mtSortRecv`/`mtWorkArea`）大量 `TMyTray`/Panel 排版屬視覺化盤位呈現，其細部對應機構需另行對照 motion-view 文件。】
+> 註（定案）：HT160S **沒有** HT172 的 `mtSortRecv`/`mtWorkArea` 元件。盤面顯示分兩層：(a) 本分頁 `mtLoaderL`/`mtLoaderR` 以 `SetSubHTrayPanel` **鏡射該 Loader 車道的生產盤內容**（Left=Loader1／`MMLoaderY_1`、Right=Loader2／`MMLoaderY_2`）；(b) Motion View 的 `mtLoaderLTrayWork`/`mtLoaderRTrayWork` 由 `BindMovingTrayPanel` 綁定（位置取實體馬達、內容取虛擬馬達），顯示**移動中盤面**。格數（預設 4×5）執行期由配方覆寫（`SyncMonitorTrayDivision`）。
 
-> 【待補：`spbTrayStatus` 按鈕在 DFM 內 Hint 為 Change Language，實際按鈕圖示／文字待現場螢幕截圖確認；其 `OnClick` 已確認切換至 `tsTrayStatus`。】
+> 註：`spbTrayStatus` 按鈕文字已確認為「Tray Status」（DFM Caption＋截圖 `main-overview.png`，圖示＋文字並列）；DFM Hint「Change Language」為複製貼上遺留，非實際功能。`OnClick` 切換至 `tsTrayStatus`。
 
 ---
 
@@ -171,7 +167,7 @@ Logs 分頁（`tsLogs`）顯示系統日誌清單。由 Main 分頁的 `apbLogs`
 |---|---|---|
 | `lstLog` | grid | 日誌列表（`TListBox`）。 |
 
-> 【待補：`apbLogs` 按鈕在 DFM 內 Hint 為 Change Language，實際按鈕圖示／文字待現場螢幕截圖確認；其 `OnClick` 已確認切換至 `tsLogs`。】
+> 註：`apbLogs` 按鈕文字已確認為「Logs」（DFM Caption＋截圖）；Hint「Change Language」為複製遺留。`OnClick` 切換至 `tsLogs`。
 
 ---
 
@@ -186,7 +182,7 @@ Time Data 分頁（`tsTimeData`）顯示時間統計表格並提供儲存。由 
 |---|---|---|
 | `sgTimeData` / `btSaveTimeData` | grid | 時間資料統計表格與存檔面板。 |
 
-> 【待補：`sbTimeData` 按鈕在 DFM 內 Hint 為 Change Language，實際按鈕圖示／文字待現場螢幕截圖確認；其 `OnClick` 已確認切換至 `tsTimeData`。】
+> 註：`sbTimeData` 按鈕文字已確認為「Time Data」（DFM Caption＋截圖）；Hint「Change Language」為複製遺留。`OnClick` 切換至 `tsTimeData`。
 
 ---
 
@@ -201,7 +197,7 @@ Map Tray 分頁（`tsMapTray`）以文字方式顯示盤位配置圖。由 Main 
 |---|---|---|
 | `Memo1` | edit | Tray 配置圖文字顯示。 |
 
-> 【待補：`btnTrayMap` 按鈕在 DFM 內 Hint 為 Change Language，實際按鈕圖示／文字待現場螢幕截圖確認；其 `OnClick` 已確認切換至 `tsMapTray`。】
+> 註：`btnTrayMap` 按鈕文字已確認為「Map Tray」（DFM Caption＋截圖）；Hint「Change Language」為複製遺留。`OnClick` 切換至 `tsMapTray`。
 
 ---
 

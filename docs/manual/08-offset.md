@@ -42,7 +42,7 @@ Offset 畫面以三個分頁 (PageOffset) 將共 **56 個** 可微調欄位分�
 | popLimit / miSetMax / miSetMin | popupmenu | 表格列右鍵叫出，設定該欄位偏移上 / 下限，存入 OffsetLimit.ini |
 | edScratch | edit | 隱藏暫存輸入框，供 QwertyKey 軟鍵盤輸入數值用（不可見） |
 
-> 【待補：畫面標籤與按鈕文字在原始碼中皆為英文 ASCII (Offset / Apply / Save / Re-alignment / Exit / Clear All 等)，機台實機上是否另有中文化字串無法由原始碼判定。】
+> 註（定案）：byte-safe 讀取確認 `uOffset.dfm` 全檔僅 396 bytes、0 個非 ASCII 位元組（畫面元件全由程式 BuildUI 建立、標籤全英文）——實機**無**另外的中文化字串。
 
 ---
 
@@ -60,7 +60,9 @@ Offset 畫面以三個分頁 (PageOffset) 將共 **56 個** 可微調欄位分�
 
 > ⚠️ 注意：下列位置因 **無對應的現有 Teach 基準欄位** 而排除於偏移之外（原始碼註解標明）：`LoaderCarLastCCDX`、`SortArmToBottomCCD` 的 Z1–Z4。
 
-> 【待補：56 個欄位的精確物理意義（各站點 Z1..Z4 對應的吸嘴 / 疊高層級等）僅能由命名與 GetOffsetExplain 概略說明推斷，精確機構對應需現場確認。】
+> 註：各站點 Z1..Z4 對應 SortArm 的 **4 支吸嘴 Z 軸**（`MSuckZ_1`~`MSuckZ_4`，即 Nozzle1~4）在該站的下探高度——非疊高層級。其餘欄位語意見表格 Hint（`GetOffsetExplain`）。
+>
+> 【待補（現場）：各吸嘴實體編號（1~4 的機構排列方向）與畫面欄位的對應方向，建議現場以單吸嘴微調驗證一次。】
 
 ---
 
@@ -148,8 +150,8 @@ Offset 畫面以三個分頁 (PageOffset) 將共 **56 個** 可微調欄位分�
 - 輸入 mm 經 `ParseOffsetText = mm × 100 ± 0.5` 四捨五入轉為內部整數 (1/100mm) 寫回對應欄位。
 - 偏移檔 .ofs / OffsetLimit.ini 內存放的均為內部單位 (1/100mm)。
 
-> 【待補：QwertyKey 軟鍵盤 (`fQwertyKey->ShowQwertyKey`) 各參數語意 (N_DOUBLE、小數位 2、range 啟用旗標) 定義於 uQwertyKey，未在本畫面原始檔內，僅依呼叫推斷。】
+> 註：QwertyKey 軟鍵盤參數（N_DOUBLE、小數 2 位、range 旗標）定義於 `uQwertyKey` 共用模組，本畫面以固定參數呼叫（輸入 mm、2 位小數、依 OffsetLimit 上下限夾制）。
 >
-> 【待補：原始 DFM (ClientWidth=640 / Height=480) 與 BuildUI() 程式設定 (720×640) 不一致；實際顯示尺寸以執行時 BuildUI 為準，此差異是否刻意需確認。】
+> 註（定案）：實際顯示尺寸以執行時 `BuildUI()` 的 `ClientWidth=720 / ClientHeight=640`（uOffset.cpp:44-45）為準；DFM 內 640×480 為設計時殘留值，執行期一律被覆寫。
 >
-> 【待補：畫面是否有權限 / 模式（例如維修模式）限制存取，需由開啟它的 `main.cpp` 上層 (ShowTopForm(fOffset, sbOffset)) 確認。】
+> 註（定案）：本畫面由主畫面 `sbOffset` 按鈕開啟（`ShowTopForm(fOffset, sbOffset)`，main.cpp:635-638），**無權限等級、無運轉中鎖定**——任何使用者、任何時刻皆可開啟。OP 版手冊應標註此為工程師畫面，操作面依廠內規範管制。

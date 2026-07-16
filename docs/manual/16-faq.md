@@ -27,11 +27,11 @@
 
 不是。若機台尚未回原點 (`fAllMotorHome==false`)，`Start` 會以 `bHomeByStart=true` 先進入 `Run_Home` 並顯示 HOME 監控；回原點完成後會「自動續跑生產」，不會停機。這與直接按 `Home`（完成後停機）不同。
 
-### Q4. 我選了 Supervisor/Engineer 權限，卻出現「User password login is not available yet.」？
+### Q4. 切換 Supervisor/Engineer 權限時要求輸入帳號密碼？
 
-依規格，正式機目前僅 `Operation` 權限可直接生效並降權；`Supervisor/Engineer/Honprec` 在正式機會顯示「User password login is not available yet.」（密碼登入尚未實作）。
+是。正式機切換非 `Operation` 等級會依序跳出 **Login User ID / Login Password** 輸入框，經帳號驗證成功才切換；輸錯顯示「User ID or password is incorrect.」並還原原等級。選 `Operation` 則直接降權免密碼。
 
-> 【待補：各使用者權限 (ROLE_OPERATION/SUPERVISOR/ENGINEER/HONPREC) 對應的可操作範圍須查 UserRoleManager 定義並現場確認。】
+> 註（定案）：權限等級為 Operation(0) < Supervisor(1) < Engineer(2) < Honprec(3)（`UserRoleManager`）。目前**唯一的權限 gate**是 Maintenance 帳號管理頁需 Engineer 以上才能編輯；其餘畫面（Teach/Offset/Speed/Maintenance 等）開啟不檢查角色——工程畫面的管制以廠內規範為主。正式機開機預設 Operation。
 
 ### Q5. 按 `Start` 後跳出「Please Enter LotID !」怎麼辦？
 
@@ -149,7 +149,7 @@
 
 清機完成提示為 `ShowSystemError(SnFKCleanOut, K_SKIP)`。操作員選 `SKIP` 即結束、回 `Normal` 並停機。
 
-> 【待補：Run_TrayFeed（補盤）模式之 `CheckAllTrayFeedFinish` 目前為 stub，TrayFeed 分支無法自動完成，實機是否啟用待現場確認。】
+> 註（定案）：HT160S **沒有 Tray Feed 功能**——`ChangeRunMode(Run_TrayFeed)` 的唯一呼叫已被註解停用、`CheckAllTrayFeedFinish` 恆回 false（stub），`Run_TrayFeed` 模式無任何入口、執行期不可達；警報視窗的 TRAY FEED 鍵在本機不會出現對應流程。
 
 ---
 
@@ -166,13 +166,13 @@
 - 離子風扇警報等「實機檢查」僅在 REALLY 模式生效。
 - DUMMY 模式下馬達與氣缸仍會「實際動作」，僅略過正確性感應器確認（防撞互鎖在 DUMMY/HAS_TRAY/REALLY 三模式皆持續生效，只在編譯期 SOFT_SIMULATE 略過）。
 
-> 【待補：DUMMY/HAS_TRAY/REALLY 三模式對各模組 (Empty/Color/Loader) IO/動作的細部差異須查三層 IO 檢查文件並現場確認。】
+> 註（定案）：三模式對 Empty/Color/Loader 的差異——**DUMMY**＝料流全虛擬（源乾用勾選框、盤在席/遺失檢查與氣缸到位確認全跳過）；**HAS_TRAY**＝真實 IO（氣缸到位確認、盤在席/遺失警報生效），但真空吸嘴檢查跳過、Top CCD 2D 走模擬循環碼；**REALLY**＝全真（真空感測報警、CCD 實體觸發、離子風扇連鎖）。詳見第 3 章定案註與第 10 章 IO 自我測試。
 
 ### Q23. 如何切換 Start Mode（Initial / Continue）？
 
 按 `pnStartMode` 切換 `iStartMode`（0=Initial / 1=Continue）。僅能在 `SystemStart==false` 時切換，並同步寫入 INI 與更新 `sbStartIcon` 圖示。
 
-> 【待補：Continue (`iStartMode=1`) 在 `Start()` 流程的實際差異行為——`CheckContinusStartIsReady()` 已被註解停用，目前 Initial 與 Continue 在啟動路徑上看不出程式分支差異，其語意是否僅供記錄/SECS 須現場確認。】
+> 註（定案）：Continue（`iStartMode=1`）**對啟動流程無任何行為差異**——`Start()` 等所有執行路徑均不讀取 `iStartMode`，`CheckContinusStartIsReady()` 僅剩註解且定義不存在；差異只在畫面圖示、ini 與操作紀錄（另 Automation TCP `GET_STATUS` 有 `START_MODE=` 鏡像欄）。SECS 端無此值。詳見第 3 章。
 
 ---
 
@@ -272,13 +272,15 @@ Loader 兩側 (Loader1 左／Loader2 右) 共用同一 Loader-Y 導軌、共用�
 
 依規格，`ErrJam` 蜂鳴只由 Note 警報觸發。純安全感測（EMG/門/氣壓/離子風）若當下沒有對應的警報對話框，只會亮紅燈而不發蜂鳴。
 
-> 【待補：SwMusic1..4 各音樣式（旋律/長短）對應的實際聲音需現場聆聽確認；各運轉狀態的 Music Select 預設值由 Maintenance 的 tsMaintTowerLight 設定。】
+> 註：各運轉狀態 Music Select **程式預設值＝[0] Mute**（全靜音）；實際值由 Maintenance 塔燈頁設定並存於號誌燈 ini。
+>
+> 【待補（現場）：SwMusic1..4 各音樣式（旋律/長短）的實際聲音需現場聆聽記錄。】
 
 ### Q36. 警報代碼從哪裡查？
 
 開機時 `CreateSystemAlarmCode()` 會依氣缸/馬達/吸嘴設定表「動態產生」整份警報代碼目錄，並輸出到 `CurrentDir\system\AlarmList.csv`（欄位：AlarmCode, AlarmType, E_ErrMessage, C_ErrMessage, E_Description, C_Description）。可開啟此 CSV 查閱機台所有可能警報。
 
-> 【待補：`C_ErrMessage`/`C_Description` 在原始碼目前以英文填入（為保持 ASCII），實機是否已切換中文語系字串需現場確認 AlarmList.csv 內容。】
+> 註（定案，2026-07-16 查核）：現行 `system\AlarmList.csv`（576 筆）的 `C_ErrMessage`/`C_Description` **仍為英文**（與 E_ 欄相同）；中文化為待辦工作項。完整清單見附錄 D。
 
 ### Q37. 提示框（OK / 是否確認）跟全警報視窗有什麼不同？
 
@@ -299,14 +301,12 @@ Loader 兩側 (Loader1 左／Loader2 右) 共用同一 Loader-Y 導軌、共用�
 
 ---
 
-## 本章待補項目 (unknowns)
+## 本章補充定案（原 unknowns）
 
-> 下列項目須由設備工程師於實機逐項校對確認後補齊。
-
-- 各使用者權限 (ROLE_OPERATION/SUPERVISOR/ENGINEER/HONPREC) 對應的可操作範圍（UserRoleManager 定義）。
-- DUMMY/HAS_TRAY/REALLY 三模式對各模組 (Empty/Color/Loader) IO/動作的細部差異。
-- Start Mode = Continue (`iStartMode=1`) 在啟動流程的實際差異行為（`CheckContinusStartIsReady()` 已停用，目前看不出分支差異）。
-- Run_TrayFeed（補盤）模式：`CheckAllTrayFeedFinish` 為 stub，實機是否啟用待確認。
-- SwMusic1..4 各音樣式對應的實際聲音，及各運轉狀態 Music Select 預設值。
-- `C_ErrMessage`/`C_Description` 實機是否已切換中文語系字串（查 `system\AlarmList.csv` 內容）。
-- AlarmType 列舉中 eFunErr/eSystemMess/eRecordProcess/eOther 的實際警報文字/觸發點（未定義分支僅印出 "Xxx Code Undefine Error"）。
+- **使用者權限（定案）**：唯一 gate＝Maintenance 帳號管理頁需 Engineer 以上；其餘畫面不檢查角色（見 Q4 註）。
+- **三模式差異（定案）**：見 Q22 註（DUMMY 全虛擬／HAS_TRAY 真 IO 不驗 IC 真值／REALLY 全真）。
+- **Continue（定案）**：對啟動流程無行為分支，僅顯示/記錄（見 Q23 註）。
+- **Run_TrayFeed（定案）**：無入口、不可達——HT160S 無 Tray Feed 功能（見 Q20 註）。
+- **Music 預設（定案）**：全狀態預設 [0] Mute；音樣式實際聲音仍待現場聆聽（見 Q35 註）。
+- **AlarmList 中文化（定案）**：現行仍全英文，中文化為待辦工作（見 Q36 註）。
+- **AlarmType 休眠列舉（定案）**：eFunErr/eSystemMess/eRecordProcess 零掛載；eOther 用於 CCD/WAR 家族（見第 13 章）。
