@@ -55,7 +55,7 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 | Summary 彙總鈕 | 按鈕 | 產量彙總按鈕（Summary）。目前未綁定，為**保留鈕（未啟用）**。 |
 | UPH／產能統計表 | 表格 | 主畫面 UPH／產能統計表格（顯示用）。 |
 
-> 註：`btnClearCount`（Clear All）已於 2026-07 接上功能（見上表）；`sbPaperSummary`（Summary）經原始碼確認未綁定 `OnClick` 且無處理函式，為保留鈕。Fail 計數標籤 `lblloseCnt` 的 DFM `Visible=False`，目前隱藏不顯示（程式亦無寫入點）。
+> 註：Clear All（清除計數）鈕已於 2026-07 接上功能（見上表）；Summary（彙總）鈕目前未綁定任何動作，為保留鈕。Fail 計數欄目前隱藏不顯示，程式也不會寫入其數值。
 
 #### Unload Auto1~6 下料即時資訊
 
@@ -97,7 +97,7 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 
 > ⚠️ 注意：LOCK / EMG / MOTOR OFF / SAFE DOOR / AIR 等狀態為安全／電源／氣壓條件的顯示結果；排除對應條件後狀態會自行恢復。
 
-> 註：`palMainStatus_En`（英文狀態面板）DFM `Visible=False` 預設隱藏；`SetMainStatus`（csystem.cpp）會同步寫入相同狀態文字，屬鏡像面板。SECS 徽章狀態 0/1/2 = HSMS OFF／CONNECT／ONLINE，由 `UpdateSecsFeatureBadge` 依 SECS 引擎連線狀態設定（詳見第 12 章）。
+> 註：另有一個英文狀態面板預設隱藏，會同步顯示相同的機台狀態文字，屬鏡像面板。SECS 徽章的三種狀態 0/1/2 = HSMS OFF／CONNECT／ONLINE，依 SECS 引擎連線狀態自動設定（詳見第 12 章）。
 
 ### 4.1.6 開始生產（Start）操作步驟
 
@@ -116,7 +116,7 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 Lot 分頁用於管理生產批次（Lot），包含 Lot 編號輸入、Lot 清單、手動新增／編輯／移除，以及產品資訊表格。透過主畫面下方的分頁按鈕切換至此分頁。
 
 ![Lot 分頁](screenshots/main-lot.png)
-> 圖 4-2 Lot 分頁。（擷取方式：於主畫面下方 log-menu 點選對應按鈕切換至 Lot 分頁。）
+> 圖 4-2 Lot 分頁。（擷取方式：於主畫面下方分頁區點選對應分頁按鈕切換至 Lot 分頁。）
 
 | 畫面項目 | 類型 | 功能 |
 |---|---|---|
@@ -146,13 +146,13 @@ Lot 分頁用於管理生產批次（Lot），包含 Lot 編號輸入、Lot 清�
 Tray Status 分頁以視覺化方式呈現各區盤位狀態，包含 Loader 左右側與分類／工作區的盤位排版。由主畫面下方的 Tray Status 按鈕切換。
 
 ![Tray Status 分頁](screenshots/main-traystatus.png)
-> 圖 4-3 Tray Status 分頁。（擷取方式：於主畫面下方 log-menu 點選 `spbTrayStatus` 按鈕切換至此分頁。）
+> 圖 4-3 Tray Status 分頁。（擷取方式：於主畫面下方分頁區點選「Tray Status」分頁按鈕切換至此分頁。）
 
 本分頁含「Loader 2D Left」與「Loader 2D Right」兩組盤位面板（各含盤面格點）。
 
-> 註（定案）：HT160S **沒有** HT172 的 `mtSortRecv`/`mtWorkArea` 元件。盤面顯示分兩層：(a) 本分頁 `mtLoaderL`/`mtLoaderR` 以 `SetSubHTrayPanel` **鏡射該 Loader 車道的生產盤內容**（Left=Loader1／`MMLoaderY_1`、Right=Loader2／`MMLoaderY_2`）；(b) Motion View 的 `mtLoaderLTrayWork`/`mtLoaderRTrayWork` 由 `BindMovingTrayPanel` 綁定（位置取實體馬達、內容取虛擬馬達），顯示**移動中盤面**。格數（預設 4×5）執行期由配方覆寫（`SyncMonitorTrayDivision`）。
+> 註（定案）：HT160S 沒有 HT172 的分類接收區與工作區盤面。盤面顯示分兩層：(a) 本分頁的 Loader 2D Left／Loader 2D Right 盤面會鏡射對應 Loader 車道（Left=Loader1、Right=Loader2）的生產盤內容；(b) Motion View 的左／右 Loader 移動盤面則顯示移動中盤面（位置取自實體馬達、內容取自虛擬馬達）。盤面格數（預設 4×5）會在執行期由配方覆寫。
 
-> 註：`spbTrayStatus` 按鈕文字已確認為「Tray Status」（DFM Caption＋截圖 `main-overview.png`，圖示＋文字並列）；DFM Hint「Change Language」為複製貼上遺留，非實際功能。`OnClick` 切換至 `tsTrayStatus`。
+> 註：此分頁按鈕文字已確認為「Tray Status」（依截圖 `main-overview.png`，圖示＋文字並列）；按鈕的滑鼠提示文字「Change Language」為複製貼上遺留、非實際功能，按下即切換至 Tray Status 分頁。
 
 ---
 
@@ -161,13 +161,13 @@ Tray Status 分頁以視覺化方式呈現各區盤位狀態，包含 Loader 左
 Logs 分頁顯示系統日誌清單。由主畫面下方的 Logs 按鈕切換。
 
 ![Logs 分頁](screenshots/main-logs.png)
-> 圖 4-4 Logs 分頁。（擷取方式：於主畫面下方 log-menu 點選 `apbLogs` 按鈕切換至此分頁。）
+> 圖 4-4 Logs 分頁。（擷取方式：於主畫面下方分頁區點選「Logs」分頁按鈕切換至此分頁。）
 
 | 畫面項目 | 類型 | 功能 |
 |---|---|---|
 | 日誌清單 | 顯示 | 日誌列表。 |
 
-> 註：`apbLogs` 按鈕文字已確認為「Logs」（DFM Caption＋截圖）；Hint「Change Language」為複製遺留。`OnClick` 切換至 `tsLogs`。
+> 註：此分頁按鈕文字已確認為「Logs」（依截圖）；按鈕的滑鼠提示文字「Change Language」為複製遺留，按下即切換至 Logs 分頁。
 
 ---
 
@@ -176,13 +176,13 @@ Logs 分頁顯示系統日誌清單。由主畫面下方的 Logs 按鈕切換。
 Time Data 分頁顯示時間統計表格並提供儲存。由主畫面下方的 Time Data 按鈕切換。
 
 ![Time Data 分頁](screenshots/main-timedata.png)
-> 圖 4-5 Time Data 分頁。（擷取方式：於主畫面下方 log-menu 點選 `sbTimeData` 按鈕切換至此分頁。）
+> 圖 4-5 Time Data 分頁。（擷取方式：於主畫面下方分頁區點選「Time Data」分頁按鈕切換至此分頁。）
 
 | 畫面項目 | 類型 | 功能 |
 |---|---|---|
 | 時間資料表與存檔鈕 | 表格 | 時間資料統計表格與存檔面板。 |
 
-> 註：`sbTimeData` 按鈕文字已確認為「Time Data」（DFM Caption＋截圖）；Hint「Change Language」為複製遺留。`OnClick` 切換至 `tsTimeData`。
+> 註：此分頁按鈕文字已確認為「Time Data」（依截圖）；按鈕的滑鼠提示文字「Change Language」為複製遺留，按下即切換至 Time Data 分頁。
 
 ---
 
@@ -191,13 +191,13 @@ Time Data 分頁顯示時間統計表格並提供儲存。由主畫面下方的 
 Map Tray 分頁以文字方式顯示盤位配置圖。由主畫面下方的 Map Tray 按鈕切換。
 
 ![Map Tray 分頁](screenshots/main-maptray.png)
-> 圖 4-6 Map Tray 分頁。（擷取方式：於主畫面下方 log-menu 點選 `btnTrayMap` 按鈕切換至此分頁。）
+> 圖 4-6 Map Tray 分頁。（擷取方式：於主畫面下方分頁區點選「Map Tray」分頁按鈕切換至此分頁。）
 
 | 畫面項目 | 類型 | 功能 |
 |---|---|---|
 | Tray 配置圖顯示區 | 顯示 | Tray 配置圖文字顯示。 |
 
-> 註：`btnTrayMap` 按鈕文字已確認為「Map Tray」（DFM Caption＋截圖）；Hint「Change Language」為複製遺留。`OnClick` 切換至 `tsMapTray`。
+> 註：此分頁按鈕文字已確認為「Map Tray」（依截圖）；按鈕的滑鼠提示文字「Change Language」為複製遺留，按下即切換至 Map Tray 分頁。
 
 ---
 

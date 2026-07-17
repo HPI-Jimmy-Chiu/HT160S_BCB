@@ -14,7 +14,7 @@
 畫面同時承載 Lot 管理、Tray Status、Logs、Time Data、Map of Tray、Simulation 等子分頁。
 
 ![主畫面與工具列](screenshots/main-overview.png)
-> 圖 3-1 主畫面與工具列。（擷取方式：程式啟動後預設即停留於此畫面；若在 MonitorView，按 `btnMainShow` 回主畫面）
+> 圖 3-1 主畫面與工具列。（擷取方式：程式啟動後預設即停留於此畫面；若在 MonitorView，按 **Return** 回主畫面）
 
 ### 頂部工具列（Main 頁）
 
@@ -81,13 +81,13 @@
 | 運轉模式（Real/Dummy） | Dummy / HasTray / Real，預設 Dummy | 運轉模式，影響三層 IO/感測檢查層級。離子風扇警報等實機檢查僅 Real 模式生效 |
 | 起動模式（Start Mode） | Initial / Continue，預設 Initial | 起動模式 |
 
-> 註（定案）：`iStartMode=Continue` **目前對執行流程無任何行為分支**——全原始碼追查結果：`Start()`／`DoStartArm()`／`ProcessStartMode()` 均不讀取 `iStartMode`，`CheckContinusStartIsReady()` 只剩被註解的呼叫（main.cpp:1968）且函式定義已不存在，SECS 端亦無鏡像；唯一對外出口是 Automation TCP `GET_STATUS` 的 `START_MODE=` 欄位。Initial/Continue 差異僅止於畫面圖示、ini 記錄與操作紀錄（RecordProcess）。
+> 註（定案）：Continue 模式**目前對執行流程無任何行為分支**——所有啟動路徑都不讀取此設定，SECS 端亦無對應值；唯一對外反映是自動化 TCP `GET_STATUS` 的 `START_MODE` 欄位。Initial／Continue 差異僅止於畫面圖示、設定記錄與操作紀錄。
 
 > 註（定案）：DUMMY / HAS_TRAY / REALLY 三模式差異——
 > - **DUMMY**：料流全虛擬。源乾以勾選框判斷、盤在席/遺失感測檢查全跳過、氣缸到位感測不確認（馬達/氣缸仍實際動作）。
 > - **HAS_TRAY**：走真實 IO——氣缸到位確認與 Empty/Color/Loader 的盤在席/遺失警報全部生效，但**真空吸嘴檢查跳過、Top CCD 2D 走模擬循環碼**（「真的搬盤，但不驗 IC 真值」）。
 > - **REALLY**：全真——真空感測故障會報警、Top CCD 實體觸發＋輪詢、離子風扇連鎖生效。
-> 詳見第 10 章 IO 自我測試（`iosetview.cpp` SelfTestTier 註解為此三層之權威定義）。
+> 詳見第 10 章 IO 自我測試（三層檢查的權威定義）。
 
 ---
 
@@ -132,7 +132,7 @@
 | AMR 模式 | 開 / 關 | AMR/AGV 模式啟用旗標，驅動 AMR 徽章 ON/OFF（此畫面唯讀顯示） |
 | SECS/GEM | 開 / 關 | SECS/GEM 付費功能旗標，決定 SECS 徽章是否顯示與可點擊（此畫面唯讀） |
 
-> 註：SECS 徽章狀態碼定義（`UpdateSecsFeatureBadge`，main.cpp）：0=**OFF**（未連線，灰）、1=**CONNECT**（TCP 已連但未 SELECTED，橄欖）、2=**ONLINE**（HSMS SELECTED，綠）；根源為 SECS 引擎 `iHsmsState`（`uHGemEquipment.cpp`），每秒刷新。
+> 註：SECS 徽章狀態：0=**OFF**（未連線，灰）、1=**CONNECT**（TCP 已連但未 SELECTED，橄欖）、2=**ONLINE**（HSMS SELECTED，綠）；依 SECS 引擎連線狀態每秒刷新。
 
 ---
 
@@ -156,7 +156,7 @@
 
 > ⚠️ 注意：運轉中無法變更 Recipe（提示「Can not change recipe while machine is running.」），須先停機。
 
-> 註：`btnClearCount`（Clear All）已於 2026-07 接上功能（見上表）；`sbPaperSummary`（Summary）確認未綁定 OnClick、無處理函式，為保留鈕。
+> 註：Clear All 已於 2026-07 接上功能（見上表）；Summary 目前未接功能，為保留鈕。
 
 ---
 
@@ -243,4 +243,4 @@
 | `User ID or password is incorrect.` | 切換權限時帳號或密碼輸入錯誤 | 確認帳號/密碼後重試（帳號管理見 Maintenance 帳號頁，需 Engineer 以上權限編輯） |
 | `Please add at least one Lot to the list !` | Lot Start 時清單為空 | 先用 Add Lot 加入 Lot |
 
-> 註：`cbbUserSelect` 選項與 `pnStartMode`／`pnRealDummy` 標籤已由 byte-safe DFM 讀取確認**全為英文**（Operation/Supervisor/Engineer/Honprec；Initial/Continue；Dummy/HasTray/Real），main.dfm 無任何中文 Caption/Hint，與截圖一致。
+> 註：User 下拉選項與 Start Mode／Real/Dummy 標籤皆為英文（Operation/Supervisor/Engineer/Honprec；Initial/Continue；Dummy/HasTray/Real），與截圖一致。

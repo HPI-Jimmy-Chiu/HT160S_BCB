@@ -357,7 +357,7 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 
 ### 12.3.9-2　AGV SVID 38202–38245 完整對照
 
-（依 `docs/AGV/HT160S_E87_AGV_Communication_Draft_20260527.md` §6/§6.1 與 `uHGemHT160.cpp`/`uAgvStation.cpp` 現行實作）
+（依 AGV 通訊草案 `docs/AGV/HT160S_E87_AGV_Communication_Draft_20260527.md` §6/§6.1 與現行實作）
 
 | SVID | 型別 | 名稱 | 語意 |
 | --- | --- | --- | --- |
@@ -372,12 +372,12 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 | 38223 / 38224 | INT4 | AMR Empty / Color Tray Count | **保留 0 不實作**（無 host CP、無計數硬體；9045 該二站亦零 SECS） |
 | 38225–38227 / 38237–38239 | INT4 | AMR Auto1–3 / Auto4–6 Tray Count | 車上盤數簿記 |
 | 38228–38230 | INT4 | AMR Loader/Empty/Color Device Count | **恆 0**：上料只交換盤數、不給 IC 數（契約，與 9045 對齊） |
-| 38231–38233 / 38240–38242 | INT4 | AMR Auto1–3 / Auto4–6 Device Count | 車上 IC 數（卸盤時逐盤累計 `CountIC()`） |
+| 38231–38233 / 38240–38242 | INT4 | AMR Auto1–3 / Auto4–6 Device Count | 車上 IC 數（卸盤時逐盤累計） |
 | 38234–38236 / 38243–38245 | ASCII | AMR Auto1–3 / Auto4–6 Bin Setting | 見下註 |
 
 > 註（Report 定義）：RPTID 2/3/4 = 各單一 bitmap（38219/38220/38221）分掛 CEID272/273/274；**RPTID 6** = 18 個 SV（TrayCount P1–P9 ＋ DeviceCount P1–P9）同掛 CEID272（叫車快照）與 CEID274（關帳實值），273 不掛；RPTID 7 = 僅 38204，掛 CEID275（身分盤 2D，Color 站 CCD 讀碼成功即發，空碼/暫代碼不上報）；RPTID 5（9 站 carrier ID）目前無 CEID 連結、備援保留。CEID274 發送前先快照 TrayCount/DeviceCount，發完才清車歸零（populate-then-send-then-reset）。
 
-> 註（DeviceCount 現況）：舊版「固定 0」已於 2026-07-13 修正——Auto 卸盤時累計工作盤 `CountIC()` 供 SVID 38231-33/38240-42；上料側（38228-38230）依「上料只交換盤數、下料才給 IC 數」之契約**恆 0，為規格而非缺陷**。
+> 註（DeviceCount 現況）：舊版「固定 0」已於 2026-07-13 修正——Auto 卸盤時累計工作盤 IC 數供 SVID 38231-33/38240-42；上料側（38228-38230）依「上料只交換盤數、下料才給 IC 數」之契約**恆 0，為規格而非缺陷**。
 
 > 註（BinSetting 格式，2026-07-15 接線）：告知 host/AMR 該 Auto 出料車裝載的分選等級。`Normal`＝純 bin 號（兼 Error/溢位站附 `,ERR`）；`By Lot+Bin`＝`LotID:Bin` 逗號串；`By Lot+PassFail`＝`LotID:PASS`/`LotID:FAIL`；`By WhiteList`＝走 Normal 分支（純 bin 號）。不掛任何 report，僅供 S1F3 查詢，由 `ServiceAgv` 每 1 秒刷新。
 
@@ -385,7 +385,7 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 
 > 【待補（現場）：實機 car-taken 感測器（目前以 `SnAutoX_InputEnd` 的 OFF 代表車已取走，IO 位址 Lane0/IP2/Port1/Bit0~5）是否為最終正式接線——未接線時真機握手會停在 Ready 不會 Finish。】
 
-> 註（定案）：`ShortageDebounce[]` **有實際邏輯**——`ServiceHandshake` 以 `++ShortageDebounce[] > GeneralSetting.iAmrHandshakeWaitSec` 作為 watchdog，強制解鎖卡死的 PREP/READY 站。`PrepDone[]`/`ReadyEntrySensor[]` 則為只寫不讀的**遺留殘骸**（僅清 0，全程式無讀取點），不影響行為。
+> 註（定案）：缺料去彈跳計數**有實際邏輯**——握手服務以「連續逾時秒數超過設定的等待秒數」作為 watchdog，強制解鎖卡死的 PREP/READY 站。另有兩個只寫不讀的**遺留旗標**（僅清 0、全程式無讀取點），不影響行為。
 
 > 註（定案）：叫車與握手的 RunMode 不對稱為**有意設計**：`PollAndCall`（發 CEID272）要求 `RunMode==Run_Normal`（只有正常生產才發起新呼叫）；`ServiceHandshake` 不檢查 RunMode（已在途的交車在其他模式如 CleanOut 仍推進到完成），唯 HOME 期間例外凍結（`Run_Home` 或未歸原時 return，2026-07-11 修正）。P1–P3 三個進料站（Loader/Empty/Color）在 `uAgvStation` 內走同一組 infeed 處理路徑。
 

@@ -129,7 +129,7 @@ Tray Form 分頁定義料盤的座標起點、格位間距與分割數。每次�
 | X-Division | 整數，1~20，預設 1 | 料盤 X 格數（上限 20） |
 | Y-Division | 整數，1~50，預設 1 | 料盤 Y 格數（上限 50） |
 
-> 註（定案）：`TrayForm.XStart/XPitch/YStart/YPitch` 的**設定值單位＝mm**；消費端（SortArm `aSortArm.cpp:457-473`、Loader `aLoader.cpp:196-212`）取值時一律 **×100 轉成 1/100mm** 教導座標（原始碼註解明寫 "tray pitch is mm (setup.ini) but teach coords are 1/100mm"）。`XDivision/YDivision` 為格數（消費端 Clamp X:1–50、Y:1–20）。
+> 註（定案）：料盤幾何（XStart／XPitch／YStart／YPitch）的**設定值單位＝mm**；分類臂與 Loader 取值時一律 **×100 轉成 1/100mm** 教導座標（設定檔存 mm、教導座標為 1/100mm）。格數（XDivision／YDivision）夾制範圍 X:1–50、Y:1–20。
 
 ### 6.3.3 操作步驟
 
@@ -352,10 +352,10 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 
 ## 6.10 補充定案（原待補事項）
 
-- **工程單位（定案）**：`TrayForm.XStart/XPitch/YStart/YPitch` 設定值單位＝mm，消費端 ×100 轉 1/100mm 教導座標（見 6.3.2 註）。
-- **Area enum 編號 1/2（定案）**：`EHT160BinArea`＝NotUse=0、**Empty=1、Loader=2**（空盤站與進料站的區域代號，合法區域名但非分選目的地）、Auto1..6=3..8、Color=9。Bin 設定格與所有分選走訪一律從 `eHT160BinAreaAuto1`(=3) 起，1/2 純屬站別保留代號。
-- **畫面標籤（定案）**：byte-safe DFM 讀取確認全為英文——`rgSortMode`＝"Sort Mode"（選項 Normal / By Lot+Bin / By Lot+PassFail / By WhiteList）、`chkAutoEnable1~6`＝"Auto1"~"Auto6"、`chkSuckEnable1~4`＝"Nozzle1"~"Nozzle4"、`chkHardwareColorBinArea`＝"Color bin area installed"、`chkUseAMR`＝"Use AMR"、`cbBinPanelType`＝"LED (HT9046)" / "TFT (HT9011)"。（註：這些控制項實際位於 maintenance.dfm 硬體頁；`edLotNo` 位於 main.dfm 的 Lot 分頁 "Lot Manual Edit" 群組。）
-- **`SYSTEM_BIN_SELECT BinSelect[2]`（定性）**：cprod 內僅宣告、全程式未見讀寫——舊機型遺留宣告，不影響行為。
-- **Error 區設為 Color 的 fallback（定案）**：`GetErrorAutoIndex` 回傳最後一個 Auto（Auto6）；滿載溢流同。詳見第 15 章 15.12。
+- **工程單位（定案）**：料盤幾何（XStart／XPitch／YStart／YPitch）設定值單位＝mm，消費端 ×100 轉 1/100mm 教導座標（見 6.3.2 註）。
+- **料區代號 1/2（定案）**：料區代號 NotUse=0、**Empty=1、Loader=2**（空盤站與進料站的代號，屬合法區域但非分選目的地）、Auto1..6=3..8、Color=9。Bin 設定格與所有分選一律從 Auto1(=3) 起算，1/2 純為站別保留代號。
+- **畫面標籤（定案）**：硬體頁各控制項螢幕標籤皆為英文——Sort Mode（選項 Normal / By Lot+Bin / By Lot+PassFail / By WhiteList）、Auto1~Auto6、Nozzle1~Nozzle4、"Color bin area installed"、"Use AMR"、Bin 面板型號 "LED (HT9046)" / "TFT (HT9011)"；Lot 編號輸入框位於主畫面 Lot 分頁的 "Lot Manual Edit" 群組。
+- **Bin 選擇舊結構（定性）**：僅宣告、全程式未見讀寫——舊機型遺留，不影響行為。
+- **Error 區設為 Color 的 fallback（定案）**：Error 區非 Auto（如 Color）時，回退為最後一個 Auto（Auto6）；滿載溢流亦同。詳見第 15 章 15.12。
 - **手動綁定 UI（定案）**：不提供；綁定僅由 Loader CCD 掃碼路徑自動產生（最低 index 先到先得），UI 僅顯示。
-- **配方選單畫面（定案）**：不存在獨立 form；新增/複製/刪除/切換全在 Product Setup（`lstRecipe`＋`edRecipeName`），主畫面 `cb_WorkFile` 亦可切換。
+- **配方選單畫面（定案）**：不存在獨立視窗；新增/複製/刪除/切換全在 Product Setup（配方清單＋配方名稱輸入框），主畫面 Recipe Name 下拉亦可切換。

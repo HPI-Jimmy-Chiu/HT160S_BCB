@@ -30,7 +30,7 @@
 | Motion View 右 Loader 移動盤面 | 表格 | 右側 Loader-Y 移動中的盤面 |
 | 模擬供盤勾選 | 勾選 | 模擬／DUMMY 下決定空料時是否持續供盤（勾選＝視為永遠有盤；未勾＝回報 `Loader Tray Empty`）。實機不使用，由推盤氣缸 On 感測器判定有無盤 |
 
-> 註（定案）：`lblLoadCurrID_1`／`lblLoaderCarID` 為靜態 Panel（Caption 固定 "Loader ID"），全程式**無任何寫入點**——HT172 靠 `SetIDPanel` 接線並掛 SVID 1080/1081，HT160S 移植時未接，屬**死 UI（保留）**；`lblLoadCurrBin_1` 元件在 HT160S 不存在（僅 DFM 有 "Current Sorting Bin :" 靜態文字）。HT160S 亦無 `mtWorkArea`/`mtSortRecv`（HT172 元件）——生產盤面＝`mtLoaderL/R`（鏡射），移動盤面＝`mtLoaderL/RTrayWork`（`BindMovingTrayPanel`）。左右對應：`LoaderNo==1`→Left（`grpLoaderL`）、`LoaderNo==2`→Right（`grpLoaderR`）。
+> 註（定案）：左右兩個「Loader ID」標籤為靜態顯示（固定文字 "Loader ID"），目前**無任何寫入點**——HT172 有接線並掛 SVID 1080/1081，HT160S 移植時未接，屬**死 UI（保留）**；HT172 的「Current Sorting Bin」顯示欄在 HT160S 不存在（僅有 "Current Sorting Bin :" 靜態文字）。盤面顯示：生產盤面＝Tray Status 頁的 Loader 2D 左/右格點（鏡射），移動盤面＝Motion View 的左/右 Loader 移動盤面。左右對應：Loader1→左側「Loader 2D Left」、Loader2→右側「Loader 2D Right」。
 
 ### 14.1.3　動作時序
 
@@ -107,19 +107,19 @@
 
 ### 14.1.6　設定
 
-| 參數 | 範圍/預設 | 說明 |
+| 設定項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| `GeneralSetting.iLoaderYSafeDistance` | 預設 10000（=100mm）；`<=0` 停用 | 兩側 Loader-Y 車跨側最小安全間隔（1/100mm），`General.ini [Safety] LoaderYSafeDistance` |
-| `GeneralSetting.iSimAmrMaxTray[0]` | 模擬補料用；index 0=Loader | 模擬 Loader 來料疊盤盤數（每次取盤遞減，0 缺料呼叫 AGV） |
-| `GeneralSetting.iSortMode` | 0/1/2 | 分流模式；1=By Lot+Bin（2D 反查後 `ResolveAuto` 綁定 (Lot,Bin)→Auto）、2=By Lot+PassFail（綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由 Bin==Pass Bin 導出、掃描時凍結） |
-| `CosFunction.bUse2DBinMap` | bool | 是否啟用 Top CCD 2D 條碼讀取與 Bin2DMap 反查（關閉只讀有無料） |
-| `Teach.Loader1/2CarFeedTrayYPosition` | 教導值 | 各側 Loader-Y 取盤位（1/100mm） |
-| `Teach.Loader1/2CarDischargeTrayYPosition` | 教導值 | 各側空盤排出位 |
-| `Teach.Loader1/2CarFirstCCDYPosition` | 教導值 | 各側 CCD 掃描第一格 Y 起點 |
-| `Teach.LoaderCarFirstCCDXPosition` | 教導值 | Top CCD X 掃描第一格起點（兩側共用） |
-| `TrayForm.XDivision / YDivision` | X clamp 1..50；Y clamp 1..20 | 盤面格數（由 recipe 讀入） |
-| `TrayForm.XPitch / YPitch` | recipe 值 (double) | 盤面格距，計算各格 CCD 位置用 |
-| `HSys.LastSet.iRealDummy` | DUMMY/HAS_TRAY/REALLY | 運行層級，影響感測器/CCD/拍照是否走實機路徑 |
+| Loader-Y 跨側安全間隔 | 預設 10000（=100mm）；`<=0` 停用 | 兩側 Loader-Y 車跨側最小安全間隔（1/100mm），設定檔 `[Safety] LoaderYSafeDistance` |
+| 模擬-Loader 疊盤盤數 | 模擬補料用 | 模擬 Loader 來料疊盤盤數（每次取盤遞減，0 缺料呼叫 AGV） |
+| 分流模式 | 0/1/2 | 分流模式；1=By Lot+Bin（2D 反查後綁定 (Lot,Bin)→Auto）、2=By Lot+PassFail（綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由 Bin==Pass Bin 導出、掃描時凍結） |
+| 啟用 2D 條碼讀取 | 開/關 | 是否啟用 Top CCD 2D 條碼讀取與 Bin 反查（關閉只讀有無料） |
+| Loader 取盤位 Y | 教導值 | 各側 Loader-Y 取盤位（1/100mm） |
+| Loader 空盤排出位 Y | 教導值 | 各側空盤排出位 |
+| Loader CCD 第一格 Y 起點 | 教導值 | 各側 CCD 掃描第一格 Y 起點 |
+| Top CCD X 第一格起點 | 教導值 | Top CCD X 掃描第一格起點（兩側共用） |
+| 盤面格數 X/Y | X 1..50；Y 1..20 | 盤面格數（由配方讀入） |
+| 盤面格距 X/Y | 配方值 | 盤面格距，計算各格 CCD 位置用 |
+| 運轉模式（Real/Dummy/HasTray） | DUMMY/HAS_TRAY/REALLY | 運轉層級，影響感測器/CCD/拍照是否走實機路徑 |
 
 ### 14.1.7　警報與排除
 
@@ -218,17 +218,17 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 
 ### 14.2.5　設定
 
-| 參數 | 範圍/預設 | 說明 |
+| 設定項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| `GeneralSetting.bColorBinAreaInstalled` | bool | Color 區是否安裝；false 時整個模組停用 |
-| `iMode`（`eHT160ColorMode`） | 預設 TraySupply(1) | 模組模式：TraySupply 供盤 / SortBin(0) 分Bin |
-| `Teach.ColorRead2DYPosition` | 教導值（1/100mm） | ColorY 前方收/讀 2D 位置 |
-| `Teach.ColorTrayArmPickYPosition` | 教導值 | ColorY 後方 TrayArm 取盤位置 |
-| `Teach.ColorRead2DXPosition` | 教導值 | Color 2D CCD 讀碼時 `MTopCCDX_Color` 的 X 位置 |
-| `CosFunction.bUseColorCcd` | bool（`[ColorCCD] Enable`） | false 時跳過相機、2D 碼留空 |
-| `GeneralSetting.iSimAmrMaxTray[2]` | int（index 2=Color） | 模擬 Color(P3) 進料堆最大盤數 |
-| `ScanDelay 逾時` | 3000 ms | Color 2D CCD 一次拍攝/讀碼回應逾時 |
-| `破棧/夾盤延時` | 各段 5 tick | 分盤動作各段安定延時 |
+| Color 區是否安裝 | 開/關 | Color 區是否安裝；未安裝時整個模組停用 |
+| Color 模組模式 | 預設 TraySupply | 模組模式：TraySupply 供盤 / SortBin 分 Bin |
+| Color 讀 2D 位置 Y | 教導值（1/100mm） | ColorY 前方收/讀 2D 位置 |
+| Color 取盤位置 Y | 教導值 | ColorY 後方盤臂取盤位置 |
+| Color 讀 2D 位置 X | 教導值 | Color 2D CCD 讀碼時的 X 位置 |
+| 啟用 Color CCD | 開/關（設定檔 `[ColorCCD] Enable`） | 未啟用時跳過相機、2D 碼留空 |
+| 模擬-Color 進料堆盤數 | 整數 | 模擬 Color(P3) 進料堆最大盤數 |
+| 2D 讀碼逾時 | 3000 ms | Color 2D CCD 一次拍攝/讀碼回應逾時 |
+| 破棧/夾盤延時 | 各段 5 tick | 分盤動作各段安定延時 |
 
 > 註（定案）：`iSupplyThreshold`（預設 100）與 `NotifyICPlaced`/`iICCount` 為**遺留碼**——全程式無任何呼叫點（`iICCount` 僅出現在 FeederDecision 除錯 dump），不影響供盤行為。
 
@@ -242,7 +242,7 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 | `Color Y motor will out of limit` | ColorY 目標超軟極限 | 檢查／修正 ColorY 的前方讀碼位或後方取盤位教導值 |
 | `Color CCD X motor will out of limit` | Color CCD X 目標超軟極限 | 檢查／修正 Color CCD 讀碼 X 位教導值 |
 
-> 註（定案）：`DoSortBin`（Color 當 Bin 區收 IC）確為空殼（switch 僅 case 1 直接 return true）、`IsAcceptingIC()` 固定回 false——此功能**未實作，屬預留介面**；Color 站目前僅作身分/reject 盤供給，不收分選 IC。
+> 註（定案）：Color 站作為 Bin 區收 IC 的功能確為空殼、固定不接受 IC——此功能**未實作，屬預留介面**；Color 站目前僅作身分/reject 盤供給，不收分選 IC。
 
 ---
 
@@ -325,14 +325,14 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 
 ### 14.3.5　設定
 
-| 參數 | 範圍/預設 | 說明 |
+| 設定項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| `Teach.EmptyCarFeedTrayYPosition` | 教導值（1/100mm） | EmptyY 軸「上料位置」（取盤/夾盤位） |
-| `Teach.EmptyCarDischargeTrayYPosition` | 教導值 | EmptyY 軸「放料位置」（送料盤入後段位） |
-| `Teach.TrayXArmToEmptyXPosition` | 教導值 | TrayArmX 進入 Empty 干涉區的 X 門檻，用於 MoveEmptyY 防撞判斷 |
-| `GeneralSetting.iSimAmrMaxTray[1]` | 設定值（index 1=Empty） | 模擬 Empty 輸入堆滿匣盤數（每次 GoDown 消耗 1） |
-| `DoClampTray SettleTicks` | Empty 用 5 | 雙缸夾盤後安定時間（HTimer ticks），>0 才做 settle+confirm |
-| `HTimer Delay` | 5 ticks（寫死於程式） | 頂升/分張各步驟延時 |
+| Empty 取盤位置 Y | 教導值（1/100mm） | EmptyY 軸上料位置（取盤/夾盤位） |
+| Empty 放料位置 Y | 教導值 | EmptyY 軸放料位置（送料盤入後段位） |
+| 盤臂進 Empty 干涉 X 門檻 | 教導值 | 盤臂 X 進入 Empty 干涉區的 X 門檻，用於防撞判斷 |
+| 模擬-Empty 進料堆盤數 | 設定值 | 模擬 Empty 輸入堆滿匣盤數（每次下降消耗 1） |
+| Empty 夾盤安定時間 | 5 tick | 雙缸夾盤後安定時間，>0 才做安定+確認 |
+| 頂升/分張延時 | 5 tick | 頂升/分張各步驟延時 |
 
 ### 14.3.6　警報與排除
 
@@ -344,7 +344,7 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 | `Front Empty Tray Is Miss Error` | 拆堆完成後前段感測器讀不到料盤（非 DUMMY） | RETRY：重新拆堆 |
 | `Empty Y motor will out of limit` | EmptyY 目標超軟體極限 | 資訊提示，拒絕該次移動 |
 
-> 註（定案）：`bLotFinish` 為 Empty 模組私有旗標，僅兩個寫入點：InitialTask 清 false；主 ladder case 100 每輪重算 `bLotFinish = (RunMode==Run_CleanOut && TrayArmModule->IsCleanOutFinish())`——即只在清機且 TrayArm 收尾完成時為 true（供 drain 分支判斷），與 Lot Start/End 流程無關。
+> 註（定案）：Empty 模組的「Lot 完成」旗標只在**清機（Clean Out）且盤臂收尾完成**時為 true（供 drain 分支判斷），與 Lot Start/End 流程無關。
 
 ---
 
@@ -437,21 +437,21 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 | --- | --- | --- |
 | `SORT_ARM_SUCKER_COUNT` | 4（常數） | 分類臂吸嘴（Suck-Z）數量 |
 | `SORT_ARM_AUTO_COUNT` | 6（常數） | 出料 Auto 站數量 |
-| `SORT_ARM_SAFE_Z_POSITION` | 10（常數，1/100mm） | 分類臂 Z 橫移前安全升起位置 |
-| `SUCK_HOME_LOST_MS` | 100 ms | 分類臂 X 移動吸嘴脫離 Home 去抖窗 |
-| `TRAYARM_ZUP_LOST_MS` | 100 ms | 盤臂 X 移動 Z 脫離上位去抖窗 |
-| `GeneralSetting.bSuckerEnabled[s]` | per-sucker bool | 各吸嘴（0..3）是否啟用；影響取放選擇與互鎖檢查範圍 |
-| `GeneralSetting.bUseAMR` | bool | AMR 模式開關，決定 TrayArm 派工策略 |
-| `GeneralSetting.iSortMode` | 0/1/2 | 分流模式；動態模式（1 By Lot+Bin / 2 By Lot+PassFail）時 `GetMappedAutoIndex` 用綁定查表（Bin 或凍結的 PASS/FAIL 分類鍵） |
-| `GeneralSetting.bShowSortArmPlaceCheck` | 預設 OFF | [診斷] 放料前彈出實際 vs 預期位置比對（生產應關） |
-| `Teach.SortArmToLoader1/2XPosition` | 教導值 | 分類臂對 Loader1/2 取料 X 基準位 |
-| `Teach.SortArmToLoader_1/2_Z1..Z4Position` | 教導值 | 分類臂在 Loader 各吸嘴下降 Z 位 |
-| `Teach.SortArmToAuto1..6XPosition` | 教導值 | 分類臂對 Auto1..6 放料 X 基準位 |
-| `Teach.SortArmToAuto_1..6_Z1..Z4Position` | 教導值 | 分類臂在各 Auto 各吸嘴下降 Z 位 |
-| `Teach.TrayXArmToAuto1..6XPosition` | 教導值 | 盤臂對 Auto1..6 放盤 X 位 |
-| `Teach.TrayXArmToColorXPosition` | 教導值 | 盤臂在 Color 站取 identity 盤 X 位（AMR） |
-| `Teach.TrayXArmToLoaderXPosition` | 教導值 | 盤臂在 Loader 後方取回收空盤 X 位 |
-| `Teach.TrayXArmToEmptyXPosition` | 教導值 | 盤臂在 EmptyTray 後方取/回收空盤 X 位 |
+| 分類臂 Z 安全升起位置 | 10（常數，1/100mm） | 分類臂 Z 橫移前安全升起位置 |
+| 吸嘴脫離 Home 去抖窗 | 100 ms | 分類臂 X 移動時吸嘴脫離 Home 的去抖窗 |
+| 盤臂 Z 脫離上位去抖窗 | 100 ms | 盤臂 X 移動時 Z 脫離上位的去抖窗 |
+| 各吸嘴是否啟用 | 每吸嘴開/關 | 各吸嘴（1~4）是否啟用；影響取放選擇與互鎖檢查範圍 |
+| AMR 模式開關 | 開/關 | AMR 模式開關，決定盤臂派工策略 |
+| 分流模式 | 0/1/2 | 分流模式；動態模式（1 By Lot+Bin / 2 By Lot+PassFail）時以綁定查表取得目標 Auto（Bin 或凍結的 PASS/FAIL 分類鍵） |
+| 放料位置比對診斷 | 預設 OFF | [診斷] 放料前彈出實際 vs 預期位置比對（生產應關） |
+| 分類臂對 Loader 取料 X 基準 | 教導值 | 分類臂對 Loader1/2 取料 X 基準位 |
+| 分類臂於 Loader 各吸嘴下降 Z | 教導值 | 分類臂在 Loader 各吸嘴下降 Z 位 |
+| 分類臂對各 Auto 放料 X 基準 | 教導值 | 分類臂對 Auto1..6 放料 X 基準位 |
+| 分類臂於各 Auto 各吸嘴下降 Z | 教導值 | 分類臂在各 Auto 各吸嘴下降 Z 位 |
+| 盤臂對各 Auto 放盤 X | 教導值 | 盤臂對 Auto1..6 放盤 X 位 |
+| 盤臂於 Color 取盤 X | 教導值 | 盤臂在 Color 站取 identity 盤 X 位（AMR） |
+| 盤臂於 Loader 取空盤 X | 教導值 | 盤臂在 Loader 後方取回收空盤 X 位 |
+| 盤臂於 Empty 取空盤 X | 教導值 | 盤臂在 EmptyTray 後方取/回收空盤 X 位 |
 
 ### 14.4.6　警報與排除
 
@@ -466,7 +466,7 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 | `Tray Arm X motor will out of limit` | 盤臂 X 目標超軟極限 | 修正教導位置 |
 | 吸嘴吸取／放料錯誤 | 吸取或放料真空動作失敗 | RETRY／SKIP；隨後系統會重置吸嘴 |
 
-> 註：夾爪/升降實體 IO 點位（`system/IO_Table.csv`，格式 Lane/IP/Port/Bit）：`C_TrayArm_FrontClamp`＝0/0/2/6、`C_TrayArm_RearClamp`＝0/0/2/7（兩者 OnDelay/OffDelay 500/500）、`C_TrayArmZ_Up`＝0/0/2/5、`C_TrayArmZ_Down`＝0/0/2/4（各自 On 感測在 Port1 同 Bit）。SortArm 吸嘴為 `Suck1~Suck4`（Sucker，0/0/1/0~3；`SuckN_On/Off` 為 IP=W 的寫出點）。`iHomeLed`=1（`HTMotor.h` LED 索引 enum）。
+> 註：夾爪/升降實體 IO 點位（`system/IO_Table.csv`，格式 Lane/IP/Port/Bit）：`C_TrayArm_FrontClamp`＝0/0/2/6、`C_TrayArm_RearClamp`＝0/0/2/7（兩者 OnDelay/OffDelay 500/500）、`C_TrayArmZ_Up`＝0/0/2/5、`C_TrayArmZ_Down`＝0/0/2/4（各自 On 感測在 Port1 同 Bit）。分類臂吸嘴為 `Suck1~Suck4`（Sucker，0/0/1/0~3）。
 >
 > 【待補（現場）：`ArmDelay.Set(3)` 的 3 拍對應實際毫秒數取決於主迴圈實際週期（標稱約 1ms/拍，即約 3ms），列入現場動態驗證清單量測。】
 
@@ -549,16 +549,16 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 
 ### 14.5.7　設定
 
-| 參數 | 範圍/預設 | 說明 |
+| 設定項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| `GeneralSetting.bAutoEnabled[0..5]` | 預設全 true；存於 INI `[SortMode] AutoEnabled0..5` | 每站 Auto1~6 啟用旗標；關閉站在 Lot+Bin 路由與置盤掃描中被略過。改動後需重啟軟體。Error Auto 即使關閉仍作溢位目標 |
-| `GeneralSetting.bUseAMR` | bool | AMR 堆疊模式總開關（堆疊順序、放料閘控、滿車服務、AGV 握手） |
-| `GeneralSetting.iSortMode` | 0/1/2 | 動態路由模式（1 By Lot+Bin / 2 By Lot+PassFail，影響 Unload 面板顯示：PassFail 模式顯示 PASS/FAIL）；路由邏輯在 SortArm |
-| `GeneralSetting.iSimAmrMaxTray[3+Index]` | 整數（盤），index 3..8 對應 Auto1~6 | 模擬各 Auto 堆疊車滿車門檻 |
-| `Teach.Auto1..6CarFeedTrayYPosition` | 教導值（1/100mm） | 各站取盤高度 Y（DoFeedTray case 1000） |
-| `Teach.Auto1..6CarDischargeTrayYPosition` | 教導值 | 各站出盤/堆疊 Y（DoDischargeTray case 1000） |
-| `Teach.Auto1..6CarFirstSortYPosition` | 教導值 | 各站作業位（供 SortArm 放 IC）Y（DoFeedTray case 6000） |
-| `MAX_TRAY_PER_CAR` | 外部定義常數 | 每台堆疊車最大盤數（滿車判定） |
+| 各 Auto 啟用旗標 | 預設全啟用；設定檔 `[SortMode] AutoEnabled0..5` | 每站 Auto1~6 啟用旗標；關閉站在 Lot+Bin 路由與置盤掃描中被略過。改動後需重啟軟體。Error Auto 即使關閉仍作溢位目標 |
+| AMR 堆疊模式總開關 | 開/關 | AMR 堆疊模式總開關（堆疊順序、放料閘控、滿車服務、AGV 握手） |
+| 分流模式 | 0/1/2 | 動態路由模式（1 By Lot+Bin / 2 By Lot+PassFail，影響 Unload 面板顯示：PassFail 模式顯示 PASS/FAIL）；路由邏輯在分類臂 |
+| 模擬-各 Auto 滿車門檻 | 整數（盤），對應 Auto1~6 | 模擬各 Auto 堆疊車滿車門檻 |
+| 各 Auto 取盤高度 Y | 教導值（1/100mm） | 各站取盤高度 Y |
+| 各 Auto 出盤/堆疊 Y | 教導值 | 各站出盤/堆疊 Y |
+| 各 Auto 作業位 Y | 教導值 | 各站作業位（供分類臂放 IC）Y |
+| 每台堆疊車最大盤數 | 常數 | 每台堆疊車最大盤數（滿車判定） |
 
 ### 14.5.8　警報與排除
 
@@ -571,6 +571,6 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 | `Auto%d output car full (%d trays) - change car then confirm` | 邏輯堆疊車盤數達每車上限 | 操作員換車後確認；清車資料並重建堆疊角色 |
 | `Auto enable changed. Please restart the software ...` | 操作員變更 per-Auto 啟用後的提示 | 重啟軟體讓 Lot+Bin 路由生效 |
 
-> 註（定案）：`DoDischargeTray` 的 CEID 陣列 `{136,137,138,140,141,142}` 跳過 139，係因 **139 在 HT9045 CEID 空間已被占用**（`DoVisualSortLotStart`），HT160 為避免撞號刻意跳過（詳見第 12 章）。AMR 模式卸盤時另於 `iAmrDeviceCount[auto] += 工作盤CountIC()` 累計車上 IC 數供 SVID 38231-33/38240-42。maintenance 畫面 `chkAutoEnable1~6` 螢幕文字已由 DFM 確認為「**Auto1**」~「**Auto6**」（英文，無中文）。
+> 註（定案）：卸盤事件的 CEID 陣列 `{136,137,138,140,141,142}` 跳過 139，係因 **139 在 HT9045 CEID 空間已被占用**，HT160 為避免撞號刻意跳過（詳見第 12 章）。AMR 模式卸盤時另累計車上 IC 數供 SVID 38231-33/38240-42。維護畫面各 Auto 啟用勾選的螢幕文字為「**Auto1**」~「**Auto6**」（英文）。
 >
 > 【待補（現場）：實機「車已被取走」感測（`IsAmrTaken` 重用 `SnAutoX_InputEnd`，Lane0/IP2/Port1/Bit0~5）是否已最終接線——未接線（Enable==false）時 AMR 握手會停在 Ready。】

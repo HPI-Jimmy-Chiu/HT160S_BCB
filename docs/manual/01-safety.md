@@ -33,7 +33,7 @@
 HT160S 以機台頂部的三色塔燈（綠 / 黃 / 紅）搭配蜂鳴器，向操作員顯示目前的運轉與故障狀態。塔燈與蜂鳴器的對應狀態由執行端 `DoSystemMessage` 即時驅動，燈色組合與音樂則於維護畫面的 Tower Light 分頁設定。
 
 ![三色塔燈與蜂鳴器](screenshots/tower-light.png)
-> 圖 1-1 三色塔燈與蜂鳴器狀態示意。（擷取方式：主畫面（fMain）運轉時觀察機台頂部塔燈；燈色/音樂組態於 Maintenance → Tower Light 分頁設定。）
+> 圖 1-1 三色塔燈與蜂鳴器狀態示意。（擷取方式：主畫面運轉時觀察機台頂部塔燈；燈色/音樂組態於 Maintenance → Tower Light 分頁設定。）
 
 ### 1.3.1 主畫面狀態與燈號對應
 
@@ -55,7 +55,7 @@ HT160S 以機台頂部的三色塔燈（綠 / 黃 / 紅）搭配蜂鳴器，向�
 | SAFE DOOR | 安全門開啟 | 紅 |
 | AIR | 氣壓異常 | 紅 |
 
-各狀態塔燈**程式預設值**（`DefaultTowerLightConfig`，maintenance.cpp）如下；現場可於 Maintenance → Tower Light 分頁逐格調整（設定存於號誌燈 ini，以現場設定為準）：
+各狀態塔燈**程式預設值**如下；現場可於 Maintenance → Tower Light 分頁逐格調整（設定存於號誌燈 ini，以現場設定為準）：
 
 | 狀態 | 綠 | 黃 | 紅 | 蜂鳴器預設 |
 | --- | --- | --- | --- | --- |

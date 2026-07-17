@@ -37,7 +37,7 @@ HT160S 把 CCD 分類結果（Bin）導向輸出料倉，提供三種模式（�
 分流模式切換與各 Auto 啟用，位於維護畫面的硬體安裝頁（Hardware Setup）的 **Sort Mode** 選擇框；By Lot+PassFail 所需的 **Pass Bin** 則在 setup 的 Bin Setting 頁以 **Pass Bin** 下拉設定（見第 6 章）。Lot 編號與工單清單則在主畫面的 Lot 分頁。
 
 ![Lot 分頁與分流設定](screenshots/main-lot.png)
-> 圖 15-1 主畫面 Lot 分頁與分流設定。（擷取方式：開啟主畫面，切換至 Lot 分頁；模式選擇位於 maintenance 硬體安裝頁 `tsMaintHardware` 的 `rgSortMode`；Pass Bin 位於 setup Bin Setting 頁）
+> 圖 15-1 主畫面 Lot 分頁與分流設定。（擷取方式：開啟主畫面，切換至 Lot 分頁；模式選擇位於維護畫面硬體安裝頁的 Sort Mode 選擇框；Pass Bin 位於設定的 Bin Setting 頁）
 
 ---
 
@@ -60,17 +60,17 @@ HT160S 把 CCD 分類結果（Bin）導向輸出料倉，提供三種模式（�
 
 ## 15.4 相關參數
 
-| 參數 | 範圍/預設 | 說明 |
+| 設定項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| `GeneralSetting.iSortMode` | 預設 0（Normal）；`[SortMode] Mode` | 分流模式：0=Normal（靜態 `BinAreaMap`），1=By Lot+Bin，2=By Lot+PassFail。以 `IsLotBinSortMode()`/`IsLotPassFailSortMode()`/`IsDynamicBindingMode()` 判讀 |
-| `[SortMode] UseLotBinMode`（legacy） | 由程式維護，不需手動改 | 向後相容鍵：載入時若無 `Mode` 鍵則以此推導（true→1）；存檔時同步寫 `(iSortMode==1)`，供舊版 exe 降級讀取（Normal 與 PassFail 都對映為 Normal） |
-| `BinAreaMap.PassBin` | 預設 0（關閉）；配方 `BinAreaMap.ini [BinAreaMap] PassBin` | 視為 PASS 的 Bin 編號。0=關閉（Production_Log PassFail 欄留白）。By Lot+PassFail 模式下為分類/路由依據，且啟動前必須 >0 |
-| `GeneralSetting.bAutoEnabled[0..5]` | 預設全 true；`[SortMode] AutoEnabled0..5` | Auto1~Auto6 是否參與分流（動態綁定時跳過停用者） |
-| `GeneralSetting.bSuckerEnabled[0..3]` | 預設全 true，至少一個須啟用；`[HardwareInstall] SuckerEnabled0..3` | SortArm 四個吸嘴啟用旗標（`FindPickCells` 跳過停用槽） |
-| `GeneralSetting.bColorBinAreaInstalled` | 預設 false；`[HardwareInstall] ColorBinAreaInstalled` | 是否安裝 Color 輸出區（影響 `BinAreaMap` Color 區可用性） |
-| `GeneralSetting.bUseAMR` | 預設 false；`[HardwareInstall] UseAMR` | 是否啟用 AMR/AGV 模式 |
-| `GeneralSetting.iLoaderYSafeDistance` | 預設 10000(=100mm)，輸入 clamp 325~650mm；`[Safety] LoaderYSafeDistance` | 兩 Loader-Y 車最小安全間距，儲存單位 1/100mm |
-| `BinAreaMap ErrorBinArea / [ErrorBinAreaMap]` | 預設 `HT160_DEFAULT_ERROR_BIN_AREA`；錯誤 Bin 可設 `Default` 沿用通用值 | 未知/未設定 Bin 與錯誤 Bin（2DScanFail/NoBinSetting）的溢位目標區 |
+| 分流模式 | 預設 0（Normal）；設定檔 `[SortMode] Mode` | 分流模式：0=Normal（靜態 Bin 對應表），1=By Lot+Bin，2=By Lot+PassFail |
+| 舊版相容鍵 `[SortMode] UseLotBinMode` | 由程式維護，不需手動改 | 向後相容鍵：載入時若無 `Mode` 鍵則以此推導（true→1）；存檔時同步寫回，供舊版程式降級讀取（Normal 與 PassFail 都對映為 Normal） |
+| Pass Bin | 預設 0（關閉）；配方 `BinAreaMap.ini [BinAreaMap] PassBin` | 視為 PASS 的 Bin 編號。0=關閉（Production_Log PassFail 欄留白）。By Lot+PassFail 模式下為分類/路由依據，且啟動前必須 >0 |
+| 各 Auto 啟用旗標 | 預設全啟用；設定檔 `[SortMode] AutoEnabled0..5` | Auto1~Auto6 是否參與分流（動態綁定時跳過停用者） |
+| 各吸嘴啟用旗標 | 預設全啟用，至少一個須啟用；設定檔 `[HardwareInstall] SuckerEnabled0..3` | 分類臂四個吸嘴啟用旗標（取放時跳過停用槽） |
+| Color 區是否安裝 | 預設否；設定檔 `[HardwareInstall] ColorBinAreaInstalled` | 是否安裝 Color 輸出區（影響 Color 區可用性） |
+| AMR/AGV 模式 | 預設否；設定檔 `[HardwareInstall] UseAMR` | 是否啟用 AMR/AGV 模式 |
+| Loader-Y 安全間距 | 預設 10000(=100mm)，輸入夾制 325~650mm；設定檔 `[Safety] LoaderYSafeDistance` | 兩 Loader-Y 車最小安全間距，儲存單位 1/100mm |
+| 錯誤 Bin 溢位目標區 | 預設通用錯誤 Bin 區；錯誤 Bin 可設 `Default` 沿用通用值 | 未知/未設定 Bin 與錯誤 Bin（2DScanFail/NoBinSetting）的溢位目標區 |
 | `LotBinBinding.ini [LotBinBinding]` | `system\LotBinBinding.ini`；每次 `ResolveAuto` 新綁定即 `SaveToIni` | 動態綁定持久化：`Mode`（寫入時的分流模式）+ `Count` + `ItemN= LotID \x01 鍵 \x01 AutoIndex`。中間「鍵」在 By Lot+Bin 是 Bin、在 By Lot+PassFail 是 PASS/FAIL 分類碼（1/2）。載入時若 `Mode` 與目前模式不符即整表捨棄（避免鍵語意被誤讀） |
 
 ---
@@ -195,6 +195,6 @@ By Lot+PassFail 把每顆 IC 依「是否為 Pass Bin」分成 PASS / FAIL 兩�
 
 > ℹ️ By Lot+PassFail 多 Lot 併行時，可用非 Error Auto 少於「2 × 併行 Lot 數」會使某個 PASS/FAIL 桶溢位到 Error Auto。客戶接受此溢位行為（不跳 Note、不擋料），但溢位的每顆合法 PASS/FAIL 產品會於 `Production_Log` 以 `TraceCode=1004`、`ErrorType=PFOverflow` 記錄（PassFail 欄仍為 PASS/FAIL、Which Auto 為 Error Auto），以便追溯混入 Error Auto 的合格品。注意：此處 FAIL 是「合法產品等級（Bin）」，與 2D 讀碼失敗的 Error（走 Error Auto、無 PassFail 記錄）是兩回事。
 
-> 註（定案）：Error 區設為非 Auto（如 Color）時，動態模式 fallback 由 `GetErrorAutoIndex`（CosFunction.cpp）處理：註解明寫 "Error area is not an Auto (e.g. Color) : fall back to the last Auto"，回傳 **Auto6**（index 5）；`ResolveAuto` 滿載溢流亦用同一 Error Auto。此為程式定義行為；若現場希望 Error 走 Color 實體站，需另開發（Color 收 IC 的 `DoSortBin` 目前為未實作之預留介面，見第 14 章）。
+> 註（定案）：Error 區設為非 Auto（如 Color）時，動態模式會回退為最後一個 Auto（**Auto6**）；滿載溢流亦用同一 Error Auto。此為程式定義行為；若現場希望 Error 走 Color 實體站，需另開發（Color 收 IC 目前為未實作之預留介面，見第 14 章）。
 
-> 註（定案）：**無獨立配方選單 form**。配方新增/複製/刪除/切換全在 Product Setup 畫面（`setup.cpp`：`lstRecipe`＋`edRecipeName`，禁刪現用配方），另主畫面 `cb_WorkFile` 可直接切換配方；後端為 `THT160RecipeManager`（`data\<配方>\setup.ini`）。
+> 註（定案）：**無獨立配方選單視窗**。配方新增/複製/刪除/切換全在 Product Setup 畫面（配方清單＋配方名稱輸入框，禁刪現用配方），另主畫面 Recipe Name 下拉可直接切換配方；配方資料存於 `data\<配方>\setup.ini`。

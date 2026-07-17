@@ -7,7 +7,7 @@
 HT160S 是一台 **料盤分類／搬運機（tray sorting / handling machine）**。它把來料盤上的每一顆 IC 透過頂部 CCD 逐格掃描（讀取每格的有無料、Bin 與 2D 條碼），依 Bin／Lot 路由規則，由分類臂（SortArm）的吸嘴逐顆吸取，放到對應的出料堆疊站（Auto1~6）；空盤則由盤臂（TrayArm）與空盤模組（Empty）負責供應與回收。整機由主畫面監看與操作，內建 SECS/GEM 與 AMR/AGV 補料／取車交握能力。
 
 ![主畫面總覽](screenshots/main-overview.png)
-> 圖 2-1 HT160S 主畫面總覽，顯示頂部功能列、生產計數、Real/Dummy 與 Start Mode、SECS/SAFE/AMR 狀態徽章、三色塔燈與機台狀態文字。（擷取方式：開機後即進入此常駐全螢幕視窗 `fMain`；其分頁 `pgcMain` 預設停在 Main 主操作頁 `tsMain`。）
+> 圖 2-1 HT160S 主畫面總覽，顯示頂部功能列、生產計數、Real/Dummy 與 Start Mode、SECS/SAFE/AMR 狀態徽章、三色塔燈與機台狀態文字。（擷取方式：開機後即進入此常駐全螢幕主畫面，預設停在 Main 主操作頁）
 
 ## 2.2 主要機構模組
 
@@ -147,4 +147,4 @@ Loader 內部運作序列：待命 → 進料 → CCD 掃描 → 可供分類 �
 - **Loader 左右對應**：Loader1 → 畫面左側「Loader 2D Left」；Loader2 → 右側「Loader 2D Right」。
 - **頂部功能列文字**：Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit（螢幕實際拼字即「Maintance」）。
 - **盤種與滿車上限**：盤種分 Normal（工作盤，載 IC）／Identity（帶 2D TrayID 身分盤，不載 IC）／Cover（頂蓋空盤，不得載 IC）；車內慣例第一片為 identity、第二片為 cover、其餘為 normal；每車最多 100 片盤。
-- **IO 點位對照**：各模組氣缸/感測器位址見附錄 B。畫面顯示名稱由程式以「前綴＋Alias」慣例產生；最終位址以機台實際設定為準。
+- **IO 點位對照**：各模組氣缸/感測器位址見附錄 B。畫面顯示名稱即該 IO 點位的別名；最終位址以機台實際設定為準。

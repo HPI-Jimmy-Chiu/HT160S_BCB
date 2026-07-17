@@ -21,7 +21,7 @@
 ![速度畫面](screenshots/screen-speed.png)
 > 圖 9-1 Speed Setup 速度設定畫面。（擷取方式：自主畫面進入速度設定畫面後擷取整個 Speed Setup 視窗）
 
-> 註（定案）：本畫面由主畫面頂部功能列 **Speed** 按鈕開啟（`sbSpeedClick` → `ShowTopForm(fSpeed, sbSpeed)`，main.cpp:640-643）；無權限等級、無運轉中鎖定（運轉中僅實際套用被擋，見 9.7）。
+> 註（定案）：本畫面由主畫面頂部功能列 **Speed** 按鈕開啟；無權限等級限制，開啟時也無運轉中鎖定（運轉中僅實際套用被擋，見 9.7）。
 
 ---
 
@@ -66,7 +66,7 @@
 | M08 | MAutoY_3 | M19 | MColorY（Color Y） |
 | M09 | MAutoY_4 | M20 | MTopCCDX_Color（Color CCD X） |
 
-> 註：畫面對所有 `MotPtr` 非 NULL 的馬達一律建列；最終清單依該機 `Mot_Table.csv` 為準（以機台 State Record 副本核對）。
+> 註：畫面會為每一顆已建立的馬達各建一列；最終清單依該機 `Mot_Table.csv` 為準（以機台 State Record 副本核對）。
 
 加速/減速兩欄在本畫面皆標示為「不提供」，係依 SPEC 屬實呈現，並非省略；說明見 9.6。
 

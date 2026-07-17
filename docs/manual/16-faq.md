@@ -149,7 +149,7 @@
 
 清機完成時會彈出提示並提供 SKIP 鍵。操作員選 **SKIP** 即結束、回一般生產並停機。
 
-> 註（定案）：HT160S **沒有 Tray Feed 功能**——`ChangeRunMode(Run_TrayFeed)` 的唯一呼叫已被註解停用、`CheckAllTrayFeedFinish` 恆回 false（stub），`Run_TrayFeed` 模式無任何入口、執行期不可達；警報視窗的 TRAY FEED 鍵在本機不會出現對應流程。
+> 註（定案）：HT160S **沒有 Tray Feed 功能**——相關執行模式無任何入口、執行期不可達；警報視窗的 TRAY FEED 鍵在本機不會出現對應流程。
 
 ---
 
@@ -170,7 +170,7 @@
 
 按 **Start Mode** 切換框切換 Initial／Continue。僅能在機台未啟動時切換，切換後會存回機台設定檔並更新 Start Mode 指示圖示。
 
-> 註（定案）：Continue（`iStartMode=1`）**對啟動流程無任何行為差異**——`Start()` 等所有執行路徑均不讀取 `iStartMode`，`CheckContinusStartIsReady()` 僅剩註解且定義不存在；差異只在畫面圖示、ini 與操作紀錄（另 Automation TCP `GET_STATUS` 有 `START_MODE=` 鏡像欄）。SECS 端無此值。詳見第 3 章。
+> 註（定案）：Continue **對啟動流程無任何行為差異**——所有執行路徑都不讀取此設定；差異只在畫面圖示、設定與操作紀錄（另自動化 TCP `GET_STATUS` 有 `START_MODE` 鏡像欄）。SECS 端無此值。詳見第 3 章。
 
 ---
 

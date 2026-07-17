@@ -56,7 +56,7 @@ LED 顏色慣例：
 
 其中 EMG 燈另疊加系統緊急停止 (EMG) 狀態。
 
-> 註（定案）：LED 索引常數定義於 `MotorAndIO/HTMotor.h`（非 database.h）：`iCwLed=0`、`iHomeLed=1`、`iCcwLed=2`、`iEmgLed=3`、`iAlarmLed=4`、`iSoftcwLed=5`、`iSoftccwLed=6`、`iServoalarmLed=7`、`iInposLed=8`、`iZPhaseLed=9`、`iServoOn=10`（共 11 顆）。實值由各驅動層 `ScanMotorStatus` 填入（MC88X1 全填；MN200/SMC 僅 Inpos）。
+> 註：狀態 LED 依 7.2 所列固定順序排列，共 11 顆；各燈的亮滅由該軸所屬的馬達驅動層帶入。MC88X1 驅動的軸會帶入全部 11 顆狀態，MN200／SMC 驅動的軸僅帶入「In Pos（到位）」一顆，其餘恆顯示未觸發。
 
 ---
 
@@ -245,7 +245,7 @@ LED 顏色慣例：
 - **教導檔相容性**：讀取教導檔時相容舊版格式（新舊鍵名皆可讀），存檔一律以新格式寫回。
 - **畫面生命週期**：開啟畫面時啟用即時更新並記錄一次 home／limit 狀態；關閉畫面時停止更新、停軸與測試。
 
-> 註（定案）：tech 檔節段名（`GroupName`）實際只有 **3 個**：`TeachEmptyAndTrayX`（Empty/TrayX 格線與 Others 一筆）、`TeachLoader`（Loader/Sort 格線＋SortZ 格線）、`TeachAuto`（Auto 格線）。鍵名一律 `ed_`＋Caption，唯一例外 `BottomCCDYCapturePosition` 用 `edt_` 前綴；讀檔先試前綴鍵、空白再回退裸 Caption（相容舊檔），存檔只寫前綴鍵。（`uteach.cpp` `AddTeachItem`/`GetTeachKey`）
+> 註（定案）：教導檔實際只有 **3 個**節段：Empty/TrayX（格線與 Others 一筆）、Loader（Loader/Sort 格線＋SortZ 格線）、Auto（Auto 格線）。各教導點以其名稱為鍵；讀檔相容舊格式，存檔採現行格式。
 
 ---
 

@@ -140,7 +140,7 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使機台運轉中停機�
 
 具名系統警報以名稱查得代碼，再取雙語訊息與面板；查無時走未定義分支，以代碼首碼判斷類型並顯示 `Xxx Code Undefine Error`，代碼前加 `-` 標示。
 
-> 註（定案，2026-07-16 查核）：現行 `system\AlarmList.csv` 共 **576 筆**（數字碼 516＋JAM 14＋MES 33＋WAR 13），`C_ErrMessage`/`C_Description` **仍為英文**（與 E_ 欄逐字相同，全檔無任何中文位元組）；且無獨立處置（Remedy）欄，處置文字內嵌於 Description（JAM/MES/WAR 多數為空）。中文化為待辦工作，非現場確認事項。完整清單見附錄 D；操作員排除手冊另見 `docs/alarm-troubleshooting/`。
+> 註（定案，2026-07-16 查核）：現行 `system\AlarmList.csv` 共 **576 筆**（數字碼 516＋JAM 14＋MES 33＋WAR 13），中文訊息欄與中文說明欄 **仍為英文**（與英文欄逐字相同，全檔無任何中文位元組）；且無獨立處置欄，處置文字內嵌於說明欄（JAM/MES/WAR 多數為空）。中文化為待辦工作，非現場確認事項。完整清單見附錄 D；操作員排除手冊另見 `docs/alarm-troubleshooting/`。
 
 ## 13.7 代表性警報訊息與排除（對照表）
 
@@ -183,7 +183,7 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使機台運轉中停機�
 | No Lot data / No 2D data / By Lot+Bin no binding | Start 前缺 Lot 註冊、缺 2D/Bin 資料、或 Lot+Bin 模式無綁定 | 提示；補齊資料／綁定後重按 Start |
 | `PROCESS` | **非警報**：操作員／流程動作紀錄（START/PAUSE/SKIP/RETRY/OFF BUZZER pressed 等），寫入事件記錄並附加到警報明細 | 不適用（紀錄用途） |
 
-> 註（定案）：`eFunErr(2)`／`eSystemMess(3)`／`eRecordProcess(7)` 三型**目前零警報掛載**——為對齊 HT172 值而保留的休眠列舉，唯一出現處是 `ShowSystemError` 未定義碼 fallback 的訊息字樣（"Function/System Message/Record Process Code Undefine Error"）。`eOther(8)` **有實際使用**：CCD 家族（如 `WAR16120` Top CCD connect not ready、`WAR0462`/`WAR0970` 2D no response）、種子碼（`WAR0330`、`WAR0475`、`WAR0154`）與 Auto 家族（`WAR%d30` Auto feed tray miss）。實際註冊使用的型別為 eJamErr/eMessageErr/eCynAlarm/eMotorAlarm/eSuckAlarm/eOther（`CreateSystemAlarmCode`，database.cpp）。
+> 註（定案）：Function／System Message／Record Process 三種警報型別**目前零警報掛載**——為對齊 HT172 而保留的休眠型別，唯一出現處是未定義碼的 fallback 訊息字樣（"Function/System Message/Record Process Code Undefine Error"）。「其他 (Other)」型別**有實際使用**：CCD 家族（如 `WAR16120` Top CCD connect not ready、`WAR0462`/`WAR0970` 2D no response）、種子碼（`WAR0330`、`WAR0475`、`WAR0154`）與 Auto 家族（`WAR%d30` Auto feed tray miss）。
 
 ## 13.8 互鎖與設計要點
 
@@ -194,9 +194,9 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使機台運轉中停機�
 - Off Buzzer 為鎖存，消音後系統不再重新驅動蜂鳴。
 - 對話框顯示期間主流程暫停，故每掃描蜂鳴驅動不執行，需靠視窗彈出時立即補聲；同一警報視窗已開時不重複彈出（避免重入）。
 
-> 註（定案）：各狀態 Music Select **程式預設值＝[0] Mute**（RadioGroup2~7 DFM ItemIndex=0），實際值由 Maintenance 塔燈頁設定並持久化於號誌燈 ini；套用鏈為 `GetMaintenanceMusicSelect` → `DriveSystemMusic`（0=全滅，1..4 → `SwMusic1..4` 互斥 ON）。
+> 註（定案）：各狀態 Music Select **預設值＝[0] Mute**，實際值由 Maintenance 的號誌燈頁設定並持久化；套用時 0=全滅，1..4 對應四種蜂鳴音互斥開啟。
 
-> 註（定案）：byte-safe 讀取確認 `note.dfm` **全檔純 ASCII、無任何中文標籤**（fNote=Note、按鈕=HOME&RETRY/SKIP/RETRY/TRAY FEED/TRAY END/CLEAN OUT/START/PAUSE/Off Buzzer）；Memo 的中文警報訊息為 runtime 由 AlarmList 填入（現行為英文，見 13.6 註）。
+> 註（定案）：全警報視窗**全為英文標籤**（視窗標題 Note、回復鍵＝HOME & RETRY／SKIP／RETRY／TRAY FEED／TRAY END／CLEAN OUT／START／PAUSE／Off Buzzer）；訊息列的警報文字為執行時由警報清單填入（現行為英文，見 13.6 註）。
 
 > 【待補（現場）：`SwMusic1..4` 各音樣式（旋律/長短）的實際聲音需現場聆聽記錄；機構面板閃爍（`FlushPanelName` 對應動態面板）正確性建議現場逐類警報抽驗一次。】
 
@@ -205,5 +205,5 @@ HT160S 遵守「絕不無聲停機」鐵則：凡是會使機台運轉中停機�
 ## 13.x 警報視窗 (Note) 實機畫面
 
 ![警報視窗 Note](screenshots/screen-message.png)
-> 圖 13-1 全警報視窗 (TfNote) 實機畫面，含回復鍵與訊息列。（擷取方式：主畫面工具列 Message，或任一警報觸發時彈出。）
+> 圖 13-1 全警報視窗實機畫面，含回復鍵與訊息列。（擷取方式：主畫面工具列 Message，或任一警報觸發時彈出。）
 
