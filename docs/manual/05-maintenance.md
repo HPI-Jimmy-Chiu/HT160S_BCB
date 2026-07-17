@@ -1,11 +1,11 @@
 # 第 05 章　維護畫面 (Maintenance)
 
-維護畫面 (TfMaintenance) 是 HT160S 工程與維護用的總畫面。版面分為兩區：右側為功能選單列（按鈕由上而下切換各功能），左側為對應的分頁內容區。本畫面集中提供：號誌燈 (Tower Light) 與蜂鳴器音樂設定、硬體安裝設定、Bin Display (COM) 設定與手動測試、Top CCD / Color CCD / Lot WebAPI 連線與測試，以及開啟 IO 監看、Teach、Motor Test、Pad COM Port、SECS/GEM 等子畫面。
+維護畫面（Maintenance）是 HT160S 工程與維護用的總畫面。版面分為兩區：右側為功能選單列（按鈕由上而下切換各功能），左側為對應的分頁內容區。本畫面集中提供：號誌燈 (Tower Light) 與蜂鳴器音樂設定、硬體安裝設定、Bin Display (COM) 設定與手動測試、Top CCD / Color CCD / Lot WebAPI 連線與測試，以及開啟 IO 監看、Teach、Motor Test、Pad COM Port、SECS/GEM 等子畫面。
 
 存檔行為分為兩類，務必區分：
 
-- **即時套用**：部分設定（吸嘴啟用、Color CCD Enable、Loader 安全距離、Color bin / AMR 勾選等）按下後立即寫入記憶體設定，部分並立即 `Save()`。
-- **關閉時存檔**：多數號誌燈與硬體設定在按 **Exit** 關閉畫面時，由 `FormClose -> SaveWorkFile` 一併寫入號誌燈 ini 或 `system\General.ini`。
+- **即時套用**：部分設定（吸嘴啟用、Color CCD Enable、Loader 安全距離、Color bin / AMR 勾選等）按下後立即寫入設定，部分並立即存檔。
+- **關閉時存檔**：多數號誌燈與硬體設定在按 **Exit** 關閉畫面時，一併寫入設定檔。
 - **需重新啟動軟體**：分類模式 (Sort By Lot+Bin)、各 Auto 啟用變更後雖會即時寫入設定，但需重新啟動軟體才會乾淨生效（畫面會跳提示）。
 
 ![維護畫面](screenshots/screen-maintenance.png)
@@ -15,32 +15,32 @@
 
 ## 5.1 功能選單列
 
-右側選單列的按鈕，依其 Action 分為「切換分頁」與「開啟子畫面」兩種。子畫面類（IO / Teach / Motor Test / Pad COM）以 ShowModal 開啟，且機台運轉時被停用。
+右側選單列的按鈕分為「切換分頁」與「開啟子畫面」兩種。子畫面類（IO Monitor / Teach / Motor Test / Pad COM Port）開啟後會獨佔輸入，且機台運轉時被停用。
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| spbMaintTowerLight | button | 切換到號誌燈與音樂設定分頁 (tsMaintTowerLight) |
-| spbMaintPassword | button | 切換到密碼分頁 (tsMaintPassword，目前為空白頁) |
-| spbMaintAmr | button | 切換到 AMR 狀態分頁 (tsMaintAmr)；分頁內 memAmrStatus 唯讀顯示 AgvCoord.DescribeAgvState() 的即時 AMR/AGV 握手狀態 |
-| spbMaintFunctionDef | button | 切換到功能定義分頁（含 G[General]、N[Network] 子頁，Network 內容隱藏） |
-| spbMaintHardware | button | 切換到硬體安裝設定分頁 (tsMaintHardware，內含 Loader/Unloader、ErrorMag、Sort Arm、Option、Lot Info 子頁) |
-| spbMaintIO | button | 開啟 IO 監看畫面 (fiosetview，ShowModal)；機台運轉 (SystemStart) 時按鈕被停用且點擊無作用 |
-| spbMaintTeach | button | 開啟 Teach 教導畫面 (fTeach，ShowModal)；運轉時停用 |
-| spbMaintMotor | button | 開啟馬達測試畫面 (fMotorTest，ShowModal)；運轉時停用 |
-| spbMaintCOM | button | 開啟 Pad/COM Port 畫面 (fComPort，ShowModal)；運轉時停用 |
-| spbMaintMCUDisplay | button | 切換到 Bin Display (COM) 設定與手動測試分頁 (tsMaintMCUDisplay) |
-| spbMaintTopCcd | button | 切換到 Top CCD 連線設定與測試分頁 (tsMaintTopCcd) |
-| spbMaintColorCcd | button | 切換到 Color CCD 連線設定與測試分頁 (tsMaintColorCcd) |
-| spbMaintLotApi | button | 切換到 Lot WebAPI 設定與手動 Fetch 測試分頁 (tsMaintLotApi) |
-| spbMaintSECS | button | 開啟 SECS/GEM 監看視窗 (ShowSecsGemLog，非 modal)；運轉時仍可開啟 |
-| spbMaintExit | button | 關閉維護畫面；關閉時自動存檔 (FormClose -> SaveWorkFile，寫號誌燈 ini 與各項硬體/裝置設定) |
+| Tower Light | 按鈕 | 切換到號誌燈與音樂設定分頁 |
+| Password | 按鈕 | 切換到密碼分頁（目前為空白頁） |
+| AMR | 按鈕 | 切換到 AMR 狀態分頁；分頁內的 AMR 握手狀態顯示框（唯讀）即時顯示 AMR/AGV 握手狀態 |
+| Function Define | 按鈕 | 切換到功能定義分頁（含 General、Network 子頁，Network 內容隱藏） |
+| Hardware Setup | 按鈕 | 切換到硬體安裝設定分頁（內含 Loader/Unloader、ErrorMag、Sort Arm、Option、Lot Info 子頁） |
+| IO Monitor | 按鈕 | 開啟 IO 監看畫面（會獨佔輸入）；機台運轉時按鈕被停用且點擊無作用 |
+| Teach | 按鈕 | 開啟 Teach 教導畫面（會獨佔輸入）；運轉時停用 |
+| Motor Test | 按鈕 | 開啟馬達測試畫面（會獨佔輸入）；運轉時停用 |
+| Pad COM Port | 按鈕 | 開啟 Pad/COM Port 畫面（會獨佔輸入）；運轉時停用 |
+| Bin Display | 按鈕 | 切換到 Bin Display (COM) 設定與手動測試分頁 |
+| Top CCD | 按鈕 | 切換到 Top CCD 連線設定與測試分頁 |
+| Color CCD | 按鈕 | 切換到 Color CCD 連線設定與測試分頁 |
+| Lot WebAPI | 按鈕 | 切換到 Lot WebAPI 設定與手動 Fetch 測試分頁 |
+| SECS/GEM | 按鈕 | 開啟 SECS/GEM 監看視窗（非獨佔，可與主畫面並存）；運轉時仍可開啟 |
+| Exit | 按鈕 | 關閉維護畫面；關閉時自動存檔（寫入號誌燈與各項硬體/裝置設定） |
 
-> ⚠️ 注意：機台運轉中 (HSys.Sys.SystemStart) 時，IO Monitor / Teach / Motor Test / Pad COM Port 四個按鈕會被停用（純視覺互鎖）；即使被點到，各 Open* 函式內仍有 SystemStart 防呆直接 return，不會造成停機。**SECS/GEM 刻意不鎖**（其 EC 編輯內部已有 idle-guard），運轉中仍可檢視。
+> ⚠️ 注意：機台運轉中時，IO Monitor / Teach / Motor Test / Pad COM Port 四個按鈕會被停用（純視覺互鎖）；即使被點到也不會造成停機。**SECS/GEM 刻意不鎖**，運轉中仍可檢視。
 
 ### 開啟子畫面操作
 
-1. 按 **IO Monitor** / **Teach** / **Motor Test** / **Pad COM Port** 開啟對應子畫面（ShowModal，會獨佔輸入）。
-2. 按 **SECS/GEM** 開啟 SECS 監看視窗（非 modal，可與主畫面並存）。
+1. 按 **IO Monitor** / **Teach** / **Motor Test** / **Pad COM Port** 開啟對應子畫面（會獨佔輸入）。
+2. 按 **SECS/GEM** 開啟 SECS 監看視窗（非獨佔，可與主畫面並存）。
 
 ---
 
@@ -48,24 +48,24 @@
 
 按 **Tower Light** 進入號誌燈分頁。畫面為 6 個狀態列 × 3 個燈色的 LED 格陣列，每列右側對應一個蜂鳴器音樂選擇 (Music Select)，下方提供 Music 試聽鈕。
 
-狀態列（由列標題 Panel13..Panel18 標示）：Running / Error-Jam / Pause / Message / Reserved（隱藏）/ Homing。燈色欄位（Label3/Label4/Label6）：Green / Yellow / Red。
+狀態列（列標題）：Running / Error-Jam / Pause / Message / Reserved（隱藏）/ Homing。燈色欄位：Green / Yellow / Red。
 
 ### 控制項
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| RGB00..RGB52 | LED 格 | 6 列狀態 × 3 色的 TALed 格；點擊單格在 ON↔OFF 間切換（已移除 BLINK），即時更新顯示並由 SetTowerLightConfigState 寫入記憶體設定，畫面關閉時存入號誌燈 ini |
-| Panel13..Panel18 | 列標題 | Running / Error-Jam / Pause / Message / Reserved / Homing（Panel17 Reserved 設 Visible=False 隱藏） |
-| Label3 / Label4 / Label6 | 欄標題 | Green / Yellow / Red |
-| RadioGroup2..RadioGroup7 | radio | 各狀態列 (Tag=1..6) 的蜂鳴器音樂選擇；存入號誌燈 ini（以 RadioGroup 名稱為 key）。RadioGroup6（Reserved/Heating 列）設 Visible=False 隱藏 |
-| sbMusic1..sbMusic4 | button | Music Test 試聽鈕 (Tag=1..4)；按下立即觸發對應蜂鳴器開關，再按一次或切換其他鍵會 CloseBuzzerOff 關閉；即時動作、不存檔 |
+| 號誌燈 LED 格（6 列狀態 × 3 色） | 圖示 | 點擊單格在 ON↔OFF 間切換（已移除 BLINK），即時更新顯示；畫面關閉時存入號誌燈設定 |
+| 狀態列標題 | 標籤 | Running / Error-Jam / Pause / Message / Reserved / Homing（Reserved 列已隱藏不顯示） |
+| 燈色欄標題 | 標籤 | Green / Yellow / Red |
+| 各列 Music Select 選項組 | 選項組 | 各狀態列對應的蜂鳴器音樂選擇；存入號誌燈設定。Reserved（Heating）列的選項組已隱藏 |
+| Music1~Music4 試聽鈕 | 按鈕 | 按下立即觸發對應蜂鳴器開/關，再按一次或切換其他鍵會關閉；即時動作、不存檔 |
 
 ### Music Select 選項
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| RadioGroup2..7 (Music Select) | 0=Mute，1..4=Music1..Music4；預設 ItemIndex=0 | 各狀態列對應的蜂鳴器音樂索引，存於號誌燈 ini。**實際何時依此設定發聲，由執行端 DoSystemMessage 套用；本畫面只負責存值。** |
-| TowerLightConfig[6][3] | 0=OFF / 1=ON / 2=BLINK（顯示為 ON）；預設由 LoadTowerLightDefaultConfig 給定 | 6 狀態列 × 3 色 ON/OFF 狀態，存於號誌燈 ini（每 LED 的 _Value/_Blink）。BLINK 已當成 ON 顯示。 |
+| Music Select（各列音樂選擇） | 0=Mute，1~4=Music1~Music4；預設 0 | 各狀態列對應的蜂鳴器音樂，存於號誌燈設定。**實際何時依此設定發聲由執行時套用；本畫面只負責存值。** |
+| 號誌燈 LED 狀態（6 列 × 3 色） | 每格 OFF / ON（BLINK 顯示為 ON）；預設值由系統給定 | 6 狀態列 × 3 色的 ON/OFF 狀態，存於號誌燈設定。BLINK 已當成 ON 顯示。 |
 
 ### 操作步驟
 
@@ -73,9 +73,9 @@
 2. 在 6 列（Running / Error-Jam / Pause / Message / Homing；Reserved 列隱藏）× 3 色（Green / Yellow / Red）的格上點擊，切換該色 ON/OFF。
 3. 在每列右側 **Music Select** 選擇該狀態要播放的音樂（[0]Mute ~ [4]Music4）。
 4. （可選）按 **Music1~Music4** 試聽，再按一次或切換其他鍵停止。
-5. 按 **Exit** 關閉畫面；關閉時自動將號誌燈狀態與音樂選擇存入號誌燈 ini。
+5. 按 **Exit** 關閉畫面；關閉時自動將號誌燈狀態與音樂選擇存入號誌燈設定。
 
-> ⚠️ 注意：LED 格已取消 BLINK，僅在 ON/OFF 間切換。Music 試聽為即時動作，不寫入 ini。
+> ⚠️ 注意：LED 格已取消 BLINK，僅在 ON/OFF 間切換。Music 試聽為即時動作，不寫入設定檔。
 
 > 註：RadioGroup6 對應的狀態列（enum `LED_Heating`，畫面標題 "Reserved"，Visible=False）為**保留列**：HT172 有加熱器 Heating 狀態，HT160 無加熱器，`GetTowerLightRunState` 永遠不會回傳 Heating（蜂鳴 ladder 併入 Running）——設定值會被讀取但執行期永不套用。
 
@@ -83,12 +83,12 @@
 
 ## 5.3 隱藏的 Heating 列
 
-號誌燈第 5 列（Panel17，列標題顯示為 **Reserved**）在 DFM 中設為 `Visible=False`，UI 上不顯示；其對應的 Music Select (RadioGroup6) 同樣設為 `Visible=False` 隱藏。此列在記憶體中對應的 enum 為 `LED_Heating`。
+號誌燈第 5 列（列標題顯示為 **Reserved**）在畫面上不顯示；其對應的 Music Select 同樣隱藏。此列在系統內部對應加熱器（Heating）狀態。
 
-| 元件 | 狀態 | 說明 |
+| 畫面項目 | 狀態 | 說明 |
 | --- | --- | --- |
-| Panel17 (Reserved 列標題) | Visible=False | 第 5 狀態列標題，隱藏 |
-| RadioGroup6 (該列 Music Select) | Visible=False | 該列蜂鳴器音樂選擇，隱藏 |
+| Reserved 狀態列標題 | 隱藏 | 第 5 狀態列標題，畫面上不顯示 |
+| Reserved 列的 Music Select | 隱藏 | 該列蜂鳴器音樂選擇，畫面上不顯示 |
 
 > 註：Heating（enum `LED_Heating`）＝畫面 "Reserved" 列。HT160 無加熱器，此狀態執行期不可達，屬 HT172 沿革保留位（見 5.2 註）。
 
@@ -96,29 +96,29 @@
 
 ## 5.4 硬體安裝設定 (Hardware Setup)
 
-按 **Hardware Setup** 進入硬體安裝分頁 (tsMaintHardware)，內含 Loader/Unloader、ErrorMag、Sort Arm、Option、Lot Info 等子頁。
+按 **Hardware Setup** 進入硬體安裝分頁，內含 Loader/Unloader、ErrorMag、Sort Arm、Option、Lot Info 等子頁。
 
-> ⚠️ 注意：Lot 運轉中 (MachineRun.bRunning) 時，ApplyHardwareEditLock 會鎖定 Loader/Unloader 的 13 個硬體勾選框（Color bin / AMR / Lot+Bin / Auto1-6 / Nozzle1-4），須結束 Lot 才能編輯；標題會顯示 `(locked - lot running, end lot to edit)`。
+> ⚠️ 注意：Lot 運轉中時，Loader/Unloader 的 13 個硬體勾選框（Color bin / AMR / Lot+Bin / Auto1-6 / Nozzle1-4）會被鎖定，須結束 Lot 才能編輯；標題會顯示 `(locked - lot running, end lot to edit)`。
 
 ### 5.4.1 Loader/Unloader 子頁
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| chkHardwareColorBinArea | checkbox | 是否安裝 Color bin 區硬體；OnClick 即時寫入 GeneralSetting.bColorBinAreaInstalled，存檔時寫入 General.ini |
-| chkUseAMR | checkbox | 是否使用 AMR；OnClick 即時寫入 GeneralSetting.bUseAMR，存檔寫入 General.ini |
-| chkAutoEnable1..chkAutoEnable6 | checkbox | 各 Auto 啟用（僅動態模式 By Lot+Bin / By Lot+PassFail 有效）；未勾選的 Auto 在綁定新分類鍵時被跳過。OnClick 即時寫入 GeneralSetting.bAutoEnabled[]，但會跳提示需重新啟動軟體才乾淨生效；運轉時被鎖定 |
-| rgSortMode | radiogroup（3 選項） | 切換分類模式：Normal（靜態 Bin->Auto 表）/ By Lot+Bin（動態綁定 (Lot,Bin)）/ By Lot+PassFail（動態綁定 (Lot,PASS/FAIL)，PASS/FAIL 由 Bin==Pass Bin 導出）。ItemIndex 對應 GeneralSetting.iSortMode(0/1/2)，OnClick 即時寫入並提示需重新啟動軟體；運轉時被鎖定。詳見第 15 章 |
-| edLoaderSafeDistance | edit | 兩台 Loader 車的最小間距（325~650 mm）；ReadOnly，點擊以螢幕鍵盤 (fQwertyKey) 輸入，OK 後 YES/NO 確認才存，即時寫入 GeneralSetting.iLoaderYSafeDistance（以 1/100mm 儲存、顯示為 mm）並 Save()；運轉時被鎖定；aLoader IsLoaderYMoveSafe 即時讀取 |
+| Color bin area installed | 勾選 | 是否安裝 Color bin 區硬體；勾選即時生效，關閉畫面時存檔 |
+| Use AMR | 勾選 | 是否使用 AMR；勾選即時生效，關閉畫面時存檔 |
+| Auto1~Auto6 | 勾選 | 各 Auto 啟用（僅動態模式 By Lot+Bin / By Lot+PassFail 有效）；未勾選的 Auto 在綁定新分類鍵時被跳過。勾選即時生效，但會跳提示需重新啟動軟體才乾淨生效；運轉時被鎖定 |
+| Sort Mode | 選項組（3 選項） | 切換分類模式：Normal（靜態 Bin→Auto 表）/ By Lot+Bin（動態綁定 Lot+Bin）/ By Lot+PassFail（動態綁定 Lot+PASS/FAIL，PASS/FAIL 由 Bin 是否等於 Pass Bin 導出）。切換即時生效並提示需重新啟動軟體；運轉時被鎖定。詳見第 15 章 |
+| Loader safe distance | 輸入 | 兩台 Loader 車的最小間距（325~650 mm）；唯讀欄，點擊以螢幕鍵盤輸入，OK 後再以 YES/NO 確認才存（以 mm 顯示/輸入）並即時存檔；運轉時被鎖定 |
 
 #### 相關參數
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| GeneralSetting.bColorBinAreaInstalled | bool；由勾選決定 | 是否安裝 Color bin 區硬體 |
-| GeneralSetting.bUseAMR | bool | 是否使用 AMR |
-| GeneralSetting.iSortMode | 0/1/2；變更需重啟軟體 | 分類模式：0=Normal 靜態 Bin->Auto、1=By Lot+Bin 動態綁定、2=By Lot+PassFail 動態綁定（依 Bin==Pass Bin 分 PASS/FAIL）。存 General.ini [SortMode] Mode（另同步寫 legacy UseLotBinMode 供舊版降級） |
-| GeneralSetting.bAutoEnabled[6] | bool ×6；預設皆勾選；變更需重啟 | Auto1~Auto6 各別啟用（僅動態模式有效） |
-| GeneralSetting.iLoaderYSafeDistance | 325.00~650.00 mm（=32500~65000）；DFM 預設顯示 100.00 | 兩台 Loader 車最小間距，儲存單位 1/100mm，畫面以 mm 顯示/輸入 |
+| Color bin area installed | 勾/不勾 | 是否安裝 Color bin 區硬體 |
+| Use AMR | 勾/不勾 | 是否使用 AMR |
+| Sort Mode | Normal / By Lot+Bin / By Lot+PassFail；變更需重啟軟體 | 分類模式：Normal＝靜態 Bin→Auto、By Lot+Bin＝動態綁定、By Lot+PassFail＝動態綁定（依 Bin 是否等於 Pass Bin 分 PASS/FAIL） |
+| Auto1~Auto6 | 各別勾選，預設皆勾選；變更需重啟 | Auto1~Auto6 各別啟用（僅動態模式有效） |
+| Loader safe distance | 325.00~650.00 mm；預設顯示 100.00 | 兩台 Loader 車最小間距，畫面以 mm 顯示/輸入 |
 
 #### 操作步驟
 
@@ -126,49 +126,49 @@
 2. 視機台安裝勾選 **Color bin area installed** / **Use AMR**（即時寫入記憶體設定）。
 3. （By Lot+Bin 模式）勾/取消 **Auto1~Auto6**；會提示需重新啟動軟體。
 4. 點 **Loader safe distance** 欄，以螢幕鍵盤輸入 325~650 mm，OK 後確認 **YES** 即時存檔。
-5. 勾選/取消等變更於畫面關閉時一併寫入 General.ini。
+5. 勾選/取消等變更於畫面關閉時一併寫入設定檔。
 
 > ⚠️ 注意：Loader 安全距離輸入經螢幕鍵盤限制在 325..650 mm，OK 後再以 YES/NO 確認才存；按 NO 則還原原值。
 
 ### 5.4.2 Sort Arm 子頁（吸嘴啟用）
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| chkSuckEnable1..chkSuckEnable4 | checkbox | 各 SortArm 吸嘴啟用（Nozzle1~Nozzle4）；未勾選者在取放 (FindPickCells) 時被跳過，可將壞吸嘴停用。OnClick 即時寫入並立即 GeneralSetting.Save()，每次取料循環即時讀取（免重啟）；至少需保留一個啟用，取消最後一個會自動勾回並提示；運轉時被鎖定 |
+| Nozzle1~Nozzle4 | 勾選 | 各 SortArm 吸嘴啟用；未勾選者在取放時被跳過，可將壞吸嘴停用。勾選即時生效並存檔，每次取料循環即時讀取（免重啟）；至少需保留一個啟用，取消最後一個會自動勾回並提示；運轉時被鎖定 |
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| GeneralSetting.bSuckerEnabled[4] | bool ×4；預設皆勾選；至少一個啟用；即時生效 | SortArm 吸嘴 Nozzle1~4 各別啟用 |
+| Nozzle1~Nozzle4 | 各別勾選，預設皆勾選；至少一個啟用；即時生效 | SortArm 吸嘴 Nozzle1~4 各別啟用 |
 
 #### 操作步驟
 
 1. 在 Hardware Setup 的 **Sort Arm** 子頁勾/取消 **Nozzle1~Nozzle4**。
-2. 變更即時寫入並 `Save()`；取放循環即時讀取，免重啟。
+2. 變更即時生效並存檔；取放循環即時讀取，免重啟。
 3. 若取消最後一個啟用的吸嘴，會被自動勾回並提示至少保留一個。
 
-> ⚠️ 注意：SortArm 吸嘴至少需保留一個啟用；取消最後一個會自動勾回並彈出提示（chkSuckEnableClick）。運轉時此區被鎖定。
+> ⚠️ 注意：SortArm 吸嘴至少需保留一個啟用；取消最後一個會自動勾回並彈出提示。運轉時此區被鎖定。
 
 ### 5.4.3 Option 子頁
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| cbBinPanelType | combo | Bin 顯示面板型號選擇（LED (HT9046) / TFT (HT9011)）；存檔時寫入 GeneralSetting.iBinDispPanelType（無即時 OnClick） |
-| cbCommType | checkbox | Option 分頁的 CommType 勾選框（DFM 有元件但載入/存檔程式未引用） |
+| Bin 顯示面板型號下拉 | 下拉 | 選擇 Bin 顯示面板型號（LED (HT9046) / TFT (HT9011)）；於畫面關閉時存檔 |
+| CommType | 勾選 | Option 分頁的 CommType 勾選框（保留項，勾選無作用） |
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| GeneralSetting.iBinDispPanelType | 0=LED(HT9046)，1=TFT(HT9011)；預設 0 | Bin 顯示面板型號 |
+| Bin 顯示面板型號下拉 | LED (HT9046) / TFT (HT9011)；預設 LED (HT9046) | Bin 顯示面板型號 |
 
 > 註：cbCommType（Option 分頁 "CommType" 勾選框）在 DFM 中存在，但載入/存檔與其他程式均未引用——**目前無作用（保留元件）**，勾選不影響任何行為。
 
 ### 5.4.4 ErrorMag 子頁（錯誤 Bin 對應顯示）
 
-ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 BinArea 名稱。
+ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的料區名稱。
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| lblHardwareErrorCode1000 | 顯示 | 1000 = 2D scan fail -> [區域]（2D 掃描失敗對應的 BinArea，唯讀） |
-| lblHardwareErrorCode1001 | 顯示 | 1001 = no bin setting -> [區域]（無 Bin 設定對應的 BinArea，唯讀） |
+| 1000 = 2D scan fail -> [區域] | 顯示 | 2D 掃描失敗對應的料區（唯讀） |
+| 1001 = no bin setting -> [區域] | 顯示 | 無 Bin 設定對應的料區（唯讀） |
 
 > 註：Function Define 分頁的 G[General]/N[Network] 子頁內容為空（Panel4 設 Visible=False）、tsMaintPassword 分頁為空白頁——皆為**保留頁（未實作）**，非故障。
 
@@ -176,42 +176,42 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 ## 5.5 Bin Display (COM) 設定與手動測試
 
-按 **Bin Display** 進入分頁 (tsMaintMCUDisplay)。上半為連線設定，下半為手動測試與操作記錄。
+按 **Bin Display** 進入分頁。上半為連線設定，下半為手動測試與操作記錄。
 
 ### 連線設定
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| chkMCUEnabled | checkbox | Bin Display 是否安裝；按 Save 時寫入 GeneralSetting.bBinDisplayInstalled 並重啟 COM |
-| edMCUIP | edit | Bin Display COM 埠（預設 COM5）；Save 寫入 GeneralSetting.sBinDispComPort |
-| edMCUPort | combo | Bin Display 鮑率（9600/19200/38400/57600/115200，原 TCP Port 欄重用）；Save 寫入 GeneralSetting.iBinDispBaud，非法值回退 9600 |
-| edMCUReconnect | edit | Bin Display 重連/延遲秒數（預設 5）；Save 寫入 GeneralSetting.iBinDispDelaySec（最小 1） |
-| btnMCUSave | button | 存 Bin Display 設定到 General.ini 並重啟 COM（RestartMCUDisplay 重設端點與標籤） |
-| btnMCUReload | button | 重新自 General.ini 載入 Bin Display 設定 |
-| btnMCURefresh | button | 刷新 Bin Display 狀態列（安裝/COM/狀態/單元數） |
+| Bin Display Installed | 勾選 | Bin Display 是否安裝；按 Save 時存檔並重啟 COM |
+| COM Port | 輸入 | Bin Display COM 埠（預設 COM5）；按 Save 存檔 |
+| Baud | 下拉 | Bin Display 鮑率（9600/19200/38400/57600/115200）；按 Save 存檔，非法值回退 9600 |
+| Delay(s) | 輸入 | Bin Display 重連/延遲秒數（預設 5）；按 Save 存檔（最小 1） |
+| Save | 按鈕 | 存 Bin Display 設定並重啟 COM（重設連線端點與標籤） |
+| Reload | 按鈕 | 重新載入 Bin Display 設定 |
+| Refresh Status | 按鈕 | 刷新 Bin Display 狀態列（安裝/COM/狀態/單元數） |
 
 ### 手動測試
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| edMCUAddress | edit | 目標 Bin 顯示單元位址（預設 0） |
-| edMCUText | edit | 要顯示的 Bin 文字/碼（預設 9，經 BinTextToDispValue 轉換） |
-| cbbMCUColor | combo | 手動測試色彩下拉 (GREEN / RED)（DFM 有元件，但送出實際讀 edMCULightValue） |
-| edMCULightValue | edit | 顏色代碼（Send Display / Send Light 實際使用，預設值 3） |
-| chkMCUCodeSymbol | checkbox | Symbol Code 勾選框（DFM 有元件，但送出程式未引用） |
-| btnMCUSendDisplay | button | 對 Address 設定 Bin 文字+顏色 (BinDisCtrl->SetUnitLabel)，即時動作 |
-| btnMCUSendCode | button | 對 Address 只設定 Bin 碼 (SetUnitBin)，即時動作 |
-| btnMCUSendLight | button | 對 Address 只設定顏色 (SetUnitColor)，即時動作 |
-| memMCULog | grid | 唯讀操作記錄欄，保留最近 200 行 |
+| Address | 輸入 | 目標 Bin 顯示單元位址（預設 0） |
+| Text | 輸入 | 要顯示的 Bin 文字/碼（預設 9） |
+| Color 下拉 | 下拉 | 手動測試色彩下拉 (GREEN / RED)（送出時實際以 Color Code 為準，此下拉無作用） |
+| Color Code | 輸入 | 顏色代碼（Send Display / Send Light 實際使用，預設值 3） |
+| Symbol Code | 勾選 | Symbol Code 勾選框（保留項，送出時未引用） |
+| Send Display | 按鈕 | 對 Address 設定 Bin 文字+顏色，即時動作 |
+| Send Code | 按鈕 | 對 Address 只設定 Bin 碼，即時動作 |
+| Send Light | 按鈕 | 對 Address 只設定顏色，即時動作 |
+| 操作記錄欄 | 顯示 | 唯讀操作記錄欄，保留最近 200 行 |
 
 ### 相關參數
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| GeneralSetting.bBinDisplayInstalled | bool | 是否安裝 Bin Display |
-| GeneralSetting.sBinDispComPort | 字串；DFM 預設 COM5 | Bin Display COM 埠 |
-| GeneralSetting.iBinDispBaud | 9600/19200/38400/57600/115200；預設 9600，非法回退 9600 | Bin Display 鮑率 |
-| GeneralSetting.iBinDispDelaySec | 最小 1；預設 5 | Bin Display 重連/延遲秒數 |
+| Bin Display Installed | 勾/不勾 | 是否安裝 Bin Display |
+| COM Port | 文字；預設 COM5 | Bin Display COM 埠 |
+| Baud | 9600/19200/38400/57600/115200；預設 9600，非法回退 9600 | Bin Display 鮑率 |
+| Delay(s) | 最小 1；預設 5 | Bin Display 重連/延遲秒數 |
 
 ### 操作步驟
 
@@ -226,24 +226,24 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 ## 5.6 Top CCD 設定與測試
 
-按 **Top CCD** 進入分頁 (tsMaintTopCcd)。
+按 **Top CCD** 進入分頁。
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| edTopCcdIP | edit | Top CCD IP（預設 172.16.8.89）；Save 寫入 General.ini [TopCCD] Address |
-| edTopCcdPort | edit | Top CCD Port（預設 5001）；Save 寫入 [TopCCD] Port |
-| chkTopCcdBottomReserved | checkbox | Bottom CCD（保留項，Enabled=False 停用，僅佔位） |
-| btnTopCcdSave | button | 存 Top CCD 端點到 General.ini 並套用到 socket（即時 SetEndpoint） |
-| btnTopCcdReload | button | 重新載入 [TopCCD] 端點並重設 socket 設定 |
-| btnTopCcdConnect | button | 先存端點再連線 Top CCD（即時） |
-| btnTopCcdDisconnect | button | 中斷 Top CCD 連線（即時） |
-| btnTopCcdShot | button | 手動觸發 Top CCD 拍照取 2D 結果（即時） |
-| edTopCcdResult | edit | 顯示收到的 2D 碼（唯讀刷新） |
-| memTopCcdLog | grid | 唯讀記錄欄，保留最近 200 行 |
+| IP | 輸入 | Top CCD IP（預設 172.16.8.89）；按 Save 存檔 |
+| Port | 輸入 | Top CCD Port（預設 5001）；按 Save 存檔 |
+| Bottom CCD (reserved) | 勾選 | Bottom CCD（保留項，停用，僅佔位） |
+| Save | 按鈕 | 存 Top CCD 端點並即時套用連線 |
+| Reload | 按鈕 | 重新載入 Top CCD 端點並重設連線 |
+| Connect | 按鈕 | 先存端點再連線 Top CCD（即時） |
+| Disconnect | 按鈕 | 中斷 Top CCD 連線（即時） |
+| Trigger Shot | 按鈕 | 手動觸發 Top CCD 拍照取 2D 結果（即時） |
+| 結果碼顯示欄 | 顯示 | 顯示收到的 2D 碼（唯讀刷新） |
+| 記錄欄 | 顯示 | 唯讀記錄欄，保留最近 200 行 |
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| General.ini [TopCCD] Address/Port | 預設 172.16.8.89 : 5001；Port 1..65535，非法回退 5001 | Top CCD 連線端點 |
+| Top CCD 連線端點（IP / Port） | 預設 172.16.8.89 : 5001；Port 1..65535，非法回退 5001 | Top CCD 連線端點 |
 
 ### 操作步驟
 
@@ -258,24 +258,24 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 ## 5.7 Color CCD 設定與測試
 
-按 **Color CCD** 進入分頁 (tsMaintColorCcd)。本頁的 **Enable Color CCD** 為即時動作。
+按 **Color CCD** 進入分頁。本頁的 **Enable Color CCD** 為即時動作。
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| edColorCcdIP | edit | Color CCD IP（預設 172.16.8.100）；Save 寫入 General.ini [ColorCCD] Address |
-| edColorCcdPort | edit | Color CCD Port（預設 5000）；Save 寫入 [ColorCCD] Port |
-| chkColorCcdEnable | checkbox | 啟用 Color CCD；OnClick 即時存檔 ([ColorCCD] Enable) 並依勾選 connect/disconnect，同時設定 CosFunction.bUseColorCcd |
-| btnColorCcdSave | button | 存 Color CCD 端點 + Enable 到 General.ini 並套用 socket |
-| btnColorCcdReload | button | 重新載入 [ColorCCD] 設定並重設 socket |
-| btnColorCcdConnect | button | 先存端點再連線 Color CCD（即時） |
-| btnColorCcdDisconnect | button | 中斷 Color CCD 連線（即時） |
-| btnColorCcdShot | button | 手動觸發 Color CCD 拍照（送 LON）；未連線時提示先 Connect |
-| edColorCcdResult | edit | 顯示收到的 2D 碼（唯讀刷新） |
-| memColorCcdLog | grid | 唯讀記錄欄，保留最近 200 行 |
+| IP | 輸入 | Color CCD IP（預設 172.16.8.100）；按 Save 存檔 |
+| Port | 輸入 | Color CCD Port（預設 5000）；按 Save 存檔 |
+| Enable Color CCD | 勾選 | 啟用 Color CCD；勾選即時存檔並依勾選連線/斷線 |
+| Save | 按鈕 | 存 Color CCD 端點 + Enable 並套用連線 |
+| Reload | 按鈕 | 重新載入 Color CCD 設定並重設連線 |
+| Connect | 按鈕 | 先存端點再連線 Color CCD（即時） |
+| Disconnect | 按鈕 | 中斷 Color CCD 連線（即時） |
+| Trigger Shot | 按鈕 | 手動觸發 Color CCD 拍照；未連線時提示先 Connect |
+| 結果碼顯示欄 | 顯示 | 顯示收到的 2D 碼（唯讀刷新） |
+| 記錄欄 | 顯示 | 唯讀記錄欄，保留最近 200 行 |
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| General.ini [ColorCCD] Address/Port/Enable | 預設 172.16.8.100 : 5000，Enable 預設 true；Enable 同步 CosFunction.bUseColorCcd | Color CCD 連線端點與啟用 |
+| Color CCD 連線端點與啟用（IP / Port / Enable） | 預設 172.16.8.100 : 5000，Enable 預設開啟 | Color CCD 連線端點與啟用 |
 
 ### 操作步驟
 
@@ -284,7 +284,7 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 3. 按 **Save** 存端點，按 **Connect** / **Disconnect** 連線或中斷。
 4. 按拍照鈕觸發一次取像，結果碼顯示於結果欄（未連線時會提示先 Connect）。
 
-> ⚠️ 注意：勾選 **Enable Color CCD** 為即時動作，會立即存檔並依勾選連線/斷線，同時同步設定 `CosFunction.bUseColorCcd`。
+> ⚠️ 注意：勾選 **Enable Color CCD** 為即時動作，會立即存檔並依勾選連線/斷線。
 
 > 註：btnColorCcdShot 的 DFM Caption 已確認為「**Trigger Shot**」（byte-safe 讀取 maintenance.dfm）。
 
@@ -292,31 +292,31 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 ## 5.8 Lot WebAPI 設定與手動 Fetch 測試
 
-按 **Lot WebAPI** 進入分頁 (tsMaintLotApi)。
+按 **Lot WebAPI** 進入分頁。
 
-| 控制項 | 類型 | 功能 |
+| 畫面項目 | 類型 | 功能 |
 | --- | --- | --- |
-| edWebapiPath | edit | Lot WebAPI 基底 URL；Save/Reload 寫入/讀取 General.ini [LotWebApi] BaseUrl |
-| chkLotApiUsePull | checkbox | 是否在 Lot Start / SECS LOTSTART 時自動抓取（customer API 就緒前預設關閉）；Save 時寫入 LotWebApiClient (SetUsePull) |
-| btnLotApiSave | button | 存 Lot WebAPI URL + UsePull 到 General.ini |
-| btnLotApiReload | button | 重新載入 [LotWebApi] 設定 |
-| edLotApiTestLot | edit | 手動測試用 Lot 名稱（預設 A5921.RCS.TEST99） |
-| btnLotApiFetch | button | 先存目前 URL，再對輸入 Lot 發起一次非同步 HTTP 抓取 (StartLotRequest)；空 Lot 或忙碌中會中止 |
-| memLotApiResult | grid | 顯示 HTTP 狀態與回應 body |
-| memLotApiLog | grid | 唯讀記錄欄，保留最近 200 行 |
+| WebAPI Path | 輸入 | Lot WebAPI 基底 URL；按 Save / Reload 存檔/讀取 |
+| Auto-pull | 勾選 | 是否在 Lot Start / SECS LOTSTART 時自動抓取（客戶 API 就緒前預設關閉）；按 Save 時存檔 |
+| Save | 按鈕 | 存 Lot WebAPI URL + 自動抓取設定 |
+| Reload | 按鈕 | 重新載入 Lot WebAPI 設定 |
+| Lot ID | 輸入 | 手動測試用 Lot 名稱（預設 A5921.RCS.TEST99） |
+| Fetch | 按鈕 | 先存目前 URL，再對輸入 Lot 發起一次抓取；空 Lot 或忙碌中會中止 |
+| Result 欄 | 顯示 | 顯示 HTTP 狀態與回應內容 |
+| 記錄欄 | 顯示 | 唯讀記錄欄，保留最近 200 行 |
 
-| 參數 | 範圍/預設 | 說明 |
+| 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
-| General.ini [LotWebApi] BaseUrl + UsePull | 空值回退 http://127.0.0.1:8160/lot/；UsePull 預設依設定 | Lot WebAPI 基底 URL 與是否自動抓取 |
+| WebAPI Path + Auto-pull | 空值回退 http://127.0.0.1:8160/lot/；自動抓取預設依設定 | Lot WebAPI 基底 URL 與是否自動抓取 |
 
 ### 操作步驟
 
 1. 按 **Lot WebAPI** 進入分頁。
 2. 輸入 **WebAPI Path**（基底 URL），（可選）勾 **Auto-pull**，按 **Save** 存檔。
 3. 在手動測試區輸入 **Lot ID**，按 **Fetch** 發一次抓取。
-4. 於 Result 欄查看 HTTP 狀態與回應 body。
+4. 於 Result 欄查看 HTTP 狀態與回應內容。
 
-> ⚠️ 注意：Fetch 為非同步動作；輸入 Lot 為空或目前正在抓取（忙碌中）時會中止。
+> ⚠️ 注意：按 **Fetch** 後系統會在背景進行抓取；輸入 Lot 為空或目前正在抓取（忙碌中）時會中止。
 
 ---
 
@@ -326,13 +326,13 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 | 互鎖 | 觸發條件 | 行為 |
 | --- | --- | --- |
-| 子畫面按鈕鎖 (UpdateRunStateLock) | 機台運轉中 (HSys.Sys.SystemStart) | 停用 IO Monitor / Teach / Motor Test / Pad COM Port 按鈕；各 Open* 函式內另有 SystemStart 防呆直接 return（不停機） |
-| SECS/GEM 不鎖 | — | 刻意不鎖（EC 編輯內部已 idle-guard），運轉中仍可檢視 |
-| 硬體編輯鎖 (ApplyHardwareEditLock) | Lot 運轉中 (MachineRun.bRunning) | 鎖定 13 個硬體勾選框（Color bin / AMR / Lot+Bin / Auto1-6 / Nozzle1-4）；標題顯示 (locked - lot running, end lot to edit) |
-| 吸嘴最少保留 (chkSuckEnableClick) | 取消最後一個啟用吸嘴 | 自動勾回並彈出提示，至少保留一個 |
+| 子畫面按鈕鎖 | 機台運轉中 | 停用 IO Monitor / Teach / Motor Test / Pad COM Port 按鈕；即使被點到也不會停機 |
+| SECS/GEM 不鎖 | — | 刻意不鎖，運轉中仍可檢視 |
+| 硬體編輯鎖 | Lot 運轉中 | 鎖定 13 個硬體勾選框（Color bin / AMR / Lot+Bin / Auto1-6 / Nozzle1-4）；標題顯示 (locked - lot running, end lot to edit) |
+| 吸嘴最少保留 | 取消最後一個啟用吸嘴 | 自動勾回並彈出提示，至少保留一個 |
 | Loader 安全距離確認 | 輸入後 | 螢幕鍵盤限制 325..650 mm，OK 後再以 YES/NO 確認才存，否則還原原值 |
 
-> ⚠️ 互鎖原則（專案規則）：防碰撞互鎖只在編譯期 SOFT_SIMULATE 旁路，絕不在執行期 DUMMY 旁路。本畫面主要為運轉/Lot 編輯鎖。
+> ⚠️ 互鎖原則：防碰撞安全互鎖在正常運轉中一律生效、不會被旁路。本畫面主要為運轉 / Lot 編輯鎖。
 
 ---
 
@@ -340,12 +340,12 @@ ErrorMag 子頁為唯讀資訊，顯示兩個特殊錯誤 Bin 目前對應的 Bi
 
 | 訊息 | 意義 | 處置 |
 | --- | --- | --- |
-| Sort mode changed. Please restart the software so the new classification mode takes effect cleanly. | 切換 Sort By Lot+Bin 模式後的提示 (ShowMyMessage) | 重新啟動軟體使新分類模式乾淨生效 |
+| Sort mode changed. Please restart the software so the new classification mode takes effect cleanly. | 切換 Sort By Lot+Bin 模式後的提示 | 重新啟動軟體使新分類模式乾淨生效 |
 | Auto enable changed. Please restart the software so the new Lot+Bin routing takes effect cleanly. | 變更 Auto1~6 啟用後的提示 | 重新啟動軟體使新 Lot+Bin 路由生效 |
 | At least one nozzle must stay enabled. | 嘗試取消最後一個 SortArm 吸嘴時的提示；系統會自動勾回 | 至少保留一個吸嘴啟用 |
-| Save Loader safe distance? | Loader 安全距離輸入後的 YES/NO 確認 (ShowMyMessageBox_YES_NO) | YES=存檔套用；NO=還原原值 |
-| 1000 = 2D scan fail -> [area] | ErrorMag 頁顯示錯誤 Bin 1000（2D 掃描失敗）對應的 BinArea（資訊，非警報） | 資訊顯示 |
-| 1001 = no bin setting -> [area] | ErrorMag 頁顯示錯誤 Bin 1001（無 Bin 設定）對應的 BinArea（資訊） | 資訊顯示 |
+| Save Loader safe distance? | Loader 安全距離輸入後的 YES/NO 確認 | YES=存檔套用；NO=還原原值 |
+| 1000 = 2D scan fail -> [area] | ErrorMag 頁顯示錯誤 Bin 1000（2D 掃描失敗）對應的料區（資訊，非警報） | 資訊顯示 |
+| 1001 = no bin setting -> [area] | ErrorMag 頁顯示錯誤 Bin 1001（無 Bin 設定）對應的料區（資訊） | 資訊顯示 |
 
 ---
 
