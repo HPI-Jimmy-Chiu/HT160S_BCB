@@ -6,7 +6,15 @@
 // from Lot Start / production START until the lot ends, then written ONCE as a
 // single custom-named file:
 //   {Date}_{Time}_KYEC-LFT_{Product}_{CustLot}_{KyecLot}_BI_{Substage}_{Sorter}_{Qty}.csv
-// under  D:\HT160S_Log\SoterOutput\<yyyymm>\ .
+// The one file is written to TWO places at lot end :
+//   1. archive : D:\HT160S_Log\SoterOutput\<yyyymm>\  - the machine's own permanent,
+//      month-bucketed record; the customer never touches it.
+//   2. pickup  : [Soter] PickupDir in system\General.ini (default
+//      D:\HT160S_Log\SoterPickup) - a FLAT, customer-facing hand-off folder. It is
+//      CLEARED at every Lot Start / production START and then holds only the current
+//      lot's file, so a customer-side fault that deletes/moves it cannot harm the
+//      archive. The customer fetches from here after the SECS Lot End event (CEID 12),
+//      which the manual Lot End path fires AFTER this file is on disk.
 //
 // Locked customer decisions (docs/plan/soter-output-csv-gap-analysis-20260714):
 //   - Cust lot (col6) == Kyec lot (col7) == the Lot given at Lot Start.
@@ -16,6 +24,8 @@
 //   - Unload Cover Tray ID (col9)= flow-lane identity-tray 2D (Auto lane).
 //   - File is written once at lot end (LotEnd button OR host STOP / run-dry /
 //     CleanOut-finish); OnLotEnd is idempotent so only the first caller writes.
+//   - A lot that produced zero genuine-2D dies still writes a header-only file
+//     (Qty=0) so the customer can tell "ran but 0 units" from a missed hand-off.
 //
 // Distinct from g_DeviceInfo (Production_Log). Singleton: g_SoterOutput.
 //---------------------------------------------------------------------------
@@ -60,13 +70,15 @@ private:
     AnsiString   m_sFileSubstage; // filename Substage    (first emitted row)
     TSoterRow    m_pending[SOTER_NOZZLE_COUNT];
     TStringList* m_pLines;        // completed CSV data rows (lot-scoped)
-    AnsiString   m_sBaseDir;      // HSys.LogRootDir + "\\SoterOutput"
+    AnsiString   m_sBaseDir;      // HSys.LogRootDir + "\\SoterOutput" (archive)
+    AnsiString   m_sPickupDir;    // customer hand-off folder (cleared each Lot Start)
 
     void DoArm(const AnsiString& sLotID);   // assumes lock held
     void CommitRow(int iNozzle, const AnsiString& sUnloadTray); // assumes lock
     AnsiString GetTitleLine();
     AnsiString BuildDataLine(const TSoterRow& r, int iNo);
     AnsiString BuildFileName();
+    void ClearPickupDir();                            // wipe the customer pickup folder (Lot Start)
     static AnsiString CsvField(const AnsiString& s);  // quote only if needed
     static AnsiString SafeToken(const AnsiString& s); // sanitize filename token
 

@@ -3,10 +3,11 @@
 #pragma hdrstop
 
 #include "cSoterOutput.h"
-#include "database.h"        // HSys.LogRootDir
+#include "database.h"        // HSys.LogRootDir / HSys.CurrentDir
 #include "GeneralSetting.h"  // GeneralSetting.sSerialNo
 #include "cCsvDailyLog.h"    // cCsvDailyLog::CsvQuote (escape helper)
 #include <FileCtrl.hpp>      // ForceDirectories
+#include <IniFiles.hpp>      // TIniFile (read [Soter] PickupDir)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 
@@ -38,6 +39,7 @@ cSoterOutput::cSoterOutput()
     , m_sFileSubstage("")
     , m_pLines(NULL)
     , m_sBaseDir("")
+    , m_sPickupDir("")
 {
     for (int i = 0; i < SOTER_NOZZLE_COUNT; ++i)
         m_pending[i].Clear();
@@ -63,6 +65,65 @@ void cSoterOutput::Init()
     // Central log root constant (HSys.LogRootDir = "D:\\HT160S_Log")
     m_sBaseDir = HSys.LogRootDir + "\\SoterOutput";
     ForceDirectories(m_sBaseDir);
+
+    // Customer pickup folder (KYEC fetch zone). Configurable via
+    // system\General.ini [Soter] PickupDir; a blank/absent key falls back to a
+    // sibling of the archive. Read once here (a per-machine commissioning path,
+    // so a change takes effect on the next restart). Kept as a direct read so
+    // this leaf feature does not alter the shared GeneralSetting class layout.
+    m_sPickupDir = "";
+    {
+        AnsiString sRoot = HSys.CurrentDir;
+        if (sRoot == "")
+            sRoot = "..";
+        AnsiString sIni = sRoot + "\\system\\General.ini";
+        if (FileExists(sIni))
+        {
+            TIniFile* pIni = new TIniFile(sIni);
+            try
+            {
+                m_sPickupDir = pIni->ReadString("Soter", "PickupDir", "").Trim();
+            }
+            __finally
+            {
+                delete pIni;
+            }
+        }
+    }
+    if (m_sPickupDir == "")
+        m_sPickupDir = HSys.LogRootDir + "\\SoterPickup";
+    ForceDirectories(m_sPickupDir);
+}
+
+//---------------------------------------------------------------------------
+// Delete every FILE in the customer pickup folder (sub-folders are left alone).
+// Called at Lot Start / production START so the hand-off folder holds only the
+// lot about to run. The permanent archive under SoterOutput is untouched, so
+// clearing here never loses the machine's own record.
+void cSoterOutput::ClearPickupDir()
+{
+    if (m_sPickupDir == "")
+        return;
+    ForceDirectories(m_sPickupDir);
+
+    TSearchRec sr;
+    AnsiString sMask = m_sPickupDir + "\\*.*";
+    if (FindFirst(sMask, faAnyFile, sr) == 0)
+    {
+        try
+        {
+            do
+            {
+                if ((sr.Attr & faDirectory) == 0)
+                    DeleteFile(m_sPickupDir + "\\" + sr.Name);
+            }
+            while (FindNext(sr) == 0);
+        }
+        __finally
+        {
+            FindClose(sr);
+        }
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -157,6 +218,10 @@ void cSoterOutput::DoArm(const AnsiString& sLotID)
         m_pLines->Clear();
     for (int i = 0; i < SOTER_NOZZLE_COUNT; ++i)
         m_pending[i].Clear();
+
+    // Fresh lot : wipe the customer hand-off folder so it only ever holds the
+    // lot now starting. (The permanent archive keeps every past lot.)
+    ClearPickupDir();
 }
 
 //---------------------------------------------------------------------------
@@ -202,35 +267,47 @@ void cSoterOutput::OnLotEnd()
     {
         if (!m_bActive)
             return;   // already flushed by an earlier terminal path
-        if (m_pLines && m_pLines->Count > 0)
+
+        // Wrap the writes so a disk-full / bad-path failure cannot unwind into the
+        // motion or SECS caller (OnLotEnd runs on the machine-control thread via the
+        // CleanOut-finish path). On failure the lot CSV is lost but the machine is not
+        // destabilised; do NOT pop a modal here (wrong thread). Buffer disarms below
+        // regardless, so a failed write is not retried into the next lot's buffer.
+        // Always emit (header + rows) : a lot with zero genuine-2D dies still writes a
+        // header-only file (Qty=0). The same file goes to (1) the permanent archive and
+        // (2) the customer pickup folder - the copy KYEC fetches after CEID 12.
+        try
         {
-            // Wrap the write so a disk-full / bad-path failure cannot unwind into the
-            // motion or SECS caller (OnLotEnd runs on the machine-control thread via the
-            // CleanOut-finish path). On failure the lot CSV is lost but the machine is not
-            // destabilised; do NOT pop a modal here (wrong thread). Buffer disarms below
-            // regardless, so a failed write is not retried into the next lot's buffer.
+            AnsiString sFileName = BuildFileName();   // Qty token = m_pLines->Count (0 ok)
+
+            TStringList* pOut = new TStringList();
             try
             {
-                AnsiString sDir = m_sBaseDir + "\\" + FormatDateTime("yyyymm", Now());
-                ForceDirectories(sDir);
-
-                TStringList* pOut = new TStringList();
-                try
-                {
-                    pOut->Add(GetTitleLine());
+                pOut->Add(GetTitleLine());
+                if (m_pLines)
                     pOut->AddStrings(m_pLines);
-                    pOut->SaveToFile(sDir + "\\" + BuildFileName());
-                }
-                __finally
+
+                // 1. permanent archive, month-bucketed (machine's own record)
+                AnsiString sArch = m_sBaseDir + "\\" + FormatDateTime("yyyymm", Now());
+                ForceDirectories(sArch);
+                pOut->SaveToFile(sArch + "\\" + sFileName);
+
+                // 2. customer pickup folder, flat (wiped at the next Lot Start)
+                if (m_sPickupDir != "")
                 {
-                    delete pOut;
+                    ForceDirectories(m_sPickupDir);
+                    pOut->SaveToFile(m_sPickupDir + "\\" + sFileName);
                 }
             }
-            catch (Exception&)
+            __finally
             {
-                // Soter CSV write failed (disk full / path). Output for this lot is lost;
-                // swallow so the caller is not disturbed.
+                delete pOut;
             }
+        }
+        catch (Exception&)
+        {
+            // Soter CSV write failed (disk full / path). Output for this lot is lost;
+            // swallow so the caller is not disturbed.
         }
         m_bActive = false;   // disarm; buffer cleared on next OnLotStart
     }
