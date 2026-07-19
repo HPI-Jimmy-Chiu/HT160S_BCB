@@ -932,7 +932,14 @@ bool TTrayArmModule::DoPlace(int Flag)
                 //not here. Setting fHasTray now would flip bCarHasTray and starve FindFeedAuto.
                 if(HSys.VMot.MMTrayArmX!=NULL)
                     AutoModule->StageRearGrid(iAutoTarget, HSys.VMot.MMTrayArmX->Tray);
-                if(Job==TAJOB_AMR_SUPPLY)
+                //AI(ht160s-amr-divert) 20260719 : key the notify on the MODE, not the job.
+                //A diverted TAJOB_LOADER_RECOVERY tray in AMR mode must also stamp RearKind/
+                //RearTrayID via NotifyTrayArmDelivered - SetRearHasTrayFromTrayArm leaves a
+                //stale RearKind (possibly Cover/Identity) that DoFeedTray would copy into
+                //WorkingKind, making IsReadyForSortArmPlace refuse IC on a plain work tray.
+                //AMR-mode Auto deliveries are only AMR_SUPPLY or a diverted recovery, so the
+                //mode test is exact; Normal mode keeps the legacy latch-only notify.
+                if(GeneralSetting.bUseAMR)
                     //AI(HT160S-Maintainer) 20260605 : record the delivered tray's stack
                     //role so the Auto knows identity/cover trays must NOT receive IC.
                     //AI(HT160S-Maintainer) 20260608 : also pass the identity tray's 2D
@@ -959,8 +966,9 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
     //AI(HT160S-Maintainer) 20260606 : called once the Loader empty tray is in hand. The
     //arm reacts to the live demand : if an Auto rear is free it supplies that Auto, else
     //it recycles the tray back into the EmptyTray supply pool. AMR stacks have a strict
-    //identity/cover/normal order that is built only by the dedicated AMR supply job, so a
-    //recovered plain tray is never injected mid-stack in AMR mode : it always recycles.
+    //identity/cover/normal order built by the dedicated AMR supply job; a recovered tray
+    //joins one only via the opt-in Normal-for-Normal path below (bUseAmrRecoveryDivert),
+    //otherwise it always recycles.
     //AI(HT160S-Maintainer) 20260625 : an identity tray (real Kind from the Loader, Phase 6 A)
     //is never an Auto supply : route it back to Color using the SAME return contract as Empty
     //(RequestReturnTray -> IsRearHasTray()==false -> NotifyTrayXToEmptyFinish). Cover/Normal
@@ -979,7 +987,14 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
         return;
     }
     bool bSupplyAuto=false;
-    if(GeneralSetting.bUseAMR==false && AutoModule!=NULL)
+    //AI(ht160s-amr-divert) 20260719 : AMR is no longer excluded wholesale. With the
+    //opt-in flag on, a recovered plain Normal tray may supply an Auto whose own
+    //GetTrayRequest asks for a Normal tray (car already stacked identity+cover), so
+    //the stack order is never violated. Carried cover still recycles to Empty and
+    //identity was routed to Color above. Flag off (default) = legacy always-recycle.
+    bool bMaySupplyAuto=(GeneralSetting.bUseAMR==false) ||
+                        (GeneralSetting.bUseAmrRecoveryDivert && iDeliverKind==eTrayKindNormal);
+    if(bMaySupplyAuto && AutoModule!=NULL)
     {
         //AI(general) 20260608 : Stage2 demand-driven Loader recovery - use the same pull
         //source as DecideJob (FindTrayRequestAuto) instead of FindEmptyRearForTrayArm, so
@@ -988,11 +1003,17 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
         //identity/cover role). This also respects the Stage0 pending latch, so a tray
         //already on its way is never double-targeted. Otherwise recycle to EmptyTray.
         int kind=eTrayReqNone;
-        int idx=AutoModule->FindTrayRequestAuto(kind);
+        int idx=AutoModule->FindTrayRequestAuto(kind, eTrayKindNormal);
         if(idx>=0 && kind==eTrayKindNormal)
         {
             iAutoTarget=idx;
             bSupplyAuto=true;
+            //AI(ht160s-amr-divert) 20260719 : breadcrumb for the new AMR pick-time path
+            //(Normal-mode supply-at-pick is legacy behavior and stays unlogged).
+            if(GeneralSetting.bUseAMR)
+                g_EventLog.Log("TA_DIVERT",
+                               AnsiString().sprintf("TrayArm recovered tray -> Auto%d at pick time (AMR kind=%d)",
+                                                    idx+1, kind));
         }
     }
 
@@ -1018,22 +1039,27 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
 //Empty and re-picking it later. Mirrors the CleanOut drain-boundary divert shape (DoPlace
 //case 1/10) in the opposite direction. FindTrayRequestAuto embeds the producer-side no-go
 //gates (CleanOut drain boundary, AMR lock, pending latch, rear occupied); the guards here
-//keep the divert out of CleanOut entirely and out of AMR mode (AMR stacks are built only
-//by the dedicated supply job), and identity trays never reach this path (routed to Color
-//at DecidePlaceDestAfterPick). On success the Empty return reservation is released via
+//keep the divert out of CleanOut entirely. AI(ht160s-amr-divert) 20260719 : AMR mode is
+//no longer excluded wholesale - it is opt-in via bUseAmrRecoveryDivert with a strict
+//Normal-for-Normal kind match (identity/cover carried trays keep their legacy return
+//routes). On success the Empty return reservation is released via
 //CancelReturnTray and the DoPlace dispatch re-enters the Auto ladder at case 1.
 bool TTrayArmModule::TryDivertCarriedTrayToAuto()
 {
     if(HSys.Sys.RunMode==Run_CleanOut)
         return false;
-    if(GeneralSetting.bUseAMR)
+    //AI(ht160s-amr-divert) 20260719 : opt-in AMR divert (General.ini [SortMode]
+    //UseAmrRecoveryDivert). Only a plain Normal carried tray may divert, and only to an
+    //Auto whose own GetTrayRequest asks for a Normal tray (car already holds identity+
+    //cover), so the AMR stack order is never violated.
+    if(GeneralSetting.bUseAMR && GeneralSetting.bUseAmrRecoveryDivert==false)
         return false;
-    if(iDeliverKind==eTrayKindIdentity)
+    if(iDeliverKind!=eTrayKindNormal)
         return false;
     if(AutoModule==NULL)
         return false;
     int kind=eTrayReqNone;
-    int idx=AutoModule->FindTrayRequestAuto(kind);
+    int idx=AutoModule->FindTrayRequestAuto(kind, eTrayKindNormal);
     if(idx<0 || kind!=eTrayKindNormal)
         return false;
     if(EmptyModule!=NULL)
@@ -1042,6 +1068,11 @@ bool TTrayArmModule::TryDivertCarriedTrayToAuto()
     iAutoTarget=idx;
     PlaceDest=TAPLACE_AUTO;
     PlaceTask=1;
+    //AI(ht160s-amr-divert) 20260719 : low-frequency breadcrumb (at most one per recovery
+    //job) so sim / on-machine runs can confirm the divert actually fired.
+    g_EventLog.Log("TA_DIVERT",
+                   AnsiString().sprintf("TrayArm carried-tray divert -> Auto%d (AMR=%d kind=%d)",
+                                        idx+1, GeneralSetting.bUseAMR?1:0, kind));
     return true;
 }
 //---------------------------------------------------------------------------

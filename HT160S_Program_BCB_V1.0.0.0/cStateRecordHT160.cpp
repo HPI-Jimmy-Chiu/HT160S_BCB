@@ -749,7 +749,8 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
     Out += "  bUseAMR=" + IntToStr(GeneralSetting.bUseAMR ? 1 : 0)
          + "  bColorBinAreaInstalled=" + IntToStr(GeneralSetting.bColorBinAreaInstalled ? 1 : 0)
          + "  iSortMode=" + IntToStr(GeneralSetting.iSortMode) + "  PassBin=" + IntToStr(BinAreaMap.GetPassBin()) + "\r\n";
-    Out += "  bUsePredictiveAutoSupply=" + IntToStr(GeneralSetting.bUsePredictiveAutoSupply ? 1 : 0) + "\r\n";
+    Out += "  bUsePredictiveAutoSupply=" + IntToStr(GeneralSetting.bUsePredictiveAutoSupply ? 1 : 0)
+         + "  bUseAmrRecoveryDivert=" + IntToStr(GeneralSetting.bUseAmrRecoveryDivert ? 1 : 0) + "\r\n";
     Out += "  bUseColorCcd=" + IntToStr(CosFunction.bUseColorCcd ? 1 : 0)
          + "  bUseTopCcd=" + IntToStr(CosFunction.bUseTopCcd ? 1 : 0)
          + "  bUse2DBinMap=" + IntToStr(CosFunction.bUse2DBinMap ? 1 : 0) + "\r\n";

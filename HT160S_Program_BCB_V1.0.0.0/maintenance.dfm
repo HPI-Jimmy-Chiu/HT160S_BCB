@@ -1116,14 +1116,54 @@ object fMaintenance: TfMaintenance
                   OnClick = chkUsePredictiveAutoSupplyClick
                 end
               end
-              object pnlUphSampleBox: TPanel
+              object pnlAmrDivertBox: TPanel
                 Left = 0
                 Top = 40
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblAmrDivertHint: TLabel
+                  Left = 320
+                  Top = 12
+                  Width = 600
+                  Height = 16
+                  AutoSize = False
+                  Caption =
+                    'When ON (AMR), a recovered Normal tray goes straight to an Auto ' +
+                    'that requests one, instead of parking at Empty first.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkUseAmrRecoveryDivert: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 300
+                  Height = 20
+                  Caption = 'AMR recovered-tray direct supply'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkUseAmrRecoveryDivertClick
+                end
+              end
+              object pnlUphSampleBox: TPanel
+                Left = 0
+                Top = 80
                 Width = 929
                 Height = 44
                 Align = alTop
                 BevelInner = bvLowered
-                TabOrder = 1
+                TabOrder = 2
                 object lblUphMinSample: TLabel
                   Left = 16
                   Top = 14

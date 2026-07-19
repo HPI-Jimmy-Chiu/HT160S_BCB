@@ -144,6 +144,9 @@ __published:
     TPanel *pnlPredictiveSupplyBox;
     TCheckBox *chkUsePredictiveAutoSupply;
     TLabel *lblPredictiveSupplyHint;
+    TPanel *pnlAmrDivertBox;
+    TCheckBox *chkUseAmrRecoveryDivert;
+    TLabel *lblAmrDivertHint;
     TTabSheet *tsMaintTeach;
     TTabSheet *tsMaintMotor;
     TTabSheet *tsMaintIO;
@@ -380,6 +383,7 @@ __published:
     void __fastcall AmrInjectButtonClick(TObject *Sender);
     void __fastcall rgSortModeClick(TObject *Sender);
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
+    void __fastcall chkUseAmrRecoveryDivertClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
     void __fastcall chkSuck2QuadVacuumClick(TObject *Sender);

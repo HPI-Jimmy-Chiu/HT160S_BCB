@@ -152,7 +152,10 @@ public:
     //eTrayReqNone(-1) when it wants none. FindTrayRequestAuto returns the first
     //requesting Auto and sets OutKind, or -1 when no Auto currently wants a tray.
     int GetTrayRequest(int Index);
-    int FindTrayRequestAuto(int &OutKind);
+    //AI(ht160s-amr-divert) 20260719 : WantKind (default eTrayReqNone=any) narrows the
+    //scan to Autos requesting exactly that kind - used by the TrayArm recovery divert
+    //to target only Autos wanting a plain Normal tray. Default = legacy behavior.
+    int FindTrayRequestAuto(int &OutKind, int WantKind=eTrayReqNone);
     int GetStationStatus(int Index);   //AI(ht160s-status) 20260703 : eAutoStatus for stbMain display / peers
     //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
     void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer

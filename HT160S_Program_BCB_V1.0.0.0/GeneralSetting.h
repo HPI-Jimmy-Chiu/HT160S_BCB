@@ -76,6 +76,15 @@ public:
 	// [SortMode] UsePredictiveAutoSupply.
 	bool bUsePredictiveAutoSupply;
 
+	// AI(ht160s-amr-divert) 20260719 : AMR recovered-tray direct supply (opt-in).
+	// When true (AMR mode only), a Loader-recovered plain Normal tray may be
+	// delivered straight to an Auto whose own GetTrayRequest asks for a Normal
+	// tray (car already stacked identity+cover), instead of always parking at the
+	// Empty rear and re-picking it later. Identity->Color and cover->Empty routes
+	// are unchanged, so the AMR stack order is never violated. Off (default) =
+	// legacy always-recycle. Stored in General.ini [SortMode] UseAmrRecoveryDivert.
+	bool bUseAmrRecoveryDivert;
+
 	// Per-Auto enable (By Lot+Bin mode only). When bAutoEnabled[i]==false, Auto(i+1)
 	// is skipped by THT160LotBinBinding::ResolveAuto so no new (LotID,Bin) pair binds
 	// to it; existing bindings still resolve. Index 0..5 = Auto1..Auto6. Default all

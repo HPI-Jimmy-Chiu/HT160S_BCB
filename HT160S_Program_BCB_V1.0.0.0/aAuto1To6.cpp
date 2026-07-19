@@ -1238,7 +1238,9 @@ int TAutoModule::GetTrayRequest(int Index)
 //   station that currently wants a tray, reporting the requested eTrayKind through
 //   OutKind. Returns -1 (and OutKind=eTrayReqNone) when no Auto wants a tray, which
 //   lets the TrayArm stay idle instead of shuttling needlessly.
-int TAutoModule::FindTrayRequestAuto(int &OutKind)
+//   AI(ht160s-amr-divert) 20260719 : WantKind!=eTrayReqNone narrows both scans to Autos
+//   requesting exactly that kind (TrayArm recovery divert wants Normal-only targets).
+int TAutoModule::FindTrayRequestAuto(int &OutKind, int WantKind)
 {
     OutKind=eTrayReqNone;
     //AI(ht160s-predictive-supply) 20260707 : Phase 1 (opt-in). Prefer an Auto that SortArm
@@ -1258,7 +1260,7 @@ int TAutoModule::FindTrayRequestAuto(int &OutKind)
         for(int t=0; t<nTargets; t++)
         {
             int Req=GetTrayRequest(Targets[t]);
-            if(Req!=eTrayReqNone)
+            if(Req!=eTrayReqNone && (WantKind==eTrayReqNone || Req==WantKind))
             {
                 OutKind=Req;
                 return Targets[t];
@@ -1268,7 +1270,7 @@ int TAutoModule::FindTrayRequestAuto(int &OutKind)
     for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
     {
         int Req=GetTrayRequest(Index);
-        if(Req!=eTrayReqNone)
+        if(Req!=eTrayReqNone && (WantKind==eTrayReqNone || Req==WantKind))
         {
             OutKind=Req;
             return Index;

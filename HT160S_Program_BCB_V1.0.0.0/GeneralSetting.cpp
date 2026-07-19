@@ -39,6 +39,7 @@ void THT160GeneralSetting::SetDefault()
 	}
 	iSortMode=smNormal;
 	bUsePredictiveAutoSupply=false;
+	bUseAmrRecoveryDivert=false;
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=true;
 	for(int s=0;s<4;s++)
@@ -127,6 +128,7 @@ void THT160GeneralSetting::Load()
 			iSortMode=smNormal;
 	}
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
+	bUseAmrRecoveryDivert=Ini->ReadBool("SortMode", "UseAmrRecoveryDivert", false);
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
 	for(int s=0;s<4;s++)
@@ -217,6 +219,7 @@ void THT160GeneralSetting::Save()
 	// both Normal and LotPassFail map to false=Normal (safe downgrade).
 	Ini->WriteBool("SortMode", "UseLotBinMode", iSortMode==smLotBin);
 	Ini->WriteBool("SortMode", "UsePredictiveAutoSupply", bUsePredictiveAutoSupply);
+	Ini->WriteBool("SortMode", "UseAmrRecoveryDivert", bUseAmrRecoveryDivert);
 	for(int a=0;a<6;a++)
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);
 	for(int s=0;s<4;s++)

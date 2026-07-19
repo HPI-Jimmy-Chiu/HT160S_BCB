@@ -1108,6 +1108,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         rgSortMode->ItemIndex=GeneralSetting.iSortMode;
     if(chkUsePredictiveAutoSupply!=NULL)
         chkUsePredictiveAutoSupply->Checked=GeneralSetting.bUsePredictiveAutoSupply;
+    if(chkUseAmrRecoveryDivert!=NULL)
+        chkUseAmrRecoveryDivert->Checked=GeneralSetting.bUseAmrRecoveryDivert;
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1185,6 +1187,8 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     }
     if(chkUsePredictiveAutoSupply!=NULL)
         GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
+    if(chkUseAmrRecoveryDivert!=NULL)
+        GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1974,6 +1978,19 @@ void __fastcall TfMaintenance::chkUsePredictiveAutoSupplyClick(TObject *Sender)
     (void)Sender;
     if(chkUsePredictiveAutoSupply!=NULL)
         GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-amr-divert) 20260719 : AMR recovered-tray direct supply toggle. Read live by
+//the TrayArm divert path, so no restart warning; mirrors the predictive-supply checkbox
+//wiring (bLoadingHardwareSettings guard; not part of ApplyHardwareEditLock).
+void __fastcall TfMaintenance::chkUseAmrRecoveryDivertClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkUseAmrRecoveryDivert!=NULL)
+        GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
