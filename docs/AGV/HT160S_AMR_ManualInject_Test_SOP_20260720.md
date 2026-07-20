@@ -148,7 +148,8 @@
 
 - **level（sticky）**：FULL / SHORTAGE / DRAINED / READY。每按一次 on↔off toggle，維持 asserted，讀取**不消費**；cycle 完成（Take / Finish）時自動清掉。
 - **edge（one-shot）**：TAKEN / FINISH。按下 = armed；協調器下一個 tick 消費一次 → 送 CEID274 → **清掉整站 cycle**（連 FULL/DRAINED 一起歸零），避免立刻又叫車 272。
-- **★ SOFT_SIMULATE 下的「無限循環」注意**：sim 下 273/274 的 predicate 硬回 true，會在 `||` **短路**掉 inject 的清除（`InfeedFinished(p) || AmrInject.InputFinish(p)`，uAgvStation.cpp:396 / Auto 同理:342）。結果**注入的 level latch（Loader Short / Auto Full）不會在 cycle 完成時自動清掉**，於是機台每秒 `272→273→274→272…` 無限重叫（模擬器若勾 Auto-AGV 會一直回應）。**這是 sim 下按一次 level 注入的預期副作用，不是機台故障。要停：再按一次該 level 鈕關掉、或取消測試模式勾選、或取消模擬器 Auto-AGV。**（真機不會有此問題:real 的 finish 靠 sensor，`AmrInject.InputFinish` 會被正常消費而清掉 latch。）
+- **★ 一次注入 = 一輪 cycle（已修，commit `40a343d`）**：協調器在送出 CEID274 時會呼叫 `AmrInject.ClearAutoCycle/ClearInputCycle` 清掉該站注入的 level latch（FULL/SHORTAGE 等），面板 log 顯示 `Auto1 cycle cleared (274)` / `P1 cycle cleared (274)`。所以**按一次 Short/Full → 跑完 272→273→274 一輪就自動停**，要再測就再按一次。
+  - **背景（為何要修）**：`40a343d` 之前，sim 下 273/274 硬回 true 會短路掉 inject 的清除（`InfeedFinished(p) || AmrInject.InputFinish(p)`，uAgvStation.cpp:396 / Auto 同理），level latch 清不掉 → 每秒 `272→273→274` **無限重叫**。若你在**舊 build** 看到此循環，先 rebuild；臨時要停可：再按一次該 level 鈕、取消測試模式、或取消模擬器 Auto-AGV。真機一直都正常（finish 靠 sensor，inject 會被正常消費而清 latch）。
 - **注入只在協調器端 OR-進 predicate**：`bFull = IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a)`。predicate 本體不變，所以**生產 / Clean-Out 等其它消費者只看到真實 sensor**，注入的爆炸半徑僅限 SECS 握手。
 - **左側 `ready=` 顯示真實 predicate、非注入值**：按了 Drain/Ready，`ready=` 不一定變——**以 log 與模擬器收到的 CEID 為準**。
 - **安全**：`bTestMode` 預設 OFF、**永不持久化**（每次開程式都是 OFF）；任何 **HOME/init**（`InitialAllTask`）、**機台 Start**（`MachineStart`）、或**取消勾選**都會清掉測試模式與所有 latch。OFF 時所有讀取/消費都 no-op。**測試模式期間請勿跑真實生產。**
@@ -289,7 +290,7 @@ Empty / Color：把 Loader 換成 Empty / Color 三顆鈕。
 | 面板按鈕全部無效 | 測試模式沒勾（`testMode=0`）；或 `bUseAMR=0` |
 | 一勾測試模式又馬上被取消 | 剛做過 HOME/init 或按了 Start（`MachineStart`/`InitialAllTask` 會清測試模式）——重新勾一次，測試期間別按 Start |
 | 看到 `CEID 35 / 36 / 37 / 148 / 149 / 150` | **正常**：下料 Full 附帶的離散滿盤預告碼（§4.3） |
-| **★ 模擬器 `272→273→274` 不斷重複、不會停**（sim build） | **握手本身正確**；重複是因為**注入的 level latch（Loader Short / Auto Full）在 SOFT_SIMULATE 下不會自動清**（sim finish 硬回 true 短路掉 inject 清除，§4.4）。**要停：再按一次 Short/Full 關掉 latch、或取消測試模式、或取消模擬器 Auto-AGV。** 真機無此問題 |
+| **★ 模擬器 `272→273→274` 不斷重複、不會停**（sim build） | **握手本身正確**。此循環是 `40a343d` 之前的舊 bug（sim 下注入 level latch 不自動清，§4.4）。**已修：現在按一次 Short/Full 跑完一輪就自動停**（log 見 `... cycle cleared (274)`）。若仍看到 → 你在舊 build，rebuild 即可；臨時要停：再按一次 Short/Full、取消測試模式、或取消 Auto-AGV。真機無此問題 |
 | **`START` 回 `HCACK=2`（每個 274 之後）** | **正常（bench 無 Lot）**：`START` 前置檢查 `CheckLotDataReady`＝false（沒載 Lot / 2D 資料）→ HCACK=2。純握手測試不需要 START 成功；要成功需先 `SET_LOT_INFO`/`LOTSTART`+WebAPI 載入 Lot。與 AGV 叫車循環無關（循環由缺料觸發，非 START） |
 | 連不上（一直 disconnected）| 兩端角色接反（都 Active 或都 Passive）；Port/防火牆；`General.ini [SECS] ActiveMode` 與模擬器 Passive 要相對（§3） |
 
