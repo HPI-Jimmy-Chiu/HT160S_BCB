@@ -1260,8 +1260,6 @@ void SYSTEM_MODULAR::InitialCylinderName()
     Cyn.C_Empty_PushTray.CylinderName="C_Empty_PushTray";
     Cyn.C_Empty_LeanOnTray.CylinderName="C_Empty_LeanOnTray";
     Cyn.C_Empty_FrontSeparateTray_1.CylinderName="C_Empty_FrontSeparateTray_1";
-    Cyn.C_Empty_RearRiseTray.CylinderName="C_Empty_RearRiseTray";
-    Cyn.C_Empty_RearSeparateTray_1.CylinderName="C_Empty_RearSeparateTray_1";
 
     Cyn.C_Loader_FrontRiseTray_1.CylinderName="C_Loader_FrontRiseTray_1";
     Cyn.C_Loader_FrontRiseTray_2.CylinderName="C_Loader_FrontRiseTray_2";
@@ -1270,49 +1268,35 @@ void SYSTEM_MODULAR::InitialCylinderName()
     Cyn.C_Loader1_LeanOnTray.CylinderName="C_Loader1_LeanOnTray";
     Cyn.C_Loader2_LeanOnTray.CylinderName="C_Loader2_LeanOnTray";
     Cyn.C_Loader_FrontSeparateTray_1.CylinderName="C_Loader_FrontSeparateTray_1";
-    Cyn.C_Loader_RearRiseTray.CylinderName="C_Loader_RearRiseTray";
 
     Cyn.C_Auto1_FrontRiseTray.CylinderName="C_Auto1_FrontRiseTray";
     Cyn.C_Auto1_PushTray.CylinderName="C_Auto1_PushTray";
     Cyn.C_Auto1_LeanOnTray.CylinderName="C_Auto1_LeanOnTray";
-    Cyn.C_Auto1_RearRiseTray.CylinderName="C_Auto1_RearRiseTray";
-    Cyn.C_Auto1_FrontSeparateTray_1.CylinderName="C_Auto1_FrontSeparateTray_1";
 
     Cyn.C_Auto2_FrontRiseTray.CylinderName="C_Auto2_FrontRiseTray";
     Cyn.C_Auto2_PushTray.CylinderName="C_Auto2_PushTray";
     Cyn.C_Auto2_LeanOnTray.CylinderName="C_Auto2_LeanOnTray";
-    Cyn.C_Auto2_RearRiseTray.CylinderName="C_Auto2_RearRiseTray";
-    Cyn.C_Auto2_FrontSeparateTray_1.CylinderName="C_Auto2_FrontSeparateTray_1";
 
     Cyn.C_Auto3_FrontRiseTray.CylinderName="C_Auto3_FrontRiseTray";
     Cyn.C_Auto3_PushTray.CylinderName="C_Auto3_PushTray";
     Cyn.C_Auto3_LeanOnTray.CylinderName="C_Auto3_LeanOnTray";
-    Cyn.C_Auto3_RearRiseTray.CylinderName="C_Auto3_RearRiseTray";
-    Cyn.C_Auto3_FrontSeparateTray_1.CylinderName="C_Auto3_FrontSeparateTray_1";
 
     Cyn.C_Auto4_FrontRiseTray.CylinderName="C_Auto4_FrontRiseTray";
     Cyn.C_Auto4_PushTray.CylinderName="C_Auto4_PushTray";
     Cyn.C_Auto4_LeanOnTray.CylinderName="C_Auto4_LeanOnTray";
-    Cyn.C_Auto4_RearRiseTray.CylinderName="C_Auto4_RearRiseTray";
-    Cyn.C_Auto4_FrontSeparateTray_1.CylinderName="C_Auto4_FrontSeparateTray_1";
 
     Cyn.C_Auto5_FrontRiseTray.CylinderName="C_Auto5_FrontRiseTray";
     Cyn.C_Auto5_PushTray.CylinderName="C_Auto5_PushTray";
     Cyn.C_Auto5_LeanOnTray.CylinderName="C_Auto5_LeanOnTray";
-    Cyn.C_Auto5_RearRiseTray.CylinderName="C_Auto5_RearRiseTray";
-    Cyn.C_Auto5_FrontSeparateTray_1.CylinderName="C_Auto5_FrontSeparateTray_1";
 
     Cyn.C_Auto6_FrontRiseTray.CylinderName="C_Auto6_FrontRiseTray";
     Cyn.C_Auto6_PushTray.CylinderName="C_Auto6_PushTray";
     Cyn.C_Auto6_LeanOnTray.CylinderName="C_Auto6_LeanOnTray";
-    Cyn.C_Auto6_RearRiseTray.CylinderName="C_Auto6_RearRiseTray";
-    Cyn.C_Auto6_FrontSeparateTray_1.CylinderName="C_Auto6_FrontSeparateTray_1";
 
     Cyn.C_Color_FrontRiseTray_1.CylinderName="C_Color_FrontRiseTray_1";
     Cyn.C_Color_FrontRiseTray_2.CylinderName="C_Color_FrontRiseTray_2";
     Cyn.C_Color_PushTray.CylinderName="C_Color_PushTray";
     Cyn.C_Color_LeanOnTray.CylinderName="C_Color_LeanOnTray";
-    Cyn.C_Color_RearRiseTray.CylinderName="C_Color_RearRiseTray";
     Cyn.C_Color_FrontSeparateTray_1.CylinderName="C_Color_FrontSeparateTray_1";
 }
 //---------------------------------------------------------------------------

@@ -1608,22 +1608,6 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Empty_LeanOnTray_Off'
             end
-            object mlC_Empty_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 81
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Empty_RearRiseTray_On'
-            end
-            object mlC_Empty_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 96
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Empty_RearRiseTray_Off'
-            end
             object mlSnEmpty_InputHasTray: TMyLed
               Left = 6
               Top = 77
@@ -1786,57 +1770,6 @@ object fiosetview: Tfiosetview
               Font.Style = []
               ParentFont = False
               TabOrder = 6
-            end
-            object bpC_Empty_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Empty_RearRiseTray'
-              Style = tsButtons
-            end
-            object bpC_Empty_RearSeparateTray_1: TBtnPanel
-              Left = 688
-              Top = 45
-              Width = 44
-              Height = 14
-              Hint = #20998#38626#27773#32568
-              BevelInner = bvRaised
-              Caption = '<->'
-              Color = 8404992
-              Font.Charset = CHINESEBIG5_CHARSET
-              Font.Color = clWhite
-              Font.Height = -12
-              Font.Name = #26032#32048#26126#39636
-              Font.Style = []
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 8
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Empty_RearSeparateTray_1'
-              Style = tsButtons
             end
             object Panel10: TPanel
               Left = 768
@@ -2029,22 +1962,6 @@ object fiosetview: Tfiosetview
             BevelOuter = bvSpace
             Color = 12761254
             TabOrder = 4
-            object mlC_Loader_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Loader_RearRiseTray_On'
-            end
-            object mlC_Loader_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Loader_RearRiseTray_Off'
-            end
             object mlSnLoader_InputHasTray: TMyLed
               Left = 6
               Top = 78
@@ -2191,31 +2108,6 @@ object fiosetview: Tfiosetview
               Font.Style = []
               ParentFont = False
               TabOrder = 4
-            end
-            object bpC_Loader_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 5
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Loader_RearRiseTray'
-              Style = tsButtons
             end
             object Panel102: TPanel
               Left = 768
@@ -2862,22 +2754,6 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto1_LeanOnTray_Off'
             end
-            object mlC_Auto1_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto1_RearRiseTray_On'
-            end
-            object mlC_Auto1_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto1_RearRiseTray_Off'
-            end
             object mlSnAuto1_InputHasTray: TMyLed
               Left = 6
               Top = 56
@@ -3049,31 +2925,6 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object bpC_Auto1_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto1_RearRiseTray'
-              Style = tsButtons
-            end
             object Panel31: TPanel
               Left = 768
               Top = 16
@@ -3157,22 +3008,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto2_LeanOnTray_Off'
-            end
-            object mlC_Auto2_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto2_RearRiseTray_On'
-            end
-            object mlC_Auto2_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto2_RearRiseTray_Off'
             end
             object mlSnAuto2_InputHasTray: TMyLed
               Left = 6
@@ -3345,31 +3180,6 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object bpC_Auto2_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto2_RearRiseTray'
-              Style = tsButtons
-            end
             object Panel71: TPanel
               Left = 768
               Top = 16
@@ -3453,22 +3263,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto3_LeanOnTray_Off'
-            end
-            object mlC_Auto3_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto3_RearRiseTray_On'
-            end
-            object mlC_Auto3_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto3_RearRiseTray_Off'
             end
             object mlSnAuto3_InputHasTray: TMyLed
               Left = 6
@@ -3640,31 +3434,6 @@ object fiosetview: Tfiosetview
               Font.Style = []
               ParentFont = False
               TabOrder = 6
-            end
-            object bpC_Auto3_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto3_RearRiseTray'
-              Style = tsButtons
             end
             object Panel107: TPanel
               Left = 768
@@ -3843,22 +3612,6 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto4_LeanOnTray_Off'
             end
-            object mlC_Auto4_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto4_RearRiseTray_On'
-            end
-            object mlC_Auto4_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto4_RearRiseTray_Off'
-            end
             object mlSnAuto4_InputHasTray: TMyLed
               Left = 6
               Top = 56
@@ -4030,31 +3783,6 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object bpC_Auto4_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto4_RearRiseTray'
-              Style = tsButtons
-            end
             object Panel120: TPanel
               Left = 768
               Top = 16
@@ -4138,22 +3866,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto5_LeanOnTray_Off'
-            end
-            object mlC_Auto5_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto5_RearRiseTray_On'
-            end
-            object mlC_Auto5_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto5_RearRiseTray_Off'
             end
             object mlSnAuto5_InputHasTray: TMyLed
               Left = 6
@@ -4326,31 +4038,6 @@ object fiosetview: Tfiosetview
               ParentFont = False
               TabOrder = 6
             end
-            object bpC_Auto5_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto5_RearRiseTray'
-              Style = tsButtons
-            end
             object Panel127: TPanel
               Left = 768
               Top = 16
@@ -4434,22 +4121,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'C_Auto6_LeanOnTray_Off'
-            end
-            object mlC_Auto6_RearRiseTray_On: TMyLed
-              Left = 666
-              Top = 80
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto6_RearRiseTray_On'
-            end
-            object mlC_Auto6_RearRiseTray_Off: TMyLed
-              Left = 666
-              Top = 95
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'C_Auto6_RearRiseTray_Off'
             end
             object mlSnAuto6_InputHasTray: TMyLed
               Left = 6
@@ -4621,31 +4292,6 @@ object fiosetview: Tfiosetview
               Font.Style = []
               ParentFont = False
               TabOrder = 6
-            end
-            object bpC_Auto6_RearRiseTray: TBtnPanel
-              Left = 688
-              Top = 80
-              Width = 45
-              Height = 30
-              BevelInner = bvRaised
-              Caption = 'v    ^'
-              Color = 8404992
-              Font.Charset = ANSI_CHARSET
-              Font.Color = clWhite
-              Font.Height = -15
-              Font.Name = 'Times New Roman'
-              Font.Style = [fsBold]
-              ParentFont = False
-              ParentShowHint = False
-              ShowHint = True
-              TabOrder = 7
-              Visible = False
-              OnClick = BtnPanelClick
-              TrueColor = 16744448
-              FalseColor = 8404992
-              FalseFontColor = clWhite
-              Alias = 'C_Auto6_RearRiseTray'
-              Style = tsButtons
             end
             object Panel145: TPanel
               Left = 768

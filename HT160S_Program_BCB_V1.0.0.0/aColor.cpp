@@ -729,10 +729,9 @@ bool TColorModule::DoGoDownTray(int Flag)
 //Empty rear/front teach Y -> Color rear (ColorTrayArmPickYPosition) / front
 //(ColorReceiveTrayYPosition; ColorRead2DYPosition is now the middle CCD scan Y). The
 //rear-occupied latch is bRearHasTray (renamed from bOutputHasTray to match Empty; the
-//output/read position is Color's rear handoff slot). The Color rear
-//riser C_Color_RearRiseTray is intentionally NOT pushed here: its use as a receive
-//stacking cylinder is mechanism-unconfirmed (plan section 0 item 2). The front
-//destacker port is the working core; RearRiseTray is left out for now.
+//output/read position is Color's rear handoff slot). NOTE 20260720 : the Color rear
+//riser does NOT exist on this machine (mechanism+wiring absent, owner-confirmed); the
+//unused C_Color_RearRiseTray declaration was removed with the whole rear-riser family.
 bool TColorModule::DoGoUpTray(int Flag)
 {
     if(Flag==0)

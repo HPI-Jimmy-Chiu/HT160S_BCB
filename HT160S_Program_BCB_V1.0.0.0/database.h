@@ -376,8 +376,6 @@ typedef struct CYLINDER_MODULAR_STRUCR
     TMyCylinder C_Empty_PushTray;
     TMyCylinder C_Empty_LeanOnTray;
     TMyCylinder C_Empty_FrontSeparateTray_1;
-    TMyCylinder C_Empty_RearRiseTray;
-    TMyCylinder C_Empty_RearSeparateTray_1;
 
     TMyCylinder C_Loader_FrontRiseTray_1;
     TMyCylinder C_Loader_FrontRiseTray_2;
@@ -386,49 +384,35 @@ typedef struct CYLINDER_MODULAR_STRUCR
     TMyCylinder C_Loader1_LeanOnTray;
     TMyCylinder C_Loader2_LeanOnTray;
     TMyCylinder C_Loader_FrontSeparateTray_1;
-    TMyCylinder C_Loader_RearRiseTray;
 
     TMyCylinder C_Auto1_FrontRiseTray;
     TMyCylinder C_Auto1_PushTray;
     TMyCylinder C_Auto1_LeanOnTray;
-    TMyCylinder C_Auto1_RearRiseTray;
-    TMyCylinder C_Auto1_FrontSeparateTray_1;
 
     TMyCylinder C_Auto2_FrontRiseTray;
     TMyCylinder C_Auto2_PushTray;
     TMyCylinder C_Auto2_LeanOnTray;
-    TMyCylinder C_Auto2_RearRiseTray;
-    TMyCylinder C_Auto2_FrontSeparateTray_1;
 
     TMyCylinder C_Auto3_FrontRiseTray;
     TMyCylinder C_Auto3_PushTray;
     TMyCylinder C_Auto3_LeanOnTray;
-    TMyCylinder C_Auto3_RearRiseTray;
-    TMyCylinder C_Auto3_FrontSeparateTray_1;
 
     TMyCylinder C_Auto4_FrontRiseTray;
     TMyCylinder C_Auto4_PushTray;
     TMyCylinder C_Auto4_LeanOnTray;
-    TMyCylinder C_Auto4_RearRiseTray;
-    TMyCylinder C_Auto4_FrontSeparateTray_1;
 
     TMyCylinder C_Auto5_FrontRiseTray;
     TMyCylinder C_Auto5_PushTray;
     TMyCylinder C_Auto5_LeanOnTray;
-    TMyCylinder C_Auto5_RearRiseTray;
-    TMyCylinder C_Auto5_FrontSeparateTray_1;
 
     TMyCylinder C_Auto6_FrontRiseTray;
     TMyCylinder C_Auto6_PushTray;
     TMyCylinder C_Auto6_LeanOnTray;
-    TMyCylinder C_Auto6_RearRiseTray;
-    TMyCylinder C_Auto6_FrontSeparateTray_1;
 
     TMyCylinder C_Color_FrontRiseTray_1;
     TMyCylinder C_Color_FrontRiseTray_2;
     TMyCylinder C_Color_PushTray;
     TMyCylinder C_Color_LeanOnTray;
-    TMyCylinder C_Color_RearRiseTray;
     TMyCylinder C_Color_FrontSeparateTray_1;
 }CYLINDER_MODULAR;
 //---------------------------------------------------------------------------
