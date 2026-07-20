@@ -55,10 +55,10 @@ EventLog 有 13 條 RecordProcess,含車號+Y 位置,夠用。但:
 5. **modal 期間被丟警報改記錄**:note.cpp:781 return 前 log「[DROPPED: modal busy]」
 6. **AD-1 尾段 latch set/consume 各一行**(aAuto1To6.cpp:161/1715)
 
-### P1 — 部分 SHIPPED `5432441` 2026-07-20
-(#8 drain點名+HomeDrainTimeout快照 / #9 AGV鎖三處 / #11 毫秒時戳 / #12 SECS即時flush 已入庫;
-#7 StuckMs看門狗 與 #10 zip收EventLog 已實作於工作區但**未提交**——cStateRecordHT160.cpp/GeneralSetting.*
-與未提交的 whitelist-override 功能糾纏,待該功能結案後同車提交)
+### P1 — 全數 SHIPPED (`5432441` + `c2ef5ee`) 2026-07-20
+(#8 drain點名+HomeDrainTimeout快照 / #9 AGV鎖三處 / #11 毫秒時戳 / #12 SECS即時flush = `5432441`;
+#7 StuckMs看門狗(auto snapshot,[Observability]StuckSnapshotSec 預設300s) / #10 zip收當日+前日
+EventLog = `c2ef5ee`,與 whitelist-override 同車提交。全數 runtime-verified,三建置 EXIT=0)
 
 ### P1
 7. 通用 StuckMs 看門狗(SystemStart=1 且模組 Task 停滯>閾值 → 自動 TriggerSnapshot;
