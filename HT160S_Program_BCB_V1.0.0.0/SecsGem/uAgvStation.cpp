@@ -321,8 +321,19 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
     //the homing span (a slow HOME silently force-released a docked AMR's handshake).
     //Freeze transitions AND aging while homing / not yet homed; nothing is cleared,
     //and InitialAllTask's ReassertLocks() re-couples the module locks afterwards.
-    if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
-        return;
+    {
+        static bool s_bFreezeLogged=false;
+        if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+        {
+            if(s_bFreezeLogged==false)
+            {
+                RecordProcess("AGV: handshake frozen for HOME (transitions + watchdog aging held)");   //AI(ht160s-obsv-p1)
+                s_bFreezeLogged=true;
+            }
+            return;
+        }
+        s_bFreezeLogged=false;
+    }
 
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
@@ -366,6 +377,8 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         {
             if(++ShortageDebounce[si] > GeneralSetting.iAmrHandshakeWaitSec)
             {
+                RecordProcess("AGV: watchdog force-release P"+IntToStr(si+1)+" (Auto"+IntToStr(a+1)+
+                    ") after "+IntToStr(GeneralSetting.iAmrHandshakeWaitSec)+"s stuck handshake");   //AI(ht160s-obsv-p1)
                 AutoModule->SetAmrLock(a, false);
                 Handshake[si]        = AGV_IDLE;
                 ShortageLatch[si]    = 0;
@@ -411,6 +424,8 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
         {
             if(++ShortageDebounce[p] > GeneralSetting.iAmrHandshakeWaitSec)
             {
+                RecordProcess("AGV: watchdog force-release P"+IntToStr(p+1)+" (infeed) after "+
+                    IntToStr(GeneralSetting.iAmrHandshakeWaitSec)+"s stuck handshake");   //AI(ht160s-obsv-p1)
                 InfeedSetLock(p, false);
                 Handshake[p]        = AGV_IDLE;
                 ShortageLatch[p]    = 0;
@@ -470,6 +485,7 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
 //by design (it is only locked from BeginPrep), mirroring the normal flow.
 void TAgvCoordinator::ReassertLocks()
 {
+    AnsiString sLocked;   //AI(ht160s-obsv-p1) 20260720 : which stations got locks re-coupled
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
         int si = a + 3;
@@ -477,13 +493,19 @@ void TAgvCoordinator::ReassertLocks()
         {
             if(AutoModule!=NULL)
                 AutoModule->SetAmrLock(a, true);
+            sLocked+=" P"+IntToStr(si+1)+"(hs="+IntToStr(Handshake[si])+")";
         }
     }
     for(int p = 0; p < 3; p++)
     {
         if(Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY)
+        {
             InfeedSetLock(p, true);
+            sLocked+=" P"+IntToStr(p+1)+"(hs="+IntToStr(Handshake[p])+")";
+        }
     }
+    if(sLocked!="")
+        RecordProcess("HOME-RESUME AGV: locks re-asserted:"+sLocked);   //AI(ht160s-obsv-p1)
 }
 //---------------------------------------------------------------------------
 void TAgvCoordinator::AbortAutoHandshake(int Index)

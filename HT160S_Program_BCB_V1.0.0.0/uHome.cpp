@@ -21,6 +21,7 @@
 #include "aEmpty.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Empty carriage PARK haul-target
 #include "aColor.h"     //AI(ht160s-home-resume-w3b2) 20260711 : Color carriage PARK haul-target
 #include "GeneralSetting.h"   //AI(ht160s-home-resume-w3c) 20260711 : iHomeReacquireOffsetCnt
+#include "cStateRecordHT160.h"   //AI(ht160s-obsv-p1) 20260720 : gStateRecord drain-timeout snapshot
 #include "aAuto1To6.h"   //AI(ht160s-home-resume-drain) 20260711 : Auto drain hook (AF-2 commit stand-in)
 #include "aSortArm.h"    //AI(ht160s-home-resume-drain) 20260711 : SP-1 vacuum reconciliation + blow-off
 #include "uAgvStation.h" //AI(ht160s-home-resume-drain) 20260711 : D1 - freeze destacker drains at non-IDLE AMR stations
@@ -410,22 +411,23 @@ bool TfHome::ProcessMotorHome()
 			}
 			if(iHomeDrainPhase==1)
 			{
+				AnsiString sNotDrained;   //AI(ht160s-obsv-p1) : name the non-converged modules at timeout
 				bool bAllDrained=true;
 				if(LoaderModule!=NULL && AgvCoord.Handshake[0]==AGV_IDLE &&
 				   LoaderModule->HomeDrainTick()==false)
-					bAllDrained=false;
+					{ bAllDrained=false; sNotDrained+=" Loader"; }
 				if(EmptyModule!=NULL && AgvCoord.Handshake[1]==AGV_IDLE &&
 				   EmptyModule->HomeDrainTick()==false)
-					bAllDrained=false;
+					{ bAllDrained=false; sNotDrained+=" Empty"; }
 				if(ColorModule!=NULL && AgvCoord.Handshake[2]==AGV_IDLE &&
 				   ColorModule->HomeDrainTick()==false)
-					bAllDrained=false;
+					{ bAllDrained=false; sNotDrained+=" Color"; }
 				if(AutoModule!=NULL && AutoModule->HomeDrainTick()==false)
-					bAllDrained=false;
+					{ bAllDrained=false; sNotDrained+=" Auto"; }
 				if(TrayArmModule!=NULL && TrayArmModule->HomeDrainTick()==false)
-					bAllDrained=false;
+					{ bAllDrained=false; sNotDrained+=" TrayArm"; }
 				if(SortArmModule!=NULL && SortArmModule->HomeDrainTick()==false)
-					bAllDrained=false;
+					{ bAllDrained=false; sNotDrained+=" SortArm"; }
 				if(bAllDrained)
 				{
 					RecordProcess("Home: drain stage done");
@@ -433,7 +435,9 @@ bool TfHome::ProcessMotorHome()
 				}
 				else if(HomeDrainTimer.Off())
 				{
-					RecordProcess("Home: drain stage TIMEOUT - fallback to park/removal");
+					RecordProcess("Home: drain stage TIMEOUT - not converged:"+sNotDrained+" - fallback to park/removal");   //AI(ht160s-obsv-p1)
+					if(gStateRecord!=NULL)
+						gStateRecord->TriggerSnapshot("HomeDrainTimeout");   //AI(ht160s-obsv-p1) : capture inner cursors BEFORE InitialAllTask wipes them
 					iHomeDrainPhase=2;
 				}
 				else
@@ -670,6 +674,28 @@ bool TfHome::ProcessMotorHome()
 					HSys.Cyn.C_TrayArm_FrontClamp.Off();
 					HSys.Cyn.C_TrayArm_RearClamp.Off();
 				}
+			}
+			//AI(ht160s-obsv-p2) 20260720 : real-build per-round axis summary. SimHomeTrace
+			//narration is compiled out on real machines, yet "which axes re-homed vs kept
+			//position" decides the coordinate frame the resume runs in.
+			{
+				AnsiString sRunR="", sSkipR="", sDisR="";
+				if(HSys.MotPtr!=NULL)
+				{
+					for(int i=0; i<HSys.iTotalMotor; i++)
+					{
+						TTrayMotor *m=HSys.MotPtr[i];
+						if(m==NULL)
+							continue;
+						if(m->GetEnable()==false)
+							sDisR+=m->NumberAlias+" ";
+						else if(IsHomedServoSkippable(m))
+							sSkipR+=m->NumberAlias+" ";
+						else
+							sRunR+=m->NumberAlias+" ";
+					}
+				}
+				RecordProcess("Home: axes run=[ "+sRunR+"] skip=[ "+sSkipR+"] disabled=[ "+sDisR+"]");
 			}
 #ifdef SOFT_SIMULATE
 			if(bSimNewStep)

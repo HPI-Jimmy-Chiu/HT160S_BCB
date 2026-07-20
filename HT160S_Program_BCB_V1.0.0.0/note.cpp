@@ -805,7 +805,9 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
     if(fNote->FlushPanel==NULL)
         fNote->FlushPanel=fNote->pn_System;
 
-    fNote->ProcessErrMessage(Code, Message, 1);
+    //AI(ht160s-obsv-p2) 20260720 : persist the Detail (sensor expect/actual/IO line) in the
+    //EventLog Message column - it previously lived only in the on-screen Memo.
+    fNote->ProcessErrMessage(Code, (Detail!="") ? (Message+" | "+Detail) : Message, 1);
     AlarmReport(Code, Message, true);    //AI(ht160s-secsgem) 20260625 : S5F1 alarm set
     DWORD dwPauseStart=GetTickCount();   //AI(HT160S-Maintainer) 20260626 : measure operator pause
     fNote->ShowModal();

@@ -23,7 +23,7 @@ void cEventLog::Log(const AnsiString& sAlarmCode,
     // CSV: Date,Time,Recovery,PauseTime,Duplicate,AlarmCode,Message,ErrorPart
     TDateTime now = Now();
     AnsiString sDate = FormatDateTime("yyyy/mm/dd", now);
-    AnsiString sTime = FormatDateTime("hh:nn:ss", now);
+    AnsiString sTime = FormatDateTime("hh:nn:ss.zzz", now);   //AI(ht160s-obsv-p1) : ms resolution (resume bursts are sub-second)
 
     AnsiString sLine;
     sLine = sDate + "," + sTime + ",,"
@@ -43,7 +43,7 @@ void cEventLog::LogRecovery(const AnsiString& sRecovery,
     // CSV: Date,Time,Recovery,PauseTime,Duplicate,AlarmCode,Message,ErrorPart
     TDateTime now = Now();
     AnsiString sDate = FormatDateTime("yyyy/mm/dd", now);
-    AnsiString sTime = FormatDateTime("hh:nn:ss", now);
+    AnsiString sTime = FormatDateTime("hh:nn:ss.zzz", now);   //AI(ht160s-obsv-p1) : ms resolution
 
     AnsiString sLine;
     sLine = sDate + "," + sTime + ","

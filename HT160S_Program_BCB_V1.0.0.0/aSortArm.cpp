@@ -1369,6 +1369,7 @@ bool TSortArmModule::CheckPlaceResidue()
             continue;
         if(HSys.LastSet.iRealDummy!=REALLY)   //no real vacuum sensor off REALLY
         {
+            RecordProcess("SortArm residue verify: slot "+IntToStr(s)+" skipped (non-REALLY tier)");   //AI(ht160s-obsv-p2)
             bNeedResidueCheck[s]=false;
             continue;
         }

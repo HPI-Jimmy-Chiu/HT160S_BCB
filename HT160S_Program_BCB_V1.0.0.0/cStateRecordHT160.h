@@ -39,6 +39,7 @@ private:
         TTaskSample Hist[SR_MAX_HISTORY];   // circular buffer
         int         HistHead;               // next write index
         int         HistCount;              // filled entries (<= SR_MAX_HISTORY)
+        bool        bStuckFired;            //AI(ht160s-obsv-p1) : one auto-snapshot per stuck episode
     };
 
     TModuleState Modules[SR_MAX_MODULE];
@@ -79,6 +80,10 @@ private:
     //AI(ht160s-lot-webapi) 20260612 : package today's Lot WebAPI log if one exists
     //  (the log only exists when a pull actually ran, i.e. the feature was in use).
     void       CaptureWebApiLog(AnsiString DstRootWithSlash);
+    //AI(ht160s-obsv-p1) 20260720 : ship today's+yesterday's EventLog CSV inside the zip
+    void       CaptureEventLog(AnsiString DstRootWithSlash);
+    //AI(ht160s-obsv-p1) 20260720 : live consumer of the StuckMs computation (auto snapshot)
+    void       CheckStuckWatchdog();
 
 public:
     cStateRecordHT160();

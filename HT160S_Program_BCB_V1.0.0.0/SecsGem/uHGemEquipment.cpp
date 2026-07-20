@@ -323,6 +323,7 @@ void THGem::EventReport(unsigned iDataID, unsigned iCeid)
     if(iHsmsState!=HSMS_STATE_SELECTED)
     {
         StringOut("[SECS][TX] S6F11 skipped (not selected)");
+        FlushSecsLogToFile();   //AI(ht160s-obsv-p1) : event evidence crash-safe
         return;
     }
 
@@ -355,6 +356,7 @@ void THGem::EventReport(unsigned iDataID, unsigned iCeid)
             DataItemOutSVValue(Rp->SVIDs[s]);
     }
     SendLocalData();
+    FlushSecsLogToFile();   //AI(ht160s-obsv-p1) : event evidence crash-safe
 }
 //---------------------------------------------------------------------------
 void THGem::SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx)
@@ -367,6 +369,7 @@ void THGem::SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx)
     if(iHsmsState!=HSMS_STATE_SELECTED)
     {
         StringOut("[SECS][TX] S5F1 skipped (not selected)");
+        FlushSecsLogToFile();   //AI(ht160s-obsv-p1) : alarm evidence crash-safe (was: <=1s RAM window)
         return;
     }
     unsigned uAlid = alid;
@@ -376,6 +379,7 @@ void THGem::SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx)
     DataItemOut(1, HType.UINT_4_TYPE, &uAlid);
     DataItemOut(HType.ASCII_TYPE, altx);
     SendLocalData();
+    FlushSecsLogToFile();   //AI(ht160s-obsv-p1) : alarm evidence crash-safe (was: <=1s RAM window)
 }
 //---------------------------------------------------------------------------
 bool THGem::IsEnableEvent(unsigned iDataID, unsigned iCeid)
