@@ -338,6 +338,7 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <ul>
 <li><strong>level（sticky）</strong>：FULL / SHORTAGE / DRAINED / READY。每按一次 on↔off toggle，維持 asserted，讀取<strong>不消費</strong>；cycle 完成（Take / Finish）時自動清掉。</li>
 <li><strong>edge（one-shot）</strong>：TAKEN / FINISH。按下 = armed；協調器下一個 tick 消費一次 → 送 CEID274 → <strong>清掉整站 cycle</strong>（連 FULL/DRAINED 一起歸零），避免立刻又叫車 272。</li>
+<li><strong>★ SOFT_SIMULATE 下的「無限循環」注意</strong>：sim 下 273/274 的 predicate 硬回 true，會在 <code>||</code> <strong>短路</strong>掉 inject 的清除（<code>InfeedFinished(p) || AmrInject.InputFinish(p)</code>，uAgvStation.cpp:396 / Auto 同理:342）。結果<strong>注入的 level latch（Loader Short / Auto Full）不會在 cycle 完成時自動清掉</strong>，於是機台每秒 <code>272→273→274→272…</code> 無限重叫（模擬器若勾 Auto-AGV 會一直回應）。<strong>這是 sim 下按一次 level 注入的預期副作用，不是機台故障。要停：再按一次該 level 鈕關掉、或取消測試模式勾選、或取消模擬器 Auto-AGV。</strong>（真機不會有此問題:real 的 finish 靠 sensor，<code>AmrInject.InputFinish</code> 會被正常消費而清掉 latch。）</li>
 <li><strong>注入只在協調器端 OR-進 predicate</strong>：<code>bFull = IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a)</code>。predicate 本體不變，所以<strong>生產 / Clean-Out 等其它消費者只看到真實 sensor</strong>，注入的爆炸半徑僅限 SECS 握手。</li>
 <li><strong>左側 <code>ready=</code> 顯示真實 predicate、非注入值</strong>：按了 Drain/Ready，<code>ready=</code> 不一定變——<strong>以 log 與模擬器收到的 CEID 為準</strong>。</li>
 <li><strong>安全</strong>：<code>bTestMode</code> 預設 OFF、<strong>永不持久化</strong>（每次開程式都是 OFF）；任何 <strong>HOME/init</strong>（<code>InitialAllTask</code>）、<strong>機台 Start</strong>（<code>MachineStart</code>）、或<strong>取消勾選</strong>都會清掉測試模式與所有 latch。OFF 時所有讀取/消費都 no-op。<strong>測試模式期間請勿跑真實生產。</strong></li>
@@ -643,6 +644,14 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <tr>
 <td>看到 <code>CEID 35 / 36 / 37 / 148 / 149 / 150</code></td>
 <td><strong>正常</strong>：下料 Full 附帶的離散滿盤預告碼（§4.3）</td>
+</tr>
+<tr>
+<td><strong>★ 模擬器 <code>272→273→274</code> 不斷重複、不會停</strong>（sim build）</td>
+<td><strong>握手本身正確</strong>；重複是因為<strong>注入的 level latch（Loader Short / Auto Full）在 SOFT_SIMULATE 下不會自動清</strong>（sim finish 硬回 true 短路掉 inject 清除，§4.4）。<strong>要停：再按一次 Short/Full 關掉 latch、或取消測試模式、或取消模擬器 Auto-AGV。</strong> 真機無此問題</td>
+</tr>
+<tr>
+<td><strong><code>START</code> 回 <code>HCACK=2</code>（每個 274 之後）</strong></td>
+<td><strong>正常（bench 無 Lot）</strong>：<code>START</code> 前置檢查 <code>CheckLotDataReady</code>＝false（沒載 Lot / 2D 資料）→ HCACK=2。純握手測試不需要 START 成功；要成功需先 <code>SET_LOT_INFO</code>/<code>LOTSTART</code>+WebAPI 載入 Lot。與 AGV 叫車循環無關（循環由缺料觸發，非 START）</td>
 </tr>
 <tr>
 <td>連不上（一直 disconnected）</td>
