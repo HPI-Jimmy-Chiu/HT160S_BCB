@@ -200,10 +200,34 @@ public:
         bInFinish[p] = false;
     }
 
-    // ---- SECS S2F41 handler alert (bad / rejected host command) ----
-    void NoteHostReject(AnsiString Cmd, unsigned Hcack)
+    // ---- SECS S2F41 host-command feedback (shown on the AMR maintenance tab) ----
+    // AI(ht160s-agv) 20260720 : log EVERY received host command with an accept/reject
+    // tag + human-readable reason + parsed-content echo, so on-site customer-IT
+    // validation reads acceptance / rejection straight off the panel. Logged
+    // regardless of test mode (a real host-command trace); sLog is self-capped.
+    AnsiString HcackReason(unsigned Hcack)
     {
-        Add("!! S2F41 cmd=" + Cmd + " HCACK=" + IntToStr((int)Hcack));
+        switch(Hcack)
+        {
+            case 0: return "OK";
+            case 1: return "command not recognized / bad format";
+            case 2: return "parameter invalid (empty list / unknown station / type / capacity / no lot data)";
+            case 3: return "one or more parameters invalid";
+            case 4: return "busy (producing / IC still in machine)";
+        }
+        return "unknown";
+    }
+    void NoteHostCommand(AnsiString Cmd, unsigned Hcack, AnsiString Detail)
+    {
+        AnsiString line = "RX S2F41 " + Cmd;
+        if(Detail.Trim() != "")
+            line = line + "  " + Detail;
+        if(Hcack == 0)
+            line = line + "  [OK]";
+        else
+            line = line + "  [REJECT HCACK=" + IntToStr((int)Hcack) + ": "
+                        + HcackReason(Hcack) + "]";
+        Add(line);
     }
 
     AnsiString GetLog() { return sLog; }

@@ -678,6 +678,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
     char CommandStr[256];
     char str[256];
     AnsiString S;
+    AnsiString sRxDetail = "";   //AI(ht160s-agv) 20260720 : parsed-content echo for AMR-tab host-cmd feedback
 
     if(HGemPtr==NULL)
         return 1;
@@ -709,6 +710,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             // Inner L[n] : n = number of Lots (variable)
             if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
             {
+                sRxDetail = "lots=" + IntToStr(n);
                 if(n==0)
                 {
                     HCACK = 2;                                   // empty list -> param error
@@ -830,6 +832,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             // receive path and a popup would stall SECS communication.
             if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
             {
+                sRxDetail = "lots=" + IntToStr(n);
                 if(n<=0)
                 {
                     HCACK = 2;                                   // empty list -> param error
@@ -1030,6 +1033,8 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         // sensor+TrayArm with zero SECS (docs/AGV/HT9045_vs_HT160_SECS_Diff)
                         // and HT160 has no stack-depth counting hardware. Loader is host-
                         // supplied because only it consumes the value (tray-kind tagging).
+                        if(sRxDetail!="") sRxDetail = sRxDetail + " ";
+                        sRxDetail = sRxDetail + cpName.Trim() + "=" + cpVal.Trim();
                         if(cpName.Trim().UpperCase()=="LOADERTRAYCOUNT")
                             AgvCoord.TrayCount[0] = StrToIntDef(cpVal, 0);  // P1 Loader expected trays
                         else if(AgvCoord.BeginPrep(cpName)==false)
@@ -1094,7 +1099,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                      (int)LotRegistry.GetLotCount());
         HGemPtr->StringOut(sLog);
     }
-    if(HCACK!=0) AmrInject.NoteHostReject(S, HCACK);   // AI(ht160s-agv) 20260708 : surface rejected host cmd on AMR tab
+    AmrInject.NoteHostCommand(S, HCACK, sRxDetail);   // AI(ht160s-agv) 20260720 : every host cmd -> AMR tab (accept/reject + reason + content)
     return 1;
 }
 //---------------------------------------------------------------------------
