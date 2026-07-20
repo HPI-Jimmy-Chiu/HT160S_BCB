@@ -929,7 +929,7 @@ object fMaintenance: TfMaintenance
           Width = 240
           Height = 28
           Style = csDropDownList
-          ItemHeight = 20
+          ItemHeight = 0
           TabOrder = 3
         end
         object btnPwAddUpdate: TButton
@@ -1003,7 +1003,9 @@ object fMaintenance: TfMaintenance
           Top = 32
           Width = 495
           Height = 24
-          Caption = '*** AMR TEST MODE ON - injection active, do NOT run real production ***'
+          Caption = 
+            '*** AMR TEST MODE ON - injection active, do NOT run real product' +
+            'ion ***'
           Color = clRed
           Font.Charset = DEFAULT_CHARSET
           Font.Color = clWhite
@@ -1020,7 +1022,6 @@ object fMaintenance: TfMaintenance
           Width = 495
           Height = 560
           BevelInner = bvLowered
-          Caption = ''
           TabOrder = 3
         end
         object memAmrTx: TMemo
@@ -1092,7 +1093,9 @@ object fMaintenance: TfMaintenance
                   Width = 600
                   Height = 16
                   AutoSize = False
-                  Caption = 'When ON, supply the Auto SortArm is waiting for first; OFF = lowest-numbered Auto.'
+                  Caption = 
+                    'When ON, supply the Auto SortArm is waiting for first; OFF = low' +
+                    'est-numbered Auto.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -1184,9 +1187,9 @@ object fMaintenance: TfMaintenance
                   Width = 620
                   Height = 16
                   AutoSize = False
-                  Caption =
-                    'Hide UPH until this many ICs are sorted (small-sample spike gua' +
-                    'rd). 0 = auto (one full tray); >0 = fixed IC count.'
+                  Caption = 
+                    'Hide UPH until this many ICs are sorted (small-sample spike guar' +
+                    'd). 0 = auto (one full tray); >0 = fixed IC count.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -1209,7 +1212,7 @@ object fMaintenance: TfMaintenance
             object tsNetwork: TTabSheet
               Caption = 'N[Network]'
               ImageIndex = 1
-              object Panel4: TPanel
+              object pnlNetworkBody: TPanel
                 Left = 0
                 Top = 0
                 Width = 929
@@ -1256,9 +1259,9 @@ object fMaintenance: TfMaintenance
             Top = 2
             Width = 937
             Height = 880
-            ActivePage = tsLoaderUnloader
+            ActivePage = tsLotInfo
             Align = alClient
-            TabIndex = 0
+            TabIndex = 4
             TabOrder = 0
             object tsLoaderUnloader: TTabSheet
               Caption = 'Loader/Unloader'
@@ -1490,6 +1493,22 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
+                object lblLoaderSafeHint: TLabel
+                  Left = 36
+                  Top = 48
+                  Width = 860
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'Minimum separation between the two loader cars. Range 325-650 mm' +
+                    '.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
                 object edLoaderSafeDistance: TEdit
                   Left = 216
                   Top = 8
@@ -1499,20 +1518,6 @@ object fMaintenance: TfMaintenance
                   TabOrder = 0
                   Text = '100.00'
                   OnClick = edLoaderSafeDistanceClick
-                end
-                object lblLoaderSafeHint: TLabel
-                  Left = 36
-                  Top = 48
-                  Width = 860
-                  Height = 16
-                  AutoSize = False
-                  Caption = 'Minimum separation between the two loader cars. Range 325-650 mm.'
-                  Font.Charset = DEFAULT_CHARSET
-                  Font.Color = clNavy
-                  Font.Height = -13
-                  Font.Name = 'MS Sans Serif'
-                  Font.Style = []
-                  ParentFont = False
                 end
               end
               object pnlMachineIdentity: TPanel
@@ -1569,7 +1574,7 @@ object fMaintenance: TfMaintenance
                   Left = 168
                   Top = 12
                   Width = 200
-                  Height = 24
+                  Height = 21
                   TabOrder = 0
                   Text = 'HT160S'
                 end
@@ -1577,17 +1582,15 @@ object fMaintenance: TfMaintenance
                   Left = 168
                   Top = 48
                   Width = 200
-                  Height = 24
+                  Height = 21
                   TabOrder = 1
-                  Text = ''
                 end
                 object edSerialNo: TEdit
                   Left = 168
                   Top = 84
                   Width = 200
-                  Height = 24
+                  Height = 21
                   TabOrder = 2
-                  Text = ''
                 end
               end
               object pnlSettleDelay: TPanel
@@ -1626,17 +1629,6 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
-                object edSettle0: TEdit
-                  Left = 240
-                  Top = 32
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 0
-                  Tag = 0
-                  Text = '500'
-                  OnClick = edSettleDelayClick
-                end
                 object lblSettle1: TLabel
                   Left = 20
                   Top = 72
@@ -1650,17 +1642,6 @@ object fMaintenance: TfMaintenance
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
-                end
-                object edSettle1: TEdit
-                  Left = 240
-                  Top = 68
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 1
-                  Tag = 1
-                  Text = '500'
-                  OnClick = edSettleDelayClick
                 end
                 object lblSettle2: TLabel
                   Left = 20
@@ -1676,17 +1657,6 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
-                object edSettle2: TEdit
-                  Left = 240
-                  Top = 104
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 2
-                  Tag = 2
-                  Text = '1000'
-                  OnClick = edSettleDelayClick
-                end
                 object lblSettle3: TLabel
                   Left = 20
                   Top = 144
@@ -1700,17 +1670,6 @@ object fMaintenance: TfMaintenance
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
-                end
-                object edSettle3: TEdit
-                  Left = 240
-                  Top = 140
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 3
-                  Tag = 3
-                  Text = '500'
-                  OnClick = edSettleDelayClick
                 end
                 object lblSettle4: TLabel
                   Left = 20
@@ -1726,17 +1685,6 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
-                object edSettle4: TEdit
-                  Left = 240
-                  Top = 176
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 4
-                  Tag = 4
-                  Text = '500'
-                  OnClick = edSettleDelayClick
-                end
                 object lblSettle5: TLabel
                   Left = 480
                   Top = 36
@@ -1750,17 +1698,6 @@ object fMaintenance: TfMaintenance
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
-                end
-                object edSettle5: TEdit
-                  Left = 700
-                  Top = 32
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 5
-                  Tag = 5
-                  Text = '500'
-                  OnClick = edSettleDelayClick
                 end
                 object lblSettle6: TLabel
                   Left = 480
@@ -1776,17 +1713,6 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
-                object edSettle6: TEdit
-                  Left = 700
-                  Top = 68
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 6
-                  Tag = 6
-                  Text = '500'
-                  OnClick = edSettleDelayClick
-                end
                 object lblSettle7: TLabel
                   Left = 480
                   Top = 108
@@ -1800,17 +1726,6 @@ object fMaintenance: TfMaintenance
                   Font.Name = 'MS Sans Serif'
                   Font.Style = []
                   ParentFont = False
-                end
-                object edSettle7: TEdit
-                  Left = 700
-                  Top = 104
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 7
-                  Tag = 7
-                  Text = '300'
-                  OnClick = edSettleDelayClick
                 end
                 object lblSettle8: TLabel
                   Left = 480
@@ -1826,17 +1741,6 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
-                object edSettle8: TEdit
-                  Left = 700
-                  Top = 140
-                  Width = 70
-                  Height = 21
-                  ReadOnly = True
-                  TabOrder = 8
-                  Tag = 8
-                  Text = '500'
-                  OnClick = edSettleDelayClick
-                end
                 object lblSettle9: TLabel
                   Left = 480
                   Top = 180
@@ -1851,14 +1755,112 @@ object fMaintenance: TfMaintenance
                   Font.Style = []
                   ParentFont = False
                 end
+                object edSettle0: TEdit
+                  Left = 240
+                  Top = 32
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle1: TEdit
+                  Tag = 1
+                  Left = 240
+                  Top = 68
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 1
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle2: TEdit
+                  Tag = 2
+                  Left = 240
+                  Top = 104
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 2
+                  Text = '1000'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle3: TEdit
+                  Tag = 3
+                  Left = 240
+                  Top = 140
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 3
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle4: TEdit
+                  Tag = 4
+                  Left = 240
+                  Top = 176
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 4
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle5: TEdit
+                  Tag = 5
+                  Left = 700
+                  Top = 32
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 5
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle6: TEdit
+                  Tag = 6
+                  Left = 700
+                  Top = 68
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 6
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle7: TEdit
+                  Tag = 7
+                  Left = 700
+                  Top = 104
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 7
+                  Text = '300'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle8: TEdit
+                  Tag = 8
+                  Left = 700
+                  Top = 140
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 8
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
                 object edSettle9: TEdit
+                  Tag = 9
                   Left = 700
                   Top = 176
                   Width = 70
                   Height = 21
                   ReadOnly = True
                   TabOrder = 9
-                  Tag = 9
                   Text = '500'
                   OnClick = edSettleDelayClick
                 end
@@ -2045,10 +2047,10 @@ object fMaintenance: TfMaintenance
                   Width = 905
                   Height = 32
                   AutoSize = False
-                  Caption =
-                    'Auto-skip a cell after pick-retries are exhausted, instead of s' +
-                    'topping for the operator. Each skipped IC is logged as a Reject ' +
-                    'and counted on the main screen (Auto Skip). Default OFF.'
+                  Caption = 
+                    'Auto-skip a cell after pick-retries are exhausted, instead of st' +
+                    'opping for the operator. Each skipped IC is logged as a Reject a' +
+                    'nd counted on the main screen (Auto Skip). Default OFF.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -2130,9 +2132,10 @@ object fMaintenance: TfMaintenance
                   Width = 897
                   Height = 16
                   AutoSize = False
-                  Caption = 'Suck2 quad-vacuum : all 4 vacuum generator circuits feed the Suck' +
-                    '2 nozzle (Nozzle2 only). Any sensor mismatch alarms. Restart req' +
-                    'uired.'
+                  Caption = 
+                    'Suck2 quad-vacuum : all 4 vacuum generator circuits feed the Suc' +
+                    'k2 nozzle (Nozzle2 only). Any sensor mismatch alarms. Restart re' +
+                    'quired.'
                 end
                 object chkSuck2QuadVacuum: TCheckBox
                   Left = 16
@@ -2152,7 +2155,7 @@ object fMaintenance: TfMaintenance
                 Left = 0
                 Top = 0
                 Width = 929
-                Height = 104
+                Height = 80
                 Align = alTop
                 BevelInner = bvLowered
                 TabOrder = 0
@@ -2160,15 +2163,13 @@ object fMaintenance: TfMaintenance
                   Left = 240
                   Top = 8
                   Width = 609
-                  Height = 92
+                  Height = 68
                   AutoSize = False
-                  Caption =
-                    'Normal = static Bin->Auto recipe table.  By Lot+Bin = each (Lot,B' +
-                    'in) pair binds to an Auto dynamically.  By Lot+PassFail = PASS/FAI' +
-                    'L (vs the Pass Bin set on the Bin Setting page) binds to an Auto p' +
-                    'er lot.  By WhiteList = only 2D codes listed in HT160S_WhiteList\W' +
-                    'hiteList.json are sorted (by the file Bin); others go to Error.  M' +
-                    'ode takes effect at the next Lot Start.'
+                  Caption = 
+                    'Normal = static Bin->Auto recipe table.  By Lot+Bin = each (Lot,' +
+                    'Bin) pair binds to an Auto dynamically.  By Lot+PassFail = PASS/' +
+                    'FAIL (vs the Pass Bin set on the Bin Setting page) binds to an A' +
+                    'uto per lot.  Mode takes effect at the next Lot Start.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13
@@ -2181,9 +2182,8 @@ object fMaintenance: TfMaintenance
                   Left = 8
                   Top = 2
                   Width = 224
-                  Height = 98
+                  Height = 74
                   Caption = 'Sort Mode'
-                  Columns = 1
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clWindowText
                   Font.Height = -13
@@ -2193,11 +2193,55 @@ object fMaintenance: TfMaintenance
                   Items.Strings = (
                     'Normal'
                     'By Lot+Bin'
-                    'By Lot+PassFail'
-                    'By WhiteList')
+                    'By Lot+PassFail')
                   ParentFont = False
                   TabOrder = 0
                   OnClick = rgSortModeClick
+                end
+              end
+              object pnlWhiteListModeBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 89
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblWhiteListModeHint: TLabel
+                  Left = 16
+                  Top = 32
+                  Width = 897
+                  Height = 49
+                  AutoSize = False
+                  Caption = 
+                    'By WhiteList: only 2D codes in HT160S_WhiteList\WhiteList.json a' +
+                    're sorted (by the file Bin); others go to Error. Customer specia' +
+                    'l mode, NOT normal production. Arms at Lot Start and auto-revert' +
+                    's to the base sort mode at Lot End. Changeable only while idle.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkWhiteListActive: TCheckBox
+                  Left = 16
+                  Top = 8
+                  Width = 470
+                  Height = 20
+                  Caption = 
+                    'Activate By WhiteList sorting for this lot only (customer specia' +
+                    'l)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkWhiteListActiveClick
                 end
               end
             end

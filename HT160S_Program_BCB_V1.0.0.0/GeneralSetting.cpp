@@ -13,6 +13,13 @@ THT160GeneralSetting GeneralSetting;
 __fastcall THT160GeneralSetting::THT160GeneralSetting()
 {
 	SetDefault();
+	//AI(ht160s-whitelist-override) 20260717 : the WhiteList overlay is per-work-order RUNTIME state,
+	//NOT a General.ini config field, so its boot-clear lives HERE (ctor), not in SetDefault(). Load()
+	//calls SetDefault() on every maintenance reopen / MCU reload; clearing the overlay inside
+	//SetDefault() would silently disarm a running WhiteList lot (adversarial review 2026-07-17 BLOCKER).
+	//RestoreLastWorkOrder restores the overlay from WhiteListOverlay.ini at boot.
+	bWhiteListActive=false;
+	RecomputeEffectiveSortMode();
 }
 //---------------------------------------------------------------------------
 AnsiString THT160GeneralSetting::GetGeneralIniFileName()
@@ -21,6 +28,52 @@ AnsiString THT160GeneralSetting::GetGeneralIniFileName()
 	if(RootPath==AnsiString(""))
 		RootPath="..";
 	return RootPath+AnsiString("\\system\\General.ini");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist-override) 20260717 : the WhiteList overlay is per-work-order runtime state
+//(NOT sticky machine config), so it lives in its own tiny ini and rides the work-order lifecycle
+//(written at Lot Start / Lot End / fresh-clear, read on resume). Keeping it out of General.ini
+//avoids the config-tier violation and the "Load() re-runs on maintenance reopen" stale-read trap.
+static AnsiString GetWhiteListOverlayIniFileName()
+{
+	AnsiString RootPath=HSys.CurrentDir;
+	if(RootPath==AnsiString(""))
+		RootPath="..";
+	return RootPath+AnsiString("\\system\\WhiteListOverlay.ini");
+}
+//---------------------------------------------------------------------------
+void THT160GeneralSetting::SaveWhiteListOverlay()
+{
+	AnsiString fn=GetWhiteListOverlayIniFileName();
+	ForceDirectories(ExtractFilePath(fn));
+	TIniFile *Ini=new TIniFile(fn);
+	try
+	{
+		Ini->WriteBool("WhiteList", "Active", bWhiteListActive);
+	}
+	__finally
+	{
+		delete Ini;
+	}
+}
+//---------------------------------------------------------------------------
+void THT160GeneralSetting::LoadWhiteListOverlay()
+{
+	AnsiString fn=GetWhiteListOverlayIniFileName();
+	bool b=false;
+	if(FileExists(fn))
+	{
+		TIniFile *Ini=new TIniFile(fn);
+		try
+		{
+			b=Ini->ReadBool("WhiteList", "Active", false);
+		}
+		__finally
+		{
+			delete Ini;
+		}
+	}
+	SetWhiteListActive(b);
 }
 //---------------------------------------------------------------------------
 void THT160GeneralSetting::SetDefault()
@@ -38,6 +91,9 @@ void THT160GeneralSetting::SetDefault()
 		iAmrIdentityTray[z]=(z==1)?0:((z==2)?-1:1);
 	}
 	iSortMode=smNormal;
+	//AI(ht160s-whitelist-override) 20260717 : do NOT touch bWhiteListActive / iEffectiveSortMode here -
+	//SetDefault() is also called from Load() (maintenance reopen / MCU reload) and must not disarm a
+	//running lot. The boot-clear is in the ctor; every SetDefault() caller recomputes the mirror after.
 	bUsePredictiveAutoSupply=false;
 	bUseAmrRecoveryDivert=false;
 	for(int a=0;a<6;a++)
@@ -58,6 +114,7 @@ void THT160GeneralSetting::SetDefault()
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
 	iHomeDrainTimeoutSec=15;
+	iStuckSnapshotSec=300;   //AI(ht160s-obsv-p1) : 5 min
 	iAutoFrontRiseDwellMs=500;
 	iAutoCleanOutRiseDwellMs=500;
 	iTrayArmClampSettleMs=300;
@@ -101,7 +158,10 @@ void THT160GeneralSetting::Load()
 
 	SetDefault();
 	if(!FileExists(FileName))
+	{
+		RecomputeEffectiveSortMode();   // no ini : keep the effective mirror consistent (overlay preserved)
 		return;
+	}
 
 	Ini=new TIniFile(FileName);
 	bColorBinAreaInstalled=Ini->ReadBool("HardwareInstall", "ColorBinAreaInstalled", false);
@@ -124,9 +184,18 @@ void THT160GeneralSetting::Load()
 	{
 		int LegacyMode=Ini->ReadBool("SortMode", "UseLotBinMode", false)?smLotBin:smNormal;
 		iSortMode=Ini->ReadInteger("SortMode", "Mode", LegacyMode);
-		if(iSortMode<smNormal || iSortMode>smWhiteList)
+		// AI(ht160s-whitelist-override) 20260717 : base mode is now {Normal,LotBin,LotPassFail}
+		// only - WhiteList is a per-lot overlay (bWhiteListActive), never a persisted base. A
+		// stale Mode=3 from the old sticky WhiteList design migrates to Normal (same static
+		// routing); the overlay is work-order state (restored by RestoreLastWorkOrder), never
+		// read here, so WhiteList must be re-commanded at the next Lot Start. Do NOT reset
+		// bWhiteListActive here : Load() also runs on every maintenance reopen, and clearing it
+		// would silently disarm a running WhiteList lot.
+		if(iSortMode<smNormal || iSortMode>smLotPassFail)
 			iSortMode=smNormal;
 	}
+	RecomputeEffectiveSortMode();   // keep the SVID-66032 mirror in step with the reloaded base
+
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
 	bUseAmrRecoveryDivert=Ini->ReadBool("SortMode", "UseAmrRecoveryDivert", false);
 	for(int a=0;a<6;a++)
@@ -158,6 +227,7 @@ void THT160GeneralSetting::Load()
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
 	iHomeReacquireOffsetCnt=Ini->ReadInteger("HomeResume", "ReacquireOffsetCnt", 100);
 	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
+	iStuckSnapshotSec=Ini->ReadInteger("Observability", "StuckSnapshotSec", 300);
 	iAutoFrontRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoFrontRiseDwellMs", 500);
 	iAutoCleanOutRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoCleanOutRiseDwellMs", 500);
 	iTrayArmClampSettleMs=Ini->ReadInteger("SettleDelay", "TrayArmClampSettleMs", 300);
@@ -238,6 +308,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
 	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
+	Ini->WriteInteger("Observability", "StuckSnapshotSec", iStuckSnapshotSec);
 	Ini->WriteInteger("SettleDelay", "AutoFrontRiseDwellMs", iAutoFrontRiseDwellMs);
 	Ini->WriteInteger("SettleDelay", "AutoCleanOutRiseDwellMs", iAutoCleanOutRiseDwellMs);
 	Ini->WriteInteger("SettleDelay", "TrayArmClampSettleMs", iTrayArmClampSettleMs);

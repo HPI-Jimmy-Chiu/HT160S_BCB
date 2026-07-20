@@ -2296,17 +2296,17 @@ object fMain: TfMain
                 Align = alBottom
                 TabOrder = 4
                 object sgProductInfo: TStringGrid
-                  FixedCols = 0
-                  FixedRows = 0
                   Left = 1
                   Top = 1
                   Width = 336
-                  Height = 114
+                  Height = 120
                   Align = alLeft
                   ColCount = 3
                   DefaultColWidth = 105
                   DefaultRowHeight = 16
+                  FixedCols = 0
                   RowCount = 6
+                  FixedRows = 0
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clBlack
                   Font.Height = -11
@@ -2522,6 +2522,48 @@ object fMain: TfMain
                     Alignment = taCenter
                     AutoSize = False
                     Caption = 'OFF'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clGray
+                    Font.Height = -12
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                end
+                object pnlFeatureBadge4: TPanel
+                  Left = 0
+                  Top = 36
+                  Width = 132
+                  Height = 30
+                  BevelInner = bvLowered
+                  TabOrder = 3
+                  object lblFeatureName4: TLabel
+                    Left = 4
+                    Top = 2
+                    Width = 38
+                    Height = 24
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'SORT'
+                    Color = clBtnFace
+                    Font.Charset = ANSI_CHARSET
+                    Font.Color = clNavy
+                    Font.Height = -11
+                    Font.Name = 'Arial'
+                    Font.Style = [fsBold]
+                    ParentColor = False
+                    ParentFont = False
+                  end
+                  object lblFeatureValue4: TLabel
+                    Left = 43
+                    Top = 4
+                    Width = 84
+                    Height = 20
+                    Alignment = taCenter
+                    AutoSize = False
+                    Caption = 'NORMAL'
                     Color = clBtnFace
                     Font.Charset = ANSI_CHARSET
                     Font.Color = clGray

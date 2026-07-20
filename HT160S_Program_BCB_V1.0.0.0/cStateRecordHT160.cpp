@@ -24,6 +24,20 @@ static const AnsiString SR_VERSION = "HT160S 1.0.0.0";
 //---------------------------------------------------------------------------
 cStateRecordHT160 *gStateRecord = NULL;
 //---------------------------------------------------------------------------
+//AI(diag-av) TEMP breadcrumb tracer for the WriteLotDataJson access-violation
+//hunt. Appends one line per step to D:\HT160S_StateRecord\_ldj_trace.txt with a
+//flush after every write so the LAST line survives an OS crash. REMOVE after fix.
+static void SR_Trace(const char *Msg)
+{
+    FILE *f = fopen("D:\\HT160S_StateRecord\\_ldj_trace.txt", "ab");
+    if(f==NULL)
+        return;
+    AnsiString T = FormatDateTime("hh:nn:ss.zzz", Now());
+    fprintf(f, "%s %s\r\n", T.c_str(), Msg);
+    fflush(f);
+    fclose(f);
+}
+//---------------------------------------------------------------------------
 cStateRecordHT160::cStateRecordHT160()
 {
     ModuleCount = 0;
@@ -35,6 +49,7 @@ cStateRecordHT160::cStateRecordHT160()
         Modules[i].Name      = "";
         Modules[i].LastTask  = -1;
         Modules[i].bHasLast  = false;
+        Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1)
         Modules[i].HistHead  = 0;
         Modules[i].HistCount = 0;
     }
@@ -140,6 +155,7 @@ void cStateRecordHT160::EnsureInited()
         Modules[i].HistHead  = 0;
         Modules[i].HistCount = 0;
         Modules[i].bHasLast  = false;
+        Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1)
         // Seed an initial sample so every module has at least one entry.
         PushSample(i, Motion->Actions[i]->Tag);
     }
@@ -163,7 +179,45 @@ void cStateRecordHT160::SampleTasks()
     {
         int Tag = Motion->Actions[i]->Tag;
         if(Modules[i].bHasLast==false || Modules[i].LastTask!=Tag)
+        {
             PushSample(i, Tag);
+            Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1) : task moved -> re-arm episode
+        }
+    }
+    CheckStuckWatchdog();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-obsv-p1) 20260720 : generic stuck watchdog. StuckMs was computed for the
+//dumps but nothing consumed it live - a module wedged mid-production idled forever
+//with no alarm and no evidence. One auto snapshot per stuck episode per module
+//(re-armed when its Task changes); HOME rounds excluded via the RunMode gate.
+void cStateRecordHT160::CheckStuckWatchdog()
+{
+    if(GeneralSetting.iStuckSnapshotSec<=0)
+        return;
+    if(HSys.Sys.SystemStart==false)
+        return;
+    if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
+        return;
+    AnsiString sStuck;
+    TDateTime tNow = Now();
+    for(int i=0; i<ModuleCount; i++)
+    {
+        if(Modules[i].bHasLast==false || Modules[i].bStuckFired)
+            continue;
+        int iLast=(Modules[i].HistHead-1+SR_MAX_HISTORY)%SR_MAX_HISTORY;
+        double dMs=double(tNow-Modules[i].Hist[iLast].Time)*86400000.0;
+        if(dMs > double(GeneralSetting.iStuckSnapshotSec)*1000.0)
+        {
+            Modules[i].bStuckFired=true;
+            sStuck+=" "+Modules[i].Name+"(task "+IntToStr(Modules[i].LastTask)+")";
+        }
+    }
+    if(sStuck!="")
+    {
+        RecordProcess("STUCK watchdog: task unchanged >"+IntToStr(GeneralSetting.iStuckSnapshotSec)+
+            "s while running:"+sStuck+" - auto snapshot");
+        TriggerSnapshot("StuckWatchdog");
     }
 }
 //---------------------------------------------------------------------------
@@ -439,7 +493,9 @@ void cStateRecordHT160::WriteMachineStateIni(AnsiString Path, AnsiString Reason,
     Ini->WriteString("Snapshot", "Version",       SR_VERSION);
     Ini->WriteString("Snapshot", "TriggerReason", Reason);
 
+    SR_Trace("MSI before delete Ini");
     delete Ini;
+    SR_Trace("MSI after delete Ini");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : escape a string for embedding in JSON.
@@ -480,13 +536,16 @@ static AnsiString SR_JsonEsc(AnsiString s)
 //keeps the JSON valid without trailing commas.
 void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, AnsiString Stamp)
 {
+    SR_Trace("LDJ 01 enter");
     TStringList *Lines=new TStringList;
     TStringList *Ic=new TStringList;
+    SR_Trace("LDJ 02 after new TStringList x2");
     try
     {
         AnsiString ActiveLot="";
         if(fMain!=NULL && fMain->edLotNo!=NULL)
             ActiveLot=fMain->edLotNo->Text;
+        SR_Trace("LDJ 03 after edLotNo read");
 
         Lines->Add("{");
         Lines->Add("  \"Snapshot\": { \"Time\": \""+SR_JsonEsc(Stamp)+"\", \"TriggerReason\": \""+SR_JsonEsc(Reason)+"\", \"Version\": \""+AnsiString(SR_VERSION)+"\" },");
@@ -495,7 +554,9 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
         Lines->Add("  \"ItemCount\": "+IntToStr(LotRegistry.GetItemCount())+",");
         Lines->Add("  \"Lots\": [");
 
+        SR_Trace("LDJ 04 before GetLotSlotCount");
         int SlotCount=LotRegistry.GetLotSlotCount();
+        SR_Trace(("LDJ 05 SlotCount=" + IntToStr(SlotCount)).c_str());
         bool bFirstLot=true;
         for(int i=0;i<SlotCount;i++)
         {
@@ -551,20 +612,36 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
             Lines->Add("    }");
         }
         Lines->Add("  ],");
+        SR_Trace("LDJ 06 after lot loop");
 
         //AI(ht160s-lotbin) 20260615 : dump the dynamic (Lot,key)->Auto table so a snapshot
         //taken in a dynamic mode shows which Auto each pair was bound to.
         //AI(ht160s-lotpassfail) 20260709 : 3-way mode name + PassBin. NOTE the "Bin" field
         //below carries a PASS/FAIL class (1=PASS,2=FAIL) when SortMode is "LotPassFail".
         {
-            AnsiString SortModeName = GeneralSetting.IsLotBinSortMode() ? AnsiString("LotBin")
-                                    : (GeneralSetting.IsLotPassFailSortMode() ? AnsiString("LotPassFail") : AnsiString("Normal"));
+            SR_Trace("LDJ 07 before IsLot*SortMode");
+            //AI(ht160s-whitelist-override) 20260717 : 4-way name off the EFFECTIVE mode (base +
+            //WhiteList overlay). Also dump the base mode and the overlay flag so a WhiteList
+            //snapshot is distinguishable from a base-only run.
+            AnsiString SortModeName;
+            switch(GeneralSetting.GetEffectiveSortMode())
+            {
+                case smLotBin:      SortModeName="LotBin";      break;
+                case smLotPassFail: SortModeName="LotPassFail"; break;
+                case smWhiteList:   SortModeName="WhiteList";   break;
+                default:            SortModeName="Normal";      break;
+            }
             Lines->Add("  \"SortMode\": \""+SortModeName+"\",");
+            Lines->Add("  \"BaseSortMode\": "+IntToStr(GeneralSetting.iSortMode)+",");
+            Lines->Add("  \"WhiteListActive\": "+IntToStr(GeneralSetting.bWhiteListActive?1:0)+",");
         }
+        SR_Trace("LDJ 08 before GetPassBin");
         Lines->Add("  \"PassBin\": "+IntToStr(BinAreaMap.GetPassBin())+",");
         Lines->Add("  \"LotBinBinding\": [");
         {
+            SR_Trace("LDJ 09 before GetBindingCount");
             int BindCount=LotBinBinding.GetBindingCount();
+            SR_Trace(("LDJ 10 BindCount=" + IntToStr(BindCount)).c_str());
             for(int b=0;b<BindCount;b++)
             {
                 AnsiString BLot;
@@ -579,13 +656,17 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
         Lines->Add("  ]");
         Lines->Add("}");
 
+        SR_Trace("LDJ 11 before SaveToFile");
         Lines->SaveToFile(Path);
+        SR_Trace("LDJ 12 after SaveToFile (OK)");
     }
     __finally
     {
+        SR_Trace("LDJ 13 finally (delete lists)");
         delete Ic;
         delete Lines;
     }
+    SR_Trace("LDJ 14 return");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-state-record-analysis) 20260612 : capture the live motion state that
@@ -748,7 +829,10 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
     Out += "[Config gates]\r\n";
     Out += "  bUseAMR=" + IntToStr(GeneralSetting.bUseAMR ? 1 : 0)
          + "  bColorBinAreaInstalled=" + IntToStr(GeneralSetting.bColorBinAreaInstalled ? 1 : 0)
-         + "  iSortMode=" + IntToStr(GeneralSetting.iSortMode) + "  PassBin=" + IntToStr(BinAreaMap.GetPassBin()) + "\r\n";
+         + "  iSortMode=" + IntToStr(GeneralSetting.iSortMode)
+         + "  WhiteListActive=" + IntToStr(GeneralSetting.bWhiteListActive ? 1 : 0)
+         + "  EffSortMode=" + IntToStr(GeneralSetting.GetEffectiveSortMode())
+         + "  PassBin=" + IntToStr(BinAreaMap.GetPassBin()) + "\r\n";
     Out += "  bUsePredictiveAutoSupply=" + IntToStr(GeneralSetting.bUsePredictiveAutoSupply ? 1 : 0)
          + "  bUseAmrRecoveryDivert=" + IntToStr(GeneralSetting.bUseAmrRecoveryDivert ? 1 : 0) + "\r\n";
     Out += "  bUseColorCcd=" + IntToStr(CosFunction.bUseColorCcd ? 1 : 0)
@@ -875,6 +959,26 @@ void cStateRecordHT160::CaptureWebApiLog(AnsiString DstRootWithSlash)
     CopyFolderFiles(WebSrc, WebDst);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-obsv-p1) 20260720 : package today's + yesterday's EventLog CSV into the
+//snapshot (the zip is what operators ship; without the narrative the state dump has
+//no timeline). Mirrors CaptureSecsLog; yesterday covers midnight-spanning shifts.
+void cStateRecordHT160::CaptureEventLog(AnsiString DstRootWithSlash)
+{
+    AnsiString Dst = DstRootWithSlash + "EventLog\\";
+    for(int iBack=0; iBack<2; iBack++)
+    {
+        Word y,mo,d;
+        DecodeDate(Now()-iBack, y, mo, d);
+        AnsiString Mon; Mon.sprintf("%04d_%02d", (int)y,(int)mo);
+        AnsiString Fn;  Fn.sprintf("HT160S_%04d_%02d_%02d.csv", (int)y,(int)mo,(int)d);
+        AnsiString Src = HSys.LogRootDir + "\\EventLog\\" + Mon + "\\" + Fn;
+        if(FileExists(Src)==false)
+            continue;
+        ForceDirectories(Dst);
+        CopyOneFile(Src, Dst + Fn);
+    }
+}
+//---------------------------------------------------------------------------
 bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
 {
     if(Reason==AnsiString(""))
@@ -889,17 +993,24 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
     if(ForceDirectories(TempDir)==false)
         return false;
 
+    SR_Trace("=== TriggerSnapshot start ===");
     WriteSnapshotIni    (TempDir + "Snapshot.ini",    Reason, Stamp);
+    SR_Trace("TS after WriteSnapshotIni");
     WriteTaskHistoryCsv (TempDir + "TaskHistory.csv");
+    SR_Trace("TS after WriteTaskHistoryCsv");
     WriteCurrentTasksTxt(TempDir + "CurrentTasks.txt");
+    SR_Trace("TS after WriteCurrentTasksTxt");
     WriteMachineStateIni(TempDir + "MachineState.ini", Reason, Stamp);
+    SR_Trace("TS after WriteMachineStateIni");
     WriteLotDataJson    (TempDir + "LotData.json",     Reason, Stamp);   //AI(ht160s-lot-webapi) 20260612 : full lot + 2D detail as JSON
+    SR_Trace("TS after WriteLotDataJson");
     WriteMotionDetailIni(TempDir + "MotionDetail.ini");   //AI(ht160s-state-record-analysis) 20260612 : motor pos + SortArm sub-task + sucker vacuum
     WriteSortArmDecisionTxt(TempDir + "SortArmDecision.txt");   //AI(ht160s-state-record-analysis) 20260616 : held-IC routing + per-Auto cell map (place/discharge deadlock evidence)
     WriteFeederDecisionTxt(TempDir + "FeederDecision.txt");   //AI(ht160s-state-record-analysis) 20260622 : Color/Empty/Loader latch + config-gate dump
     CaptureConfig       (TempDir + "MachineConfig\\");
     CaptureSecsLog      (TempDir);   //AI(ht160s-secsgem) 20260611 : include SECS log if feature on
     CaptureWebApiLog    (TempDir);   //AI(ht160s-lot-webapi) 20260612 : include Lot WebAPI log if any pull ran today
+    CaptureEventLog     (TempDir);   //AI(ht160s-obsv-p1) 20260720 : ship the narrative with the state
 
     AnsiString ZipPath = SaveRoot + Stamp + ".zip";
     bool bZipped = CompressFolder(TempDir, ZipPath);
@@ -909,6 +1020,7 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
         LastSnapshotZip = ZipPath;        //AI(general) 20260608 : remember zip path for Explorer /select
         DeleteFolderRecursive(TempDir);   // keep only the zip on success
     }
+    RecordProcess(AnsiString("SNAPSHOT ")+Reason+(bZipped?" ok ":" FAILED ")+ZipPath);   //AI(ht160s-obsv-p2) : 7z failure was swallowed
 
     return bZipped;
 }

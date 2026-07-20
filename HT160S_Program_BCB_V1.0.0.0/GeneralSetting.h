@@ -59,13 +59,27 @@ public:
 	// [SortMode] Mode (legacy [SortMode] UseLotBinMode read for back-compat when
 	// Mode is absent). Use the Is*SortMode() helpers instead of comparing raw ints.
 	int iSortMode;
-	bool IsNormalSortMode()      { return iSortMode==smNormal; }
-	bool IsLotBinSortMode()      { return iSortMode==smLotBin; }
-	bool IsLotPassFailSortMode() { return iSortMode==smLotPassFail; }
-	//AI(ht160s-whitelist) 20260715 : 4th mode. Static Bin->Auto table (like Normal), but the
-	// 2D->Bin source is a local WhiteList.json loaded at Lot Start; codes not in the list -> Error.
-	bool IsWhiteListSortMode()   { return iSortMode==smWhiteList; }
-	bool IsDynamicBindingMode()  { return iSortMode==smLotBin || iSortMode==smLotPassFail; }
+	// AI(ht160s-whitelist-override) 20260717 : WhiteList is a TEMPORARY per-lot OVERLAY, not a
+	// base production mode. base iSortMode stays in {smNormal,smLotBin,smLotPassFail} (sticky in
+	// General.ini). bWhiteListActive rides the work order : armed at Lot Start by the local
+	// chkWhiteListActive panel or the SECS SORTMODE pair, auto-cleared at Lot End. The routing
+	// core reads the EFFECTIVE mode below, so while armed it behaves like smWhiteList (static
+	// Bin->Auto table like Normal, but the 2D->Bin source is a local WhiteList.json loaded at Lot
+	// Start; codes not in the list -> Error) and falls back to the base mode when disarmed.
+	// iEffectiveSortMode is a live mirror exported to the host as SVID 66032 (needs a real int to
+	// point at). Use the Is*SortMode() helpers - they all read the effective mode.
+	bool bWhiteListActive;
+	int  iEffectiveSortMode;
+	int  GetEffectiveSortMode()       { return bWhiteListActive ? smWhiteList : iSortMode; }
+	void RecomputeEffectiveSortMode() { iEffectiveSortMode = GetEffectiveSortMode(); }
+	void SetWhiteListActive(bool b)   { bWhiteListActive=b; RecomputeEffectiveSortMode(); }
+	void SaveWhiteListOverlay();      // AI(ht160s-whitelist-override) 20260717 : persist overlay (own ini, work-order lifecycle)
+	void LoadWhiteListOverlay();
+	bool IsNormalSortMode()      { return GetEffectiveSortMode()==smNormal; }
+	bool IsLotBinSortMode()      { return GetEffectiveSortMode()==smLotBin; }
+	bool IsLotPassFailSortMode() { return GetEffectiveSortMode()==smLotPassFail; }
+	bool IsWhiteListSortMode()   { return bWhiteListActive; }
+	bool IsDynamicBindingMode()  { return IsLotBinSortMode() || IsLotPassFailSortMode(); }
 
 	// AI(ht160s-predictive-supply) 20260707 : demand-aware TrayArm replenish order.
 	// When true, FindTrayRequestAuto first serves an Auto that SortArm is currently
@@ -149,6 +163,7 @@ public:
 	int iAutoPushConfirmSettleMs;
 	int iAutoDischargePostYSettleMs;
 	int iHomeReacquireOffsetCnt;
+	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
 	int iHomeDrainTimeoutSec;      //AI(ht160s-home-resume-drain) 20260711 : HOME cylinder-drain stage timeout (s); on expiry the round falls back to park/removal   //AI(ht160s-home-resume-w3c) 20260711 : HOME re-acquire approach offset (1/100mm; front stopper rises this far clear of the parked tray edge). Sign/direction verified on-machine per carriage.
 	int iAutoFrontRiseDwellMs;
 	int iAutoCleanOutRiseDwellMs;

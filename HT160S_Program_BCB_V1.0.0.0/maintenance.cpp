@@ -6,6 +6,7 @@
 #include "database.h"
 #include "csystem.h"   //AI(ht160s-whitelist) 20260715 : HasICUnderMachine() guard for Sort-mode change
 #include "maintenance.h"
+#include "main.h"   //AI(ht160s-whitelist-override) 20260717 : fMain->UpdateSortModeFeatureBadge()
 #include "ComPort.h"
 #include "CosFunction.h"
 #include "GeneralSetting.h"
@@ -1106,6 +1107,16 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     //bLoadingHardwareSettings window so setting ItemIndex will NOT fire the restart prompt.
     if(rgSortMode!=NULL)
         rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+    //AI(ht160s-whitelist-override) 20260717 : WhiteList is a per-lot overlay shown as a separate
+    //checkbox, not a base radio item. Reflect the live overlay state (still inside the loading
+    //window so the OnClick prompt stays suppressed).
+    if(chkWhiteListActive!=NULL)
+        chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
+    //AI(ht160s-whitelist-override) 20260717 : refresh the Main sort-mode badge after a settings
+    //reload (GeneralSetting.Load re-reads the base mode) so the badge cannot go stale vs an unsaved
+    //rgSortMode change that Load reverts. Cheap edge-triggered repaint; safe inside the load window.
+    if(fMain!=NULL)
+        fMain->UpdateSortModeFeatureBadge();
     if(chkUsePredictiveAutoSupply!=NULL)
         chkUsePredictiveAutoSupply->Checked=GeneralSetting.bUsePredictiveAutoSupply;
     if(chkUseAmrRecoveryDivert!=NULL)
@@ -1183,7 +1194,10 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     if(rgSortMode!=NULL)
     {
         int idx=rgSortMode->ItemIndex;   //AI(ht160s-lotpassfail) 20260709 : -1 (unselected) -> Normal
-        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smWhiteList)?idx:smNormal;
+        //AI(ht160s-whitelist-override) 20260717 : base is {Normal,LotBin,LotPassFail} only;
+        //WhiteList is the overlay (chkWhiteListActive), never a base value.
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+        GeneralSetting.RecomputeEffectiveSortMode();
     }
     if(chkUsePredictiveAutoSupply!=NULL)
         GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
@@ -1261,6 +1275,10 @@ void __fastcall TfMaintenance::ApplyHardwareEditLock()
     //be switched mid-lot (would corrupt the in-progress dynamic binding).
     if(rgSortMode!=NULL)
         rgSortMode->Enabled=bEnable;
+    //AI(ht160s-whitelist-override) 20260717 : the WhiteList overlay toggle is locked on the same
+    //bRunning gate - the mode cannot flip mid-lot (would corrupt in-progress routing).
+    if(chkWhiteListActive!=NULL)
+        chkWhiteListActive->Enabled=bEnable;
 
     if(pnlHardwareHeader!=NULL)
     {
@@ -1948,12 +1966,49 @@ void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
     if(rgSortMode!=NULL)
     {
         int idx=rgSortMode->ItemIndex;
-        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smWhiteList)?idx:smNormal;
+        //AI(ht160s-whitelist-override) 20260717 : base is {Normal,LotBin,LotPassFail} only.
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+        GeneralSetting.RecomputeEffectiveSortMode();
     }
     RefreshHardwareSettingsStatus();
+    if(fMain!=NULL)
+        fMain->UpdateSortModeFeatureBadge();   //AI(ht160s-whitelist-override) 20260717 : Main mode badge
     //AI(ht160s-whitelist) 20260715 : mode is a live value consumed at the next Lot Start
     // (2D->Bin load) + per-scan routing; no software restart needed.
     ShowMyMessage("Sort mode changed. It takes effect at the next Lot Start.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist-override) 20260717 : local activation of the WhiteList overlay for the NEXT
+//lot. WhiteList is a customer special mode, NOT normal production - it rides the work order and
+//auto-reverts to the base sort mode at Lot End. Same idle-only guard as rgSortModeClick : the
+//overlay must not flip while ICs are under the machine (would corrupt in-progress routing).
+void __fastcall TfMaintenance::chkWhiteListActiveClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(HasICUnderMachine())
+    {
+        if(chkWhiteListActive!=NULL)
+        {
+            bLoadingHardwareSettings=true;             // suppress the re-entrant OnClick
+            chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
+            bLoadingHardwareSettings=false;
+        }
+        ShowMyMessage("Cannot change WhiteList while ICs are still under the machine. "
+                      "Finish or clear the current material first.");
+        return;
+    }
+    if(chkWhiteListActive!=NULL)
+        GeneralSetting.SetWhiteListActive(chkWhiteListActive->Checked);
+    RefreshHardwareSettingsStatus();
+    if(fMain!=NULL)
+        fMain->UpdateSortModeFeatureBadge();
+    if(GeneralSetting.bWhiteListActive)
+        ShowMyMessage("By WhiteList armed. It takes effect at the next Lot Start and reverts to "
+                      "the base sort mode at Lot End.");
+    else
+        ShowMyMessage("By WhiteList cleared. The base sort mode will be used.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-whitelist) 20260716 : re-sync the Sort-mode radio to GeneralSetting.iSortMode
@@ -1963,11 +2018,14 @@ void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
 //reverting the host's change on the next SaveHardwareSettings.
 void __fastcall TfMaintenance::SyncSortModeSelectorFromSetting()
 {
-    if(rgSortMode==NULL)
-        return;
     bool bSaved=bLoadingHardwareSettings;
     bLoadingHardwareSettings=true;
-    rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+    if(rgSortMode!=NULL)
+        rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+    //AI(ht160s-whitelist-override) 20260717 : also re-sync the WhiteList overlay checkbox so a
+    //host SORTMODE switch (or a Lot End revert) is reflected on the hardware page too.
+    if(chkWhiteListActive!=NULL)
+        chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
     bLoadingHardwareSettings=bSaved;
 }
 //---------------------------------------------------------------------------

@@ -57,7 +57,7 @@ enum TMainFeatureStatusIndex
     eMainFeatureSECS = 0,
     eMainFeatureSafeDoor,
     eMainFeatureAMR,            //AI(ht160s-agv) 20260615 : AMR/AGV ON-OFF status badge
-    eMainFeatureReserve2,
+    eMainFeatureSortMode,       //AI(ht160s-whitelist-override) 20260717 : effective sort-mode badge
     eMainFeatureReserve3,
     eMainFeatureReserve4,
     eMainFeatureReserve5,
@@ -138,6 +138,9 @@ __published:	// IDE-managed Components
     TPanel *pnlFeatureBadge3;
     TLabel *lblFeatureName3;
     TLabel *lblFeatureValue3;
+    TPanel *pnlFeatureBadge4;
+    TLabel *lblFeatureName4;
+    TLabel *lblFeatureValue4;
     TPanel *palMainStatus_En;
     TPanel *pnlLight;
     TALed *ledYellow;
@@ -427,6 +430,7 @@ private:	// User declarations
     TLabel *FeatureStatusValueLabels[MAIN_FEATURE_STATUS_COUNT];
     bool bUpdatingMainSelections;
     int  iLastSecsBadgeState;
+    int  iLastSortModeBadge;   //AI(ht160s-whitelist-override) 20260717 : edge-trigger guard for the sort-mode badge
     bool bLotApiPullActive;
     AnsiString sLotApiPullLot;
     bool bLotApiPullAll;
@@ -466,6 +470,7 @@ public:		// User declarations
     void __fastcall StartLotWebApiPullAll();
     void __fastcall UpdateSecsFeatureBadge();
     void __fastcall UpdateAmrFeatureBadge();   //AI(ht160s-agv) 20260615 : sync AMR badge to GeneralSetting.bUseAMR
+    void __fastcall UpdateSortModeFeatureBadge();   //AI(ht160s-whitelist-override) 20260717 : sync sort-mode badge to effective mode
     void __fastcall SetFeatureStatusBadge(int BadgeIndex, AnsiString ValueText, TColor ValueColor);
     void __fastcall SetSimulateScreenStatus();
     void __fastcall ShowMotorInfo();

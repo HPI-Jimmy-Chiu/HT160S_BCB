@@ -124,7 +124,9 @@ void HT160Gem::AddSV()
     //AI(ht160s-whitelist) 20260716 : Q6 host read-back of the active sort mode. Bound to the
     // live config int (stable global address, read at serialize time) so a SORTMODE switch via
     // S2F41 LOTSTART is confirmable by S1F3. No RefreshSVData mirror : not a per-cycle snapshot.
-    HGemPtr->SetSVDataPointer(66032, HType.INT_4_TYPE, "Sort Mode", "", &GeneralSetting.iSortMode, "0=Normal 1=LotBin 2=LotPassFail 3=WhiteList");
+    //AI(ht160s-whitelist-override) 20260717 : report the EFFECTIVE mode (base + WhiteList overlay),
+    // not the raw base, so the host reads WHITELIST during a WhiteList lot and the base between lots.
+    HGemPtr->SetSVDataPointer(66032, HType.INT_4_TYPE, "Sort Mode", "", &GeneralSetting.iEffectiveSortMode, "0=Normal 1=LotBin 2=LotPassFail 3=WhiteList (effective)");
 
     //AI(ht160s-agv) 20260615 : E87/AGV SVIDs (draft 38202-38245), bound to the
     // AgvCoord snapshot block (stable addresses). Bitmaps 38219-38221 are written
@@ -926,18 +928,26 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         //AI(ht160s-whitelist) 20260716 : list parsed + guards passed -> commit the
                         // buffered lots (order preserved), then apply the host sort-mode switch
                         // BEFORE the 2D-source load decision below so this lot loads via the newly
-                        // selected mode. Persist it (sticky across restarts) and keep the maintenance
-                        // selector in sync so a later hardware-page Save cannot revert it.
+                        // selected mode.
                         int k;
                         for(k=0; k<nBuf; k++)
                             LotRegistry.AddLot(bufLots[k], HT160_LOT_SOURCE_SECS, "", "");
-                        if(PendingSortMode!="")
-                        {
-                            GeneralSetting.iSortMode = (PendingSortMode=="WHITELIST") ? smWhiteList : smNormal;
-                            GeneralSetting.Save();
-                            if(fMaintenance!=NULL)
-                                fMaintenance->SyncSortModeSelectorFromSetting();
-                        }
+                        //AI(ht160s-whitelist-override) 20260717 : WhiteList is a per-lot OVERLAY, not a
+                        // base mode. Set it on EVERY accepted LOTSTART : WHITELIST arms it for THIS lot;
+                        // NORMAL *or NO SORTMODE pair* disarms (base production mode). Per the customer
+                        // spec the host must send SORTMODE=WHITELIST for every whitelist lot, so a no-pair
+                        // LOTSTART means base - disarming here stops WhiteList leaking into a subsequent
+                        // no-pair lot (adversarial review 2026-07-17 MAJOR). The accept path is idle-gated
+                        // (SystemStart==false && !HasICUnderMachine above) and pair+bRunning is already
+                        // rejected, so this never flips routing on in-flight material. Do NOT write the
+                        // base iSortMode; persist the overlay (work-order lifecycle, NOT sticky
+                        // General.ini) and keep the maintenance selector + Main badge in sync.
+                        GeneralSetting.SetWhiteListActive(PendingSortMode=="WHITELIST");
+                        GeneralSetting.SaveWhiteListOverlay();
+                        if(fMaintenance!=NULL)
+                            fMaintenance->SyncSortModeSelectorFromSetting();
+                        if(fMain!=NULL)
+                            fMain->UpdateSortModeFeatureBadge();
                     }
                     if(HCACK==0 && FirstLot!="" && fMain!=NULL)
                     {

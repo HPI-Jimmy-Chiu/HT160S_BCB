@@ -175,6 +175,7 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     bUpdatingMainSelections = false;
     bFeatureBadgeOverflowWarned = false;   //AI(ht160s-mainui) 20260617 : badge-grid overflow warning not shown yet
     iLastSecsBadgeState = -1;   //AI(ht160s-secsgem) 20260612 : force the first periodic tick to paint the real HSMS state
+    iLastSortModeBadge = -1;    //AI(ht160s-whitelist-override) 20260717 : force the first sort-mode badge paint
     bLotApiPullActive = false;  //AI(ht160s-lot-webapi) 20260612 : Stage 4 : no pull in flight at startup
     sLotApiPullLot = "";
     bLotApiPullAll = false;     //AI(ht160s-lot-webapi) 20260612 : no "pull all lots" sweep at startup
@@ -437,6 +438,12 @@ void __fastcall TfMain::BuildFeatureStatusBadges()
     FeatureStatusNameLabels[eMainFeatureAMR]  = lblFeatureName3;
     FeatureStatusValueLabels[eMainFeatureAMR] = lblFeatureValue3;
 
+    //AI(ht160s-whitelist-override) 20260717 : effective sort-mode badge (Normal / By Lot+Bin /
+    //  By Lot+PassFail / WhiteList). WhiteList is a customer special override shown in red.
+    FeatureStatusPanels[eMainFeatureSortMode]      = pnlFeatureBadge4;
+    FeatureStatusNameLabels[eMainFeatureSortMode]  = lblFeatureName4;
+    FeatureStatusValueLabels[eMainFeatureSortMode] = lblFeatureValue4;
+
     //AI(ht160s-secsgem) 20260616 : seed the static-default value text/color for the
     //  two badges that carry one (SECS, SAFE); AMR is seeded from its live flag below.
     SetFeatureStatusBadge(eMainFeatureSECS, GetFeatureStatusDefaultValue(eMainFeatureSECS), GetFeatureStatusDefaultColor(eMainFeatureSECS));
@@ -468,6 +475,9 @@ void __fastcall TfMain::BuildFeatureStatusBadges()
     //  operator can read AMR ON/OFF at a glance (GetFeatureStatusDefaultValue only
     //  carries a static "OFF" placeholder).
     UpdateAmrFeatureBadge();
+
+    //AI(ht160s-whitelist-override) 20260717 : seed the sort-mode badge from the effective mode.
+    UpdateSortModeFeatureBadge();
 
     //AI(ht160s-mainui) 20260617 : arrange the badges into the COLS x ROWS grid now
     //  that every badge's final Visible state is known (SECS may be hidden above).
@@ -592,6 +602,27 @@ void __fastcall TfMain::UpdateSecsFeatureBadge()
         case 2:  SetFeatureStatusBadge(eMainFeatureSECS, "ONLINE",  clGreen);  break;
         case 1:  SetFeatureStatusBadge(eMainFeatureSECS, "CONNECT", clOlive);  break;
         default: SetFeatureStatusBadge(eMainFeatureSECS, "OFF",     clGray);   break;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist-override) 20260717 : sync the main-screen sort-mode badge to the EFFECTIVE
+//  sort mode (base production mode, or WhiteList while the per-lot overlay is armed). Edge-
+//  triggered on the effective mode so repeated calls (mode change, Lot Start/End, host SORTMODE
+//  switch, maintenance edit) are cheap. WhiteList is a customer special override, painted red so
+//  the operator can see at a glance the machine is NOT in normal production.
+void __fastcall TfMain::UpdateSortModeFeatureBadge()
+{
+    int Mode = GeneralSetting.GetEffectiveSortMode();
+    if(Mode == iLastSortModeBadge)
+        return;
+    iLastSortModeBadge = Mode;
+
+    switch(Mode)
+    {
+        case smLotBin:      SetFeatureStatusBadge(eMainFeatureSortMode, "LOT+BIN",   clGreen); break;
+        case smLotPassFail: SetFeatureStatusBadge(eMainFeatureSortMode, "PASS/FAIL", clGreen); break;
+        case smWhiteList:   SetFeatureStatusBadge(eMainFeatureSortMode, "WHITELIST", clRed);   break;
+        default:            SetFeatureStatusBadge(eMainFeatureSortMode, "NORMAL",    clGray);  break;
     }
 }
 //---------------------------------------------------------------------------
@@ -2205,6 +2236,11 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     //future "inherit last record?" prompt will gate this clear for that path.)
     LotBinBinding.Clear();
     LotBinBinding.SaveToIni();
+    //AI(ht160s-whitelist-override) 20260717 : persist the per-lot WhiteList overlay with the work
+    //order so a mid-lot restart resumes in the same mode (mirrors the LotBinBinding lifecycle). The
+    //overlay was armed/cleared beforehand via the maintenance panel or a SECS SORTMODE pair.
+    GeneralSetting.SaveWhiteListOverlay();
+    UpdateSortModeFeatureBadge();
 
     //AI(ht160s-lot-reset) 20260706 : a fresh Lot Start zeroes the per-run production
     //counters (Auto Cnt display, UPH, SECS Scanned/Sorted/TotalIC) so they represent
@@ -2482,6 +2518,14 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     }
     SoftStop=true;
     MachineRun.bRunning=false;
+
+    //AI(ht160s-whitelist-override) 20260717 : revert the per-lot WhiteList overlay to the base sort
+    //mode as the lot closes. Placed EARLY (right after bRunning clears, before any file I/O or CEID
+    //emit that could pump the message loop) so a host LOTSTART(WHITELIST) for the NEXT lot is not
+    //clobbered by this revert - arm(N+1) then lands after disarm(N). Persist cleared + refresh badge.
+    GeneralSetting.SetWhiteListActive(false);
+    GeneralSetting.SaveWhiteListOverlay();
+    UpdateSortModeFeatureBadge();
 
     //AI(ht160s-uph) 20260706 : record this lot's total UPH (HT172 parity : aggregate
     //TotalIC / productive-hours) to the EventLog + per-lot UPH summary before the work
@@ -3347,6 +3391,19 @@ void __fastcall TfMain::RestoreLastWorkOrder()
         bLoaded=(LotRegistry.GetLotCount()>0 || LotBinBinding.GetBindingCount()>0);
     }
 
+    //AI(ht160s-whitelist-override) 20260717 : restore the per-lot WhiteList overlay with the work
+    //order (mirrors LotBinBinding.LoadFromIni above). Only when a work order was actually loaded;
+    //otherwise force the overlay OFF and persist it so a stale overlay file cannot arm a machine
+    //with no work order. The Yes/No prompt below then keeps (Yes) or clears (No) it.
+    if(bLoaded)
+        GeneralSetting.LoadWhiteListOverlay();
+    else
+    {
+        GeneralSetting.SetWhiteListActive(false);
+        GeneralSetting.SaveWhiteListOverlay();
+    }
+    UpdateSortModeFeatureBadge();
+
     //AI(ht160s-lotbin) 20260615 : "inherit last record?" gate. When a previous work
     //order was restored above, ask the operator whether to resume it or start fresh.
     //NO clears the WHOLE work order (registry + LastLotList.ini + (Lot,Bin)->Auto
@@ -3370,6 +3427,10 @@ void __fastcall TfMain::RestoreLastWorkOrder()
                 DeleteFile(GetWorkOrderFileName());
             LotBinBinding.Clear();
             LotBinBinding.SaveToIni();
+            //AI(ht160s-whitelist-override) 20260717 : fresh start also clears the WhiteList overlay.
+            GeneralSetting.SetWhiteListActive(false);
+            GeneralSetting.SaveWhiteListOverlay();
+            UpdateSortModeFeatureBadge();
             if(edLotNo!=NULL)
                 edLotNo->Text="";
             RefreshLotListFromRegistry();

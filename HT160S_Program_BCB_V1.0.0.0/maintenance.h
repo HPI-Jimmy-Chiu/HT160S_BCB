@@ -177,7 +177,7 @@ __published:
     TCheckBox *chkAutoEnable5;
     TCheckBox *chkAutoEnable6;
     TTabSheet *tsNetwork;
-    TPanel *Panel4;
+    TPanel *pnlNetworkBody;
     TEdit *edWebapiPath;
     TLabel *Label1;
     TTimer *tmrTowerLightBlink;
@@ -296,6 +296,9 @@ __published:
     TPanel *pnlSortModeBox;
     TLabel *lblLotBinModeHint;
     TRadioGroup *rgSortMode;
+    TPanel *pnlWhiteListModeBox;
+    TCheckBox *chkWhiteListActive;
+    TLabel *lblWhiteListModeHint;
     TCheckBox *cbCommType;
     TPanel *pnlSuck2QuadBox;
     TLabel *lblSuck2QuadHint;
@@ -382,6 +385,7 @@ __published:
     void __fastcall chkAmrTestModeClick(TObject *Sender);
     void __fastcall AmrInjectButtonClick(TObject *Sender);
     void __fastcall rgSortModeClick(TObject *Sender);
+    void __fastcall chkWhiteListActiveClick(TObject *Sender);
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkUseAmrRecoveryDivertClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
