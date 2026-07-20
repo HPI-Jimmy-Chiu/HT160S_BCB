@@ -35,6 +35,8 @@ struct TLoaderSideState
     HTimer CcdDelay;
     bool bWaitingAmrFeed;     //AI(ht160s-agv) 20260626 : AMR feed deferral latch (per-side; HT9046 func-static illegal here, 2 sides share DoFeedTray)
     HTimer FeedWaitTimer;     //AI(ht160s-agv) 20260626 : AMR feed deferral countdown (wait for AMR refill before MES0920)
+    bool bRise1Waiting;       //AI(ht160s-anti-ghost-d) 20260720 : case-10 rise1-not-retracted wait latch (mirrors bWaitingAmrFeed idiom)
+    HTimer Rise1WaitTimer;    //AI(ht160s-anti-ghost-d) 20260720 : case-10 rise1-settle countdown before the named MES0925 Note
 };
 //---------------------------------------------------------------------------
 class TLoaderModule
@@ -96,7 +98,8 @@ private:
     bool AcquireFrontOwner(int LoaderNo);
     void ReleaseFrontOwner(int LoaderNo);
     bool IsSoftSimulate();
-    bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
+    bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
+    bool IsInputHasTrayTrustworthy();   //AI(ht160s-anti-ghost-d) 20260720 : SnLoader_InputHasTray valid only when front rise-1 is confirmed retracted
     bool IsSupplyCarDry();     //AI(ht160s-loader) 20260706 : supply car empty for this side (InputEnd + input HasTray both empty; sim=chkLoadTray)
     int ReadTopCcdBin(int LoaderNo, int CellX, int CellY, bool &bOk);
     AnsiString ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, bool &bOk);

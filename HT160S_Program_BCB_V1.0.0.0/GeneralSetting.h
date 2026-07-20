@@ -164,6 +164,7 @@ public:
 	int iAutoDischargePostYSettleMs;
 	int iHomeReacquireOffsetCnt;
 	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
+	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)
 	int iHomeDrainTimeoutSec;      //AI(ht160s-home-resume-drain) 20260711 : HOME cylinder-drain stage timeout (s); on expiry the round falls back to park/removal   //AI(ht160s-home-resume-w3c) 20260711 : HOME re-acquire approach offset (1/100mm; front stopper rises this far clear of the parked tray edge). Sign/direction verified on-machine per carriage.
 	int iAutoFrontRiseDwellMs;
 	int iAutoCleanOutRiseDwellMs;

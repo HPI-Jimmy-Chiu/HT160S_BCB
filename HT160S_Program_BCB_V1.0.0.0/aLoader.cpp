@@ -124,6 +124,8 @@ void TLoaderModule::PauseTimeoutTimers()
     Side[1].CcdDelay.Pause();
     Side[0].FeedWaitTimer.Pause();
     Side[1].FeedWaitTimer.Pause();
+    Side[0].Rise1WaitTimer.Pause();   //AI(ht160s-anti-ghost-d) 20260720 : mid-settle pause must not charge the case-10 rise1 wait
+    Side[1].Rise1WaitTimer.Pause();
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::ReStartTimeoutTimers()
@@ -132,6 +134,8 @@ void TLoaderModule::ReStartTimeoutTimers()
     Side[1].CcdDelay.ReStart();
     Side[0].FeedWaitTimer.ReStart();
     Side[1].FeedWaitTimer.ReStart();
+    Side[0].Rise1WaitTimer.ReStart();   //AI(ht160s-anti-ghost-d) 20260720
+    Side[1].Rise1WaitTimer.ReStart();
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::ResetSide(TLoaderSideState *State)
@@ -152,6 +156,8 @@ void TLoaderModule::ResetSide(TLoaderSideState *State)
     State->CcdDelay.Clear();
     State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : clear AMR feed deferral on side reset
     State->FeedWaitTimer.Clear();
+    State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) 20260720 : clear rise1-settle wait on side reset
+    State->Rise1WaitTimer.Clear();
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsValidLoaderNo(int LoaderNo)
@@ -1319,6 +1325,23 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-anti-ghost-d) 20260720 : SnLoader_InputHasTray reads TRUE whenever the front
+//rise-1 cylinder is EXTENDED (rise1 lifts the tray stack across the sensor beam), so a
+//"tray present" read is only trustworthy while rise1 is confirmed RETRACTED (its Off-reed
+//reads On). An untrusted read is what let a stuck-up rise1 (interrupted destack across a
+//HOME) mint a ghost tray via case 9500 -> later empty-suck. Enable-gate : a machine whose
+//rise1 Off-reed is not installed cannot confirm the position, so treat as trustworthy
+//(never permanently stall the feed) - matches the "disabled point never blocks" idiom.
+//Sim/DUMMY : no physical rise1 -> always trustworthy (behavior unchanged offline).
+bool TLoaderModule::IsInputHasTrayTrustworthy()
+{
+    if(IsSoftSimulate())
+        return true;
+    if(HSys.Cyn.C_Loader_FrontRiseTray_1.OffSensor.Enable==false)
+        return true;
+    return HSys.Cyn.C_Loader_FrontRiseTray_1.OffSensor.IsOn();
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
 {
     TLoaderSideState *State=GetSide(LoaderNo);
@@ -1336,6 +1359,8 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
         State->FeedDelay.Clear();
         State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : fresh feed attempt re-arms AMR deferral
         State->FeedWaitTimer.Clear();
+        State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) 20260720 : fresh feed must not inherit a stale rise1 wait
+        State->Rise1WaitTimer.Clear();
         return true;
     }
     if(OtherState->Status==LS_FEEDING ||
@@ -1371,8 +1396,36 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             if(TrayMotor->fHasTray)
             {
                 State->FeedTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
+                State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) : leaving case 10 clears the wait
+                State->Rise1WaitTimer.Clear();
                 return true;
             }
+            //AI(ht160s-anti-ghost-d) 20260720 : rise1 MUST be confirmed retracted before this
+            //case acts. rise1 up (a) falsely lights SnLoader_InputHasTray -> the LK-1 branch
+            //below would mint a GHOST tray via 9500, and (b) makes the fall-through destack
+            //(case 100) double-stack onto the stack rise1 is still holding. Owner ruling (Q3) :
+            //never mint, never blind-act - WAIT for rise1 to settle down (drain / posture
+            //re-acquire brings it down), and NAME it on timeout so it is never a silent idle.
+            if(IsInputHasTrayTrustworthy()==false)
+            {
+                if(State->bRise1Waiting==false)
+                {
+                    State->Rise1WaitTimer.SetMS(GeneralSetting.iRise1SettleWaitSec*1000);
+                    State->Rise1WaitTimer.On();
+                    State->bRise1Waiting=true;
+                    RecordProcess("WAIT Loader"+IntToStr(LoaderNo)+": rise1 (C_Loader_FrontRiseTray_1) not retracted - InputHasTray read held, awaiting settle");   //AI(ht160s-anti-ghost-d)
+                    break;
+                }
+                if(State->Rise1WaitTimer.Off())
+                {
+                    State->bRise1Waiting=false;
+                    State->Rise1WaitTimer.Clear();
+                    ShowMyError("MES0925", LangT("Loader front rise cylinder not retracted (C_Loader_FrontRiseTray_1)"), K_RETRY);   //AI(ht160s-anti-ghost-d) : named, K_RETRY -> re-check after operator clears rise1
+                }
+                break;   //hold at case 10 until rise1 confirmed down
+            }
+            State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) : rise1 down -> read trustworthy, resume normal decision
+            State->Rise1WaitTimer.Clear();
             //AI(ht160s-home-resume-lk1) 20260713 : orphan-tray self-collect on resume. A
             //HOME taken between the destack landing (case 8300 clamps the tray on the
             //carriage) and the identity mint (case 9500) leaves a tray PHYSICALLY on the
@@ -1533,7 +1586,8 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 if(HSys.Sys.RunMode==Run_CleanOut)
                 {
                     if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
-                       HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+                       HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn() &&
+                       IsInputHasTrayTrustworthy())   //AI(ht160s-anti-ghost-d) 20260720 : rise1 down or the read is a false-light -> do not mint a ghost (skip -> idle -> StuckMs watchdog nets a prolonged stall)
                     {
                         RecordProcess("HEAL Loader CleanOut self-collect: stranded front tray (side "+
                             IntToStr(LoaderNo)+") - mint via 9500");   //AI(ht160s-obsv-p0)

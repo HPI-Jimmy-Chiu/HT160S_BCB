@@ -113,7 +113,8 @@ void THT160GeneralSetting::SetDefault()
 	iAutoPushConfirmSettleMs=500;
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
-	iHomeDrainTimeoutSec=15;
+	iHomeDrainTimeoutSec=15;
+	iRise1SettleWaitSec=10;   //AI(ht160s-anti-ghost-d) 20260720
 	iStuckSnapshotSec=300;   //AI(ht160s-obsv-p1) : 5 min
 	iAutoFrontRiseDwellMs=500;
 	iAutoCleanOutRiseDwellMs=500;
@@ -226,7 +227,8 @@ void THT160GeneralSetting::Load()
 	iAutoPushConfirmSettleMs=Ini->ReadInteger("SettleDelay", "AutoPushConfirmSettleMs", 500);
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
 	iHomeReacquireOffsetCnt=Ini->ReadInteger("HomeResume", "ReacquireOffsetCnt", 100);
-	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
+	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
+	iRise1SettleWaitSec=Ini->ReadInteger("HomeResume", "Rise1SettleWaitSec", 10);
 	iStuckSnapshotSec=Ini->ReadInteger("Observability", "StuckSnapshotSec", 300);
 	iAutoFrontRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoFrontRiseDwellMs", 500);
 	iAutoCleanOutRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoCleanOutRiseDwellMs", 500);
@@ -263,6 +265,7 @@ void THT160GeneralSetting::Load()
 	if(iAmrFeedWaitSec      < 5) iAmrFeedWaitSec      = 5;
 	if(iAmrFullWaitSec      < 5) iAmrFullWaitSec      = 5;
 	if(iAmrHandshakeWaitSec < 5) iAmrHandshakeWaitSec = 5;
+	if(iRise1SettleWaitSec  < 5) iRise1SettleWaitSec  = 5;   //AI(ht160s-anti-ghost-d) 20260720 : same HTimer 0=instant / negative=49.7d footgun as the AGV waits
 	delete Ini;
 }
 //---------------------------------------------------------------------------
@@ -307,7 +310,8 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "AutoPushConfirmSettleMs", iAutoPushConfirmSettleMs);
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
-	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
+	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
+	Ini->WriteInteger("HomeResume", "Rise1SettleWaitSec", iRise1SettleWaitSec);
 	Ini->WriteInteger("Observability", "StuckSnapshotSec", iStuckSnapshotSec);
 	Ini->WriteInteger("SettleDelay", "AutoFrontRiseDwellMs", iAutoFrontRiseDwellMs);
 	Ini->WriteInteger("SettleDelay", "AutoCleanOutRiseDwellMs", iAutoCleanOutRiseDwellMs);

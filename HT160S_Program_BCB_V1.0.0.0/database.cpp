@@ -987,6 +987,14 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(ht160s-anti-ghost-d) 20260720 : Loader front rise-1 not retracted -> the
+        //SnLoader_InputHasTray read is untrustworthy (rise1 up falsely lights it). Registered
+        //standalone (not in the 20-seed arrays) to avoid resizing the parallel arrays.
+        {
+            AnsiString cd="MES0925", mg="Loader front rise cylinder not retracted (C_Loader_FrontRiseTray_1)";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(cleanout) 20260706 : 6th family member MES%d23 = per-Auto clean-out residual
         //watchdog (EventLog-only). Suffix 23 chosen because 27 (the first pick) collides with
         //the Color seed MES1427 "Color supply stack full"; 23 is free across MES1123..MES1623.
