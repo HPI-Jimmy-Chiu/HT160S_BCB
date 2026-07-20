@@ -45,6 +45,32 @@
 
 > **完整現場驗收 = R（至少每站一輪，驗 sensor）＋ I（驗協定不受 sensor 影響）＋ 有車時做 A。**
 
+### 2.1 這三種途徑用哪些設定切換？（都是現成功能，無需新開發）
+
+**沒有單一「R/I/A 模式鍵」**。行為由下列**現成開關組合**決定：
+
+| 層 | 開關 | 位置 | 作用 |
+|---|---|---|---|
+| ① 編譯 | `SOFT_SIMULATE` | `MachineType.h`（build 時） | 有 define＝**恆 sim**（筆電 dev）；註解掉＝真機 build，才啟用第 ② 層 |
+| ② 執行期 Real/Dummy | 主畫面 **Real/Dummy 面板**（點一下循環 Dummy→HasTray→Real） | 主畫面 `pnRealDummy`；存 `lastset.ini [System] RealDummy` | **Real**＝真 sensor 驅動；**Dummy**＝sim 行為（273/274 自動完成）。**只在真機 build 有效**（筆電 build 恆 sim，切了沒用） |
+| ③ 注入 | **Enable AMR manual-inject test mode** 勾選 | 維護 → AMR 頁 `chkAmrTestMode` | 勾＝注入按鈕生效（bypass sensor）；不勾＝靠 sensor / 實際 |
+| ④ AMR 總開關 | `UseAMR=1` | `General.ini [HardwareInstall]` / 維護 | 沒開整個握手不啟動 |
+| ⑤ Host | Auto-AGV / Automation | 模擬器連線列 | 自動回 `START_AGV`/`START`、自動 ACK |
+
+途徑 → 設定對應：
+
+| 途徑 | ① 編譯 | ② Real/Dummy | ③ 測試模式勾選 | 碰 sensor |
+|---|---|---|---|---|
+| **I 注入** | 任意 | 任意 | **勾 ON** | 不碰 |
+| **R 真 sensor** | 真機 build（off） | **Real** | 不勾 | 要碰 |
+| **A 真 AMR** | 真機 build（off） | Real | 不勾 | 不碰（車動） |
+| （附）真機上跑 sim 行為 | 真機 build（off） | **Dummy** | 任意 | 不碰（273/274 自動） |
+
+**重點**：
+- **全部是現成功能**，不用新開發。
+- 你**現在筆電跑的是 ① 有 define 的 dev build → 恆 sim**；主畫面把 Real/Dummy 切成 Real **也沒用**（`IsSoftSimulate()` 恆 true）。要驗真 sensor，必須用**真機 build（`SOFT_SIMULATE` 註解掉）**，再把主畫面切 **Real**。
+- ②③ 獨立可組合：真機+Real+不勾＝純真 sensor（R）；真機+Real+勾＝可用注入 override 真機當下補不到的邊緣（例如沒車時的 Take）。
+
 ---
 
 ## 3. 前置條件（真機版，缺一不可）

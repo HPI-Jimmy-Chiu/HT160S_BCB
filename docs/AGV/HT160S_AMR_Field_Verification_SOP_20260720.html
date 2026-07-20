@@ -161,6 +161,96 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <blockquote>
 <p><strong>完整現場驗收 = R（至少每站一輪，驗 sensor）＋ I（驗協定不受 sensor 影響）＋ 有車時做 A。</strong></p>
 </blockquote>
+<h3 id="21">2.1 這三種途徑用哪些設定切換？（都是現成功能，無需新開發）</h3>
+<p><strong>沒有單一「R/I/A 模式鍵」</strong>。行為由下列<strong>現成開關組合</strong>決定：</p>
+<table>
+<thead>
+<tr>
+<th>層</th>
+<th>開關</th>
+<th>位置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 編譯</td>
+<td><code>SOFT_SIMULATE</code></td>
+<td><code>MachineType.h</code>（build 時）</td>
+<td>有 define＝<strong>恆 sim</strong>（筆電 dev）；註解掉＝真機 build，才啟用第 ② 層</td>
+</tr>
+<tr>
+<td>② 執行期 Real/Dummy</td>
+<td>主畫面 <strong>Real/Dummy 面板</strong>（點一下循環 Dummy→HasTray→Real）</td>
+<td>主畫面 <code>pnRealDummy</code>；存 <code>lastset.ini [System] RealDummy</code></td>
+<td><strong>Real</strong>＝真 sensor 驅動；<strong>Dummy</strong>＝sim 行為（273/274 自動完成）。<strong>只在真機 build 有效</strong>（筆電 build 恆 sim，切了沒用）</td>
+</tr>
+<tr>
+<td>③ 注入</td>
+<td><strong>Enable AMR manual-inject test mode</strong> 勾選</td>
+<td>維護 → AMR 頁 <code>chkAmrTestMode</code></td>
+<td>勾＝注入按鈕生效（bypass sensor）；不勾＝靠 sensor / 實際</td>
+</tr>
+<tr>
+<td>④ AMR 總開關</td>
+<td><code>UseAMR=1</code></td>
+<td><code>General.ini [HardwareInstall]</code> / 維護</td>
+<td>沒開整個握手不啟動</td>
+</tr>
+<tr>
+<td>⑤ Host</td>
+<td>Auto-AGV / Automation</td>
+<td>模擬器連線列</td>
+<td>自動回 <code>START_AGV</code>/<code>START</code>、自動 ACK</td>
+</tr>
+</tbody>
+</table>
+<p>途徑 → 設定對應：</p>
+<table>
+<thead>
+<tr>
+<th>途徑</th>
+<th>① 編譯</th>
+<th>② Real/Dummy</th>
+<th>③ 測試模式勾選</th>
+<th>碰 sensor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>I 注入</strong></td>
+<td>任意</td>
+<td>任意</td>
+<td><strong>勾 ON</strong></td>
+<td>不碰</td>
+</tr>
+<tr>
+<td><strong>R 真 sensor</strong></td>
+<td>真機 build（off）</td>
+<td><strong>Real</strong></td>
+<td>不勾</td>
+<td>要碰</td>
+</tr>
+<tr>
+<td><strong>A 真 AMR</strong></td>
+<td>真機 build（off）</td>
+<td>Real</td>
+<td>不勾</td>
+<td>不碰（車動）</td>
+</tr>
+<tr>
+<td>（附）真機上跑 sim 行為</td>
+<td>真機 build（off）</td>
+<td><strong>Dummy</strong></td>
+<td>任意</td>
+<td>不碰（273/274 自動）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>重點</strong>：
+- <strong>全部是現成功能</strong>，不用新開發。
+- 你<strong>現在筆電跑的是 ① 有 define 的 dev build → 恆 sim</strong>；主畫面把 Real/Dummy 切成 Real <strong>也沒用</strong>（<code>IsSoftSimulate()</code> 恆 true）。要驗真 sensor，必須用<strong>真機 build（<code>SOFT_SIMULATE</code> 註解掉）</strong>，再把主畫面切 <strong>Real</strong>。
+- ②③ 獨立可組合：真機+Real+不勾＝純真 sensor（R）；真機+Real+勾＝可用注入 override 真機當下補不到的邊緣（例如沒車時的 Take）。</p>
 <hr />
 <h2 id="3">3. 前置條件（真機版，缺一不可）</h2>
 <table>
