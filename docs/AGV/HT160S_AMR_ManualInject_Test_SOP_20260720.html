@@ -72,6 +72,67 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <blockquote>
 <p><strong>一句話</strong>：畫面①按鈕只翻動「感測判斷層」的回傳值，下游的 bitmap / CEID 編號 / SVID 片數 / S2F42 HCACK 全部走<strong>原本生產程式碼、一個 byte 都不變</strong>。所以你在模擬器（畫面②）看到的封包，和真實生產送出的<strong>完全一致</strong>。</p>
 </blockquote>
+<h3 id="01-vs">0.1 卡住流程 vs 完整流程（一眼對照）</h3>
+<blockquote>
+<p>這張圖對照「<strong>未 HOME → 只跑到一半</strong>」（＝2026/07/20 <code>SECSGEM_TextLog_11.txt</code> 實際觀察到的情況）與「<strong>先 HOME → 完整跑完</strong>」。差別只在<strong>測試前有沒有先 HOME</strong>（見 §2 第 5 條、§10）。</p>
+</blockquote>
+<pre><code>   ✗ 未 HOME（卡住 = 你這次的 log）          ✓ 先 HOME（完整）
+   ───────────────────────────────        ───────────────────────────────
+   （機台 fAllMotorHome = false）           （先按 Home 鈕，homed = true）
+
+   機台 → S6F11 CEID272  叫車  (Full/Short)  機台 → S6F11 CEID272  叫車  (Full/Short)
+   Host → S2F41 START_AGV                    Host → S2F41 START_AGV
+   機台 → S2F42 HCACK=0      hs=PREP          機台 → S2F42 HCACK=0      hs=PREP
+            │                                         │  (按 Drain / Ready)
+            ▼                                         ▼
+     ✗✗ 就停在這裡                            機台 → S6F11 CEID273  Ready   hs=READY
+   （ServiceHandshake:324                              │  (按 Take / Finish)
+     fAllMotorHome==false                              ▼
+     → 直接 return，                         機台 → S6F11 CEID274  Finish  hs=IDLE
+     273/274 永遠不送）                       Host → S2F41 START
+                                             機台 → S2F42 HCACK=0   → 續跑生產
+</code></pre>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>未 HOME（卡住）</th>
+<th>先 HOME（完整）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CEID272 叫車</td>
+<td>✅ 有</td>
+<td>✅ 有</td>
+</tr>
+<tr>
+<td>START_AGV → HCACK=0</td>
+<td>✅ 有（<code>hs=PREP</code>）</td>
+<td>✅ 有（<code>hs=PREP</code>）</td>
+</tr>
+<tr>
+<td><strong>CEID273 Ready</strong></td>
+<td>❌ <strong>無</strong></td>
+<td>✅ 有（<code>hs=READY</code>）</td>
+</tr>
+<tr>
+<td><strong>CEID274 Finish</strong></td>
+<td>❌ <strong>無</strong></td>
+<td>✅ 有（<code>hs=IDLE</code>）</td>
+</tr>
+<tr>
+<td>續跑 START</td>
+<td>❌ 無</td>
+<td>✅ 有</td>
+</tr>
+<tr>
+<td>卡點</td>
+<td>停在 <code>hs=PREP</code></td>
+<td>走完回 <code>hs=IDLE</code></td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="1">1. 名詞與角色</h2>
 <ul>

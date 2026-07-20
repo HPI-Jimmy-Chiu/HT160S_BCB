@@ -15,6 +15,37 @@
 
 > **一句話**：畫面①按鈕只翻動「感測判斷層」的回傳值，下游的 bitmap / CEID 編號 / SVID 片數 / S2F42 HCACK 全部走**原本生產程式碼、一個 byte 都不變**。所以你在模擬器（畫面②）看到的封包，和真實生產送出的**完全一致**。
 
+### 0.1 卡住流程 vs 完整流程（一眼對照）
+
+> 這張圖對照「**未 HOME → 只跑到一半**」（＝2026/07/20 `SECSGEM_TextLog_11.txt` 實際觀察到的情況）與「**先 HOME → 完整跑完**」。差別只在**測試前有沒有先 HOME**（見 §2 第 5 條、§10）。
+
+```
+   ✗ 未 HOME（卡住 = 你這次的 log）          ✓ 先 HOME（完整）
+   ───────────────────────────────        ───────────────────────────────
+   （機台 fAllMotorHome = false）           （先按 Home 鈕，homed = true）
+
+   機台 → S6F11 CEID272  叫車  (Full/Short)  機台 → S6F11 CEID272  叫車  (Full/Short)
+   Host → S2F41 START_AGV                    Host → S2F41 START_AGV
+   機台 → S2F42 HCACK=0      hs=PREP          機台 → S2F42 HCACK=0      hs=PREP
+            │                                         │  (按 Drain / Ready)
+            ▼                                         ▼
+     ✗✗ 就停在這裡                            機台 → S6F11 CEID273  Ready   hs=READY
+   （ServiceHandshake:324                              │  (按 Take / Finish)
+     fAllMotorHome==false                              ▼
+     → 直接 return，                         機台 → S6F11 CEID274  Finish  hs=IDLE
+     273/274 永遠不送）                       Host → S2F41 START
+                                             機台 → S2F42 HCACK=0   → 續跑生產
+```
+
+| | 未 HOME（卡住） | 先 HOME（完整） |
+|---|---|---|
+| CEID272 叫車 | ✅ 有 | ✅ 有 |
+| START_AGV → HCACK=0 | ✅ 有（`hs=PREP`） | ✅ 有（`hs=PREP`） |
+| **CEID273 Ready** | ❌ **無** | ✅ 有（`hs=READY`） |
+| **CEID274 Finish** | ❌ **無** | ✅ 有（`hs=IDLE`） |
+| 續跑 START | ❌ 無 | ✅ 有 |
+| 卡點 | 停在 `hs=PREP` | 走完回 `hs=IDLE` |
+
 ---
 
 ## 1. 名詞與角色
