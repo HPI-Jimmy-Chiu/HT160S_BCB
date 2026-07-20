@@ -119,6 +119,12 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 </tr>
 <tr>
 <td>5</td>
+<td><strong>★ 機台已 HOME 完成</strong>（<code>fAllMotorHome==true</code>）</td>
+<td>主畫面狀態非 <code>HOMING</code>；各軸 HOME 燈綠（<code>fAllMotorHome &amp;&amp; bHomeFinish</code>）；State Record 顯示已 homed</td>
+<td><strong><code>ServiceHandshake</code> 第 324 行 <code>if(RunMode==Run_Home \|\| fAllMotorHome==false) return;</code> → CEID273 / 274 永遠不送，握手卡在 PREP</strong>（會出現「只有 272、沒有 273/274」）。<strong>這是最容易漏的一條</strong></td>
+</tr>
+<tr>
+<td>6</td>
 <td><strong>模擬器 Automation ＝ ON</strong></td>
 <td>連線列 <strong>Automation ✓</strong></td>
 <td>設備上報的 S6F11 不會被回 ACK（測試仍可看到 TX，但不完整）</td>
@@ -126,7 +132,8 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 </tbody>
 </table>
 <blockquote>
-<p><strong>重點</strong>：滿足第 4 點但仍「不要按 Start 跑真實生產」——測試模式 banner 也是這個意思（見 §4.4 安全）。RunMode=Normal 只是<strong>模式選擇</strong>，不是「正在跑料」。</p>
+<p><strong>★★ 操作順序鐵律（務必照做）</strong>：<strong>先 HOME → 再勾測試模式 → 再按注入</strong>。原因：HOME 完成（<code>csystem.cpp:1352-1361</code>：<code>InitialAllTask(true)</code> 內含 <code>AmrInject.Reset()</code>）與按 <strong>Start</strong>（<code>MachineStart</code> 亦 <code>AmrInject.Reset()</code>）<strong>都會清掉測試模式與所有 latch</strong>。所以若你「先勾測試模式再 HOME」，HOME 會把測試模式關掉，之後按注入全無效；若「根本沒 HOME」，273/274 被閘門擋死。</p>
+<p><strong>重點</strong>：滿足第 4 點但仍「不要按 Start 跑真實生產」——測試模式 banner 也是這個意思（見 §4.4 安全）。RunMode=Normal 只是<strong>模式選擇</strong>，不是「正在跑料」；HOME 則用 <strong>Home 鈕</strong>完成（不要用 Start 去 HOME，Start 會清測試模式）。</p>
 </blockquote>
 <hr />
 <h2 id="3">3. 連線拓撲與角色方向（重要，勿接反）</h2>
@@ -274,6 +281,43 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <li><strong>左側 <code>ready=</code> 顯示真實 predicate、非注入值</strong>：按了 Drain/Ready，<code>ready=</code> 不一定變——<strong>以 log 與模擬器收到的 CEID 為準</strong>。</li>
 <li><strong>安全</strong>：<code>bTestMode</code> 預設 OFF、<strong>永不持久化</strong>（每次開程式都是 OFF）；任何 <strong>HOME/init</strong>（<code>InitialAllTask</code>）、<strong>機台 Start</strong>（<code>MachineStart</code>）、或<strong>取消勾選</strong>都會清掉測試模式與所有 latch。OFF 時所有讀取/消費都 no-op。<strong>測試模式期間請勿跑真實生產。</strong></li>
 </ul>
+<h3 id="45-sensor-soft_simulate">4.5 需不需要觸碰 sensor？（含 SOFT_SIMULATE）— 重要</h3>
+<p><strong>單動測試的設計目的就是「不必碰任何 sensor」</strong>——注入按鈕直接取代 sensor 邊緣（面板勾選字樣即 <em>bypass sensor edge only</em>）。這在<strong>真機</strong>與 <strong>SOFT_SIMULATE</strong> 皆成立。</p>
+<p>各邊緣的真機 / sim 行為（已對程式碼查證）：</p>
+<table>
+<thead>
+<tr>
+<th>邊緣（CEID）</th>
+<th>真機（SOFT_SIMULATE OFF）讀什麼</th>
+<th>SOFT_SIMULATE ON</th>
+<th>用注入按鈕時</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full / Short（272）</td>
+<td>Auto：<code>SnAutoX_InputFullTray</code> sensor｜Loader：<code>SnLoader_Inputend</code></td>
+<td>Auto：比 <code>iSimAmrMaxTray</code> 盤數門檻（非 sensor）｜Loader：<code>iSimInfeedCount&lt;=0</code>（非 sensor）</td>
+<td>按鈕直接 OR 成 true</td>
+</tr>
+<tr>
+<td>Drain / Ready（273）</td>
+<td>Auto：車態 State 旗標＋前缸 out-bit（非 raw sensor）｜Loader：前缸 out-bit</td>
+<td><strong>硬回 true</strong>（完全不讀）</td>
+<td>按鈕直接 OR 成 true</td>
+</tr>
+<tr>
+<td>Take / Finish（274）</td>
+<td>Auto：<code>SnAutoX_InputEnd</code> sensor（<strong>尚未接線→恆回 false，卡在 Ready</strong>）｜Loader：<code>SnLoader_Inputend</code> ON</td>
+<td><strong>硬回 true</strong>（完全不讀）</td>
+<td>按鈕直接 OR 成 true</td>
+</tr>
+</tbody>
+</table>
+<p><strong>結論（回應 sensor 問題）：</strong>
+1. <strong>真機</strong>：想跑完整條而不碰 sensor → 用<strong>注入按鈕</strong>（尤其 Take/Finish，因為 <code>SnAutoX_InputEnd</code> 還沒接線，不注入就會永遠停在 Ready）。這正是本測試模式存在的理由。
+2. <strong>SOFT_SIMULATE</strong>：273/274 的 predicate <strong>本來就硬回 true、根本不讀 sensor</strong>；272 讀的是模擬盤數（也非實體 sensor）。所以 <strong>sim 下你完全不會碰到任何實體 sensor</strong>。（甚至不注入，homed 之後 273/274 也會自動完成——注入是讓你能「明確、逐步」地驗每一站。）
+3. <strong>但</strong>：以上都<strong>不能免除「先 HOME」</strong>。HOME 不是 sensor 問題，是 <code>ServiceHandshake</code> 的 <code>fAllMotorHome</code> 閘門（§2 第 5 條）。<strong>sensor 可以不碰，HOME 一定要做。</strong></p>
 <hr />
 <h2 id="5-2-secsgem-host">5. 畫面② — SECS/GEM Host 模擬器（逐元件說明）</h2>
 <p>啟動：<code>cd D:\AI_Area\Tool\HT160S_SECS_Simulator\code</code> → 雙擊 <code>start.bat</code>（或 <code>python secs_host_simulator.py</code>）。</p>
@@ -366,8 +410,20 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">0</td>
-<td>勾 <strong>Enable ... test mode</strong></td>
+<td style="text-align: right;"><strong>0a</strong></td>
+<td><strong>先 HOME 機台</strong>（Home 鈕），等 HOMING 結束、各軸 HOME 燈綠</td>
+<td>狀態非 HOMING；<code>fAllMotorHome==true</code>（否則後面 273/274 永遠不出）</td>
+<td>—</td>
+</tr>
+<tr>
+<td style="text-align: right;">0b</td>
+<td>確認 RunMode=Normal、AMR ON、模擬器 ● selected</td>
+<td>狀態列 <code>Selected=1 bUseAMR=1</code></td>
+<td>● selected（綠）</td>
+</tr>
+<tr>
+<td style="text-align: right;">0c</td>
+<td><strong>HOME 之後</strong>才勾 <strong>Enable ... test mode</strong></td>
 <td>banner 亮紅；log <code>== AMR TEST MODE ON ==</code>；狀態列 <code>AmrInject: testMode=1 armed[ ]</code></td>
 <td>—</td>
 </tr>
@@ -419,10 +475,10 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">0</td>
-<td>勾 <strong>Enable ... test mode</strong></td>
-<td>banner 亮；<code>== AMR TEST MODE ON ==</code></td>
-<td>—</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td><strong>先 HOME</strong>（Home 鈕）等 homed → <strong>再</strong>勾 <strong>Enable ... test mode</strong></td>
+<td><code>fAllMotorHome==true</code>；banner 亮；<code>== AMR TEST MODE ON ==</code></td>
+<td>● selected（綠）</td>
 </tr>
 <tr>
 <td style="text-align: right;">1</td>
@@ -490,6 +546,14 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <tr>
 <td>按 <strong>Full/Short</strong> 完全沒送 CEID272</td>
 <td>① 不在 <strong>Normal 模式</strong>（<code>RunMode!=Run_Normal</code>，<code>PollAndCall</code> 直接 return）② <code>bUseAMR=0</code> ③ 未 SELECTED（<code>Selected=0</code>）。對照 §2 前置條件</td>
+</tr>
+<tr>
+<td><strong>★ 只出現 CEID272，之後永遠沒有 273 / 274（握手卡在 <code>hs=PREP</code>）</strong></td>
+<td><strong>最常見：機台未 HOME（<code>fAllMotorHome==false</code>）→ <code>ServiceHandshake</code> 第 324 行 freeze 閘門直接 return，273/274 完全不送</strong>（送 272 的 <code>PollAndCall</code> 不受此閘門管，才會只有前半）。<strong>處置：先 HOME 機台</strong>（Home 鈕，等 homed）<strong>再重測</strong>。※ SOFT_SIMULATE 下 273/274 的 predicate 硬回 true，所以 sim 卡在 PREP 幾乎必然是「沒 HOME」。次要可能：先勾了測試模式又去 HOME/Start，把測試模式清掉了（見下一列）</td>
+</tr>
+<tr>
+<td>按 <strong>Drain/Ready</strong> 沒出 CEID273</td>
+<td>① 機台未 HOME（同上，最優先查）② 尚未收到 <code>START_AGV</code>（未進 PREP，先確認第 2 步 HCACK=0）。順序見 §8</td>
 </tr>
 <tr>
 <td>模擬器沒自動回 <code>START_AGV</code></td>

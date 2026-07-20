@@ -35,9 +35,12 @@
 | 2 | **AMR 模式開啟**（`GeneralSetting.bUseAMR=1`）| 主畫面 **AMR** badge = 綠色 ON；面板左側狀態列 `bUseAMR=1` | `PollAndCall` 直接 return，按鈕全無效 |
 | 3 | **HSMS 已 SELECTED（連線就緒）** | 面板左側狀態列 `Selected=1`；模擬器右上 **● selected**（綠） | 設備不會送任何 CEID |
 | 4 | **機台在 Normal（正常）生產模式**（`RunMode=Run_Normal`） | 主畫面模式選擇＝Normal（模擬器 `S1F3` 回覆 `Run Mode=0`） | **`PollAndCall` 第 237 行 `if(RunMode!=Run_Normal) return;` → 叫車 CEID272 不會送**（Full / Short 按了沒反應）。※ 只需選 Normal 模式，**不必**真的按 Start 跑料 |
-| 5 | **模擬器 Automation ＝ ON** | 連線列 **Automation ✓** | 設備上報的 S6F11 不會被回 ACK（測試仍可看到 TX，但不完整） |
+| 5 | **★ 機台已 HOME 完成**（`fAllMotorHome==true`） | 主畫面狀態非 `HOMING`；各軸 HOME 燈綠（`fAllMotorHome && bHomeFinish`）；State Record 顯示已 homed | **`ServiceHandshake` 第 324 行 `if(RunMode==Run_Home \|\| fAllMotorHome==false) return;` → CEID273 / 274 永遠不送，握手卡在 PREP**（會出現「只有 272、沒有 273/274」）。**這是最容易漏的一條** |
+| 6 | **模擬器 Automation ＝ ON** | 連線列 **Automation ✓** | 設備上報的 S6F11 不會被回 ACK（測試仍可看到 TX，但不完整） |
 
-> **重點**：滿足第 4 點但仍「不要按 Start 跑真實生產」——測試模式 banner 也是這個意思（見 §4.4 安全）。RunMode=Normal 只是**模式選擇**，不是「正在跑料」。
+> **★★ 操作順序鐵律（務必照做）**：**先 HOME → 再勾測試模式 → 再按注入**。原因：HOME 完成（`csystem.cpp:1352-1361`：`InitialAllTask(true)` 內含 `AmrInject.Reset()`）與按 **Start**（`MachineStart` 亦 `AmrInject.Reset()`）**都會清掉測試模式與所有 latch**。所以若你「先勾測試模式再 HOME」，HOME 會把測試模式關掉，之後按注入全無效；若「根本沒 HOME」，273/274 被閘門擋死。
+>
+> **重點**：滿足第 4 點但仍「不要按 Start 跑真實生產」——測試模式 banner 也是這個意思（見 §4.4 安全）。RunMode=Normal 只是**模式選擇**，不是「正在跑料」；HOME 則用 **Home 鈕**完成（不要用 Start 去 HOME，Start 會清測試模式）。
 
 ---
 
@@ -118,6 +121,23 @@
 - **左側 `ready=` 顯示真實 predicate、非注入值**：按了 Drain/Ready，`ready=` 不一定變——**以 log 與模擬器收到的 CEID 為準**。
 - **安全**：`bTestMode` 預設 OFF、**永不持久化**（每次開程式都是 OFF）；任何 **HOME/init**（`InitialAllTask`）、**機台 Start**（`MachineStart`）、或**取消勾選**都會清掉測試模式與所有 latch。OFF 時所有讀取/消費都 no-op。**測試模式期間請勿跑真實生產。**
 
+### 4.5 需不需要觸碰 sensor？（含 SOFT_SIMULATE）— 重要
+
+**單動測試的設計目的就是「不必碰任何 sensor」**——注入按鈕直接取代 sensor 邊緣（面板勾選字樣即 *bypass sensor edge only*）。這在**真機**與 **SOFT_SIMULATE** 皆成立。
+
+各邊緣的真機 / sim 行為（已對程式碼查證）：
+
+| 邊緣（CEID） | 真機（SOFT_SIMULATE OFF）讀什麼 | SOFT_SIMULATE ON | 用注入按鈕時 |
+|---|---|---|---|
+| Full / Short（272） | Auto：`SnAutoX_InputFullTray` sensor｜Loader：`SnLoader_Inputend` | Auto：比 `iSimAmrMaxTray` 盤數門檻（非 sensor）｜Loader：`iSimInfeedCount<=0`（非 sensor） | 按鈕直接 OR 成 true |
+| Drain / Ready（273） | Auto：車態 State 旗標＋前缸 out-bit（非 raw sensor）｜Loader：前缸 out-bit | **硬回 true**（完全不讀） | 按鈕直接 OR 成 true |
+| Take / Finish（274） | Auto：`SnAutoX_InputEnd` sensor（**尚未接線→恆回 false，卡在 Ready**）｜Loader：`SnLoader_Inputend` ON | **硬回 true**（完全不讀） | 按鈕直接 OR 成 true |
+
+**結論（回應 sensor 問題）：**
+1. **真機**：想跑完整條而不碰 sensor → 用**注入按鈕**（尤其 Take/Finish，因為 `SnAutoX_InputEnd` 還沒接線，不注入就會永遠停在 Ready）。這正是本測試模式存在的理由。
+2. **SOFT_SIMULATE**：273/274 的 predicate **本來就硬回 true、根本不讀 sensor**；272 讀的是模擬盤數（也非實體 sensor）。所以 **sim 下你完全不會碰到任何實體 sensor**。（甚至不注入，homed 之後 273/274 也會自動完成——注入是讓你能「明確、逐步」地驗每一站。）
+3. **但**：以上都**不能免除「先 HOME」**。HOME 不是 sensor 問題，是 `ServiceHandshake` 的 `fAllMotorHome` 閘門（§2 第 5 條）。**sensor 可以不碰，HOME 一定要做。**
+
 ---
 
 ## 5. 畫面② — SECS/GEM Host 模擬器（逐元件說明）
@@ -160,7 +180,9 @@
 
 | 步 | 你在畫面①做 | 畫面①應出現（log / 狀態列） | 畫面②模擬器應出現 |
 |---:|-------------|------------------------------|--------------------|
-| 0 | 勾 **Enable ... test mode** | banner 亮紅；log `== AMR TEST MODE ON ==`；狀態列 `AmrInject: testMode=1 armed[ ]` | — |
+| **0a** | **先 HOME 機台**（Home 鈕），等 HOMING 結束、各軸 HOME 燈綠 | 狀態非 HOMING；`fAllMotorHome==true`（否則後面 273/274 永遠不出） | — |
+| 0b | 確認 RunMode=Normal、AMR ON、模擬器 ● selected | 狀態列 `Selected=1 bUseAMR=1` | ● selected（綠） |
+| 0c | **HOME 之後**才勾 **Enable ... test mode** | banner 亮紅；log `== AMR TEST MODE ON ==`；狀態列 `AmrInject: testMode=1 armed[ ]` | — |
 | 1 | 按 **A1 Full** | log `Auto1 FULL=1`；狀態列 `armed[ A1F ]` → 隨即 `P4 AUTO1: lock=1 hs=CALLED` | `RX S6F11 CEID=272`（＋`CEID 35`）→ 自動 `TX S6F12`、`TX S2F41 START_AGV(AUTO1)` |
 | 2 | （等 START_AGV 回來） | 狀態列 `P4 AUTO1: lock=1 hs=PREP` | `RX S2F42 HCACK=0` |
 | 3 | 按 **A1 Drain** | log `Auto1 DRAINED=1` | `RX S6F11 CEID=273`（Ready）→ 自動 `TX S6F12` |
@@ -179,7 +201,7 @@
 
 | 步 | 你在畫面①做 | 畫面①應出現 | 畫面②模擬器應出現 |
 |---:|-------------|-------------|--------------------|
-| 0 | 勾 **Enable ... test mode** | banner 亮；`== AMR TEST MODE ON ==` | — |
+| **0** | **先 HOME**（Home 鈕）等 homed → **再**勾 **Enable ... test mode** | `fAllMotorHome==true`；banner 亮；`== AMR TEST MODE ON ==` | ● selected（綠） |
 | 1 | 按 **Loader Short** | log `Loader SHORTAGE=1`；`P1 Loader: hs=CALLED` | `RX S6F11 CEID=272`（P1）→ `TX S6F12`、`TX S2F41 START_AGV(Loader)` |
 | 2 | （等 START_AGV 回來） | `P1 Loader: lock=1 hs=PREP` | `RX S2F42 HCACK=0` |
 | 3 | 按 **Loader Ready** | log `Loader READY=1` | `RX S6F11 CEID=273`（Ready） |
@@ -226,6 +248,8 @@ Empty / Color：把 Loader 換成 Empty / Color 三顆鈕。
 | 症狀 | 可能原因 / 處理 |
 |------|------------------|
 | 按 **Full/Short** 完全沒送 CEID272 | ① 不在 **Normal 模式**（`RunMode!=Run_Normal`，`PollAndCall` 直接 return）② `bUseAMR=0` ③ 未 SELECTED（`Selected=0`）。對照 §2 前置條件 |
+| **★ 只出現 CEID272，之後永遠沒有 273 / 274（握手卡在 `hs=PREP`）** | **最常見：機台未 HOME（`fAllMotorHome==false`）→ `ServiceHandshake` 第 324 行 freeze 閘門直接 return，273/274 完全不送**（送 272 的 `PollAndCall` 不受此閘門管，才會只有前半）。**處置：先 HOME 機台**（Home 鈕，等 homed）**再重測**。※ SOFT_SIMULATE 下 273/274 的 predicate 硬回 true，所以 sim 卡在 PREP 幾乎必然是「沒 HOME」。次要可能：先勾了測試模式又去 HOME/Start，把測試模式清掉了（見下一列）|
+| 按 **Drain/Ready** 沒出 CEID273 | ① 機台未 HOME（同上，最優先查）② 尚未收到 `START_AGV`（未進 PREP，先確認第 2 步 HCACK=0）。順序見 §8 |
 | 模擬器沒自動回 `START_AGV` | 連線列 **Auto-AGV** 沒勾（改手動 §8，或勾起來） |
 | 模擬器收到 CEID 但無 ACK | **Automation** 沒勾 |
 | 按 **Drain/Ready** 沒出 CEID273 | 尚未收到 `START_AGV`（未進 PREP）；先確認第 2 步 HCACK=0。順序見 §8 |
