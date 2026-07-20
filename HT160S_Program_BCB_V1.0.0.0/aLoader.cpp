@@ -104,6 +104,9 @@ void TLoaderModule::InitialFlag(bool bKeepMaterial)
     //AI(ht160s-rearready-p0) 20260705 : RearKind/RearTrayID/RearSourceTray moved into
     //the bKeepRear guard above -- wiping them while the tray stays parked would
     //misroute a preserved cover/identity tray as Normal.
+    if(bKeepMaterial)
+        RecordProcess("HOME-RESUME Loader: keptRear="+IntToStr(bKeepRear?1:0)+" rearKind="+IntToStr(RearKind)+
+            " rearID="+RearTrayID+" ledgerSerial="+IntToStr(iFeedSerial)+" carTotal="+IntToStr(iCarTrayTotal));   //AI(ht160s-obsv-p0)
     CurrentLotNumber="";
     TestUpTask=1;
     TestDownTask=1;
@@ -1385,6 +1388,8 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
                HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
             {
+                RecordProcess("HEAL Loader LK1: orphan tray on carriage at resume (side "+IntToStr(LoaderNo)+
+                    ") - confirm-then-mint via 9500");   //AI(ht160s-obsv-p0)
                 State->FeedTask=9500;
                 break;
             }
@@ -1529,7 +1534,11 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 {
                     if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
                        HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+                    {
+                        RecordProcess("HEAL Loader CleanOut self-collect: stranded front tray (side "+
+                            IntToStr(LoaderNo)+") - mint via 9500");   //AI(ht160s-obsv-p0)
                         State->FeedTask=9500;
+                    }
                     break;
                 }
                 //AI(ht160s-agv) 20260626 : AMR-aware feed deferral (port of HT9046

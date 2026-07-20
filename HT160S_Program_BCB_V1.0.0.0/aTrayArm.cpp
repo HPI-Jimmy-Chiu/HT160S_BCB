@@ -66,6 +66,7 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
             HSys.VMot.MMTrayArmX->fHasTray=true;
         bAdoptedResidue=true;
         bResiduePendingNotify=true;
+        RecordProcess("HOME-RESUME TrayArm: adopted clamp-held residue tray (latch empty, both clamp reeds On)");   //AI(ht160s-obsv-p0)
     }
 #endif
     PickTask=1;
@@ -87,9 +88,13 @@ void TTrayArmModule::InitialFlag(bool bKeepMaterial)
     //are restarted.
     if(bKeepMaterial && bHasTray && bAdoptedResidue==false)
     {
+        RecordProcess("HOME-RESUME TrayArm: keep-carry Job="+IntToStr(Job)+" dest="+IntToStr(PlaceDest)+
+            " autoTarget="+IntToStr(iAutoTarget)+" kind="+IntToStr(iDeliverKind)+" id="+iDeliverTrayID);   //AI(ht160s-obsv-p0)
         Status=TAS_CARRYING;
         return;
     }
+    if(bKeepMaterial)
+        RecordProcess(AnsiString("HOME-RESUME TrayArm: no carry kept (idle reset)")+(bAdoptedResidue?" [residue-adopted]":""));   //AI(ht160s-obsv-p0)
     Status=TAS_IDLE;
     Job=TAJOB_NONE;
     iAutoTarget=-1;
@@ -843,7 +848,11 @@ bool TTrayArmModule::DoPlace(int Flag)
     //Color). This runs before the PlaceDest dispatch so DoPlaceToColor/DoPlaceToEmpty(1)
     //also enter their switch at case 4000.
     if(PlaceTask==1 && IsCarriedTrayAlreadyDeposited())
+    {
+        RecordProcess("HEAL TrayArm XS1: carried tray already deposited - fast-forward to handoff commit (dest="+
+            IntToStr(PlaceDest)+" autoTarget="+IntToStr(iAutoTarget)+")");   //AI(ht160s-obsv-p0)
         PlaceTask=4000;
+    }
 
     //AI(HT160S-Maintainer) 20260606 : Loader-recovery jobs may instead recycle the tray
     //back to the EmptyTray rear when no Auto needs one. Dispatch to that path.
@@ -1279,6 +1288,8 @@ void TTrayArmModule::DoTrayArm(int &Task)
                     //adopt fast-forward instead signs the real (present) tray at case 4000.
                     if(IsCarriedTrayAlreadyDeposited()==false)
                     {
+                        RecordProcess("HEAL TrayArm XS2: resume re-send return request (dest="+IntToStr(PlaceDest)+
+                            " kind="+IntToStr(iDeliverKind)+")");   //AI(ht160s-obsv-p0)
                         if(PlaceDest==TAPLACE_EMPTY && EmptyModule!=NULL)
                             EmptyModule->RequestReturnTray();
                         if(PlaceDest==TAPLACE_COLOR && ColorModule!=NULL)
@@ -1292,6 +1303,9 @@ void TTrayArmModule::DoTrayArm(int &Task)
                                 ColorModule->RequestReturnTray();
                         }
                     }
+                    else
+                        RecordProcess("HEAL TrayArm XS2: carried tray already deposited - skip re-send (dest="+
+                            IntToStr(PlaceDest)+")");   //AI(ht160s-obsv-p0)
                     DoPlace(0);
                     Task=2000;
                     break;
@@ -1311,6 +1325,8 @@ void TTrayArmModule::DoTrayArm(int &Task)
                                   (bRearEn  && HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn());
                     if((bFrontEn || bRearEn) && bAnyOn==false)
                     {
+                        if(bHasTray)
+                            RecordProcess("HEAL TrayArm: un-adopt - clamp reeds read open, held-tray latch released");   //AI(ht160s-obsv-p0)
                         if(HSys.VMot.MMTrayArmX!=NULL)
                             HSys.VMot.MMTrayArmX->fHasTray=false;
                         bHasTray=false;

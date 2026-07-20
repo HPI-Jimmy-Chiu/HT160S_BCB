@@ -778,7 +778,13 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
 {
     EnsureNote();
     if(fNote->fShow)
+    {
+        //AI(ht160s-obsv-p0) 20260720 : a second alarm raised behind an open Note modal was
+        //silently discarded (no EventLog, no SECS) - offline timelines then miss a real
+        //alarm. Record the drop; single-modal behavior unchanged.
+        RecordProcess("ALARM DROPPED (modal busy): "+Code+" "+Message);
         return 0;
+    }
 
     HSys.DecStopAllMotor();
     HSys.Sys.SystemStart=false;

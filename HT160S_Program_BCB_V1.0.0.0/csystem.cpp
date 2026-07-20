@@ -22,7 +22,8 @@
 #include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject test mode on machine start
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
-#include "note.h"                       //AI(HT160S-Maintainer) 20260603 : ShowSystemError for ProcessAlarm dispatch
+#include "note.h"
+#include "cStateRecordHT160.h"   //AI(ht160s-obsv-p0) 20260720 : gStateRecord post-resume baseline snapshot                       //AI(HT160S-Maintainer) 20260603 : ShowSystemError for ProcessAlarm dispatch
 #include "mymessbox.h"                   //AI 20260622 : ShowMyMessage for the real-machine (#ifndef SOFT_SIMULATE) servo-alarm home-flag-reset notice in ScanAllMotorStatus
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -1366,6 +1367,7 @@ void ProcessMotion()
             //silently reverting to a Normal production run (was: unconditional Run_Normal).
             //InitialAllTask(true) reset the per-module clean-out finish flags, so the cascade
             //re-evaluates and finishes fast if the pipeline is already empty.
+            bool bByStart=bHomeByStart;   //AI(ht160s-obsv-p0) : captured before the branch consumes it
             if(bHomeByStart)
             {
                 ChangeRunMode(Run_Normal);                                      //20120102 Daver add
@@ -1381,6 +1383,15 @@ void ProcessMotion()
                 ChangeRunMode(Run_Normal);
                 SoftStop=true;
             }
+            //AI(ht160s-obsv-p0) 20260720 : resume finalize breadcrumb + post-resume baseline
+            //snapshot. The 30-slot TaskHistory ring wraps within the resume burst, so the only
+            //reconstructable baseline of "what the machine believed right after resume" is
+            //captured HERE, before production restarts.
+            RecordProcess(AnsiString("HOME-RESUME finalize: mode=")+
+                (HSys.Sys.RunMode==Run_CleanOut?AnsiString("CleanOut"):AnsiString("Normal"))+
+                " byStart="+IntToStr(bByStart?1:0));
+            if(gStateRecord!=NULL)
+                gStateRecord->TriggerSnapshot("HomeResumeDone");
             SetMotorSpeed(true);                                                //AI(HT160S-Maintainer) 20260602 : re-apply working speed after home (HT172 0420 csystem/uhome port)
         }
 		return;

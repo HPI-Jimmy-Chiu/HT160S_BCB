@@ -225,6 +225,17 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
             ClearSlot(SlotIndex);
         }
     }
+    if(bKeepMaterial)
+    {
+        int iKeptIC=0;
+        for(int k=0; k<SORT_ARM_SUCKER_COUNT; k++)
+        {
+            if(Slot[k].bHasIC)
+                iKeptIC++;
+        }
+        RecordProcess("HOME-RESUME SortArm: kept heldIC="+IntToStr(iKeptIC)+
+            " residuePending="+IntToStr(bKeepResidue?1:0)+" reArmed="+IntToStr(bResidueArmed?1:0));   //AI(ht160s-obsv-p0)
+    }
     UpdateKitSuckState();
 }
 //---------------------------------------------------------------------------
@@ -1395,6 +1406,7 @@ bool TSortArmModule::CheckPlaceResidue()
                     else
                     {
                         Sucker->Normal();
+                        RecordProcess("SortArm residue verify: slot "+IntToStr(s)+" CLEAR");   //AI(ht160s-obsv-p0)
                         bNeedResidueCheck[s]=false;
                         ResidueTask[s]=1;
                     }
@@ -2170,6 +2182,19 @@ AnsiString TSortArmModule::DescribeHolding()
         s += "PickRetry=" + IntToStr(iPickRetryCount)
            + " / " + IntToStr(GeneralSetting.iSortArmPickRetryCount)
            + "  PickSuckErrSlots=" + (errSlots.IsEmpty() ? AnsiString("none") : errSlots) + "\r\n";
+    }
+
+    //AI(ht160s-obsv-p0) 20260720 : residue-verify chain visibility. The Auto discharge gate
+    //waits on bResidueClear; without these fields a post-resume "station full forever" hang
+    //shows no blocker in the dump.
+    {
+        AnsiString resSlots;
+        for(int r=0; r<SORT_ARM_SUCKER_COUNT; r++)
+            if(bNeedResidueCheck[r])
+                resSlots += (resSlots.IsEmpty() ? AnsiString("") : AnsiString(",")) + IntToStr(r);
+        s += "ResiduePending=" + (resSlots.IsEmpty() ? AnsiString("none") : resSlots)
+           + "  ResidueArmed=" + IntToStr(bResidueArmed ? 1 : 0)
+           + "  ResidueAutoIndex=" + IntToStr(iResidueAutoIndex) + "\r\n";
     }
 
     for(int i=0; i<SORT_ARM_SUCKER_COUNT; i++)

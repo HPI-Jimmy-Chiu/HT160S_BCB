@@ -46,6 +46,9 @@ void TEmptyModule::InitialFlag(bool bKeepMaterial)
         bReturnTray=false;
         bTrayXToEmptyFinish=false;
     }
+    if(bKeepMaterial)
+        RecordProcess("HOME-RESUME Empty: kept returnTray="+IntToStr(bReturnTray?1:0)+
+            " xferFinish="+IntToStr(bTrayXToEmptyFinish?1:0));   //AI(ht160s-obsv-p0)
     bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no rear-return in flight at init
     bLotFinish=false;
     FrontSourceTray.Clear();   //AI(ht160s-tray-source) : no stale front grid across init/lot

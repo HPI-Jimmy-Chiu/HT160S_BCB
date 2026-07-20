@@ -87,6 +87,9 @@ void TColorModule::InitialFlag(bool bKeepMaterial)
     GoUpDelay.Clear();
     if(bKeepPresented==false)
         sTrayID2D="";
+    if(bKeepMaterial)
+        RecordProcess("HOME-RESUME Color: keptPresented="+IntToStr(bKeepPresented?1:0)+" id="+sTrayID2D+
+            " returnTray="+IntToStr(bReturnTray?1:0)+" returnedCount="+IntToStr(iReturnedCount));   //AI(ht160s-obsv-p0)
     FeedDelay.Clear();
     GoDownDelay.Clear();
     ScanDelay.Clear();

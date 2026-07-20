@@ -133,6 +133,21 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         Car[Index].Clear();
         InitAutoCarStack(Index);
     }
+    if(bKeepMaterial)
+    {
+        AnsiString sKeep;
+        for(int k=0; k<AUTO_STATION_COUNT; k++)
+        {
+            if(State[k].bCarHasTray || bRearDeliveredPending[k] || bDischargeTailPending[k] || bOperatorHolding[k])
+                sKeep+=" A"+IntToStr(k+1)+"(car="+IntToStr(State[k].bCarHasTray?1:0)+
+                    ",rearPend="+IntToStr(bRearDeliveredPending[k]?1:0)+
+                    ",tail="+IntToStr(bDischargeTailPending[k]?1:0)+
+                    ",oper="+IntToStr(bOperatorHolding[k]?1:0)+")";
+        }
+        if(sKeep=="")
+            sKeep=" none";
+        RecordProcess("HOME-RESUME Auto: kept"+sKeep);   //AI(ht160s-obsv-p0)
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-home-resume-drain) 20260711 : W2 drain hook (AF-2). A HOME landing in the
@@ -160,7 +175,12 @@ bool TAutoModule::HomeDrainTick()
     //station; DoAuto case 3000 finishes the eject on resume (latch survives keep-material).
     if(iDischargeAuto>=0 && iDischargeAuto<AUTO_STATION_COUNT &&
        (DischargeTask==5000 || DischargeTask==6000 || DischargeTask==6100))
+    {
+        if(bDischargeTailPending[iDischargeAuto]==false)
+            RecordProcess("HOME-DRAIN Auto: discharge-tail latched (Auto"+IntToStr(iDischargeAuto+1)+
+                " DischargeTask="+IntToStr(DischargeTask)+")");   //AI(ht160s-obsv-p0) : latch edge only (drain ticks every scan)
         bDischargeTailPending[iDischargeAuto]=true;
+    }
     //AI(ht160s-home-resume-drain) 20260713 : AD-2 FrontRise convergence. uHome homes only
     //MAutoY and InitialFlag only resets the DischargeSubTask cursor, so a riser left On by
     //a HOME in the discharge / cleanout FrontRise dwell stays extended and collides on the
@@ -1475,6 +1495,12 @@ AnsiString TAutoModule::DescribeStation(int Index)
        + "  RearPending=" + IntToStr(bRearDeliveredPending[Index] ? 1 : 0)
        + "  AmrLocked="   + IntToStr(bAmrLocked[Index] ? 1 : 0)
        + "  WorkingKind=" + IntToStr(WorkingKind[Index]) + "\r\n";
+    //AI(ht160s-obsv-p0) 20260720 : discharge-gate blockers - a post-resume "full forever"
+    //station is diagnosable only if the gate inputs are in the dump.
+    s += "  ResidueClear=" + IntToStr(State[Index].bResidueClear ? 1 : 0)
+       + "  DischTail="    + IntToStr(bDischargeTailPending[Index] ? 1 : 0)
+       + "  RearKind="     + IntToStr(RearKind[Index])
+       + "  RearID="       + RearTrayID[Index] + "\r\n";
 
     //AI(ht160s-agv) 20260627 : Auto-full AMR safety-net dump (State Record gap analysis).
     //Log the computed full verdict + raw InputFullTray sensor + the full-wait latch/hold
@@ -1722,6 +1748,7 @@ void TAutoModule::DoAuto(int &Task)
             if(iTail>=0)
             {
                 bDischargeTailPending[iTail]=false;
+                RecordProcess("HOME-RESUME Auto: discharge-tail consumed (Auto"+IntToStr(iTail+1)+") - re-enter eject at 5000");   //AI(ht160s-obsv-p0)
                 iDischargeAuto=iTail;
                 DischargeTask=5000;
                 Task=4000;
