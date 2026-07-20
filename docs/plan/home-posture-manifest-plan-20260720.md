@@ -43,9 +43,12 @@ slot bHasIC=允許 On,否則 Off(SP-1 drain 已對帳,收編為驗證項)
 
 ## 施工序(依既定優先)
 
-1. **D|幽靈盤三點封堵**:LK-1(aLoader case10)、CleanOut 自收(case9000 分支)、9500 confirm
-   三處 InputHasTray 讀值加「rise1 Off-reed 確認在下」前提(D-1 政策);同一 sensor 雙防線
-   相關性失效問題就此解除
+1. **D|幽靈盤三點封堵** — **SHIPPED `31d8fad` 2026-07-20**(三建置 EXIT=0+selftest+對抗式複驗
+   workflow wv7hv5mkr=SHIP 裁決)。IsInputHasTrayTrustworthy()=rise1 Off-reed 確認在下才可信;
+   case10(LK-1+destack 前置,rise1 未下=等+逾時 MES0925,D-1 政策)、case9000 CleanOut 自收
+   直接閘住。case9500 mint 經複驗確認由 DoFrontDestackDown case7 的 rise1 Pop-confirm 傳遞性
+   保護,無旁路。逾時秒數 [HomeResume]Rise1SettleWaitSec 預設10s(clamp>=5,防 HTimer 0=instant/
+   負值=49.7天無聲卡死 footgun)。**上機驗證pending**(sim 短路 helper 不可重現 rise1 卡up)
 2. **B|停放快照雙判準**:park gate 改 `fHasTray OR PushTray_On reed`(無聲失盤封堵);
    ghost 分支(帳=true、reed=OFF)候選:(a)不停放+EventLog+人工確認(推薦)/(b)照停放讓取回逾時自曝 — **待拍板**
 3. **Manifest 兩檢查點落地**(本計畫主體;復用 ts_IOSelfTest 巡檢核心+自動 State Record)
