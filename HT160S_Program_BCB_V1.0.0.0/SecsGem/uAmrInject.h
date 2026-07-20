@@ -172,6 +172,34 @@ public:
         return true;
     }
 
+    // ---- cycle finish : clear this station's injected level latches (sim-safe) ----
+    // AI(ht160s-agv) 20260720 : under SOFT_SIMULATE the drained/taken predicate is
+    // hard-true and short-circuits the AutoTaken/InputFinish consume above, so an
+    // injected FULL/SHORTAGE level latch never auto-cleared and the handshake re-called
+    // every tick (272->273->274 loop). The coordinator now calls these at the CEID274
+    // fire point so one inject drives exactly one cycle, then stops. Real hardware is
+    // unaffected (its finish predicate is sensor-driven and consumes the inject normally).
+    void ClearAutoCycle(int a)
+    {
+        if(bTestMode == false || AutoOOR(a))
+            return;
+        if(bAutoFull[a] || bAutoDrained[a] || bAutoTaken[a])
+            Add("Auto" + IntToStr(a + 1) + " cycle cleared (274)");
+        bAutoFull[a] = false;
+        bAutoDrained[a] = false;
+        bAutoTaken[a] = false;
+    }
+    void ClearInputCycle(int p)
+    {
+        if(bTestMode == false || InOOR(p))
+            return;
+        if(bInShort[p] || bInReady[p] || bInFinish[p])
+            Add("P" + IntToStr(p + 1) + " cycle cleared (274)");
+        bInShort[p] = false;
+        bInReady[p] = false;
+        bInFinish[p] = false;
+    }
+
     // ---- SECS S2F41 handler alert (bad / rejected host command) ----
     void NoteHostReject(AnsiString Cmd, unsigned Hcack)
     {

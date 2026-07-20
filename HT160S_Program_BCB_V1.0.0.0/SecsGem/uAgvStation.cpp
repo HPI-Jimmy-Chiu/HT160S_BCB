@@ -357,6 +357,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 TrayCount[si]   = 0;        //AI(ht160s-agv-devicecount) : car is now empty, keep the SVID snapshot honest
                 DeviceCount[si] = 0;
                 Handshake[si] = AGV_IDLE;
+                AmrInject.ClearAutoCycle(a);   //AI(ht160s-agv) 20260720 : sim one-inject = one cycle (clear stuck level latch)
             }
         }
         // AI(ht160s-agv) 20260625 : watchdog. Age PREP/READY; on a stuck gate
@@ -401,6 +402,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 InfeedRefill(p);            // sim : restock the input stack to max
                 Handshake[p] = AGV_IDLE;
                 ShortageLatch[p] = 0;
+                AmrInject.ClearInputCycle(p);   //AI(ht160s-agv) 20260720 : sim one-inject = one cycle (clear stuck level latch)
             }
         }
         // AI(ht160s-agv) 20260625 : watchdog. Age PREP/READY; on a stuck gate force-
