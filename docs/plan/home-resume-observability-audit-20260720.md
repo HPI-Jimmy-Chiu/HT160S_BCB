@@ -42,7 +42,8 @@ EventLog 有 13 條 RecordProcess,含車號+Y 位置,夠用。但:
 
 ## 補強清單(裁判定版)
 
-### P0(全部=單檔單慣用法,不動控制時序)
+### P0(全部=單檔單慣用法,不動控制時序)— **SHIPPED `e6b01a1` 2026-07-20**
+(三建置 EXIT=0 + selftest 實測:七條 HOME-RESUME EventLog 行 + HomeResumeDone 快照 zip 皆已產生)
 1. **resume manifest**:InitialAllTask(true) 尾端每模組一行「kept/wiped+關鍵 latch」+
    「Home finished: mode=<Normal|CleanOut> keepMaterial=1 byStart=<0|1>」(csystem.cpp:1383)
 2. **自動快照 TriggerSnapshot("HomeResumeDone")**:InitialAllTask(true) 返回後立即(csystem.cpp:1360)
