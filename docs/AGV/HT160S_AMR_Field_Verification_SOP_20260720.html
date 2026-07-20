@@ -502,6 +502,25 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <li>不論哪種，<strong>HOME 一定要先做</strong>（HOME 是 motion 閘門，不是 sensor；§3 第 5 條）。</li>
 </ul>
 <hr />
+<h2 id="8a-tsmaintamr-host-it">8A. tsMaintAmr 面板：收到的 host 命令即時回饋（對客戶 IT）</h2>
+<p>前面幾節看的是<strong>機台送出</strong>（272/273/274）與<strong>模擬器</strong>端。反過來，<strong>機台收到 host 的每一筆 <code>S2F41</code> 命令</strong>（客戶 IT 送的 <code>START_AGV</code> / <code>START</code> / <code>SET_LOT_INFO</code> / <code>LOTSTART</code>…）都會即時顯示在 <strong>維護 → AMR 頁（tsMaintAmr）下方 log</strong>，含<strong>接受/拒絕 + 人類可讀原因 + 收到內容</strong>。現場和客戶 IT 對測時，直接看這裡就能當場反饋「你送的命令機台收到沒、對不對」。</p>
+<p>面板顯示格式（<code>RX S2F41 &lt;命令&gt;  &lt;收到內容&gt;  [OK] / [REJECT HCACK=n: 原因]</code>）：</p>
+<pre><code>RX S2F41 START_AGV  Loader=Action  [OK]
+RX S2F41 START_AGV  AUTO1=Action   [OK]
+RX S2F41 SET_LOT_INFO  lots=3       [OK]
+RX S2F41 START_AGV  AUTO7=Action   [REJECT HCACK=2: parameter invalid (empty list / unknown station / type / capacity / no lot data)]
+RX S2F41 START      [REJECT HCACK=2: parameter invalid (... / no lot data)]
+</code></pre>
+<p>HCACK 對照：<code>0</code>=接受；<code>1</code>=命令不認得/格式錯；<code>2</code>=參數無效（空清單/站名不存在/型別錯/超容量/無 Lot 資料）；<code>4</code>=busy（生產中/機台內有 IC）。</p>
+<p><strong>現場對客戶 IT 的用法</strong>：
+- 客戶送命令 → 面板出現 <code>[OK]</code> = 機台正確收到並接受；出現 <code>[REJECT ...]</code> = 當場把該行截圖回饋，原因已寫在行內。
+- <code>START_AGV</code> 那行的 <code>站名=值</code>（如 <code>Loader=Action</code> / <code>AUTO1=Action</code>）可讓 IT 核對「機台有沒有正確解讀我送的站點」；站名打錯（如 <code>AUTO7</code>）會直接 <code>[REJECT ... unknown station]</code>。
+- 不限測試模式：<strong>正式對測（測試模式關）也會顯示</strong>，log 自動截斷不爆量。
+- 這是「接收端」回饋，和模擬器端的「送出端」判讀（§ 模擬器 log：272→273→274→cycle complete）互補，一次對齊雙向。</p>
+<blockquote>
+<p>相關：機台端實作見 <code>SecsGem/uHGemHT160.cpp</code>（S2F42 handler）+ <code>SecsGem/uAmrInject.h</code>（<code>NoteHostCommand</code>/<code>HcackReason</code>），commit <code>2ad9a5c</code>。</p>
+</blockquote>
+<hr />
 <h2 id="9">9. 驗收檢查表（真機）</h2>
 <ul>
 <li>[ ] SECS badge、AMR badge = ON；<code>Selected=1</code>、<code>fAllMotorHome=true</code>、RunMode=Normal。</li>
@@ -510,6 +529,7 @@ hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
 <li>[ ] （I）注入三顆邊緣，每按一輪 272→273→274 完成後<strong>自動停</strong>（不循環）；面板 log 見 <code>... cycle cleared (274)</code>。</li>
 <li>[ ] START 回 HCACK=0（有載 Lot）或 HCACK=2（bench 無 Lot，正常）。</li>
 <li>[ ] host 端收到的 CEID/bitmap/SVID 與規格一致。</li>
+<li>[ ] <strong>（接收端，§8A）</strong> tsMaintAmr 面板每筆收到的 host 命令都顯示 <code>[OK]</code>；客戶送錯時顯示 <code>[REJECT HCACK=n: 原因]</code>，站名/內容 echo 正確。</li>
 </ul>
 <hr />
 <h2 id="10">10. 疑難排解（真機）</h2>

@@ -205,6 +205,32 @@ Auto 下料要「先滿車、再取走」，比 Loader 多一個「排空」條�
 
 ---
 
+## 8A. tsMaintAmr 面板：收到的 host 命令即時回饋（對客戶 IT）
+
+前面幾節看的是**機台送出**（272/273/274）與**模擬器**端。反過來，**機台收到 host 的每一筆 `S2F41` 命令**（客戶 IT 送的 `START_AGV` / `START` / `SET_LOT_INFO` / `LOTSTART`…）都會即時顯示在 **維護 → AMR 頁（tsMaintAmr）下方 log**，含**接受/拒絕 + 人類可讀原因 + 收到內容**。現場和客戶 IT 對測時，直接看這裡就能當場反饋「你送的命令機台收到沒、對不對」。
+
+面板顯示格式（`RX S2F41 <命令>  <收到內容>  [OK] / [REJECT HCACK=n: 原因]`）：
+
+```
+RX S2F41 START_AGV  Loader=Action  [OK]
+RX S2F41 START_AGV  AUTO1=Action   [OK]
+RX S2F41 SET_LOT_INFO  lots=3       [OK]
+RX S2F41 START_AGV  AUTO7=Action   [REJECT HCACK=2: parameter invalid (empty list / unknown station / type / capacity / no lot data)]
+RX S2F41 START      [REJECT HCACK=2: parameter invalid (... / no lot data)]
+```
+
+HCACK 對照：`0`=接受；`1`=命令不認得/格式錯；`2`=參數無效（空清單/站名不存在/型別錯/超容量/無 Lot 資料）；`4`=busy（生產中/機台內有 IC）。
+
+**現場對客戶 IT 的用法**：
+- 客戶送命令 → 面板出現 `[OK]` = 機台正確收到並接受；出現 `[REJECT ...]` = 當場把該行截圖回饋，原因已寫在行內。
+- `START_AGV` 那行的 `站名=值`（如 `Loader=Action` / `AUTO1=Action`）可讓 IT 核對「機台有沒有正確解讀我送的站點」；站名打錯（如 `AUTO7`）會直接 `[REJECT ... unknown station]`。
+- 不限測試模式：**正式對測（測試模式關）也會顯示**，log 自動截斷不爆量。
+- 這是「接收端」回饋，和模擬器端的「送出端」判讀（§ 模擬器 log：272→273→274→cycle complete）互補，一次對齊雙向。
+
+> 相關：機台端實作見 `SecsGem/uHGemHT160.cpp`（S2F42 handler）+ `SecsGem/uAmrInject.h`（`NoteHostCommand`/`HcackReason`），commit `2ad9a5c`。
+
+---
+
 ## 9. 驗收檢查表（真機）
 
 - [ ] SECS badge、AMR badge = ON；`Selected=1`、`fAllMotorHome=true`、RunMode=Normal。
@@ -213,6 +239,7 @@ Auto 下料要「先滿車、再取走」，比 Loader 多一個「排空」條�
 - [ ] （I）注入三顆邊緣，每按一輪 272→273→274 完成後**自動停**（不循環）；面板 log 見 `... cycle cleared (274)`。
 - [ ] START 回 HCACK=0（有載 Lot）或 HCACK=2（bench 無 Lot，正常）。
 - [ ] host 端收到的 CEID/bitmap/SVID 與規格一致。
+- [ ] **（接收端，§8A）** tsMaintAmr 面板每筆收到的 host 命令都顯示 `[OK]`；客戶送錯時顯示 `[REJECT HCACK=n: 原因]`，站名/內容 echo 正確。
 
 ---
 
