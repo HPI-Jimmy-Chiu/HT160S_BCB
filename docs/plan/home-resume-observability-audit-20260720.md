@@ -55,6 +55,11 @@ EventLog 有 13 條 RecordProcess,含車號+Y 位置,夠用。但:
 5. **modal 期間被丟警報改記錄**:note.cpp:781 return 前 log「[DROPPED: modal busy]」
 6. **AD-1 尾段 latch set/consume 各一行**(aAuto1To6.cpp:161/1715)
 
+### P1 — 部分 SHIPPED `5432441` 2026-07-20
+(#8 drain點名+HomeDrainTimeout快照 / #9 AGV鎖三處 / #11 毫秒時戳 / #12 SECS即時flush 已入庫;
+#7 StuckMs看門狗 與 #10 zip收EventLog 已實作於工作區但**未提交**——cStateRecordHT160.cpp/GeneralSetting.*
+與未提交的 whitelist-override 功能糾纏,待該功能結案後同車提交)
+
 ### P1
 7. 通用 StuckMs 看門狗(SystemStart=1 且模組 Task 停滯>閾值 → 自動 TriggerSnapshot;
    計算已存在 cStateRecordHT160.cpp:335-381,只差消費者)
@@ -63,6 +68,8 @@ EventLog 有 13 條 RecordProcess,含車號+Y 位置,夠用。但:
 10. State Record zip 收錄當日+前日 EventLog(仿 CaptureSecsLog)
 11. EventLog 時戳加毫秒(.zzz,同欄位相容)
 12. SECS log 狀態性 stream(S2F41/S5F1)立即 flush 或例外掛鉤 flush
+
+### P2 — #13 軸摘要 / #15 快照自記 / #16(tier-skip+Detail欄) SHIPPED;#14 StepTrace自動武裝與 #16b re-arm計數 未做
 
 ### P2
 13. 真機版每輪 HOME 軸摘要(homed/skipped/disabled;字串 SimHomeTrace 已組好)
