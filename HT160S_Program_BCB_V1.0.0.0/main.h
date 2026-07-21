@@ -482,6 +482,7 @@ public:		// User declarations
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();
     void __fastcall DoLotEndProcess();   //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body (btnLotEnd + CleanOut-finish auto path)
+    void __fastcall EmitCleanOutOK();    //AI(ht160s-overcount-tripqueue D3) 20260721 : S6F11 CEID28 CleanOutOK (self-gates on HSMS SELECTED); called from csystem CleanOut-finish before Lot End
     void __fastcall RefreshEventLogView();
     void __fastcall RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status diagnostic sheet pump (throttled; called from DoSystemMessage)
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);

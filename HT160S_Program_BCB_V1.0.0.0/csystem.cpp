@@ -19,6 +19,7 @@
 #include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() in CheckCleanOutFinish
 #include "cprod.h"
 #include "cSoterOutput.h"
+#include "GeneralSetting.h"   //AI(ht160s-overcount-tripqueue D6) 20260721 : GeneralSetting.bUseAMR gates the CleanOut auto-Lot-End
 #include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject test mode on machine start
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
@@ -1424,29 +1425,46 @@ void ProcessMotion()
 	{
 		if(CheckCleanOutFinish())
 		{
-			tRunData.LotEndTime=Now();
-			tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
-			if(fMain!=NULL) fMain->FreezeProductInfoAtLotEnd();
-			g_SoterOutput.OnLotEnd();
-			InitialAllTask();
-			HSys.Sys.bCleanOut=false;   //AI(HT160S-Maintainer) 20260605 : CleanOut fully done, drop nested latch
-			//AI(HT160S-Maintainer) 20260612 : pop a "CleanOut finish" note (ref HT172
-			//  ShowSystemError(SnFKCleanOut, K_SKIP|K_TRAY_FEED)). Operator picks SKIP
-			//  (end : back to Normal + stop) or TRAY_FEED (drain remaining trays).
-			//  NOTE: CheckAllTrayFeedFinish() is still a stub returning false, so the
-			//  TRAY_FEED branch will not auto-complete until that is wired : SKIP is
-			//  the only fully-working choice today.
-			int retCleanOut=ShowSystemError(HSys.Sen.SnFKCleanOut.Name, K_SKIP, 0);
-			// if(retCleanOut==K_TRAY_FEED)
-			// {
-			// 	CheckAllTrayFeedFinish(true);   // reset per-module TrayFeed finish flags
-			// 	ChangeRunMode(Run_TrayFeed);
-			// }
-			// else
+			//AI(ht160s-overcount-tripqueue D3/D6) 20260721 : emit CEID28 CleanOutOK first
+			//(host sees Clean Out done before Lot End), in BOTH modes (self-gates on SELECTED).
+			if(fMain!=NULL) fMain->EmitCleanOutOK();
+			if(GeneralSetting.bUseAMR)
 			{
-				ChangeRunMode(Run_Normal);
-				SoftStop=true;
+				//AMR mode : run the FULL Lot End automatically (no operator modal) -- CEID12 +
+				//UPH/Soter/lastdata + WhiteList revert + ArchiveWorkOrder + LotRegistry.Clear +
+				//LotBinBinding.Clear, all inside DoLotEndProcess (reads live lot data, so call it
+				//BEFORE InitialAllTask). Investigation confirmed CleanOut-finish is reachable
+				//without an AMR car-unload, so no per-Auto unload handshake is required here (that
+				//D4 automation -- AMR physically taking the output cars -- is a separate future step;
+				//the output cars hold the sorted product for operator/AMR removal exactly as a manual
+				//Lot End leaves them today). Non-AMR keeps the existing modal path below (D6).
+				HSys.Sys.bCleanOut=false;
+				if(fMain!=NULL) fMain->DoLotEndProcess();
+				InitialAllTask();
 			}
+			else
+			{
+				tRunData.LotEndTime=Now();
+				tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
+				if(fMain!=NULL) fMain->FreezeProductInfoAtLotEnd();
+				g_SoterOutput.OnLotEnd();
+				InitialAllTask();
+				HSys.Sys.bCleanOut=false;   //AI(HT160S-Maintainer) 20260605 : CleanOut fully done, drop nested latch
+				//AI(HT160S-Maintainer) 20260612 : pop a "CleanOut finish" note (ref HT172
+				//  ShowSystemError(SnFKCleanOut, K_SKIP|K_TRAY_FEED)). Operator picks SKIP
+				//  (end : back to Normal + stop) or TRAY_FEED (drain remaining trays).
+				//  NOTE: CheckAllTrayFeedFinish() is still a stub returning false, so the
+				//  TRAY_FEED branch will not auto-complete until that is wired : SKIP is
+				//  the only fully-working choice today.
+				int retCleanOut=ShowSystemError(HSys.Sen.SnFKCleanOut.Name, K_SKIP, 0);
+				// if(retCleanOut==K_TRAY_FEED)
+				// {
+				// 	CheckAllTrayFeedFinish(true);   // reset per-module TrayFeed finish flags
+				// 	ChangeRunMode(Run_TrayFeed);
+				// }
+			}
+			ChangeRunMode(Run_Normal);
+			SoftStop=true;
 		}
 	}
 	else if(HSys.Sys.RunMode==Run_OneCycle)

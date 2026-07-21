@@ -301,10 +301,12 @@ host 靜默（KYEC 手動驗證）：
 - [x] S3-follow aLoader/database：MES0921 從 mapAlarmCodeList SSOT 移除（Q3，陣列 20→19）+ 專屬 OverTrayRecycle CSV（cCsvDailyLog 惰性 InitLog，§1.5）—— **SHIPPED**
 - [x] S4 aLoader：源乾等車窗→自動 CleanOut（選項 B，§2.1；bAmrLocked==false + IsSupplyCarDry 閘，逾時取代 MES0920）—— **SHIPPED**
 - [x] S5 uAgvStation：進料側 CleanOut 閘（PollAndCall 釋放 CALLED + ServiceHandshake P1-P3 early-return + BeginPrep 拒收 infeed）—— **SHIPPED**（HCACK 用「return true+不進 PREP」既有 operator-holding idiom，非 HCACK=4；host 靠 timeout；安全結果相同。ReadyEntrySensor instant-finish 註記留待 S6/上機需要時再補）
-- [ ] S6 後端 D1-D6（7/16 S1-S6 順序）→ build + V6
-- [ ] S7 真機組態編譯驗證（SOFT_SIMULATE off → Full → 還原）
-- [ ] S8 SECS simulator 全情境 V1-V7
-- [ ] S9 攻防複驗 → 修正 → 提交
+- [x] S6-enablers `DoLotEndProcess()` 抽出 + `[AGV]CleanOutAmrWaitSec` —— **SHIPPED `c52cc77`**
+- [x] S6b 後端 core：CEID28 `EmitCleanOutOK` + AMR 自動 Lot End（csystem 完成分支呼叫 `DoLotEndProcess()`，非 AMR 維持彈窗）—— **CODE-COMPLETE**（調查證實 CleanOut finish 不靠 AMR 收車即可達成，見下）；dev+real build EXIT0、selftest PASS
+- [ ] **D4（延後，非必要）** per-Auto 主動叫 AMR 收輸出車（CleanOut 期間 CEID272→273→274）+ `IsStationCleanOutUnloadDue` + `iCleanOutAmrWaitSec` 超時彈窗 + 車空 finish 閘。**調查結論：finish 現況即可達成（drain ladder case 7000 清所有 per-station flag + latch bCleanOutFinish；輸出車留盤不擋 finish）**，故 D4 純為「無人化自動取車」加值，非收尾必要條件——待使用者決定是否要做
+- [x] S7 真機組態編譯驗證（每個 commit 都做：SOFT_SIMULATE off → Full → 還原，全 EXIT0）
+- [ ] S8 SECS simulator 全情境 V1-V7（上機/連模擬器；含兩車 V1b）—— 待使用者
+- [~] S9 攻防複驗：Part 1（TripQueue）已過（wf_48bf8a33）；Part 2+3 自動複驗撞 session usage limit（8pm 重置）→ 已用**主迴圈手動對抗式走查**代替（S4/S5/S6b 全risk點無缺陷，含 modal-in-control-loop 已排除）；建議 8pm 後重跑自動複驗獨立確認
 - [ ] S10 docs/SECS comm-examples + 操作說明更新
 - [ ] S11 上機驗證（使用者）
 - [ ] **S12（最後才處理，獨立調查任務）** AMR 上料動作能否在機台 **halt / pause**（SystemStart=false / SoftStop）情況下執行？現況 `PollAndCall` gate `RunMode==Run_Normal`、`ServiceHandshake` gate HOME——但未查 halt/pause 下 SECS 1s timer 與進料握手是否仍運作。**對照 9045 是否允許**（9045 `CheckAMRAction` 由 Timer4 驅動，csystem.cpp:8591 `DoLoad()` 前有 `SystemStart==false → return` 閘——初步跡象 9045 生產動作也停，但 AMR 握手在 uLotInfo Timer4 可能獨立，須第一手查證）。使用者指示：**最後才處理**，本輪不查。

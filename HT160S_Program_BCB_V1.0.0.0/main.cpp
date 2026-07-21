@@ -2613,6 +2613,15 @@ void __fastcall TfMain::DoLotEndProcess()
     RecordProcess("Lot data cleared (Lot End)");
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue D3) 20260721 : emit S6F11 CEID28 "Clean Out Finish"
+//(was defined but never sent). Called from csystem's CleanOut-finish BEFORE the Lot End
+//so the host sees CleanOutOK(28) then PressLotEnd(12). EventReport self-gates on
+//USE_SECS_GEM + HSMS SELECTED, so this is a no-op when SECS is off / link is down.
+void __fastcall TfMain::EmitCleanOutOK()
+{
+    EventReport(SECS_EVENT.CleanOutOK);
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : Lot Manual Edit list helpers (multi-lot queue, UI layer)
 void __fastcall TfMain::SetupLotListGrid()
 {
