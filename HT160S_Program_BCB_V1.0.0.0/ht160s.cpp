@@ -4,9 +4,10 @@
 #include "cStateRecordHT160.h"
 //---------------------------------------------------------------------------
 USEFORM("main.cpp", fMain);
-
+USEFORM("iosetview.cpp", fiosetview);
 USEFORM("uteach.cpp", fTeach);
 USEFORM("uMotorTest.cpp", fMotorTest);
+USEFORM("uHome.cpp", fHome);
 USEFORM("uQwertyKey.cpp", fQwertyKey);
 USEFORM("language.cpp", fLan);
 USEFORM("setup.cpp", fSetup);
@@ -17,45 +18,10 @@ USEFORM("uspeed.cpp", fSpeed);
 USEFORM("systools.cpp", FormSysTools);
 USEFORM("mymessbox.cpp", MyMessageBox);
 USEFORM("note.cpp", fNote);
-USEUNIT("cmydef.cpp");
-USEUNIT("cprod.cpp");
-USEUNIT("CosFunction.cpp");
-USEUNIT("UserRoleManager.cpp");
-USEUNIT("cEventLog.cpp");
-USEUNIT("cProductionLog.cpp");
-USEUNIT("cSelfCheck.cpp");
-USEUNIT("cStepTrace.cpp");
-USEUNIT("cStateRecordHT160.cpp");
 USEFORM("database.cpp", DataModule1);
-USEUNIT("aLoader.cpp");
-USEUNIT("aEmpty.cpp");
-USEUNIT("aAuto1To6.cpp");
-USEUNIT("aTrayArm.cpp");
-USEUNIT("aSortArm.cpp");
-USEUNIT("aColor.cpp");
-USEUNIT("csystem.cpp");
-USEUNIT("uruncontrol.cpp");
-USEUNIT("HTimer.cpp");
-USEUNIT("myio.cpp");
-USEUNIT("myio_MN200.cpp");
-USEUNIT("mysensor.cpp");
-USEUNIT("myswitch.cpp");
-USEUNIT("mycylin.cpp");
-USEUNIT("MyKitSuck.cpp");
-USEUNIT("MotorAndIO\\HTMotor.cpp");
-USEUNIT("MotorAndIO\\MyMotor.cpp");
-USEUNIT("MotorAndIO\\mySMCmotor.cpp");
-USEUNIT("MotorAndIO\\myMN200motor.cpp");
-USEUNIT("MotorAndIO\\MC88X1PLazyLoad.cpp");
-USEUNIT("MotorAndIO\\myMC88X1motor.cpp");
-USEUNIT("AutomationServer.cpp");
 USEFORM("ComPort.cpp", fComPort);
-USEUNIT("uPadInterface.cpp");
-USEUNIT("SecsGem\uHGemEquipment.cpp");
-USEUNIT("SecsGem\UsecegemMainFrom.cpp");
-USEUNIT("SecsGem\uHGemClass.cpp");
-USEUNIT("SecsGem\uHGemHT160.cpp");
-USEFORM("iosetview.cpp", fiosetview);
+USEFORM("SecsGem\uHGemLogForm.cpp", fSecsGemLog);
+//---------------------------------------------------------------------------
 #include "AutomationServer.h"
 #include "aLoader.h"
 #include "aEmpty.h"
@@ -70,6 +36,7 @@ USEFORM("iosetview.cpp", fiosetview);
 #include "GeneralSetting.h"
 #include "deviceinfo.h"
 #include "cSoterOutput.h"
+#include "uFtpUploadThread.h"   //AI(ht160s-ftp) 20260721 : create background FTP upload worker at startup
 #include "cSelfCheck.h"
 #include "SecsGem\uHGemEquipment.h"
 #include "SecsGem\UsecegemMainFrom.h"
@@ -226,22 +193,16 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //constructors that read HSys are safe. Forms are shown later via Show/
          //ShowModal; their DFM Visible=False keeps them hidden.
          Application->CreateForm(__classid(TfMain), &fMain);
-         UpdateInitProgress(52);
          Application->CreateForm(__classid(TDataModule1), &DataModule1);
          Application->CreateForm(__classid(TMyMessageBox), &MyMessageBox);
          Application->CreateForm(__classid(TfNote), &fNote);
          Application->CreateForm(__classid(TfHome), &fHome);
-         UpdateInitProgress(58);
          Application->CreateForm(__classid(Tfiosetview), &fiosetview);
-         UpdateInitProgress(63);
          Application->CreateForm(__classid(TfSetup), &fSetup);
          Application->CreateForm(__classid(TfData), &fData);
          Application->CreateForm(__classid(TfMaintenance), &fMaintenance);
-         UpdateInitProgress(68);
          Application->CreateForm(__classid(TfTeach), &fTeach);
-         UpdateInitProgress(74);
          Application->CreateForm(__classid(TfMotorTest), &fMotorTest);
-         UpdateInitProgress(80);
          Application->CreateForm(__classid(TfOffset), &fOffset);
          Application->CreateForm(__classid(TfSpeed), &fSpeed);
          Application->CreateForm(__classid(TFormSysTools), &FormSysTools);
@@ -260,6 +221,12 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //high-volume comm/diagnostic channels. GeneralSetting is already loaded
          //(HSys.Initial -> InitialCosFunction -> GeneralSetting.Load).
          g_EventLog.SetRetentionDays(GeneralSetting.iLogRetentionEventDays);
+         //AI(ht160s-ftp) 20260721 : create the background FTP upload worker now that
+         //GeneralSetting (retention) and the log root are ready. LoadConfig reads
+         //[Ftp] and the worker starts suspended->resumed inside Ensure. Enable/
+         //UploadReport ship OFF, so nothing uploads until the maintenance screen
+         //verifies the link; teardown is in TfMain::FormClose.
+         EnsureFtpUploadThreadCreated();
          //AI(ht160s-maintainer) 20260615 : per-channel serial comm CSV logs,
          //same folder layout as EventLog. Pad + LED bin display, for tracing.
          g_PadCommLog.Init("PadLog");

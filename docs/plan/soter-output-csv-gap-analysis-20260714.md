@@ -5,6 +5,17 @@
 > 權威規格:客戶 Excel `D:\backup_version\HT160S\Document\Soter檔案格式.xlsx`(per-die,每顆 IC 一列)
 > 狀態:**計畫待審查 — Phase 0 客戶確認為前置阻塞,尚無程式碼**
 
+> **[2026-07-21 更新 — 部分決策已作廢/實作]** 本文件的 col6/col7「Cust lot == Kyec lot == 單一 Lot Start lot」暫定決策
+> **已作廢**。KYEC 於 2026-07-21 確認 CustomerLotNo 與 KYECLotNo 為**不同值**(檔名範例
+> `A5921.RCS.TEST99`(cust) vs `NQ4000NAA1`(kyec))。現行實作:
+> - Soter 於 Lot End **依 owning lot 拆檔**(一 KYEC 批一 CSV),全檔共用結批時戳;col6=owning lot(2D-map LOTID)、
+>   col7=KYEC 批號(SET_LOT_INFO 提供,空→"NA")。見 `cSoterOutput.cpp` / `.h`。
+> - KYEC 批號經 **SET_LOT_INFO** 進機台(`L[2]{custLot,kyecLot}` 向下相容 ASCII,**SML 格式仍待 KYEC 最終確認**),
+>   存於 `TLotRunInfo.sKyecLotID`,SaveWorkOrder 持久化。
+> - FTP 兩段式交檔(per-KYEC-lot 資料夾 + `/LotEnd/` flag)見 `uFtpUploadThread.cpp` 與
+>   `docs/plan/ftp-kyec-upload-plan-20260721.md`。
+> 其餘欄位決策(Substage=2D JSON、SorterID=sSerialNo、Load/Unload cover tray)維持本文件記載。**狀態:code-complete,上機驗證 pending。**
+
 ---
 
 ## 0. 檔案規格摘要(來自客戶 Excel)

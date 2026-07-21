@@ -183,6 +183,11 @@ void MainProc()
 	if(fMain!=NULL)
 		fMain->PollLotDataWebApi();
 
+	//AI(ht160s-ftp) 20260721 : drain background FTP upload results into the EventLog.
+	//Same safe main-thread spot as the WebAPI poll; cheap no-op when nothing uploaded.
+	if(fMain!=NULL)
+		fMain->PollFtpUploadResults();
+
 	//AI(ht160s-uph) 20260706 : advance the per-tray UPH observer (reads Auto status).
 	TrayUphLog_Tick();
 

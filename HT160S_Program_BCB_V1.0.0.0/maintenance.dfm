@@ -250,9 +250,25 @@ object fMaintenance: TfMaintenance
       ParentFont = False
       OnClick = spbMaintenanceMenuClick
     end
+    object spbMaintFtp: TSpeedButton
+      Left = 8
+      Top = 792
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'FTP'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
     object spbMaintExit: TSpeedButton
       Left = 8
-      Top = 852
+      Top = 932
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -1133,7 +1149,7 @@ object fMaintenance: TfMaintenance
                   Width = 600
                   Height = 16
                   AutoSize = False
-                  Caption =
+                  Caption = 
                     'When ON (AMR), a recovered Normal tray goes straight to an Auto ' +
                     'that requests one, instead of parking at Empty first.'
                   Font.Charset = DEFAULT_CHARSET
@@ -3317,6 +3333,209 @@ object fMaintenance: TfMaintenance
         object memLotApiLog: TMemo
           Left = 20
           Top = 422
+          Width = 780
+          Height = 210
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 3
+        end
+      end
+      object tsMaintFtp: TTabSheet
+        Caption = 'FTP'
+        object pnlFtpSetup: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 210
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblFtpHost: TLabel
+            Left = 16
+            Top = 18
+            Width = 80
+            Height = 16
+            Caption = 'Host / IP'
+          end
+          object lblFtpPort: TLabel
+            Left = 380
+            Top = 18
+            Width = 40
+            Height = 16
+            Caption = 'Port'
+          end
+          object lblFtpUser: TLabel
+            Left = 16
+            Top = 50
+            Width = 80
+            Height = 16
+            Caption = 'User'
+          end
+          object lblFtpPwd: TLabel
+            Left = 380
+            Top = 50
+            Width = 80
+            Height = 16
+            Caption = 'Password'
+          end
+          object lblFtpRemoteDir: TLabel
+            Left = 16
+            Top = 82
+            Width = 90
+            Height = 16
+            Caption = 'Remote Dir'
+          end
+          object lblFtpSaveHint: TLabel
+            Left = 220
+            Top = 174
+            Width = 540
+            Height = 20
+            AutoSize = False
+            Caption = 'Save/Reload persist to system\General.ini [Ftp].'
+          end
+          object edFtpHost: TEdit
+            Left = 110
+            Top = 14
+            Width = 250
+            Height = 21
+            TabOrder = 0
+          end
+          object edFtpPort: TEdit
+            Left = 430
+            Top = 14
+            Width = 80
+            Height = 21
+            TabOrder = 1
+          end
+          object edFtpUser: TEdit
+            Left = 110
+            Top = 46
+            Width = 250
+            Height = 21
+            TabOrder = 2
+          end
+          object edFtpPwd: TEdit
+            Left = 470
+            Top = 46
+            Width = 180
+            Height = 21
+            PasswordChar = '*'
+            TabOrder = 3
+          end
+          object edFtpRemoteDir: TEdit
+            Left = 110
+            Top = 78
+            Width = 400
+            Height = 21
+            TabOrder = 4
+          end
+          object chkFtpEnable: TCheckBox
+            Left = 16
+            Top = 110
+            Width = 620
+            Height = 20
+            Caption = 'Enable production upload (Lot End). Off = local report only, no upload.'
+            TabOrder = 5
+          end
+          object chkFtpUploadReport: TCheckBox
+            Left = 16
+            Top = 136
+            Width = 620
+            Height = 20
+            Caption = 'Upload production report (Soter CSV) to KYEC FTP at Lot End'
+            TabOrder = 6
+          end
+          object btnFtpSave: TButton
+            Left = 16
+            Top = 170
+            Width = 90
+            Height = 28
+            Caption = 'Save'
+            TabOrder = 7
+            OnClick = btnFtpSaveClick
+          end
+          object btnFtpReload: TButton
+            Left = 116
+            Top = 170
+            Width = 90
+            Height = 28
+            Caption = 'Reload'
+            TabOrder = 8
+            OnClick = btnFtpReloadClick
+          end
+        end
+        object pnlFtpStatus: TPanel
+          Left = 20
+          Top = 242
+          Width = 780
+          Height = 42
+          BevelOuter = bvLowered
+          TabOrder = 1
+          object lblFtpState: TLabel
+            Left = 8
+            Top = 12
+            Width = 380
+            Height = 20
+            AutoSize = False
+            Caption = 'State: -'
+          end
+          object lblFtpLastError: TLabel
+            Left = 400
+            Top = 12
+            Width = 370
+            Height = 20
+            AutoSize = False
+            Caption = 'Last Error: '
+          end
+        end
+        object pnlFtpTest: TPanel
+          Left = 20
+          Top = 296
+          Width = 780
+          Height = 150
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 2
+          object lblFtpTestTitle: TLabel
+            Left = 16
+            Top = 12
+            Width = 400
+            Height = 20
+            AutoSize = False
+            Caption = 'Manual test (runs even when Enable is off)'
+          end
+          object btnFtpTestConn: TButton
+            Left = 16
+            Top = 40
+            Width = 140
+            Height = 28
+            Caption = 'Test Connection'
+            TabOrder = 0
+            OnClick = btnFtpTestConnClick
+          end
+          object btnFtpTestUpload: TButton
+            Left = 170
+            Top = 40
+            Width = 160
+            Height = 28
+            Caption = 'Test Upload'
+            TabOrder = 1
+            OnClick = btnFtpTestUploadClick
+          end
+          object memFtpResult: TMemo
+            Left = 16
+            Top = 76
+            Width = 748
+            Height = 64
+            ReadOnly = True
+            ScrollBars = ssBoth
+            TabOrder = 2
+            WordWrap = False
+          end
+        end
+        object memFtpLog: TMemo
+          Left = 20
+          Top = 458
           Width = 780
           Height = 210
           ReadOnly = True

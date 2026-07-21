@@ -15,6 +15,7 @@
 #include "ColorCcdSocket.h"
 #include "CosFunction.h"
 #include "LotWebApiClient.h"
+#include "uFtpUploadThread.h"
 #include "iosetview.h"
 #include "uteach.h"
 #include "uMotorTest.h"
@@ -844,6 +845,121 @@ void __fastcall TfMaintenance::AddLotWebApiLog(AnsiString Text)
         memLotApiLog->Lines->Delete(0);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : populate the FTP maintenance fields from the worker's
+// live config. The worker is created at startup, so it is non-null by the time
+// this screen shows; guarded anyway.
+void __fastcall TfMaintenance::LoadFtpConfigToUi()
+{
+    if(FtpUploadThd==NULL)
+        return;
+    AnsiString sHost, sUser, sPwd, sRemoteDir;
+    int iPort, iTimeoutMs, iRetry;
+    bool bEnable, bUploadReport;
+    FtpUploadThd->GetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
+                            bEnable, bUploadReport, iTimeoutMs, iRetry);
+    if(edFtpHost!=NULL)          edFtpHost->Text=sHost;
+    if(edFtpPort!=NULL)          edFtpPort->Text=IntToStr(iPort);
+    if(edFtpUser!=NULL)          edFtpUser->Text=sUser;
+    if(edFtpPwd!=NULL)           edFtpPwd->Text=sPwd;
+    if(edFtpRemoteDir!=NULL)     edFtpRemoteDir->Text=sRemoteDir;
+    if(chkFtpEnable!=NULL)       chkFtpEnable->Checked=bEnable;
+    if(chkFtpUploadReport!=NULL) chkFtpUploadReport->Checked=bUploadReport;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : push the FTP maintenance fields into the worker and
+// persist to General.ini [Ftp]. Starts from the live config so TimeoutMs/Retry
+// (no UI field) are preserved; port falls back if the field is non-numeric.
+void __fastcall TfMaintenance::SaveFtpConfigFromUi()
+{
+    if(FtpUploadThd==NULL)
+        return;
+    AnsiString sHost, sUser, sPwd, sRemoteDir;
+    int iPort, iTimeoutMs, iRetry;
+    bool bEnable, bUploadReport;
+    FtpUploadThd->GetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
+                            bEnable, bUploadReport, iTimeoutMs, iRetry);
+    if(edFtpHost!=NULL)          sHost=edFtpHost->Text.Trim();
+    if(edFtpPort!=NULL)          iPort=StrToIntDef(edFtpPort->Text.Trim(), iPort);
+    if(edFtpUser!=NULL)          sUser=edFtpUser->Text.Trim();
+    if(edFtpPwd!=NULL)           sPwd=edFtpPwd->Text;
+    if(edFtpRemoteDir!=NULL)     sRemoteDir=edFtpRemoteDir->Text.Trim();
+    if(chkFtpEnable!=NULL)       bEnable=chkFtpEnable->Checked;
+    if(chkFtpUploadReport!=NULL) bUploadReport=chkFtpUploadReport->Checked;
+    FtpUploadThd->SetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
+                            bEnable, bUploadReport, iTimeoutMs, iRetry);
+    FtpUploadThd->SaveConfig();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnFtpSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    SaveFtpConfigFromUi();
+    LoadFtpConfigToUi();   // reflect the normalized values (RemoteDir slashes, port)
+    AddFtpLog("Config saved.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnFtpReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    if(FtpUploadThd!=NULL)
+        FtpUploadThd->LoadConfig();
+    LoadFtpConfigToUi();
+    AddFtpLog("Config reloaded.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : manual test buttons ONLY enqueue a job; the worker runs
+// it in the background and the outcome surfaces via RefreshFtpStatus. The UI never
+// touches WinINet, so a hung server cannot freeze the screen. Test jobs ignore the
+// Enable gate (that gate is for production uploads only).
+void __fastcall TfMaintenance::btnFtpTestConnClick(TObject *Sender)
+{
+    (void)Sender;
+    if(FtpUploadThd==NULL)
+        return;
+    SaveFtpConfigFromUi();   // test exactly what is on screen
+    FtpUploadThd->EnqueueTestConn();
+    AddFtpLog("Test connection requested.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnFtpTestUploadClick(TObject *Sender)
+{
+    (void)Sender;
+    if(FtpUploadThd==NULL)
+        return;
+    SaveFtpConfigFromUi();
+    FtpUploadThd->EnqueueTestUpload(GeneralSetting.sSerialNo);
+    AddFtpLog("Test upload requested.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshFtpStatus()
+{
+    if(FtpUploadThd==NULL)
+    {
+        if(lblFtpState!=NULL)
+            lblFtpState->Caption="State: not started";
+        return;
+    }
+    if(lblFtpState!=NULL)
+        lblFtpState->Caption=AnsiString("State: ")+FtpUploadThd->GetStatusSnapshot();
+    if(lblFtpLastError!=NULL)
+        lblFtpLastError->Caption=AnsiString("Last Error: ")+FtpUploadThd->GetLastError();
+    if(memFtpResult!=NULL)
+    {
+        AnsiString sLog=FtpUploadThd->GetResultLog();
+        if(memFtpResult->Lines->Text!=sLog)
+            memFtpResult->Lines->Text=sLog;
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::AddFtpLog(AnsiString Text)
+{
+    if(memFtpLog==NULL)
+        return;
+    memFtpLog->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+Text);
+    while(memFtpLog->Lines->Count>200)
+        memFtpLog->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RefreshAmrStatus()
 {
     if(memAmrStatus!=NULL)
@@ -1459,6 +1575,7 @@ void __fastcall TfMaintenance::tmrTowerLightBlinkTimer(TObject *Sender)
     RefreshTopCcdStatus();
     RefreshColorCcdStatus();
     RefreshLotWebApiStatus();
+    RefreshFtpStatus();
     RefreshAmrStatus();
 }
 //---------------------------------------------------------------------------
@@ -1493,6 +1610,7 @@ void __fastcall TfMaintenance::RegisterMaintenancePages()
         {tsMaintColorCcd,    spbMaintColorCcd,    maShowPage, false},
         {tsMaintLotApi,      spbMaintLotApi,      maShowPage, false},
         {tsMaintSECS,        spbMaintSECS,        maOpenSecs, false},
+        {tsMaintFtp,         spbMaintFtp,         maShowPage, false},
         {NULL,               spbMaintExit,        maCloseForm, true}
     };
     int PageIndex;
@@ -1915,6 +2033,9 @@ void __fastcall TfMaintenance::FormShow(TObject *Sender)
 {
     (void)Sender;
     OpenWorkFile();
+    //AI(ht160s-ftp) 20260721 : populate the FTP page from the live worker config
+    //each time the maintenance screen opens (the worker exists by now).
+    LoadFtpConfigToUi();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkHardwareColorBinAreaClick(TObject *Sender)

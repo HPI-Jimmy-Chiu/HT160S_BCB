@@ -837,6 +837,7 @@ bool THT160Bin2DMap::LoadLatest()
 void TLotRunInfo::Clear()
 {
 	sLotID="";
+	sKyecLotID="";
 	sSourceMachine="";
 	sDeviceName="";
 	iSource=HT160_LOT_SOURCE_OFFLINE;
@@ -1185,6 +1186,10 @@ bool THT160LotRegistry::SaveToJsonFile(AnsiString FileName)
 			Out->Add("      \"LOTID\": \""+JsonEsc(Lot->sLotID)+"\",");
 			Out->Add("      \"Substage\": \""+JsonEsc(Lot->sSubstage)+"\",");
 			Out->Add("      \"ProductCode\": \""+JsonEsc(Lot->sProductCode)+"\",");
+			//AI(ht160s-ftp) 20260721 : persist the KYEC batch id (Soter col7) so a reboot mid-lot
+			//keeps it across SaveWorkOrder/LoadWorkOrder. Absent in the customer 2D-map JSON, which
+			//is fine : the guarded import below only overwrites when the field is actually present.
+			Out->Add("      \"KYECLotID\": \""+JsonEsc(Lot->sKyecLotID)+"\",");
 			Out->Add("      \"ICIInfo\": [");
 
 			IcList->Clear();
@@ -1443,6 +1448,13 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 			if(ProdNode!=NULL && cJSON_IsString(ProdNode) && ProdNode->valuestring!=NULL)
 				ProductCode=AnsiString(ProdNode->valuestring);
 
+			//AI(ht160s-ftp) 20260721 : KYEC batch id (Soter col7), present only in our own
+			//WorkOrder.json round-trip; the customer 2D-map JSON omits it.
+			cJSON *KyecNode=cJSON_GetObjectItem(LotNode, "KYECLotID");
+			AnsiString KyecLotId="";
+			if(KyecNode!=NULL && cJSON_IsString(KyecNode) && KyecNode->valuestring!=NULL)
+				KyecLotId=AnsiString(KyecNode->valuestring);
+
 			int LotIndex=AddLot(LotNumber, HT160_LOT_SOURCE_OFFLINE, "", ProductCode);
 			if(LotIndex>=0)
 			{
@@ -1451,6 +1463,10 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 				{
 					Lot->sSubstage=Substage;
 					Lot->sProductCode=ProductCode;
+					//AI(ht160s-ftp) 20260721 : only overwrite when supplied, so a per-lot 2D pull
+					//(which has no KYECLotID) cannot wipe the KYEC batch id that SET_LOT_INFO set.
+					if(KyecLotId.Trim()!="")
+						Lot->sKyecLotID=KyecLotId;
 				}
 			}
 

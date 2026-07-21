@@ -736,30 +736,96 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                 }
                 else
                 {
-                    LotRegistry.Clear();                         // D1 overwrite
+                    //AI(ht160s-ftp) 20260721 : parse into local buffers FIRST, commit atomically
+                    // (Clear + AddLot) ONLY after the whole list parses cleanly. A mid-list reject
+                    // (HCACK!=0) then leaves the prior work order untouched, so the host's "rejected"
+                    // belief matches the machine. Mirrors the LOTSTART buffer-then-commit path; the
+                    // previous code Cleared before the loop and committed incrementally, leaving a
+                    // partial lot set live after a reject.
+                    AnsiString bufCust[HT160_MAX_LOT];
+                    AnsiString bufKyec[HT160_MAX_LOT];
+                    int nBuf = 0;
                     HCACK = 0;
                     for(i=0; i<n; i++)
                     {
-                        HGemPtr->GetDataItemLenAndType(len, Type);
-                        if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
+                        //AI(ht160s-ftp) 20260721 : each SET_LOT_INFO item is EITHER
+                        //   A  "custLot"                     (legacy : Cust lot only, no KYEC batch)
+                        //   L[2]{ A "custLot", A "kyecLot" }  (KYEC : Cust lot + Kyec batch id, Soter col7)
+                        // Backward compatible : an old host sending bare ASCII still works unchanged; a
+                        // new host sends the pair. The L[2] READ idiom mirrors the proven LOTSTART
+                        // SORTMODE-pair reader below, so it cannot mis-consume the stream. **The pair
+                        // SHAPE is OUR PROPOSAL pending KYEC confirmation of the SET_LOT_INFO SML**
+                        // (docs/plan/ftp-kyec-upload-plan-20260721) -- if KYEC carries the KYEC lot a
+                        // different way, ONLY this L[2] branch changes; the ASCII branch is the shipped path.
+                        AnsiString custLot = "";
+                        AnsiString kyecLot = "";
+                        if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
                         {
-                            if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)==1)
+                            HCACK = 2;                           // truncated list -> param error
+                            break;
+                        }
+                        if(Type==HType.LIST_TYPE)
+                        {
+                            int pairLen = 0;
+                            if(HGemPtr->GetDataItemLenAndTypeAndDelete(pairLen, HType.LIST_TYPE)!=1
+                               || pairLen<1 || pairLen>2)
                             {
-                                AnsiString lot = str;
-                                LotRegistry.AddLot(lot, HT160_LOT_SOURCE_SECS, "", "");
-                                if(i==0 && fMain!=NULL)
-                                    fMain->edLotNo->Text = lot; // D2 backfill first lot
+                                HCACK = 2;                       // malformed (custLot[,kyecLot]) pair
+                                break;
                             }
-                            else
+                            if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                                HGemPtr->DataItemIn(len, Type, custLot);
+                            if(pairLen>=2 && HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                                HGemPtr->DataItemIn(len, Type, kyecLot);
+                            if(custLot.Trim()=="")
+                            {
+                                HCACK = 2;                       // pair carried no Cust lot -> param error
+                                break;
+                            }
+                        }
+                        else if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
+                        {
+                            if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)!=1)
                             {
                                 HCACK = 2;                       // read failure -> param error
                                 break;
                             }
+                            custLot = AnsiString(str);
                         }
                         else
                         {
                             HCACK = 2;                           // type mismatch -> param error
                             break;
+                        }
+
+                        if(nBuf>=HT160_MAX_LOT)
+                        {
+                            HCACK = 2;                           // more items than capacity -> param error
+                            break;
+                        }
+                        bufCust[nBuf] = custLot;
+                        bufKyec[nBuf] = kyecLot;
+                        nBuf++;
+                    }
+
+                    // Commit atomically only on a clean parse (mirrors LOTSTART). On any reject the
+                    // prior work order is left intact, matching the host's HCACK=2 belief.
+                    if(HCACK==0)
+                    {
+                        LotRegistry.Clear();                     // D1 overwrite, now AFTER a clean parse
+                        for(int j=0; j<nBuf; j++)
+                        {
+                            int iLotIdx = LotRegistry.AddLot(bufCust[j], HT160_LOT_SOURCE_SECS, "", "");
+                            if(iLotIdx>=0)
+                            {
+                                //AI(ht160s-ftp) 20260721 : carry the KYEC batch id like the 2D-JSON
+                                // path sets Substage; "" -> Soter renders "NA" (col7 / FTP token).
+                                TLotRunInfo *pLot = LotRegistry.GetLot(iLotIdx);
+                                if(pLot!=NULL)
+                                    pLot->sKyecLotID = bufKyec[j];
+                            }
+                            if(j==0 && fMain!=NULL)
+                                fMain->edLotNo->Text = bufCust[j]; // D2 backfill first lot
                         }
                     }
                 }

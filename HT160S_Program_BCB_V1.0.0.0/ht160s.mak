@@ -27,20 +27,21 @@ OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uHome.obj
     MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj \
     MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj \
     AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj \
-    LotWebApiClient.obj ComPort.obj MyComm.obj MyBinDisp.obj uPadInterface.obj \
-    SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj \
-    SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uAgvStation.obj \
-    SecsGem\uHGemLogForm.obj
+    LotWebApiClient.obj uFtpUploadThread.obj ComPort.obj MyComm.obj \
+    MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj \
+    SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj \
+    SecsGem\uAgvStation.obj SecsGem\uHGemLogForm.obj
 RESFILES = ht160s.res
 MAINSOURCE = ht160s.cpp
 RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm \
     uQwertyKey.dfm language.dfm setup.dfm data.dfm maintenance.dfm uOffset.dfm \
     uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm \
     SecsGem\uHGemLogForm.dfm
-LIBFILES = 
+LIBFILES = D:\ProgramFiles\Borland\CBuilder6\Lib\Debug\vclx.lib
 IDLFILES = 
 IDLGENFILES = 
-LIBRARIES = ws2_32.lib
+LIBRARIES = bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib wininet.lib rtl.lib \
+    vcl.lib
 PACKAGES = vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx.bpi \
     bdertl.bpi vcldbx.bpi ibxpress.bpi dsnap.bpi cds.bpi bdecds.bpi qrpt.bpi \
     teeui.bpi teedb.bpi tee.bpi dss.bpi teeqr.bpi visualclx.bpi \
@@ -48,14 +49,15 @@ PACKAGES = vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx
     inet.bpi inetdbbde.bpi inetdbxpress.bpi inetdb.bpi nmfast.bpi webdsnap.bpi \
     bcbie.bpi websnap.bpi soaprtl.bpi dclocx.bpi dbexpress.bpi dbxcds.bpi \
     indy.bpi dclusr60.bpi
-SPARELIBS = vcl.lib rtl.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib bdertl.lib
+SPARELIBS = vcl.lib rtl.lib wininet.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib \
+    bdertl.lib
 DEFFILE = 
 OTHERFILES = 
 # ---------------------------------------------------------------------------
 DEBUGLIBPATH = $(BCB)\lib\debug
 RELEASELIBPATH = $(BCB)\lib\release
 USERDEFINES = _DEBUG
-SYSDEFINES = _RTLDLL;NO_STRICT;USEPACKAGES
+SYSDEFINES = NO_STRICT
 INCLUDEPATH = Include;SecsGem;MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\Component;$(BCB)\include;$(BCB)\include\vcl;D:\HT160S_BCB\elec\myvcl
 LIBPATH = Include;SecsGem;MotorAndIO;$(BCB)\Projects;D:\HT160S_BCB\elec\myvcl;$(BCB)\Projects\Lib;$(BCB)\lib\obj;$(BCB)\lib;D:\HT160S_BCB\elec\Component
 WARNINGS= -w-par
@@ -67,17 +69,17 @@ PATHOBJ = .;$(LIBPATH)
 # ---------------------------------------------------------------------------
 CFLAG1 = -Od -H=..\Obj\ht160s.csm -Hc -Vx -Ve -X- -r- -a8 -b- -k -y -v -vi- -c -tW \
     -tWM
-IDLCFLAGS = -ISecsGem -IMotorAndIO -I$(BCB)\Projects -ID:\HT160S_BCB\elec\Component \
-    -I$(BCB)\include -I$(BCB)\include\vcl -ID:\HT160S_BCB\elec\myvcl \
-    -src_suffix cpp -D_DEBUG -boa
+IDLCFLAGS = -IInclude -ISecsGem -IMotorAndIO -I$(BCB)\Projects \
+    -ID:\HT160S_BCB\elec\Component -I$(BCB)\include -I$(BCB)\include\vcl \
+    -ID:\HT160S_BCB\elec\myvcl -src_suffix cpp -D_DEBUG -boa
 PFLAGS = -$YD -$W -$O- -$A8 -v -JPHNE -M
 RFLAGS = 
 AFLAGS = /mx /w2 /zd
 LFLAGS = -D"" -aa -Tpe -x -Gn -v
 # ---------------------------------------------------------------------------
-ALLOBJ = c0w32.obj $(PACKAGES) Memmgr.Lib sysinit.obj $(OBJFILES)
+ALLOBJ = c0w32.obj sysinit.obj $(OBJFILES)
 ALLRES = $(RESFILES)
-ALLLIB = $(LIBFILES) $(LIBRARIES) import32.lib cp32mti.lib
+ALLLIB = $(LIBFILES) $(LIBRARIES) import32.lib cp32mt.lib
 # ---------------------------------------------------------------------------
 !ifdef IDEOPTIONS
 

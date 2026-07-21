@@ -6,12 +6,30 @@
 #include "database.h"        // HSys.LogRootDir / HSys.CurrentDir
 #include "GeneralSetting.h"  // GeneralSetting.sSerialNo
 #include "cCsvDailyLog.h"    // cCsvDailyLog::CsvQuote (escape helper)
+#include "uFtpUploadThread.h"// FtpUploadThd : Lot End FTP hand-off (enqueue only)
+#include "cEventLog.h"       // g_EventLog : record an upload-skipped audit line
 #include <FileCtrl.hpp>      // ForceDirectories
 #include <IniFiles.hpp>      // TIniFile (read [Soter] PickupDir)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 
 cSoterOutput g_SoterOutput;
+
+//---------------------------------------------------------------------------
+//AI(ht160s-soter) 20260721 : per-lot output bucket. One bucket per distinct owning
+// lot in the current Lot End flush : its completed CSV data rows plus the filename
+// meta (Kyec lot / Product / Substage) captured from that lot's rows. Heap-allocated,
+// held in m_pLotBuckets->Objects[], freed wholesale by FreeAllBuckets().
+struct TSoterLotBucket
+{
+    AnsiString   sCustLot;
+    AnsiString   sKyecLot;
+    AnsiString   sProduct;
+    AnsiString   sSubstage;
+    TStringList* pLines;
+    TSoterLotBucket() { pLines = new TStringList(); }
+    ~TSoterLotBucket() { delete pLines; }
+};
 
 //---------------------------------------------------------------------------
 void TSoterRow::Clear()
@@ -21,6 +39,8 @@ void TSoterRow::Clear()
     sFinishTime = "";
     sProductCode= "";
     sSubstage   = "";
+    sCustLotID  = "";
+    sKyecLotID  = "";
     sLoadTray   = "";
     sUnloadTray = "";
     s2DID       = "";
@@ -34,10 +54,8 @@ void TSoterRow::Clear()
 cSoterOutput::cSoterOutput()
     : m_pCS(NULL)
     , m_bActive(false)
-    , m_sLotID("")
-    , m_sFileProduct("")
-    , m_sFileSubstage("")
-    , m_pLines(NULL)
+    , m_sArmCustLot("")
+    , m_pLotBuckets(NULL)
     , m_sBaseDir("")
     , m_sPickupDir("")
 {
@@ -48,8 +66,9 @@ cSoterOutput::cSoterOutput()
 //---------------------------------------------------------------------------
 cSoterOutput::~cSoterOutput()
 {
-    delete m_pLines;
-    m_pLines = NULL;
+    FreeAllBuckets();
+    delete m_pLotBuckets;
+    m_pLotBuckets = NULL;
     delete m_pCS;
     m_pCS = NULL;
 }
@@ -59,8 +78,15 @@ void cSoterOutput::Init()
 {
     if (!m_pCS)
         m_pCS = new TCriticalSection();
-    if (!m_pLines)
-        m_pLines = new TStringList();
+    if (!m_pLotBuckets)
+    {
+        m_pLotBuckets = new TStringList();   // Objects[] hold TSoterLotBucket*; keyed by CustLot
+        // Registry lot ids are case-SENSITIVE (AddLot / FindLotIndex compare byte-exact),
+        // so the bucket key must be too : TStringList::IndexOf defaults to case-INsensitive,
+        // which would collapse two case-only-distinct lots into one file. Not Sorted : files
+        // are emitted in insertion (commit) order.
+        m_pLotBuckets->CaseSensitive = true;
+    }
 
     // Central log root constant (HSys.LogRootDir = "D:\\HT160S_Log")
     m_sBaseDir = HSys.LogRootDir + "\\SoterOutput";
@@ -93,6 +119,19 @@ void cSoterOutput::Init()
     if (m_sPickupDir == "")
         m_sPickupDir = HSys.LogRootDir + "\\SoterPickup";
     ForceDirectories(m_sPickupDir);
+}
+
+//---------------------------------------------------------------------------
+void cSoterOutput::FreeAllBuckets()
+{
+    if (m_pLotBuckets == NULL)
+        return;
+    for (int i = 0; i < m_pLotBuckets->Count; ++i)
+    {
+        TSoterLotBucket* b = (TSoterLotBucket*)m_pLotBuckets->Objects[i];
+        delete b;
+    }
+    m_pLotBuckets->Clear();
 }
 
 //---------------------------------------------------------------------------
@@ -138,6 +177,15 @@ AnsiString cSoterOutput::CsvField(const AnsiString& s)
 }
 
 //---------------------------------------------------------------------------
+// "" -> "NA". Used for the Kyec lot (col7 + filename token) when SET_LOT_INFO
+// did not supply a KYEC batch id. Per customer : missing data = "NA", and a lot
+// cannot run without lot info, so NA is a should-not-happen marker.
+AnsiString cSoterOutput::NaIfBlank(const AnsiString& s)
+{
+    return (s.Trim() == "") ? AnsiString("NA") : s;
+}
+
+//---------------------------------------------------------------------------
 // Replace characters that are illegal in a Windows file name with '-' so the
 // custom Soter file name (built from Product / Lot / Substage tokens) is always
 // creatable by SaveToFile.
@@ -174,8 +222,8 @@ AnsiString cSoterOutput::BuildDataLine(const TSoterRow& r, int iNo)
     sLine += "," + CsvField(r.sFinishTime);          // 3  FinishTime
     sLine += "," + CsvField(r.sProductCode);         // 4  ProductCode
     sLine += "," + CsvField(r.sSubstage);            // 5  Substage
-    sLine += "," + CsvField(m_sLotID);               // 6  Cust lot
-    sLine += "," + CsvField(m_sLotID);               // 7  Kyec Lot (== col6)
+    sLine += "," + CsvField(r.sCustLotID);           // 6  Cust lot (owning lot / 2D-map LOTID)
+    sLine += "," + CsvField(NaIfBlank(r.sKyecLotID));// 7  Kyec Lot (SET_LOT_INFO; NA if blank)
     sLine += "," + CsvField(r.sLoadTray);            // 8  Load Cover Tray ID
     sLine += "," + CsvField(r.sUnloadTray);          // 9  Unload Cover Tray ID
     sLine += "," + CsvField(GeneralSetting.sSerialNo);// 10 SorterID
@@ -188,39 +236,95 @@ AnsiString cSoterOutput::BuildDataLine(const TSoterRow& r, int iNo)
 }
 
 //---------------------------------------------------------------------------
-// Resolved at lot end so Date/Time and Qty reflect the final file.
-AnsiString cSoterOutput::BuildFileName()
+// Build one file name from a lot's meta and the shared batch stamp. Product /
+// Substage come from the lot's rows (not a global first-row latch), so a lot with
+// dies always gets its own tokens; a zero-die fallback passes blank Product/Substage.
+AnsiString cSoterOutput::BuildFileName(const AnsiString& sProduct, const AnsiString& sCustLot,
+        const AnsiString& sKyecLot, const AnsiString& sSubstage, int iQty, const AnsiString& sStamp)
 {
-    TDateTime dtNow = Now();
     AnsiString sName;
-    sName  = FormatDateTime("yyyymmdd", dtNow);
-    sName += "_" + FormatDateTime("hhnnss", dtNow);
+    sName  = sStamp;                                 // "yyyymmdd_hhnnss" (shared batch stamp)
     sName += "_KYEC-LFT";
-    sName += "_" + SafeToken(m_sFileProduct);
-    sName += "_" + SafeToken(m_sLotID);              // CustomerLotNo
-    sName += "_" + SafeToken(m_sLotID);              // KYECLotNo (== CustomerLotNo)
+    sName += "_" + SafeToken(sProduct);
+    sName += "_" + SafeToken(sCustLot);              // CustomerLotNo
+    sName += "_" + SafeToken(NaIfBlank(sKyecLot));   // KYECLotNo (NA if blank)
     sName += "_BI";
-    sName += "_" + SafeToken(m_sFileSubstage);
+    sName += "_" + SafeToken(sSubstage);
     sName += "_" + SafeToken(GeneralSetting.sSerialNo);
-    sName += "_" + IntToStr(m_pLines ? m_pLines->Count : 0);
+    sName += "_" + IntToStr(iQty);
     sName += ".csv";
     return sName;
 }
 
 //---------------------------------------------------------------------------
-void cSoterOutput::DoArm(const AnsiString& sLotID)
+// Guarantee a file name is unique within ONE Lot End flush. SafeToken is not
+// injective (e.g. "L/1" and "L-1" both map to "L-1"; a trailing '.' is stripped),
+// so two distinct owning-lot buckets could build the same name and the second
+// SaveToFile would overwrite the first in BOTH archive and pickup, losing a lot's
+// CSV. On collision, insert "_<n>" before the ".csv" so no data is ever lost.
+// pSeen is case-INsensitive (Windows file names are), matching the filesystem.
+static AnsiString UniqueFileNameInFlush(TStringList* pSeen, const AnsiString& sName)
 {
-    m_bActive       = true;
-    m_sLotID        = sLotID;
-    m_sFileProduct  = "";
-    m_sFileSubstage = "";
-    if (m_pLines)
-        m_pLines->Clear();
+    AnsiString sBase = sName;
+    AnsiString sExt  = "";
+    int iDot = sName.LastDelimiter(".");
+    if (iDot > 0)
+    {
+        sBase = sName.SubString(1, iDot - 1);
+        sExt  = sName.SubString(iDot, sName.Length() - iDot + 1);
+    }
+    AnsiString sCand = sName;
+    int n = 1;
+    while (pSeen->IndexOf(sCand) >= 0)
+    {
+        n++;
+        sCand = sBase + "_" + IntToStr(n) + sExt;
+    }
+    pSeen->Add(sCand);
+    return sCand;
+}
+
+//---------------------------------------------------------------------------
+// Write header (+ optional data rows) to BOTH the month-bucketed archive and the
+// flat customer pickup folder. pDataLines == NULL -> header-only (zero-die file).
+void cSoterOutput::WriteOneFile(const AnsiString& sArchDir, const AnsiString& sFileName,
+        TStringList* pDataLines)
+{
+    TStringList* pOut = new TStringList();
+    try
+    {
+        pOut->Add(GetTitleLine());
+        if (pDataLines != NULL)
+            pOut->AddStrings(pDataLines);
+
+        // 1. permanent archive, month-bucketed (machine's own record)
+        ForceDirectories(sArchDir);
+        pOut->SaveToFile(sArchDir + "\\" + sFileName);
+
+        // 2. customer pickup folder, flat (wiped at the next Lot Start)
+        if (m_sPickupDir != "")
+        {
+            ForceDirectories(m_sPickupDir);
+            pOut->SaveToFile(m_sPickupDir + "\\" + sFileName);
+        }
+    }
+    __finally
+    {
+        delete pOut;
+    }
+}
+
+//---------------------------------------------------------------------------
+void cSoterOutput::DoArm(const AnsiString& sCustLot)
+{
+    m_bActive     = true;
+    m_sArmCustLot = sCustLot;
+    FreeAllBuckets();
     for (int i = 0; i < SOTER_NOZZLE_COUNT; ++i)
         m_pending[i].Clear();
 
     // Fresh lot : wipe the customer hand-off folder so it only ever holds the
-    // lot now starting. (The permanent archive keeps every past lot.)
+    // flush now starting. (The permanent archive keeps every past lot.)
     ClearPickupDir();
 }
 
@@ -273,35 +377,142 @@ void cSoterOutput::OnLotEnd()
         // CleanOut-finish path). On failure the lot CSV is lost but the machine is not
         // destabilised; do NOT pop a modal here (wrong thread). Buffer disarms below
         // regardless, so a failed write is not retried into the next lot's buffer.
-        // Always emit (header + rows) : a lot with zero genuine-2D dies still writes a
-        // header-only file (Qty=0). The same file goes to (1) the permanent archive and
-        // (2) the customer pickup folder - the copy KYEC fetches after CEID 12.
         try
         {
-            AnsiString sFileName = BuildFileName();   // Qty token = m_pLines->Count (0 ok)
+            // One batch stamp for the whole flush : every per-lot file of this Lot End
+            // shares {Date}_{Time}, and the archive month is taken from the same stamp
+            // (a cross-midnight flush is not split across two month folders).
+            TDateTime  dtBatch = Now();
+            AnsiString sStamp  = FormatDateTime("yyyymmdd", dtBatch) + "_"
+                               + FormatDateTime("hhnnss", dtBatch);
+            AnsiString sArch   = m_sBaseDir + "\\" + FormatDateTime("yyyymm", dtBatch);
 
-            TStringList* pOut = new TStringList();
+            // pSeen tracks file names emitted THIS flush so a SafeToken collision cannot
+            // silently overwrite one lot's file (see UniqueFileNameInFlush). pPub groups the
+            // written CSVs by KYEC lot for the FTP hand-off : each KYEC lot gets ONE /LotEnd/
+            // flag listing all its CSVs, and ONE publish job that uploads every CSV BEFORE the
+            // flag (the commit signal); name=KyecLot (case-sensitive), Objects=TStringList* of
+            // that lot's written CSV leaf names. Both are declared NULL and allocated INSIDE
+            // the guarded try so a throw during allocation is covered by the __finally.
+            TStringList* pSeen = NULL;
+            TStringList* pPub  = NULL;
+            bool bUploadOn = (FtpUploadThd != NULL &&
+                              FtpUploadThd->GetEnable() && FtpUploadThd->GetUploadReport());
+            bool bNoKyecLogged = false;
             try
             {
-                pOut->Add(GetTitleLine());
-                if (m_pLines)
-                    pOut->AddStrings(m_pLines);
+                pSeen = new TStringList();
+                pPub  = new TStringList();
+                pPub->CaseSensitive = true;
 
-                // 1. permanent archive, month-bucketed (machine's own record)
-                AnsiString sArch = m_sBaseDir + "\\" + FormatDateTime("yyyymm", Now());
-                ForceDirectories(sArch);
-                pOut->SaveToFile(sArch + "\\" + sFileName);
-
-                // 2. customer pickup folder, flat (wiped at the next Lot Start)
-                if (m_sPickupDir != "")
+                int nBuckets = (m_pLotBuckets != NULL) ? m_pLotBuckets->Count : 0;
+                if (nBuckets == 0)
                 {
-                    ForceDirectories(m_sPickupDir);
-                    pOut->SaveToFile(m_sPickupDir + "\\" + sFileName);
+                    // Zero genuine-2D dies : still emit ONE header-only file (Qty=0) for the
+                    // armed lot so the customer can tell "ran but 0 units" from a missed
+                    // hand-off. Product / Substage / Kyec are unknown here (no rows).
+                    AnsiString sFileName = BuildFileName("", m_sArmCustLot, "", "", 0, sStamp);
+                    sFileName = UniqueFileNameInFlush(pSeen, sFileName);
+                    WriteOneFile(sArch, sFileName, NULL);
+                    // KYEC lot unknown for a zero-die lot -> no upload possible. Note once.
+                    if (bUploadOn && !bNoKyecLogged)
+                    {
+                        g_EventLog.Log("FTP_SKIP", "Soter 0-die lot has no KYEC batch id, upload skipped", "");
+                        bNoKyecLogged = true;
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < nBuckets; ++i)
+                    {
+                        TSoterLotBucket* b = (TSoterLotBucket*)m_pLotBuckets->Objects[i];
+                        if (b == NULL)
+                            continue;
+                        AnsiString sFileName = BuildFileName(b->sProduct, b->sCustLot, b->sKyecLot,
+                                                             b->sSubstage, b->pLines->Count, sStamp);
+                        sFileName = UniqueFileNameInFlush(pSeen, sFileName);
+                        WriteOneFile(sArch, sFileName, b->pLines);
+
+                        if (b->sKyecLot.Trim() != "")
+                        {
+                            int gi = pPub->IndexOf(b->sKyecLot);
+                            TStringList* g;
+                            if (gi < 0)
+                            {
+                                g = new TStringList();
+                                pPub->AddObject(b->sKyecLot, (TObject*)g);
+                            }
+                            else
+                            {
+                                g = (TStringList*)pPub->Objects[gi];
+                            }
+                            g->Add(sFileName);   // CSV leaf name (already unique within the flush)
+                        }
+                        else if (bUploadOn && !bNoKyecLogged)
+                        {
+                            // A lot with dies but no KYEC batch id : cannot build /<KYLotNo>/,
+                            // so skip its upload. The archive + pickup copy is still written.
+                            g_EventLog.Log("FTP_SKIP",
+                                AnsiString("Soter lot has no KYEC batch id, upload skipped (lot=")
+                                + b->sCustLot + ")", "");
+                            bNoKyecLogged = true;
+                        }
+                    }
+                }
+
+                // Publish phase : one flag + one publish job per KYEC lot (upload gated ON).
+                if (bUploadOn)
+                {
+                    AnsiString sDateCode = FormatDateTime("yyyymmddhhnnss", dtBatch);
+                    for (int gi = 0; gi < pPub->Count; ++gi)
+                    {
+                        AnsiString   sKyec = pPub->Strings[gi];
+                        TStringList* g     = (TStringList*)pPub->Objects[gi];
+                        if (g == NULL || g->Count == 0)
+                            continue;
+
+                        // Sanitize the KYEC lot ONCE and use it for BOTH the flag name and the
+                        // remote folder (passed to EnqueueLotPublish) so the /LotEnd/ flag token
+                        // always matches the /<KYLotNo>/ folder the worker creates. For real
+                        // alphanumeric KYEC ids SafeToken is a no-op; this only diverges for an
+                        // exotic id (e.g. a '/'), where the sanitized, creatable form is correct.
+                        AnsiString sKyecSafe = SafeToken(sKyec);
+                        // flag : <KYLotNo>_<DateCode>.txt ; content = one CSV leaf name per line
+                        AnsiString sFlagName = UniqueFileNameInFlush(pSeen,
+                            sKyecSafe + "_" + sDateCode + ".txt");
+                        AnsiString sFlagPath = sArch + "\\" + sFlagName;
+
+                        AnsiString   sCsvJoined = "";
+                        TStringList* pFlag = new TStringList();
+                        try
+                        {
+                            for (int k = 0; k < g->Count; ++k)
+                            {
+                                pFlag->Add(g->Strings[k]);
+                                if (sCsvJoined != "")
+                                    sCsvJoined += "\n";
+                                sCsvJoined += sArch + "\\" + g->Strings[k];
+                            }
+                            pFlag->SaveToFile(sFlagPath);   // local flag copy (audit + upload source)
+                        }
+                        __finally
+                        {
+                            delete pFlag;
+                        }
+
+                        FtpUploadThd->EnqueueLotPublish(sKyecSafe, sCsvJoined, sFlagPath);
+                    }
                 }
             }
             __finally
             {
-                delete pOut;
+                if (pPub != NULL)
+                {
+                    for (int i = 0; i < pPub->Count; ++i)
+                        delete (TStringList*)pPub->Objects[i];
+                    delete pPub;
+                }
+                delete pSeen;
             }
         }
         catch (Exception&)
@@ -309,7 +520,7 @@ void cSoterOutput::OnLotEnd()
             // Soter CSV write failed (disk full / path). Output for this lot is lost;
             // swallow so the caller is not disturbed.
         }
-        m_bActive = false;   // disarm; buffer cleared on next OnLotStart
+        m_bActive = false;   // disarm; buckets cleared on next OnLotStart (DoArm)
     }
     __finally
     {
@@ -319,6 +530,8 @@ void cSoterOutput::OnLotEnd()
 
 //---------------------------------------------------------------------------
 void cSoterOutput::OpenRow(int iNozzle,
+                           const AnsiString& sCustLot,
+                           const AnsiString& sKyecLot,
                            const AnsiString& sProductCode,
                            const AnsiString& sSubstage,
                            const AnsiString& sCode2D,
@@ -343,6 +556,8 @@ void cSoterOutput::OpenRow(int iNozzle,
         r.Clear();
         r.bActive     = true;
         r.sStartTime  = FormatDateTime("yyyy-mm-dd hh:nn:ss", Now());
+        r.sCustLotID  = sCustLot;
+        r.sKyecLotID  = sKyecLot;
         r.sProductCode= sProductCode;
         r.sSubstage   = sSubstage;
         r.sLoadTray   = sLoadTray;
@@ -359,7 +574,8 @@ void cSoterOutput::OpenRow(int iNozzle,
 }
 
 //---------------------------------------------------------------------------
-// assumes lock held
+// assumes lock held. Route the completed row into its owning lot's bucket (created
+// on first row of that lot), capturing the bucket's filename meta from the row.
 void cSoterOutput::CommitRow(int iNozzle, const AnsiString& sUnloadTray)
 {
     if (iNozzle < 0 || iNozzle >= SOTER_NOZZLE_COUNT)
@@ -371,16 +587,30 @@ void cSoterOutput::CommitRow(int iNozzle, const AnsiString& sUnloadTray)
     r.sFinishTime = FormatDateTime("yyyy-mm-dd hh:nn:ss", Now());
     r.sUnloadTray = sUnloadTray;
 
-    // Latch the filename Product / Substage tokens from the first emitted row.
-    if (m_sFileProduct == "" && r.sProductCode != "")
-        m_sFileProduct = r.sProductCode;
-    if (m_sFileSubstage == "" && r.sSubstage != "")
-        m_sFileSubstage = r.sSubstage;
-
-    if (m_pLines)
+    if (m_pLotBuckets != NULL)
     {
-        int iNo = m_pLines->Count + 1;
-        m_pLines->Add(BuildDataLine(r, iNo));
+        AnsiString sKey = r.sCustLotID;   // file-split key (may be "" for a die with no owning lot)
+        int idx = m_pLotBuckets->IndexOf(sKey);
+        TSoterLotBucket* b;
+        if (idx < 0)
+        {
+            b = new TSoterLotBucket();
+            b->sCustLot  = r.sCustLotID;
+            b->sKyecLot  = r.sKyecLotID;
+            b->sProduct  = r.sProductCode;
+            b->sSubstage = r.sSubstage;
+            m_pLotBuckets->AddObject(sKey, (TObject*)b);
+        }
+        else
+        {
+            b = (TSoterLotBucket*)m_pLotBuckets->Objects[idx];
+            // First non-empty value wins : fill any meta the bucket still lacks.
+            if (b->sKyecLot == "" && r.sKyecLotID != "")   b->sKyecLot  = r.sKyecLotID;
+            if (b->sProduct == "" && r.sProductCode != "") b->sProduct  = r.sProductCode;
+            if (b->sSubstage == "" && r.sSubstage != "")   b->sSubstage = r.sSubstage;
+        }
+        int iNo = b->pLines->Count + 1;   // per-file serial, 1-based
+        b->pLines->Add(BuildDataLine(r, iNo));
     }
     r.Clear();
 }

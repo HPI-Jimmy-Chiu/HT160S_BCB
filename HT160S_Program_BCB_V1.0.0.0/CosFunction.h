@@ -202,6 +202,7 @@ public:
 typedef struct
 {
 	AnsiString sLotID;             // Lot identity (key returned by reverse lookup)
+	AnsiString sKyecLotID;         // KYEC batch id (Soter col7 / file token); from SET_LOT_INFO, "" until supplied
 	AnsiString sSourceMachine;     // which upstream machine sent this Lot
 	AnsiString sDeviceName;        // product / device (optional)
 	int        iSource;            // HT160_LOT_SOURCE_OFFLINE / _SECS

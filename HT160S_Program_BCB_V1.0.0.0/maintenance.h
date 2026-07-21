@@ -14,7 +14,7 @@
 //---------------------------------------------------------------------------
 enum
 {
-    MAX_MAINTENANCE_MENU_COUNT = 16
+    MAX_MAINTENANCE_MENU_COUNT = 18
 };
 //---------------------------------------------------------------------------
 enum TMaintenanceMenuAction
@@ -278,6 +278,33 @@ __published:
     TButton *btnLotApiFetch;
     TMemo *memLotApiResult;
     TMemo *memLotApiLog;
+    TSpeedButton *spbMaintFtp;
+    TTabSheet *tsMaintFtp;
+    TPanel *pnlFtpSetup;
+    TPanel *pnlFtpStatus;
+    TPanel *pnlFtpTest;
+    TLabel *lblFtpHost;
+    TLabel *lblFtpPort;
+    TLabel *lblFtpUser;
+    TLabel *lblFtpPwd;
+    TLabel *lblFtpRemoteDir;
+    TLabel *lblFtpSaveHint;
+    TEdit *edFtpHost;
+    TEdit *edFtpPort;
+    TEdit *edFtpUser;
+    TEdit *edFtpPwd;
+    TEdit *edFtpRemoteDir;
+    TCheckBox *chkFtpEnable;
+    TCheckBox *chkFtpUploadReport;
+    TButton *btnFtpSave;
+    TButton *btnFtpReload;
+    TLabel *lblFtpState;
+    TLabel *lblFtpLastError;
+    TLabel *lblFtpTestTitle;
+    TButton *btnFtpTestConn;
+    TButton *btnFtpTestUpload;
+    TMemo *memFtpResult;
+    TMemo *memFtpLog;
     TTabSheet *tsSortArm;
     TPanel *pnlSuckerEnableBox;
     TLabel *lblSuckerEnableHint;
@@ -374,6 +401,10 @@ __published:
     void __fastcall btnLotApiSaveClick(TObject *Sender);
     void __fastcall btnLotApiReloadClick(TObject *Sender);
     void __fastcall btnLotApiFetchClick(TObject *Sender);
+    void __fastcall btnFtpSaveClick(TObject *Sender);
+    void __fastcall btnFtpReloadClick(TObject *Sender);
+    void __fastcall btnFtpTestConnClick(TObject *Sender);
+    void __fastcall btnFtpTestUploadClick(TObject *Sender);
     void __fastcall spbMaintenanceMenuClick(TObject *Sender);
     void __fastcall RGB00Click(TObject *Sender);
     void __fastcall sbMusic1Click(TObject *Sender);
@@ -452,6 +483,10 @@ private:
     void __fastcall SaveLotWebApiSettings();
     void __fastcall RefreshLotWebApiStatus();
     void __fastcall AddLotWebApiLog(AnsiString Text);
+    void __fastcall LoadFtpConfigToUi();
+    void __fastcall SaveFtpConfigFromUi();
+    void __fastcall RefreshFtpStatus();
+    void __fastcall AddFtpLog(AnsiString Text);
     void __fastcall RefreshAmrStatus();
     void __fastcall BuildAmrInjectPanel();
     void __fastcall ShowPasswordPage();

@@ -466,6 +466,7 @@ public:		// User declarations
     bool __fastcall ArchiveDiscardedWorkOrder(AnsiString Reason);
     void __fastcall RequestLotDataFromWebApi(AnsiString LotID);
     void __fastcall PollLotDataWebApi();
+    void __fastcall PollFtpUploadResults();   //AI(ht160s-ftp) 20260721 : drain FTP upload results -> EventLog
     void __fastcall StartNextLotApiPull();
     void __fastcall StartLotWebApiPullAll();
     void __fastcall UpdateSecsFeatureBadge();

@@ -36,6 +36,8 @@
 #include "aSortArm.h"  //AI(ht160s-status) 20260703 : SortArmModule->GetStatus for the Module Status sheet
 #include "aTrayArm.h"  //AI(ht160s-status) 20260703 : TrayArmModule->GetStatus for the Module Status sheet
 #include "LotWebApiClient.h"   //AI(ht160s-lot-webapi) 20260612 : Stage 4 : machine-flow Lot data pull
+#include "uFtpUploadThread.h"  //AI(ht160s-ftp) 20260721 : background FTP upload worker (lifecycle + result pump)
+#include "cEventLog.h"         //AI(ht160s-ftp) 20260721 : g_EventLog.Log for FTP upload audit records
 #include "SecsGem/UsecegemMainFrom.h"
 #include "SecsGem/uHGemHT160.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : SECS/GEM log monitor window
@@ -702,6 +704,19 @@ void __fastcall TfMain::FormClose(TObject *Sender, TCloseAction &Action)
     {
         MyThread->Terminate();
         MyThread->WaitFor();
+    }
+
+    //AI(ht160s-ftp) 20260721 : stop the background FTP upload worker before the VCL
+    //message loop ends. EndThread signals its events, WaitFor blocks until Execute
+    //returns (the worker never Synchronizes, so no deadlock against this main-thread
+    //WaitFor). Any in-flight upload is abandoned; a partially-sent lot is re-sent on
+    //the next Lot End (the KYEC hand-off is idempotent, flag-committed).
+    if(FtpUploadThd != NULL)
+    {
+        FtpUploadThd->EndThread();
+        FtpUploadThd->WaitFor();
+        delete FtpUploadThd;
+        FtpUploadThd = NULL;
     }
 
     //AI(HT160S-Maintainer) 20260603 : release central alarm object
@@ -2500,6 +2515,25 @@ void __fastcall TfMain::PollLotDataWebApi()
                 StartNextLotApiPull();
             }
         }
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : pump background FTP upload results into the EventLog.
+// Called every MainProc cycle (VCL main thread via TRunControl::Synchronize), the
+// same safe spot as PollLotDataWebApi. Cheap no-op when the queue is empty. Only
+// LOT_PUBLISH ok / give-up messages reach here; maintenance test-button results
+// stay on the maintenance screen. The per-cycle guard caps the drain so a flood of
+// queued results cannot stall one MainProc tick.
+void __fastcall TfMain::PollFtpUploadResults()
+{
+    if(FtpUploadThd == NULL)
+        return;
+    AnsiString sMsg;
+    int iGuard = 0;
+    while(iGuard < 20 && FtpUploadThd->FetchResult(sMsg))
+    {
+        g_EventLog.Log("FTP_UPLOAD", sMsg, "");
+        iGuard++;
     }
 }
 //---------------------------------------------------------------------------

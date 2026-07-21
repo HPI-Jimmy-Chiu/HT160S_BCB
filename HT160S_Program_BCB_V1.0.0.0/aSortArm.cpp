@@ -1291,7 +1291,7 @@ void TSortArmModule::RecordAutoSkippedCells()
                 AnsiString sSoterLoad="";
                 if(ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
                     sSoterLoad=ColorModule->GetTrayID();
-                g_SoterOutput.OpenRow(s, sSoterProd, sSoterSub,
+                g_SoterOutput.OpenRow(s, (Lot!=NULL ? Lot->sLotID : AnsiString("")), (Lot!=NULL ? Lot->sKyecLotID : AnsiString("")), sSoterProd, sSoterSub,
                     Slot[s].Code2D, sSoterLoad,
                     SoterIc.sRetestCode, SoterIc.iHBin, SoterIc.iSBin, SoterIc.sDiePass);
                 g_SoterOutput.CommitRejectRow(s);
@@ -1520,7 +1520,7 @@ void TSortArmModule::TransferPickDataFromLoader()
                         AnsiString sSoterLoad="";
                         if(ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
                             sSoterLoad=ColorModule->GetTrayID();
-                        g_SoterOutput.OpenRow(SlotIndex, sSoterProd, sSoterSub,
+                        g_SoterOutput.OpenRow(SlotIndex, (Lot!=NULL ? Lot->sLotID : AnsiString("")), (Lot!=NULL ? Lot->sKyecLotID : AnsiString("")), sSoterProd, sSoterSub,
                             Slot[SlotIndex].Code2D, sSoterLoad,
                             SoterIc.sRetestCode, SoterIc.iHBin, SoterIc.iSBin, SoterIc.sDiePass);
                     }
