@@ -294,12 +294,13 @@ host 靜默（KYEC 手動驗證）：
 
 ## 8. 施工順序（可獨立驗證）
 
-- [ ] S0 使用者最終核可本計畫（§9 四問已定案）
-- [ ] S1 模擬器增強（Auto-AGV 帶 LoaderTrayCount + 兩車腳本）→ scenario_runner 過 —— 先做，後續每步都要它驗
-- [ ] S2 aLoader：TripQueue 結構 + EnqueueTrip + mint 分類改寫 + 生命週期 + DescribeState → build + V1b 分類序列正確
-- [ ] S3 aLoader：case 9000 改寫（拆 MES0921/break + SSOT 移除）+ OverTrayRecycle log → build + V2/V3
-- [ ] S4 aLoader：源乾等車窗→自動 CleanOut（§2.1）→ build + V1/V4b
-- [ ] S5 uAgvStation：進料側閘 + 取消 CALLED + consume-once + ReadyEntrySensor instant-finish 註記（§2.3/1.1/Q1）→ build + V4/V7
+- [x] S0 計畫核可（Q1-Q4 定案）— 使用者「動工」2026-07-21
+- [x] S1 模擬器增強（Auto-AGV 帶 LoaderTrayCount + `twocar` 腳本 + GUI/CLI）→ scenario_runner 67/67 PASS
+- [x] S2 aLoader：TripQueue 結構 + EnqueueTrip + mint 分類改寫 + 生命週期 + DescribeState —— **SHIPPED `bd9f8f0`**（對抗式複驗過；dev+real build EXIT0；selftest PASS）
+- [x] S3-core aLoader：case 9000 拆 MES0921 stop + 拆 CleanOut break + FlushTripsOnDry 源乾reconcile + INF_OVERTRAY —— **SHIPPED `bd9f8f0`**
+- [x] S3-follow aLoader/database：MES0921 從 mapAlarmCodeList SSOT 移除（Q3，陣列 20→19）+ 專屬 OverTrayRecycle CSV（cCsvDailyLog 惰性 InitLog，§1.5）—— **SHIPPED**
+- [x] S4 aLoader：源乾等車窗→自動 CleanOut（選項 B，§2.1；bAmrLocked==false + IsSupplyCarDry 閘，逾時取代 MES0920）—— **SHIPPED**
+- [x] S5 uAgvStation：進料側 CleanOut 閘（PollAndCall 釋放 CALLED + ServiceHandshake P1-P3 early-return + BeginPrep 拒收 infeed）—— **SHIPPED**（HCACK 用「return true+不進 PREP」既有 operator-holding idiom，非 HCACK=4；host 靠 timeout；安全結果相同。ReadyEntrySensor instant-finish 註記留待 S6/上機需要時再補）
 - [ ] S6 後端 D1-D6（7/16 S1-S6 順序）→ build + V6
 - [ ] S7 真機組態編譯驗證（SOFT_SIMULATE off → Full → 還原）
 - [ ] S8 SECS simulator 全情境 V1-V7

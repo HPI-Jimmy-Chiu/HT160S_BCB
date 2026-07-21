@@ -235,6 +235,25 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         return;
     }
 
+    //AI(ht160s-overcount-tripqueue S5) 20260721 : in Clean Out, release any pending INFEED
+    //(P1-P3) handshake so a CALLED latched just before CleanOut entry does not stay stuck
+    //(PollAndCall's normal CALLED->IDLE re-arm is below the RunMode gate, so it never runs
+    //in CleanOut) and no infeed refill restarts mid-drain (which would reset the trip queue
+    //+ re-feed). Outfeed (P4-P9 Auto unload) is intentionally NOT touched -- that is the D4
+    //CleanOut unload path.
+    if(HSys.Sys.RunMode==Run_CleanOut)
+    {
+        for(int p = 0; p < 3; p++)
+        {
+            if(Handshake[p]!=AGV_IDLE)
+            {
+                InfeedSetLock(p, false);
+                Handshake[p] = AGV_IDLE;
+            }
+            ShortageLatch[p] = 0;
+        }
+    }
+
     if(HSys.Sys.RunMode!=Run_Normal)
         return;
 
@@ -390,6 +409,14 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
             ShortageDebounce[si] = 0;   // state changed (or idle) : restart the age
     }
 
+    //AI(ht160s-overcount-tripqueue S5) 20260721 : do NOT advance the INFEED (P1-P3) handoff
+    //during Clean Out -- a mid-drain refill would EnqueueTrip + re-feed and stall the finish.
+    //Outfeed (P4-P9) above already ran (the D4 unload path). P1-P3 is the last section so an
+    //early return here skips only infeed. PollAndCall additionally forces P1-P3 to IDLE in
+    //CleanOut, so this is belt-and-suspenders + removes any tick-ordering dependency.
+    if(HSys.Sys.RunMode==Run_CleanOut)
+        return;
+
     // --- P1-P3 : infeed handoff (CEID273 Ready / CEID274 Finish). Ready = the station's
     // front stacking cylinders are home/idle (IsReadyForAmrHandoff), the BeginPrep lock
     // holding them frozen through the handoff. Finish = refill complete (real: the input
@@ -458,6 +485,16 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
        AutoModule->IsOperatorHolding(AgvStation[i].AutoIndex))
     {
         RecordProcess("AGV: START_AGV "+cpName+" ignored - operator holding the full car");
+        return true;
+    }
+    //AI(ht160s-overcount-tripqueue S5) 20260721 : refuse an INFEED (P1-P3) handoff while the
+    //machine is draining in Clean Out -- restarting infeed would EnqueueTrip a new car + re-
+    //feed and stall the CleanOut finish. Mirror the operator-holding idiom: the CP name is a
+    //known station so return true (well-formed SECS reply, HCACK=0) but do NOT enter PREP, so
+    //no Ready(273) follows and the host's own timeout handles it. Outfeed (Auto) is allowed.
+    if(AgvStation[i].Kind!=ASK_AUTO && i<3 && HSys.Sys.RunMode==Run_CleanOut)
+    {
+        RecordProcess("AGV: START_AGV "+cpName+" ignored - infeed frozen during Clean Out");
         return true;
     }
     Handshake[i] = AGV_PREP;     // station asked to prepare for AGV handoff

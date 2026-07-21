@@ -52,6 +52,7 @@ TLoaderModule::TLoaderModule()
     TripQueue=new TList;
     bTripSeen=false;
     bOverTrayLogged=false;
+    bOverTrayLogInited=false;   //AI(ht160s-overcount-tripqueue) 20260721 : OverTrayLog InitLog deferred to first over-tray (LogRootDir not ready at ctor)
     InitialFlag();
 }
 //---------------------------------------------------------------------------
@@ -1706,6 +1707,24 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                         break;
                     State->bWaitingAmrFeed=false;
                     State->FeedWaitTimer.Clear();
+                    //AI(ht160s-overcount-tripqueue S4) 20260721 : selection B (multi-car one
+                    //lot). The AMR car-window (iAmrFeedWaitSec) elapsed with no refill. If the
+                    //source is truly dry and no AGV handoff is in flight, treat it as "this
+                    //lot's last car drained" and auto-enter Clean Out instead of the MES0920
+                    //operator prompt. A new START_AGV DURING the window would have set bAmrLocked
+                    //(freezing the destack at DoLoader case 100) so we would not reach here mid-
+                    //placing; the bAmrLocked==false guard makes that explicit. CleanOut completion
+                    //still runs its existing finish path (auto Lot End is the later S6/D1-D6 step).
+                    if(HSys.Sys.RunMode==Run_Normal
+                       && bAmrLocked==false
+                       && IsSupplyCarDry())
+                    {
+                        RecordProcess("AUTO CleanOut: Loader source dry, AMR car-window elapsed, no new car (side "+
+                            IntToStr(LoaderNo)+")");   //AI(ht160s-obsv)
+                        HSys.Sys.bCleanOut=true;
+                        HSys.Sys.RunMode=Run_CleanOut;
+                        break;
+                    }
                 }
                 Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), &HSys.Sen.SnLoader_Inputend, true, K_RETRY|K_CLEAN_OUT);
                 if(Ret==K_RETRY)
@@ -1773,9 +1792,26 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     else if(bTripSeen)
                     {
                         kFed=eTrayKindCover;
-                        //AI(ht160s-overcount-tripqueue) 20260721 : latch BOTH the RecordProcess
-                        //and the EventLog once per episode (bOverTrayLogged) so a long over-count
-                        //drain does not flood the State-Record ring one line per tray (review fix).
+                        //AI(ht160s-overcount-tripqueue) 20260721 : per-tray detail -> dedicated
+                        //OverTrayRecycle CSV (retention-pruned, off the State-Record ring). Lazy
+                        //InitLog here (LogRootDir is set by now). Columns: Date,Time,Station,
+                        //TrayKind,TrayID_2D,Reason,Destination.
+                        if(bOverTrayLogInited==false)
+                        {
+                            OverTrayLog.InitLog("OverTrayRecycle", "OverTrayRecycle",
+                                "Date,Time,Station,TrayKind,TrayID_2D,Reason,Destination");
+                            OverTrayLog.SetRetentionDays(90);
+                            bOverTrayLogInited=true;
+                        }
+                        {
+                            TDateTime nowOt=Now();
+                            OverTrayLog.AppendLine(
+                                FormatDateTime("yyyy/mm/dd", nowOt)+","+
+                                FormatDateTime("hh:nn:ss.zzz", nowOt)+
+                                ",Loader"+IntToStr(LoaderNo)+",Cover,,over-count,Empty");
+                        }
+                        //latch the RecordProcess + EventLog once per episode (bOverTrayLogged) so a
+                        //long over-count drain does not flood the State-Record ring per tray.
                         if(bOverTrayLogged==false)
                         {
                             RecordProcess("OVERTRAY Loader: over-count tray (side "+IntToStr(LoaderNo)+

@@ -5,6 +5,7 @@
 #include <Classes.hpp>
 #include "HTimer.h"
 #include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) 20260625 : eTrayKind/TMyTray for rear-tray hold (Phase 6 A.1)
+#include "cCsvDailyLog.h"         //AI(ht160s-overcount-tripqueue) 20260721 : dedicated per-tray OverTrayRecycle CSV
 //---------------------------------------------------------------------------
 // Loader per-side handshake status for the shared Loader-Y axis. SortArm uses
 // this to know when a side has finished CCD scanning and the Y axis may be
@@ -79,6 +80,8 @@ private:
     TList *TripQueue;
     bool   bTripSeen;         //AI(ht160s-overcount-tripqueue) 20260721 : a real trip has been enqueued this episode (over-count vs host-silent discriminator at mint)
     bool   bOverTrayLogged;   //AI(ht160s-overcount-tripqueue) 20260721 : once-per-episode INF_OVERTRAY EventLog latch (cleared on new trip / non-keep init)
+    cCsvDailyLog OverTrayLog; //AI(ht160s-overcount-tripqueue) 20260721 : per-tray OverTrayRecycle CSV (D:\HT160S_Log\OverTrayRecycle\<YYYY_MM>\, retention-pruned)
+    bool   bOverTrayLogInited;//AI(ht160s-overcount-tripqueue) 20260721 : lazy InitLog latch (LogRootDir must be set -> init on first over-tray, not in ctor)
     //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray hold (transfer-chain relay).
     //Kind is tagged on the carriage Tray grid at feed time; at discharge it is
     //transferred into this module-level hold before ClearTray releases the carriage.
