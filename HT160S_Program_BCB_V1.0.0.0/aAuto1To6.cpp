@@ -972,6 +972,15 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                         //modal re-reads the physical sensor, so sim skips this gate.
                         if(IsSoftSimulate()==false && IsOutputCarFullForAmr(Index))
                         {
+                            //AI(amr-unmanned D4-3) 20260721 : full output car during CleanOut
+                            //drain. AMR : do NOT pop the operator modal, do NOT GoUp into a
+                            //full car (overloads the AGV gripper). Hold this station this tick;
+                            //the coordinator CALLs the AGV (D4-2) -> collect (273/274 ClearAmrCar,
+                            //Full -> OFF) -> next tick GoUp proceeds. AGV not responding -> WAR0962
+                            //(W3/W4). Normally the car was already collected during the sorting
+                            //phase (continuous full-CALL), so this hold is the rare AGV-slow edge.
+                            if(GeneralSetting.bUseAMR)
+                                continue;
                             TMySensor *FullSensor=GetInputFullTray(Index);
                             AnsiString ErrorText;
                             ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
@@ -1249,6 +1258,14 @@ int TAutoModule::GetTrayRequest(int Index)
         return eTrayReqNone;                 // car still busy with a working tray
     if(State[Index].bRearHasTray || bRearDeliveredPending[Index])
         return eTrayReqNone;                 // rear already loaded or on the way
+    //AI(amr-unmanned D4-1) 20260721 : do NOT request the next tray while the output car is
+    //FULL. Reuse IsOutputCarFullForAmr (the SAME verdict the AGV full-CALL / finish gate
+    //use) so 'full' is single-sourced : sim = iSimAmrMaxTray count, REAL = Full sensor ONLY
+    //(user ruling). Closes the user invariant's edge : after a GoUp fills the car, rear
+    //stops pulling until the AGV collects (Full sensor -> OFF). GetNextTrayKindForAuto's
+    //iTrayCount>=MAX_TRAY_PER_CAR check is KEPT as Car.Tray[] bounds protection, not 'full'.
+    if(GeneralSetting.bUseAMR && IsOutputCarFullForAmr(Index))
+        return eTrayReqNone;
     if(GeneralSetting.bUseAMR)
         return GetNextTrayKindForAuto(Index); // 0/1/2, or -1 when the car is full
     return eTrayKindNormal;                  // Normal mode : always an empty work tray
@@ -1610,33 +1627,14 @@ void TAutoModule::ServiceCarFull()
         //wait/defer and fall straight to the sensor / logical-full operator modal below.
         if(GeneralSetting.bUseAMR && HGem!=NULL && HGem->IsSelected())
         {
-            bool bFull   = IsOutputCarFullForAmr(Index);
-            bool bLocked = IsAmrLocked(Index);
-            if(bFull && bLocked)
-            {
-                if(bWaitingAmrFull[Index]==false)
-                {
-                    AmrFullWaitTimer[Index].SetMS(GeneralSetting.iAmrFullWaitSec*1000);
-                    AmrFullWaitTimer[Index].On();
-                    bWaitingAmrFull[Index]=true;
-                    continue;
-                }
-                if(AmrFullWaitTimer[Index].Off()==false)
-                    continue;                       // still waiting for the AGV
-                // timed out : take this Auto out of the handshake, mark operator-holding,
-                // then fall through to the existing ShowMyError ladder below.
-                bWaitingAmrFull[Index]=false;
-                AmrFullWaitTimer[Index].Clear();
-                bOperatorHolding[Index]=true;
-                AgvCoord.AbortAutoHandshake(Index);   // releases lock + Handshake[si]=AGV_IDLE
-            }
-            else
-            {
-                // not (full & locked) : normal AGV path, no operator alarm needed.
-                bWaitingAmrFull[Index]=false;
-                AmrFullWaitTimer[Index].Clear();
-                continue;
-            }
+            //AI(amr-unmanned D4-4) 20260721 : link-up AMR -> the AGV full-collect handshake
+            //owns the full car (PollAndCall CEID272 -> ServiceHandshake 273/274 -> ClearAmrCar;
+            //its aging escalates to WAR0962 via W3/W4 if the AGV never responds). NO operator
+            //modal here, and no separate iAmrFullWaitSec wait (the unified iAgvTimeoutSec
+            //governs in the coordinator). Was: wait then bOperatorHolding + fall-through to
+            //the modal. SECS link DOWN still falls through to the operator modal below (a
+            //genuine comm-lost fault, distinct from AGV-slow).
+            continue;
         }
 
         bool bLogicalFull=(Car[Index].iTrayCount>=MAX_TRAY_PER_CAR);

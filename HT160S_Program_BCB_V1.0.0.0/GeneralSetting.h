@@ -191,7 +191,7 @@ public:
 	int iAmrFeedWaitSec;   //AI(ht160s-agv) 20260626 : seconds to wait for AMR magazine refill before Loader-empty alarm (HT9046 600s)
 	int iAmrFullWaitSec;   //AI(ht160s-agv) seconds to wait for AMR to take a full output car before the Auto-full operator alarm
 	int iAmrHandshakeWaitSec;   //AI(ht160s-agv) coordinator PREP/READY watchdog aging limit (seconds) before releasing the AMR lock
-	int iCleanOutAmrWaitSec;   //AI(ht160s-overcount-tripqueue D2) 20260721 : Clean Out per-Auto AMR-unload handshake timeout (seconds) before the operator fallback modal
+	int iAgvTimeoutSec;   //AI(amr-unmanned W1) 20260721 : unified AGV handshake timeout (seconds) -> WAR0962; serves Normal full-collect wait, CleanOut collect wait, Empty/Color supply wait (was iCleanOutAmrWaitSec, never consumed)
 	// Machine identity (status-bar panels 1-3). Persisted in General.ini
 	// [MachineIdentity]. sMachineModel defaults "HT160S". These are the HT160
 	// source of truth; UpdateMachineIdentity() copies them into the cmydef

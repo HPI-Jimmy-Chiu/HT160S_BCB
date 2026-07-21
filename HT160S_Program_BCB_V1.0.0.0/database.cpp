@@ -999,6 +999,16 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(amr-unmanned W2) 20260721 : AGV/AMR handshake timeout (code aligned to HT9045
+        //WAR0962 asendic_Loader.cpp:1963 "waited too long for the AMR"). The ONLY alarm the
+        //unmanned AMR line raises for a logistics condition : full/empty states silently
+        //handshake with the AGV; this fires only when the AGV does not respond within
+        //GeneralSetting.iAgvTimeoutSec. Registered standalone (same idiom as MES0925).
+        {
+            AnsiString cd="WAR0962", mg="AGV/AMR handshake timeout - AGV did not respond";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(cleanout) 20260706 : 6th family member MES%d23 = per-Auto clean-out residual
         //watchdog (EventLog-only). Suffix 23 chosen because 27 (the first pick) collides with
         //the Color seed MES1427 "Color supply stack full"; 23 is free across MES1123..MES1623.

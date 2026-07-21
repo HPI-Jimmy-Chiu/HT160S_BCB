@@ -319,6 +319,11 @@ void TEmptyModule::DoEmpty(int &Task)
             //Anchored on IsInputShortageForAmr (NOT bFrontHasTray) per the InputEnd rule.
             if(IsInputShortageForAmr() && HSys.Sys.RunMode!=Run_CleanOut)   //AI(cleanout) 20260701 : no Empty source-dry alarm during CleanOut
             {
+                //AI(amr-unmanned batch3) 20260721 : real AMR unmanned line -> the coordinator P2
+                //supply CALL (CEID272) + WAR0962-on-timeout own Empty source-dry (align with Color,
+                //which has NO supply-empty alarm). No operator MES1022 modal / no in-ladder wait.
+                if(GeneralSetting.bUseAMR && IsSoftSimulate()==false)
+                    break;
                 if(GeneralSetting.bUseAMR)
                 {
                     if(bWaitingAmrFeed==false)
@@ -381,7 +386,10 @@ void TEmptyModule::DoEmpty(int &Task)
                 //supply stack : hold the drain and ask the operator to empty it (AMR=0 ->
                 //operator; the modal repeats until the Full sensor goes OFF, mirroring Auto
                 //ServiceCarFull). IsOutputCarFullForAmr is sim-false, so this never blocks sim.
-                if(IsOutputCarFullForAmr())
+                //AI(amr-unmanned batch2) 20260721 : supply-stack FULL = "stop bringing", not
+                //"collect". AMR (unmanned) : GoUp anyway (mechanically safe, user ruling), no
+                //modal, no AGV call - drains as next production consumes it. non-AMR keeps modal.
+                if(IsOutputCarFullForAmr() && GeneralSetting.bUseAMR==false)
                 {
                     do
                     {

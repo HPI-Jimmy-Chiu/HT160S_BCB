@@ -143,9 +143,30 @@ void TAgvCoordinator::Reset()
         ShortageLatch[i]    = 0;
         ShortageDebounce[i] = 0;
         ReadyEntrySensor[i] = 0;
+        TimeoutPending[i]   = 0;   //AI(amr-unmanned W3) 20260721
     }
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
         BinSetting[a] = "";
+}
+//---------------------------------------------------------------------------
+//AI(amr-unmanned W3) 20260721 : WAR0962 K_RETRY handler. Station back to IDLE so
+//PollAndCall re-CALLs (its trigger condition - full car / supply shortage - is still
+//true). Locks are deliberately NOT released : between IDLE and the re-CALL a released
+//Auto lock would let FindDischargeAuto GoUp into the still-full car. Manual recovery
+//(operator empties the car / refills supply) self-heals through the existing sensor
+//paths (bFull==false&&CALLED->IDLE release; IsAmrTaken InputEnd-OFF -> CEID274).
+void TAgvCoordinator::RetryStation(int si)
+{
+    if(si < 0 || si >= AGV_STATION_COUNT)
+        return;
+    TimeoutPending[si]   = 0;
+    ShortageDebounce[si] = 0;
+    ShortageLatch[si]    = 0;
+    if(Handshake[si]!=AGV_IDLE)
+    {
+        RecordProcess("AGV: WAR0962 RETRY - station P"+IntToStr(si+1)+" reset to IDLE for re-call");
+        Handshake[si] = AGV_IDLE;
+    }
 }
 //---------------------------------------------------------------------------
 // "P1:0,P2:0,...,Px:1,...,P9:0" with exactly one bit set (single-station rule).
@@ -254,7 +275,11 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         }
     }
 
-    if(HSys.Sys.RunMode!=Run_Normal)
+    //AI(amr-unmanned D4-2) 20260721 : the P4-P9 full-collect CALL now also runs in
+    //Run_CleanOut (a drain GoUp can fill the output car; without a CALL the finish gate
+    //IsAllCleanOutFinish blocks on the Full sensor forever = the latent silent stall).
+    //P1-P3 shortage CALLs stay Run_Normal-only (infeed frozen in CleanOut, S5).
+    if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
         return;
 
     // --- P4-P9 : Auto output-car full -> lock + AGVSupplement (enter CALLED) ---
@@ -298,6 +323,11 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             Handshake[si] = AGV_IDLE;
         }
     }
+
+    //AI(amr-unmanned D4-2) 20260721 : infeed shortage CALLs stay Run_Normal-only (the
+    //P4-P9 loop above also serves Run_CleanOut for the full-collect).
+    if(HSys.Sys.RunMode!=Run_Normal)
+        return;
 
     // --- P1-P3 : input shortage -> AGVSupplement (enter CALLED). Polarity: the input
     // sensor reads ON=has tray, OFF=empty (user-confirmed 20260623 + draft section 9), so
@@ -391,22 +421,28 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 AmrInject.ClearAutoCycle(a);   //AI(ht160s-agv) 20260720 : sim one-inject = one cycle (clear stuck level latch)
             }
         }
-        // AI(ht160s-agv) 20260625 : watchdog. Age PREP/READY; on a stuck gate
-        // force-release the Auto lock so the feed loop is never latched forever.
-        if((Handshake[si]==AGV_PREP || Handshake[si]==AGV_READY) && Handshake[si]==hsBefore)
+        //AI(amr-unmanned W3) 20260721 : Auto (P4-P9) handshake aging now covers CALLED too
+        //(host never answered the 272 - previously CALLED sat silent forever) and, instead
+        //of the old SILENT force-release (which unlocked the station and let a discharge
+        //GoUp into a still-full car), latches TimeoutPending once. The MAIN loop (csystem)
+        //pops WAR0962 there (never a modal on this SECS-timer path); K_RETRY -> RetryStation
+        //re-CALLs. Lock and state are KEPT while pending so nothing moves into the full car.
+        if((Handshake[si]==AGV_CALLED || Handshake[si]==AGV_PREP || Handshake[si]==AGV_READY)
+           && Handshake[si]==hsBefore)
         {
-            if(++ShortageDebounce[si] > GeneralSetting.iAmrHandshakeWaitSec)
+            if(++ShortageDebounce[si] > GeneralSetting.iAgvTimeoutSec && TimeoutPending[si]==0)
             {
-                RecordProcess("AGV: watchdog force-release P"+IntToStr(si+1)+" (Auto"+IntToStr(a+1)+
-                    ") after "+IntToStr(GeneralSetting.iAmrHandshakeWaitSec)+"s stuck handshake");   //AI(ht160s-obsv-p1)
-                AutoModule->SetAmrLock(a, false);
-                Handshake[si]        = AGV_IDLE;
-                ShortageLatch[si]    = 0;
+                RecordProcess("AGV: handshake timeout P"+IntToStr(si+1)+" (Auto"+IntToStr(a+1)+
+                    ") after "+IntToStr(GeneralSetting.iAgvTimeoutSec)+"s -> WAR0962 pending");   //AI(amr-unmanned W3)
+                TimeoutPending[si]   = 1;
                 ShortageDebounce[si] = 0;
             }
         }
         else
+        {
             ShortageDebounce[si] = 0;   // state changed (or idle) : restart the age
+            TimeoutPending[si]   = 0;   // handshake moved on : stale pending is void
+        }
     }
 
     //AI(ht160s-overcount-tripqueue S5) 20260721 : do NOT advance the INFEED (P1-P3) handoff
@@ -446,22 +482,43 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 AmrInject.ClearInputCycle(p);   //AI(ht160s-agv) 20260720 : sim one-inject = one cycle (clear stuck level latch)
             }
         }
-        // AI(ht160s-agv) 20260625 : watchdog. Age PREP/READY; on a stuck gate force-
-        // release the infeed lock so the WHOLE feed loop is never latched forever.
-        if((Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY) && Handshake[p]==hsBefore)
+        //AI(amr-unmanned W3) 20260721 : P1 (Loader) keeps the legacy SILENT force-release
+        //(its supply timeout is the S4 source-dry auto-CleanOut path, Q3 ruling - no WAR0962).
+        //P2-P3 (Empty/Color supply) age CALLED+PREP+READY vs iAgvTimeoutSec and latch
+        //TimeoutPending for the main-loop WAR0962 instead of silently releasing.
+        if(p==0)
         {
-            if(++ShortageDebounce[p] > GeneralSetting.iAmrHandshakeWaitSec)
+            if((Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY) && Handshake[p]==hsBefore)
             {
-                RecordProcess("AGV: watchdog force-release P"+IntToStr(p+1)+" (infeed) after "+
-                    IntToStr(GeneralSetting.iAmrHandshakeWaitSec)+"s stuck handshake");   //AI(ht160s-obsv-p1)
-                InfeedSetLock(p, false);
-                Handshake[p]        = AGV_IDLE;
-                ShortageLatch[p]    = 0;
+                if(++ShortageDebounce[p] > GeneralSetting.iAmrHandshakeWaitSec)
+                {
+                    RecordProcess("AGV: watchdog force-release P1 (Loader infeed) after "+
+                        IntToStr(GeneralSetting.iAmrHandshakeWaitSec)+"s stuck handshake");   //AI(ht160s-obsv-p1)
+                    InfeedSetLock(p, false);
+                    Handshake[p]        = AGV_IDLE;
+                    ShortageLatch[p]    = 0;
+                    ShortageDebounce[p] = 0;
+                }
+            }
+            else
+                ShortageDebounce[p] = 0;   // state changed (or idle) : restart the age
+        }
+        else if((Handshake[p]==AGV_CALLED || Handshake[p]==AGV_PREP || Handshake[p]==AGV_READY)
+                && Handshake[p]==hsBefore)
+        {
+            if(++ShortageDebounce[p] > GeneralSetting.iAgvTimeoutSec && TimeoutPending[p]==0)
+            {
+                RecordProcess("AGV: handshake timeout P"+IntToStr(p+1)+" (infeed) after "+
+                    IntToStr(GeneralSetting.iAgvTimeoutSec)+"s -> WAR0962 pending");   //AI(amr-unmanned W3)
+                TimeoutPending[p]   = 1;
                 ShortageDebounce[p] = 0;
             }
         }
         else
+        {
             ShortageDebounce[p] = 0;   // state changed (or idle) : restart the age
+            TimeoutPending[p]   = 0;   // handshake moved on : stale pending is void
+        }
     }
 }
 //---------------------------------------------------------------------------

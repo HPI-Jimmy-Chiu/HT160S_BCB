@@ -427,7 +427,10 @@ void TColorModule::DoColor(int &Task)
                     //AI(cleanout) 20260703 : Full gate (user design, mirrors Empty). Hold
                     //the drain and ask the operator to empty the stack; the modal repeats
                     //until the Full sensor goes OFF. IsInputFullForAmr is sim-false.
-                    if(IsInputFullForAmr())
+                    //AI(amr-unmanned batch2) 20260721 : supply-stack FULL = "stop bringing", not
+                    //"collect". AMR (unmanned) : GoUp anyway (mechanically safe, user ruling), no
+                    //modal, no AGV call - drains as next production consumes it. non-AMR keeps modal.
+                    if(IsInputFullForAmr() && GeneralSetting.bUseAMR==false)
                     {
                         do
                         {

@@ -68,9 +68,16 @@ public:
     unsigned char ShortageLatch[AGV_STATION_COUNT];  // one-shot: fire CEID272 once
     int           ShortageDebounce[AGV_STATION_COUNT];  // AI(ht160s-agv) 20260625 : per-station PREP/READY age (ServiceHandshake watchdog ticks)
     unsigned char ReadyEntrySensor[AGV_STATION_COUNT]; // edge baseline for Finish
+    //AI(amr-unmanned W3) 20260721 : one-shot per-station "AGV handshake timed out" latch.
+    //Set by the ServiceHandshake/PollAndCall aging (CALLED+PREP+READY vs iAgvTimeoutSec)
+    //for P2-P9 (Empty/Color supply + Auto collect; P1 Loader excluded - its timeout is the
+    //S4 source-dry auto-CleanOut). CONSUMED by the MAIN control loop (csystem) which pops
+    //WAR0962 there - never a modal on this SECS-timer path. Cleared by RetryStation/Reset.
+    unsigned char TimeoutPending[AGV_STATION_COUNT];
 
     TAgvCoordinator();
     void Reset();
+    void RetryStation(int si);   //AI(amr-unmanned W3) 20260721 : WAR0962 K_RETRY -> station back to IDLE (+unlock kept? no: keep lock semantics, see .cpp) so PollAndCall re-CALLs
 
     AnsiString BuildBitmap(int targetPIndex);    // "P1:0,...,Px:1,...,P9:0"
     int        LookupByName(AnsiString cpName);  // -> index 0..8, -1 if unknown

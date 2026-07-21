@@ -128,7 +128,7 @@ void THT160GeneralSetting::SetDefault()
 	iAmrFeedWaitSec=600;
 	iAmrFullWaitSec=600;
 	iAmrHandshakeWaitSec=240;
-	iCleanOutAmrWaitSec=300;   //AI(ht160s-overcount-tripqueue D2) 20260721 : CleanOut AMR-unload handshake timeout
+	iAgvTimeoutSec=300;   //AI(amr-unmanned W1) 20260721 : unified AGV handshake timeout -> WAR0962
 	sMachineModel="HT160S";
 	sHandlerID="";
 	sSerialNo="";
@@ -243,7 +243,7 @@ void THT160GeneralSetting::Load()
 	iAmrFeedWaitSec=Ini->ReadInteger("AGV", "AmrFeedWaitSec", 600);
 	iAmrFullWaitSec=Ini->ReadInteger("AGV", "AmrFullWaitSec", 600);
 	iAmrHandshakeWaitSec=Ini->ReadInteger("AGV", "AmrHandshakeWaitSec", 240);
-	iCleanOutAmrWaitSec=Ini->ReadInteger("AGV", "CleanOutAmrWaitSec", 300);   //AI(ht160s-overcount-tripqueue D2) 20260721
+	iAgvTimeoutSec=Ini->ReadInteger("AGV", "AgvTimeoutSec", 300);   //AI(amr-unmanned W1) 20260721
 	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
 	sHandlerID=Ini->ReadString("MachineIdentity", "HandlerID", "");
 	sSerialNo=Ini->ReadString("MachineIdentity", "SerialNo", "");
@@ -268,7 +268,7 @@ void THT160GeneralSetting::Load()
 	if(iAmrFullWaitSec      < 5) iAmrFullWaitSec      = 5;
 	if(iAmrHandshakeWaitSec < 5) iAmrHandshakeWaitSec = 5;
 	if(iRise1SettleWaitSec  < 5) iRise1SettleWaitSec  = 5;   //AI(ht160s-anti-ghost-d) 20260720 : same HTimer 0=instant / negative=49.7d footgun as the AGV waits
-	if(iCleanOutAmrWaitSec  < 5) iCleanOutAmrWaitSec  = 5;   //AI(ht160s-overcount-tripqueue D2) 20260721 : same HTimer footgun
+	if(iAgvTimeoutSec       < 5) iAgvTimeoutSec       = 5;   //AI(amr-unmanned W1) 20260721 : same HTimer footgun
 	delete Ini;
 }
 //---------------------------------------------------------------------------
@@ -328,7 +328,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("AGV", "AmrFeedWaitSec", iAmrFeedWaitSec);
 	Ini->WriteInteger("AGV", "AmrFullWaitSec", iAmrFullWaitSec);
 	Ini->WriteInteger("AGV", "AmrHandshakeWaitSec", iAmrHandshakeWaitSec);
-	Ini->WriteInteger("AGV", "CleanOutAmrWaitSec", iCleanOutAmrWaitSec);   //AI(ht160s-overcount-tripqueue D2) 20260721
+	Ini->WriteInteger("AGV", "AgvTimeoutSec", iAgvTimeoutSec);   //AI(amr-unmanned W1) 20260721
 	Ini->WriteString("MachineIdentity", "Model", sMachineModel);
 	Ini->WriteString("MachineIdentity", "HandlerID", sHandlerID);
 	Ini->WriteString("MachineIdentity", "SerialNo", sSerialNo);

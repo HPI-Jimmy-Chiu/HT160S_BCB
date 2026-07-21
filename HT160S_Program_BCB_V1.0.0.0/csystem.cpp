@@ -20,6 +20,7 @@
 #include "cprod.h"
 #include "cSoterOutput.h"
 #include "GeneralSetting.h"   //AI(ht160s-overcount-tripqueue D6) 20260721 : GeneralSetting.bUseAMR gates the CleanOut auto-Lot-End
+#include "SecsGem/uAgvStation.h"   //AI(amr-unmanned W4) 20260721 : AgvCoord.TimeoutPending -> WAR0962 in the main loop
 #include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject test mode on machine start
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
@@ -62,6 +63,31 @@ static void UpdateRunControlFlag()
 		fMaintenance->UpdateRunStateLock();
 	if(fSetup!=NULL && fSetup->Visible)
 		fSetup->UpdateRunStateLock();
+}
+//---------------------------------------------------------------------------
+//AI(amr-unmanned W4) 20260721 : consume the AGV coordinator's per-station handshake-
+//timeout latch in the MAIN control loop (safe modal context; TAgvCoordinator runs on the
+//SECS 1s timer and must NOT pop modals there). Fires WAR0962 (B-class) once per timed-out
+//station; the only key is K_RETRY -> RetryStation re-CALLs the AGV. AMR-mode only. P1
+//(Loader/si=0) is never latched by the coordinator (its supply timeout is the S4 source-
+//dry auto-CleanOut, Q3 ruling), so this loop starts at si=1 (Empty/Color supply + Auto
+//collect). Manual recovery (operator empties car / refills) self-heals via the sensor
+//paths without ever reaching here.
+static void ServiceAgvTimeoutAlarm()
+{
+	if(GeneralSetting.bUseAMR==false)
+		return;
+	for(int si=1; si<AGV_STATION_COUNT; si++)
+	{
+		if(AgvCoord.TimeoutPending[si]==0)
+			continue;
+		AnsiString Where;
+		if(si==1)      Where="Empty (P2)";
+		else if(si==2) Where="Color (P3)";
+		else           Where="Auto"+IntToStr(si-2)+" (P"+IntToStr(si+1)+")";
+		ShowMyError("WAR0962", LangT("AGV/AMR handshake timeout - AGV did not respond")+" : "+Where, K_RETRY);
+		AgvCoord.RetryStation(si);   // clears pending + station->IDLE so PollAndCall re-CALLs
+	}
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260603 : central alarm consumer. Modules raise alarms via
@@ -214,6 +240,11 @@ void MainProc()
 		if(DataModule1!=NULL && bSortArmNeedHome==false && HSys.Sys.SystemStart)
 			DataModule1->DoAllProcess();
 	}
+
+	//AI(amr-unmanned W4) 20260721 : pop WAR0962 for any AGV handshake that timed out this
+	//cycle (main-loop modal context; latched by the SECS-timer coordinator). Before
+	//ProcessAlarm so it shares the same drain tick.
+	ServiceAgvTimeoutAlarm();
 
 	//AI(HT160S-Maintainer) 20260603 : drain any alarms raised during this cycle's
 	//module processing and show them through the central dispatch.
