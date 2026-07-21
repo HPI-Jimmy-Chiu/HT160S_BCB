@@ -77,6 +77,13 @@ static void ServiceAgvTimeoutAlarm()
 {
 	if(GeneralSetting.bUseAMR==false)
 		return;
+	//AI(amr-unmanned W4-fix) 20260722 : freeze during HOME, mirroring the SECS-timer
+	//coordinator's home-freeze (uAgvStation ServiceHandshake). Without this a TimeoutPending
+	//latched just before a HOME could pop WAR0962 (ShowNoteAlarm DecStopAllMotor +
+	//SystemStart=false) mid-homing and abort the just-armed sequence. Consume the latch only
+	//after HOME completes (the pending flag survives; it fires on the next non-HOME tick).
+	if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+		return;
 	for(int si=1; si<AGV_STATION_COUNT; si++)
 	{
 		if(AgvCoord.TimeoutPending[si]==0)

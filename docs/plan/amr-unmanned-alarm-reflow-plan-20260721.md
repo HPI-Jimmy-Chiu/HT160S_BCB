@@ -80,6 +80,30 @@
 5. 對抗式複驗（session 用量允許時跑 workflow；否則主迴圈手動走查）。
 6. 上機驗證（使用者）：真機 AMR + 模擬器 host。
 
+## 5.5 RESUME STATE（2026-07-22 暫停點 — 下次從這裡接續）
+
+**已 SHIPPED（feat/iosetview-172-refactor）：**
+- `271560f`：行為全套（W1-W4 + D4-1/2/3/4 + 批次2/3）。dev+真機 build EXIT0、encoding165、selftest PASS。Big5 檔 cp950 byte-safe。
+- Run_Home guard 修正（W4-fix，csystem `ServiceAgvTimeoutAlarm` 加 HOME 凍結）——**本段落最後一個 commit**（見下）。
+
+**對抗式複驗結果（workflow w6v3b9iyh，裁定 FIX-FIRST low-urgency；核心 SOLID：WAR0962 aging/latch/main-loop 消費/P1 排除/D4 閘/非AMR不變 全部確認乾淨）。已修/待辦：**
+
+1. **[已修] Run_Home guard**（MEDIUM）：`ServiceAgvTimeoutAlarm` 原本只 gate `bUseAMR`，HOME 前若有 TimeoutPending 會彈 WAR0962（DecStopAllMotor+SystemStart=false）打斷 homing。已加 `if(RunMode==Run_Home || fAllMotorHome==false) return;`。
+
+2. **[待你定案 — HIGH] Color 源乾 MES1421 未抑制**：實碼證實 `MES1421`（aColor.cpp:1131-1155）＝**Color 源乾**（`SnColor_OutputBottomHasTray` OFF；註解「source-dry... wait iAmrFeedWaitSec... Mirrors Empty/Loader source-dry template」），是 Empty MES1022 的對等。依原則 AMR 應抑制（如 MES1022）。**但你先前口頭裁定 MES1421＝B類「盤不見」**——與實碼衝突。且協調器現在也服務 Color P3（`SnColor_InputEnd` OFF→CEID272→WAR0962 300s），與 MES1421（`SnColor_OutputBottomHasTray` 600s）可能**雙重告警**（讀不同 sensor）。**待你釐清 Color 供料 sensor 模型 + MES1421 該不該抑制**。附帶：aEmpty.cpp:322 batch3 註解誤稱「Color 無 supply-empty alarm」，無論如何要修正。
+
+3. **[待你定案 — MEDIUM] case-4000 死鎖邊角**：AMR CleanOut 排料時若輸出車滿**且載台上有在製盤**（bCarHasTray true，drain 常見態），D4-3 `continue` 保持該站 → 但 273 `IsDrainedForAmr` 要求 `!bCarHasTray` → 273 永不發 → 收車握手卡 CALLED/PREP → 逾時 WAR0962，而 **K_RETRY 無法自癒**（無人線無操作員手動清車）。這是 Phase A 就標的邊角；WAR0962 有兜底（非無聲），但 retry 死路。**需設計決定**：回到原「滿車收料用獨立 Ready（忽略在製盤，收走換車後補疊）」，或確認你的不變量在 drain 也成立（GoUp 後才滿→載台空）。
+
+4. **[NIT] 殘留死碼**（D4-4 後）：`bWaitingAmrFull[]`/`AmrFullWaitTimer[]`/`iAmrFullWaitSec`/`AbortAutoHandshake` 已不再使用；可清。
+5. **[LOW] RetryStation 註解過度宣稱**「manual self-heal via bFull==false&&CALLED→IDLE」——實際靠 re-CALL 贏 race；修註解。
+6. **[NIT] ini 遷移**：舊 `[AGV]CleanOutAmrWaitSec` 改名 `AgvTimeoutSec`，舊機 ini 舊 key 失效落回預設 300（原本就是 no-op 欄，無行為變化）。
+
+**未做：**
+- **W5**：`tsMaintSECS` 加 `AgvTimeoutSec` 秒數 UI 欄（from-scratch DFM，文字模式，有剝除風險）。設定已可由 General.ini `[AGV]AgvTimeoutSec` 編、預設 300。
+- **上機 + SECS-sim 情境驗證**（含 CleanOut 灌滿 Auto→AGV 收；AGV 不回→WAR0962）。
+
+**下次開工建議順序**：先定案 #2（Color MES1421）+ #3（case-4000）兩個設計點 → 修 → 清 #4/#5 → W5 → 全 build gate + 重跑對抗複驗（script: `wf_204cdd67-7f6` 可 resume）→ 上機。
+
 ## 6. 不動項
 
 - 非 AMR 模式一切照舊（Q1）。
