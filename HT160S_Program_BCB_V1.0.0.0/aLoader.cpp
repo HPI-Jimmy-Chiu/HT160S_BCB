@@ -18,6 +18,7 @@
 #include "TopCcdSocket.h"
 #include "main.h"            //AI(HT160S-Maintainer) 20260609 : chkLoadTray on fMain
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260610 : LoaderYSafeDistance interlock
+#include "cEventLog.h"        //AI(ht160s-overcount-tripqueue) 20260721 : g_EventLog for INF_OVERTRAY / WRN_TRIP_NOCOUNT / WRN_TRIP_UNDELIVERED
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -46,7 +47,25 @@ TLoaderModule::TLoaderModule()
     bRearReadyForPick=false;
     bRearResidualAlarmed=false;
     RearKind=eTrayKindNormal;
+    //AI(ht160s-overcount-tripqueue) 20260721 : allocate the per-car trip FIFO BEFORE
+    //InitialFlag (its non-keep path clears/frees the queue).
+    TripQueue=new TList;
+    bTripSeen=false;
+    bOverTrayLogged=false;
     InitialFlag();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : free the trip FIFO. Entries are new'd in
+//EnqueueTrip; free each before deleting the list itself.
+TLoaderModule::~TLoaderModule()
+{
+    if(TripQueue!=NULL)
+    {
+        for(int i=0; i<TripQueue->Count; i++)
+            delete (TTripEntry*)TripQueue->Items[i];
+        delete TripQueue;
+        TripQueue=NULL;
+    }
 }
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -68,7 +87,26 @@ void TLoaderModule::InitialFlag(bool bKeepMaterial)
     //the remaining cover/identity trays as Normal and broke the MES0921 cross-check.
     if(bKeepMaterial==false)
     {
-        iSecsCarTrayCount=0;     //AI(ht160s-agv) 20260627 : no host count yet; RefillSimInfeed falls back to iSimAmrMaxTray
+        //AI(ht160s-overcount-tripqueue) 20260721 : drop all pending trips on a cold /
+        //non-keep reset. Log leftovers first (host over-declared / a car not fully drained)
+        //for the audit trail, then free every entry.
+        if(TripQueue!=NULL && TripQueue->Count>0)
+        {
+            int nRemain=0;
+            for(int i=0; i<TripQueue->Count; i++)
+            {
+                TTripEntry *e=(TTripEntry*)TripQueue->Items[i];
+                nRemain += (e->iTotal - e->iServed);
+                delete e;
+            }
+            g_EventLog.Log("WRN_TRIP_UNDELIVERED",
+                "Loader reset dropped "+IntToStr(TripQueue->Count)+" trip(s), "+
+                IntToStr(nRemain)+" tray(s) unconsumed", "");
+            TripQueue->Clear();
+        }
+        bTripSeen=false;
+        bOverTrayLogged=false;
+        iSecsCarTrayCount=0;     //AI(ht160s-agv) 20260627 : no host count yet
         RefillSimInfeed();
     }
     ResetSide(&Side[0]);
@@ -99,14 +137,24 @@ void TLoaderModule::InitialFlag(bool bKeepMaterial)
     iYOwner[0]=LOADER_Y_OWNER_NONE;
     iYOwner[1]=LOADER_Y_OWNER_NONE;
     SimuCcdCycleIndex=0;
-    if(bKeepMaterial==false)
-        iFeedSerial=0;        //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - reset feed counter (kept on keep-material HOME, see car-ledger note above)
+    //AI(ht160s-overcount-tripqueue) 20260721 : feed serial retired -- per-trip iServed in
+    //TripQueue replaces it. keep-material preserves the whole queue (trips + iServed); the
+    //non-keep reset above already dropped + freed the trips.
     //AI(ht160s-rearready-p0) 20260705 : RearKind/RearTrayID/RearSourceTray moved into
     //the bKeepRear guard above -- wiping them while the tray stays parked would
     //misroute a preserved cover/identity tray as Normal.
     if(bKeepMaterial)
+    {
+        int nHeadServed=0, nHeadTotal=0;
+        if(TripQueue!=NULL && TripQueue->Count>0)
+        {
+            TTripEntry *h=(TTripEntry*)TripQueue->Items[0];
+            nHeadServed=h->iServed; nHeadTotal=h->iTotal;
+        }
         RecordProcess("HOME-RESUME Loader: keptRear="+IntToStr(bKeepRear?1:0)+" rearKind="+IntToStr(RearKind)+
-            " rearID="+RearTrayID+" ledgerSerial="+IntToStr(iFeedSerial)+" carTotal="+IntToStr(iCarTrayTotal));   //AI(ht160s-obsv-p0)
+            " rearID="+RearTrayID+" trips="+IntToStr(TripQueue!=NULL?TripQueue->Count:0)+
+            " head="+IntToStr(nHeadServed)+"/"+IntToStr(nHeadTotal));   //AI(ht160s-obsv-p0 + overcount-tripqueue)
+    }
     CurrentLotNumber="";
     TestUpTask=1;
     TestDownTask=1;
@@ -565,35 +613,89 @@ bool TLoaderModule::IsInputHandoffFinishedForAmr()
 //full magazine). Real machine ignores the count (sensor-driven).
 void TLoaderModule::RefillSimInfeed()
 {
-    //AI(ht160s-agv) 20260627 : latch the FIXED magazine total for this car. When AMR is
-    //on and the host declared a LoaderTrayCount (SECS S2F41 -> SetExpectedCarTrayCount),
-    //that physical total (SECS work-only count + firmware-added header) is the source of truth
-    //tagging and the count-vs-Inputend cross-check; otherwise fall back to the sim max.
-    //AI(ht160s-loader-worktray-count) 20260713 : the host SECS LoaderTrayCount is WORK trays
-    //ONLY (9045 iSECSSetTrayCount parity); the cover/identity header trays are firmware-added
-    //here so iCarTrayTotal is the true physical magazine total. Header = [AMR] CoverTray0 +
-    //IdentityTray0 (a negative identity sentinel contributes 0). Fixes the old
-    //"iCarTrayTotal = iSecsCarTrayCount" that treated the work count as the full total, so the
-    //Motion-View work count read short by the header count. Sim-fallback (no host count) still
-    //uses the configured per-zone max as the physical total.
-    if(GeneralSetting.bUseAMR && iSecsCarTrayCount>0)
-    {
-        int iHeader = GeneralSetting.iAmrCoverTray[0]
-                    + ((GeneralSetting.iAmrIdentityTray[0]>0) ? GeneralSetting.iAmrIdentityTray[0] : 0);
-        iCarTrayTotal = iSecsCarTrayCount + iHeader;
-    }
-    else
-        iCarTrayTotal = GeneralSetting.iSimAmrMaxTray[0];
-    iSimInfeedCount=iCarTrayTotal;
-    iFeedSerial=0;            //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - new car => restart feed serial
+    //AI(ht160s-overcount-tripqueue) 20260721 : RefillSimInfeed now ONLY seeds the SIM
+    //input-stack count (Motion-View header + sim shortage read). The per-car physical
+    //total + cover/identity boundary moved into TripQueue (see EnqueueTrip); the old
+    //iCarTrayTotal/iFeedSerial scalars are retired. Real machine is sensor-driven and
+    //ignores this count. Sim seed = the configured per-zone max.
+    iSimInfeedCount = GeneralSetting.iSimAmrMaxTray[0];
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-agv) 20260627 : the AGV coordinator calls this on car arrival (CEID274
-//Finish) with the host-declared LoaderTrayCount captured from the preceding S2F41.
-//Stored so the next RefillSimInfeed latches it as the fixed car total. 0 = host silent.
+//AI(ht160s-agv) 20260627 : the AGV coordinator latches the host-declared LoaderTrayCount
+//on car arrival. Retained for API compatibility / callers that only want to record the
+//last-declared value; EnqueueTrip is the live path (it sets iSecsCarTrayCount too). 0 = host silent.
 void TLoaderModule::SetExpectedCarTrayCount(int n)
 {
     iSecsCarTrayCount = (n>0) ? n : 0;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : enqueue one per-car feed trip at CEID274
+//(InfeedRefill). nWork = host-declared WORK-tray count (S2F41 LoaderTrayCount); the
+//physical total adds the firmware cover/identity header (same math the old RefillSimInfeed
+//used). nWork<=0 = the host sent START_AGV with no LoaderTrayCount CP : do NOT guess a
+//total (a wrong guess mis-tags trays + floods Color 2D) -- skip the enqueue, warn, and let
+//that car's trays fall to the over-count Cover path at mint (Normal if host was always
+//silent). Also tops up the sim input stock so a sim run drains the arrived car.
+void TLoaderModule::EnqueueTrip(int nWork)
+{
+    iSecsCarTrayCount = (nWork>0) ? nWork : 0;   // last-declared value, for the dump
+    if(nWork<=0)
+    {
+        g_EventLog.Log("WRN_TRIP_NOCOUNT",
+            "Loader START_AGV without LoaderTrayCount - car not enqueued", "");
+        return;
+    }
+    //AI(ht160s-overcount-tripqueue) 20260721 : clamp BOTH header terms to >=0 so iTotal
+    //matches GetFedTrayKind's boundary math exactly (it clamps idCount/cvCount the same
+    //way). Only a negative IDENTITY is a documented sentinel; a negative Cover in a bad
+    //ini would otherwise make iTotal and the mint boundaries diverge (review fix, low).
+    int iHeader = ((GeneralSetting.iAmrCoverTray[0]>0)    ? GeneralSetting.iAmrCoverTray[0]    : 0)
+                + ((GeneralSetting.iAmrIdentityTray[0]>0) ? GeneralSetting.iAmrIdentityTray[0] : 0);
+    TTripEntry *e = new TTripEntry;
+    e->iTotal  = nWork + iHeader;
+    e->iServed = 0;
+    TripQueue->Add(e);
+    bTripSeen = true;
+    bOverTrayLogged = false;                     // new car -> a fresh over-count episode may log again
+    //AI(ht160s-overcount-tripqueue) 20260721 : seed the sim/display stock to the TOTAL
+    //REMAINING across all queued trips (bounded), not an unconditional accumulate. The
+    //sole per-feed decrement (case 1000) is IsSoftSimulate()-gated, so a real-machine '+='
+    //would grow the Motion-View header forever; recompute keeps it a true per-car snapshot.
+    {
+        int nRemain=0;
+        for(int i=0; i<TripQueue->Count; i++)
+        {
+            TTripEntry *q=(TTripEntry*)TripQueue->Items[i];
+            nRemain += (q->iTotal - q->iServed);
+        }
+        iSimInfeedCount = nRemain;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : source-dry reconcile. Called on the first
+//SnLoader_Inputend-OFF (source dry) detection in the AMR feed path. A dry magazine is
+//physically empty, so any trip still open (iServed<iTotal) declared trays that were never
+//delivered (host over-declared, or the car was short / jammed / partly removed). Closing
+//every open trip here keeps the NEXT car's cover/identity boundary clean -- the single
+//scalar it replaced self-healed because RefillSimInfeed reset the counters on every car;
+//the FIFO needs this explicit per-car close instead. Does NOT fire on the V1b overlap
+//(there the source only goes dry after both trips are already fully consumed + popped, so
+//the queue is empty and this is a no-op). WRN only when it actually closes an open trip.
+void TLoaderModule::FlushTripsOnDry()
+{
+    if(TripQueue==NULL || TripQueue->Count==0)
+        return;
+    int nTrips=TripQueue->Count, nShort=0;
+    for(int i=0; i<nTrips; i++)
+    {
+        TTripEntry *e=(TTripEntry*)TripQueue->Items[i];
+        nShort += (e->iTotal - e->iServed);
+        delete e;
+    }
+    TripQueue->Clear();
+    g_EventLog.Log("WRN_TRIP_SHORT",
+        "Loader source dry with "+IntToStr(nTrips)+" open trip(s), "+
+        IntToStr(nShort)+" declared tray(s) never delivered - trips closed", "");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - D2 stack-position convention.
@@ -1522,34 +1624,15 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 9000:
-            //AI(ht160s-agv) 20260627 : AMR-on tray-count vs Inputend cross-check. iCarTrayTotal
-            //is the FIXED physical magazine total (SECS work-only LoaderTrayCount + firmware header,
-            //latched at car arrival). Once iFeedSerial has consumed the whole total the count
-            //says the car is drained; if SnLoader_Inputend still reads a tray the count and the
-            //hardware disagree -> abnormal, raise MES0921 rather than feed a tray the count says
-            //is not there. count==0 + Inputend OFF is the NORMAL source-dry case, left to the
-            //deferral/MES0920 else-branch below. Disabled sensor never false-fires (Enable gate).
-            if(GeneralSetting.bUseAMR
-               && iCarTrayTotal>0
-               && (iCarTrayTotal - iFeedSerial)<=0
-               && HSys.Sen.SnLoader_Inputend.Enable==true
-               && HSys.Sen.SnLoader_Inputend.IsOn())
-            {
-                //AI(cleanout) 20260701 : draining the supply car in CleanOut - do NOT raise the
-                //count-mismatch alarm; break and let the DoLoader finish guard retire the side.
-                if(HSys.Sys.RunMode==Run_CleanOut)
-                    break;
-                Ret=ShowMyError("MES0921", LangT("Loader Tray Count Mismatch"), K_RETRY|K_CLEAN_OUT);
-                if(Ret==K_RETRY)
-                    State->FeedTask=1;
-                if(Ret==K_CLEAN_OUT)
-                {
-                    HSys.Sys.RunMode=Run_CleanOut;
-                    HSys.Sys.bCleanOut=true;
-                    State->FeedTask=10000;
-                }
-                break;
-            }
+            //AI(ht160s-overcount-tripqueue) 20260721 : the old MES0921 count-vs-Inputend
+            //cross-check (count exhausted + Inputend ON -> full-machine stop, one per tray)
+            //is REMOVED. Over-count is no longer an error : extra physical trays are fed as
+            //Cover (tagged at mint via TripQueue) and recycled to Empty -- logged, not
+            //alarmed. The CleanOut-only "break" that used to wedge here forever (the side
+            //never retires while Inputend ON) is gone too, so CleanOut now drains the extra
+            //trays and finishes. Flow falls straight through to the present-branch below,
+            //which mints the tray (kind decided by the trip FIFO). See docs/plan/
+            //loader-overcount-nostop-cleanout-lotend-plan-20260721.md Part 1.
             //AI(HT160S-Maintainer) 20260609 : in simulate/DUMMY the chkLoadTray
             //checkbox decides : checked = treat the tray as present (feed forever),
             //unchecked = fall through to the "Loader Tray Empty" alarm.
@@ -1608,6 +1691,12 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 {
                     if(State->bWaitingAmrFeed==false)
                     {
+                        //AI(ht160s-overcount-tripqueue) 20260721 : first source-dry edge for
+                        //this side -> the magazine is empty, so close any open feed trip whose
+                        //declared trays were never delivered (short/jammed/over-declared car).
+                        //Keeps the next car's cover/identity boundary clean. No-op on the V1b
+                        //overlap (queue already empty once both trips fully consumed).
+                        FlushTripsOnDry();
                         State->FeedWaitTimer.SetMS(GeneralSetting.iAmrFeedWaitSec*1000);
                         State->FeedWaitTimer.On();
                         State->bWaitingAmrFeed=true;
@@ -1657,9 +1746,47 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                 //tag this fed tray's kind on the carriage Tray grid (born here, mirrors Color
                 //BirthIdentityTray). Identity trays get a sim TrayID; real machine leaves it
                 //blank (no 2D read at feed, D2) and Color re-reads/re-births the 2D on reuse.
-                iFeedSerial++;
+                //AI(ht160s-overcount-tripqueue) 20260721 : classify against the HEAD trip
+                //(FIFO), not a single scalar, so overlapping cars keep separate boundaries.
+                //  bUseAMR off                     -> Normal (manual production, no header)
+                //  queue head present              -> advance iServed, GetFedTrayKind on that
+                //                                     trip; pop+free when iServed reaches iTotal
+                //  queue empty + a trip was seen   -> over-count -> Cover (recycle Empty; CCD
+                //                                     scan still runs so a real IC is sorted --
+                //                                     physical decides), EventLog once/episode
+                //  queue empty + never seen a trip -> host silent -> Normal
                 {
-                    eTrayKind kFed=GetFedTrayKind(iFeedSerial, iCarTrayTotal);
+                    eTrayKind kFed;
+                    if(GeneralSetting.bUseAMR==false)
+                        kFed=eTrayKindNormal;
+                    else if(TripQueue->Count>0)
+                    {
+                        TTripEntry *h=(TTripEntry*)TripQueue->Items[0];
+                        h->iServed++;
+                        kFed=GetFedTrayKind(h->iServed, h->iTotal);
+                        if(h->iServed>=h->iTotal)
+                        {
+                            delete h;
+                            TripQueue->Delete(0);
+                        }
+                    }
+                    else if(bTripSeen)
+                    {
+                        kFed=eTrayKindCover;
+                        //AI(ht160s-overcount-tripqueue) 20260721 : latch BOTH the RecordProcess
+                        //and the EventLog once per episode (bOverTrayLogged) so a long over-count
+                        //drain does not flood the State-Record ring one line per tray (review fix).
+                        if(bOverTrayLogged==false)
+                        {
+                            RecordProcess("OVERTRAY Loader: over-count tray (side "+IntToStr(LoaderNo)+
+                                ") tagged Cover -> recycle Empty (per-episode, first tray)");
+                            g_EventLog.Log("INF_OVERTRAY",
+                                "Loader over-count tray recycled as Cover (host under-declared LoaderTrayCount)", "");
+                            bOverTrayLogged=true;
+                        }
+                    }
+                    else
+                        kFed=eTrayKindNormal;
                     TrayMotor->Tray.SetKind(kFed);
                     if(kFed==eTrayKindIdentity)
                         TrayMotor->Tray.TrayID = IsSoftSimulate()
@@ -2388,13 +2515,26 @@ AnsiString TLoaderModule::DescribeState()
        + "  iYOwner=[" + IntToStr(iYOwner[0]) + "," + IntToStr(iYOwner[1]) + "]"
        + "  iTopCcdCount=" + IntToStr(iTopCcdCount)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
-    //AI(ht160s-tray-source) 20260625 : Phase 6 A.6 - rear-tray hold + feed serial.
-    s += "  RearKind=" + IntToStr((int)RearKind)
-       + "  RearTrayID=" + RearTrayID
-       + "  iFeedSerial=" + IntToStr(iFeedSerial)
-       + "  iCarTrayTotal=" + IntToStr(iCarTrayTotal)
-       + "  iSecsCarTrayCount=" + IntToStr(iSecsCarTrayCount)
-       + "  Remain=" + IntToStr(iCarTrayTotal - iFeedSerial) + "\r\n";
+    //AI(ht160s-overcount-tripqueue) 20260721 : dump the trip FIFO (depth + head served/
+    //total + trays remaining across all trips) in place of the retired iCarTrayTotal/iFeedSerial.
+    {
+        int nTrips = (TripQueue!=NULL) ? TripQueue->Count : 0;
+        int nHeadServed=0, nHeadTotal=0, nRemainAll=0;
+        for(int i=0; i<nTrips; i++)
+        {
+            TTripEntry *e=(TTripEntry*)TripQueue->Items[i];
+            nRemainAll += (e->iTotal - e->iServed);
+            if(i==0) { nHeadServed=e->iServed; nHeadTotal=e->iTotal; }
+        }
+        s += "  RearKind=" + IntToStr((int)RearKind)
+           + "  RearTrayID=" + RearTrayID
+           + "  Trips=" + IntToStr(nTrips)
+           + "  Head=" + IntToStr(nHeadServed) + "/" + IntToStr(nHeadTotal)
+           + "  RemainAll=" + IntToStr(nRemainAll)
+           + "  bTripSeen=" + IntToStr(bTripSeen ? 1 : 0)
+           + "  bOverTrayLogged=" + IntToStr(bOverTrayLogged ? 1 : 0)
+           + "  iSecsCarTrayCount=" + IntToStr(iSecsCarTrayCount) + "\r\n";
+    }
     for(int n=1; n<=2; n++)
     {
         TLoaderSideState *St = GetSide(n);

@@ -76,13 +76,14 @@ static void InfeedRefill(int p)
 {
     if(p==0 && LoaderModule!=NULL)
     {
-        //AI(ht160s-agv) 20260627 : latch the host-declared SECS LoaderTrayCount (WORK
-        //trays only; RefillSimInfeed adds the cover/identity header trays) that the preceding S2F41
-        //START_AGV captured into AgvCoord.TrayCount[0], so the Loader tags tray kind
-        //and runs the count-vs-Inputend cross-check against the REAL total. 0 = host
-        //silent -> the Loader falls back to iSimAmrMaxTray inside RefillSimInfeed.
-        LoaderModule->SetExpectedCarTrayCount(AgvCoord.TrayCount[0]);
-        LoaderModule->RefillSimInfeed();
+        //AI(ht160s-overcount-tripqueue) 20260721 : enqueue this car as a per-car feed trip
+        //(work count from the preceding S2F41 LoaderTrayCount CP into AgvCoord.TrayCount[0]).
+        //TripQueue keeps overlapping cars' cover/identity boundaries separate; nWork<=0
+        //warns + skips (over-count Cover path at mint). Consume-once: clear TrayCount[0] so
+        //a later car whose START_AGV omits LoaderTrayCount does NOT silently inherit this
+        //car's count (the old stale-reuse footgun).
+        LoaderModule->EnqueueTrip(AgvCoord.TrayCount[0]);
+        AgvCoord.TrayCount[0] = 0;
     }
     else if(p==1 && EmptyModule!=NULL) EmptyModule->RefillSimInfeed();
     else if(p==2 && ColorModule!=NULL) ColorModule->RefillSimInfeed();

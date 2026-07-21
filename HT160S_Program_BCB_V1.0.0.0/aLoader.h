@@ -39,6 +39,19 @@ struct TLoaderSideState
     HTimer Rise1WaitTimer;    //AI(ht160s-anti-ghost-d) 20260720 : case-10 rise1-settle countdown before the named MES0925 Note
 };
 //---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : per-car feed trip. iTotal = physical
+//magazine total for that car (host WORK count + firmware cover/identity header);
+//iServed = trays already minted from it. A FIFO of these lets back-to-back cars
+//(a 2nd car placed while the 1st still has stock) each keep their own cover/
+//identity boundary -- the single-scalar iCarTrayTotal/iFeedSerial lost the 1st
+//car's boundary when the 2nd car's CEID274 reset it. Generalises the HT9045
+//now/latest two-slot rollover (uLotInfo.cpp:13056 / acatchtray.cpp:5470).
+struct TTripEntry
+{
+    int iTotal;
+    int iServed;
+};
+//---------------------------------------------------------------------------
 class TLoaderModule
 {
 private:
@@ -57,12 +70,18 @@ private:
     AnsiString CurrentLotNumber;
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
-    int iSecsCarTrayCount;    //AI(ht160s-agv) 20260627 : host-declared SECS LoaderTrayCount = WORK trays ONLY (firmware adds cover/identity header); 0 = host silent
-    int iCarTrayTotal;        //AI(ht160s-agv) 20260627 : fixed total for the current car (SECS count when AMR+nonzero, else iSimAmrMaxTray); drives kind tagging + count-vs-Inputend cross-check
+    int iSecsCarTrayCount;    //AI(ht160s-agv) 20260627 : LAST host-declared SECS LoaderTrayCount = WORK trays ONLY (dump/visibility only; 0 = host silent). Per-car total now lives in TripQueue, not here.
+    //AI(ht160s-overcount-tripqueue) 20260721 : per-car feed trips (FIFO). Replaces the
+    //single-scalar iCarTrayTotal/iFeedSerial (retired) so overlapping cars each keep
+    //their own cover/identity boundary. Head = trip being consumed; iServed advances at
+    //each mint; a trip is popped+freed when iServed reaches iTotal. Owned pointer:
+    //new'd in the ctor, entries freed in the dtor / InitialFlag(non-keep-material).
+    TList *TripQueue;
+    bool   bTripSeen;         //AI(ht160s-overcount-tripqueue) 20260721 : a real trip has been enqueued this episode (over-count vs host-silent discriminator at mint)
+    bool   bOverTrayLogged;   //AI(ht160s-overcount-tripqueue) 20260721 : once-per-episode INF_OVERTRAY EventLog latch (cleared on new trip / non-keep init)
     //AI(ht160s-tray-source) 20260625 : Phase 6 A.1 - rear-tray hold (transfer-chain relay).
     //Kind is tagged on the carriage Tray grid at feed time; at discharge it is
     //transferred into this module-level hold before ClearTray releases the carriage.
-    int iFeedSerial;          // 1-based feed counter on the shared supply car (sim count)
     eTrayKind RearKind;       // kind of the tray currently parked at rear
     AnsiString RearTrayID;    // identity 2D of the rear tray (identity trays only)
     TMyTray RearSourceTray;   // full grid of the rear tray (transfer-chain relay)
@@ -98,7 +117,7 @@ private:
     bool AcquireFrontOwner(int LoaderNo);
     void ReleaseFrontOwner(int LoaderNo);
     bool IsSoftSimulate();
-    bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
+    bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
     bool IsInputHasTrayTrustworthy();   //AI(ht160s-anti-ghost-d) 20260720 : SnLoader_InputHasTray valid only when front rise-1 is confirmed retracted
     bool IsSupplyCarDry();     //AI(ht160s-loader) 20260706 : supply car empty for this side (InputEnd + input HasTray both empty; sim=chkLoadTray)
     int ReadTopCcdBin(int LoaderNo, int CellX, int CellY, bool &bOk);
@@ -110,9 +129,16 @@ private:
     bool DoDischargeTray(int LoaderNo, int Flag);
     bool DoFrontDestackDown(int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared front-destacker separate-one-tray sequence (cylinder-only)
     eTrayKind GetFedTrayKind(int feedSerial, int total);   //AI(ht160s-tray-source) 20260625 : D2 stack-position convention, identity fed LAST (Phase 6 A.2)
+    void FlushTripsOnDry();   //AI(ht160s-overcount-tripqueue) 20260721 : source-dry reconcile -- close open trips (declared trays never delivered / car short) so the NEXT car's boundary stays clean
+    //AI(ht160s-overcount-tripqueue) 20260721 : TLoaderModule owns a heap TList (TripQueue);
+    //it is a singleton (one global via new). Make it non-copyable so a future by-value copy
+    //cannot shallow-copy the pointer -> double-free. Declared, never defined (link error on misuse).
+    TLoaderModule(const TLoaderModule&);
+    TLoaderModule& operator=(const TLoaderModule&);
 
 public:
     TLoaderModule();
+    ~TLoaderModule();   //AI(ht160s-overcount-tripqueue) 20260721 : free TripQueue entries + the list
     void InitialFlag(bool bKeepMaterial=false);   //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the AMR car ledger (host count / car totals / feed serial)
     void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze per-side CcdDelay timeout on machine pause
     void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
@@ -147,6 +173,7 @@ public:
     bool IsInputShortageForAmr();
     bool IsInputHandoffFinishedForAmr();
     void RefillSimInfeed();
+    void EnqueueTrip(int nWork);   //AI(ht160s-overcount-tripqueue) 20260721 : enqueue a per-car feed trip at CEID274 InfeedRefill; nWork<=0 => WRN_TRIP_NOCOUNT + skip (no enqueue)
     void SetExpectedCarTrayCount(int n);   //AI(ht160s-agv) 20260627 : coordinator latches the SECS LoaderTrayCount on car arrival (before RefillSimInfeed)
     int GetCarTrayCount();   //AI(ht160s-agv) 20260624 : sim input-stack tray count on the shared supply car (PanelMain6 Motion View header)
     bool IsAllCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : both sides drained in CleanOut
