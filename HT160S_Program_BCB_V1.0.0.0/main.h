@@ -481,6 +481,7 @@ public:		// User declarations
     void __fastcall ShowTrayUphHistory();    //AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172 UPH_StringGrid parity)
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();
+    void __fastcall DoLotEndProcess();   //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body (btnLotEnd + CleanOut-finish auto path)
     void __fastcall RefreshEventLogView();
     void __fastcall RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status diagnostic sheet pump (throttled; called from DoSystemMessage)
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);

@@ -113,7 +113,7 @@ void THT160GeneralSetting::SetDefault()
 	iAutoPushConfirmSettleMs=500;
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
-	iHomeDrainTimeoutSec=15;
+	iHomeDrainTimeoutSec=15;
 	iRise1SettleWaitSec=10;   //AI(ht160s-anti-ghost-d) 20260720
 	iStuckSnapshotSec=300;   //AI(ht160s-obsv-p1) : 5 min
 	iAutoFrontRiseDwellMs=500;
@@ -128,6 +128,7 @@ void THT160GeneralSetting::SetDefault()
 	iAmrFeedWaitSec=600;
 	iAmrFullWaitSec=600;
 	iAmrHandshakeWaitSec=240;
+	iCleanOutAmrWaitSec=300;   //AI(ht160s-overcount-tripqueue D2) 20260721 : CleanOut AMR-unload handshake timeout
 	sMachineModel="HT160S";
 	sHandlerID="";
 	sSerialNo="";
@@ -227,7 +228,7 @@ void THT160GeneralSetting::Load()
 	iAutoPushConfirmSettleMs=Ini->ReadInteger("SettleDelay", "AutoPushConfirmSettleMs", 500);
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
 	iHomeReacquireOffsetCnt=Ini->ReadInteger("HomeResume", "ReacquireOffsetCnt", 100);
-	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
+	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
 	iRise1SettleWaitSec=Ini->ReadInteger("HomeResume", "Rise1SettleWaitSec", 10);
 	iStuckSnapshotSec=Ini->ReadInteger("Observability", "StuckSnapshotSec", 300);
 	iAutoFrontRiseDwellMs=Ini->ReadInteger("SettleDelay", "AutoFrontRiseDwellMs", 500);
@@ -242,6 +243,7 @@ void THT160GeneralSetting::Load()
 	iAmrFeedWaitSec=Ini->ReadInteger("AGV", "AmrFeedWaitSec", 600);
 	iAmrFullWaitSec=Ini->ReadInteger("AGV", "AmrFullWaitSec", 600);
 	iAmrHandshakeWaitSec=Ini->ReadInteger("AGV", "AmrHandshakeWaitSec", 240);
+	iCleanOutAmrWaitSec=Ini->ReadInteger("AGV", "CleanOutAmrWaitSec", 300);   //AI(ht160s-overcount-tripqueue D2) 20260721
 	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
 	sHandlerID=Ini->ReadString("MachineIdentity", "HandlerID", "");
 	sSerialNo=Ini->ReadString("MachineIdentity", "SerialNo", "");
@@ -266,6 +268,7 @@ void THT160GeneralSetting::Load()
 	if(iAmrFullWaitSec      < 5) iAmrFullWaitSec      = 5;
 	if(iAmrHandshakeWaitSec < 5) iAmrHandshakeWaitSec = 5;
 	if(iRise1SettleWaitSec  < 5) iRise1SettleWaitSec  = 5;   //AI(ht160s-anti-ghost-d) 20260720 : same HTimer 0=instant / negative=49.7d footgun as the AGV waits
+	if(iCleanOutAmrWaitSec  < 5) iCleanOutAmrWaitSec  = 5;   //AI(ht160s-overcount-tripqueue D2) 20260721 : same HTimer footgun
 	delete Ini;
 }
 //---------------------------------------------------------------------------
@@ -310,7 +313,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "AutoPushConfirmSettleMs", iAutoPushConfirmSettleMs);
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
-	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
+	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
 	Ini->WriteInteger("HomeResume", "Rise1SettleWaitSec", iRise1SettleWaitSec);
 	Ini->WriteInteger("Observability", "StuckSnapshotSec", iStuckSnapshotSec);
 	Ini->WriteInteger("SettleDelay", "AutoFrontRiseDwellMs", iAutoFrontRiseDwellMs);
@@ -325,6 +328,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("AGV", "AmrFeedWaitSec", iAmrFeedWaitSec);
 	Ini->WriteInteger("AGV", "AmrFullWaitSec", iAmrFullWaitSec);
 	Ini->WriteInteger("AGV", "AmrHandshakeWaitSec", iAmrHandshakeWaitSec);
+	Ini->WriteInteger("AGV", "CleanOutAmrWaitSec", iCleanOutAmrWaitSec);   //AI(ht160s-overcount-tripqueue D2) 20260721
 	Ini->WriteString("MachineIdentity", "Model", sMachineModel);
 	Ini->WriteString("MachineIdentity", "HandlerID", sHandlerID);
 	Ini->WriteString("MachineIdentity", "SerialNo", sSerialNo);

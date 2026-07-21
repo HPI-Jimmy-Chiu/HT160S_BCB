@@ -164,7 +164,7 @@ public:
 	int iAutoDischargePostYSettleMs;
 	int iHomeReacquireOffsetCnt;
 	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
-	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)
+	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)
 	int iHomeDrainTimeoutSec;      //AI(ht160s-home-resume-drain) 20260711 : HOME cylinder-drain stage timeout (s); on expiry the round falls back to park/removal   //AI(ht160s-home-resume-w3c) 20260711 : HOME re-acquire approach offset (1/100mm; front stopper rises this far clear of the parked tray edge). Sign/direction verified on-machine per carriage.
 	int iAutoFrontRiseDwellMs;
 	int iAutoCleanOutRiseDwellMs;
@@ -191,6 +191,7 @@ public:
 	int iAmrFeedWaitSec;   //AI(ht160s-agv) 20260626 : seconds to wait for AMR magazine refill before Loader-empty alarm (HT9046 600s)
 	int iAmrFullWaitSec;   //AI(ht160s-agv) seconds to wait for AMR to take a full output car before the Auto-full operator alarm
 	int iAmrHandshakeWaitSec;   //AI(ht160s-agv) coordinator PREP/READY watchdog aging limit (seconds) before releasing the AMR lock
+	int iCleanOutAmrWaitSec;   //AI(ht160s-overcount-tripqueue D2) 20260721 : Clean Out per-Auto AMR-unload handshake timeout (seconds) before the operator fallback modal
 	// Machine identity (status-bar panels 1-3). Persisted in General.ini
 	// [MachineIdentity]. sMachineModel defaults "HT160S". These are the HT160
 	// source of truth; UpdateMachineIdentity() copies them into the cmydef

@@ -2543,8 +2543,16 @@ static AnsiString GetWorkOrderFileName();
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnLotEndClick(TObject *Sender)
 {
-    //AI(HT160S-Maintainer) 20260604 : P1 stop the sort run (HT172 LotEnd analog).
+    //AI(ht160s-overcount-tripqueue D3) 20260721 : thin shell. The Lot-End body moved to
+    //DoLotEndProcess() so the CleanOut-finish path (csystem) can auto-run the identical
+    //sequence (CEID12 + work-order / LotBinBinding clear). Button behaviour byte-unchanged.
     (void)Sender;
+    DoLotEndProcess();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::DoLotEndProcess()
+{
+    //AI(HT160S-Maintainer) 20260604 : P1 stop the sort run (HT172 LotEnd analog).
     if(HSys.Sys.SystemStart==true)
     {
         RecordProcess("LOT END pressed");
