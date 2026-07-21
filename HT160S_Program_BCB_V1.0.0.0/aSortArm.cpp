@@ -2139,6 +2139,16 @@ bool TSortArmModule::IsOneCycleFinish()
     return bOneCycleFinish;
 }
 //---------------------------------------------------------------------------
+//AI 20260721 : re-arm the one-shot OneCycle finish latch WITHOUT the old
+//InitialAllTask full per-module reset. OneCycle finish now freezes all modules
+//(pause-like) and clears only this latch, so a later OneCycle press is not a
+//stale-true instant no-op. Mirrors HT172 (clears its OneCycle latch, no reset).
+//bOneCycleFinish is set only in DoSortArm case 1 (OneCycle, idle, no held IC).
+void TSortArmModule::ClearOneCycleFinish()
+{
+    bOneCycleFinish=false;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-state-record-analysis) 20260612 : expose pick/place sub-task so the
 //Store Hangup snapshot can record WHICH step the arm is in (e.g. 30 = moving XY,
 //40 = Z-down). Top-level DoSortArm Task only shows 1/100/200.

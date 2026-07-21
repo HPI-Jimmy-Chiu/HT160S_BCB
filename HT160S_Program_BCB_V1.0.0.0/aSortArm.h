@@ -157,6 +157,7 @@ public:
     int GetStatus();   //AI(ht160s-status) 20260703 : eSortArmStatus with SAS_RECOVERY overlay
     bool IsCleanOutFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm CleanOut finish
     bool IsOneCycleFinish();   //AI(HT160S-Maintainer) 20260605 : SortArm OneCycle finish
+    void ClearOneCycleFinish();   //AI 20260721 : re-arm one-shot OneCycle finish latch (freeze-and-continue)
     int  GetPickTask();        //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
     int  GetPlaceTask();       //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
     AnsiString DescribeHolding();   //AI(ht160s-state-record-analysis) 20260616 : read-only held-IC + routing dump for SortArmDecision.txt

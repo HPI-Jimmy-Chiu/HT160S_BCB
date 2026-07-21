@@ -1453,18 +1453,26 @@ void ProcessMotion()
 	{
 		if(CheckOneCycleFinish())
 		{
-			InitialAllTask();
-			//AI(HT160S-Maintainer) 20260605 : place-before-stop done. If OneCycle was
-			//launched mid-CleanOut, resume CleanOut and run it to completion (no stop :
-			//nested-continuation latch); otherwise return to Normal and stop the machine.
+			//AI 20260721 : OneCycle finish. Freeze all modules (pause-like) and only re-arm
+			//the SortArm one-shot finish latch -- was InitialAllTask(), a full per-module reset
+			//(HOME-resume machinery : cursor + material wipe + AGV reassert) too heavy for a
+			//single-cycle pause, and it wiped material OneCycle deliberately leaves under the
+			//machine. HT172 likewise clears only its OneCycle latch here. Clearing the latch is
+			//mandatory : else a later OneCycle press reads a stale true and finishes instantly.
+			if(SortArmModule!=NULL)
+				SortArmModule->ClearOneCycleFinish();
+			//If OneCycle was launched mid-CleanOut, resume CleanOut and run to completion
+			//WITHOUT stopping (no SoftStop : the nested-continuation intent the old copied
+			//SoftStop=true contradicted); otherwise return to Normal and stop.
 			if(HSys.Sys.bCleanOut)
             {
                 ChangeRunMode(Run_CleanOut);
-                SoftStop=true;
+                RecordProcess("ONE CYCLE finish: resume CleanOut (no stop)");
             }
 			else
 			{
 				ChangeRunMode(Run_Normal);
+				RecordProcess("ONE CYCLE finish: back to Normal, stop");
 				SoftStop=true;
 			}
 		}
