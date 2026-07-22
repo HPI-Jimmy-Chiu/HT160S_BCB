@@ -149,12 +149,13 @@ void TAgvCoordinator::Reset()
         BinSetting[a] = "";
 }
 //---------------------------------------------------------------------------
-//AI(amr-unmanned W3) 20260721 : WAR0962 K_RETRY handler. Station back to IDLE so
-//PollAndCall re-CALLs (its trigger condition - full car / supply shortage - is still
-//true). Locks are deliberately NOT released : between IDLE and the re-CALL a released
-//Auto lock would let FindDischargeAuto GoUp into the still-full car. Manual recovery
-//(operator empties the car / refills supply) self-heals through the existing sensor
-//paths (bFull==false&&CALLED->IDLE release; IsAmrTaken InputEnd-OFF -> CEID274).
+//AI(amr-unmanned W3) 20260721 : WAR0962 K_RETRY handler. Reset the station to IDLE and
+//clear the timeout/shortage latches so PollAndCall re-evaluates its trigger (full car /
+//supply shortage) next tick and re-CALLs if it is still true. Locks are deliberately NOT
+//released : between IDLE and the re-CALL a released Auto lock would let FindDischargeAuto
+//GoUp into the still-full car. Real recovery is the underlying condition clearing (the AGV
+//takes the car / a refill restocks) -> PollAndCall then sees not-full/not-short and simply
+//does not re-CALL; a served car completes via IsAmrTaken (InputEnd-OFF -> CEID274).
 void TAgvCoordinator::RetryStation(int si)
 {
     if(si < 0 || si >= AGV_STATION_COUNT)
@@ -305,9 +306,10 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         }
 
         bool bFull = AutoModule->IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
-        // AI(ht160s-agv) 20260627 : do NOT re-CALL an Auto the operator is taking after a
-        // station-side full-wait timeout (AbortAutoHandshake set Handshake=AGV_IDLE);
-        // IsOperatorHolding is cleared by HOME/InitialFlag so re-CALL then resumes.
+        // AI(ht160s-agv) 20260627 : do NOT re-CALL an Auto whose full car the operator is
+        // carrying away manually (IsOperatorHolding, cleared by HOME/InitialFlag). NOTE: after
+        // the D4-4 full-collect refactor nothing sets operator-holding true, so this gate is
+        // currently always open; kept for the manual / SECS-link-down car-change path.
         if(bFull && Handshake[si]==AGV_IDLE && AutoModule->IsOperatorHolding(a)==false)
         {
             AutoModule->SetAmrLock(a, true);
@@ -563,13 +565,6 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
     return true;
 }
 //---------------------------------------------------------------------------
-// AI(ht160s-agv) 20260627 : station-side timeout release for an Auto output car.
-// ServiceCarFull waited iAmrFullWaitSec for the AGV and timed out; the operator is
-// taking the full car manually. Drop THIS Auto's handshake (release the lock + reset
-// the handshake/aging state) so neither the watchdog (ServiceHandshake) nor the
-// re-CALL path (PollAndCall) touches it again until the next clean full edge -- the
-// re-CALL is additionally gated by IsOperatorHolding, cleared on HOME/InitialFlag.
-// Modeled on the link-down release in PollAndCall (SetAmrLock false + AGV_IDLE).
 //AI(ht160s-home-resume-w5) 20260711 : post-HOME lock re-assert (D1 + FX(A)-1/FX(A)-5).
 //InitialAllTask wipes every module bAmrLocked while Handshake[] survives (Reset runs
 //only in the ctor) -> lock/state split : after a HOME during CALLED/PREP/READY the
@@ -601,18 +596,6 @@ void TAgvCoordinator::ReassertLocks()
     }
     if(sLocked!="")
         RecordProcess("HOME-RESUME AGV: locks re-asserted:"+sLocked);   //AI(ht160s-obsv-p1)
-}
-//---------------------------------------------------------------------------
-void TAgvCoordinator::AbortAutoHandshake(int Index)
-{
-    if(Index < 0 || Index >= AGV_AUTO_COUNT)
-        return;
-    int si = Index + 3;
-    if(AutoModule!=NULL)
-        AutoModule->SetAmrLock(Index, false);
-    Handshake[si]        = AGV_IDLE;
-    ShortageLatch[si]    = 0;
-    ShortageDebounce[si] = 0;
 }
 //---------------------------------------------------------------------------
 // AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state. Used by

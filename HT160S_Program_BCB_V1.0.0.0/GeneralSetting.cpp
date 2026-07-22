@@ -126,7 +126,6 @@ void THT160GeneralSetting::SetDefault()
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
 	iAmrFeedWaitSec=600;
-	iAmrFullWaitSec=600;
 	iAmrHandshakeWaitSec=240;
 	iAgvTimeoutSec=300;   //AI(amr-unmanned W1) 20260721 : unified AGV handshake timeout -> WAR0962
 	sMachineModel="HT160S";
@@ -241,7 +240,6 @@ void THT160GeneralSetting::Load()
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
 	iAmrFeedWaitSec=Ini->ReadInteger("AGV", "AmrFeedWaitSec", 600);
-	iAmrFullWaitSec=Ini->ReadInteger("AGV", "AmrFullWaitSec", 600);
 	iAmrHandshakeWaitSec=Ini->ReadInteger("AGV", "AmrHandshakeWaitSec", 240);
 	iAgvTimeoutSec=Ini->ReadInteger("AGV", "AgvTimeoutSec", 300);   //AI(amr-unmanned W1) 20260721
 	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
@@ -265,7 +263,6 @@ void THT160GeneralSetting::Load()
 	// AI(ht160s-agv) clamp : HTimer::Off() returns true at 0 (instant alarm) and wraps
 	// negative to ~49.7 days (never alarms). Force a positive lower bound on all AGV waits.
 	if(iAmrFeedWaitSec      < 5) iAmrFeedWaitSec      = 5;
-	if(iAmrFullWaitSec      < 5) iAmrFullWaitSec      = 5;
 	if(iAmrHandshakeWaitSec < 5) iAmrHandshakeWaitSec = 5;
 	if(iRise1SettleWaitSec  < 5) iRise1SettleWaitSec  = 5;   //AI(ht160s-anti-ghost-d) 20260720 : same HTimer 0=instant / negative=49.7d footgun as the AGV waits
 	if(iAgvTimeoutSec       < 5) iAgvTimeoutSec       = 5;   //AI(amr-unmanned W1) 20260721 : same HTimer footgun
@@ -326,7 +323,6 @@ void THT160GeneralSetting::Save()
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);
 	Ini->WriteInteger("AGV", "AmrFeedWaitSec", iAmrFeedWaitSec);
-	Ini->WriteInteger("AGV", "AmrFullWaitSec", iAmrFullWaitSec);
 	Ini->WriteInteger("AGV", "AmrHandshakeWaitSec", iAmrHandshakeWaitSec);
 	Ini->WriteInteger("AGV", "AgvTimeoutSec", iAgvTimeoutSec);   //AI(amr-unmanned W1) 20260721
 	Ini->WriteString("MachineIdentity", "Model", sMachineModel);

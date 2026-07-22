@@ -64,14 +64,13 @@ private:
     //operator full-car modal to the AGV handshake. Set when a full car is handed to the
     //AGV; cleared on AGV finish (ClearAmrCar) or a home/init.
     bool bAmrLocked[6];
-    //AI(ht160s-agv) 20260627 : per-Auto AMR output-car full-wait safety net. While a full
-    //car is locked to the AGV (bAmrLocked) ServiceCarFull arms AmrFullWaitTimer for
-    //iAmrFullWaitSec; on expiry it sets bOperatorHolding (suppress re-CALL) + calls
-    //AgvCoord.AbortAutoHandshake, then falls through to the existing operator full modal.
-    //All three are cleared on HOME/InitialFlag.
-    bool   bWaitingAmrFull[6];
+    //AI(ht160s-home-resume-w5) 20260711 : per-Auto "operator is manually carrying the full
+    //car away" latch. PollAndCall / BeginPrep read it (IsOperatorHolding) to avoid CALLing
+    //the AGV into a person's hands; cleared on the car-change commit (ServiceCarFull) and on
+    //HOME/InitialFlag. NOTE: the D4-4 full-collect refactor removed the old ServiceCarFull
+    //wait-expiry setter, so nothing currently sets this true (the AGV coordinator owns AMR
+    //full end-to-end); kept for the manual / SECS-link-down car-change path.
     bool   bOperatorHolding[6];
-    HTimer AmrFullWaitTimer[6];
     //AI(general) 20260608 : Stage0 fix for TrayArm back-and-forth. Latches a
     //TrayArm-delivered rear tray so RefreshAutoState() cannot erase the logical
     //handshake when the physical rear sensor reads OFF (offline / sim-data run).
@@ -122,8 +121,8 @@ public:
     TAutoModule();
     void InitialFlag(bool bKeepMaterial=false);
     bool HomeDrainTick();            //AI(ht160s-home-resume-drain) 20260711 : stand-in execute the FeedTask 6000/7000 single-scan commit (AF-2) so the clamped tray is never software-blind
-    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : freeze AmrFullWaitTimer[] (AMR full/source wait) on machine pause
-    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : thaw them on resume (csystem actuator-timer enrollment)
+    void PauseTimeoutTimers();     //AI(ht160s-actuator-timer) 20260627 : actuator-timer enrollment stub (Auto has no wall-clock timeout window since the AmrFullWaitTimer removal)
+    void ReStartTimeoutTimers();   //AI(ht160s-actuator-timer) 20260627 : enrollment stub (see PauseTimeoutTimers)
     void DoAuto(int &Task);
     int FindEmptyRearForTrayArm();
     bool IsRearHasTray(int Index);

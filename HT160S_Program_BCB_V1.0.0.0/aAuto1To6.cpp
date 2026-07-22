@@ -11,7 +11,7 @@
 #include "mymessbox.h"
 #include "uteach.h"
 #include "SecsGem\uHGemEquipment.h"
-#include "SecsGem\uAgvStation.h"   //AI(ht160s-agv) 20260627 : AgvCoord.AbortAutoHandshake on Auto-full timeout
+#include "SecsGem\uAgvStation.h"   //AI(ht160s-agv) : AgvCoord (AMR full-collect handshake + DeviceCount)
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260605 : GeneralSetting.bUseAMR mode switch
 #include "CosFunction.h"      //AI(ht160s-state-record-analysis) 20260616 : TrayForm recipe geometry for DescribeStation cell map
 #include "aSortArm.h"
@@ -51,22 +51,17 @@ TAutoModule::TAutoModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-actuator-timer) 20260627 : freeze/thaw the per-station AMR full/source wait
-//timers (AmrFullWaitTimer[] -> AbortAutoHandshake + operator full-car modal on expiry) so
-//a machine pause taken during the AMR wait is not charged against the wait budget -- no
-//premature handshake abort / alarm on resume. Freezing only DEFERS the expiry; it never
-//fabricates one, so coordinator state (locks/handshake) is untouched (AgvCoord keeps its
-//own free-running watchdog). Called from csystem Pause/ReStartActuatorTimeoutTimers.
+//AI(ht160s-actuator-timer) 20260627 : actuator-timer enrollment hook. Auto has no wall-
+//clock timeout window to freeze on a machine pause since the AMR full-wait (AmrFullWaitTimer[])
+//was removed -- the AGV full-collect handshake is governed by the coordinator's own free-
+//running watchdog (iAgvTimeoutSec). Kept as an enrollment stub so csystem Pause/ReStart-
+//ActuatorTimeoutTimers need no change and a future Auto timeout timer has a home.
 void TAutoModule::PauseTimeoutTimers()
 {
-    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
-        AmrFullWaitTimer[Index].Pause();
 }
 //---------------------------------------------------------------------------
 void TAutoModule::ReStartTimeoutTimers()
 {
-    for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
-        AmrFullWaitTimer[Index].ReStart();
 }
 //---------------------------------------------------------------------------
 void TAutoModule::InitialFlag(bool bKeepMaterial)
@@ -94,11 +89,6 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         bCleanOutCheck[Index]=false;
         bCleanOutResidualLogged[Index]=false;   //AI(cleanout) 20260706 : new episode, allow one residual log again
         bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
-        //AI(ht160s-agv) 20260627 : reset the Auto-full AMR-wait safety net (before the
-        //bKeepMaterial early-out so a recoverable home also drops the wait/hold, otherwise
-        //re-CALL stays suppressed after HOME).
-        bWaitingAmrFull[Index]=false;
-        AmrFullWaitTimer[Index].Clear();
         //AI(ht160s-home-resume-w5) 20260711 : bOperatorHolding models a PHYSICAL fact
         //(a person is carrying the full car away) that a HOME cannot erase -- clearing
         //it here let PollAndCall re-CALL the AGV into the operator's hands within 1s of
@@ -1528,7 +1518,6 @@ AnsiString TAutoModule::DescribeStation(int Index)
         int iFullVer = IsOutputCarFullForAmr(Index) ? 1 : 0;
         s += "  FullVerdict="  + IntToStr(iFullVer)
            + "  InputFullSn="  + IntToStr(iFullSn)
-           + "  WaitingFull="  + IntToStr(bWaitingAmrFull[Index] ? 1 : 0)
            + "  OperHolding="  + IntToStr(bOperatorHolding[Index] ? 1 : 0) + "\r\n";
     }
 
@@ -1630,7 +1619,7 @@ void TAutoModule::ServiceCarFull()
             //AI(amr-unmanned D4-4) 20260721 : link-up AMR -> the AGV full-collect handshake
             //owns the full car (PollAndCall CEID272 -> ServiceHandshake 273/274 -> ClearAmrCar;
             //its aging escalates to WAR0962 via W3/W4 if the AGV never responds). NO operator
-            //modal here, and no separate iAmrFullWaitSec wait (the unified iAgvTimeoutSec
+            //modal here, and no separate per-Auto full-wait timer (the unified iAgvTimeoutSec
             //governs in the coordinator). Was: wait then bOperatorHolding + fall-through to
             //the modal. SECS link DOWN still falls through to the operator modal below (a
             //genuine comm-lost fault, distinct from AGV-slow).

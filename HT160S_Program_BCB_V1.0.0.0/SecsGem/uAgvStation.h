@@ -97,11 +97,6 @@ public:
     AnsiString DescribeAutoBins(int AutoIndex);
     void       RefreshBinSettings();
 
-    // AI(ht160s-agv) 20260627 : station-side timeout release. Auto-full waited
-    // iAmrFullWaitSec for the AGV; drop THIS Auto's handshake (lock + state) so
-    // neither the watchdog nor PollAndCall touches it until the next clean edge.
-    void AbortAutoHandshake(int Index);
-
     // AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state for
     // the State Record snapshot + the AMR maintenance panel (header + one line per
     // P1..P9 : lock / handshake / live ready). No state change.
