@@ -84,7 +84,9 @@
 
 **已 SHIPPED（feat/iosetview-172-refactor）：**
 - `271560f`：行為全套（W1-W4 + D4-1/2/3/4 + 批次2/3）。dev+真機 build EXIT0、encoding165、selftest PASS。Big5 檔 cp950 byte-safe。
-- Run_Home guard 修正（W4-fix，csystem `ServiceAgvTimeoutAlarm` 加 HOME 凍結）——**本段落最後一個 commit**（見下）。
+- `318b095`：Run_Home guard（W4-fix，csystem `ServiceAgvTimeoutAlarm` 加 HOME 凍結）。
+- `38c294b`：**MES1421 定案走 A**——Color rear-miss B類全模式立即跳，整套 Color AMR-feed 等待機構（`bWaitingAmrFeed`+`AmrFeedWaitTimer`）移除，錯誤註解修正 + FindFeedAuto dispatch 註解修正。dev+真機 build EXIT0、encoding165、selftest PASS。（複驗 wf_38538652-260：correctness clean、completeness 一個 stale 註解已修）。
+- `4cb8f40`：清理 D4-4 遺留死碼——`bWaitingAmrFull[]`/`AmrFullWaitTimer[]`/`iAmrFullWaitSec`(含 ini)/`AbortAutoHandshake` 移除，PauseTimeoutTimers/ReStart 變 enrollment stub，RetryStation 註解修正。dev+真機 build EXIT0。
 
 **對抗式複驗結果（workflow w6v3b9iyh，裁定 FIX-FIRST low-urgency；核心 SOLID：WAR0962 aging/latch/main-loop 消費/P1 排除/D4 閘/非AMR不變 全部確認乾淨）。已修/待辦：**
 
@@ -96,19 +98,21 @@
    - **MES1421（aColor.cpp:1131-1153）＝盤送到 rear 後不見＝B類真故障**（夾好的盤在搬運途中遺失/未到位，AGV 補供料倉放不了盤到 rear）——**使用者原裁定正確**，是 Empty MES1021（rear-miss）的對等，不是 MES1022 的對等。**維持不抑制；shipped 程式碼本來就沒動它，無需修改**。
    - 錯誤來源＝aColor.cpp:1135-1138 的**程式註解寫錯**（把 rear 檢查標成 "source-dry ... refill the supply magazine"），連 w6v3b9iyh 複驗都被誤導。
    - Color **沒有**源乾 MES 碼（不像 Empty MES1022/Loader MES0920）→ 源乾路徑＝AGV 叫車+WAR0962，**無雙重告警問題**（先前擔憂撤回）。aEmpty.cpp:322 註解「Color 無 supply-empty alarm」**是對的**，不用修（先前修正項取消）。
-   - **殘留一個小待裁定**：MES1421 外包著既有 AMR 等待層（aColor.cpp:1139-1152，bUseAMR 下先等 iAmrFeedWaitSec 才跳）——但 AGV 補的是供料倉、放不了盤到 rear，等待無意義且讓 B 類真故障晚跳。選項 A＝拆等待層（立即跳，符合「真故障立即 Alarm」原則）+修註解；選項 B＝只修註解、行為保留。**待使用者裁定**。
+   - **已定案走 A（SHIPPED `38c294b`）**：拆掉整套 AMR 等待層，MES1421 全模式立即跳；錯誤註解修正。
 
 3. **[已結案 2026-07-22 — 死鎖不可達，撤回] case-4000 邊角**：同 workflow 查證＋對抗複驗 agree：**「輸出車滿 且 載台有在製盤」在真機上不可能同時發生**，鏈條第一步就不成立。結構性保證（全在 aAuto1To6.cpp）：(A) 在製盤只能由 rear 晉升產生，FindFeedAuto 只在 `bCarHasTray==false` 時動（:474）；(B) rear 只在**車不滿**時才收盤——GetTrayRequest 對 Full/bCarHasTray/rear-pending 全回 None（:1257,1259,1267-1268 D4-1）；(C) 車「變滿」唯一途徑＝GoUp 推疊，而正常出料 case1000 **先清** bCarHasTray（:796）**才**在 case6100 推升觸發 Full sensor（:840）→ Full 亮起瞬間載台必空。故 drain 遇滿車被 D4-3 hold 時載台一定是空的 → `IsDrainedForAmr`（:1428）可滿足 → 273 發 → AGV 收 → 排料續行。複驗附註一個理論窗（case1000→6100 之間 GetTrayRequest 短暫重開），物理上不可能在出料尾段完成整趟 TrayArm 取放，且即使發生也有 WAR0962 兜底非無聲。**無需任何設計變更**。
 
-4. **[NIT] 殘留死碼**（D4-4 後）：`bWaitingAmrFull[]`/`AmrFullWaitTimer[]`/`iAmrFullWaitSec`/`AbortAutoHandshake` 已不再使用；可清。
-5. **[LOW] RetryStation 註解過度宣稱**「manual self-heal via bFull==false&&CALLED→IDLE」——實際靠 re-CALL 贏 race；修註解。
-6. **[NIT] ini 遷移**：舊 `[AGV]CleanOutAmrWaitSec` 改名 `AgvTimeoutSec`，舊機 ini 舊 key 失效落回預設 300（原本就是 no-op 欄，無行為變化）。
+4. **[已清 SHIPPED `4cb8f40`] 殘留死碼**（D4-4 後）：`bWaitingAmrFull[]`/`AmrFullWaitTimer[]`/`iAmrFullWaitSec`(含 ini)/`AbortAutoHandshake` 移除；PauseTimeoutTimers/ReStart 變 enrollment stub。
+5. **[已修 SHIPPED `4cb8f40`] RetryStation 註解**：改成「reset IDLE+清 latch 讓 PollAndCall 重評估；恢復靠底層滿/短缺條件消失」的精確描述。
+6. **[NIT] ini 遷移**：舊 `[AGV]CleanOutAmrWaitSec` 改名 `AgvTimeoutSec`；`4cb8f40` 又移除了 `AmrFullWaitSec`——舊機 ini 這兩個舊 key 失效被忽略（無行為變化）。
+
+7. **[新發現 — 待使用者裁定] `bOperatorHolding[]` 事實上已失效**：D4-4 移除了它唯一的 setter（舊 ServiceCarFull 等待逾時路徑），所以現在**沒有任何地方把它設 true**，PollAndCall/BeginPrep 的「操作員正在搬滿車、別叫 AGV 進他手裡」抑制閘**恆開**。`4cb8f40` 保留該成員（仍被讀）並在碼內註記此事實，**未移除**。設計問題：AMR 線是否還需要這個抑制？若需要，哪條路徑（手動換車 / SECS link-down fallback）該重新 set true？**待裁定**——不猜。
 
 **未做：**
 - **W5**：`tsMaintSECS` 加 `AgvTimeoutSec` 秒數 UI 欄（from-scratch DFM，文字模式，有剝除風險）。設定已可由 General.ini `[AGV]AgvTimeoutSec` 編、預設 300。
 - **上機 + SECS-sim 情境驗證**（含 CleanOut 灌滿 Auto→AGV 收；AGV 不回→WAR0962）。
 
-**下次開工建議順序**（2026-07-22 更新：#2/#3 兩大設計點已結案）：等使用者裁定 MES1421 等待層 A/B → 修註解（aColor.cpp:1135-1138，cp950 byte-safe）→ 清 #4/#5 → W5 → 全 build gate → 上機。
+**下次開工建議順序**（2026-07-22 更新：#2/#3/#4/#5 全結案）：等使用者裁定 #7（bOperatorHolding 去留）→ W5 → 全 build gate → 上機。
 
 ## 6. 不動項
 
