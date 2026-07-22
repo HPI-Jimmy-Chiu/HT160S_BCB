@@ -53,8 +53,6 @@ private:
     HTimer ScanDelay;         //AI(HT160S-Maintainer) 20260608 : Color CCD shot response timeout
 
     bool bAmrLocked;          //AI(ht160s-agv) 20260623 : AMR handoff lock (freeze front destack)
-    bool bWaitingAmrFeed;     //AI(ht160s-agv) 20260627 : Color source-dry AMR wait latch (P4)
-    HTimer AmrFeedWaitTimer;  //AI(ht160s-agv) 20260627 : Color source-dry AMR wait timer (P4)
     int iSimInfeedCount;      //AI(ht160s-agv) 20260623 : sim input-stack tray count (drains per destack)
 
     //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow, ported near-verbatim

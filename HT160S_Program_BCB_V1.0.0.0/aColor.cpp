@@ -30,8 +30,6 @@ TColorModule::TColorModule()
 void TColorModule::InitialFlag(bool bKeepMaterial)
 {
     bAmrLocked=false;
-    bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait (P4)
-    AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear Color source-dry AMR wait timer (P4)
     RefillSimInfeed();
     Status=CS_IDLE;   //AI(ht160s-status) 20260703 : ladder-owned status reset
     FeedTask=1;
@@ -140,21 +138,19 @@ int TColorModule::GetHomeHaulTargetY()
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-actuator-timer) 20260627 : freeze/thaw this module's wall-clock timeout
-//windows (ScanDelay CCD shot + AmrFeedWaitTimer source-dry AMR wait MES1421) so a machine pause taken mid-scan is not
-//charged against the timeout budget -- no false scan-timeout on resume. Called from
+//window (ScanDelay CCD shot) so a machine pause taken mid-scan is not charged
+//against the timeout budget -- no false scan-timeout on resume. Called from
 //csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
 //pause/resume edges, alongside Cylinder[]/SortArmSuck. Add future Color timeout
 //timers here; csystem needs no change.
 void TColorModule::PauseTimeoutTimers()
 {
     ScanDelay.Pause();
-    AmrFeedWaitTimer.Pause();
 }
 //---------------------------------------------------------------------------
 void TColorModule::ReStartTimeoutTimers()
 {
     ScanDelay.ReStart();
-    AmrFeedWaitTimer.ReStart();
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : AMR P3 (ColorTray) handoff interface, mirrors TAutoModule.
@@ -475,9 +471,11 @@ void TColorModule::DoColor(int &Task)
                 //AI(ht160s-color-align-empty) 20260626 : mirror TEmptyModule::DoEmpty
                 //case 100 - always destack a front tray when the front buffer is empty
                 //(no bInputHasTray pre-gate). Color == Empty + CCD : identity is stamped
-                //by DoReadColor2D (real scan, or COLOR2D_ when CCD-off/HAS_TRAY/sim); a
-                //truly empty real magazine is caught downstream by the output-sensor
-                //MES1421 at DoFeedTray case 7000, so producing here can never silently hang.
+                //by DoReadColor2D (real scan, or COLOR2D_ when CCD-off/HAS_TRAY/sim). A
+                //truly empty front magazine is caught upstream by MES1424 (DoGoDownTray case
+                //700 front-staging miss) or the coordinator source-dry path (SnColor_InputEnd
+                //-> IsInputShortageForAmr -> AGV call + WAR0962), so producing here cannot
+                //silently hang. (MES1421 at case 7000 is a rear-arrival fault, not source-dry.)
                 Status=CS_DESTACK;   //AI(ht160s-status) 20260703
                 DoGoDownTray(0);
                 Task=1200;
@@ -1132,24 +1130,15 @@ bool TColorModule::DoFeedTray(int Flag)
                HSys.Sen.SnColor_OutputBottomHasTray.IsOff() &&
                HSys.LastSet.iRealDummy!=DUMMY)
             {
-                //AI(ht160s-agv) 20260627 : source-dry. In AMR mode wait iAmrFeedWaitSec for
-                //the AGV to refill the supply magazine before raising the operator modal;
-                //the happy path (refill in time) never reaches ShowMyError. Mirrors Empty/
-                //Loader source-dry template. Armed ONLY under bUseAMR.
-                if(GeneralSetting.bUseAMR)
-                {
-                    if(bWaitingAmrFeed==false)
-                    {
-                        AmrFeedWaitTimer.SetMS(GeneralSetting.iAmrFeedWaitSec*1000);
-                        AmrFeedWaitTimer.On();
-                        bWaitingAmrFeed=true;
-                        break;
-                    }
-                    if(AmrFeedWaitTimer.Off()==false)
-                        break;
-                    bWaitingAmrFeed=false;
-                    AmrFeedWaitTimer.Clear();
-                }
+                //AI(amr-unmanned W7) 20260722 : REAR-ARRIVAL check (analog of Empty MES1021),
+                //NOT source-dry - by this case the tray was already destacked, clamped and
+                //carried to the rear, so an AGV supply/magazine refill cannot place a tray
+                //here; if it is absent it was lost/mis-positioned in transport (or the rear
+                //sensor faulted), which the AGV cannot clear. B-class genuine fault : alarm
+                //immediately in ALL modes. (The old bUseAMR iAmrFeedWaitSec wait was wired to
+                //the wrong sensor - it only delayed a real fault and stalled the feed
+                //silently meanwhile. The true Color source-dry path is SnColor_InputEnd ->
+                //IsInputShortageForAmr -> AGV call + WAR0962, handled by the coordinator.)
                 Ret=ShowMyError("MES1421", LangT("Color supply tray is not ready"), &HSys.Sen.SnColor_OutputBottomHasTray, true, K_RETRY);
                 if(Ret==K_RETRY)
                     FeedTask=1;
@@ -1159,8 +1148,6 @@ bool TColorModule::DoFeedTray(int Flag)
                 bTrayReady=true;
                 Status=CS_REAR_READY;   //AI(ht160s-status) 20260703 : clamps popped (case5000/6000) + presented
                 bSupplyRequested=false;
-                bWaitingAmrFeed=false;     //AI(ht160s-agv) 20260627 : supply present -> end AMR wait (P4)
-                AmrFeedWaitTimer.Clear();  //AI(ht160s-agv) 20260627 : clear AMR wait timer on success (P4)
                 FeedTask=13000;
             }
             break;
@@ -2004,9 +1991,8 @@ AnsiString TColorModule::DescribeState()
     s += "  bTrayReady=" + IntToStr(bTrayReady ? 1 : 0)
        + "  bSupplyRequested=" + IntToStr(bSupplyRequested ? 1 : 0)
        + "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0) + "\r\n";
-    //AI(ht160s-agv) 20260627 : Color source-dry AMR wait latch + AMR lock (P4 State Record).
-    s += "  bWaitingAmrFeed=" + IntToStr(bWaitingAmrFeed ? 1 : 0)
-       + "  bAmrLocked=" + IntToStr(bAmrLocked ? 1 : 0) + "\r\n";
+    //AI(ht160s-agv) 20260627 : AMR lock (P4 State Record).
+    s += "  bAmrLocked=" + IntToStr(bAmrLocked ? 1 : 0) + "\r\n";
     s += "  Installed=" + IntToStr(IsInstalled() ? 1 : 0)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)
        + "  Mode=" + AnsiString(IsTraySupplyMode() ? "TraySupply" : (IsSortBinMode() ? "SortBin" : "?")) + "\r\n";
