@@ -146,10 +146,9 @@ typedef struct
 	// Top CCD (Loader IC 2D) reader enable; mirrors bUseColorCcd. [TopCCD] Enable
 	// in General.ini; OFF -> simulated 2D (REALLY only; HAS_TRAY/DUMMY always sim).
 	bool bUseTopCcd;
-	// Which customer bin field drives sorting when the lot table comes from the
-	// customer 2DIDHistory format : 0=SBin (default), 1=HBin. HBin/SBin both
-	// stored as backup regardless. See HT160_SORT_BIN_SOURCE_*.
-	int iSortBinSource;
+	//AI(ht160s-kyec) 20260722 : routing bin source used to be selectable (SBin/HBin);
+	//it is now permanently HBin (see LoadFromJsonString). The knob was removed so it can
+	//never be mis-set. HBin/SBin are both still recorded per-IC for the Soter report.
 	// Paid customer-bound feature : SECS/GEM factory communication. Gates both
 	// the engine boot (GemInitial) and the main-form SECS status badge/log view.
 	bool bUseSecsGem;
@@ -195,8 +194,6 @@ public:
 #define HT160_MAX_LOT 64                 // max Lots coexisting on the machine
 #define HT160_LOT_SOURCE_OFFLINE 0       // operator built the lot data by hand
 #define HT160_LOT_SOURCE_SECS    1       // remote host (SECS) pushed the lot data
-#define HT160_SORT_BIN_SOURCE_SBIN 0     // route by customer SBin field
-#define HT160_SORT_BIN_SOURCE_HBIN 1     // route by customer HBin field (default)
 //---------------------------------------------------------------------------
 // Layer 1 : one production Lot instance currently held on the machine.
 typedef struct
@@ -228,12 +225,18 @@ typedef struct
 typedef struct
 {
 	AnsiString sCode2D;       // QRCodeID (unique key)
-	AnsiString sLotID;        // owning Lot
-	int        iBin;          // routing bin actually used (per iSortBinSource)
+	AnsiString sLotID;        // owning Lot = KYEC lot (machine identity)
+	int        iBin;          // routing bin actually used (always HBin)
 	int        iHBin;         // customer HBin (backup)
 	int        iSBin;         // customer SBin (backup)
 	AnsiString sRetestCode;   // customer RetestCode (backup)
 	AnsiString sDiePass;      // customer DiePass (backup)
+	//AI(ht160s-kyec) 20260722 : dual lot identity. These three are PER-IC because one
+	//KYEC lot can map to several customer lots (1:N). The Soter report reads them per die
+	//(col6 Cust lot / col4 ProductCode / col5 Substage); col7 = owning KYEC lot (sLotID).
+	AnsiString sCustLotID;    // customer lot (WebAPI QRCodeIDHis[].LOTID) -> Soter col6
+	AnsiString sProductCode;  // per-IC ProductCode -> Soter col4
+	AnsiString sSubstage;     // per-IC Substage -> Soter col5
 } TLotIcInfo;
 //---------------------------------------------------------------------------
 // Layer 2 : the Lot registry + the global 2D-code reverse index.
@@ -246,6 +249,9 @@ private:
 	TStringList *m_Code2DIndex;    // Sorted; name=Code2D; Objects=(LotIndex*1000000+Bin)
 	TStringList *m_Code2DInfo;     // Sorted; name=Code2D; Objects=TLotIcInfo* (backup)
 	AnsiString   m_LastDupCode;    // last duplicate 2D code seen on load
+	//AI(ht160s-kyec) 20260722 : # of already-present 2D codes UPDATED in place by the
+	//last LoadFromJsonString upsert pass (WebAPI re-pull latest-wins). Reset each parse.
+	int          m_RefreshCount;
 
 	int  PackRef(int LotIndex, int Bin);
 	void UnpackRef(int Packed, int &LotIndex, int &Bin);
@@ -260,6 +266,8 @@ public:
 	int  GetLotSlotCount();                 // raw slot span (incl. freed gaps)
 	int  GetItemCount();
 	AnsiString GetLastDuplicateCode();
+	//AI(ht160s-kyec) 20260722 : # of codes refreshed (upserted to latest) by the last parse.
+	int  GetRefreshCount();
 
 	// Simulation helper : fetch the Index-th registered 2D code (sorted order).
 	// Returns "" if Index is out of range. Used to cycle virtual ICs when no
@@ -279,10 +287,16 @@ public:
 	bool AddItem(AnsiString LotID, AnsiString Code2D, int Bin, AnsiString &DupExistingLot);
 
 	// Extended add : same as AddItem but also stores the customer backup fields
-	// (HBin/SBin/RetestCode/DiePass). Bin is the routing bin actually used.
+	// (HBin/SBin/RetestCode/DiePass) plus the per-IC customer identity (CustLotID /
+	// ProductCode / Substage). Bin is the routing bin actually used.
+	//AI(ht160s-kyec) 20260722 : bUpsert=true (WebAPI re-pull) -> an already-present 2D code
+	//is UPDATED in place to the latest data (owning lot kept, iPlanQty not bumped,
+	//m_RefreshCount++) instead of being rejected. bUpsert=false keeps the legacy
+	//reject-on-duplicate (manual editor / offline import).
 	bool AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
 		int HBin, int SBin, AnsiString RetestCode, AnsiString DiePass,
-		AnsiString &DupExistingLot);
+		AnsiString CustLotID, AnsiString ProductCode, AnsiString Substage,
+		AnsiString &DupExistingLot, bool bUpsert=false);
 
 	// Remove one 2D->Bin item by its unique Code2D. Returns false if the code is
 	// not present. Decrements the owning lot's iPlanQty. Used by the manual 2D/Bin
@@ -300,6 +314,8 @@ public:
 	//AI(ht160s-lot-webapi) 20260612 : UI / traceability : enumerate every 2D IC
 	// record that belongs to one Lot. Out is filled with one tab-separated line
 	// per IC : Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass.
+	//AI(ht160s-kyec) 20260722 : appended \t CustLotID \t ProductCode \t Substage (per-IC).
+	// Trailing fields are backward-compatible : all front-indexed readers ignore them.
 	// Returns the record count (0 = this Lot has no 2D data loaded yet).
 	int  GetLotIcList(AnsiString LotID, TStrings *Out);
 
@@ -313,7 +329,12 @@ public:
 	bool LoadFromJsonFile(AnsiString FileName, bool &bHasDuplicate, AnsiString &FirstDupCode);
 	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : load directly from a JSON string
 	// (e.g. a WebAPI HTTP response body), not a file.  LoadFromJsonFile delegates here.
-	bool LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode);
+	//AI(ht160s-kyec) 20260722 : StampKyecLotId != "" (WebAPI pull) registers EVERY IC in
+	//the response under that KYEC lot (owning lot), keeping each response group's LOTID as
+	//the per-IC customer lot, and enables upsert (latest-wins). Default "" (boot restore /
+	//local import) keeps the legacy per-LOTID keying with no upsert.
+	bool LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode,
+		AnsiString StampKyecLotId="");
 	bool LoadLatest(bool &bHasDuplicate, AnsiString &FirstDupCode);
 };
 //---------------------------------------------------------------------------

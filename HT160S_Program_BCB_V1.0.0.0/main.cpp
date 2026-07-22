@@ -2464,13 +2464,17 @@ void __fastcall TfMain::PollLotDataWebApi()
     {
         bDuplicate=false;
         DupCode="";
-        int iLotsBefore=LotRegistry.GetLotCount(); /*AI(ht160s-lot-webapi) 20260715: snapshot before parse*/ if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode))
+        int iLotsBefore=LotRegistry.GetLotCount(); /*AI(ht160s-lot-webapi) 20260715: snapshot before parse*/ if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode, sLotApiPullLot)) /*AI(ht160s-kyec) 20260722: stamp KYEC lot -> ICs register under it, customer lot kept per-IC + upsert latest-wins*/
         {
             RefreshLotListFromRegistry();
             SaveWorkOrder();
             if(LotRegistry.GetLotCount()==iLotsBefore) RecordProcess("Lot WebAPI parsed 0 lots (schema mismatch?): "+sLotApiPullLot); else RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot); /*AI(ht160s-lot-webapi) 20260715: break silent-empty parse*/
             if(bDuplicate==true)
                 RecordProcess("Lot WebAPI duplicate 2D ignored: "+DupCode);
+            //AI(ht160s-kyec) 20260722 : re-pull latest-wins : loud record of how many existing
+            //2D codes were refreshed in place to the newest WebAPI data.
+            if(LotRegistry.GetRefreshCount()>0)
+                RecordProcess("Lot WebAPI refreshed "+IntToStr(LotRegistry.GetRefreshCount())+" existing 2D codes to latest data: "+sLotApiPullLot);
             bAttemptOk=true;
         }
         else

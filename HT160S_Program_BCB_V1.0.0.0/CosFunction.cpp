@@ -864,6 +864,7 @@ __fastcall THT160LotRegistry::THT160LotRegistry()
 	m_Code2DInfo->CaseSensitive=true;
 	m_LotCount=0;
 	m_LastDupCode="";
+	m_RefreshCount=0;
 	for(int i=0;i<HT160_MAX_LOT;i++)
 		m_Lots[i].Clear();
 }
@@ -940,6 +941,13 @@ AnsiString THT160LotRegistry::GetCode2DByIndex(int Index)
 AnsiString THT160LotRegistry::GetLastDuplicateCode()
 {
 	return m_LastDupCode;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-kyec) 20260722 : # of already-present 2D codes updated in place (upserted to
+//latest) by the most recent LoadFromJsonString parse. Reset at each parse start.
+int THT160LotRegistry::GetRefreshCount()
+{
+	return m_RefreshCount;
 }
 //---------------------------------------------------------------------------
 int THT160LotRegistry::FindLotIndex(AnsiString LotID)
@@ -1063,13 +1071,14 @@ bool THT160LotRegistry::RenameLot(AnsiString OldLotID, AnsiString NewLotID)
 bool THT160LotRegistry::AddItem(AnsiString LotID, AnsiString Code2D, int Bin, AnsiString &DupExistingLot)
 {
 	// Legacy / offline / "Maps" path : no customer backup fields, so mirror Bin
-	// into HBin/SBin and leave RetestCode/DiePass empty.
-	return AddItemEx(LotID, Code2D, Bin, Bin, Bin, "", "", DupExistingLot);
+	// into HBin/SBin and leave RetestCode/DiePass/customer identity empty.
+	return AddItemEx(LotID, Code2D, Bin, Bin, Bin, "", "", "", "", "", DupExistingLot);
 }
 //---------------------------------------------------------------------------
 bool THT160LotRegistry::AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
 	int HBin, int SBin, AnsiString RetestCode, AnsiString DiePass,
-	AnsiString &DupExistingLot)
+	AnsiString CustLotID, AnsiString ProductCode, AnsiString Substage,
+	AnsiString &DupExistingLot, bool bUpsert)
 {
 	DupExistingLot="";
 	AnsiString Code=Code2D.Trim();
@@ -1080,12 +1089,41 @@ bool THT160LotRegistry::AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
 	if(LotIndex<0)
 		return false;                 // registry full
 
-	// 2D code is globally unique : reject a code already owned by any Lot.
+	// 2D code is globally unique.
 	int Exist=m_Code2DIndex->IndexOf(Code);
 	if(Exist>=0)
 	{
 		int OldLotIndex, OldBin;
 		UnpackRef((int)m_Code2DIndex->Objects[Exist], OldLotIndex, OldBin);
+		//AI(ht160s-kyec) 20260722 : WebAPI re-pull latest-wins, but ONLY for a SAME-lot re-pull
+		//(OldLotIndex==LotIndex) : update the existing per-IC record + routing bin in place
+		//(owning lot kept, iPlanQty NOT bumped) ; the caller logs the aggregate m_RefreshCount.
+		//A genuine CROSS-lot 2D collision (code already owned by a DIFFERENT lot) is NOT a
+		//refresh : fall through to the reject path so bHasDuplicate surfaces the operator error
+		//(the globally-unique 2D invariant, CosFunction.h).
+		if(bUpsert && OldLotIndex==LotIndex)
+		{
+			m_Code2DIndex->Objects[Exist]=(TObject*)PackRef(OldLotIndex, Bin);
+			int InfoIdx=m_Code2DInfo->IndexOf(Code);
+			if(InfoIdx>=0)
+			{
+				TLotIcInfo *Rec=(TLotIcInfo*)m_Code2DInfo->Objects[InfoIdx];
+				if(Rec!=NULL)
+				{
+					Rec->iBin=Bin;
+					Rec->iHBin=HBin;
+					Rec->iSBin=SBin;
+					Rec->sRetestCode=RetestCode;
+					Rec->sDiePass=DiePass;
+					Rec->sCustLotID=CustLotID;
+					Rec->sProductCode=ProductCode;
+					Rec->sSubstage=Substage;
+				}
+			}
+			m_RefreshCount++;
+			return true;
+		}
+		// Legacy path : reject a code already owned by any Lot.
 		if(OldLotIndex>=0 && OldLotIndex<m_LotCount)
 			DupExistingLot=m_Lots[OldLotIndex].sLotID;
 		m_LastDupCode=Code;
@@ -1105,6 +1143,9 @@ bool THT160LotRegistry::AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
 	Info->iSBin=SBin;
 	Info->sRetestCode=RetestCode;
 	Info->sDiePass=DiePass;
+	Info->sCustLotID=CustLotID;
+	Info->sProductCode=ProductCode;
+	Info->sSubstage=Substage;
 	m_Code2DInfo->AddObject(Code, (TObject*)Info);
 	return true;
 }
@@ -1158,7 +1199,7 @@ static AnsiString JsonEsc(AnsiString S)
 //AI(ht160s-2dbin-manual) 20260628 : serialize ALL non-blank lots in the
 // 2DIDHistory schema that LoadFromJsonString already parses (round-trips). The
 // 2DIDHistory shape has no "Bin" field; LoadFromJsonString recomputes the
-// routing Bin from HBin/SBin per CosFunction.iSortBinSource. Manual items have
+// routing Bin is always HBin. Manual items have
 // HBin=SBin=Bin so the round-trip is lossless; SECS items keep their real
 // HBin/SBin. NO trailing commas (cJSON rejects them).
 bool THT160LotRegistry::SaveToJsonFile(AnsiString FileName)
@@ -1198,7 +1239,7 @@ bool THT160LotRegistry::SaveToJsonFile(AnsiString FileName)
 			{
 				// One tab-separated line : Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass
 				AnsiString Line=IcList->Strings[j];
-				AnsiString F0="",F2="",F3="",F4="",F5="";
+				AnsiString F0="",F2="",F3="",F4="",F5="",F6="",F7="",F8="";
 				int Field=0;
 				AnsiString Cur="";
 				for(int k=1;k<=Line.Length()+1;k++)
@@ -1211,9 +1252,12 @@ bool THT160LotRegistry::SaveToJsonFile(AnsiString FileName)
 						else if(Field==3) F3=Cur;
 						else if(Field==4) F4=Cur;
 						else if(Field==5) F5=Cur;
+						else if(Field==6) F6=Cur;
+						else if(Field==7) F7=Cur;
+						else if(Field==8) F8=Cur;
 						Field++;
 						Cur="";
-						if(Field>5)
+						if(Field>8)
 							break;
 					}
 					else
@@ -1226,7 +1270,10 @@ bool THT160LotRegistry::SaveToJsonFile(AnsiString FileName)
 				Out->Add("          \"HBin\": \""+JsonEsc(F2)+"\",");
 				Out->Add("          \"SBin\": \""+JsonEsc(F3)+"\",");
 				Out->Add("          \"RetestCode\": \""+JsonEsc(F4)+"\",");
-				Out->Add("          \"DiePass\": \""+JsonEsc(F5)+"\"");
+				Out->Add("          \"DiePass\": \""+JsonEsc(F5)+"\",");
+				Out->Add("          \"CustLotID\": \""+JsonEsc(F6)+"\",");
+				Out->Add("          \"ProductCode\": \""+JsonEsc(F7)+"\",");
+				Out->Add("          \"Substage\": \""+JsonEsc(F8)+"\"");
 				Out->Add("        }"+Comma);
 			}
 
@@ -1260,6 +1307,9 @@ bool THT160LotRegistry::FindIcInfo(AnsiString Code2D, TLotIcInfo &Info)
 	Info.iSBin=0;
 	Info.sRetestCode="";
 	Info.sDiePass="";
+	Info.sCustLotID="";
+	Info.sProductCode="";
+	Info.sSubstage="";
 	AnsiString Code=Code2D.Trim();
 	if(Code==AnsiString(""))
 		return false;
@@ -1293,9 +1343,11 @@ int THT160LotRegistry::GetLotIcList(AnsiString LotID, TStrings *Out)
 			continue;
 		if(Rec->sLotID.Trim()!=Key)
 			continue;
+		//AI(ht160s-kyec) 20260722 : append per-IC CustLotID/ProductCode/Substage (F6-F8).
 		AnsiString Line=Rec->sCode2D+"\t"+IntToStr(Rec->iBin)+"\t"+
 			IntToStr(Rec->iHBin)+"\t"+IntToStr(Rec->iSBin)+"\t"+
-			Rec->sRetestCode+"\t"+Rec->sDiePass;
+			Rec->sRetestCode+"\t"+Rec->sDiePass+"\t"+
+			Rec->sCustLotID+"\t"+Rec->sProductCode+"\t"+Rec->sSubstage;
 		Out->Add(Line);
 		Count++;
 	}
@@ -1367,12 +1419,16 @@ bool THT160LotRegistry::LoadFromJsonFile(AnsiString FileName, bool &bHasDuplicat
 	return LoadFromJsonString(Text, bHasDuplicate, FirstDupCode);
 }
 //---------------------------------------------------------------------------
-bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode)
+bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode,
+	AnsiString StampKyecLotId)
 {
 	// Appends to the registry (multi-Lot).  Accepts both the legacy "Maps"
 	// shape and the customer "2DIDHistory" shape.  Caller decides when to Clear().
+	//AI(ht160s-kyec) 20260722 : StampKyecLotId != "" registers every IC under that KYEC
+	//lot (owning), keeping each response group LOTID per-IC as the customer lot, upsert on.
 	bHasDuplicate=false;
 	FirstDupCode="";
+	m_RefreshCount=0;
 
 	cJSON *Root=cJSON_Parse(Json.c_str());
 	if(Root==NULL)
@@ -1426,7 +1482,7 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 	// Customer 2DIDHistory format (new) : root "2DIDHistory"[] -> Lot
 	// { LOTID, Substage, ProductCode, ICIInfo[] } -> IC
 	// { QRCodeID, RetestCode, HBin(str), SBin(str), DiePass }. HBin/SBin are
-	// strings; the routing Bin is SBin or HBin per CosFunction.iSortBinSource.
+	// strings; the routing Bin is always HBin (SBin kept per-IC for the report).
 	cJSON *Hist=cJSON_GetObjectItem(Root, "2DIDHistory"); if(Hist==NULL) Hist=cJSON_GetObjectItem(Root, "QRCodeIDHis"); /*AI(ht160s-lot-webapi) 20260715: accept real KYEC root key QRCodeIDHis*/
 	if(Hist!=NULL && cJSON_IsArray(Hist))
 	{
@@ -1455,7 +1511,11 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 			if(KyecNode!=NULL && cJSON_IsString(KyecNode) && KyecNode->valuestring!=NULL)
 				KyecLotId=AnsiString(KyecNode->valuestring);
 
-			int LotIndex=AddLot(LotNumber, HT160_LOT_SOURCE_OFFLINE, "", ProductCode);
+			//AI(ht160s-kyec) 20260722 : machine keys on the KYEC lot ; the response group
+			//LOTID is the customer lot (kept per-IC for Soter col6). Without a stamp
+			//(boot restore / local import) the legacy per-LOTID keying stands.
+			AnsiString LotKey=(StampKyecLotId.Trim()!="") ? StampKyecLotId : LotNumber;
+			int LotIndex=AddLot(LotKey, HT160_LOT_SOURCE_OFFLINE, "", ProductCode);
 			if(LotIndex>=0)
 			{
 				TLotRunInfo *Lot=GetLot(LotIndex);
@@ -1501,11 +1561,25 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 
 						int HBin=StrToIntDef(HBinStr.Trim(), 0);
 						int SBin=StrToIntDef(SBinStr.Trim(), 0);
-						int RouteBin=(CosFunction.iSortBinSource==HT160_SORT_BIN_SOURCE_HBIN) ? HBin : SBin;
+						//AI(ht160s-kyec) 20260722 : routing bin is always HBin (SBin never used
+						//for classification ; both still recorded per-IC for the report).
+						int RouteBin=HBin;
+
+						//AI(ht160s-kyec) 20260722 : per-IC customer identity. A live WebAPI
+						//response supplies LOTID/Product/Substage only at the group level, so
+						//fall back to those ; our own WorkOrder.json round-trip writes them
+						//per-IC (CustLotID/ProductCode/Substage) which then win.
+						cJSON *IcCustNode=cJSON_GetObjectItem(IcNode, "CustLotID");
+						AnsiString IcCustLot=(IcCustNode!=NULL && cJSON_IsString(IcCustNode) && IcCustNode->valuestring!=NULL) ? AnsiString(IcCustNode->valuestring) : LotNumber;
+						cJSON *IcProdNode=cJSON_GetObjectItem(IcNode, "ProductCode");
+						AnsiString IcProduct=(IcProdNode!=NULL && cJSON_IsString(IcProdNode) && IcProdNode->valuestring!=NULL) ? AnsiString(IcProdNode->valuestring) : ProductCode;
+						cJSON *IcSubNode=cJSON_GetObjectItem(IcNode, "Substage");
+						AnsiString IcSubstage=(IcSubNode!=NULL && cJSON_IsString(IcSubNode) && IcSubNode->valuestring!=NULL) ? AnsiString(IcSubNode->valuestring) : Substage;
 
 						AnsiString DupLot;
-						if(!AddItemEx(LotNumber, Qr, RouteBin, HBin, SBin,
-							RetestCode, DiePass, DupLot))
+						if(!AddItemEx(LotKey, Qr, RouteBin, HBin, SBin,
+							RetestCode, DiePass, IcCustLot, IcProduct, IcSubstage,
+							DupLot, (StampKyecLotId.Trim()!="")))
 						{
 							if(!bHasDuplicate)
 								FirstDupCode=Qr;
@@ -1847,7 +1921,7 @@ void InitialCosFunction()
 	CosFunction.bUse2DBinMap=true;
 	CosFunction.bUseColorCcd=true;   // default on; overridden by [ColorCCD] Enable below
 	CosFunction.bUseTopCcd=true;   // default on; overridden by [TopCCD] Enable below
-	CosFunction.iSortBinSource=HT160_SORT_BIN_SOURCE_HBIN;   // route by HBin by default
+	//AI(ht160s-kyec) 20260722 : routing bin source removed (permanently HBin); no default to set.
 	CosFunction.bUseSecsGem=false;   // paid SECS/GEM off unless a CUSTOMER_CODE enables it
 	DoCustomerFunction();
 	// General tier (ship + hardware install) : system\General.ini.

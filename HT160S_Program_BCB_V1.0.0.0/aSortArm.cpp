@@ -1281,17 +1281,10 @@ void TSortArmModule::RecordAutoSkippedCells()
             TLotIcInfo SoterIc;
             if(Slot[s].Code2D!="" && LotRegistry.FindIcInfo(Slot[s].Code2D, SoterIc))
             {
-                AnsiString sSoterProd="";
-                AnsiString sSoterSub="";
-                if(Lot!=NULL)
-                {
-                    sSoterProd=Lot->sProductCode;
-                    sSoterSub=Lot->sSubstage;
-                }
                 AnsiString sSoterLoad="";
                 if(ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
                     sSoterLoad=ColorModule->GetTrayID();
-                g_SoterOutput.OpenRow(s, (Lot!=NULL ? Lot->sLotID : AnsiString("")), (Lot!=NULL ? Lot->sKyecLotID : AnsiString("")), sSoterProd, sSoterSub,
+                g_SoterOutput.OpenRow(s, SoterIc.sCustLotID, (Lot!=NULL ? Lot->sLotID : AnsiString("")), SoterIc.sProductCode, SoterIc.sSubstage,
                     Slot[s].Code2D, sSoterLoad,
                     SoterIc.sRetestCode, SoterIc.iHBin, SoterIc.iSBin, SoterIc.sDiePass);
                 g_SoterOutput.CommitRejectRow(s);
@@ -1510,17 +1503,10 @@ void TSortArmModule::TransferPickDataFromLoader()
                     TLotIcInfo SoterIc;
                     if(Slot[SlotIndex].Code2D!="" && LotRegistry.FindIcInfo(Slot[SlotIndex].Code2D, SoterIc))
                     {
-                        AnsiString sSoterProd="";
-                        AnsiString sSoterSub="";
-                        if(Lot!=NULL)
-                        {
-                            sSoterProd=Lot->sProductCode;
-                            sSoterSub=Lot->sSubstage;
-                        }
                         AnsiString sSoterLoad="";
                         if(ColorModule!=NULL && ColorModule->IsTrayID2DGenuine())
                             sSoterLoad=ColorModule->GetTrayID();
-                        g_SoterOutput.OpenRow(SlotIndex, (Lot!=NULL ? Lot->sLotID : AnsiString("")), (Lot!=NULL ? Lot->sKyecLotID : AnsiString("")), sSoterProd, sSoterSub,
+                        g_SoterOutput.OpenRow(SlotIndex, SoterIc.sCustLotID, (Lot!=NULL ? Lot->sLotID : AnsiString("")), SoterIc.sProductCode, SoterIc.sSubstage,
                             Slot[SlotIndex].Code2D, sSoterLoad,
                             SoterIc.sRetestCode, SoterIc.iHBin, SoterIc.iSBin, SoterIc.sDiePass);
                     }

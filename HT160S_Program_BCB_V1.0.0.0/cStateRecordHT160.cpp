@@ -580,13 +580,15 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
             Lines->Add("      \"Items\": [");
             for(int k=0;k<IcCount;k++)
             {
-                // GetLotIcList row = Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass
+                //AI(ht160s-kyec) 20260722 : row = Code2D \t Bin \t HBin \t SBin \t RetestCode
+                // \t DiePass \t CustLotID(f6) \t ProductCode(f7) \t Substage(f8); dump CustLotID
+                // so a snapshot shows which customer lot each IC belongs to under its KYEC lot.
                 AnsiString Row=Ic->Strings[k];
-                AnsiString f[6];
-                for(int fi=0;fi<6;fi++)
+                AnsiString f[7];
+                for(int fi=0;fi<7;fi++)
                     f[fi]="";
                 int fidx=0, start=1;
-                for(int p=1;p<=Row.Length() && fidx<6;p++)
+                for(int p=1;p<=Row.Length() && fidx<7;p++)
                 {
                     if(Row[p]=='\t')
                     {
@@ -595,7 +597,7 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
                         start=p+1;
                     }
                 }
-                if(fidx<6)
+                if(fidx<7)
                     f[fidx]=Row.SubString(start, Row.Length()-start+1);
 
                 AnsiString IcComma = (k==0) ? AnsiString("") : AnsiString(",");
@@ -605,7 +607,8 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
                 AnsiString Item="        "+IcComma+"{ \"Code2D\": \""+SR_JsonEsc(f[0])+"\""+
                     ", \"Bin\": "+Bin+", \"HBin\": "+HBin+", \"SBin\": "+SBin+
                     ", \"RetestCode\": \""+SR_JsonEsc(f[4])+"\""+
-                    ", \"DiePass\": \""+SR_JsonEsc(f[5])+"\" }";
+                    ", \"DiePass\": \""+SR_JsonEsc(f[5])+"\""+
+                    ", \"CustLotID\": \""+SR_JsonEsc(f[6])+"\" }";
                 Lines->Add(Item);
             }
             Lines->Add("      ]");

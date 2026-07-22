@@ -410,14 +410,17 @@ void cSoterOutput::OnLotEnd()
                 {
                     // Zero genuine-2D dies : still emit ONE header-only file (Qty=0) for the
                     // armed lot so the customer can tell "ran but 0 units" from a missed
-                    // hand-off. Product / Substage / Kyec are unknown here (no rows).
-                    AnsiString sFileName = BuildFileName("", m_sArmCustLot, "", "", 0, sStamp);
+                    // hand-off. No rows -> Product/Substage/customer lot unknown.
+                    //AI(ht160s-kyec) 20260722 : m_sArmCustLot is the armed KYEC lot -> col7
+                    //(KYEC token). The customer-lot token (col6) is NA : no die resolved one.
+                    AnsiString sFileName = BuildFileName("", "NA", m_sArmCustLot, "", 0, sStamp);
                     sFileName = UniqueFileNameInFlush(pSeen, sFileName);
                     WriteOneFile(sArch, sFileName, NULL);
-                    // KYEC lot unknown for a zero-die lot -> no upload possible. Note once.
+                    //AI(ht160s-kyec) 20260722 : a 0-die lot is archive/pickup only, no FTP publish
+                    //(customer ruling). The KYEC lot IS known; there is simply nothing to publish.
                     if (bUploadOn && !bNoKyecLogged)
                     {
-                        g_EventLog.Log("FTP_SKIP", "Soter 0-die lot has no KYEC batch id, upload skipped", "");
+                        g_EventLog.Log("FTP_SKIP", "Soter 0-die lot (KYEC "+m_sArmCustLot+"): header-only file, no FTP publish", "");
                         bNoKyecLogged = true;
                     }
                 }
@@ -589,7 +592,11 @@ void cSoterOutput::CommitRow(int iNozzle, const AnsiString& sUnloadTray)
 
     if (m_pLotBuckets != NULL)
     {
-        AnsiString sKey = r.sCustLotID;   // file-split key (may be "" for a die with no owning lot)
+        //AI(ht160s-kyec) 20260722 : file-split key = KYEC lot + customer lot (composite) so the
+        //SAME customer LOTID under two different KYEC lots in one flush does NOT merge into one
+        //CSV/folder. \x01 cannot appear in a lot id. Common 1:1/1:N case is unchanged (the KYEC
+        //lot is constant across the flush, so the bucket count matches a custlot-only key).
+        AnsiString sKey = r.sKyecLotID + "\x01" + r.sCustLotID;   // composite (KYEC, cust)
         int idx = m_pLotBuckets->IndexOf(sKey);
         TSoterLotBucket* b;
         if (idx < 0)

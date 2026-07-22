@@ -19,12 +19,13 @@
 //      archive. The customer fetches from here after the SECS Lot End event (CEID 12),
 //      which the manual Lot End path fires AFTER these files are on disk.
 //
-// Locked customer decisions (docs/plan/soter-output-csv-gap-analysis-20260714; KYEC
-// per-lot split + Cust!=Kyec confirmed 2026-07-21):
-//   - Cust lot (col6) = owning lot (2D-map LOTID). Kyec lot (col7) = KYEC batch id
-//     from SET_LOT_INFO; distinct values. "" -> "NA" (customer: missing = NA, and a
-//     lot cannot run without lot info, so NA is a should-not-happen marker).
-//   - Substage (col5) comes from the 2D-map JSON (no host E87).
+// Locked customer decisions (docs/plan/kyec-lot-identity-plan-20260722 ; KYEC dual lot
+// identity, 1:N confirmed 2026-07-22):
+//   - The machine keys everything on the KYEC lot (SECS/OSATLot). Kyec lot (col7) = the
+//     owning KYEC lot (registry sLotID). Cust lot (col6) = the WebAPI response LOTID,
+//     stored PER-IC (one KYEC lot can map to several customer lots, 1:N). Distinct values.
+//     "" -> "NA".
+//   - Substage (col5) + ProductCode (col4) are PER-IC (2D-map JSON group values); no host E87.
 //   - SorterID (col10 + filename) = GeneralSetting.sSerialNo.
 //   - Load Cover Tray ID (col8)  = incoming identity-tray 2D (Color side).
 //   - Unload Cover Tray ID (col9)= flow-lane identity-tray 2D (Auto lane).
@@ -74,7 +75,7 @@ class cSoterOutput
 private:
     TCriticalSection* m_pCS;
     bool         m_bActive;       // armed between Lot Start and the LotEnd flush
-    AnsiString   m_sArmCustLot;   // armed lot id (zero-die fallback file identity)
+    AnsiString   m_sArmCustLot;   // armed lot id = KYEC lot (zero-die fallback col7 identity)
     TSoterRow    m_pending[SOTER_NOZZLE_COUNT];
     TStringList* m_pLotBuckets;   // keyed by CustLot (case-sensitive), insertion-order; Objects=TSoterLotBucket*
     AnsiString   m_sBaseDir;      // HSys.LogRootDir + "\\SoterOutput" (archive)
