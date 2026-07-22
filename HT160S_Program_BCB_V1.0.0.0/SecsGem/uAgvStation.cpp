@@ -306,11 +306,8 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         }
 
         bool bFull = AutoModule->IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
-        // AI(ht160s-agv) 20260627 : do NOT re-CALL an Auto whose full car the operator is
-        // carrying away manually (IsOperatorHolding, cleared by HOME/InitialFlag). NOTE: after
-        // the D4-4 full-collect refactor nothing sets operator-holding true, so this gate is
-        // currently always open; kept for the manual / SECS-link-down car-change path.
-        if(bFull && Handshake[si]==AGV_IDLE && AutoModule->IsOperatorHolding(a)==false)
+        // AI(ht160s-agv) 20260627 : full car + station idle -> CALL the AGV to collect it.
+        if(bFull && Handshake[si]==AGV_IDLE)
         {
             AutoModule->SetAmrLock(a, true);
             SupplementBitmap = BuildBitmap(AgvStation[si].PIndex);
@@ -534,23 +531,11 @@ bool TAgvCoordinator::BeginPrep(AnsiString cpName)
     int i = LookupByName(cpName);
     if(i < 0)
         return false;
-    //AI(ht160s-home-resume-w5) 20260711 : operator-holding gate (FX(S)-8). After a
-    //full-wait timeout the operator is manually taking this car; dispatching the AGV
-    //into their hands is a person/vehicle conflict. The CP name IS a known station, so
-    //still return true (the caller keys the SECS reply shape off that) -- we simply do
-    //not enter PREP : the host sees no Ready and its own timeout handles the retry.
-    //bOperatorHolding now clears on the car-change commit (sensor-OFF edge), not HOME.
-    if(AgvStation[i].Kind==ASK_AUTO && AutoModule!=NULL && AgvStation[i].AutoIndex>=0 &&
-       AutoModule->IsOperatorHolding(AgvStation[i].AutoIndex))
-    {
-        RecordProcess("AGV: START_AGV "+cpName+" ignored - operator holding the full car");
-        return true;
-    }
     //AI(ht160s-overcount-tripqueue S5) 20260721 : refuse an INFEED (P1-P3) handoff while the
     //machine is draining in Clean Out -- restarting infeed would EnqueueTrip a new car + re-
-    //feed and stall the CleanOut finish. Mirror the operator-holding idiom: the CP name is a
-    //known station so return true (well-formed SECS reply, HCACK=0) but do NOT enter PREP, so
-    //no Ready(273) follows and the host's own timeout handles it. Outfeed (Auto) is allowed.
+    //feed and stall the CleanOut finish. The CP name is a known station, so return true
+    //(well-formed SECS reply, HCACK=0) but do NOT enter PREP, so no Ready(273) follows and
+    //the host's own timeout handles it. Outfeed (Auto) is allowed.
     if(AgvStation[i].Kind!=ASK_AUTO && i<3 && HSys.Sys.RunMode==Run_CleanOut)
     {
         RecordProcess("AGV: START_AGV "+cpName+" ignored - infeed frozen during Clean Out");

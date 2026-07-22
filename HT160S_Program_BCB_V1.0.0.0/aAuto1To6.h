@@ -64,13 +64,6 @@ private:
     //operator full-car modal to the AGV handshake. Set when a full car is handed to the
     //AGV; cleared on AGV finish (ClearAmrCar) or a home/init.
     bool bAmrLocked[6];
-    //AI(ht160s-home-resume-w5) 20260711 : per-Auto "operator is manually carrying the full
-    //car away" latch. PollAndCall / BeginPrep read it (IsOperatorHolding) to avoid CALLing
-    //the AGV into a person's hands; cleared on the car-change commit (ServiceCarFull) and on
-    //HOME/InitialFlag. NOTE: the D4-4 full-collect refactor removed the old ServiceCarFull
-    //wait-expiry setter, so nothing currently sets this true (the AGV coordinator owns AMR
-    //full end-to-end); kept for the manual / SECS-link-down car-change path.
-    bool   bOperatorHolding[6];
     //AI(general) 20260608 : Stage0 fix for TrayArm back-and-forth. Latches a
     //TrayArm-delivered rear tray so RefreshAutoState() cannot erase the logical
     //handshake when the physical rear sensor reads OFF (offline / sim-data run).
@@ -159,7 +152,6 @@ public:
     //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
     void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer
     bool IsAmrLocked(int Index);
-    bool IsOperatorHolding(int Index);   //AI(ht160s-agv) 20260627 : operator took the full car after a full-wait timeout (PollAndCall re-CALL gate)
     bool IsDrainedForAmr(int Index);           // Ready : no working/rear/full tray left (all GoUp to car)
     bool IsAmrTaken(int Index);                // Finish : AGV removed the car (sim=true; real sensor TBD)
     void ClearAmrCar(int Index);               // AGV finish : empty the car + re-seed stack + unlock

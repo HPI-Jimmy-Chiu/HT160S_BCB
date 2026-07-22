@@ -89,14 +89,6 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         bCleanOutCheck[Index]=false;
         bCleanOutResidualLogged[Index]=false;   //AI(cleanout) 20260706 : new episode, allow one residual log again
         bAmrLocked[Index]=false;   //AI(ht160s-agv) 20260615 : drop any AGV handoff lock on home/init
-        //AI(ht160s-home-resume-w5) 20260711 : bOperatorHolding models a PHYSICAL fact
-        //(a person is carrying the full car away) that a HOME cannot erase -- clearing
-        //it here let PollAndCall re-CALL the AGV into the operator's hands within 1s of
-        //HOME completion (FX(S)-1). Keep it on a keep-material HOME; it now clears on
-        //the car-change commit below (sensor-OFF edge / operator confirm), which also
-        //removes the old "HOME is the only way out" escape (FX(S)-2).
-        if(bKeepMaterial==false)
-            bOperatorHolding[Index]=false;
         //AI(HT160S-Maintainer) 20260612 : on a recoverable home keep the car stack + its
         //tray roles/2D identity so the Auto does not forget what it is holding. Only the
         //sensor-backed presence above and the cleanout transient flags are refreshed.
@@ -128,11 +120,10 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
         AnsiString sKeep;
         for(int k=0; k<AUTO_STATION_COUNT; k++)
         {
-            if(State[k].bCarHasTray || bRearDeliveredPending[k] || bDischargeTailPending[k] || bOperatorHolding[k])
+            if(State[k].bCarHasTray || bRearDeliveredPending[k] || bDischargeTailPending[k])
                 sKeep+=" A"+IntToStr(k+1)+"(car="+IntToStr(State[k].bCarHasTray?1:0)+
                     ",rearPend="+IntToStr(bRearDeliveredPending[k]?1:0)+
-                    ",tail="+IntToStr(bDischargeTailPending[k]?1:0)+
-                    ",oper="+IntToStr(bOperatorHolding[k]?1:0)+")";
+                    ",tail="+IntToStr(bDischargeTailPending[k]?1:0)+")";
         }
         if(sKeep=="")
             sKeep=" none";
@@ -1386,16 +1377,6 @@ bool TAutoModule::IsAmrLocked(int Index)
     return bAmrLocked[Index];
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-agv) 20260627 : true after ServiceCarFull timed out waiting for the AGV and
-//  the operator is taking the full car. PollAndCall reads this to avoid re-CALLing the
-//  same Auto (re-CALL ping-pong). Cleared on HOME/InitialFlag.
-bool TAutoModule::IsOperatorHolding(int Index)
-{
-    if(Index<0 || Index>=AUTO_STATION_COUNT)
-        return false;
-    return bOperatorHolding[Index];
-}
-//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260615 : Ready (CEID273) condition. The Auto has stacked every tray
 //  into the car - no working tray, no rear tray (none in transit), nothing left to
 //  discharge. With the AMR lock on, TrayArm cannot feed it, so this state is stable.
@@ -1509,16 +1490,15 @@ AnsiString TAutoModule::DescribeStation(int Index)
        + "  RearKind="     + IntToStr(RearKind[Index])
        + "  RearID="       + RearTrayID[Index] + "\r\n";
 
-    //AI(ht160s-agv) 20260627 : Auto-full AMR safety-net dump (State Record gap analysis).
-    //Log the computed full verdict + raw InputFullTray sensor + the full-wait latch/hold
-    //so a hang at ServiceCarFull is diagnosable (full-but-stuck vs waiting vs operator-held).
+    //AI(ht160s-agv) 20260627 : Auto-full dump (State Record gap analysis). Log the computed
+    //full verdict + the raw InputFullTray sensor so a hang at ServiceCarFull is diagnosable
+    //(computed-full-but-sensor-not vs sensor-full-but-not-cleared).
     {
         TMySensor *FullSensor=GetInputFullTray(Index);
         int iFullSn  = (FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn()) ? 1 : 0;
         int iFullVer = IsOutputCarFullForAmr(Index) ? 1 : 0;
         s += "  FullVerdict="  + IntToStr(iFullVer)
-           + "  InputFullSn="  + IntToStr(iFullSn)
-           + "  OperHolding="  + IntToStr(bOperatorHolding[Index] ? 1 : 0) + "\r\n";
+           + "  InputFullSn="  + IntToStr(iFullSn) + "\r\n";
     }
 
     //AI(cleanout) 20260706 : clean-out diagnostic (State Record observability). Log the drain
@@ -1620,7 +1600,7 @@ void TAutoModule::ServiceCarFull()
             //owns the full car (PollAndCall CEID272 -> ServiceHandshake 273/274 -> ClearAmrCar;
             //its aging escalates to WAR0962 via W3/W4 if the AGV never responds). NO operator
             //modal here, and no separate per-Auto full-wait timer (the unified iAgvTimeoutSec
-            //governs in the coordinator). Was: wait then bOperatorHolding + fall-through to
+            //governs in the coordinator). Was: a local wait + hold-off then fall-through to
             //the modal. SECS link DOWN still falls through to the operator modal below (a
             //genuine comm-lost fault, distinct from AGV-slow).
             continue;
@@ -1653,7 +1633,6 @@ void TAutoModule::ServiceCarFull()
             while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
             Car[Index].Clear();
             InitAutoCarStack(Index);
-            bOperatorHolding[Index]=false;   //AI(ht160s-home-resume-w5) : car changed (sensor OFF confirmed) -> person done, re-CALL re-armed
         }
         else if(bLogicalFull)
         {
@@ -1662,7 +1641,6 @@ void TAutoModule::ServiceCarFull()
             ShowMyError(AnsiString().sprintf("MES%d25", 11+Index), ErrorText, K_RETRY);
             Car[Index].Clear();
             InitAutoCarStack(Index);
-            bOperatorHolding[Index]=false;   //AI(ht160s-home-resume-w5) : car changed (operator confirmed) -> re-CALL re-armed
         }
     }
 }
