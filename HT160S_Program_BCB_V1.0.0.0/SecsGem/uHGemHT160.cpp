@@ -813,6 +813,15 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     if(HCACK==0)
                     {
                         LotRegistry.Clear();                     // D1 overwrite, now AFTER a clean parse
+                        //AI(ht160s-lotbin) 20260722 : a SET_LOT_INFO work-order overwrite must
+                        // ALSO drop the prior order's dynamic (Lot,Bin)->Auto bindings, mirroring
+                        // the manual Lot Start (main.cpp LotBinBinding.Clear/SaveToIni). Otherwise
+                        // the stale bindings keep IsAutoBound holding Autos, so the new order's
+                        // (Lot,Bin) gets routed to the Error Auto. Guarded by the same clean-parse
+                        // HCACK==0 gate as the LotRegistry overwrite, so a rejected list leaves
+                        // both intact. LOTSTART stays additive (mid-lot resume) and does NOT clear.
+                        LotBinBinding.Clear();
+                        LotBinBinding.SaveToIni();
                         for(int j=0; j<nBuf; j++)
                         {
                             int iLotIdx = LotRegistry.AddLot(bufCust[j], HT160_LOT_SOURCE_SECS, "", "");
