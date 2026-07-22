@@ -87,6 +87,7 @@
 - `318b095`：Run_Home guard（W4-fix，csystem `ServiceAgvTimeoutAlarm` 加 HOME 凍結）。
 - `38c294b`：**MES1421 定案走 A**——Color rear-miss B類全模式立即跳，整套 Color AMR-feed 等待機構（`bWaitingAmrFeed`+`AmrFeedWaitTimer`）移除，錯誤註解修正 + FindFeedAuto dispatch 註解修正。dev+真機 build EXIT0、encoding165、selftest PASS。（複驗 wf_38538652-260：correctness clean、completeness 一個 stale 註解已修）。
 - `4cb8f40`：清理 D4-4 遺留死碼——`bWaitingAmrFull[]`/`AmrFullWaitTimer[]`/`iAmrFullWaitSec`(含 ini)/`AbortAutoHandshake` 移除，PauseTimeoutTimers/ReStart 變 enrollment stub，RetryStation 註解修正。dev+真機 build EXIT0。
+- `026730b`：**`bOperatorHolding` 整組移除**（使用者裁定；D4-4 後恆 false 純死碼）——成員+getter `IsOperatorHolding`+PollAndCall/BeginPrep 兩閘+busy-check 項+State Record 傾印+清除+相關註解全清。行為中性（獨立 adversarial review CLEAN）。dev+真機 build EXIT0、encoding165、selftest PASS。
 
 **對抗式複驗結果（workflow w6v3b9iyh，裁定 FIX-FIRST low-urgency；核心 SOLID：WAR0962 aging/latch/main-loop 消費/P1 排除/D4 閘/非AMR不變 全部確認乾淨）。已修/待辦：**
 
@@ -106,13 +107,13 @@
 5. **[已修 SHIPPED `4cb8f40`] RetryStation 註解**：改成「reset IDLE+清 latch 讓 PollAndCall 重評估；恢復靠底層滿/短缺條件消失」的精確描述。
 6. **[NIT] ini 遷移**：舊 `[AGV]CleanOutAmrWaitSec` 改名 `AgvTimeoutSec`；`4cb8f40` 又移除了 `AmrFullWaitSec`——舊機 ini 這兩個舊 key 失效被忽略（無行為變化）。
 
-7. **[新發現 — 待使用者裁定] `bOperatorHolding[]` 事實上已失效**：D4-4 移除了它唯一的 setter（舊 ServiceCarFull 等待逾時路徑），所以現在**沒有任何地方把它設 true**，PollAndCall/BeginPrep 的「操作員正在搬滿車、別叫 AGV 進他手裡」抑制閘**恆開**。`4cb8f40` 保留該成員（仍被讀）並在碼內註記此事實，**未移除**。設計問題：AMR 線是否還需要這個抑制？若需要，哪條路徑（手動換車 / SECS link-down fallback）該重新 set true？**待裁定**——不猜。
+7. **[已移除 SHIPPED `026730b`] `bOperatorHolding[]`**：使用者裁定「AMR 全自動無人線無此情境」→ 整組移除（成員/getter/兩閘/busy-check/傾印/清除/註解）。D4-4 後恆 false，行為中性（adversarial review CLEAN）。
 
 **未做：**
 - **W5**：`tsMaintSECS` 加 `AgvTimeoutSec` 秒數 UI 欄（from-scratch DFM，文字模式，有剝除風險）。設定已可由 General.ini `[AGV]AgvTimeoutSec` 編、預設 300。
 - **上機 + SECS-sim 情境驗證**（含 CleanOut 灌滿 Auto→AGV 收；AGV 不回→WAR0962）。
 
-**下次開工建議順序**（2026-07-22 更新：#2/#3/#4/#5 全結案）：等使用者裁定 #7（bOperatorHolding 去留）→ W5 → 全 build gate → 上機。
+**下次開工建議順序**（2026-07-22 更新：#1-#7 全結案）：只剩 **W5**（`AgvTimeoutSec` UI 欄）→ 全 build gate → **上機 + SECS-sim 驗證**。行為與清理全數 code-complete。
 
 ## 6. 不動項
 
