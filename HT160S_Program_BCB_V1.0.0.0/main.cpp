@@ -2296,6 +2296,14 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
 // sweep (1 initial try + (LOT_API_MAX_RETRY-1) retries). Guards against transient
 // network blips / a momentarily slow customer WebAPI server dropping a lot.
 static const int LOT_API_MAX_RETRY = 3;
+//AI(ht160s-lot-webapi) 20260722 : start-attempt outcome codes for RequestLotDataFromWebApi,
+// so the pull-all sweep can distinguish "in flight" from "shared client busy, wait" from
+// "could not start at all". Fixes a stall where a busy client or a StartLotRequest that
+// never began left the sweep armed with nothing in flight and PollLotDataWebApi looping as
+// a no-op forever (until the next Lot Start / Lot End cleared the flags).
+static const int LOT_PULL_STARTED = 0;   // request began : Poll drives it to completion
+static const int LOT_PULL_BUSY    = 1;   // shared client busy : leave armed, re-kick when free
+static const int LOT_PULL_FAILED  = 2;   // StartLotRequest refused (bad URL etc.) : consume a retry
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : advance the "pull all lots" sweep. Walk the raw
 // registry slots from iLotApiPullCursor, skipping freed (blank) slots, and kick off
@@ -2306,6 +2314,7 @@ void __fastcall TfMain::StartNextLotApiPull()
 {
     TLotRunInfo *Lot;
     int SlotCount;
+    int iStart;                                    //AI(ht160s-lot-webapi) 20260722 : RequestLotDataFromWebApi outcome
 
     if(bLotApiPullAll==false)
         return;
@@ -2319,11 +2328,30 @@ void __fastcall TfMain::StartNextLotApiPull()
             iLotApiPullCursor++;                   // skip freed/blank slots
             continue;
         }
-        //real lot at the cursor : pull it. Do NOT advance the cursor here -
-        //PollLotDataWebApi advances it on success, or re-calls us (same cursor)
-        //to retry on failure, or advances it once the retries are used up.
-        RequestLotDataFromWebApi(Lot->sLotID);
-        return;                                    // one in flight ; Poll will call us again
+        //real lot at the cursor : try to start its pull. Do NOT advance the cursor here -
+        //PollLotDataWebApi advances it on success, or re-kicks us (same cursor) to retry.
+        iStart=RequestLotDataFromWebApi(Lot->sLotID);
+        if(iStart==LOT_PULL_STARTED || iStart==LOT_PULL_BUSY)
+            return;                                // STARTED: in flight, Poll drives it.
+                                                   // BUSY : armed, Poll re-kicks when client frees.
+        //AI(ht160s-lot-webapi) 20260722 : LOT_PULL_FAILED - the request could not even begin
+        //(bad URL etc.). Consume the SAME per-lot retry budget as a completed-but-failed pull,
+        //then stop for this tick ; PollLotDataWebApi re-kicks next tick (same lot while retries
+        //remain, next lot once used up), so a bad URL advances the sweep instead of spin-logging.
+        iLotApiRetryCount++;
+        if(iLotApiRetryCount<LOT_API_MAX_RETRY)
+        {
+            RecordProcess("Lot WebAPI start retry "+IntToStr(iLotApiRetryCount)+"/"+
+                          IntToStr(LOT_API_MAX_RETRY-1)+" for slot "+IntToStr(iLotApiPullCursor));
+        }
+        else
+        {
+            RecordProcess("Lot WebAPI giving up slot "+IntToStr(iLotApiPullCursor)+
+                          " (could not start after "+IntToStr(LOT_API_MAX_RETRY-1)+" retries)");
+            iLotApiPullCursor++;                   // skip this lot and continue the sweep
+            iLotApiRetryCount=0;
+        }
+        return;                                    // one start attempt per tick ; Poll re-kicks us
     }
 
     //no more lots to pull : end the sweep
@@ -2402,23 +2430,25 @@ void __fastcall TfMain::StartLotWebApiPullAll()
 // Used by both the manual LotStart path and the SECS S2F42 LOTSTART handler, so it
 // must NEVER show a modal dialog (the SECS path runs on the HSMS/VCL receive thread
 // and a popup would stall factory communication). On any problem we just log.
-void __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
+int __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
 {
     AnsiString Lot;
 
     Lot=LotID.Trim();
     if(Lot=="")
-        return;
+        return LOT_PULL_FAILED;              //AI(ht160s-lot-webapi) 20260722 : nothing to pull : let the sweep advance
 
     EnsureLotWebApiClientCreated();
     if(LotWebApiClient==NULL)
-        return;
+        return LOT_PULL_FAILED;              //AI(ht160s-lot-webapi) 20260722 : no client : advance rather than stall
 
     if(LotWebApiClient->IsBusy())
     {
-        //a pull is already running : do not stack requests (non-blocking, no modal)
+        //a pull is already running : do not stack requests (non-blocking, no modal).
+        //AI(ht160s-lot-webapi) 20260722 : NOT a failure. Leave the sweep armed and report
+        //BUSY ; PollLotDataWebApi re-kicks once the shared client frees (no retry consumed).
         RecordProcess("Lot WebAPI pull skipped (client busy): "+Lot);
-        return;
+        return LOT_PULL_BUSY;
     }
 
     if(LotWebApiClient->StartLotRequest(Lot))
@@ -2426,12 +2456,15 @@ void __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
         bLotApiPullActive=true;
         sLotApiPullLot=Lot;
         RecordProcess("Lot WebAPI pull started: "+Lot);
+        return LOT_PULL_STARTED;
     }
-    else
-    {
-        //start failed (bad URL etc) : log only, never block the caller
-        RecordProcess("Lot WebAPI pull start failed: "+LotWebApiClient->GetLastError());
-    }
+
+    //start failed (bad URL etc) : log only, never block the caller.
+    //AI(ht160s-lot-webapi) 20260722 : report FAILED so StartNextLotApiPull consumes a retry
+    //for this lot and moves on, instead of leaving bLotApiPullActive false and stalling the
+    //whole sweep forever (the original bug : a busy/failed start never advanced the cursor).
+    RecordProcess("Lot WebAPI pull start failed: "+LotWebApiClient->GetLastError());
+    return LOT_PULL_FAILED;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive the in-flight pull. Called every
@@ -2445,6 +2478,27 @@ void __fastcall TfMain::PollLotDataWebApi()
     int HttpStatus;
     bool bDuplicate;
     AnsiString DupCode;
+
+    //AI(ht160s-lot-webapi) 20260722 : resume a stalled pull-all sweep. If the sweep is armed
+    // but nothing is in flight - because a start could not begin, or we were waiting on a busy
+    // shared client (e.g. a maintenance-page manual Fetch) - re-kick it here. Guard on the
+    // client being FREE so a busy client is waited out silently (no per-tick spin-log), and
+    // abort the sweep if the client has vanished so it can never hang. Without this the sweep
+    // could stay armed forever with this function looping as a no-op (the B4 async-sweep stall).
+    if(bLotApiPullAll==true && bLotApiPullActive==false)
+    {
+        if(LotWebApiClient==NULL)
+        {
+            bLotApiPullAll=false;
+            iLotApiRetryCount=0;
+            RecordProcess("Lot WebAPI pull-all aborted: client unavailable");
+        }
+        else if(LotWebApiClient->IsBusy()==false)
+        {
+            StartNextLotApiPull();
+        }
+        //else client busy : wait silently, re-kick on a later tick
+    }
 
     if(bLotApiPullActive==false)
         return;

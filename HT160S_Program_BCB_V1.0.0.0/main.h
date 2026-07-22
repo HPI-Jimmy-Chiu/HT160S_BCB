@@ -464,7 +464,7 @@ public:		// User declarations
     bool __fastcall LoadWhiteListFile();   //AI(ht160s-whitelist) 20260715 : WhiteList mode 2D->Bin loader
     void __fastcall ArchiveWorkOrderToLotStory();
     bool __fastcall ArchiveDiscardedWorkOrder(AnsiString Reason);
-    void __fastcall RequestLotDataFromWebApi(AnsiString LotID);
+    int __fastcall RequestLotDataFromWebApi(AnsiString LotID);
     void __fastcall PollLotDataWebApi();
     void __fastcall PollFtpUploadResults();   //AI(ht160s-ftp) 20260721 : drain FTP upload results -> EventLog
     void __fastcall StartNextLotApiPull();
