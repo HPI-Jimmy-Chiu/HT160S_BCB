@@ -88,6 +88,7 @@
 - `38c294b`：**MES1421 定案走 A**——Color rear-miss B類全模式立即跳，整套 Color AMR-feed 等待機構（`bWaitingAmrFeed`+`AmrFeedWaitTimer`）移除，錯誤註解修正 + FindFeedAuto dispatch 註解修正。dev+真機 build EXIT0、encoding165、selftest PASS。（複驗 wf_38538652-260：correctness clean、completeness 一個 stale 註解已修）。
 - `4cb8f40`：清理 D4-4 遺留死碼——`bWaitingAmrFull[]`/`AmrFullWaitTimer[]`/`iAmrFullWaitSec`(含 ini)/`AbortAutoHandshake` 移除，PauseTimeoutTimers/ReStart 變 enrollment stub，RetryStation 註解修正。dev+真機 build EXIT0。
 - `026730b`：**`bOperatorHolding` 整組移除**（使用者裁定；D4-4 後恆 false 純死碼）——成員+getter `IsOperatorHolding`+PollAndCall/BeginPrep 兩閘+busy-check 項+State Record 傾印+清除+相關註解全清。行為中性（獨立 adversarial review CLEAN）。dev+真機 build EXIT0、encoding165、selftest PASS。
+- `b71daa3`：**W5 — `AgvTimeoutSec` UI 欄**（使用者確認放 **tsMaintAmr** 而非 tsMaintSECS：後者是不顯示的 log 啟動器）。以該頁既有動態建立方式（CreateMaintLabel/Edit/Button）加「AGV Handshake Timeout (s)」標籤+輸入框+Save 鈕，**不動 DFM**（執行期上移 TX-log memo 讓出空間，零剝除風險）；載入自 iAgvTimeoutSec（未 focus 才同步）、Save 夾 >=5 + GeneralSetting.Save()。dev+真機 build EXIT0、encoding165、selftest PASS。
 
 **對抗式複驗結果（workflow w6v3b9iyh，裁定 FIX-FIRST low-urgency；核心 SOLID：WAR0962 aging/latch/main-loop 消費/P1 排除/D4 閘/非AMR不變 全部確認乾淨）。已修/待辦：**
 
@@ -110,10 +111,11 @@
 7. **[已移除 SHIPPED `026730b`] `bOperatorHolding[]`**：使用者裁定「AMR 全自動無人線無此情境」→ 整組移除（成員/getter/兩閘/busy-check/傾印/清除/註解）。D4-4 後恆 false，行為中性（adversarial review CLEAN）。
 
 **未做：**
-- **W5**：`tsMaintSECS` 加 `AgvTimeoutSec` 秒數 UI 欄（from-scratch DFM，文字模式，有剝除風險）。設定已可由 General.ini `[AGV]AgvTimeoutSec` 編、預設 300。
-- **上機 + SECS-sim 情境驗證**（含 CleanOut 灌滿 Auto→AGV 收；AGV 不回→WAR0962）。
+- **上機驗證**（唯一剩項）：
+  - UI：進維護→AMR 頁，確認「AGV Handshake Timeout (s)」欄顯示正確、改值 Save 後重開仍在（寫入 General.ini `[AGV]AgvTimeoutSec`）。
+  - 行為 + SECS-sim 情境：CleanOut 灌滿 Auto→AGV 收；AGV 不回→WAR0962（逾時秒數＝該 UI 欄設定值）。
 
-**下次開工建議順序**（2026-07-22 更新：#1-#7 全結案）：只剩 **W5**（`AgvTimeoutSec` UI 欄）→ 全 build gate → **上機 + SECS-sim 驗證**。行為與清理全數 code-complete。
+**狀態（2026-07-22）：本案全 code-complete**（行為 W1-W4 + D4 + 批次、MES1421-A、死碼清理、bOperatorHolding 移除、W5 UI 全 SHIPPED）。只剩使用者上機驗證。
 
 ## 6. 不動項
 
