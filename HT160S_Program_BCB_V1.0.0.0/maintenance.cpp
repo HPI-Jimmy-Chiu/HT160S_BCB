@@ -307,6 +307,7 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     iMaintenanceMenuCount=0;
     LastClickButton=NULL;
     bTowerLightBlinkPhase=false;
+    edAgvTimeoutSec=NULL;   //AI(amr-unmanned W5) 20260722 : dynamically built on the AMR page (BuildAgvTimeoutField)
     //AI(ht160s-maintainer) 20260613 : Bin Display (MCU) / Top CCD / Color CCD / Lot
     //WebAPI page controls now stream from the DFM, so they are already assigned by the
     //time this body runs - do not NULL them and do not runtime-build the pages.
@@ -969,6 +970,11 @@ void __fastcall TfMaintenance::RefreshAmrStatus()
             memAmrStatus->Lines->Text = sAmrDump;
     }
     BuildAmrInjectPanel();
+    BuildAgvTimeoutField();
+    //AI(amr-unmanned W5) 20260722 : keep the field in sync with the setting except while the
+    //operator is typing in it (do not clobber an in-progress edit; Save commits it).
+    if(edAgvTimeoutSec!=NULL && edAgvTimeoutSec->Focused()==false)
+        edAgvTimeoutSec->Text = IntToStr(GeneralSetting.iAgvTimeoutSec);
     if(chkAmrTestMode!=NULL && chkAmrTestMode->Checked!=AmrInject.IsTestMode())
         chkAmrTestMode->Checked = AmrInject.IsTestMode();
     if(pnlAmrTestBanner!=NULL)
@@ -1016,6 +1022,40 @@ void __fastcall TfMaintenance::BuildAmrInjectPanel()
         }
         y += 34;
     }
+}
+//---------------------------------------------------------------------------
+//AI(amr-unmanned W5) 20260722 : build the AGV handshake-timeout (iAgvTimeoutSec) editor on
+//the AMR page. Created dynamically (same idiom as BuildAmrInjectPanel) and build-once,
+//guarded on edAgvTimeoutSec==NULL. A strip is freed below the inject panel (ends y620) by
+//lifting the TX-log memo at runtime so the DFM stays untouched (no designer / text-mode edit,
+//no component-strip risk).
+void __fastcall TfMaintenance::BuildAgvTimeoutField()
+{
+    if(edAgvTimeoutSec!=NULL)
+        return;
+    if(tsMaintAmr==NULL || memAmrTx==NULL)
+        return;
+    memAmrTx->Top = 664;
+    memAmrTx->Height = 248;
+    CreateMaintLabel(this, tsMaintAmr, 440, 632, 210, 20, "AGV Handshake Timeout (s):");
+    edAgvTimeoutSec = CreateMaintEdit(this, tsMaintAmr, 656, 630, 70, IntToStr(GeneralSetting.iAgvTimeoutSec));
+    CreateMaintButton(this, tsMaintAmr, 734, 628, 90, "Save", btnAgvTimeoutSaveClick);
+}
+//---------------------------------------------------------------------------
+//AI(amr-unmanned W5) 20260722 : commit the AGV handshake timeout. Clamp >=5 (mirrors the
+//GeneralSetting.Load footgun guard : HTimer::Off() is instant at 0, ~49.7d when negative),
+//persist to General.ini, then reflect the clamped value back into the edit.
+void __fastcall TfMaintenance::btnAgvTimeoutSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    int v = ReadEditInt(edAgvTimeoutSec, 300);
+    if(v < 5)
+        v = 5;
+    GeneralSetting.iAgvTimeoutSec = v;
+    GeneralSetting.Save();
+    if(edAgvTimeoutSec!=NULL)
+        edAgvTimeoutSec->Text = IntToStr(v);
+    RefreshAmrStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkAmrTestModeClick(TObject *Sender)

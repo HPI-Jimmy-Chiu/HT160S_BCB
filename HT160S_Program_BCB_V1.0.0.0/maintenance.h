@@ -415,6 +415,7 @@ __published:
     void __fastcall chkUseAMRClick(TObject *Sender);
     void __fastcall chkAmrTestModeClick(TObject *Sender);
     void __fastcall AmrInjectButtonClick(TObject *Sender);
+    void __fastcall btnAgvTimeoutSaveClick(TObject *Sender);
     void __fastcall rgSortModeClick(TObject *Sender);
     void __fastcall chkWhiteListActiveClick(TObject *Sender);
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
@@ -443,6 +444,7 @@ private:
     TALed *TowerLightLeds[TOWER_LIGHT_ROW_COUNT][TOWER_LIGHT_COLOR_COUNT];
     bool bTowerLightBlinkPhase;
     bool bLoadingHardwareSettings;   // guard: suppress save-on-click handlers during programmatic LoadHardwareSettings
+    TEdit *edAgvTimeoutSec;   //AI(amr-unmanned W5) 20260722 : dynamically-built AGV handshake timeout (s) editor on the AMR page (NULL until BuildAgvTimeoutField)
 
     void __fastcall RegisterMaintenancePages();
     void __fastcall LayoutMaintenanceButtons();
@@ -489,6 +491,7 @@ private:
     void __fastcall AddFtpLog(AnsiString Text);
     void __fastcall RefreshAmrStatus();
     void __fastcall BuildAmrInjectPanel();
+    void __fastcall BuildAgvTimeoutField();
     void __fastcall ShowPasswordPage();
     void __fastcall RefreshPasswordGrid();
 public:
