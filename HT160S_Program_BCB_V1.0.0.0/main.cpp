@@ -2598,6 +2598,24 @@ void __fastcall TfMain::DoLotEndProcess()
     iLotApiPullCursor=0;
     iLotApiRetryCount=0;
 
+    //AI(ht160s-lot-webapi) 20260722 : also abort a SINGLE pull already on the wire.
+    // Clearing bLotApiPullAll (above) is not enough : PollLotDataWebApi's own guard is
+    // bLotApiPullActive, not bLotApiPullAll, so a sweep pull still in flight when Lot End
+    // fires would land in the lower half, LoadFromJsonString the response into the registry
+    // we Clear() just below, and SaveWorkOrder re-write WorkOrder.json - re-adding the lot the
+    // operator just ended. Drop the active flag AND Cancel() the client (closes the socket,
+    // returns iState to IDLE) so the stale response is never consumed, and so the next Lot
+    // Start's pull is not blocked by a still-"busy" client. Guarded on bLotApiPullActive : the
+    // maintenance manual fetch (bLotApiResultPending) uses the same single-request client but is
+    // display-only (never touches LotRegistry), and cannot be in flight at the same time as a
+    // production pull, so this leaves that diagnostic path alone.
+    if(bLotApiPullActive==true)
+    {
+        bLotApiPullActive=false;
+        if(LotWebApiClient!=NULL)
+            LotWebApiClient->Cancel();
+    }
+
     //AI(ht160s-lot-webapi) 20260612 : Lot End clears the whole work order so the
     // next lot starts clean. Clear() drops every Lot slot, the 2D-code index and
     // all per-IC 2D/Bin records. Then blank the active Lot No, repaint the grid
