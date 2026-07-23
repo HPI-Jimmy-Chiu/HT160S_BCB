@@ -105,6 +105,7 @@ void THT160GeneralSetting::SetDefault()
 	iSortArmXDatumBias=-1000;
 	iSortArmYDatumBias=-1000;
 	iSortArmPickRetryCount=3;
+	iSortArmZMoveGuardMs=8000;   //AI(bcb6-172align) 20260723 : conservative default (ms)
 	bSortArmAutoSkipOnPickFail=false;
 	iLoaderYSafeDistance=10000;
 	iEmptyDestackSettleMs=500;
@@ -217,9 +218,12 @@ void THT160GeneralSetting::Load()
 	iSortArmXDatumBias=Ini->ReadInteger("SortArm", "XDatumBias", -1000);
 	iSortArmYDatumBias=Ini->ReadInteger("SortArm", "YDatumBias", -1000);
 	iSortArmPickRetryCount=Ini->ReadInteger("SortArm", "PickRetryCount", 3);
+	iSortArmZMoveGuardMs=Ini->ReadInteger("SortArm", "ZMoveGuardMs", 8000);
 	bSortArmAutoSkipOnPickFail=Ini->ReadBool("SortArm", "AutoSkipOnPickFail", false);
 	if(iSortArmPickRetryCount<0)
 		iSortArmPickRetryCount=0;
+	if(iSortArmZMoveGuardMs<1000)
+		iSortArmZMoveGuardMs=1000;
 	iLoaderYSafeDistance=Ini->ReadInteger("Safety", "LoaderYSafeDistance", 10000);
 	iEmptyDestackSettleMs=Ini->ReadInteger("SettleDelay", "EmptyDestackSettleMs", 500);
 	iColorDestackSettleMs=Ini->ReadInteger("SettleDelay", "ColorDestackSettleMs", 500);
@@ -302,6 +306,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SortArm", "XDatumBias", iSortArmXDatumBias);
 	Ini->WriteInteger("SortArm", "YDatumBias", iSortArmYDatumBias);
 	Ini->WriteInteger("SortArm", "PickRetryCount", iSortArmPickRetryCount);
+	Ini->WriteInteger("SortArm", "ZMoveGuardMs", iSortArmZMoveGuardMs);
 	Ini->WriteBool("SortArm", "AutoSkipOnPickFail", bSortArmAutoSkipOnPickFail);
 	Ini->WriteInteger("Safety", "LoaderYSafeDistance", iLoaderYSafeDistance);
 	Ini->WriteInteger("SettleDelay", "EmptyDestackSettleMs", iEmptyDestackSettleMs);

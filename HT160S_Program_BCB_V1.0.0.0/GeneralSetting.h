@@ -144,6 +144,7 @@ public:
 	// (HT172 DoPickFromLoader hardcodes 3; here tunable). 0 = alarm on the first failure.
 	// Stored in General.ini [SortArm] PickRetryCount.
 	int iSortArmPickRetryCount;
+	int iSortArmZMoveGuardMs;   //AI(bcb6-172align) 20260723 : pick/place SuckZ down-move guard timeout ms; still not done + Home on -> alarm
 
 	// AI(ht160s-autoskip) 20260714 : when true, a SortArm cell that still fails to pick
 	// after iSortArmPickRetryCount retries is auto-skipped (written off EMPTY_IC, the arm

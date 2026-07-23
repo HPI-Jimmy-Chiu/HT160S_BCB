@@ -56,6 +56,7 @@ private:
     int    iResidueAutoIndex;      //AI(ht160s-residue) 20260624 : Auto to report residue-clear to when bg check completes (-1 idle)
     bool   bResidueArmed;          //AI(ht160s-residue) 20260625 : residue check enabled only after nozzle lifted to top (place case 60)
     unsigned int dwSuckHomeLostStart;   //AI(HT160S-Maintainer) 20260622 : SortArmX suck-home loss debounce (GetTickCount of first loss; 0=clear)
+    unsigned int dwZDownGuardStart;   //AI(bcb6-172align) 20260723 : pick/place SuckZ down-move guard debounce (GetTickCount; 0=clear)
     unsigned int dwHoldLostStart;   //AI(ht160s-falldown) 20260706 : held-IC vacuum-loss debounce (GetTickCount of first OFF; 0=clear)
     bool bMoveAborted;   //AI(ht160s-sortarm) 20260703 : teach abort of an in-flight MoveSuckerToCell (bail before the next axis move; no stray Y after a fault modal raised mid-case-30). Cleared at case 0 / InitialFlag.
     int  iPickRetryCount;   //AI(ht160s-pick-retry) 20260702 : failed pick strokes on the current cell (HT172 iRetryCT port)
@@ -150,6 +151,7 @@ public:
     void SetPnPParameters(double PickDelaySec, double PlaceDelaySec, double DestroyCheckSec);   //AI(ht160s-pnp) 20260626 : push recipe [PnP] values into the runtime model
     int  GetDestroyCheckMS();   //AI(ht160s-pnp) 20260626 : dDestroyCheckTime as ms for the blow dwell (floor 300 on <=0)
     bool AreAllSuckersHome();   //AI(HT160S-Maintainer) 20260622 : canonical SortArm-move suck-home interlock (live Led[iHomeLed])
+    bool GuardSuckZDown(bool bPick);   //AI(bcb6-172align) 20260723 : bounded SuckZ down-move / Home cross-check (HT172 aSortArm:643); alarm not silent deadlock
     bool SortArmZToSafePos();   //AI(ht160s-sortarm) 20260703 : public for Teach All-Z-up button + not-home recovery (lift all suck-Z to SORT_ARM_SAFE_Z_POSITION)
     void AbortCurrentMove();   //AI(ht160s-sortarm) 20260703 : set abort flag so an in-flight MoveSuckerToCell bails before issuing the next axis move (teach StopSortArmTest)
     void DoSortArm(int &Task);

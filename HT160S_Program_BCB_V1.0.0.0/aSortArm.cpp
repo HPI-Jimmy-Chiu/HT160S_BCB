@@ -152,6 +152,7 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     bOneCycleFinish=false;
     dwSuckHomeLostStart=0;
     dwHoldLostStart=0;   //AI(ht160s-falldown) 20260706 : reset held-IC vacuum-loss debounce
+    dwZDownGuardStart=0;   //AI(bcb6-172align) 20260723 : fresh SuckZ down-move guard on home/init
     bMoveAborted=false;   //AI(ht160s-sortarm) 20260703 : no pending in-flight move abort on home/init
     iPickRetryCount=0;   //AI(ht160s-pick-retry) 20260702 : fresh pick-retry budget on home/init
     //AI(ht160s-home-resume-w4) 20260711 : keep-material HOME preserves an UNFINISHED
@@ -865,6 +866,57 @@ bool TSortArmModule::MovePlaceZDown()
         }
     }
     return bAllDone;
+}
+//---------------------------------------------------------------------------
+bool TSortArmModule::GuardSuckZDown(bool bPick)
+{
+    //AI(bcb6-172align) 20260723 : open-loop SuckZ (MC88X1, no encoder) down-move safety, ported
+    //from HT172 aSortArm.cpp:643. A pick/place Z-down that never reports done (card MotionDone
+    //latched busy, lost steps, or a stuck/failed Home sensor) used to hang PickTask=45 / PlaceTask=40
+    //forever and deadlock the whole machine (only the 300s watchdog noticed). Give the down-move a
+    //bounded window (GeneralSetting.iSortArmZMoveGuardMs); if it is still not done AND a commanded-down
+    //nozzle is STILL on its Home sensor (never left the top), stop all motion and raise an operator
+    //alarm instead of a silent hang. Time-based debounce like MoveSortArmX. Returns true on fault.
+#ifdef SOFT_SIMULATE
+    (void)bPick;
+    return false;   //no card in sim : MoveTo completes instantly so this is never reached
+#else
+    int GuardMs=GeneralSetting.iSortArmZMoveGuardMs;
+    if(GuardMs<1000)
+        GuardMs=1000;
+    if(dwZDownGuardStart==0)
+    {
+        dwZDownGuardStart=GetTickCount();
+        return false;
+    }
+    if((int)(GetTickCount()-dwZDownGuardStart)<GuardMs)
+        return false;
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        bool bCommandedDown;
+        if(bPick)
+            bCommandedDown=Slot[s].bCanPick;
+        else
+            bCommandedDown=Slot[s].bPlaceSelected;
+        if(bCommandedDown==false)
+            continue;
+        TTrayMotor *Motor=GetSuckZMotor(s);
+        if(Motor==NULL || Motor->GetEnable()==false)
+            continue;
+        Motor->ScanMotorStatus();
+        if(Motor->Led[iHomeLed])
+        {
+            dwZDownGuardStart=0;
+            HSys.StopAllMotor();
+            ShowSystemError("SortArm SuckZ "+IntToStr(s+1)+" down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.", K_RETRY);
+            return true;
+        }
+    }
+    dwZDownGuardStart=0;
+    HSys.StopAllMotor();
+    ShowSystemError("SortArm SuckZ down did not complete within timeout. Check the suck-Z axis and MC88X1 card.", K_RETRY);
+    return true;
+#endif
 }
 //---------------------------------------------------------------------------
 bool TSortArmModule::FindPickCells(int LoaderNo)
@@ -1730,6 +1782,7 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
     switch(PickTask)
     {
         case 1:
+            dwZDownGuardStart=0;   //AI(bcb6-172align) 20260723 : fresh pick cycle -> reset SuckZ down-move guard
             if(FindPickCells(iActiveLoaderNo)==false)
             {
                 PickTask=1;
@@ -1777,9 +1830,12 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
                 break;
             if(MovePickZDown())
             {
+                dwZDownGuardStart=0;                                     //AI(bcb6-172align) 20260723 : Z-down done, disarm guard
                 StartPnpSettle(dPickDelaySec);                           //AI(ht160s-pnp) 20260626 : let the nozzle settle on the IC before suck
                 PickTask=47;
             }
+            else
+                GuardSuckZDown(true);                                    //AI(bcb6-172align) 20260723 : bounded Home cross-check; alarm not silent deadlock
             break;
 
         case 47:
@@ -1978,6 +2034,7 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
     switch(PlaceTask)
     {
         case 1:
+            dwZDownGuardStart=0;   //AI(bcb6-172align) 20260723 : fresh place cycle -> reset SuckZ down-move guard
             if(SelectPlaceAuto()==false)
             {
                 return false;
@@ -2010,9 +2067,12 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
         case 40:
             if(MovePlaceZDown())
             {
+                dwZDownGuardStart=0;                                     //AI(bcb6-172align) 20260723 : Z-down done, disarm guard
                 StartPnpSettle(dPlaceDelaySec);                          //AI(ht160s-pnp) 20260626 : settle at the place position before releasing the IC
                 PlaceTask=45;
             }
+            else
+                GuardSuckZDown(false);                                   //AI(bcb6-172align) 20260723 : bounded Home cross-check; alarm not silent deadlock
             break;
 
         case 45:
