@@ -1545,7 +1545,12 @@ void TSortArmModule::TransferPlaceDataToAuto()
                 //AI(ht160s-lotpassfail) 20260709 : read the class FROZEN at CCD scan (Slot.PassClass)
                 //so the logged result matches the class the IC was actually routed on; 0 -> blank.
                 int PassClassVal=Slot[SlotIndex].PassClass;
-                AnsiString PassFailText=(PassClassVal==1)?AnsiString("PASS"):((PassClassVal==2)?AnsiString("FAIL"):AnsiString(""));
+                AnsiString PassFailText="";
+                //AI(bcb6-ternary) 20260723 : nested ?: yielding AnsiString miscompiles in BCB6 (crash); use if/else
+                if(PassClassVal==1)
+                    PassFailText=AnsiString("PASS");
+                else if(PassClassVal==2)
+                    PassFailText=AnsiString("FAIL");
                 g_DeviceInfo.AddPassFail(SlotIndex, PassFailText);
             }
             //AI(ht160s-lotpassfail) 20260709 : By Lot+PassFail overflow trace. When every

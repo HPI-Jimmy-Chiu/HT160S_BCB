@@ -2856,8 +2856,16 @@ void Tfiosetview::SelfTestSensorTick()
             int row=iSensorGridRow[i];
             if(row>=1 && row<grdSelfTest->RowCount)
             {
-                grdSelfTest->Cells[3][row]=bSensorSeenOn[i]?AnsiString("OK"):(raw==1?LangT("hold"):LangT("wait"));
-                grdSelfTest->Cells[4][row]=bSensorSeenOff[i]?AnsiString("OK"):(raw==0?LangT("hold"):LangT("wait"));
+                AnsiString c3;   //AI(bcb6-ternary) 20260723 : nested ?: -> AnsiString miscompiles in BCB6; use if/else
+                if(bSensorSeenOn[i]) c3=AnsiString("OK");
+                else if(raw==1) c3=LangT("hold");
+                else c3=LangT("wait");
+                grdSelfTest->Cells[3][row]=c3;
+                AnsiString c4;
+                if(bSensorSeenOff[i]) c4=AnsiString("OK");
+                else if(raw==0) c4=LangT("hold");
+                else c4=LangT("wait");
+                grdSelfTest->Cells[4][row]=c4;
                 grdSelfTest->Cells[5][row]=bNowPass?AnsiString("PASS"):AnsiString("...");
             }
         }

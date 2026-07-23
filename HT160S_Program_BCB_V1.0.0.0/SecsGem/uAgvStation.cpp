@@ -667,9 +667,13 @@ AnsiString TAgvCoordinator::DescribeAutoBins(int AutoIndex)
                 continue;
             AnsiString token;
             if(GeneralSetting.IsLotPassFailSortMode())
-                token = LotID + ":" + (Key == 1 ? AnsiString("PASS")
-                                     : Key == 2 ? AnsiString("FAIL")
-                                     :            IntToStr(Key));
+            {
+                AnsiString kt;   //AI(bcb6-ternary) 20260723 : nested ?: -> AnsiString miscompiles in BCB6; use if/else
+                if(Key == 1) kt = AnsiString("PASS");
+                else if(Key == 2) kt = AnsiString("FAIL");
+                else kt = IntToStr(Key);
+                token = LotID + ":" + kt;
+            }
             else
                 token = LotID + ":" + IntToStr(Key);
             s = (s == "") ? token : (s + "," + token);
