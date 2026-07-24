@@ -480,8 +480,17 @@ bool TMyMC88X1Motor::MoveTo(int Tar)
     {
         if(Direction)
             NowPulse=-NowPulse;
-        if(NowPulse==TargetPulse)
-            return true;
+        //AI(mc88x1-arrive-tol) 20260724 : accept a small +/- pulse window, not an exact match.
+        //Open-loop stepper: a completed move lands exactly on target; but if the card settles a
+        //pulse or two off, the exact test made MoveTo never report done -> the caller hangs. The
+        //axis is already idle here (MotionDone()). Window is tiny (a few pulses, sub-0.1mm).
+        {
+            long dPulse = NowPulse - TargetPulse;
+            if(dPulse < 0)
+                dPulse = -dPulse;
+            if(dPulse <= 5)
+                return true;
+        }
     }
     return false;
 }

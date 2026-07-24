@@ -877,6 +877,11 @@ bool TSortArmModule::GuardSuckZDown(bool bPick)
     //bounded window (GeneralSetting.iSortArmZMoveGuardMs); if it is still not done AND a commanded-down
     //nozzle is STILL on its Home sensor (never left the top), stop all motion and raise an operator
     //alarm instead of a silent hang. Time-based debounce like MoveSortArmX. Returns true on fault.
+    //AI(sortarm-vacuum) 20260724 : SCOPE - guards "Z-down never reports done" (axis stuck / never
+    //reaches teach Z). Does NOT cover "nozzle reached Z but vacuum will not seal" - that is the
+    //pick-suck path (case 50 -> SUC0011) and was the 20260723 on-machine event; this guard
+    //correctly did NOT fire there (case 45 had already passed). Originally named after the wrong
+    //root cause; kept as a distinct, real safety net for the Z-not-done failure.
 #ifdef SOFT_SIMULATE
     (void)bPick;
     return false;   //no card in sim : MoveTo completes instantly so this is never reached
