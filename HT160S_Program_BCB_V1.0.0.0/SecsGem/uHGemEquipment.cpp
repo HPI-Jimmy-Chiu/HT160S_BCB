@@ -57,6 +57,8 @@ __fastcall THGem::THGem(TComponent *Owner)
     ECList     = new TList;
     ReportList = new TList;
     CEIDList   = new TList;
+    bHostManagesReports = false;   //AI(secs-reportdef) 20260724
+    bEventDefLoaded     = false;   //AI(secs-reportdef) 20260724
 
     //AI(ht160s-secsgem) 20260610 : Phase 0 HSMS-SS socket transport init
     GemLogic     = NULL;
@@ -326,6 +328,16 @@ void THGem::EventReport(unsigned iDataID, unsigned iCeid)
         FlushSecsLogToFile();   //AI(ht160s-obsv-p1) : event evidence crash-safe
         return;
     }
+    //AI(secs-reportdef) 20260724 : per-CEID enable gate. IsEnableEvent is inert until the host
+    //sends its first S2F37, so this is a no-op for today's always-on stream; after the host opts
+    //in, only a CEID it explicitly disabled is suppressed (unregistered CEIDs still fire).
+    if(IsEnableEvent(iDataID, iCeid)==false)
+    {
+        StringOut("[SECS][TX] S6F11 suppressed (CEID disabled by host)");
+        FlushSecsLogToFile();
+        return;
+    }
+
 
     //AI(ht160s-secsgem) 20260611 : let the GEM logic snapshot live machine data
     // (run mode / lot / output / UPH / alarm) into its SV members before encode.
@@ -384,7 +396,16 @@ void THGem::SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx)
 //---------------------------------------------------------------------------
 bool THGem::IsEnableEvent(unsigned iDataID, unsigned iCeid)
 {
-    return true;
+    //AI(secs-reportdef) 20260724 : provably inert until the host manages reports.
+    //(A) no host S2F37 yet -> identical to legacy unconditional send.
+    //(B) unregistered CEID -> fail OPEN (never silence, e.g. CEID 138).
+    //(C) host is managing -> honour the per-CEID enable flag.
+    if(!bHostManagesReports)
+        return true;
+    TGemCEIDItem *Ce = FindCEIDItem(iCeid);
+    if(Ce==NULL)
+        return true;
+    return Ce->Enabled;
 }
 //---------------------------------------------------------------------------
 void THGem::StringOut(AnsiString Text)
@@ -701,6 +722,230 @@ void THGem::ReadEventReportData()
 {
 }
 //---------------------------------------------------------------------------
+//AI(secs-reportdef) 20260724 : S2F34/F36/F38 binary-ack senders (single B code; reuses request SystemByte).
+void THGem::ReportAcknowledge(unsigned char DRACK)
+{
+    InitLocalHead(2, 34, 0);
+    DataItemOut(1, HType.BINARY_TYPE, &DRACK);
+    SendLocalData();
+}
+//---------------------------------------------------------------------------
+void THGem::LinkReportAcknowledge(unsigned char LRACK)
+{
+    InitLocalHead(2, 36, 0);
+    DataItemOut(1, HType.BINARY_TYPE, &LRACK);
+    SendLocalData();
+}
+//---------------------------------------------------------------------------
+void THGem::EnableDisableEventReportAcknowledge(unsigned char ERACK)
+{
+    InitLocalHead(2, 38, 0);
+    DataItemOut(1, HType.BINARY_TYPE, &ERACK);
+    SendLocalData();
+}
+//---------------------------------------------------------------------------
+bool THGem::IsValidSVID(unsigned SVID)
+{
+    return (FindSVItem(SVID)!=NULL);
+}
+//---------------------------------------------------------------------------
+//AI(secs-reportdef) 20260724 : remove ReportID from every CEID's link list (compact in place).
+void THGem::UnlinkReportFromAllCeids(unsigned ReportID)
+{
+    if(CEIDList==NULL) return;
+    for(int i=0; i<CEIDList->Count; i++)
+    {
+        TGemCEIDItem *Ce = (TGemCEIDItem*)CEIDList->Items[i];
+        int w = 0;
+        for(int r=0; r<Ce->ReportCount; r++)
+            if(Ce->ReportIDs[r]!=ReportID)
+                Ce->ReportIDs[w++] = Ce->ReportIDs[r];
+        Ce->ReportCount = w;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(secs-reportdef) 20260724 : delete a HOST report (Mode==0) and unlink it. Firmware reports are
+//protected upstream (DRACK 0x03) and never reach here.
+void THGem::DeleteHostReport(unsigned ReportID)
+{
+    if(ReportList==NULL) return;
+    for(int i=0; i<ReportList->Count; i++)
+    {
+        TGemReportItem *Rp = (TGemReportItem*)ReportList->Items[i];
+        if(Rp->ReportID==ReportID && Rp->Mode==0)
+        {
+            UnlinkReportFromAllCeids(ReportID);
+            delete Rp;
+            ReportList->Delete(i);
+            return;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void THGem::DeleteAllHostReports()
+{
+    if(ReportList==NULL) return;
+    for(int i=ReportList->Count-1; i>=0; i--)
+    {
+        TGemReportItem *Rp = (TGemReportItem*)ReportList->Items[i];
+        if(Rp->Mode==0)
+        {
+            UnlinkReportFromAllCeids(Rp->ReportID);
+            delete Rp;
+            ReportList->Delete(i);
+        }
+    }
+}
+//---------------------------------------------------------------------------
+//AI(secs-reportdef) 20260724 : S2F33 Define Report. L,2{ DATAID, L,a{ L,2{ RPTID, L,b{ SVID.. } } } }.
+//Parse into scratch, validate ALL, then commit atomically. DRACK 0=ok 1=space 2=fmt 3=firmware-dup 4=badSVID.
+void THGem::ProcessDefineReport_S2F33()
+{
+    int a=0, b=0, len=0, i=0, j=0;
+    unsigned char Type=0;
+    AnsiString sTmp;
+    static unsigned rid[64];
+    static int      svn[64];
+    static unsigned svv[64][64];
+    int nRpt = 0;
+    ResetReturnCode();
+    if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)              { ReportAcknowledge(0x02); return; }
+    if(GetDataItemLenAndType(len, Type)!=1)                 { ReportAcknowledge(0x02); return; }
+    if(DataItemIn(len, Type, sTmp)!=1)                      { ReportAcknowledge(0x02); return; }
+    if(GetDataItemLenAndTypeAndDelete(a, HType.LIST_TYPE)!=1){ ReportAcknowledge(0x02); return; }
+    if(a==0)  { DeleteAllHostReports(); ReportAcknowledge(0x00); SaveEventReportData(); return; }
+    if(a>64)  { ReportAcknowledge(0x01); return; }
+    for(i=0; i<a; i++)
+    {
+        if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)         { ReportAcknowledge(0x02); return; }
+        if(GetDataItemLenAndType(len, Type)!=1)             { ReportAcknowledge(0x02); return; }
+        if(DataItemIn(len, Type, sTmp)!=1)                  { ReportAcknowledge(0x02); return; }
+        unsigned rr = (unsigned)atoi(sTmp.c_str());
+        TGemReportItem *ex = FindReportItem(rr);
+        if(ex!=NULL && ex->Mode==1)                         { ReportAcknowledge(0x03); return; }
+        if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ ReportAcknowledge(0x02); return; }
+        if(b>64)                                            { ReportAcknowledge(0x01); return; }
+        rid[nRpt]=rr; svn[nRpt]=b;
+        for(j=0; j<b; j++)
+        {
+            if(GetDataItemLenAndType(len, Type)!=1)         { ReportAcknowledge(0x02); return; }
+            if(DataItemIn(len, Type, sTmp)!=1)              { ReportAcknowledge(0x02); return; }
+            unsigned sv = (unsigned)atoi(sTmp.c_str());
+            if(IsValidSVID(sv)==false)                      { ReportAcknowledge(0x04); return; }
+            svv[nRpt][j]=sv;
+        }
+        nRpt++;
+        if(nRpt>=64)                                        { ReportAcknowledge(0x01); return; }
+    }
+    for(i=0; i<nRpt; i++)
+    {
+        if(svn[i]==0) DeleteHostReport(rid[i]);
+        else          SetReportIDContent(rid[i], (unsigned)svn[i], svv[i], 0);
+    }
+    ReportAcknowledge(0x00);
+    SaveEventReportData();
+}
+//---------------------------------------------------------------------------
+//AI(secs-reportdef) 20260724 : S2F35 Link Event Report. L,2{ DATAID, L,a{ L,2{ CEID, L,b{ RPTID.. } } } }.
+//LRACK 0=ok 2=fmt 4=badCEID 5=badRPTID. Host can only link EXISTING (firmware) CEIDs -> session-only.
+void THGem::ProcessLinkEventReport_S2F35()
+{
+    int a=0, b=0, len=0, i=0, j=0;
+    unsigned char Type=0;
+    AnsiString sTmp;
+    static unsigned cid[64];
+    static int      rpn[64];
+    static unsigned rpv[64][32];
+    int nCe = 0;
+    ResetReturnCode();
+    if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)              { LinkReportAcknowledge(0x02); return; }
+    if(GetDataItemLenAndType(len, Type)!=1)                 { LinkReportAcknowledge(0x02); return; }
+    if(DataItemIn(len, Type, sTmp)!=1)                      { LinkReportAcknowledge(0x02); return; }
+    if(GetDataItemLenAndTypeAndDelete(a, HType.LIST_TYPE)!=1){ LinkReportAcknowledge(0x02); return; }
+    if(a==0)  { LinkReportAcknowledge(0x00); return; }
+    if(a>64)  { LinkReportAcknowledge(0x02); return; }
+    for(i=0; i<a; i++)
+    {
+        if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)         { LinkReportAcknowledge(0x02); return; }
+        if(GetDataItemLenAndType(len, Type)!=1)             { LinkReportAcknowledge(0x02); return; }
+        if(DataItemIn(len, Type, sTmp)!=1)                  { LinkReportAcknowledge(0x02); return; }
+        unsigned cc = (unsigned)atoi(sTmp.c_str());
+        if(FindCEIDItem(cc)==NULL)                          { LinkReportAcknowledge(0x04); return; }
+        if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ LinkReportAcknowledge(0x02); return; }
+        if(b>32)                                            { LinkReportAcknowledge(0x02); return; }
+        cid[nCe]=cc; rpn[nCe]=b;
+        for(j=0; j<b; j++)
+        {
+            if(GetDataItemLenAndType(len, Type)!=1)         { LinkReportAcknowledge(0x02); return; }
+            if(DataItemIn(len, Type, sTmp)!=1)              { LinkReportAcknowledge(0x02); return; }
+            unsigned rr = (unsigned)atoi(sTmp.c_str());
+            if(FindReportItem(rr)==NULL)                    { LinkReportAcknowledge(0x05); return; }
+            rpv[nCe][j]=rr;
+        }
+        nCe++;
+        if(nCe>=64)                                         { LinkReportAcknowledge(0x02); return; }
+    }
+    for(i=0; i<nCe; i++)
+        SetCEIDContent(cid[i], (unsigned)rpn[i], rpv[i], 0);
+    LinkReportAcknowledge(0x00);
+}
+//---------------------------------------------------------------------------
+//AI(secs-reportdef) 20260724 : S2F37 Enable/Disable Event. L,2{ CEED(BOOL), L,n{ CEID.. } }. n==0 = all.
+//ERACK 0=ok 1=CEID-not-exist 2=fmt. Success is the ONLY point that arms bHostManagesReports.
+void THGem::ProcessEnableDisableEventReport_S2F37()
+{
+    int n=0, len=0, i=0;
+    unsigned char Type=0, rawb=0;
+    bool bCeed=false;
+    AnsiString sTmp;
+    static unsigned cid[256];
+    int nCe = 0;
+    ResetReturnCode();
+    if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)             { EnableDisableEventReportAcknowledge(0x02); return; }
+    if(GetDataItemLenAndType(len, Type)!=1)                { EnableDisableEventReportAcknowledge(0x02); return; }
+    if(Type==HType.BOOLEAN_TYPE)
+    {
+        if(DataItemIn(1, HType.BOOLEAN_TYPE, &bCeed)!=1)   { EnableDisableEventReportAcknowledge(0x02); return; }
+    }
+    else if(Type==HType.BINARY_TYPE || Type==HType.UINT_1_TYPE)
+    {
+        if(DataItemIn(1, Type, &rawb)!=1)                  { EnableDisableEventReportAcknowledge(0x02); return; }
+        bCeed = (rawb!=0);
+    }
+    else
+    {
+        if(DataItemIn(len, Type, sTmp)!=1)                 { EnableDisableEventReportAcknowledge(0x02); return; }
+        bCeed = (atoi(sTmp.c_str())!=0);
+    }
+    if(GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1){ EnableDisableEventReportAcknowledge(0x02); return; }
+    if(n>256) { EnableDisableEventReportAcknowledge(0x02); return; }
+    for(i=0; i<n; i++)
+    {
+        if(GetDataItemLenAndType(len, Type)!=1)            { EnableDisableEventReportAcknowledge(0x02); return; }
+        if(DataItemIn(len, Type, sTmp)!=1)                 { EnableDisableEventReportAcknowledge(0x02); return; }
+        unsigned cc = (unsigned)atoi(sTmp.c_str());
+        if(FindCEIDItem(cc)==NULL)                         { EnableDisableEventReportAcknowledge(0x01); return; }
+        cid[nCe++]=cc;
+    }
+    if(n==0)
+    {
+        if(CEIDList!=NULL)
+            for(i=0; i<CEIDList->Count; i++)
+                ((TGemCEIDItem*)CEIDList->Items[i])->Enabled = bCeed;
+    }
+    else
+    {
+        for(i=0; i<nCe; i++)
+        {
+            TGemCEIDItem *Ce = FindCEIDItem(cid[i]);
+            if(Ce!=NULL) Ce->Enabled = bCeed;
+        }
+    }
+    bHostManagesReports = true;
+    EnableDisableEventReportAcknowledge(0x00);
+    SaveEventReportData();
+}
+//---------------------------------------------------------------------------
 void THGem::SetCEIDContent(unsigned iCeid, unsigned iReportCount, unsigned *iReportIDData, int Mode)
 {
     SetCEIDContent(iCeid, "", iReportCount, iReportIDData, Mode);
@@ -714,6 +959,8 @@ void THGem::SetCEIDContent(unsigned iCeid, AnsiString CeidAlias, unsigned iRepor
     {
         p = new TGemCEIDItem;
         p->CEID = iCeid;
+        p->Enabled = true;   //AI(secs-reportdef) 20260724 : default enabled (preserve today's always-on)
+        p->Mode = Mode;      //AI(secs-reportdef) 20260724 : 0=host, 1=firmware
         CEIDList->Add(p);
     }
     p->Alias = CeidAlias;
@@ -733,6 +980,7 @@ bool THGem::SetReportIDContent(unsigned iReportID, unsigned iReportCount, unsign
     {
         p = new TGemReportItem;
         p->ReportID = iReportID;
+        p->Mode = Mode;   //AI(secs-reportdef) 20260724 : 0=host, 1=firmware
         ReportList->Add(p);
     }
     int n = (int)iReportCount;

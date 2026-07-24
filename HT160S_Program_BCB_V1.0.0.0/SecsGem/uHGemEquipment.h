@@ -92,12 +92,15 @@ struct TGemReportItem
     unsigned ReportID;
     int SVCount;
     unsigned SVIDs[64];
+    int Mode;   //AI(secs-reportdef) 20260724 : 0=host-defined, 1=firmware-default
 };
 struct TGemCEIDItem
 {
     unsigned CEID;
     int ReportCount;
     unsigned ReportIDs[32];
+    int Mode;   //AI(secs-reportdef) 20260724 : 0=host-defined, 1=firmware-default
+    bool Enabled;   //AI(secs-reportdef) 20260724 : per-CEID S6F11 enable (S2F37); default true
     AnsiString Alias;
 };
 //---------------------------------------------------------------------------
@@ -137,6 +140,8 @@ private:
     TList *ECList;       // TGemECItem*
     TList *ReportList;   // TGemReportItem*
     TList *CEIDList;     // TGemCEIDItem*
+    bool bHostManagesReports;   //AI(secs-reportdef) 20260724 : false until first successful S2F37; enable-gate inert while false
+    bool bEventDefLoaded;       //AI(secs-reportdef) 20260724 : true after ReadEventReportData; Save is a no-op before
     TGemSVItem     *FindSVItem(unsigned SVID);
     TGemECItem     *FindECItem(unsigned ECID);
     TGemReportItem *FindReportItem(unsigned ReportID);
@@ -292,6 +297,17 @@ public:
     void SetCEIDContent(unsigned iCeid, unsigned iReportCount, unsigned *iReportIDData, int Mode);
     void SetCEIDContent(unsigned iCeid, AnsiString CeidAlias, unsigned iReportCount, unsigned *iReportIDData, int Mode);
     bool SetReportIDContent(unsigned iReportID, unsigned iReportCount, unsigned *iReportIDData, int Mode);
+    //AI(secs-reportdef) 20260724 : S2F33/F35/F37 host report-definition (bodies on THGem; HT160Gem virtuals delegate)
+    void ProcessDefineReport_S2F33();
+    void ProcessLinkEventReport_S2F35();
+    void ProcessEnableDisableEventReport_S2F37();
+    void ReportAcknowledge(unsigned char DRACK);
+    void LinkReportAcknowledge(unsigned char LRACK);
+    void EnableDisableEventReportAcknowledge(unsigned char ERACK);
+    bool IsValidSVID(unsigned SVID);
+    void DeleteHostReport(unsigned ReportID);
+    void UnlinkReportFromAllCeids(unsigned ReportID);
+    void DeleteAllHostReports();
 
     void InitLocalHead(int Stream, int Function, int WaitBit);
     void DataItemOut(int Len, unsigned char Type, void *Value);

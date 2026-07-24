@@ -88,6 +88,10 @@ public:
     virtual void S1F14_ConnectRequestAcknowledge();
     //AI(secs-online) 20260724 : S1F17 Request ONLINE -> S1F18 ONLACK=0 + control state Online-Remote
     virtual void S1F18_ONLINEAcknowledge();
+    //AI(secs-reportdef) 20260724 : S2F33/F35/F37 -> delegate to THGem processors
+    virtual void S2F34_DefineReportAcknowledge();
+    virtual void S2F36_LinkEventReportAcknowledge();
+    virtual void S2F38_EnableDisableEventReportAcknowledge();
     //AI(ht160s-secsgem) 20260611 : GUI EC editor - same idle/range guard as S2F16.
     //  0=ok, 1=ECID not host-settable, 2=busy, 3=range/convert error.
     int GuiWriteTrayEC(unsigned ECID, AnsiString sValue);

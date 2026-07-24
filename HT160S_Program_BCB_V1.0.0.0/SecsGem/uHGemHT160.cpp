@@ -1240,6 +1240,25 @@ void HT160Gem::S1F18_ONLINEAcknowledge()
     HGemPtr->StringOut("[SECS] S1F18 ONLINE acknowledged (ONLACK=0, control state -> Online-Remote 5)");
 }
 //---------------------------------------------------------------------------
+void HT160Gem::S2F34_DefineReportAcknowledge()
+{
+    //AI(secs-reportdef) 20260724 : Find* are private on THGem -> body lives there; delegate.
+    if(HGemPtr!=NULL)
+        HGemPtr->ProcessDefineReport_S2F33();
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S2F36_LinkEventReportAcknowledge()
+{
+    if(HGemPtr!=NULL)
+        HGemPtr->ProcessLinkEventReport_S2F35();
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S2F38_EnableDisableEventReportAcknowledge()
+{
+    if(HGemPtr!=NULL)
+        HGemPtr->ProcessEnableDisableEventReport_S2F37();
+}
+//---------------------------------------------------------------------------
 void HT160Gem::S2F32_DateAndTimeAcknowledge()
 {
     //AI(ht160s-secsgem) 20260625 : host S2F31 Date and Time Set Request -> reply S2F32 TIACK.

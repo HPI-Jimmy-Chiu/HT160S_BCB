@@ -89,6 +89,9 @@ void HTGem::Dispatch(int S, int F)
         case 41: S2F42_Host_Command_Acknowledge();   return;
         case 13: S2F14_EquipmentConstanData();       return;
         case 15: S2F16_NewEquipmentConstantSendAcknowledge(); return;//AI(ht160s-secsgem) 20260611 : EC write
+        case 33: S2F34_DefineReportAcknowledge();             return;//AI(secs-reportdef) 20260724 : Define Report
+        case 35: S2F36_LinkEventReportAcknowledge();          return;//AI(secs-reportdef) 20260724 : Link Event Report
+        case 37: S2F38_EnableDisableEventReportAcknowledge(); return;//AI(secs-reportdef) 20260724 : Enable/Disable Event
         }
         break;
     case 5:
