@@ -310,7 +310,38 @@ void THGem::SetMachineTypeAndSoftwarseVer(char *MachineType, char *SoftwareVersi
 //---------------------------------------------------------------------------
 void THGem::SaveEventReportData()
 {
-    StringOut("[SECS] SaveEventReportData placeholder");
+    //AI(secs-reportdef) 20260724 : persist HOST-defined reports (Mode==0) ONLY. Links to firmware
+    //CEIDs and per-CEID enable are session-only by design, so a reboot never sends FEWER events
+    //than the firmware baseline. No-op until ReadEventReportData has run (guards the boot-time
+    //firmware registration from clobbering the host file with an empty one).
+    if(!bEventDefLoaded)
+        return;
+    AnsiString Dir = HSys.CurrentDir + "\\system";
+    AnsiString Fn  = Dir + "\\EventReportDef.ini";
+    try { ForceDirectories(Dir); } catch(...) {}
+    TStringList *sl = new TStringList;
+    try
+    {
+        sl->Add("FormatVersion=1");
+        if(ReportList!=NULL)
+        {
+            for(int i=0; i<ReportList->Count; i++)
+            {
+                TGemReportItem *Rp = (TGemReportItem*)ReportList->Items[i];
+                if(Rp->Mode!=0) continue;
+                AnsiString row = "Report=" + IntToStr((int)Rp->ReportID) + "|";
+                for(int s=0; s<Rp->SVCount; s++)
+                {
+                    if(s>0) row += ",";
+                    row += IntToStr((int)Rp->SVIDs[s]);
+                }
+                sl->Add(row);
+            }
+        }
+        sl->SaveToFile(Fn);
+    }
+    catch(...) {}
+    delete sl;
 }
 //---------------------------------------------------------------------------
 void THGem::EventReport(unsigned iDataID, unsigned iCeid)
@@ -720,6 +751,49 @@ void THGem::WriteAlamData()
 //---------------------------------------------------------------------------
 void THGem::ReadEventReportData()
 {
+    //AI(secs-reportdef) 20260724 : overlay HOST-defined reports onto the firmware baseline (already
+    //registered by AddReprot). Robust: missing/corrupt/bad-version -> keep firmware defaults, never
+    //throw, never block boot. Links + enable are NOT restored (session-only by design). Sets
+    //bEventDefLoaded so Save is armed only after this overlay has loaded.
+    bEventDefLoaded = true;
+    AnsiString Fn = HSys.CurrentDir + "\\system\\EventReportDef.ini";
+    if(!FileExists(Fn))
+        return;
+    TStringList *sl = new TStringList;
+    try
+    {
+        sl->LoadFromFile(Fn);
+        if(sl->Count>=1 && sl->Strings[0].Trim()=="FormatVersion=1")
+        {
+            for(int i=1; i<sl->Count; i++)
+            {
+                AnsiString line = sl->Strings[i].Trim();
+                if(line.SubString(1,7)!="Report=") continue;
+                AnsiString body = line.SubString(8, line.Length()-7);
+                int bar = body.Pos("|");
+                if(bar<=0) continue;
+                unsigned rid = (unsigned)atoi(body.SubString(1, bar-1).c_str());
+                if(rid==0) continue;
+                TGemReportItem *ex = FindReportItem(rid);
+                if(ex!=NULL && ex->Mode==1) continue;
+                AnsiString rest = body.SubString(bar+1, body.Length()-bar);
+                unsigned sv[64];
+                int n = 0;
+                while(rest.Trim()!="" && n<64)
+                {
+                    int comma = rest.Pos(",");
+                    AnsiString tok;
+                    if(comma>0) { tok = rest.SubString(1, comma-1); rest = rest.SubString(comma+1, rest.Length()-comma); }
+                    else        { tok = rest; rest = ""; }
+                    unsigned s = (unsigned)atoi(tok.Trim().c_str());
+                    if(IsValidSVID(s)) sv[n++] = s;
+                }
+                if(n>0) SetReportIDContent(rid, (unsigned)n, sv, 0);
+            }
+        }
+    }
+    catch(...) {}
+    delete sl;
 }
 //---------------------------------------------------------------------------
 //AI(secs-reportdef) 20260724 : S2F34/F36/F38 binary-ack senders (single B code; reuses request SystemByte).

@@ -91,7 +91,7 @@ void TFSECS::GemInitial(AnsiString HandlerType, AnsiString SoftwareVersion)
     HGem->SetReceipeDirectoryAndGlobalName("..\\data\\", "*.*", 0);
     HGem->SetMachineTypeAndSoftwarseVer(HandlerType.c_str(), SoftwareVersion.c_str());
     SECS_SETData(HGem);
-    HGem->SaveEventReportData();
+    HGem->ReadEventReportData();   //AI(secs-reportdef) 20260724 : overlay host report defs AFTER firmware baseline (was SaveEventReportData)
     HGem->Timer1->Enabled = true;
 
     //AI(ht160s-secsgem) 20260610 : open the HSMS socket (listen or connect).

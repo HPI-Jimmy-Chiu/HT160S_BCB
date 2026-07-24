@@ -354,7 +354,7 @@ void HT160Gem::AddReprot()
     unsigned rLdId[1]; rLdId[0] = AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID;
     HGemPtr->SetReportIDContent(7, 1, rLdId, EquDefault);
 
-    HGemPtr->SaveEventReportData();
+    //AI(secs-reportdef) 20260724 : premature save removed - persistence loads at boot via ReadEventReportData and saves on host S2F33/F37 only
 }
 //---------------------------------------------------------------------------
 int HT160Gem::S2F15_CheckNewEquipmentConstant()
