@@ -42,6 +42,7 @@ cStateRecordHT160::cStateRecordHT160()
 {
     ModuleCount = 0;
     bInited     = false;
+    bPrevRunGate = false;                 //AI(ht160s-obsv) 20260724
     SaveRoot    = "D:\\HT160S_StateRecord\\";
 
     for(int i=0; i<SR_MAX_MODULE; i++)
@@ -50,6 +51,7 @@ cStateRecordHT160::cStateRecordHT160()
         Modules[i].LastTask  = -1;
         Modules[i].bHasLast  = false;
         Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1)
+        Modules[i].WatchBase = Now();     //AI(ht160s-obsv) 20260724 : real base set at EnsureInited seed
         Modules[i].HistHead  = 0;
         Modules[i].HistCount = 0;
     }
@@ -117,14 +119,16 @@ void cStateRecordHT160::PushSample(int ModuleIndex, int Task)
         return;
 
     TModuleState *M = &Modules[ModuleIndex];
-    M->Hist[M->HistHead].Time = Now();
+    TDateTime tNow = Now();
+    M->Hist[M->HistHead].Time = tNow;
     M->Hist[M->HistHead].Task = Task;
     M->HistHead = (M->HistHead + 1) % SR_MAX_HISTORY;
     if(M->HistCount < SR_MAX_HISTORY)
         M->HistCount++;
 
-    M->LastTask = Task;
-    M->bHasLast = true;
+    M->LastTask  = Task;
+    M->bHasLast  = true;
+    M->WatchBase = tNow;   //AI(ht160s-obsv) 20260724 : stuck-clock base = last task change (rebased again on production resume in CheckStuckWatchdog)
 }
 //---------------------------------------------------------------------------
 void cStateRecordHT160::EnsureInited()
@@ -191,22 +195,43 @@ void cStateRecordHT160::SampleTasks()
 //dumps but nothing consumed it live - a module wedged mid-production idled forever
 //with no alarm and no evidence. One auto snapshot per stuck episode per module
 //(re-armed when its Task changes); HOME rounds excluded via the RunMode gate.
+//AI(ht160s-obsv) 20260724 : FIX false fire on resume. A Pause/Stop drops SystemStart
+//(MachinePause, csystem.cpp) which freezes task sampling while Now() keeps advancing.
+//The old dMs = Now()-lastTaskChangeTime therefore counted the whole paused span, so
+//the watchdog fired the instant the operator resumed (stale >threshold carry-over,
+//e.g. the 2026-07-23 17:12:07 StuckWatchdog snapshot that was really the 16:59 pause).
+//Fix (minimal) : each module's stuck clock is measured from WatchBase, and WatchBase
+//is REBASED to now on every false->true edge of the production gate below, so a resume
+//grants a fresh full window of ACTUAL running before any module can trip. WatchBase is
+//also set to the last task-change time in PushSample, so a module that keeps advancing
+//never trips. Pause == Stop for this gate (both drop SystemStart), so mid-run pauses
+//also rebase and cannot inflate the clock.
 void cStateRecordHT160::CheckStuckWatchdog()
 {
     if(GeneralSetting.iStuckSnapshotSec<=0)
         return;
-    if(HSys.Sys.SystemStart==false)
-        return;
-    if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
-        return;
-    AnsiString sStuck;
+
+    bool bRunGate = (HSys.Sys.SystemStart!=false) &&
+                    (HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_CleanOut);
     TDateTime tNow = Now();
+    if(bRunGate && bPrevRunGate==false)
+    {
+        for(int i=0; i<ModuleCount; i++)
+        {
+            Modules[i].WatchBase   = tNow;
+            Modules[i].bStuckFired = false;
+        }
+    }
+    bPrevRunGate = bRunGate;
+    if(bRunGate==false)
+        return;
+
+    AnsiString sStuck;
     for(int i=0; i<ModuleCount; i++)
     {
         if(Modules[i].bHasLast==false || Modules[i].bStuckFired)
             continue;
-        int iLast=(Modules[i].HistHead-1+SR_MAX_HISTORY)%SR_MAX_HISTORY;
-        double dMs=double(tNow-Modules[i].Hist[iLast].Time)*86400000.0;
+        double dMs=double(tNow-Modules[i].WatchBase)*86400000.0;
         if(dMs > double(GeneralSetting.iStuckSnapshotSec)*1000.0)
         {
             Modules[i].bStuckFired=true;

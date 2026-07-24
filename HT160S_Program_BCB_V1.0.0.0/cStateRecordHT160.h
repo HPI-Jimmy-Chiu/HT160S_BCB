@@ -40,11 +40,13 @@ private:
         int         HistHead;               // next write index
         int         HistCount;              // filled entries (<= SR_MAX_HISTORY)
         bool        bStuckFired;            //AI(ht160s-obsv-p1) : one auto-snapshot per stuck episode
+        TDateTime   WatchBase;              //AI(ht160s-obsv) 20260724 : stuck-clock base (last task change OR last production resume) - immune to Pause/Stop wall-clock inflation
     };
 
     TModuleState Modules[SR_MAX_MODULE];
     int          ModuleCount;
     bool         bInited;
+    bool         bPrevRunGate;              //AI(ht160s-obsv) 20260724 : prev state of the production gate; rebase WatchBase on its false->true edge
     AnsiString   SaveRoot;                  // e.g. "D:\\HT160S_StateRecord\\"
 
     void       EnsureInited();
