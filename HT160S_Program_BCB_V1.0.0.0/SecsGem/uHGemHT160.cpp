@@ -1223,6 +1223,23 @@ void HT160Gem::S1F14_ConnectRequestAcknowledge()
     HGemPtr->StringOut("[SECS] S1F14 establish-comm acknowledged (COMMACK=0)");
 }
 //---------------------------------------------------------------------------
+void HT160Gem::S1F18_ONLINEAcknowledge()
+{
+    //AI(secs-online) 20260724 : host S1F17 Request ONLINE -> reply S1F18 <B ONLACK>. ONLACK=0
+    //  (accepted). Also lift the GEM control-state mirror to Online-Remote(5), matching the
+    //  existing "ONLINE" host command (S2F41) semantics at S2F42 dispatch. Previously unhandled
+    //  -> the S1 dispatch fell through to S9F3 (Unrecognized), so a GEM host could never bring
+    //  the tool online via S1F17/F18. Send idiom mirrors S1F14_ConnectRequestAcknowledge.
+    if(HGemPtr==NULL)
+        return;
+    unsigned char ONLACK = 0;
+    HGemPtr->InitLocalHead(1, 18, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &ONLACK);
+    HGemPtr->SendLocalData();
+    iControlState = 5;   //Online-Remote (same target as the ONLINE host command)
+    HGemPtr->StringOut("[SECS] S1F18 ONLINE acknowledged (ONLACK=0, control state -> Online-Remote 5)");
+}
+//---------------------------------------------------------------------------
 void HT160Gem::S2F32_DateAndTimeAcknowledge()
 {
     //AI(ht160s-secsgem) 20260625 : host S2F31 Date and Time Set Request -> reply S2F32 TIACK.
