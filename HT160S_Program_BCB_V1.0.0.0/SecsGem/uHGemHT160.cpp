@@ -102,6 +102,12 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1021, HType.INT_4_TYPE, "UPH", "pcs/hr", &svUPH, "units per hour (9045 SVID 1021)");
     HGemPtr->SetSVDataPointer(1027, HType.ASCII_TYPE, "System Time", "", &sSystemTime, "current system time (9045 SVID 1027)");
 
+    //AI(secs-gem-std) 20260727 : SVID 1518 Real/Dummy, 9045-aligned. Bound DIRECTLY to the live
+    // HSys.LastSet.iRealDummy (int; DUMMY=0 / HAS_TRAY=1 / REALLY=2 already match the 9045
+    // 0:Dummy / 1:Tray Only / 2:Real encoding) so a host RPTID-502 read gets the true mode
+    // with no snapshot. The KYEC CJ_EAP host references SVID 1518 in report RPTID 502.
+    HGemPtr->SetSVDataPointer(1518, HType.INT_4_TYPE, "Real/Dummy", "", &HSys.LastSet.iRealDummy, "0=Dummy 1=Tray Only 2=Real (9045 SVID 1518)");
+
     //AI(ht160s-secsgem) 20260612 : HT160 custom high band (66000+). Values are
     // snapshotted into the sv* members by RefreshSVData() right before each
     // serialize, so the bound address stays valid while the reported value tracks
@@ -1245,6 +1251,23 @@ void HT160Gem::S1F18_ONLINEAcknowledge()
     HGemPtr->StringOut("[SECS] S1F18 ONLINE acknowledged (ONLACK=0, control state -> Online-Remote 5)");
 }
 //---------------------------------------------------------------------------
+void HT160Gem::S1F16_OFFLINEAcknowledge()
+{
+    //AI(secs-offline) 20260727 : host S1F15 Request OFF-LINE -> reply S1F16 <B OFLACK>. OFLACK=0
+    //  (accepted). Mirror of S1F18_ONLINEAcknowledge: also drop the GEM control-state mirror to
+    //  Off-Line(1). Single-binary reply idiom (InitLocalHead + DataItemOut(BINARY) + SendLocalData).
+    //  Previously S1F15 had no Dispatch case -> fell to S9F3, so a GEM host could not take the
+    //  tool OFF-LINE. Pairs with the S1F17/F18 online path (commit 21be26a).
+    if(HGemPtr==NULL)
+        return;
+    unsigned char OFLACK = 0;
+    HGemPtr->InitLocalHead(1, 16, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &OFLACK);
+    HGemPtr->SendLocalData();
+    iControlState = 1;   //Equipment Off-Line (GEM control state)
+    HGemPtr->StringOut("[SECS] S1F16 OFF-LINE acknowledged (OFLACK=0, control state -> Off-Line 1)");
+}
+//---------------------------------------------------------------------------
 void HT160Gem::S2F34_DefineReportAcknowledge()
 {
     //AI(secs-reportdef) 20260724 : Find* are private on THGem -> body lives there; delegate.
@@ -1278,6 +1301,50 @@ void HT160Gem::S2F32_DateAndTimeAcknowledge()
     HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &TIACK);
     HGemPtr->SendLocalData();
     HGemPtr->StringOut("[SECS] S2F32 date/time acknowledged (TIACK=0, clock NOT set)");
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S2F18_DateandTimeData()
+{
+    //AI(secs-gem-std) 20260727 : host S2F17 Date and Time Request -> reply S2F18 <A TIME>.
+    //  16-char SEMI E5 TIME "YYYYMMDDhhmmsscc" (cc=centiseconds, fixed "00") from the equipment
+    //  clock. READ-ONLY : reports current time, sets nothing (the write side stays S2F31->S2F32
+    //  ack-only). Previously routed to the base SendUnsupported stub -> host S2F17 T3-timed-out.
+    if(HGemPtr==NULL)
+        return;
+    AnsiString sTime = Now().FormatString("yyyymmddhhnnss") + "00";
+    HGemPtr->InitLocalHead(2, 18, 0);
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, sTime);
+    HGemPtr->SendLocalData();
+    HGemPtr->StringOut("[SECS] S2F18 date/time data sent (" + sTime + ")");
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S2F26_DiagnosticLoopbackData()
+{
+    //AI(secs-gem-std) 20260727 : host S2F25 Loopback Diagnostic Request -> reply S2F26 echoing the
+    //  received binary (ABS) back unchanged - the standard HSMS link diagnostic. Mirrors HT9045
+    //  S2F26. HT160 has no S9F7 primitive, so a malformed request is logged (no reply) rather than
+    //  an on-wire S9F7. Previously routed to the base SendUnsupported stub -> host S2F25 T3-timeout.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ResetReturnCode();
+    int len = 0;
+    unsigned char Type = 0;
+    if(HGemPtr->GetDataItemLenAndType(len, Type)==1 && Type==HType.BINARY_TYPE && len>=0 && len<=4096)
+    {
+        unsigned char *Temp = new unsigned char[len+1];
+        if(HGemPtr->DataItemIn(len, Type, Temp)==1)
+        {
+            HGemPtr->InitLocalHead(2, 26, 0);
+            HGemPtr->DataItemOut(len, HType.BINARY_TYPE, Temp);
+            HGemPtr->SendLocalData();
+            HGemPtr->StringOut("[SECS] S2F26 loopback echoed (len=" + IntToStr(len) + ")");
+        }
+        else
+            HGemPtr->StringOut("[SECS] S2F25 loopback read failed - no echo");
+        delete[] Temp;
+    }
+    else
+        HGemPtr->StringOut("[SECS] S2F25 loopback format error (not BINARY) - no echo");
 }
 //---------------------------------------------------------------------------
 void HT160Gem::S5F4_EnableDisableAlarmAcknowledge()

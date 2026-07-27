@@ -88,6 +88,8 @@ public:
     virtual void S1F14_ConnectRequestAcknowledge();
     //AI(secs-online) 20260724 : S1F17 Request ONLINE -> S1F18 ONLACK=0 + control state Online-Remote
     virtual void S1F18_ONLINEAcknowledge();
+    //AI(secs-offline) 20260727 : S1F15 Request OFF-LINE -> S1F16 OFLACK=0 + control state Off-Line(1)
+    virtual void S1F16_OFFLINEAcknowledge();
     //AI(secs-reportdef) 20260724 : S2F33/F35/F37 -> delegate to THGem processors
     virtual void S2F34_DefineReportAcknowledge();
     virtual void S2F36_LinkEventReportAcknowledge();
@@ -102,6 +104,9 @@ public:
     virtual int  S2F42_Host_Command_Acknowledge();
     //AI(ht160s-secsgem) 20260625 : S2F31 date/time set -> S2F32 TIACK (ack-only, no clock write)
     virtual void S2F32_DateAndTimeAcknowledge();
+    //AI(secs-gem-std) 20260727 : S2F17 Date/Time Request -> S2F18 TIME ; S2F25 Loopback -> S2F26 echo
+    virtual void S2F18_DateandTimeData();
+    virtual void S2F26_DiagnosticLoopbackData();
     //AI(ht160s-secsgem) 20260625 : S5F3 enable/disable alarm -> S5F4 ack
     virtual void S5F4_EnableDisableAlarmAcknowledge();
     virtual void S5F6_ListAlarmData();

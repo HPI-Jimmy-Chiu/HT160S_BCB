@@ -77,6 +77,7 @@ void HTGem::Dispatch(int S, int F)
         case 3:  S1F4_SelectedStatusReply();         return;
         case 11: S1F12_StatusVariableNamelistReply();return;//AI(ht160s-secsgem) 20260611 : SV namelist
         case 13: S1F14_ConnectRequestAcknowledge();  return;
+        case 15: S1F16_OFFLINEAcknowledge();         return;//AI(secs-offline) 20260727 : S1F15 Request OFF-LINE -> S1F16 OFLACK
         case 17: S1F18_ONLINEAcknowledge();          return;//AI(secs-online) 20260724 : S1F17 Request ONLINE -> S1F18 ONLACK
         }
         break;
