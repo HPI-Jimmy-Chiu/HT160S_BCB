@@ -919,7 +919,7 @@ void THGem::ProcessDefineReport_S2F33()
             svv[nRpt][j]=sv;
         }
         nRpt++;
-        if(nRpt>=64)                                        { ReportAcknowledge(0x01); return; }
+        //AI(secs-boundary-fix) 20260727 : removed spurious post-increment guard - rid[64] fill is already bounded by the a>64 reject above; the old nRpt>=64 check wrongly DRACK=0x01-rejected a legitimate 64-report batch and skipped the commit.
     }
     for(i=0; i<nRpt; i++)
     {
@@ -990,7 +990,7 @@ void THGem::ProcessLinkEventReport_S2F35()
         }
         rpn[nCe]=w; rpb[nCe]=b;
         nCe++;
-        if(nCe>=64)                                         { LinkReportAcknowledge(0x02); return; }
+        //AI(secs-boundary-fix) 20260727 : removed spurious post-increment guard - cid[64] fill is already bounded by the a>64 reject above; the old nCe>=64 check wrongly LRACK=0x02-rejected a legitimate 64-CEID batch and skipped the commit.
     }
     for(i=0; i<nCe; i++)
     {
