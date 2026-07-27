@@ -201,10 +201,10 @@ int TAgvCoordinator::LookupByName(AnsiString cpName)
 // single-SVID report 7 (stationIndex = AMR_IDENTITY_CARRIER_INDEX = Color P3 / SVID 38204). Stamp
 // CarrierID[stationIndex] then fire. EventReport self-gates on HSMS SELECTED, so this is a no-op
 // when no host is connected (incl. laptop SOFT_SIMULATE without the SECS simulator attached).
-// DataID=0 matches HT160S's own AGV/E87 events (272/273/274) and is host-informational (host
-// dispatches on CEID, not DataID). NOTE: this intentionally DIVERGES from HT9045, which fires
-// AGVLdID with DataID=1; HT160S standardizes all AGV events on DataID=0. Do NOT use the 1-arg
-// EventReport wrapper -- it hardcodes DataID=1.
+// DataID=1 aligns to HT9045 (all equipment-initiated S6F11 use DataID=1) AND to HT160S's own
+// operator events; the host dispatches on CEID, DataID is host-informational. AI(secs-pathA-align)
+// 20260727 : changed from the earlier HT160S-only DataID=0 on AGV events (272/273/274/275) to align
+// the whole AMR command set to HT9045 per customer request. (The 1-arg EventReport wrapper also uses DataID=1.)
 void TAgvCoordinator::ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiString id2D)
 {
     if(Gem == NULL)
@@ -214,7 +214,7 @@ void TAgvCoordinator::ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiStr
     if(stationIndex < 0 || stationIndex >= AGV_STATION_COUNT)
         return;                    // guard the index (single change-point AMR_IDENTITY_CARRIER_INDEX)
     CarrierID[stationIndex] = id2D;   // SVID = AgvStation[stationIndex].SvidCarrierID; CEID275 ships it via report 7
-    Gem->EventReport(0, 275);      // CEID275 AGVLdID
+    Gem->EventReport(1, 275);      // CEID275 AGVLdID
 }
 //---------------------------------------------------------------------------
 // Phase B/B-2 : raise AGVSupplement (CEID272). P4-P9 = AMR Auto output-car full
@@ -311,7 +311,7 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         {
             AutoModule->SetAmrLock(a, true);
             SupplementBitmap = BuildBitmap(AgvStation[si].PIndex);
-            Gem->EventReport(0, 272);   // CEID272 AGVSupplement
+            Gem->EventReport(1, 272);   // CEID272 AGVSupplement
             Gem->EventReport(1, AutoFullCeid[a]);   // discrete Auto Full (two-stage pre-notification)
             Handshake[si] = AGV_CALLED;
         }
@@ -338,7 +338,7 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         if(bShort && Handshake[p]==AGV_IDLE)
         {
             SupplementBitmap = BuildBitmap(AgvStation[p].PIndex);
-            Gem->EventReport(0, 272);   // CEID272 AGVSupplement
+            Gem->EventReport(1, 272);   // CEID272 AGVSupplement
             Handshake[p] = AGV_CALLED;
             ShortageLatch[p] = 1;       // kept for the FeederDecision snapshot
         }
@@ -393,7 +393,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
             if(AutoModule->IsDrainedForAmr(a) || AmrInject.AutoDrained(a))   //AI(ht160s-agv) 20260708 : test-mode inject (SECS-273 gate only)
             {
                 StatusBitmap = BuildBitmap(AgvStation[si].PIndex);
-                Gem->EventReport(0, 273);   // CEID273 AGVLDUnLDStatus (Ready)
+                Gem->EventReport(1, 273);   // CEID273 AGVLDUnLDStatus (Ready)
                 Handshake[si] = AGV_READY;
             }
         }
@@ -412,7 +412,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                     DeviceCount[si] = AutoModule->GetAmrDeviceCount(a);
                 }
                 FinishBitmap = BuildBitmap(AgvStation[si].PIndex);
-                Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish
+                Gem->EventReport(1, 274);   // CEID274 AGVLDUnLDFinish
                 AutoModule->ClearAmrCar(a);
                 TrayCount[si]   = 0;        //AI(ht160s-agv-devicecount) : car is now empty, keep the SVID snapshot honest
                 DeviceCount[si] = 0;
@@ -464,7 +464,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
             if(InfeedReady(p) || AmrInject.InputReady(p))   //AI(ht160s-agv) 20260708 : test-mode inject (SECS-273 gate only)
             {
                 StatusBitmap = BuildBitmap(AgvStation[p].PIndex);
-                Gem->EventReport(0, 273);   // CEID273 AGVLDUnLDStatus (Ready)
+                Gem->EventReport(1, 273);   // CEID273 AGVLDUnLDStatus (Ready)
                 Handshake[p] = AGV_READY;
             }
         }
@@ -473,7 +473,7 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
             if(InfeedFinished(p) || AmrInject.InputFinish(p))   //AI(ht160s-agv) 20260708 : test-mode inject (one-shot)
             {
                 FinishBitmap = BuildBitmap(AgvStation[p].PIndex);
-                Gem->EventReport(0, 274);   // CEID274 AGVLDUnLDFinish
+                Gem->EventReport(1, 274);   // CEID274 AGVLDUnLDFinish
                 InfeedSetLock(p, false);    // front destack may resume
                 InfeedRefill(p);            // sim : restock the input stack to max
                 Handshake[p] = AGV_IDLE;
