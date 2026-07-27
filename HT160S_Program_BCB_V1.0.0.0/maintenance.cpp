@@ -1277,6 +1277,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         chkUsePredictiveAutoSupply->Checked=GeneralSetting.bUsePredictiveAutoSupply;
     if(chkUseAmrRecoveryDivert!=NULL)
         chkUseAmrRecoveryDivert->Checked=GeneralSetting.bUseAmrRecoveryDivert;
+    if(chkSkipUnknown2DAlarm!=NULL)
+        chkSkipUnknown2DAlarm->Checked=GeneralSetting.bSkipUnknown2DAlarm;   //AI(ht160s-whitelist) 20260727 : F1 load (Checked= fires OnClick; bLoadingHardwareSettings guards the write)
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1359,6 +1361,8 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
     if(chkUseAmrRecoveryDivert!=NULL)
         GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
+    if(chkSkipUnknown2DAlarm!=NULL)
+        GeneralSetting.bSkipUnknown2DAlarm=chkSkipUnknown2DAlarm->Checked;   //AI(ht160s-whitelist) 20260727 : F1 save
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -2210,6 +2214,19 @@ void __fastcall TfMaintenance::chkUseAmrRecoveryDivertClick(TObject *Sender)
     (void)Sender;
     if(chkUseAmrRecoveryDivert!=NULL)
         GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist) 20260727 : F1 operator opt-in to silence WAR0475 (2D-not-in-any-lot).
+//Pure data/traceability skip (routes the readable-but-unmatched IC to the Error Auto), NOT a
+//physical interlock, so no restart warning; mirrors the AMR-divert checkbox wiring.
+void __fastcall TfMaintenance::chkSkipUnknown2DAlarmClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkSkipUnknown2DAlarm!=NULL)
+        GeneralSetting.bSkipUnknown2DAlarm=chkSkipUnknown2DAlarm->Checked;
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------

@@ -2031,8 +2031,11 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                             TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                         State->CcdTask=1;
                     }
-                    else if(GeneralSetting.IsWhiteListSortMode())
+                    else if(GeneralSetting.IsWhiteListSortMode() || GeneralSetting.bSkipUnknown2DAlarm)
                     {
+                        //AI(ht160s-whitelist) 20260727 : entered in WhiteList mode OR when the operator
+                        // armed bSkipUnknown2DAlarm (F1). Both treat "a readable 2D not in any lot" as an
+                        // EXPECTED reject -> route silently to the Error Auto, NO blocking WAR0475 modal.
                         //AI(ht160s-whitelist) 20260715 : WhiteList mode - a 2D code that reads OK
                         // but is NOT in the whitelist file is an EXPECTED reject (customer semantic),
                         // NOT an operator exception, so route it silently to the Error Auto with NO

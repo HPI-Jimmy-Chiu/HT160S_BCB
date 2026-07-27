@@ -147,6 +147,9 @@ __published:
     TPanel *pnlAmrDivertBox;
     TCheckBox *chkUseAmrRecoveryDivert;
     TLabel *lblAmrDivertHint;
+    TPanel *pnlSkip2DBox;
+    TCheckBox *chkSkipUnknown2DAlarm;
+    TLabel *lblSkip2DHint;
     TTabSheet *tsMaintTeach;
     TTabSheet *tsMaintMotor;
     TTabSheet *tsMaintIO;
@@ -420,6 +423,7 @@ __published:
     void __fastcall chkWhiteListActiveClick(TObject *Sender);
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkUseAmrRecoveryDivertClick(TObject *Sender);
+    void __fastcall chkSkipUnknown2DAlarmClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
     void __fastcall chkSuck2QuadVacuumClick(TObject *Sender);

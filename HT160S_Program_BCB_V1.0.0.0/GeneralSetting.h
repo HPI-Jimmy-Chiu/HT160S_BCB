@@ -99,6 +99,14 @@ public:
 	// legacy always-recycle. Stored in General.ini [SortMode] UseAmrRecoveryDivert.
 	bool bUseAmrRecoveryDivert;
 
+	// AI(ht160s-whitelist) 20260727 : F1 operator opt-in. When true, a 2D code that READS
+	// OK but is not found in any loaded lot is routed SILENTLY to the Error Auto (same body
+	// as the WhiteList reject / the WAR0475 K_SKIP path) instead of raising the BLOCKING
+	// WAR0475 modal that halts the whole Loader task loop per unmatched IC. Off (default) =
+	// legacy operator Retry/Skip/Manual modal. A genuinely misread GOOD IC also lands in
+	// Error when on, so keep it operator-armed. Stored in General.ini [SortMode] SkipUnknown2DAlarm.
+	bool bSkipUnknown2DAlarm;
+
 	// Per-Auto enable (By Lot+Bin mode only). When bAutoEnabled[i]==false, Auto(i+1)
 	// is skipped by THT160LotBinBinding::ResolveAuto so no new (LotID,Bin) pair binds
 	// to it; existing bindings still resolve. Index 0..5 = Auto1..Auto6. Default all

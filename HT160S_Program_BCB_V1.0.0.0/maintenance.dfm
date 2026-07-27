@@ -1175,6 +1175,46 @@ object fMaintenance: TfMaintenance
                   OnClick = chkUseAmrRecoveryDivertClick
                 end
               end
+              object pnlSkip2DBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 2
+                object lblSkip2DHint: TLabel
+                  Left = 320
+                  Top = 12
+                  Width = 600
+                  Height = 16
+                  AutoSize = False
+                  Caption =
+                    'When ON, a 2D not found in any lot goes silently to Error (no WA' +
+                    'R0475 stop). Default OFF. A misread good IC also goes to Error.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkSkipUnknown2DAlarm: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 300
+                  Height = 20
+                  Caption = 'Skip unknown-2D alarm (WAR0475)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkSkipUnknown2DAlarmClick
+                end
+              end
               object pnlUphSampleBox: TPanel
                 Left = 0
                 Top = 80

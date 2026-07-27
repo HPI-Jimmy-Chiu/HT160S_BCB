@@ -1788,6 +1788,26 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
     {
         case 1:
             dwZDownGuardStart=0;   //AI(bcb6-172align) 20260723 : fresh pick cycle -> reset SuckZ down-move guard
+            //AI(ht160s-residue) 20260727 : F5 orphan-flag guard. A fresh pick begins only
+            //when the place machine is idle, so a bNeedResidueCheck bit still set while
+            //bResidueArmed==false is orphaned (place interrupted between case50 and case70).
+            //CheckPlaceResidue's armed==false early-out never clears it, so it would latch
+            //IsResidueCheckBusy() true and deadlock the pick Z-down gate at case45 (empty tray
+            //included). Clear it here, GUARDED by bResidueArmed==false so a LIVE background
+            //verify is never abandoned, and reopen the target Auto discharge gate place case50 shut.
+            if(bResidueArmed==false)
+            {
+                for(int rs=0; rs<SORT_ARM_SUCKER_COUNT; rs++)
+                {
+                    bNeedResidueCheck[rs]=false;
+                    ResidueTask[rs]=1;
+                }
+                if(iResidueAutoIndex>=0 && AutoModule!=NULL)
+                {
+                    AutoModule->SetPlaceResidueClear(iResidueAutoIndex, true);
+                    iResidueAutoIndex=-1;
+                }
+            }
             if(FindPickCells(iActiveLoaderNo)==false)
             {
                 PickTask=1;

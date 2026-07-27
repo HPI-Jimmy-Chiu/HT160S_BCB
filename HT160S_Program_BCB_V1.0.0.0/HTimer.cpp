@@ -32,6 +32,16 @@ void HTimer::SetMS(int iTime)
 void HTimer::On()
 {
     ulStartTicks=GetTickCount();
+    //AI(ht160s-ccd-timeout) 20260727 : On() starts a FRESH timing window. Reset the
+    //accumulated pause budget: only pauses that occur AFTER this arm (via Pause()/
+    //ReStart()) should extend THIS window. Previously iPauseLen was cleared only in
+    //Clear(); a SetMS()+On() re-arm (CcdDelay 100ms/3000ms, FeedWait, Rise1, cylinder/
+    //sucker Delay, TrayArm ArmDelay -- none Clear() between cells) inherited pause time
+    //accumulated while the timer was idle earlier in the same tray, so every "100ms"
+    //settle became 100ms + total mid-tray pause, appearing as a hang. Resume uses
+    //ReStart(), never On(), so nothing relies on iPauseLen surviving an On().
+    iPauseLen=0;
+    Paused=false;
     InUsed=true;
 }
 //---------------------------------------------------------------------------

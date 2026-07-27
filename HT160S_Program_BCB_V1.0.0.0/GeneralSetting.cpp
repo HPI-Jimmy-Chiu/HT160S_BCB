@@ -96,6 +96,7 @@ void THT160GeneralSetting::SetDefault()
 	//running lot. The boot-clear is in the ctor; every SetDefault() caller recomputes the mirror after.
 	bUsePredictiveAutoSupply=false;
 	bUseAmrRecoveryDivert=false;
+	bSkipUnknown2DAlarm=false;   //AI(ht160s-whitelist) 20260727 : F1 default OFF (legacy WAR0475 modal)
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=true;
 	for(int s=0;s<4;s++)
@@ -200,6 +201,7 @@ void THT160GeneralSetting::Load()
 
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
 	bUseAmrRecoveryDivert=Ini->ReadBool("SortMode", "UseAmrRecoveryDivert", false);
+	bSkipUnknown2DAlarm=Ini->ReadBool("SortMode", "SkipUnknown2DAlarm", false);   //AI(ht160s-whitelist) 20260727 : F1
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
 	for(int s=0;s<4;s++)
@@ -297,6 +299,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("SortMode", "UseLotBinMode", iSortMode==smLotBin);
 	Ini->WriteBool("SortMode", "UsePredictiveAutoSupply", bUsePredictiveAutoSupply);
 	Ini->WriteBool("SortMode", "UseAmrRecoveryDivert", bUseAmrRecoveryDivert);
+	Ini->WriteBool("SortMode", "SkipUnknown2DAlarm", bSkipUnknown2DAlarm);   //AI(ht160s-whitelist) 20260727 : F1
 	for(int a=0;a<6;a++)
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);
 	for(int s=0;s<4;s++)
