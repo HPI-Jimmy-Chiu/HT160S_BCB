@@ -336,6 +336,11 @@ public:
 	bool LoadFromJsonString(AnsiString Json, bool &bHasDuplicate, AnsiString &FirstDupCode,
 		AnsiString StampKyecLotId="");
 	bool LoadLatest(bool &bHasDuplicate, AnsiString &FirstDupCode);
+	//AI(ht160s-whitelist) 20260727 : pre-flight for the customer WhiteList.json contract only
+	//(KYEC-WhiteList-Interface-Spec 3.2). Loads nothing; returns false + an operator-facing
+	//Reason when the file is not a usable whitelist. See the definition for why the shared
+	//LoadFromJsonString cannot carry these rules.
+	bool ValidateWhiteListJson(AnsiString Json, AnsiString &Reason);
 };
 //---------------------------------------------------------------------------
 // Dynamic (Lot,Bin) -> Auto binding table for the "By Lot+Bin" sort mode

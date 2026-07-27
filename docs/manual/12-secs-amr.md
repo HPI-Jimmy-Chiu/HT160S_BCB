@@ -226,7 +226,7 @@ Settings 分頁可編輯 SECS 主機連線設定並回寫到機台設定檔 `sys
 | HT160 自訂（66000+） | 66000 / 66001 / 66002 | Run Mode / System Running / Control State | 66002 鏡像 4=Local / 5=Remote |
 | HT160 自訂 | 66010 / 66011 | Alarm Active / Alarm Code | |
 | HT160 自訂 | 66020 / 66021 | Total IC / Total Sorted | |
-| HT160 自訂 | 66030 / 66031 / 66032 | Active Lot Count / Current Lot ID / Sort Mode | 66032：0=Normal、1=LotBin、2=LotPassFail、3=WhiteList（S1F3 查詢） |
+| HT160 自訂 | 66030 / 66031 / 66032 | Active Lot Count / Current Lot ID / Sort Mode | 66032 回「有效模式」（S1F3 查詢）：0/1/2 = 維護畫面 Sort Mode 選擇器的基礎模式（Normal／LotBin／LotPassFail），3 = By WhiteList 臨時覆蓋生效中（非選擇器第四項；Lot End 後回到基礎值） |
 | AGV band（38xxx） | 38202–38245 | E87/AGV 站台資料 | 逐一定義見 12.3.9-2 |
 
 > 註：Report 1 的 13 個 SV 即「4 個 9045 對齊 + 9 個 66000 band」混編（66032 不在 Report 1 內，僅供 S1F3）。與 KYEC 主機對接的最大架構差異：9045 的報告為 host-dynamic（S2F33/35/37 動態定義），HT160 為 equipment-static 固定 7 個 report。完整對照見 `docs/AGV/HT9045_vs_HT160_SECS_Diff_20260625.md`、現況介面合約見 `docs/SECS/HT160S_SECS_Comm_Examples.md`。
@@ -379,7 +379,7 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 
 > 註（DeviceCount 現況）：舊版「固定 0」已於 2026-07-13 修正——Auto 卸盤時累計工作盤 IC 數供 SVID 38231-33/38240-42；上料側（38228-38230）依「上料只交換盤數、下料才給 IC 數」之契約**恆 0，為規格而非缺陷**。
 
-> 註（BinSetting 格式，2026-07-15 接線）：告知 host/AMR 該 Auto 出料車裝載的分選等級。`Normal`＝純 bin 號（兼 Error/溢位站附 `,ERR`）；`By Lot+Bin`＝`LotID:Bin` 逗號串；`By Lot+PassFail`＝`LotID:PASS`/`LotID:FAIL`；`By WhiteList`＝走 Normal 分支（純 bin 號）。不掛任何 report，僅供 S1F3 查詢，由 `ServiceAgv` 每 1 秒刷新。
+> 註（BinSetting 格式，2026-07-15 接線）：告知 host/AMR 該 Auto 出料車裝載的分選等級。`Normal`＝純 bin 號（兼 Error/溢位站附 `,ERR`）；`By Lot+Bin`＝`LotID:Bin` 逗號串；`By Lot+PassFail`＝`LotID:PASS`/`LotID:FAIL`；`By WhiteList`（臨時覆蓋生效中，非第四種基礎模式）＝走 Normal 分支（純 bin 號）。不掛任何 report，僅供 S1F3 查詢，由 `ServiceAgv` 每 1 秒刷新。
 
 > 註（CEID 跳號）：Auto1–6 卸盤完成事件為 {136,137,138,140,141,142}——**139 在 9045 CEID 空間已被占用**（`DoVisualSortLotStart`），HT160 為避免撞號刻意跳過。此 6 個 CEID 不掛 report（空 body，host 依 CEID 認事件）。另 Auto 車滿預告事件沿用 9045 保留號：Auto1–3=35/36/37、Auto4–6=148/149/150（掛 Report 1，與 CEID272 同時雙發）。
 

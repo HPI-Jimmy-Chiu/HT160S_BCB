@@ -354,7 +354,7 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 
 - **工程單位（定案）**：料盤幾何（XStart／XPitch／YStart／YPitch）設定值單位＝mm，消費端 ×100 轉 1/100mm 教導座標（見 6.3.2 註）。
 - **料區代號 1/2（定案）**：料區代號 NotUse=0、**Empty=1、Loader=2**（空盤站與進料站的代號，屬合法區域但非分選目的地）、Auto1..6=3..8、Color=9。Bin 設定格與所有分選一律從 Auto1(=3) 起算，1/2 純為站別保留代號。
-- **畫面標籤（定案）**：硬體頁各控制項螢幕標籤皆為英文——Sort Mode（選項 Normal / By Lot+Bin / By Lot+PassFail / By WhiteList）、Auto1~Auto6、Nozzle1~Nozzle4、"Color bin area installed"、"Use AMR"、Bin 面板型號 "LED (HT9046)" / "TFT (HT9011)"；Lot 編號輸入框位於主畫面 Lot 分頁的 "Lot Manual Edit" 群組。
+- **畫面標籤（定案）**：硬體頁各控制項螢幕標籤皆為英文——Sort Mode（選項組共 **3 項**：Normal / By Lot+Bin / By Lot+PassFail；**By WhiteList 不是本選項組的第四項**，而是同頁獨立的「Activate By WhiteList sorting for this lot only」臨時覆蓋勾選框）、Auto1~Auto6、Nozzle1~Nozzle4、"Color bin area installed"、"Use AMR"、Bin 面板型號 "LED (HT9046)" / "TFT (HT9011)"；Lot 編號輸入框位於主畫面 Lot 分頁的 "Lot Manual Edit" 群組。
 - **Bin 選擇舊結構（定性）**：僅宣告、全程式未見讀寫——舊機型遺留，不影響行為。
 - **Error 區設為 Color 的 fallback（定案）**：Error 區非 Auto（如 Color）時，回退為最後一個 Auto（Auto6）；滿載溢流亦同。詳見第 15 章 15.12。
 - **手動綁定 UI（定案）**：不提供；綁定僅由 Loader CCD 掃碼路徑自動產生（最低 index 先到先得），UI 僅顯示。

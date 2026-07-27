@@ -1930,6 +1930,12 @@ void __fastcall TfMain::sbStoreHangupClick(TObject *Sender)
         ShowMyMessage(LangT("State Record snapshot failed (check 7-Zip / disk)."));
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-whitelist) 20260727 : last WhiteList.json load failure, in operator words.
+//  Set by LoadWhiteListFile (missing / unreadable / bad JSON / missing KYECLotID),
+//  cleared on a valid load, read by CheckLotDataReady so the blocked Start says WHY
+//  the file was refused instead of the generic "missing or empty".
+static AnsiString gWhiteListLoadError="";
+//---------------------------------------------------------------------------
 //AI(poka-yoke) 20260616 : shared start-precondition guard. Returns true when
 //  lot/2D data is ready; otherwise fills Reason and the caller warns + aborts.
 //  Centralizes what Start() checked inline so OneCycle uses the SAME rules. Only
@@ -1945,9 +1951,15 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
     //AI(ht160s-whitelist) 20260715 : WhiteList mode loads its 2D->Bin list from the local
     // file at Lot Start (LoadWhiteListFile). Give a mode-specific reason before the generic
     // 2D-data gates below so a missing/empty whitelist file is obvious.
+    //AI(ht160s-whitelist) 20260727 : prefer the exact refusal recorded by LoadWhiteListFile
+    // (e.g. a lot with no KYECLotID) - the generic text sends the FE hunting for a missing
+    // file that is actually present but invalid.
     if(GeneralSetting.IsWhiteListSortMode() && LotRegistry.GetItemCount()<=0)
     {
-        Reason="WhiteList mode is ON but HT160S_WhiteList\\WhiteList.json is missing or empty !";
+        if(gWhiteListLoadError!=AnsiString(""))
+            Reason=gWhiteListLoadError;
+        else
+            Reason="WhiteList mode is ON but HT160S_WhiteList\\WhiteList.json is missing or empty !";
         return false;
     }
     //AI(ht160s-lot-webapi) 20260612 : Start safety gate. Refuse to start the
@@ -2276,13 +2288,19 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     // SECS S2F42 LOTSTART handler pulls every lot too (not just the first).
     //AI(ht160s-whitelist) 20260715 : WhiteList mode substitutes the local WhiteList.json
     // for the WebAPI pull (same LotRegistry, same downstream). See LoadWhiteListFile.
+    //AI(ht160s-whitelist) 20260727 : a REJECTED whitelist file leaves the registry empty ON
+    // PURPOSE. Saving that would overwrite WorkOrder.json with an empty order and destroy the
+    // power-on restore point over a fixable typo in WhiteList.json. LoadWhiteListFile already
+    // saves on the valid path, so skip the unconditional save when it refused the file.
+    bool bWhiteListOk=true;
     if(GeneralSetting.IsWhiteListSortMode())
-        LoadWhiteListFile();
+        bWhiteListOk=LoadWhiteListFile();
     else
         StartLotWebApiPullAll();
     //AI(HT160S-Maintainer) 20260608 : need1 : persist the started work order so
     //the next power-on can restore it (see RestoreLastWorkOrder / FormShow).
-    SaveWorkOrder();
+    if(bWhiteListOk)
+        SaveWorkOrder();
     RecordProcess("LOT START pressed");
 
     //AI(ht160s-secsgem) 20260714 : notify host a new lot has started (S6F11 CEID 11).
@@ -2339,7 +2357,10 @@ void __fastcall TfMain::StartNextLotApiPull()
 // runs on the HSMS/VCL receive thread). Gated by the Lot WebAPI "UsePull" toggle.
 //AI(ht160s-whitelist) 20260715 : WhiteList mode 2D->Bin source. In place of the WebAPI pull,
 // load HT160S_WhiteList\WhiteList.json into LotRegistry through the SAME parser the WebAPI uses
-// (LoadFromJsonString, "Maps" schema). Clear() FIRST so the local file is AUTHORITATIVE : only
+//AI(ht160s-whitelist) 20260727 : the file must be in the CUSTOMER schema (root QRCodeIDHis /
+// 2DIDHistory, per-lot LOTID + KYECLotID) - ValidateWhiteListJson refuses anything else,
+// including the legacy "Maps" import shape this comment used to name.
+// (LoadFromJsonString). Clear() FIRST so the local file is AUTHORITATIVE : only
 // listed codes become routable, and any boot-restored / stale WorkOrder 2D data cannot leak
 // through in WhiteList mode. On success mirror PollLotDataWebApi (RefreshLotListFromRegistry +
 // SaveWorkOrder). Runs on the same VCL thread as the WebAPI helpers; never shows a modal.
@@ -2347,6 +2368,7 @@ bool __fastcall TfMain::LoadWhiteListFile()
 {
     AnsiString fn = HSys.CurrentDir + "\\HT160S_WhiteList\\WhiteList.json";
     ForceDirectories(ExtractFilePath(fn));   // guide the FE : create the folder if absent
+    gWhiteListLoadError="";                  // re-armed below on every failure path
     //AI(ht160s-whitelist) 20260715 : Clear FIRST - unconditionally, BEFORE the file checks.
     // WhiteList is authoritative: if the file is missing/unreadable the registry MUST end up
     // EMPTY so CheckLotDataReady blocks Start with the right reason, and NO boot-restored /
@@ -2355,6 +2377,7 @@ bool __fastcall TfMain::LoadWhiteListFile()
     LotRegistry.Clear();
     if(!FileExists(fn))
     {
+        gWhiteListLoadError="WhiteList file not found : "+fn;
         RecordProcess("WhiteList: file missing - "+fn);
         RefreshLotListFromRegistry();         // reflect the now-empty registry in the UI
         return false;
@@ -2365,24 +2388,47 @@ bool __fastcall TfMain::LoadWhiteListFile()
     catch(...)
     {
         delete raw;
+        gWhiteListLoadError="WhiteList file cannot be read : "+fn;
         RecordProcess("WhiteList: read failed - "+fn);
         RefreshLotListFromRegistry();
         return false;
     }
     delete raw;
 
+    //AI(ht160s-whitelist) 20260727 : pre-flight the CUSTOMER contract before the shared parser
+    // touches anything. KYECLotID (and LOTID) are mandatory per lot - KYECLotID is the KYEC
+    // batch identity the customer file declares for the run, so a whitelist lot without it is
+    // an unidentifiable batch. The shared parser cannot carry this rule (it also serves the
+    // WebAPI pull and the boot restore, where the field is legitimately absent), and it returns
+    // true for any parseable JSON - including a typo'd root key, which would otherwise log
+    // "loaded" with an empty registry. All-or-nothing, matching the authoritative-list semantic
+    // above : the first offending lot rejects the WHOLE file and the registry stays empty, so
+    // Start is blocked with the exact reason instead of running a partially-identified batch.
+    AnsiString vReason="";
+    if(!LotRegistry.ValidateWhiteListJson(text, vReason))
+    {
+        gWhiteListLoadError=vReason;
+        RecordProcess("WhiteList: "+vReason+" - "+fn);
+        RefreshLotListFromRegistry();
+        return false;
+    }
+
     bool bDup=false; AnsiString dupCode="";
     bool ok = LotRegistry.LoadFromJsonString(text, bDup, dupCode);
     RefreshLotListFromRegistry();
     if(ok)
     {
+        gWhiteListLoadError="";
         SaveWorkOrder();                       // persist only a VALID whitelist load
         RecordProcess("WhiteList loaded: "+fn+"  (2D="+IntToStr(LotRegistry.GetItemCount())+")");
         if(bDup)
             RecordProcess("WhiteList duplicate 2D ignored: "+dupCode);
     }
     else
+    {
+        gWhiteListLoadError="WhiteList file is not valid JSON : "+fn;
         RecordProcess("WhiteList: JSON parse failed - "+fn);
+    }
     return ok;
 }
 //---------------------------------------------------------------------------
@@ -2572,6 +2618,11 @@ void __fastcall TfMain::DoLotEndProcess()
     GeneralSetting.SetWhiteListActive(false);
     GeneralSetting.SaveWhiteListOverlay();
     UpdateSortModeFeatureBadge();
+    //AI(ht160s-whitelist) 20260727 : drop the last file-refusal reason with the lot. It
+    //described THIS lot's WhiteList.json; keeping it would let a later Start quote a
+    //refusal for a file the FE has since fixed (the next Lot Start re-reads the file and
+    //sets a fresh reason if it is still bad).
+    gWhiteListLoadError="";
 
     //AI(ht160s-uph) 20260706 : record this lot's total UPH (HT172 parity : aggregate
     //TotalIC / productive-hours) to the EventLog + per-lot UPH summary before the work

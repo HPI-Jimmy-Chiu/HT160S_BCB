@@ -1504,8 +1504,11 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 			if(ProdNode!=NULL && cJSON_IsString(ProdNode) && ProdNode->valuestring!=NULL)
 				ProductCode=AnsiString(ProdNode->valuestring);
 
-			//AI(ht160s-ftp) 20260721 : KYEC batch id (Soter col7), present only in our own
-			//WorkOrder.json round-trip; the customer 2D-map JSON omits it.
+			//AI(ht160s-ftp) 20260721 : KYEC batch id (Soter col7), present in our own
+			//WorkOrder.json round-trip; the customer per-lot 2D-map WebAPI response omits it.
+			//AI(ht160s-whitelist) 20260727 : the customer WhiteList.json DOES carry it and it is
+			//MANDATORY there (ValidateWhiteListJson rejects the file without it). Keep the read
+			//optional HERE - this parser is shared with the WebAPI pull / boot restore.
 			cJSON *KyecNode=cJSON_GetObjectItem(LotNode, "KYECLotID");
 			AnsiString KyecLotId="";
 			if(KyecNode!=NULL && cJSON_IsString(KyecNode) && KyecNode->valuestring!=NULL)
@@ -1594,6 +1597,76 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 	}
 
 	cJSON_Delete(Root);
+	return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist) 20260727 : WhiteList.json pre-flight (customer schema ONLY, see
+// KYEC-WhiteList-Interface-Spec 3.2). Deliberately separate from LoadFromJsonString :
+// that parser must stay permissive - it serves three schemas and returns true for ANY
+// parseable JSON (a per-lot WebAPI response legitimately carries no KYECLotID, the boot
+// WorkOrder restore and the manual "Maps" import carry no such field at all). The
+// WhiteList file is a different contract : it is the AUTHORITATIVE sort list, so a
+// malformed one must be refused whole, with a reason the FE can act on, instead of
+// half-loading and silently dropping ICs into the Error bin. Checks in the order a
+// mistake is most likely : customer root array present / at least one lot / every lot
+// has a LOTID / every lot has a KYECLotID. Reason is operator-facing English (it is
+// what the blocked Start shows). Read-only : the registry is not touched.
+bool THT160LotRegistry::ValidateWhiteListJson(AnsiString Json, AnsiString &Reason)
+{
+	Reason="";
+	cJSON *Root=cJSON_Parse(Json.c_str());
+	if(Root==NULL)
+	{
+		Reason="WhiteList file is not valid JSON";
+		return false;
+	}
+	cJSON *Hist=cJSON_GetObjectItem(Root, "2DIDHistory");
+	if(Hist==NULL)
+		Hist=cJSON_GetObjectItem(Root, "QRCodeIDHis");
+	if(Hist==NULL || !cJSON_IsArray(Hist))
+	{
+		//Covers a typo'd root key AND the legacy "Maps" import schema, which has no
+		//KYECLotID field at all and therefore can never satisfy the WhiteList contract.
+		Reason="WhiteList file has no QRCodeIDHis lot list (customer format required)";
+		cJSON_Delete(Root);
+		return false;
+	}
+	int LotSeen=0;
+	cJSON *LotNode=Hist->child;
+	while(LotNode!=NULL)
+	{
+		LotSeen++;
+		cJSON *IdNode=cJSON_GetObjectItem(LotNode, "LOTID");
+		AnsiString LotId="";
+		if(IdNode!=NULL && cJSON_IsString(IdNode) && IdNode->valuestring!=NULL)
+			LotId=AnsiString(IdNode->valuestring);
+		//A blank LOTID is fatal here even though the loader would merely skip it :
+		//AddLot("") returns -1 and the whole lot's ICs vanish with no log line, which
+		//is exactly the silent mis-sort this file must never cause.
+		if(LotId.Trim()==AnsiString(""))
+		{
+			Reason="WhiteList rejected : lot #"+IntToStr(LotSeen)+" has no LOTID (mandatory) !";
+			cJSON_Delete(Root);
+			return false;
+		}
+		cJSON *KyecNode=cJSON_GetObjectItem(LotNode, "KYECLotID");
+		AnsiString KyecId="";
+		if(KyecNode!=NULL && cJSON_IsString(KyecNode) && KyecNode->valuestring!=NULL)
+			KyecId=AnsiString(KyecNode->valuestring);
+		if(KyecId.Trim()==AnsiString(""))
+		{
+			Reason="WhiteList rejected : lot "+LotId+" has no KYECLotID (mandatory) !";
+			cJSON_Delete(Root);
+			return false;
+		}
+		LotNode=LotNode->next;
+	}
+	cJSON_Delete(Root);
+	if(LotSeen<=0)
+	{
+		Reason="WhiteList file contains no lot data";
+		return false;
+	}
 	return true;
 }
 //---------------------------------------------------------------------------

@@ -126,7 +126,12 @@ void HT160Gem::AddSV()
     // S2F41 LOTSTART is confirmable by S1F3. No RefreshSVData mirror : not a per-cycle snapshot.
     //AI(ht160s-whitelist-override) 20260717 : report the EFFECTIVE mode (base + WhiteList overlay),
     // not the raw base, so the host reads WHITELIST during a WhiteList lot and the base between lots.
-    HGemPtr->SetSVDataPointer(66032, HType.INT_4_TYPE, "Sort Mode", "", &GeneralSetting.iEffectiveSortMode, "0=Normal 1=LotBin 2=LotPassFail 3=WhiteList (effective)");
+    //AI(ht160s-whitelist) 20260727 : WhiteList is NOT a 4th entry of the maintenance Sort Mode
+    // selector (rgSortMode stays 3-way : 0/1/2). Value 3 means "the per-lot WhiteList overlay is
+    // armed", whatever the base is; between lots the base value comes back. Matching semantic on
+    // the command side : SORTMODE=NORMAL means "no overlay, keep the operator's base selector",
+    // NOT "set base to 0", so a NORMAL lot can legitimately read back 1 or 2 here.
+    HGemPtr->SetSVDataPointer(66032, HType.INT_4_TYPE, "Sort Mode", "", &GeneralSetting.iEffectiveSortMode, "effective: 0/1/2=base Normal/LotBin/LotPassFail, 3=WhiteList overlay armed");
 
     //AI(ht160s-agv) 20260615 : E87/AGV SVIDs (draft 38202-38245), bound to the
     // AgvCoord snapshot block (stable addresses). Bitmaps 38219-38221 are written

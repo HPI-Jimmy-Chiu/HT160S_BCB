@@ -20,8 +20,15 @@
 
 | 格式家族 | 用途 | 對含特殊字元的碼 |
 |----------|------|------------------|
-| **JSON（Maps schema）** — 本資料夾 `*.json` | 正式 / 機台 / 多-Lot / 與 `WorkOrder.json` round-trip | **完全安全**（cJSON 自動處理逗號/空格/引號/Tab） |
+| **JSON（Maps schema）** — 本資料夾 `2DBin_Import_*.json` | 正式 / 機台 / 多-Lot / 與 `WorkOrder.json` round-trip | **完全安全**（cJSON 自動處理逗號/空格/引號/Tab） |
 | **CSV（RFC-4180 引號版）** — 本資料夾 `*.csv` | 操作員用 Excel 手編、單 Lot 進 grid | 含特殊字元的欄位須用 `"…"` 包住才安全 |
+
+> **例外：`WhiteList.sample.json` 不是 Maps schema。** 白名單走客戶格式（根 `QRCodeIDHis` →
+> 每 Lot `LOTID` / `KYECLotID` / `Substage` / `ProductCode` / `ICInfo[{QRCodeID, HBin}]`），
+> 且 `LOTID`、`KYECLotID` 皆為必填——機台在 Lot Start 會逐 Lot 檢查，缺一即整份檔案退回。
+> 用 Maps schema 寫白名單一定會被拒（該 schema 沒有 `KYECLotID` 欄）。
+> 規格見 `D:\HT160S_BCB\docs\whitelist\KYEC-WhiteList-Interface-Spec.md`，
+> 佈署路徑 `D:\HT160S_BCB\HT160S_WhiteList\WhiteList.json`。
 
 > **狀態（重要）**：本資料夾的 **JSON 範例檔已就緒**，但主畫面 Import 按鈕
 > 目前**只解析 CSV**（走 `Split2DBinLine`）。要讓 `.json` 能被匯入，需在
