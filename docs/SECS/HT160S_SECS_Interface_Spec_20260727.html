@@ -1,0 +1,1086 @@
+<!doctype html><html lang='zh-Hant'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>HT-160S SECS/GEM Interface Specification</title><style>
+*{box-sizing:border-box}
+body{font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",system-ui,Arial,sans-serif;
+ line-height:1.6;color:#1f2328;max-width:1080px;margin:0 auto;padding:32px 20px;background:#fff}
+h1{font-size:1.8em;border-bottom:3px solid #0969da;padding-bottom:.3em}
+h2{font-size:1.4em;border-bottom:1px solid #d0d7de;padding-bottom:.25em;margin-top:2em}
+h3{font-size:1.15em;margin-top:1.6em;color:#0550ae}
+blockquote{border-left:4px solid #0969da;background:#f6f8fa;margin:1em 0;padding:.6em 1em;color:#57606a}
+code{background:#eff1f3;padding:.12em .4em;border-radius:4px;font-family:Consolas,"Courier New",monospace;font-size:.9em}
+pre{background:#0d1117;color:#e6edf3;padding:14px 16px;border-radius:8px;overflow-x:auto}
+pre code{background:none;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.92em;display:block;overflow-x:auto}
+th,td{border:1px solid #d0d7de;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#0969da;color:#fff;white-space:nowrap}
+tr:nth-child(even){background:#f6f8fa}
+hr{border:0;border-top:1px solid #d0d7de;margin:2em 0}
+a{color:#0969da}
+@media (prefers-color-scheme:dark){
+ body{background:#0d1117;color:#e6edf3}
+ h3{color:#79c0ff} blockquote{background:#161b22;color:#8b949e}
+ code{background:#161b22} th,td{border-color:#30363d} tr:nth-child(even){background:#161b22}
+ th{background:#1f6feb}}
+</style></head><body><h1 id="ht-160s-secsgem-secsgem-interface-specification">HT-160S SECS/GEM 介面規格書 / SECS/GEM Interface Specification</h1>
+<blockquote>
+<p><strong>機型 Model:</strong> HT-160S (Tray Sorter) &nbsp;|&nbsp; <strong>MDLN:</strong> <code>HT-160S</code> &nbsp;|&nbsp; <strong>SOFTREV:</strong> <code>1.0.0.0</code>
+<strong>文件版本 Doc rev:</strong> 2026-07-27
+<strong>依據 Based on:</strong> current firmware build (branch <code>feat/iosetview-172-refactor</code>)</p>
+<p>本規格反映 HT-160S <strong>目前實作</strong>的 SECS-II / GEM 介面。命令面向 HT-90XX (HT9045) 對齊;
+但 <strong>SVID / CEID 字典為 HT-160S 自有</strong>(sorter 語意,見 §3),與 HT-90XX (tester) 不完全相同。
+This document describes the SECS-II / GEM interface <strong>as currently implemented</strong> on HT-160S.
+The command surface is aligned to HT-90XX; the SVID/CEID dictionary is HT-160S-specific (§3).</p>
+</blockquote>
+<hr />
+<h2 id="0-conventions">0. 閱讀慣例 / Conventions</h2>
+<table>
+<thead>
+<tr>
+<th>記號</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>方向 Direction</td>
+<td><code>H→E</code> = host 送設備 (host→equipment);&nbsp; <code>E→H</code> = 設備送 host</td>
+</tr>
+<tr>
+<td><code>L,n{...}</code></td>
+<td>List of n items</td>
+</tr>
+<tr>
+<td><code>A</code> / <code>B</code> / <code>Bool</code></td>
+<td>ASCII / Binary(1 byte) / Boolean</td>
+</tr>
+<tr>
+<td><code>U1 U2 U4</code> / <code>I1 I2 I4</code></td>
+<td>unsigned / signed integer (1/2/4 byte)</td>
+</tr>
+<tr>
+<td><code>FT8</code></td>
+<td>8-byte float (F8)</td>
+</tr>
+<tr>
+<td>W-bit</td>
+<td>primary message expects a reply</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-connection-transport">1. 連線與傳輸 / Connection &amp; Transport</h2>
+<ul>
+<li><strong>HSMS-SS</strong>,設備端為 <strong>passive</strong>(host 主動撥入 / equipment is passive, host connects in)。</li>
+<li>Port / Device(Session) ID:見 <code>system\ComPort.ini</code>(現場觀察 on-site observed: <strong>port 6000, Device ID = 1</strong>)。</li>
+<li>型號 / 版本 由 S1F2 與 S1F14 回報:<code>MDLN = HT-160S</code>,<code>SOFTREV = 1.0.0.0</code>。</li>
+<li><strong>GEM 控制狀態 Control State</strong>(鏡像於 SVID 66002 / mirrored in SVID 66002):
+  | 值 | 狀態 | 進入方式 |
+  |---|---|---|
+  | 1 | Off-Line | S1F15/F16,或 RCMD <code>ONLINE_LOCAL</code> 前 |
+  | 4 | On-Line Local | RCMD <code>ONLINE_LOCAL</code> |
+  | 5 | On-Line Remote | S1F17/F18,或 RCMD <code>ONLINE_REMOTE</code>/<code>ONLINE</code> |</li>
+<li>事件 / 警報推播(S6F11 / S5F1)僅在 <strong>HSMS SELECTED</strong> 時送出。</li>
+<li>標準上線序列(host):<code>S1F13 → S1F17 → S2F37(disable all) → S5F3 → S2F33(define) → S2F35(link) → S2F37(enable)</code>,全數支援(見 §2、§4)。</li>
+</ul>
+<hr />
+<h2 id="2-supported-message-list">2. 支援訊息總表 / Supported Message List</h2>
+<blockquote>
+<p>以下為 HT-160S <strong>目前已實作</strong>的 SECS-II 訊息。未列於此、或列於 §5 者為尚未支援。</p>
+</blockquote>
+<h3 id="stream-1-equipment-status">Stream 1 — 設備狀態 / Equipment Status</h3>
+<table>
+<thead>
+<tr>
+<th>S/F</th>
+<th>名稱 Name</th>
+<th>方向</th>
+<th>回覆</th>
+<th>本體 Body (SECS-II)</th>
+<th>說明 Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1F1</td>
+<td>Are You There Request</td>
+<td>H→E</td>
+<td>S1F2</td>
+<td>(header only)</td>
+<td>存活探測</td>
+</tr>
+<tr>
+<td>S1F2</td>
+<td>On-Line Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,2{ A MDLN, A SOFTREV }</code></td>
+<td>= <code>{"HT-160S","1.0.0.0"}</code></td>
+</tr>
+<tr>
+<td>S1F3</td>
+<td>Selected Equipment Status Request</td>
+<td>H→E</td>
+<td>S1F4</td>
+<td><code>L,n{ SVID }</code>(n=0=全部)</td>
+<td>讀 SVID</td>
+</tr>
+<tr>
+<td>S1F4</td>
+<td>Selected Equipment Status Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,n{ &lt;SV value&gt; }</code></td>
+<td>未知 SVID 回空 item</td>
+</tr>
+<tr>
+<td>S1F11</td>
+<td>Status Variable Namelist Request</td>
+<td>H→E</td>
+<td>S1F12</td>
+<td><code>L,n{ SVID }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>S1F12</td>
+<td>Status Variable Namelist Reply</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,n{ L,3{ U4 SVID, A NAME, A UNITS } }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>S1F13</td>
+<td>Establish Communications Request</td>
+<td>H→E</td>
+<td>S1F14</td>
+<td><code>L,2{ A MDLN, A SOFTREV }</code></td>
+<td>body 不解析</td>
+</tr>
+<tr>
+<td>S1F14</td>
+<td>Establish Comm. Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,2{ B COMMACK, L,2{ A MDLN, A SOFTREV } }</code></td>
+<td>COMMACK=0 恆接受</td>
+</tr>
+<tr>
+<td>S1F15</td>
+<td>Request OFF-LINE</td>
+<td>H→E</td>
+<td>S1F16</td>
+<td>(header only)</td>
+<td><strong>本次新增 (a146d14 前)</strong></td>
+</tr>
+<tr>
+<td>S1F16</td>
+<td>OFF-LINE Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B OFLACK</code></td>
+<td>OFLACK=0,控制狀態→1</td>
+</tr>
+<tr>
+<td>S1F17</td>
+<td>Request ON-LINE</td>
+<td>H→E</td>
+<td>S1F18</td>
+<td>(header only)</td>
+<td></td>
+</tr>
+<tr>
+<td>S1F18</td>
+<td>ON-LINE Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B ONLACK</code></td>
+<td>ONLACK=0,控制狀態→5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stream-2-equipment-control-diagnostics">Stream 2 — 設備控制與診斷 / Equipment Control &amp; Diagnostics</h3>
+<table>
+<thead>
+<tr>
+<th>S/F</th>
+<th>名稱 Name</th>
+<th>方向</th>
+<th>回覆</th>
+<th>本體 Body (SECS-II)</th>
+<th>說明 Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S2F13</td>
+<td>Equipment Constant Request</td>
+<td>H→E</td>
+<td>S2F14</td>
+<td><code>L,n{ ECID }</code>(n=0=全部)</td>
+<td>讀 EC</td>
+</tr>
+<tr>
+<td>S2F14</td>
+<td>Equipment Constant Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,n{ &lt;EC value&gt; }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>S2F15</td>
+<td>New Equipment Constant Send</td>
+<td>H→E</td>
+<td>S2F16</td>
+<td><code>L,n{ L,2{ ECID, ECV } }</code></td>
+<td>寫 EC(限 idle,見 §3.2)</td>
+</tr>
+<tr>
+<td>S2F16</td>
+<td>New EC Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B EAC</code></td>
+<td>0=ok 1=不可寫 2=busy 3=範圍</td>
+</tr>
+<tr>
+<td>S2F17</td>
+<td>Date and Time Request</td>
+<td>H→E</td>
+<td>S2F18</td>
+<td>(header only)</td>
+<td><strong>本次新增</strong></td>
+</tr>
+<tr>
+<td>S2F18</td>
+<td>Date and Time Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>A[16] TIME</code></td>
+<td><code>YYYYMMDDhhmmsscc</code>,唯讀</td>
+</tr>
+<tr>
+<td>S2F25</td>
+<td>Loopback Diagnostic Request</td>
+<td>H→E</td>
+<td>S2F26</td>
+<td><code>B ABS</code></td>
+<td><strong>本次新增</strong></td>
+</tr>
+<tr>
+<td>S2F26</td>
+<td>Loopback Diagnostic Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B ABS</code>(echo)</td>
+<td>原封回送</td>
+</tr>
+<tr>
+<td>S2F31</td>
+<td>Date and Time Send</td>
+<td>H→E</td>
+<td>S2F32</td>
+<td><code>A[..] TIME</code></td>
+<td></td>
+</tr>
+<tr>
+<td>S2F32</td>
+<td>Date and Time Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B TIACK</code></td>
+<td>TIACK=0;<strong>刻意不寫設備時鐘</strong></td>
+</tr>
+<tr>
+<td>S2F33</td>
+<td>Define Report</td>
+<td>H→E</td>
+<td>S2F34</td>
+<td><code>L,2{ U4 DATAID, L,a{ L,2{ U4 RPTID, L,b{ U4 SVID } } } }</code></td>
+<td>見 §4;<strong>容忍未知 SVID</strong></td>
+</tr>
+<tr>
+<td>S2F34</td>
+<td>Define Report Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B DRACK</code></td>
+<td>0=ok 1=space 2=fmt 3=firmware-dup</td>
+</tr>
+<tr>
+<td>S2F35</td>
+<td>Link Event Report</td>
+<td>H→E</td>
+<td>S2F36</td>
+<td><code>L,2{ U4 DATAID, L,a{ L,2{ U4 CEID, L,b{ U4 RPTID } } } }</code></td>
+<td>見 §4;<strong>容忍未知 CEID/RPTID</strong></td>
+</tr>
+<tr>
+<td>S2F36</td>
+<td>Link Event Report Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B LRACK</code></td>
+<td>0=ok 2=fmt</td>
+</tr>
+<tr>
+<td>S2F37</td>
+<td>Enable/Disable Event Report</td>
+<td>H→E</td>
+<td>S2F38</td>
+<td><code>L,2{ Bool CEED, L,n{ U4 CEID } }</code></td>
+<td>n=0=全部</td>
+</tr>
+<tr>
+<td>S2F38</td>
+<td>Enable/Disable Event Ack</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B ERACK</code></td>
+<td>0=ok 1=CEID不存在</td>
+</tr>
+<tr>
+<td>S2F41</td>
+<td>Host Command Send</td>
+<td>H→E</td>
+<td>S2F42</td>
+<td><code>L,2{ A RCMD, L,n{ L,2{ A CPNAME, A CPVAL } } }</code></td>
+<td>見 §3.4</td>
+</tr>
+<tr>
+<td>S2F42</td>
+<td>Host Command Acknowledge</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,2{ B HCACK, L,0 }</code></td>
+<td>0=ok 1=無效 2=不可執行 4=busy</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stream-5-alarm">Stream 5 — 警報 / Alarm</h3>
+<table>
+<thead>
+<tr>
+<th>S/F</th>
+<th>名稱 Name</th>
+<th>方向</th>
+<th>回覆</th>
+<th>本體 Body (SECS-II)</th>
+<th>說明 Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S5F1</td>
+<td>Alarm Report Send</td>
+<td>E→H</td>
+<td>(S5F2)</td>
+<td><code>L,3{ B ALCD, U4 ALID, A ALTX }</code></td>
+<td>ALCD bit7:0x80=set/0x00=clear</td>
+</tr>
+<tr>
+<td>S5F3</td>
+<td>Enable/Disable Alarm Send</td>
+<td>H→E</td>
+<td>S5F4</td>
+<td><code>L,2{ ALED, ALID }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>S5F4</td>
+<td>Enable/Disable Alarm Ack</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B ACKC5</code></td>
+<td>ACKC5=0</td>
+</tr>
+<tr>
+<td>S5F5</td>
+<td>List Alarm Request</td>
+<td>H→E</td>
+<td>S5F6</td>
+<td><code>L,n{ ALID }</code>(n=0=全部)</td>
+<td></td>
+</tr>
+<tr>
+<td>S5F6</td>
+<td>List Alarm Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,n{ L,3{ B ALCD, U4 ALID, A ALTX } }</code></td>
+<td>目錄由 AlarmList.csv/SSOT 即時產生</td>
+</tr>
+<tr>
+<td>S5F7</td>
+<td>List Enabled Alarm Request</td>
+<td>H→E</td>
+<td>S5F8</td>
+<td><code>L,0</code></td>
+<td></td>
+</tr>
+<tr>
+<td>S5F8</td>
+<td>List Enabled Alarm Data</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>L,n{ L,3{ B ALCD, U4 ALID, A ALTX } }</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="stream-6-9-event-error">Stream 6 / 9 — 事件與錯誤 / Event &amp; Error</h3>
+<table>
+<thead>
+<tr>
+<th>S/F</th>
+<th>名稱 Name</th>
+<th>方向</th>
+<th>回覆</th>
+<th>本體 Body (SECS-II)</th>
+<th>說明 Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S6F11</td>
+<td>Event Report Send</td>
+<td>E→H</td>
+<td>(S6F12)</td>
+<td><code>L,3{ U4 DATAID, U4 CEID, L,r{ L,2{ U4 RPTID, L,{ &lt;SV values&gt; } } } }</code></td>
+<td>事件觸發時送;DATAID=1</td>
+</tr>
+<tr>
+<td>S9F3</td>
+<td>Unrecognized Stream/Function</td>
+<td>E→H</td>
+<td>—</td>
+<td><code>B[10] MHEAD</code></td>
+<td>收到未實作的 primary 時送</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-data-dictionary">3. 資料字典 / Data Dictionary</h2>
+<blockquote>
+<p>⚠️ HT-160S 的 SVID/CEID 編號為 <strong>本機自有</strong>,與 HT-90XX (tester) 不同。若 host 依 HT-90XX 字典設定報表,
+請依本節重新對應;HT-160S 的 S2F33/S2F35 會<strong>容忍</strong>未知的 SVID/CEID(見 §4),但那些欄位會回空值。</p>
+</blockquote>
+<h3 id="31-status-variables-svid-s1f3f4-s6f11">3.1 狀態變數 / Status Variables (SVID) — S1F3/F4, S6F11</h3>
+<p><strong>共同段(對齊 HT-90XX)/ Common band (HT-90XX aligned):</strong></p>
+<table>
+<thead>
+<tr>
+<th>SVID</th>
+<th>名稱 Name</th>
+<th>型別</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1001</td>
+<td>Machine Model</td>
+<td>A</td>
+<td>機型名 = HT-160S</td>
+</tr>
+<tr>
+<td>1003</td>
+<td>Software Version</td>
+<td>A</td>
+<td>軟體版本</td>
+</tr>
+<tr>
+<td>1021</td>
+<td>UPH</td>
+<td>I4</td>
+<td>每小時產出</td>
+</tr>
+<tr>
+<td>1027</td>
+<td>System Time</td>
+<td>A</td>
+<td>系統時間</td>
+</tr>
+<tr>
+<td>1518</td>
+<td>Real/Dummy</td>
+<td>I4</td>
+<td>0=Dummy / 1=Tray Only / 2=Real</td>
+</tr>
+</tbody>
+</table>
+<p><strong>HT-160S 自有高位段 / HT-160S-specific high band (66000+):</strong></p>
+<table>
+<thead>
+<tr>
+<th>SVID</th>
+<th>名稱 Name</th>
+<th>型別</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>66000</td>
+<td>Run Mode</td>
+<td>I4</td>
+<td>0=Normal 1=Home 2=OneCycle 3=CleanOut 4=TrayFeed</td>
+</tr>
+<tr>
+<td>66001</td>
+<td>System Running</td>
+<td>I4</td>
+<td>1=運轉中 0=停止</td>
+</tr>
+<tr>
+<td>66002</td>
+<td>Control State</td>
+<td>I4</td>
+<td>4=Local 5=Remote 1=Off-Line(GEM 控制狀態鏡像)</td>
+</tr>
+<tr>
+<td>66010</td>
+<td>Alarm Active</td>
+<td>I4</td>
+<td>1=有警報顯示中</td>
+</tr>
+<tr>
+<td>66011</td>
+<td>Alarm Code</td>
+<td>I4</td>
+<td>目前警報碼(0=無)</td>
+</tr>
+<tr>
+<td>66020</td>
+<td>Total IC</td>
+<td>I4</td>
+<td>本批/本輪處理 IC 數</td>
+</tr>
+<tr>
+<td>66021</td>
+<td>Total Sorted</td>
+<td>I4</td>
+<td>已分選 IC 數</td>
+</tr>
+<tr>
+<td>66030</td>
+<td>Active Lot Count</td>
+<td>I4</td>
+<td>目前載入 Lot 數</td>
+</tr>
+<tr>
+<td>66031</td>
+<td>Current Lot ID</td>
+<td>A</td>
+<td>首個 Lot ID</td>
+</tr>
+<tr>
+<td>66032</td>
+<td>Sort Mode</td>
+<td>I4</td>
+<td>0=Normal 1=LotBin 2=LotPassFail 3=WhiteList</td>
+</tr>
+</tbody>
+</table>
+<p><strong>AMR / AGV 段 / AMR band (38xxx):</strong></p>
+<table>
+<thead>
+<tr>
+<th>SVID</th>
+<th>名稱 Name</th>
+<th>型別</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>38219</td>
+<td>Supplement Bitmap</td>
+<td>A</td>
+<td>要料事件站別 <code>P1:x,...,P9:x</code>(CEID 272)</td>
+</tr>
+<tr>
+<td>38220</td>
+<td>LD/UnLD Status Bitmap</td>
+<td>A</td>
+<td>交握中站別(CEID 273)</td>
+</tr>
+<tr>
+<td>38221</td>
+<td>LD/UnLD Finish Bitmap</td>
+<td>A</td>
+<td>完成站別(CEID 274)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>AMR 各站 carrier/count SVID / per-station SVIDs</strong>(P1=Loader … P9=Auto6):</p>
+<table>
+<thead>
+<tr>
+<th>站 Station</th>
+<th>Carrier ID</th>
+<th>Tray Count</th>
+<th>Device Count</th>
+<th>Bin Setting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1 Loader</td>
+<td>38202</td>
+<td>38222</td>
+<td>38228</td>
+<td>—</td>
+</tr>
+<tr>
+<td>P2 Empty</td>
+<td>38203</td>
+<td>38223</td>
+<td>38229</td>
+<td>—</td>
+</tr>
+<tr>
+<td>P3 Color</td>
+<td>38204</td>
+<td>38224</td>
+<td>38230</td>
+<td>—</td>
+</tr>
+<tr>
+<td>P4 Auto1</td>
+<td>38205</td>
+<td>38225</td>
+<td>38231</td>
+<td>38234</td>
+</tr>
+<tr>
+<td>P5 Auto2</td>
+<td>38206</td>
+<td>38226</td>
+<td>38232</td>
+<td>38235</td>
+</tr>
+<tr>
+<td>P6 Auto3</td>
+<td>38207</td>
+<td>38227</td>
+<td>38233</td>
+<td>38236</td>
+</tr>
+<tr>
+<td>P7 Auto4</td>
+<td>38208</td>
+<td>38237</td>
+<td>38240</td>
+<td>38243</td>
+</tr>
+<tr>
+<td>P8 Auto5</td>
+<td>38209</td>
+<td>38238</td>
+<td>38241</td>
+<td>38244</td>
+</tr>
+<tr>
+<td>P9 Auto6</td>
+<td>38210</td>
+<td>38239</td>
+<td>38242</td>
+<td>38245</td>
+</tr>
+</tbody>
+</table>
+<p>Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。</p>
+<h3 id="32-equipment-constants-ecid-s2f13f14-s2f15f16">3.2 設備常數 / Equipment Constants (ECID) — S2F13/F14, S2F15/F16</h3>
+<table>
+<thead>
+<tr>
+<th>ECID</th>
+<th>名稱 Name</th>
+<th>型別</th>
+<th>單位</th>
+<th>可寫?</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1501</td>
+<td>Recipe Name</td>
+<td>A</td>
+<td>—</td>
+<td>唯讀</td>
+<td>目前配方(Setup File)名</td>
+</tr>
+<tr>
+<td>2758</td>
+<td>Tray X Pitch</td>
+<td>FT8</td>
+<td>mm</td>
+<td>可寫(idle)</td>
+<td>對齊 9045 Type1 Pitch X</td>
+</tr>
+<tr>
+<td>2759</td>
+<td>Tray Y Pitch</td>
+<td>FT8</td>
+<td>mm</td>
+<td>可寫(idle)</td>
+<td>9045 Type1 Pitch Y</td>
+</tr>
+<tr>
+<td>2760</td>
+<td>Tray X Start</td>
+<td>FT8</td>
+<td>mm</td>
+<td>可寫(idle)</td>
+<td>9045 Type1 Start X</td>
+</tr>
+<tr>
+<td>2761</td>
+<td>Tray Y Start</td>
+<td>FT8</td>
+<td>mm</td>
+<td>可寫(idle)</td>
+<td>9045 Type1 Start Y</td>
+</tr>
+<tr>
+<td>2762</td>
+<td>Tray X Division</td>
+<td>I4</td>
+<td>—</td>
+<td>可寫(idle)</td>
+<td>每列格數 X</td>
+</tr>
+<tr>
+<td>2763</td>
+<td>Tray Y Division</td>
+<td>I4</td>
+<td>—</td>
+<td>可寫(idle)</td>
+<td>每欄格數 Y</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>S2F15 寫入僅在機台 idle(非運轉、機內無 IC)時接受(EAC=2 否則);目前僅 tray-geometry 段可寫,Recipe(1501)唯讀。</p>
+</blockquote>
+<h3 id="33-collection-events-ceid-s6f11">3.3 事件 / Collection Events (CEID) — S6F11</h3>
+<p><strong>操作 / 機台狀態事件 1–31</strong>(每個攜帶 Report 1 = 13-SVID 狀態快照):</p>
+<table>
+<thead>
+<tr>
+<th>CEID</th>
+<th>事件</th>
+<th>CEID</th>
+<th>事件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Handler change status</td>
+<td>17</td>
+<td>Show Alarm</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Recipe Change</td>
+<td>18</td>
+<td>Release Alarm</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Press Clear Count</td>
+<td>19</td>
+<td>Show Message</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Press Start (no IC)</td>
+<td>20</td>
+<td>Release Message</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Press Start (with IC)</td>
+<td>21</td>
+<td>Change User</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Press Pause</td>
+<td>22</td>
+<td>Enter Setup Page</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Press Home</td>
+<td>23</td>
+<td>Enter Maintenance Page</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Press One Cycle</td>
+<td>24</td>
+<td>Enter I/O Page</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Press Clean Out</td>
+<td>25</td>
+<td>Enter Teach Page</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Press Tray Feed</td>
+<td>26</td>
+<td>Enter SECS GEM Page</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>Press Lot Start</strong></td>
+<td>27</td>
+<td>One Cycle Finish</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>Press Lot End</strong></td>
+<td>28</td>
+<td>Clean Out Finish</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Press Exit</td>
+<td>29</td>
+<td>Tray Feed Finish</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Press Retry</td>
+<td>30</td>
+<td>Time Event</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Press Skip</td>
+<td>31</td>
+<td>Switch Real/Dummy</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Press Alarm Reset</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Auto 滿盤事件 / Auto Full:</strong> 35=Auto1, 36=Auto2, 37=Auto3, 148=Auto4, 149=Auto5, 150=Auto6。</p>
+<p><strong>AMR / AGV 材料交握事件 / AMR material handoff:</strong></p>
+<table>
+<thead>
+<tr>
+<th>CEID</th>
+<th>名稱</th>
+<th>攜帶報表</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>272</td>
+<td>AGVSupplement</td>
+<td>Report(SVID 38219)</td>
+<td>要料(哪個站以 P-bitmap 表示)</td>
+</tr>
+<tr>
+<td>273</td>
+<td>AGVLDUnLDStatus</td>
+<td>Report(SVID 38220)</td>
+<td>交握中</td>
+</tr>
+<tr>
+<td>274</td>
+<td>AGVLDUnLDFinish</td>
+<td>Report(SVID 38221)</td>
+<td>上/下料完成</td>
+</tr>
+<tr>
+<td>275</td>
+<td>AGVLdID</td>
+<td>Report(carrier-ID SVID)</td>
+<td>載具/Tray ID</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>P-bitmap 站別對應:P1=Loader, P2=Empty, P3=Color, P4-P9=Auto1-6。</p>
+</blockquote>
+<h3 id="34-remote-commands-rcmd-s2f41f42">3.4 遠端命令 / Remote Commands (RCMD) — S2F41/F42</h3>
+<table>
+<thead>
+<tr>
+<th>RCMD</th>
+<th>動作</th>
+<th>參數 CP</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SET_LOT_INFO</code></td>
+<td>覆蓋式登記 Lot</td>
+<td>Lot id list</td>
+<td>清空後重登;不啟動運轉</td>
+</tr>
+<tr>
+<td><code>LOTSTART</code></td>
+<td>累加式登記 Lot + 預取 2D/Bin</td>
+<td>Lot id list</td>
+<td>不啟動運轉(啟動仍為 operator-gated)</td>
+</tr>
+<tr>
+<td><code>START</code></td>
+<td>遠端啟動運轉</td>
+<td>—</td>
+<td>需 RUN CHECK / idle 條件</td>
+</tr>
+<tr>
+<td><code>STOP</code></td>
+<td>停機(收尾)</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>PAUSE</code></td>
+<td>暫停</td>
+<td>—</td>
+<td>= SystemStart=false, SoftStop=true</td>
+</tr>
+<tr>
+<td><code>HOME</code></td>
+<td>回原點</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>CLEARCOUNT</code></td>
+<td>清除計數</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ONLINE_REMOTE</code> / <code>ONLINE</code></td>
+<td>控制狀態→Remote(5)</td>
+<td>—</td>
+<td>鏡像 66002</td>
+</tr>
+<tr>
+<td><code>ONLINE_LOCAL</code></td>
+<td>控制狀態→Local(4)</td>
+<td>—</td>
+<td>鏡像 66002</td>
+</tr>
+<tr>
+<td><code>START_AGV</code></td>
+<td>AMR 派車 prep + lock</td>
+<td>station / <code>LoaderTrayCount</code> …</td>
+<td>記 intent+盤數;實際 motion 由機構/START 驅動</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>HCACK: 0=成功 / 1=命令無效 / 2=不可執行(如機內有 IC)/ 4=busy。未列命令回 HCACK=1。</p>
+</blockquote>
+<h3 id="35-alarms-alid-s5f1-s5f5f6">3.5 警報 / Alarms (ALID) — S5F1, S5F5/F6</h3>
+<ul>
+<li>ALID 目錄由機台警報 SSOT(<code>system\AlarmList.csv</code> / <code>mapAlarmCodeList</code>)<strong>即時</strong>產生,約 480+ 碼。</li>
+<li>欄位:<code>AlarmCode, AlarmType, E_ErrMessage, C_ErrMessage, E_Description, C_Description</code>(中英雙語)。</li>
+<li>S5F1 ALTX = <code>&lt;code&gt; &lt;English message&gt;</code>;ALCD bit7 = 0x80(set)/0x00(clear)。</li>
+<li><strong>完整警報清單請見隨附的 <code>system\AlarmList.csv</code></strong>(過長,不在本規格內展開)。</li>
+</ul>
+<hr />
+<h2 id="4-dynamic-event-reports-tolerance">4. 動態報表定義與容忍行為 / Dynamic Event Reports &amp; Tolerance</h2>
+<p>HT-160S 支援標準 GEM 動態報表定義流程:</p>
+<pre><code>S2F37 (Bool=0, L,0)  → 停用全部事件 (disable all)
+S2F33 (RPTID→SVIDs)  → 定義報表      (define reports)   → S2F34 DRACK
+S2F35 (CEID→RPTIDs)  → 連結事件↔報表 (link)             → S2F36 LRACK
+S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
+</code></pre>
+<p>事件觸發時,S6F11 依 CEID→RPTID→SVID 連結序列化當前 SV 值。報表定義<strong>跨重開機保留</strong>(存於 <code>system\EventReportDef.ini</code>)。</p>
+<h3 id="tolerance-behavior-important">容忍行為(重要)/ Tolerance behavior (important)</h3>
+<p>為讓依 <strong>HT-90XX 字典</strong>設定的 host(其引用的 SVID/CEID 未必存在於 HT-160S)能順利完成報表定義,HT-160S 採<strong>容忍</strong>策略,而非整批拒絕:</p>
+<ul>
+<li><strong>S2F33 未知 SVID</strong>:接受定義(不回 DRACK=0x04),該 SVID 於 S6F11 回<strong>空 item</strong>。</li>
+<li><strong>S2F35 未知 CEID</strong>:接受連結(自動建立為 host CEID,無對應機台事件則不觸發)。</li>
+<li><strong>S2F35 未知 RPTID</strong>:略過該連結(不影響其餘)。</li>
+<li><strong>保護</strong>:若對「已存在的機台事件(如 AMR 272-275)」連結到全部未知的 RPTID,<strong>不覆寫</strong>其既有綁定(避免清空)。</li>
+</ul>
+<blockquote>
+<p>換言之:host 可完整完成上線與報表定義流程;未對應到 HT-160S 實際資料的欄位會回空值,待雙方確認後再由 HT-160S 補實作或由 host 改用本規格 §3 的 SVID/CEID。</p>
+</blockquote>
+<hr />
+<h2 id="5-not-yet-supported">5. 尚未支援 / Not Yet Supported</h2>
+<p>以下訊息目前<strong>未實作</strong>(收到會回 S9F3 或僅記錄,不影響上線)。如客戶流程需要,可依需求評估補上:</p>
+<table>
+<thead>
+<tr>
+<th>訊息</th>
+<th>名稱</th>
+<th>備註</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S2F23 / F24</td>
+<td>Trace Initialize</td>
+<td>以事件報表(S2F33/35/37 + S6F11)取代</td>
+</tr>
+<tr>
+<td>S2F29 / F30</td>
+<td>EC Namelist</td>
+<td>可由現有 EC 表補回覆</td>
+</tr>
+<tr>
+<td>S6F15 / F16</td>
+<td>Event Report Request(pull)</td>
+<td>host 若改用 pull 模式再補</td>
+</tr>
+<tr>
+<td>S6F19 / F20</td>
+<td>Individual Report Request</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>S7F1–F26</td>
+<td>Process Program(配方上下傳)</td>
+<td>recipe 走本地/FTP;非 event-report 集</td>
+</tr>
+<tr>
+<td>S10F3–F6</td>
+<td>Terminal Display</td>
+<td>終端訊息顯示</td>
+</tr>
+<tr>
+<td>S14F1 / F2</td>
+<td>GetAttr(物件屬性)</td>
+<td></td>
+</tr>
+<tr>
+<td>S125F1 / F2</td>
+<td>KYEC 自訂 EC-change report</td>
+<td>HT-90XX 自訂 stream</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-ht-90xx-alignment-notes-vs-ht-90xx">6. 對齊 HT-90XX 註記 / Alignment Notes vs HT-90XX</h2>
+<ul>
+<li><strong>命令面 / Command surface</strong>:S1/S2/S5/S6 的基礎 GEM 訊息與 HT-90XX 對齊(見 §2)。</li>
+<li><strong>字典面 / Dictionary</strong>:HT-160S 為 tray sorter,無 tester 站位/測試結果/接觸次數等概念,故:</li>
+<li>HT-90XX 的 tester 專屬 SVID(如 1420 32-site 測試結果、6001/6002 Arm 接觸次數、1006/1007 Socket ID)<strong>在 HT-160S 無對應</strong>,以容忍機制回空值或請 host 移除。</li>
+<li>HT-160S 的機台狀態/產出/AMR 資料集中於 66xxx 與 38xxx 段(§3.1)。</li>
+<li><strong>建議</strong>:host 端請依本規格 §3 對應 HT-160S 實際 SVID/CEID;無法對應者(tester 專屬)由雙方確認後移除或以容忍空值處理。</li>
+</ul>
+<hr />
+<p><em>本規格依現行 firmware 實作產出,供 KYEC / EAP 整合對接使用。行為之最終確認以現場 host round-trip 為準。</em>
+<em>This spec reflects the shipping firmware; final behavior is confirmed by on-site host round-trip testing.</em></p></body></html>
