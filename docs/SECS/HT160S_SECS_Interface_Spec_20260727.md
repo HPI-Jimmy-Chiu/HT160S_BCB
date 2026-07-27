@@ -200,16 +200,28 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 
 **Auto 滿盤事件 / Auto Full:** 35=Auto1, 36=Auto2, 37=Auto3, 148=Auto4, 149=Auto5, 150=Auto6。
 
-**AMR / AGV 材料交握事件 / AMR material handoff:**
+**AMR / AGV 材料交握事件 / AMR material handoff:**（全部 DataID=1,對齊 HT9045 / all DataID=1, aligned to HT9045)
 
 | CEID | 名稱 | 攜帶報表 | 說明 |
 |---|---|---|---|
-| 272 | AGVSupplement | Report(SVID 38219) | 要料(哪個站以 P-bitmap 表示) |
-| 273 | AGVLDUnLDStatus | Report(SVID 38220) | 交握中 |
-| 274 | AGVLDUnLDFinish | Report(SVID 38221) | 上/下料完成 |
-| 275 | AGVLdID | Report(carrier-ID SVID) | 載具/Tray ID |
+| 272 | AGVSupplement | Report 2(SVID 38219 bitmap)**+ Report 6** | 要料;**同時帶各站 Tray Count + Device Count** |
+| 273 | AGVLDUnLDStatus | Report 3(SVID 38220 bitmap) | 交握中(尚未計數,不帶 count) |
+| 274 | AGVLDUnLDFinish | Report 4(SVID 38221 bitmap)**+ Report 6** | 上/下料完成;**帶收尾 Tray Count + Device Count** |
+| 275 | AGVLdID | Report 7(SVID 38204) | Color 身分 Tray 2D(見下) |
 
 > P-bitmap 站別對應:P1=Loader, P2=Empty, P3=Color, P4-P9=Auto1-6。
+
+**下料 Tray/Device Count 上傳(對齊 HT9045 iAMRTrayCount / iAMRDeviceCount)/ Unload count upload:**
+
+- CEID **272(要車)與 274(完成)** 皆附 **Report 6**;Report 6 = 9 站 **Tray Count**(SVID 38222–38227 / 38237–38239)接著 9 站 **Device Count**(SVID 38228–38233 / 38240–38242),與 HT9045 的 `iAMRTrayCount[]` / `iAMRDeviceCount[]` **同編號同語意**。
+- 下料(Auto 站)時兩值皆填真值:`TrayCount = 該車盤數 (Car->iTrayCount)`;`Device Count = 該 Auto 車的 IC 累計`(卸料時逐盤 `+= Tray.CountIC()` 累加)。
+- 上料方向(Loader/Empty/Color)僅交換盤數,Device Count 保持 0(與上下料契約一致:上料交換盤數、下料才給 IC 件數 — HT9045/HT160 皆然)。
+
+**Color 身分 Tray 2D 上傳(CEID 275 AGVLdID,對齊 HT9045)/ Color identity-tray 2D upload:**
+
+- 由 Color CCD 於 Loader 回收進料點掃描身分 Tray 2D,掃描完成即以 S6F11 **CEID 275** 上傳。
+- 值寫入 **SVID 38204**(Color P3 carrier ID),經 Report 7 送出;DataID=1(對齊 HT9045)。
+- 對齊 HT9045 AGVLdID(load id);HT9045 的 report 內容為 host 動態定義,HT-160S 現以 Report 7 單一身分 SVID 為預設,host 亦可經 S2F35 改綁自己的報表。
 
 ### 3.4 遠端命令 / Remote Commands (RCMD) — S2F41/F42
 
@@ -287,6 +299,35 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
   - HT-90XX 的 tester 專屬 SVID(如 1420 32-site 測試結果、6001/6002 Arm 接觸次數、1006/1007 Socket ID)**在 HT-160S 無對應**,以容忍機制回空值或請 host 移除。
   - HT-160S 的機台狀態/產出/AMR 資料集中於 66xxx 與 38xxx 段(§3.1)。
 - **建議**:host 端請依本規格 §3 對應 HT-160S 實際 SVID/CEID;無法對應者(tester 專屬)由雙方確認後移除或以容忍空值處理。
+
+---
+
+## 7. HT-160S 專屬項目與對齊狀態 / HT-160S-Specific Items & Alignment Status
+
+> 依客戶要求:凡 HT-160S 使用到的 SECS 命令皆對齊 HT-90XX (HT9045)。§7.1 列已對齊項;§7.2 列 HT-160S 專屬(9045 無對應或同號不同義)項目及其存在理由。
+> Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. §7.1 = aligned; §7.2 = HT-160S-specific with rationale.
+
+### 7.1 已對齊 HT9045 / Aligned to HT9045
+- **訊息 Messages**:S1 / S2 / S5 / S6 基礎 GEM 全數對齊(§2)。
+- **RCMD**:`PAUSE` `START` `STOP` `HOME` `LOTSTART` `ONLINE_REMOTE` `ONLINE_LOCAL` `START_AGV`。
+- **SVID 共同段**:1001 / 1003 / 1021 / 1027 / 1518。
+- **ECID**:1501,2758–2763(Type1 tray 幾何)。
+- **CEID**:AMR 272 / 273 / 274 / 275,Auto-Full 35 / 36 / 37。
+- **AMR 資料**:Tray/Device Count(SVID 38222+ / 38228+)、Color 身分 2D(CEID 275 / SVID 38204)、事件 DataID=1 —— 皆對齊 HT9045(見 §3.3)。
+
+### 7.2 HT-160S 專屬(9045 無對應)+ 為何特殊 / HT-160S-only + rationale
+
+| 項目 Item | 類別 | 用途 Purpose | 為何 HT-160S 專屬 Why HT-160S-specific |
+|---|---|---|---|
+| `SET_LOT_INFO` | RCMD | 一次**覆蓋式**登記整批 Lot(清空後重登) | 9045 用 `START_LOT`(keyed)+ `LOTSTART` 按鈕;HT-160S 的 lot 模型支援批次多-Lot 一次載入,故自有此命令 |
+| `ONLINE`(裸) | RCMD | = `ONLINE_REMOTE` 別名 | 便利別名;9045 僅有 `ONLINE_REMOTE` / `ONLINE_LOCAL` |
+| `CLEARCOUNT` | RCMD | host 遠端清除生產計數 | 9045 將 clear-count 僅作操作員事件(CEID 5),無對應 RCMD(9045 另有 `CLEAN_AUTO_SORT_COUNT`,語意不同) |
+| SVID **66000–66032** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞 |
+| SVID **38237–38245** | SVID | Auto4/5/6 的 carrier / tray / device / bin-setting | HT-160S 有 **6 個 Auto 輸出站**,9045 僅 3(SVID 到 38236);為第 4–6 站延伸 |
+| CEID **148 / 149 / 150** | CEID | Auto4/5/6 滿盤事件 | 同上:6 輸出站 vs 9045 的 3(35/36/37) |
+| CEID **1–31** 編號 | CEID | HT-160S 自有操作 / UI / 機台狀態事件集(見 §3.3) | **同號不同義**:HT-160S 的操作事件集與 9045 的 CEID 1–37 語意不同。host 以 S2F35 綁定報表到所需 CEID 時,**請依本規格 §3.3 的意義**,勿套用 9045 的 CEID 語意。AMR(272–275)與 Auto-Full(35/36/37)則同號同義。 |
+
+> **無 HT-160S 專屬的 SxFy 訊息,亦無專屬 ECID** —— HT-160S 未自創任何 SECS 訊息(§2 皆標準 GEM),ECID 全數對齊 9045。
 
 ---
 

@@ -875,7 +875,7 @@ The command surface is aligned to HT-90XX; the SVID/CEID dictionary is HT-160S-s
 </tbody>
 </table>
 <p><strong>Auto 滿盤事件 / Auto Full:</strong> 35=Auto1, 36=Auto2, 37=Auto3, 148=Auto4, 149=Auto5, 150=Auto6。</p>
-<p><strong>AMR / AGV 材料交握事件 / AMR material handoff:</strong></p>
+<p><strong>AMR / AGV 材料交握事件 / AMR material handoff:</strong>（全部 DataID=1,對齊 HT9045 / all DataID=1, aligned to HT9045)</p>
 <table>
 <thead>
 <tr>
@@ -889,32 +889,44 @@ The command surface is aligned to HT-90XX; the SVID/CEID dictionary is HT-160S-s
 <tr>
 <td>272</td>
 <td>AGVSupplement</td>
-<td>Report(SVID 38219)</td>
-<td>要料(哪個站以 P-bitmap 表示)</td>
+<td>Report 2(SVID 38219 bitmap)<strong>+ Report 6</strong></td>
+<td>要料;<strong>同時帶各站 Tray Count + Device Count</strong></td>
 </tr>
 <tr>
 <td>273</td>
 <td>AGVLDUnLDStatus</td>
-<td>Report(SVID 38220)</td>
-<td>交握中</td>
+<td>Report 3(SVID 38220 bitmap)</td>
+<td>交握中(尚未計數,不帶 count)</td>
 </tr>
 <tr>
 <td>274</td>
 <td>AGVLDUnLDFinish</td>
-<td>Report(SVID 38221)</td>
-<td>上/下料完成</td>
+<td>Report 4(SVID 38221 bitmap)<strong>+ Report 6</strong></td>
+<td>上/下料完成;<strong>帶收尾 Tray Count + Device Count</strong></td>
 </tr>
 <tr>
 <td>275</td>
 <td>AGVLdID</td>
-<td>Report(carrier-ID SVID)</td>
-<td>載具/Tray ID</td>
+<td>Report 7(SVID 38204)</td>
+<td>Color 身分 Tray 2D(見下)</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
 <p>P-bitmap 站別對應:P1=Loader, P2=Empty, P3=Color, P4-P9=Auto1-6。</p>
 </blockquote>
+<p><strong>下料 Tray/Device Count 上傳(對齊 HT9045 iAMRTrayCount / iAMRDeviceCount)/ Unload count upload:</strong></p>
+<ul>
+<li>CEID <strong>272(要車)與 274(完成)</strong> 皆附 <strong>Report 6</strong>;Report 6 = 9 站 <strong>Tray Count</strong>(SVID 38222–38227 / 38237–38239)接著 9 站 <strong>Device Count</strong>(SVID 38228–38233 / 38240–38242),與 HT9045 的 <code>iAMRTrayCount[]</code> / <code>iAMRDeviceCount[]</code> <strong>同編號同語意</strong>。</li>
+<li>下料(Auto 站)時兩值皆填真值:<code>TrayCount = 該車盤數 (Car-&gt;iTrayCount)</code>;<code>Device Count = 該 Auto 車的 IC 累計</code>(卸料時逐盤 <code>+= Tray.CountIC()</code> 累加)。</li>
+<li>上料方向(Loader/Empty/Color)僅交換盤數,Device Count 保持 0(與上下料契約一致:上料交換盤數、下料才給 IC 件數 — HT9045/HT160 皆然)。</li>
+</ul>
+<p><strong>Color 身分 Tray 2D 上傳(CEID 275 AGVLdID,對齊 HT9045)/ Color identity-tray 2D upload:</strong></p>
+<ul>
+<li>由 Color CCD 於 Loader 回收進料點掃描身分 Tray 2D,掃描完成即以 S6F11 <strong>CEID 275</strong> 上傳。</li>
+<li>值寫入 <strong>SVID 38204</strong>(Color P3 carrier ID),經 Report 7 送出;DataID=1(對齊 HT9045)。</li>
+<li>對齊 HT9045 AGVLdID(load id);HT9045 的 report 內容為 host 動態定義,HT-160S 現以 Report 7 單一身分 SVID 為預設,host 亦可經 S2F35 改綁自己的報表。</li>
+</ul>
 <h3 id="34-remote-commands-rcmd-s2f41f42">3.4 遠端命令 / Remote Commands (RCMD) — S2F41/F42</h3>
 <table>
 <thead>
@@ -1081,6 +1093,79 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 <li>HT-160S 的機台狀態/產出/AMR 資料集中於 66xxx 與 38xxx 段(§3.1)。</li>
 <li><strong>建議</strong>:host 端請依本規格 §3 對應 HT-160S 實際 SVID/CEID;無法對應者(tester 專屬)由雙方確認後移除或以容忍空值處理。</li>
 </ul>
+<hr />
+<h2 id="7-ht-160s-ht-160s-specific-items-alignment-status">7. HT-160S 專屬項目與對齊狀態 / HT-160S-Specific Items &amp; Alignment Status</h2>
+<blockquote>
+<p>依客戶要求:凡 HT-160S 使用到的 SECS 命令皆對齊 HT-90XX (HT9045)。§7.1 列已對齊項;§7.2 列 HT-160S 專屬(9045 無對應或同號不同義)項目及其存在理由。
+Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. §7.1 = aligned; §7.2 = HT-160S-specific with rationale.</p>
+</blockquote>
+<h3 id="71-ht9045-aligned-to-ht9045">7.1 已對齊 HT9045 / Aligned to HT9045</h3>
+<ul>
+<li><strong>訊息 Messages</strong>:S1 / S2 / S5 / S6 基礎 GEM 全數對齊(§2)。</li>
+<li><strong>RCMD</strong>:<code>PAUSE</code> <code>START</code> <code>STOP</code> <code>HOME</code> <code>LOTSTART</code> <code>ONLINE_REMOTE</code> <code>ONLINE_LOCAL</code> <code>START_AGV</code>。</li>
+<li><strong>SVID 共同段</strong>:1001 / 1003 / 1021 / 1027 / 1518。</li>
+<li><strong>ECID</strong>:1501,2758–2763(Type1 tray 幾何)。</li>
+<li><strong>CEID</strong>:AMR 272 / 273 / 274 / 275,Auto-Full 35 / 36 / 37。</li>
+<li><strong>AMR 資料</strong>:Tray/Device Count(SVID 38222+ / 38228+)、Color 身分 2D(CEID 275 / SVID 38204)、事件 DataID=1 —— 皆對齊 HT9045(見 §3.3)。</li>
+</ul>
+<h3 id="72-ht-160s-9045-ht-160s-only-rationale">7.2 HT-160S 專屬(9045 無對應)+ 為何特殊 / HT-160S-only + rationale</h3>
+<table>
+<thead>
+<tr>
+<th>項目 Item</th>
+<th>類別</th>
+<th>用途 Purpose</th>
+<th>為何 HT-160S 專屬 Why HT-160S-specific</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SET_LOT_INFO</code></td>
+<td>RCMD</td>
+<td>一次<strong>覆蓋式</strong>登記整批 Lot(清空後重登)</td>
+<td>9045 用 <code>START_LOT</code>(keyed)+ <code>LOTSTART</code> 按鈕;HT-160S 的 lot 模型支援批次多-Lot 一次載入,故自有此命令</td>
+</tr>
+<tr>
+<td><code>ONLINE</code>(裸)</td>
+<td>RCMD</td>
+<td>= <code>ONLINE_REMOTE</code> 別名</td>
+<td>便利別名;9045 僅有 <code>ONLINE_REMOTE</code> / <code>ONLINE_LOCAL</code></td>
+</tr>
+<tr>
+<td><code>CLEARCOUNT</code></td>
+<td>RCMD</td>
+<td>host 遠端清除生產計數</td>
+<td>9045 將 clear-count 僅作操作員事件(CEID 5),無對應 RCMD(9045 另有 <code>CLEAN_AUTO_SORT_COUNT</code>,語意不同)</td>
+</tr>
+<tr>
+<td>SVID <strong>66000–66032</strong></td>
+<td>SVID</td>
+<td>機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032)</td>
+<td>sorter 特有資料,9045(tester)無對應;刻意置於 <strong>66000+ 高位段</strong>以絕不與 9045 的 SVID 段碰撞</td>
+</tr>
+<tr>
+<td>SVID <strong>38237–38245</strong></td>
+<td>SVID</td>
+<td>Auto4/5/6 的 carrier / tray / device / bin-setting</td>
+<td>HT-160S 有 <strong>6 個 Auto 輸出站</strong>,9045 僅 3(SVID 到 38236);為第 4–6 站延伸</td>
+</tr>
+<tr>
+<td>CEID <strong>148 / 149 / 150</strong></td>
+<td>CEID</td>
+<td>Auto4/5/6 滿盤事件</td>
+<td>同上:6 輸出站 vs 9045 的 3(35/36/37)</td>
+</tr>
+<tr>
+<td>CEID <strong>1–31</strong> 編號</td>
+<td>CEID</td>
+<td>HT-160S 自有操作 / UI / 機台狀態事件集(見 §3.3)</td>
+<td><strong>同號不同義</strong>:HT-160S 的操作事件集與 9045 的 CEID 1–37 語意不同。host 以 S2F35 綁定報表到所需 CEID 時,<strong>請依本規格 §3.3 的意義</strong>,勿套用 9045 的 CEID 語意。AMR(272–275)與 Auto-Full(35/36/37)則同號同義。</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>無 HT-160S 專屬的 SxFy 訊息,亦無專屬 ECID</strong> —— HT-160S 未自創任何 SECS 訊息(§2 皆標準 GEM),ECID 全數對齊 9045。</p>
+</blockquote>
 <hr />
 <p><em>本規格依現行 firmware 實作產出,供 KYEC / EAP 整合對接使用。行為之最終確認以現場 host round-trip 為準。</em>
 <em>This spec reflects the shipping firmware; final behavior is confirmed by on-site host round-trip testing.</em></p></body></html>
