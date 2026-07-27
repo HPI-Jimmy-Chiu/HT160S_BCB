@@ -931,7 +931,8 @@ void THGem::ProcessDefineReport_S2F33()
 }
 //---------------------------------------------------------------------------
 //AI(secs-reportdef) 20260724 : S2F35 Link Event Report. L,2{ DATAID, L,a{ L,2{ CEID, L,b{ RPTID.. } } } }.
-//LRACK 0=ok 2=fmt 4=badCEID 5=badRPTID. Host can only link EXISTING (firmware) CEIDs -> session-only.
+//LRACK 0=ok 2=fmt. AI(secs-pathA) 20260727 : unknown CEID/RPTID are TOLERATED (log + create/skip),
+//not LRACK=0x04/0x05-rejected, so the on-site CJ_EAP host completes its S2F35 link phase (Path A probe).
 void THGem::ProcessLinkEventReport_S2F35()
 {
     int a=0, b=0, len=0, i=0, j=0;
@@ -954,18 +955,39 @@ void THGem::ProcessLinkEventReport_S2F35()
         if(GetDataItemLenAndType(len, Type)!=1)             { LinkReportAcknowledge(0x02); return; }
         if(DataItemIn(len, Type, sTmp)!=1)                  { LinkReportAcknowledge(0x02); return; }
         unsigned cc = (unsigned)atoi(sTmp.c_str());
-        if(FindCEIDItem(cc)==NULL)                          { LinkReportAcknowledge(0x04); return; }
+        //AI(secs-pathA) 20260727 : Path A discovery-probe tolerance. Do NOT LRACK=0x04-reject a link
+        //to a CEID the firmware lacks - the on-site CJ_EAP host is numbered for the HT9045 CEID
+        //dictionary, and a hard reject blocks its link phase (and our capture of the referenced set).
+        //SetCEIDContent find-or-creates (Mode=0 host) so an unknown CEID is created + linked; it has
+        //no fire site in HT160 so it simply never fires. Log it for referenced-set discovery.
+        if(FindCEIDItem(cc)==NULL)
+        {
+            AnsiString sUnkCe;
+            sUnkCe.sprintf("[SECS][S2F35] link to unknown CEID=%u (Path A tolerate; host-created, never fires)", cc);
+            StringOut(sUnkCe);
+        }
         if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ LinkReportAcknowledge(0x02); return; }
         if(b>32)                                            { LinkReportAcknowledge(0x02); return; }
-        cid[nCe]=cc; rpn[nCe]=b;
+        cid[nCe]=cc;
+        int w=0;
         for(j=0; j<b; j++)
         {
             if(GetDataItemLenAndType(len, Type)!=1)         { LinkReportAcknowledge(0x02); return; }
             if(DataItemIn(len, Type, sTmp)!=1)              { LinkReportAcknowledge(0x02); return; }
             unsigned rr = (unsigned)atoi(sTmp.c_str());
-            if(FindReportItem(rr)==NULL)                    { LinkReportAcknowledge(0x05); return; }
-            rpv[nCe][j]=rr;
+            //AI(secs-pathA) 20260727 : skip (do not store) a link to an undefined RPTID rather than
+            //LRACK=0x05-rejecting, so no dangling ref reaches S6F11 serialize. With S2F33 tolerance
+            //the host RPTIDs normally exist; this is a safety net.
+            if(FindReportItem(rr)==NULL)
+            {
+                AnsiString sUnkRp;
+                sUnkRp.sprintf("[SECS][S2F35] skip unknown RPTID=%u in CEID=%u link (Path A tolerate)", rr, cc);
+                StringOut(sUnkRp);
+                continue;
+            }
+            rpv[nCe][w]=rr; w++;
         }
+        rpn[nCe]=w;
         nCe++;
         if(nCe>=64)                                         { LinkReportAcknowledge(0x02); return; }
     }
