@@ -940,6 +940,7 @@ void THGem::ProcessLinkEventReport_S2F35()
     AnsiString sTmp;
     static unsigned cid[64];
     static int      rpn[64];
+    static int      rpb[64];
     static unsigned rpv[64][32];
     int nCe = 0;
     ResetReturnCode();
@@ -987,12 +988,26 @@ void THGem::ProcessLinkEventReport_S2F35()
             }
             rpv[nCe][w]=rr; w++;
         }
-        rpn[nCe]=w;
+        rpn[nCe]=w; rpb[nCe]=b;
         nCe++;
         if(nCe>=64)                                         { LinkReportAcknowledge(0x02); return; }
     }
     for(i=0; i<nCe; i++)
+    {
+        //AI(secs-pathA) 20260727 : adversarial-review MEDIUM fix - do NOT commit a link
+        //whose reports were ALL unknown-skipped (rpn==0 while the host DID request rpb>0).
+        //That would overwrite an existing firmware CEID binding to L,0 and silently drop
+        //its S6F11 payload for the session. Preserve the binding; a genuine host unlink
+        //(b==0 -> rpb==0) still commits ReportCount=0 as before.
+        if(rpn[i]==0 && rpb[i]>0)
+        {
+            AnsiString sKeep;
+            sKeep.sprintf("[SECS][S2F35] CEID=%u link had only unknown RPTIDs - preserve existing binding, no commit", cid[i]);
+            StringOut(sKeep);
+            continue;
+        }
         SetCEIDContent(cid[i], (unsigned)rpn[i], rpv[i], 0);
+    }
     LinkReportAcknowledge(0x00);
 }
 //---------------------------------------------------------------------------
