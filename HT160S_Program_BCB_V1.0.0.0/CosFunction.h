@@ -340,7 +340,7 @@ public:
 	//(KYEC-WhiteList-Interface-Spec 3.2). Loads nothing; returns false + an operator-facing
 	//Reason when the file is not a usable whitelist. See the definition for why the shared
 	//LoadFromJsonString cannot carry these rules.
-	bool ValidateWhiteListJson(AnsiString Json, AnsiString &Reason);
+	bool ValidateWhiteListJson(AnsiString Json, AnsiString &Reason, AnsiString ExpectedKyecLot="");
 };
 //---------------------------------------------------------------------------
 // Dynamic (Lot,Bin) -> Auto binding table for the "By Lot+Bin" sort mode

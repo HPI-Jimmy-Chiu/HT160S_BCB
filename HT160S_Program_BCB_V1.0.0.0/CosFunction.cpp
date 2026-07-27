@@ -1611,7 +1611,7 @@ bool THT160LotRegistry::LoadFromJsonString(AnsiString Json, bool &bHasDuplicate,
 // mistake is most likely : customer root array present / at least one lot / every lot
 // has a LOTID / every lot has a KYECLotID. Reason is operator-facing English (it is
 // what the blocked Start shows). Read-only : the registry is not touched.
-bool THT160LotRegistry::ValidateWhiteListJson(AnsiString Json, AnsiString &Reason)
+bool THT160LotRegistry::ValidateWhiteListJson(AnsiString Json, AnsiString &Reason, AnsiString ExpectedKyecLot)
 {
 	Reason="";
 	cJSON *Root=cJSON_Parse(Json.c_str());
@@ -1656,6 +1656,19 @@ bool THT160LotRegistry::ValidateWhiteListJson(AnsiString Json, AnsiString &Reaso
 		if(KyecId.Trim()==AnsiString(""))
 		{
 			Reason="WhiteList rejected : lot "+LotId+" has no KYECLotID (mandatory) !";
+			cJSON_Delete(Root);
+			return false;
+		}
+		//AI(ht160s-whitelist-kyec) 20260727 : cross-check the file's KYEC lot against the Lot Start
+		// lot (edLotNo -> ExpectedKyecLot), which the loader stamps as the registry key = Soter col7.
+		// The file KYECLotID is authoritative for the KYEC identity ; a mismatch means the lot was
+		// opened under a different id than the file declares (e.g. a manual operator who typed the
+		// customer lot into the Lot list), which would silently sort under the Lot Start value and
+		// drop the KYEC identity from the report. Reject loudly instead. Skipped when ExpectedKyecLot
+		// is blank (degenerate ; the loader then falls back to per-lot LOTID keying).
+		if(ExpectedKyecLot.Trim()!=AnsiString("") && KyecId.Trim()!=ExpectedKyecLot.Trim())
+		{
+			Reason="WhiteList rejected : lot "+LotId+" KYECLotID ("+KyecId.Trim()+") != Lot Start lot ("+ExpectedKyecLot.Trim()+") !";
 			cJSON_Delete(Root);
 			return false;
 		}

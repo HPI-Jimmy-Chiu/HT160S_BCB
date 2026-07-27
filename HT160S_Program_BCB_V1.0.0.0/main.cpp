@@ -2378,6 +2378,11 @@ bool __fastcall TfMain::LoadWhiteListFile()
     if(!FileExists(fn))
     {
         gWhiteListLoadError="WhiteList file not found : "+fn;
+        //AI(ht160s-whitelist-kyec) 20260727 : a rejected WhiteList file is a HANDLED,
+        // operator-actionable outcome (production Start is blocked with this exact reason),
+        // NOT a software fault. Record every rejection in the EventLog so the FE/operator sees
+        // it was detected and handled, never mistaken for the software silently misbehaving.
+        g_EventLog.Log("WRN_WHITELIST_REJECT", gWhiteListLoadError);
         RecordProcess("WhiteList: file missing - "+fn);
         RefreshLotListFromRegistry();         // reflect the now-empty registry in the UI
         return false;
@@ -2389,6 +2394,7 @@ bool __fastcall TfMain::LoadWhiteListFile()
     {
         delete raw;
         gWhiteListLoadError="WhiteList file cannot be read : "+fn;
+        g_EventLog.Log("WRN_WHITELIST_REJECT", gWhiteListLoadError);
         RecordProcess("WhiteList: read failed - "+fn);
         RefreshLotListFromRegistry();
         return false;
@@ -2404,17 +2410,29 @@ bool __fastcall TfMain::LoadWhiteListFile()
     // "loaded" with an empty registry. All-or-nothing, matching the authoritative-list semantic
     // above : the first offending lot rejects the WHOLE file and the registry stays empty, so
     // Start is blocked with the exact reason instead of running a partially-identified batch.
+    //AI(ht160s-whitelist-kyec) 20260727 : the KYEC lot the registry keys on (Soter col7) is the
+    // Lot Start lot held in edLotNo (SECS LOTSTART / manual Lot Start, both set before this runs).
+    // Capture it up here so (a) the pre-flight validator can reject a file whose per-lot KYECLotID
+    // disagrees with it - otherwise a manual operator who typed the customer lot would silently sort
+    // under it and drop the KYEC identity from the report - and (b) the loader below stamps it as
+    // the registry key, exactly like the WebAPI pull (LoadFromJsonString(Body, ..., sLotApiPullLot)).
+    AnsiString sKyecStamp = edLotNo->Text.Trim();
     AnsiString vReason="";
-    if(!LotRegistry.ValidateWhiteListJson(text, vReason))
+    if(!LotRegistry.ValidateWhiteListJson(text, vReason, sKyecStamp))
     {
         gWhiteListLoadError=vReason;
+        g_EventLog.Log("WRN_WHITELIST_REJECT", gWhiteListLoadError);
         RecordProcess("WhiteList: "+vReason+" - "+fn);
         RefreshLotListFromRegistry();
         return false;
     }
 
+    // sKyecStamp (the KYEC lot) was captured + cross-checked against every lot's KYECLotID above ;
+    // stamp it so the registry keys on the KYEC lot (Lot->sLotID = Soter col7) while each IC's
+    // sCustLotID = the file's customer LOTID (col6) - the 1-KYEC-lot : N-customer-lot shape the
+    // WebAPI pull already produces.
     bool bDup=false; AnsiString dupCode="";
-    bool ok = LotRegistry.LoadFromJsonString(text, bDup, dupCode);
+    bool ok = LotRegistry.LoadFromJsonString(text, bDup, dupCode, sKyecStamp);
     RefreshLotListFromRegistry();
     if(ok)
     {
@@ -2427,6 +2445,7 @@ bool __fastcall TfMain::LoadWhiteListFile()
     else
     {
         gWhiteListLoadError="WhiteList file is not valid JSON : "+fn;
+        g_EventLog.Log("WRN_WHITELIST_REJECT", gWhiteListLoadError);
         RecordProcess("WhiteList: JSON parse failed - "+fn);
     }
     return ok;

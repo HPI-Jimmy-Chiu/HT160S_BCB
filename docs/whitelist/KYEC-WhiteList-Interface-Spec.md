@@ -4,7 +4,7 @@
 |---|---|
 | 設備 | HT160S IC 分類機（Sorter） |
 | 對象 | 客戶 EAP / IT 介接端 |
-| 版本 | v1.1（2026-07-27） |
+| 版本 | v1.2（2026-07-27） |
 
 ---
 
@@ -42,30 +42,31 @@
 - 省略 `SORTMODE` 選項對時，等同 `NORMAL`（不套用白名單，使用基礎模式）。
 - **每個白名單 Lot 都必須帶 `SORTMODE = WHITELIST`。**
 - 選項對隨 Lot 一併送出；一次 `LOTSTART` 至多一組 `SORTMODE`，重複時以最後一組為準。
+- **`LOTSTART` 帶的 Lot 批號＝京元批（京元內部批號）**，與正常生產（WebAPI）一致。此批號即機台分選與 Soter 報表所用的身分（col7 Kyec Lot），且須與白名單檔案內該批的 `KYECLotID` 一致（見 §3.2）；客戶批號另由檔案 `LOTID` 提供（Soter col6）。
 
 ### 2.2 電文範例
 
-啟用白名單並開 Lot：
+啟用白名單並開 Lot（`LOTSTART` 批號填**京元批**，例 `NQ4000NAA1`）：
 
 ```
 S2F41 W
 <L [2]
   <A "LOTSTART">
   <L [2]
-    <A "CUSTLOT0001">
+    <A "NQ4000NAA1">
     <L [2] <A "SORTMODE"> <A "WHITELIST">>
   >
 >
 ```
 
-使用基礎模式並開 Lot：
+使用基礎模式並開 Lot（`LOTSTART` 批號同為京元批）：
 
 ```
 S2F41 W
 <L [2]
   <A "LOTSTART">
   <L [2]
-    <A "CUSTLOT0002">
+    <A "NQ4000NAA2">
     <L [2] <A "SORTMODE"> <A "NORMAL">>
   >
 >
@@ -125,10 +126,10 @@ S2F41 W
 
 | 層級 | 欄位 | 內容 | 型別 | 必填 |
 |---|---|---|---|---|
-| Lot | `LOTID` | 客戶批號 | 字串（不可空） | 是 |
+| Lot | `LOTID` | 客戶批號（→ Soter 報表 col6 Cust lot） | 字串（不可空） | 是 |
 | Lot | `Substage` | 站點 | 字串 | 是 |
 | Lot | `ProductCode` | 產品型號 | 字串 | 是 |
-| Lot | `KYECLotID` | 京元內部批號 | 字串（不可空） | 是 |
+| Lot | `KYECLotID` | 京元批號＝機台分選／報表身分（→ Soter col7 Kyec Lot）；須與 host `LOTSTART` 送的批號一致 | 字串（不可空） | 是 |
 | Lot | `ICInfo` | 該 Lot 的 IC 陣列 | 陣列 | 是 |
 | IC | `QRCodeID` | IC 2D 碼 | 字串 | 是 |
 | IC | `HBin` | 分選 Bin | 字串 | 是 |
@@ -143,6 +144,11 @@ S2F41 W
   只要檔案中**任何一個** Lot 缺少 `KYECLotID`（欄位不存在、空字串或只有空白），整份檔案視為無效 → 機台不載入任何資料。
 - 欄位名稱不分大小寫；`QRCodeID` 之值分大小寫。
 
+> **雙批號對應（務必理解）**：機台將「京元批」與「客戶批」視為兩個不同身分。
+> - **京元批**＝host `LOTSTART` 送的批號＝檔案 `KYECLotID`（兩者須一致）＝機台分選綁定與 Soter 報表 **col7 Kyec Lot** 的身分。
+> - **客戶批**＝檔案 `LOTID`，逐顆記於 Soter 報表 **col6 Cust lot**。
+> - 一個京元批可對應多個客戶批：檔案內可有多個 `QRCodeIDHis` 元素、`KYECLotID` 相同而 `LOTID` 不同，機台會併於同一京元批之下、各顆保留自己的客戶批。
+
 **機台強制檢查項目**（不符即整份檔案退回，不載入任何資料，並於生產 Start 時顯示對應訊息）：
 
 | 檢查 | 訊息 |
@@ -153,9 +159,12 @@ S2F41 W
 | 至少一個 Lot | `WhiteList file contains no lot data` |
 | 每個 Lot 有非空 `LOTID` | `WhiteList rejected : lot #<序號> has no LOTID (mandatory) !` |
 | 每個 Lot 有非空 `KYECLotID` | `WhiteList rejected : lot <LOTID> has no KYECLotID (mandatory) !` |
+| 每個 Lot 的 `KYECLotID` 等於 host `LOTSTART` 送的批號（京元批） | `WhiteList rejected : lot <LOTID> KYECLotID (<檔案值>) != Lot Start lot (<LOTSTART值>) !` |
+
+> 退檔為機台**主動偵測並處理**的結果，非軟體異常：每次退檔都會寫入機台 EventLog（`D:\HT160S_Log\EventLog`，事件碼 `WRN_WHITELIST_REJECT`）與 Process 記錄，並在生產 Start 時以上表訊息擋下。**Lot Start 動作本身照常完成，被擋下的是後續的生產 Start**；機台不會用空名單進行分選。
 
 其餘欄位（`Substage`、`ProductCode`）與 `QRCodeID` 唯一性屬**資料品質要求**：機台不會因此退回檔案，
-但缺漏會直接反映在生產報表（欄位空白）；重複的 `QRCodeID` 只保留第一筆、其餘忽略（僅記錄於機台 Process 記錄）。
+但缺漏會直接反映在生產報表（欄位空白）；重複的 `QRCodeID` 以**最後一筆**為準（後者覆蓋前者的 Bin），機台不另行警告，故請務必確保檔案內 2D 碼不重複。
 `HBin` 若誤寫成數字（`1` 而非 `"1"`）機台讀不到，該顆會被視為 Bin 0，請務必用字串。
 
 ### 3.3 範例檔
@@ -164,8 +173,8 @@ S2F41 W
 {
   "QRCodeIDHis": [
     {
-      "LOTID": "CUSTLOT0001",
-      "KYECLotID": "KYEC-INTERNAL-9001",
+      "LOTID": "A5921.RCS.TEST99",
+      "KYECLotID": "NQ4000NAA1",
       "Substage": "FT1",
       "ProductCode": "TESTDEV-A123",
       "ICInfo": [
@@ -194,7 +203,7 @@ S2F41 W
 
 - 每顆 IC 的 `QRCodeID`，須與 CCD 讀值完全一致。
 - 每顆 IC 的 `HBin`，其編號須對應機台已設定之 Bin。
-- Lot 層之 `LOTID`、`KYECLotID`、`Substage`、`ProductCode`（四項皆為必填）。
+- Lot 層之 `LOTID`（客戶批）、`KYECLotID`（京元批，須與 host `LOTSTART` 送的批號一致）、`Substage`、`ProductCode`（四項皆為必填）。
 
 ---
 
@@ -202,7 +211,7 @@ S2F41 W
 
 1. 依 §3.2 格式製作 `WhiteList.json`（每個 Lot 都要有 `KYECLotID`）。
 2. 將檔案放入機台 `D:\HT160S_BCB\HT160S_WhiteList\` 資料夾（完整路徑 `D:\HT160S_BCB\HT160S_WhiteList\WhiteList.json`）。
-3. 主機以 `LOTSTART` + `SORTMODE = WHITELIST` 開 Lot。
+3. 主機以 `LOTSTART`（批號＝京元批，須與檔案 `KYECLotID` 一致）+ `SORTMODE = WHITELIST` 開 Lot。
 4. （選用）以 `S1F3` 查詢 SVID 66032，確認回報 `3`。
 5. Lot End 後，機台自動還原為基礎分選模式（回讀值變回 `0`／`1`／`2`，視現場 Sort Mode 設定）。
 
