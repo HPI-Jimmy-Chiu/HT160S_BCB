@@ -905,7 +905,17 @@ void THGem::ProcessDefineReport_S2F33()
             if(GetDataItemLenAndType(len, Type)!=1)         { ReportAcknowledge(0x02); return; }
             if(DataItemIn(len, Type, sTmp)!=1)              { ReportAcknowledge(0x02); return; }
             unsigned sv = (unsigned)atoi(sTmp.c_str());
-            if(IsValidSVID(sv)==false)                      { ReportAcknowledge(0x04); return; }
+            //AI(secs-pathA) 20260727 : Path A tolerance - accept host-referenced SVIDs the
+            //firmware does not define (was DRACK=0x04 hard reject, which blocked the on-site
+            //CJ_EAP report def, e.g. RPTID 504={20001,20002,20003}). S6F11 emits an empty item
+            //for an unknown SVID (DataItemOutSVItem NULL branch @ this file), so the report LIST
+            //length stays aligned. Log the unknown SVID for referenced-set discovery.
+            if(IsValidSVID(sv)==false)
+            {
+                AnsiString sUnkSv;
+                sUnkSv.sprintf("[SECS][S2F33] accept unknown SVID=%u (Path A tolerate; reports empty)", sv);
+                StringOut(sUnkSv);
+            }
             svv[nRpt][j]=sv;
         }
         nRpt++;
