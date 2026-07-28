@@ -1099,8 +1099,21 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             // intent via AgvCoord.BeginPrep; LoaderTrayCount sets the expected loader
             // tray count (SVID 38222). Records intent + ACKs ONLY : no motion is
             // driven and no Ready (CEID273) is faked - that is Phase D + in-place sensor.
+            //AI(secs-kyec-startagv) 20260728 : refuse START_AGV outright when AMR is switched off.
+            // BeginPrep/ReassertLocks have no bUseAMR gate, but EVERY release path does -
+            // PollAndCall (uAgvStation.cpp:229), ServiceHandshake (:360) and the WAR0962 timeout
+            // sweep (csystem.cpp:78) all early-return when bUseAMR==false. So a START_AGV received
+            // with AMR off would lock a module with no code path left that can ever unlock it.
+            // HCACK=2 also matches the documented host-simulator contract
+            // (D:\AI_Area\Tool\HT160S_SECS_Simulator\code\ht160s_presets.py "2=param (unknown CP or non-AMR)").
             int innerLen;
-            if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
+            if(GeneralSetting.bUseAMR==false)
+            {
+                HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+                HGemPtr->StringOut("[SECS] START_AGV refused : AMR is disabled (bUseAMR=0)");
+                HCACK = 2;
+            }
+            else if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
             {
                 if(n<=0)
                 {
@@ -1131,10 +1144,47 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         // supplied because only it consumes the value (tray-kind tagging).
                         if(sRxDetail!="") sRxDetail = sRxDetail + " ";
                         sRxDetail = sRxDetail + cpName.Trim() + "=" + cpVal.Trim();
-                        if(cpName.Trim().UpperCase()=="LOADERTRAYCOUNT")
+                        AnsiString cpN = cpName.Trim().UpperCase();
+                        AnsiString cpV = cpVal.Trim().UpperCase();
+                        if(cpN=="LOADERTRAYCOUNT")
                             AgvCoord.TrayCount[0] = StrToIntDef(cpVal, 0);  // P1 Loader expected trays
-                        else if(AgvCoord.BeginPrep(cpName)==false)
+                        //AI(secs-kyec-startagv) 20260728 : LoaderICCount is a REAL KYEC CP, not an
+                        // unknown one - the field host sends it on every START_AGV upload packet
+                        // (KYEC log 2026-06-08 SECSGEM_TextLog_15.txt:544). It used to fall through
+                        // to BeginPrep -> HCACK=2 and the whole handoff was refused. Park it in the
+                        // P1 Loader device slot (SVID 38228 AMR Loader Device Count), which had no
+                        // writer at all and always reported 0. Latched, not consume-once: unlike
+                        // TrayCount[0] (consumed by EnqueueTrip, uAgvStation.cpp:85) nothing acts on
+                        // it, it is purely the host-declared incoming IC count for read-back.
+                        else if(cpN=="LOADERICCOUNT")
+                            AgvCoord.DeviceCount[0] = StrToIntDef(cpVal, 0);
+                        else if(AgvCoord.LookupByName(cpName) < 0)
                             HCACK = 2;                           // unknown CP name -> param error
+                        //AI(secs-kyec-startagv) 20260728 : the KYEC host sends the FULL station
+                        // vector every time, exactly one station carrying "Action" and all the rest
+                        // "NA" (SECSGEM_TextLog_15.txt:507-546). "NA" means "listed for vector
+                        // completeness, do nothing". HT160 used to ignore the value and BeginPrep
+                        // EVERY named station, so one Loader dispatch put up to 8 innocent stations
+                        // into AGV_PREP and locked their mechanisms - and the lock has no cheap
+                        // release (RetryStation keeps it, AgvCoord.Reset has no runtime caller), so
+                        // it ends in WAR0962 = DecStopAllMotor. HT9045 gates on the same literal
+                        // (uHGemHT9045.cpp:1676-1709 requires S2=="Action"). Match it.
+                        else if(cpV=="ACTION")
+                            AgvCoord.BeginPrep(cpName);
+                        else if(cpV!="NA")
+                        {
+                            //AI(secs-kyec-startagv) 20260728 : a known station with a verb we do not
+                            // model yet (customer may later add LOAD/UNLOAD/SUPPLY routing, see
+                            // docs\AGV\HT160S_E87_AGV_Communication_Draft_20260527.md:299). Do NOT
+                            // act and do NOT reject - 9045 would silently no-op it and rejecting the
+                            // packet would break a host we cannot re-spec. Log it so the field tells
+                            // us what the real verb set is.
+                            AnsiString sUnk;
+                            sUnk.sprintf("[SECS] START_AGV %s: unmodelled CP value '%s' - no action taken",
+                                         cpName.Trim().c_str(), cpVal.Trim().c_str());
+                            HGemPtr->StringOut(sUnk);
+                            RecordProcess("AGV: START_AGV "+cpName.Trim()+" value '"+cpVal.Trim()+"' not modelled - ignored");
+                        }
                     }
                 }
             }
