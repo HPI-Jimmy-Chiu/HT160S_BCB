@@ -136,9 +136,17 @@ START_AGV  L[10]
 
 > **額外發現（編號 bug）**：9045 的 Auto4/5/6 Unloading tray 是 **145 / 146 / 147**，
 > 但 HT160 的 `AutoCeid[6]={136,137,138,140,141,142}` 把 Auto4/5/6 放在 **140/141/142**，
-> 正好撞到 9045 的 140（Prepare Load Tray）與 141（GEM Control State Change）。
-> Auto1–3（136/137/138）是對的，Auto4–6 錯位。建議改成 145/146/147 —— 這 6 個 CEID 目前**未註冊**（發了也不會送出），
-> 所以現在改的代價最低。
+> 正好撞到 9045 的 140（Prepare Load Tray）與 141（GEM Control State Change）。Auto1–3（136/137/138）是對的。
+>
+> **更正（20260728 複查）**：初版此處寫「未註冊所以發了也不會送出」是**錯的**。
+> `THGem::EventReport()`（`uHGemEquipment.cpp`）在 `FindCEIDItem()` 回 NULL 時 `reportCount=0`，
+> 但仍照常 `InitLocalHead(6,11,1)` → `SendLocalData()`，**S6F11 會實際送上線**，只是報表清單為空 `L[0]`。
+> 也就是說撞號是**現正發生**、不是潛在風險。
+> 附帶驗證：9045 送 CEID 136 時同樣是 `L[0]` 空報表（`SECSGEM_TextLog_18.txt:445`），
+> 所以 HT160「不註冊 → 空報表」的設計本身是 9045-faithful，**唯一要修的就是編號**。
+>
+> **已修**：`aAuto1To6.cpp` `AutoCeid[6]` 改為 `{136,137,138,145,146,147}`；sim `-Clean`、
+> 真機 `-Full`（關 `SOFT_SIMULATE`）、還原後 `-Full` 三次建置皆 exit 0。
 
 ### 3-3. 只有 9045 有（240 個號碼）
 
