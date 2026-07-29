@@ -18,6 +18,7 @@
 #include "UsecegemMainFrom.h" // AI(ht160s-secsgem) 20260715 : ComputeAlarmAlid (S5 ALID SSOT)
 #include "GeneralSetting.h" // AI(ht160s-whitelist) 20260715 : IsWhiteListSortMode()
 #include "maintenance.h"    // AI(ht160s-whitelist) 20260716 : SyncSortModeSelectorFromSetting (SECS SORTMODE UI sync)
+#include "cEventLog.h"      // AI(secs-msggap) 20260728 : g_EventLog (S10F3/S10F5 host terminal text)
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -82,6 +83,13 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
 //---------------------------------------------------------------------------
 HT160Gem::~HT160Gem()
 {
+    //AI(secs-audit-fix) 20260729 : un-wire the transport->logic back-pointer set in the ctor.
+    //THGem::OnPeerDisconnected() calls GemLogic->OnCommunicationLost(), and THGem outlives us
+    //whenever the global HSys (which owns HSys.MyGem == this) is destroyed before Application
+    //(which owns HGem). Static-dtor order is not guaranteed here, so both ends clear the link :
+    //~THGem nulls GemLogic before it stops its sockets, and we null it from this side too.
+    if(HGemPtr!=NULL)
+        HGemPtr->SetGemLogic(NULL);
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddSV()
@@ -1222,6 +1230,289 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                 HCACK = 0;
             }
         }
+        else if(S=="ONE_CYCLE")
+        {
+            //AI(secs-kyec-rcmd4) 20260728 : KYEC host ONE_CYCLE. Field body 2026-06-08,
+            // invariant across all 11 occurrences : L[2]{ A[9] "ONE_CYCLE", L[0] } - the
+            // parameter list is ALWAYS empty, so it is consumed and ignored.
+            // ORDERING NOTE : these four new branches use EXACT == (never AnsiPos) and sit
+            // after HOME, immediately before the catch-all else. Verified that no earlier
+            // AnsiPos prefix can swallow them - in particular "ONE_CYCLE" does NOT begin with
+            // "ONLINE" (O-N-E vs O-N-L). Keep PP_SIGNALTOWER ahead of PP_MUSIC so the longer
+            // of the shared "PP_" pair matches first if these are ever converted to AnsiPos.
+            // Routed through the factored TfMain::OneCycleCore() (main.cpp) : the
+            // sbOneCycle1Click body WITHOUT its two ShowMyMessage modals, which would stall
+            // the HSMS receive path. Same precedent as the HOME branch (HomeCore) and the
+            // START branch (MachineStart -> HCACK) above.
+            // bRequireRunning=true is the SECS-ONLY stale-arm guard : arming Run_OneCycle on
+            // a stopped machine is a LATCH nothing clears until the next Start (ProcessMotion
+            // early-returns while SystemStart==false), which would silently turn the
+            // operator's next Start into one cycle plus an automatic stop.
+            //AI(secs-msggap-fix) 20260729 : recounted from the KYEC logs, and the guard is on
+            // FIRMER ground than the first draft said. The 11 commands split 3 ACCEPTED /
+            // 8 SWALLOWED (not 2/9), and the third acceptance is the smoking gun : ONE_CYCLE at
+            // 19:00:19.281 armed (9045 CEID 3 at 19:00:19.306) on a machine that went HALT
+            // 0.85 s later, so the arm LATCHED - exactly the failure this guard prevents.
+            // 9045 clears its own BtnOneCycle->Down latch at exactly one site, inside the
+            // finish handler that then never ran. The retry burst is 9 commands over
+            // 8 min 00.3 s at an exact 60.0 s cadence (7 unambiguously in HALT, one on the
+            // ART->HALT boundary, the last in Alarm) - "nine times in nine minutes" was loose.
+            // DELIBERATE DEVIATION from HT9045, which answers HCACK=0 unconditionally and
+            // swallows every rejection silently - its HCACK=0 means "message received", not
+            // "cycle accepted". HT160 tells the truth.
+            //AI(secs-msggap-fix) 20260729 : do NOT claim this is field-proven host-safe. The
+            // "host tolerates refusals and keeps its cadence" evidence is ENERGY_SAVING's
+            // (23/23 HCACK=2, zero S9Fx all day) and does not transfer : ONE_CYCLE got HCACK=0
+            // on all 11 field occurrences, so a non-zero answer to it has never been on the
+            // wire. Treat the host's reaction to HCACK=2/4 here as an ON-MACHINE WATCH ITEM;
+            // reproduce the 60 s retry storm on the simulator first.
+            //AI(secs-msggap-fix) 20260729 : the empty parameter list IS consumed below, which
+            // 9045 does not do at all. Harmless while the body stays L[0] (11/11) and it keeps
+            // the token stream clean if a host ever attaches parameters.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(fMain==NULL)
+            {
+                HCACK = 2;                                       // no UI context -> param error
+            }
+            else
+            {
+                AnsiString ocReason;
+                switch(fMain->OneCycleCore(true, ocReason))
+                {
+                    case ocStarted:      HCACK = 0; break;   // armed on a running machine
+                    case ocRejBusy:      HCACK = 4; break;   // a cycle is already armed and running
+                    //AI(secs-audit-fix) 20260729 : machine stopped -> 2 "cannot perform now",
+                    //never 4. SEMI E5 HCACK=4 is a POSITIVE ack ("will be performed, completion
+                    //signalled later by an event"), and this same change made that promise
+                    //checkable by emitting CEID 27 on cycle finish - a stopped machine will
+                    //never emit it, so 4 would leave the host waiting forever. This was the
+                    //dominant field case: 8 of the 11 KYEC ONE_CYCLE commands on 2026-06-08
+                    //arrived while the equipment was reporting HALT.
+                    case ocRejStopped:   HCACK = 2; break;   // stopped -> cannot perform now
+                    default:             HCACK = 2; break;   // ocRejMode / ocRejNotReady
+                }
+                sRxDetail = ocReason;
+                if(HCACK==0)
+                    RecordProcess("ONE CYCLE by secs-remote");
+                else
+                    RecordProcess("SECS ONE_CYCLE refused : "+ocReason);
+            }
+        }
+        else if(S=="ENERGY_SAVING")
+        {
+            //AI(secs-kyec-rcmd4) 20260728 : KYEC host ENERGY_SAVING. Field body 2026-06-08,
+            // invariant across all 23 occurrences :
+            //   L[2]{ A[13] "ENERGY_SAVING", L[1]{ L[2]{ A[5] "STATE", U4[1] 0 } } }
+            // STATE always 0 (= leave power save; 1 never seen).
+            //AI(secs-msggap-fix) 20260729 : "a ~30-minute heartbeat" is only half the story -
+            // 22 beats run 00:03:24 to 10:33:54 at 28.9-30.8 min spacing, then the host STOPS
+            // for 4 h 59.6 min, sends one orphan at 15:33:32, and nothing for the last 3 h 49.
+            // So do not treat the arrival of this command as a liveness signal.
+            // HT-160S HAS NO POWER-SAVE SUBSYSTEM to enter or leave : no heater
+            // (DoTemptureControl() is an empty stub), no ATC, no motor-current idle-off.
+            // So : VALIDATE the STATE syntax (a malformed packet is still reported as a format
+            // error) and then REFUSE with HCACK=2. Deliberately NOT accept-and-no-op - replying
+            // 0 would tell the host the machine changed a power state that does not exist.
+            // This is byte-identical to what KYEC's OWN HT9045 already answers : 23/23 HCACK=2,
+            // after which the host neither escalated (zero S9Fx all day) nor changed cadence.
+            // The refusal is field-proven host-safe. It is also strictly better than the
+            // unknown-command path : HCACK=1 for a well-formed command reads to a host audit as
+            // "command not recognised" rather than "known, not available".
+            //AI(secs-msggap-fix) 20260729 : the HCACK=2 itself is directly observed, but which
+            // 9045 rung produced it is NOT observable in a SECS log - it is narrowed by
+            // elimination to one of two config-level Function Disable rungs (the IC / Contact /
+            // ATC-online gates are time-varying, while HCACK stayed 2 across 15.5 h and states
+            // SLEEP / Alarm / HALT / Running). No HT160 behaviour depends on which one.
+            //AI(secs-kyec-rcmd4-fix) 20260728 : an EMPTY parameter list is a well-formed
+            // ENERGY_SAVING, so it must get the same "known command, not available" answer as
+            // any other well-formed one. Returning 1 here contradicted this branch's own
+            // rationale two paragraphs up (1 = not recognised) and disagreed with the sibling
+            // PP_SIGNALTOWER / PP_MUSIC branches, which both accept n<=0 as a valid shape.
+            // Only a genuinely unreadable list stays HCACK=1.
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1)
+            {
+                HCACK = 1;                                       // body is not a list -> format error
+            }
+            else if(n<=0)
+            {
+                HCACK = 2;                                       // well-formed but empty -> known command, not available
+            }
+            else
+            {
+                int esPairLen;
+                HCACK = 2;                                       // syntax good so far -> "known command, not available"
+                for(i=0; i<n; i++)
+                {
+                    if(HGemPtr->GetDataItemLenAndTypeAndDelete(esPairLen, HType.LIST_TYPE)!=1 || esPairLen!=2)
+                    {
+                        HCACK = 1;                               // pair is not an L[2] -> format error
+                        break;
+                    }
+                    AnsiString esName="", esValStr="";
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                        HGemPtr->DataItemIn(len, Type, esName);
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                        HGemPtr->DataItemIn(len, Type, esValStr);
+                    if(sRxDetail!="") sRxDetail = sRxDetail + " ";
+                    sRxDetail = sRxDetail + esName.Trim() + "=" + esValStr.Trim();
+                    int esState = StrToIntDef(esValStr.Trim(), -1);
+                    if(esName.Trim().UpperCase()!="STATE" || esState<0 || esState>1)
+                    {
+                        HCACK = 1;                               // unknown CP name / value out of domain -> format error
+                        break;
+                    }
+                }
+                if(HCACK==2)
+                    RecordProcess("SECS ENERGY_SAVING refused : HT-160S has no power-save subsystem");
+            }
+        }
+        else if(S=="PP_SIGNALTOWER")
+        {
+            //AI(secs-kyec-rcmd4) 20260728 : KYEC host PP_SIGNALTOWER - a LATCHED host override
+            // of the per-RunState tower-lamp table (SetSecsTowerOverride / DoSystemMessage,
+            // csystem.cpp). Field bodies 2026-06-08, 15 occurrences :
+            //   SET   L[2]{ A[14] "PP_SIGNALTOWER", L[3]{ L[2]{A "RED",U4 v},
+            //                    L[2]{A "GREEN",U4 v}, L[2]{A "YELLOW",U4 v} } }   (6x)
+            //   CLEAR L[2]{ A[14] "PP_SIGNALTOWER", L[0] }                          (9x)
+            // Values seen are only 0 and 2, never 1; documented domain 0=off / 1=on / 2=blink.
+            // MORE clears than sets, so the clear must be idempotent. Paired with PP_MUSIC
+            // ~0.3 s apart (0.256-0.361 s, PP_MUSIC always first).
+            //AI(secs-msggap-fix) 20260729 : two corrections to the field reading above.
+            // (1) NOT all six SETs are 2/2/2 - five are, and one (19:07:50.526) is
+            //     RED=2 GREEN=0 YELLOW=0. The host does use non-uniform per-colour states, so
+            //     never collapse the three colours into one value. Per-colour handling below is
+            //     load-bearing, not defensive.
+            // (2) The trigger is NOT specifically "tester is IDLE, priority lot waiting" - only
+            //     3 of the 6 SET bursts follow that text; the others follow "has no schedule.",
+            //     "MES_Status Changed toSetUp", and an S10F3 "[ART]User manually abort ART
+            //     process.". And two of the nine CLEARs arrive 0.3 s after the equipment's OWN
+            //     alarm event report. So this is a GENERIC host attention annunciator that the
+            //     host does also use around alarm-ish conditions. The alarm-suppression gates in
+            //     csystem.cpp stand on their own safety argument (machine-derived red must win) -
+            //     they must NOT be justified by "the host never uses this for alarms".
+            // Buffer-then-commit (LOTSTART / SET_LOT_INFO idiom) : an unknown CP name or an
+            // out-of-domain value rejects the WHOLE packet and applies NOTHING. HT9045 partially
+            // applies and latches the flag anyway - not ported. A colour the host does not name
+            // keeps its previous value (-1), matching 9045's write-only-what-is-present.
+            // No busy/idle pre-gate : a lamp command is safe in every machine state.
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1)
+            {
+                HCACK = 1;                                       // bad list format
+            }
+            else if(n<=0)
+            {
+                ClearSecsTowerOverride();                        // empty list -> release (idempotent : 9 clears for 6 sets)
+                sRxDetail = "clear";
+                RecordProcess("SECS PP_SIGNALTOWER : tower override released (empty parameter list)");
+                HCACK = 0;
+            }
+            else
+            {
+                int stPairLen;
+                int stRed=-1, stYellow=-1, stGreen=-1;           // -1 = colour not named -> keep previous
+                HCACK = 0;
+                for(i=0; i<n; i++)
+                {
+                    if(HGemPtr->GetDataItemLenAndTypeAndDelete(stPairLen, HType.LIST_TYPE)!=1 || stPairLen!=2)
+                    {
+                        HCACK = 1;                               // pair is not an L[2] -> format error
+                        break;
+                    }
+                    AnsiString stName="", stValStr="";
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                        HGemPtr->DataItemIn(len, Type, stName);
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                        HGemPtr->DataItemIn(len, Type, stValStr);
+                    if(sRxDetail!="") sRxDetail = sRxDetail + " ";
+                    sRxDetail = sRxDetail + stName.Trim() + "=" + stValStr.Trim();
+                    AnsiString stN = stName.Trim().UpperCase();
+                    int stVal = StrToIntDef(stValStr.Trim(), -1);
+                    if(stVal<0 || stVal>2)
+                    {
+                        HCACK = 2;                               // value outside 0..2 -> param error, apply nothing
+                        break;
+                    }
+                    if(stN=="RED")
+                        stRed=stVal;
+                    else if(stN=="YELLOW")
+                        stYellow=stVal;
+                    else if(stN=="GREEN")
+                        stGreen=stVal;
+                    else
+                    {
+                        HCACK = 2;                               // unknown CP name -> param error, apply nothing
+                        break;
+                    }
+                }
+                if(HCACK==0)
+                {
+                    SetSecsTowerOverride(stRed, stYellow, stGreen);
+                    RecordProcess("SECS PP_SIGNALTOWER : tower override armed ("+sRxDetail+")");
+                }
+            }
+        }
+        else if(S=="PP_MUSIC")
+        {
+            //AI(secs-kyec-rcmd4) 20260728 : KYEC host PP_MUSIC - a LATCHED host override of the
+            // per-RunState buzzer selection (SetSecsMusicOverride / DoSystemMessage,
+            // csystem.cpp). Field bodies 2026-06-08, 15 occurrences :
+            //   SET   L[2]{ A[8] "PP_MUSIC", L[1]{ L[2]{ A[0] "", U4[1] 1 } } }   (6x)
+            //   CLEAR L[2]{ A[8] "PP_MUSIC", L[0] }                               (9x)
+            // *** THE CP NAME IS A ZERO-LENGTH ASCII ITEM A[0] "". *** It is READ - to keep the
+            // token stream in sync - and then DISCARDED WITHOUT COMPARISON, exactly as HT9045
+            // does. Adding a name check here would reject every real KYEC PP_MUSIC packet; this
+            // is the single easiest way to get this command wrong.
+            // The A[0] read is proven safe in HT160's own tokenizer : ProcessSML stores three
+            // tokens for a zero-length ASCII item, the peek returns 1 at len=0 and DataItemInSub
+            // passes the l>len check and deletes all three.
+            // Only the VALUE is validated : 1..4 -> SwMusic1..SwMusic4 (database.h:453-456).
+            // HT9045 does SW[SwMusic1+CLASS-1].On() with NO range check, so CLASS=0 drives the
+            // switch immediately BEFORE SwMusic1 - that latent bug is deliberately NOT ported;
+            // out-of-range -> HCACK=2 and SetSecsMusicOverride clamps again defensively.
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1)
+            {
+                HCACK = 1;                                       // bad list format
+            }
+            else if(n<=0)
+            {
+                ClearSecsMusicOverride();                        // empty list -> release (idempotent)
+                sRxDetail = "clear";
+                RecordProcess("SECS PP_MUSIC : music override released (empty parameter list)");
+                HCACK = 0;
+            }
+            else
+            {
+                int pmPairLen;
+                int pmClass = -1;
+                HCACK = 0;
+                for(i=0; i<n; i++)
+                {
+                    if(HGemPtr->GetDataItemLenAndTypeAndDelete(pmPairLen, HType.LIST_TYPE)!=1 || pmPairLen!=2)
+                    {
+                        HCACK = 1;                               // pair is not an L[2] -> format error
+                        break;
+                    }
+                    AnsiString pmName="", pmValStr="";
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                        HGemPtr->DataItemIn(len, Type, pmName);   // A[0] "" at KYEC : read to stay in sync, NEVER compared
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                        HGemPtr->DataItemIn(len, Type, pmValStr);
+                    if(sRxDetail!="") sRxDetail = sRxDetail + " ";
+                    sRxDetail = sRxDetail + "class=" + pmValStr.Trim();
+                    pmClass = StrToIntDef(pmValStr.Trim(), -1);
+                    if(pmClass<1 || pmClass>4)
+                    {
+                        HCACK = 2;                               // class outside SwMusic1..4 -> param error, apply nothing
+                        break;
+                    }
+                }
+                if(HCACK==0 && pmClass>=1)
+                {
+                    SetSecsMusicOverride(pmClass);
+                    RecordProcess("SECS PP_MUSIC : music override armed (class="+IntToStr(pmClass)+")");
+                }
+            }
+        }
         else
         {
             HCACK = 1;                                           // unknown command
@@ -1315,7 +1606,31 @@ void HT160Gem::S1F16_OFFLINEAcknowledge()
     HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &OFLACK);
     HGemPtr->SendLocalData();
     iControlState = 1;   //Equipment Off-Line (GEM control state)
+    //AI(secs-kyec-rcmd4-fix) 20260728 : going OFF-LINE means the host has handed the machine back
+    //  to the operator, so it must not leave the tower/buzzer driven by a stale host override.
+    if(IsSecsPanelOverrideActive())
+    {
+        ClearSecsPanelOverride();
+        HGemPtr->StringOut("[SECS] S1F16 OFF-LINE : host panel override (tower/buzzer) released");
+        RecordProcess("SECS: OFF-LINE released host panel override");
+    }
     HGemPtr->StringOut("[SECS] S1F16 OFF-LINE acknowledged (OFLACK=0, control state -> Off-Line 1)");
+}
+//---------------------------------------------------------------------------
+//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost (peer disconnect / socket error /
+//  Separate.req / watchdog DropConnection). KYEC arms PP_SIGNALTOWER + PP_MUSIC and clears them
+//  seconds later with an empty parameter list; if the link drops in between, the operator is left
+//  with a tower and buzzer nobody can release except the panel ALARM RESET key - which arrives
+//  over the Pad RS232 link (SnFKAlarmReset/SnRKAlarmReset are COMM_PAD), so a Pad outage would
+//  mean no escape at all. Release the latch with the host that set it.
+void HT160Gem::OnCommunicationLost()
+{
+    if(IsSecsPanelOverrideActive()==false)
+        return;
+    ClearSecsPanelOverride();
+    if(HGemPtr!=NULL)
+        HGemPtr->StringOut("[SECS] link lost : host panel override (tower/buzzer) released");
+    RecordProcess("SECS: link lost released host panel override");
 }
 //---------------------------------------------------------------------------
 void HT160Gem::S2F34_DefineReportAcknowledge()
@@ -1456,6 +1771,351 @@ void HT160Gem::EmitAlarmCatalog(int Func)
     AnsiString msg;
     msg.sprintf("[SECS][TX] S5F%d alarm catalog sent (%d entries)", Func, n);
     HGemPtr->StringOut(msg);
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S6F16_EventReportData()
+{
+    //AI(secs-msggap) 20260728 : host S6F15 Event Report Request -> reply S6F16.
+    //  KYEC sends a BARE <U4[1] CEID> (verified in all 3 occurrences), not an L,1 wrapper,
+    //  so read one scalar directly. An optional L,1 wrapper is tolerated for other hosts.
+    //  ResetReturnCode() FIRST : iReturnCode is sticky (GetDataItemLenAndType only ever
+    //  lowers it), so a previous message's read failure would otherwise poison this one.
+    //  Same first line as S2F26 / S2F33 / S2F37.
+    //  DATAID is 1 : hardcoded in HT9045, matches the wire, and matches the global
+    //  EventReport(unsigned) glue which calls HGem->EventReport(1, Ceid).
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ResetReturnCode();
+    int len = 0;
+    unsigned char Type = 0;
+    AnsiString sTmp;
+    //AI(secs-msggap-fix) 20260728 : NEVER return without sending. A silent return is the exact
+    //  failure this whole patch exists to remove - the host just T3s again. Every parse failure
+    //  now falls through to EmitEventReportBody with CEID 0, which is a well-formed
+    //  L,3{ DATAID, CEID=0, L,0 } (FindCEIDItem returns NULL -> reportCount 0), i.e. "no such
+    //  event". Reachable without a malformed host: DataItemIn(AnsiString&) has no BINARY /
+    //  BOOLEAN / U8 / F4 / F8 branch and rejects Len!=1 for numerics, so a host encoding the
+    //  CEID as <U8[1]> or <U4[2]> would otherwise get total silence.
+    unsigned iCeid = 0;
+    if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+    {
+        HGemPtr->StringOut("[SECS] S6F15 format error (empty body) - replying S6F16 CEID=0");
+    }
+    else
+    {
+        bool bReadable = true;
+        if(Type==HType.LIST_TYPE)
+        {
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(len, HType.LIST_TYPE)!=1 ||
+               HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+            {
+                HGemPtr->StringOut("[SECS] S6F15 format error (bad list wrapper) - replying S6F16 CEID=0");
+                bReadable = false;
+            }
+        }
+        if(bReadable)
+        {
+            if(HGemPtr->DataItemIn(len, Type, sTmp)!=1)
+                HGemPtr->StringOut("[SECS] S6F15 format error (CEID unreadable) - replying S6F16 CEID=0");
+            else
+                iCeid = (unsigned)strtoul(sTmp.c_str(), NULL, 10);   //saturates at ULONG_MAX; atoi would wrap a U4 >= 2^31
+        }
+    }
+    HGemPtr->EmitEventReportBody(16, 1, iCeid);
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S6F20_IndividualReportData()
+{
+    //AI(secs-msggap) 20260728 : host S6F19 Individual Report Request -> reply S6F20.
+    //  KYEC sends a BARE <U4[1] RPTID> (verified in all 8 occurrences: 700 x3, 600 x3,
+    //  506 x2). The answer is a flat list of that report's SV values read from the LIVE
+    //  registry, so a host that deletes and redefines the RPTID mid-campaign - KYEC does
+    //  exactly this to 506, L[5] in one session and L[6] in another - gets the new shape.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ResetReturnCode();
+    int len = 0;
+    unsigned char Type = 0;
+    AnsiString sTmp;
+    //AI(secs-msggap-fix) 20260728 : same rule as S6F16 - never return without sending. RPTID 0
+    //  is not defined, so EmitIndividualReport answers the well-formed empty L,0 that S6F20
+    //  already uses for an unknown report. See the S6F16 comment for why this is reachable
+    //  without a malformed host.
+    unsigned uRpt = 0;
+    if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+    {
+        HGemPtr->StringOut("[SECS] S6F19 format error (empty body) - replying S6F20 L,0");
+    }
+    else
+    {
+        bool bReadable = true;
+        if(Type==HType.LIST_TYPE)
+        {
+            if(HGemPtr->GetDataItemLenAndTypeAndDelete(len, HType.LIST_TYPE)!=1 ||
+               HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+            {
+                HGemPtr->StringOut("[SECS] S6F19 format error (bad list wrapper) - replying S6F20 L,0");
+                bReadable = false;
+            }
+        }
+        if(bReadable)
+        {
+            if(HGemPtr->DataItemIn(len, Type, sTmp)!=1)
+                HGemPtr->StringOut("[SECS] S6F19 format error (RPTID unreadable) - replying S6F20 L,0");
+            else
+                uRpt = (unsigned)strtoul(sTmp.c_str(), NULL, 10);   //saturates; atoi would wrap a U4 >= 2^31
+        }
+    }
+    HGemPtr->EmitIndividualReport(uRpt);
+}
+//---------------------------------------------------------------------------
+//AI(secs-msggap) 20260728 : shared sink for host terminal text (S10F3 and S10F5).
+//  Writes one SECS log line, one EventLog CSV row, and queues the raw text on
+//  HTGem::SecsAlarmMessage - a TStringList that already exists (allocated in all three
+//  HTGem constructors, freed in the dtor) and until now had ZERO consumers.
+//  It NEVER pops a dialog. The caller runs inside the HSMS receive callback
+//  (THGem::HandleDataMessage -> GemLogic->Dispatch), and every HT160 message box is a
+//  ShowModal that suspends MainProc, so a popup here would stall SECS itself.
+//  Deliberately NOT classified by severity: the host text cannot be judged in firmware.
+//  Substring matching is provably broken on this very corpus - the purely informational
+//  "[MIScheduleSetAlarm]|HP93K-1042EXA is IDLE now." contains the word "Alarm", while the
+//  real action text "[OMS1] Criteria Check Alarm" arrives with TID=0x00 in one capture and
+//  TID=0x01 in another, and informational texts also arrive with TID=0x01.
+//AI(secs-msggap-fix) 20260729 : TID is not a severity LEVEL, but it is not meaningless either -
+//  9045 consumes it as iSECSMessageCanCloseByOperator and its message box keys the dismissal
+//  gate off it (0 = normal flow, 1 = operator may close directly, 2 = employee-ID check). Read
+//  that way this host's usage is mostly coherent with one off-pattern text. So : it is a
+//  DISMISSAL-POLICY flag, not a severity rank, and this host's use of it is not fully
+//  self-consistent - which is why nothing here branches on it. Whoever implements the phase-2
+//  operator popup must honour it as a dismissal gate, not sort by it.
+//  Everything is logged identically; the operator reads it.
+//  CR/LF are flattened for the log/CSV copy (one row per message); the queued copy keeps
+//  its line breaks for a future popup.
+//---------------------------------------------------------------------------
+static void SinkHostTerminalText(THGem *Gem, TStringList *Queue, int F,
+                                 unsigned char TID, AnsiString sText, unsigned char ACKC10)
+{
+    AnsiString sFlat = sText;
+    for(int i=1; i<=sFlat.Length(); i++)
+    {
+        if(sFlat[i]=='\r' || sFlat[i]=='\n')
+            sFlat[i] = ' ';
+    }
+    AnsiString sMsg;
+    sMsg.sprintf("S10F%d TID=%u ACKC10=%u : %s",
+                 F, (unsigned)TID, (unsigned)ACKC10, sFlat.c_str());
+    if(Gem!=NULL)
+    {
+        Gem->StringOut("[SECS] host terminal text " + sMsg);
+        Gem->FlushSecsLogToFile();
+    }
+    g_EventLog.Log("SECS_TERM", sMsg, "");
+    if(Queue!=NULL && sText!="")
+    {
+        Queue->Add(sText);
+        while(Queue->Count > 50)   // bounded : nothing drains this in phase 1
+            Queue->Delete(0);
+    }
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S10F4_TerminalDisplaySingleAcknowledge()
+{
+    //AI(secs-msggap) 20260728 : host S10F3 Terminal Display Single -> reply S10F4 <B ACKC10>.
+    //  Body: L,2{ B[1] TID, A[n] TEXT }. Bare binary reply, no list wrapper - same single-byte
+    //  triad as S5F4 / S1F16 / S1F18 / S2F32 (HT160 has no LocalAcknowledge wrapper).
+    //  The Dispatch case already existed but landed on the base SendUnsupported stub, which
+    //  only writes a log line - that is why the host T3s today.
+    //  ACKC10 per SEMI E5: 0=accepted, 1=will not be displayed, 2=terminal not available.
+    //  0 on a clean parse (the text IS accepted - logged, CSV'd and queued), 1 on any format
+    //  error. 2 is not used: HT9045 answered 0 every single time at KYEC, so 0 is the
+    //  field-proven answer.
+    //  TEXT READ - safety critical: the literal HT9045 form for THIS function is
+    //  `char str[1024]` plus DataItemIn(1024, ASCII_TYPE, str). That OVERFLOWS on HT160, because
+    //  DataItemInSub only guards `if(l>len) return -2;` and then does strncpy(temp, src, len+1)
+    //  - 1025 bytes into a 1024 buffer. The safe form is to peek the REAL length with
+    //  GetDataItemLenAndType and hand it to the AnsiString overload, which allocates
+    //  new char[Len+4] and null-terminates at [Len]. No fixed buffer at all.
+    //AI(secs-msggap-fix) 20260729 : do NOT generalise that 1-byte-overrun description to S10F6.
+    //  9045's S10F6 is WORSE : it peeks the request's own length and passes it straight to
+    //  DataItemIn with no 1024 clamp at all, so a verbatim port there is an unbounded stack
+    //  smash, not an off-by-one. Both HT160 handlers use the AnsiString overload, so neither is
+    //  exposed - but a maintainer reading only the paragraph above would "fix" S10F6 by capping
+    //  at 1024, which is not even the defect.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ResetReturnCode();
+    unsigned char TID    = 0;
+    unsigned char ACKC10 = 0;
+    int len = 0;
+    unsigned char Type = 0;
+    AnsiString sText;
+    if(HGemPtr->DataItemIn(2, HType.LIST_TYPE, NULL)!=1)
+        ACKC10 = 1;
+    else if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+        ACKC10 = 1;
+    else if(Type!=HType.BINARY_TYPE && Type!=HType.UINT_1_TYPE)
+        ACKC10 = 1;
+    else if(HGemPtr->DataItemIn(1, Type, &TID)!=1)
+        ACKC10 = 1;
+    else if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+        ACKC10 = 1;
+    else if(Type!=HType.ASCII_TYPE || len<0 || len>4096)
+        ACKC10 = 1;
+    else if(HGemPtr->DataItemIn(len, Type, sText)!=1)
+        ACKC10 = 1;
+
+    HGemPtr->InitLocalHead(10, 4, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &ACKC10);
+    HGemPtr->SendLocalData();
+
+    SinkHostTerminalText(HGemPtr, SecsAlarmMessage, 3, TID, sText, ACKC10);
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S10F6_TerminalDisplayMultiBlockAcknowledge()
+{
+    //AI(secs-msggap) 20260728 : host S10F5 Terminal Display Multi-block -> reply S10F6.
+    //  Body: L,2{ B[1] TID, L,n{ A TEXT ... } }, n observed 1..3 across the 7 KYEC captures.
+    //  Lines are joined with CRLF exactly like HT9045, but read via the AnsiString overload
+    //  (see the buffer-overflow note in S10F4). Reply is the same bare <B ACKC10>.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ResetReturnCode();
+    unsigned char TID    = 0;
+    unsigned char ACKC10 = 0;
+    int n = 0, len = 0, i = 0;
+    unsigned char Type = 0;
+    AnsiString sLine;
+    AnsiString sText;
+    if(HGemPtr->DataItemIn(2, HType.LIST_TYPE, NULL)!=1)
+        ACKC10 = 1;
+    else if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+        ACKC10 = 1;
+    else if(Type!=HType.BINARY_TYPE && Type!=HType.UINT_1_TYPE)
+        ACKC10 = 1;
+    else if(HGemPtr->DataItemIn(1, Type, &TID)!=1)
+        ACKC10 = 1;
+    else if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1 || n<0 || n>64)
+        ACKC10 = 1;
+    else
+    {
+        for(i=0; i<n; i++)
+        {
+            if(HGemPtr->GetDataItemLenAndType(len, Type)!=1 ||
+               Type!=HType.ASCII_TYPE || len<0 || len>4096 ||
+               HGemPtr->DataItemIn(len, Type, sLine)!=1)
+            {
+                ACKC10 = 1;
+                break;
+            }
+            if(sText.Length() < 8192)
+                sText = sText + sLine + "\r\n";
+        }
+    }
+
+    HGemPtr->InitLocalHead(10, 6, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &ACKC10);
+    HGemPtr->SendLocalData();
+
+    SinkHostTerminalText(HGemPtr, SecsAlarmMessage, 5, TID, sText, ACKC10);
+}
+//---------------------------------------------------------------------------
+void HT160Gem::S125F2_EnableDisableECDataAcknowledge()
+{
+    //AI(secs-msggap) 20260728 : host S125F1 Enable/Disable EC Data Send (KYEC private stream)
+    //  -> reply exactly ONE S125F2 <B ACK>. Body: L,2{ B[1] ALED, L,n{ U4 ECID ... } }.
+    //  KYEC sends a pair per session: ALED=0x01 with L,0 (disable all), then ALED=0x80 with
+    //  L,45. ALED is a BIT-7 flag on this host, not a boolean - HT9045 tests `T & 0x80`, which
+    //  is why 0x01 means DISABLE despite looking like a true.
+    //  Nothing is stored. The only thing the EC-enable list gates on HT9045 is whether an EC
+    //  change fires CEID 48, and HT160 registers no such CEID and has no EC-enable table, so
+    //  an enable table here would be dead weight. The referenced ECIDs are logged instead,
+    //  the same referenced-set discovery logging S2F33 does for unknown SVIDs.
+    //  ACK 0=Acknowledge, 1=Denied. Exactly ONE reply per request - see the Dispatch comment
+    //  for why HT9045's 45-acks-per-request loop is a defect and is not ported.
+    //AI(secs-msggap-fix) 20260729 : ACK=1 is also returned when the list names an ECID this
+    //  machine does not register, so a 0 never claims an enable that cannot happen. See the
+    //  in-loop comment for the 9045 and KYEC-wire evidence.
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ResetReturnCode();
+    unsigned char ALED = 0;
+    unsigned char ACK  = 0;
+    int n = 0, len = 0, i = 0;
+    int nUnknownEc = 0;                  //AI(secs-msggap-fix) 20260729 : ECIDs this machine does not register
+    unsigned char Type = 0;
+    AnsiString sTmp;
+    AnsiString sIds;
+    AnsiString sUnknownIds;
+    if(HGemPtr->DataItemIn(2, HType.LIST_TYPE, NULL)!=1)
+        ACK = 1;
+    else if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+        ACK = 1;
+    else if(Type!=HType.BINARY_TYPE && Type!=HType.UINT_1_TYPE)
+        ACK = 1;
+    else if(HGemPtr->DataItemIn(1, Type, &ALED)!=1)
+        ACK = 1;
+    else if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1 || n<0 || n>256)
+        ACK = 1;
+    else
+    {
+        for(i=0; i<n; i++)
+        {
+            if(HGemPtr->GetDataItemLenAndType(len, Type)!=1 ||
+               HGemPtr->DataItemIn(len, Type, sTmp)!=1)
+            {
+                ACK = 1;
+                break;
+            }
+            if(i<32)
+            {
+                if(sIds!="")
+                    sIds = sIds + ",";
+                sIds = sIds + sTmp;
+            }
+            //AI(secs-msggap-fix) 20260729 : do not ACK=0 an ECID this machine does not have.
+            //A 0 tells the host "EC-change reporting is now enabled for that ECID" - it is not,
+            //and with no EC-enable table and no EC-change event on HT160 it never will be.
+            //HT9045 answers 1 per unregistered ECID (uHGemClass.cpp:2650-2653), wire-proven at
+            //KYEC by the four 0x01 acks at list positions 7/8/10/45 = ECIDs 2101/2102/2004/8506,
+            //the exact four missing from the whole 9045 tree. HT160 sends ONE ack per request, so
+            //the honest compression is : any unregistered ECID -> ACK=1 for the request, and name
+            //the offenders in the log. KYEC's list is 45 ECIDs of which HT160 owns exactly one
+            //(1501), so this normally answers 1 - which is the truth, where 0 was a lie.
+            //GetECName() is used instead of the private FindECItem(): it returns "" for an
+            //unregistered ECID, and all seven ECs this machine registers have a non-empty name.
+            if(HGemPtr->GetECName((unsigned)strtoul(sTmp.c_str(), NULL, 10))=="")
+            {
+                nUnknownEc++;
+                if(nUnknownEc<=32)
+                {
+                    if(sUnknownIds!="")
+                        sUnknownIds = sUnknownIds + ",";
+                    sUnknownIds = sUnknownIds + sTmp;
+                }
+            }
+        }
+        if(ACK==0 && nUnknownEc>0)
+            ACK = 1;                                 // list references ECIDs this machine has no EC for
+    }
+
+    HGemPtr->InitLocalHead(125, 2, 0);
+    HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &ACK);
+    HGemPtr->SendLocalData();
+
+    const char *pMode = "disable";
+    if((ALED & 0x80)!=0)
+        pMode = "enable";
+    AnsiString sLog;
+    sLog.sprintf("[SECS] S125F2 ACK=%u ALED=0x%02X (%s) ECIDcount=%d notRegistered=%d",
+                 (unsigned)ACK, (unsigned)ALED, pMode, n, nUnknownEc);
+    HGemPtr->StringOut(sLog);
+    if(sIds!="")
+        HGemPtr->StringOut("[SECS] S125F1 referenced ECIDs (first 32): " + sIds);
+    //AI(secs-msggap-fix) 20260729 : the not-registered set is the discovery list - it is what the
+    //host expects this machine to report EC changes for and what a future EC port would add.
+    if(sUnknownIds!="")
+        HGemPtr->StringOut("[SECS] S125F1 ECIDs NOT registered here (first 32): " + sUnknownIds);
+    HGemPtr->FlushSecsLogToFile();
 }
 //---------------------------------------------------------------------------
 int HT160Gem::S7F2_ProcessProgramLoadGrant()

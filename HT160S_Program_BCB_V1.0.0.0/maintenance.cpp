@@ -1621,6 +1621,35 @@ void __fastcall TfMaintenance::tmrTowerLightBlinkTimer(TObject *Sender)
     RefreshLotWebApiStatus();
     RefreshFtpStatus();
     RefreshAmrStatus();
+    RefreshSecsOverrideStatus();
+}
+//---------------------------------------------------------------------------
+//AI(secs-kyec-rcmd4-fix) 20260728 : host PP_SIGNALTOWER / PP_MUSIC override status + the
+//  screen-side operator escape. The only other release is the panel ALARM RESET key, and
+//  SnFKAlarmReset / SnRKAlarmReset are COMM_PAD sensors (IO_Table.csv) that arrive over the
+//  Pad RS232 link - with the Pad down there was no escape at all and no indication that an
+//  override was even armed. Driven off the existing 300 ms tmrTowerLightBlink refresh.
+void __fastcall TfMaintenance::RefreshSecsOverrideStatus()
+{
+    if(lblSecsOverrideState==NULL)
+        return;
+    bool bActive=IsSecsPanelOverrideActive();
+    if(bActive)
+        lblSecsOverrideState->Caption="Override: ACTIVE - host is driving the tower light / buzzer";
+    else
+        lblSecsOverrideState->Caption="Override: inactive";
+    if(btnSecsOverrideRelease!=NULL)
+        btnSecsOverrideRelease->Enabled=bActive;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsOverrideReleaseClick(TObject *Sender)
+{
+    (void)Sender;
+    if(IsSecsPanelOverrideActive()==false)
+        return;
+    ClearSecsPanelOverride();
+    RecordProcess("SECS: host panel override released from Maintenance screen");
+    RefreshSecsOverrideStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenWorkFile()
@@ -1744,7 +1773,26 @@ void __fastcall TfMaintenance::SelectMaintenancePage(int PageIndex)
     }
     if(MenuActions[PageIndex]==maOpenSecs)
     {
-        OpenSecsGemLog(MenuButtons[PageIndex]);
+        //AI(secs-audit-fix) 20260729 : select tsMaintSECS as a real page BEFORE popping the
+        //(non-modal) SECS/GEM log window. Previously this branch returned early, so the ONLY
+        //ActivePage assignment in this unit (below) never ran for tsMaintSECS - and since
+        //RegisterMaintenancePages sets TabVisible=false on every page there is no tab strip
+        //either. The page was therefore unreachable, which made the host-override escape it
+        //carries (lblSecsOverrideState / btnSecsOverrideRelease) dead UI: the label was
+        //repainted 3x/s by tmrTowerLightBlink and the button could never be clicked, even
+        //though the interface spec tells the customer it exists. Behaviour is additive - the
+        //log window still opens on the same single click; closing it now reveals the SECS/GEM
+        //page with the override status and the Release button. OpenSecsGemLog(NULL) is passed
+        //NULL so it does not undo the menu-button Down state we set here.
+        if(pcMaintenance!=NULL && MenuPages[PageIndex]!=NULL && MenuButtons[PageIndex]!=NULL)
+        {
+            pcMaintenance->ActivePage=MenuPages[PageIndex];
+            pnlTitle->Caption=MenuPages[PageIndex]->Caption;
+            MenuButtons[PageIndex]->Down=true;
+            LastClickButton=MenuButtons[PageIndex];
+            RefreshSecsOverrideStatus();
+        }
+        OpenSecsGemLog(NULL);
         return;
     }
 

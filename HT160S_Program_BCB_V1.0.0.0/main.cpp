@@ -1848,25 +1848,79 @@ void __fastcall TfMain::sbHome1Click(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
+//AI(secs-kyec-rcmd4) 20260728 : factored One Cycle entry point - the same split the machine
+//command layer already uses for Start (MachineStart) and Home (HomeCore). The BUTTON keeps
+//its ShowMyMessage modals; the SECS S2F41 "ONE_CYCLE" branch calls this core and maps the
+//result to HCACK. A modal on the SECS path would stall the HSMS receive thread.
+//bRequireRunning is the SECS-ONLY stale-arm guard : ChangeRunMode(Run_OneCycle) on a stopped
+//machine is a LATCH that nothing clears until the next Start, because ProcessMotion
+//early-returns while SystemStart==false so the OneCycle-finish dispatcher never runs, and
+//DoStartArm only resets RunMode on the UNHOMED path. On a homed, stopped machine a host
+//command accepted at idle would silently turn the operator's NEXT Start into one cycle
+//followed by an automatic stop. The operator button passes false and keeps "arm one cycle,
+//then Start".
+//AI(secs-msggap-fix) 20260729 : the field evidence, recounted, is stronger than "observed, not
+//theoretical" - it is an actual stranded arm, not just a retry burst. KYEC's ONE_CYCLE at
+//19:00:19.281 was ACCEPTED and armed (9045 CEID 3 at 19:00:19.306) on a machine that went HALT
+//0.85 s later, and 9045 clears that latch at exactly one site inside the finish handler, which
+//then never ran. The retry burst around it is 9 commands over 8 min 00.3 s at an exact 60.0 s
+//cadence (7 unambiguously in HALT, one on the ART->HALT boundary, the last in Alarm) - the
+//earlier "nine times in nine minutes" was loose. See docs/plan/secs-9045-claim-crosscheck-20260729.md.
+eOneCycleResult TfMain::OneCycleCore(bool bRequireRunning, AnsiString &Reason)
+{
+    Reason = "";
+    //AI(secs-audit-fix) 20260729 : the STOPPED test now runs FIRST, ahead of the already-armed
+    //test. Order matters for the host answer : a stopped machine that still carries a stale
+    //Run_OneCycle latch used to answer "already armed" -> HCACK=4 (a positive ack promising a
+    //completion event) when the truthful answer is "cannot perform now" -> HCACK=2. With the
+    //stopped test first, a stopped machine ALWAYS answers 2 regardless of the latch, so the host
+    //can never be told a cycle is under way while the machine sits still. Operator button path
+    //is unchanged : it passes bRequireRunning=false, so this test is skipped entirely and
+    //arm-at-idle-then-Start still works.
+    if(bRequireRunning && HSys.Sys.SystemStart==false)
+    {
+        Reason = "One Cycle from host requires the machine to be running.";
+        return ocRejStopped;
+    }
+    //Checked before the mode gate so an already-armed cycle reports busy (HCACK=4) rather
+    //than the generic mode message. HT9045 silently no-ops this case, which is what made
+    //the KYEC retry storm invisible.
+    if(HSys.Sys.RunMode==Run_OneCycle)
+    {
+        Reason = "One Cycle is already armed.";
+        return ocRejBusy;
+    }
+    if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
+    {
+        Reason = "One Cycle is only allowed in Normal / Clean Out mode.";
+        return ocRejMode;
+    }
+    //Deliberately NO HasICUnderMachine() gate : One Cycle is a place-what-you-hold-then-stop
+    //operation that is DESIGNED to leave material under the machine, so gating on IC would
+    //make the command permanently unusable mid-lot - its only real use.
+    if(CheckLotDataReady(Reason)==false)
+        return ocRejNotReady;
+    EventReport(SECS_EVENT.PressOneCycle);
+    ChangeRunMode(Run_OneCycle);
+    Reason = "armed";
+    return ocStarted;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::sbOneCycle1Click(TObject *Sender)
 {
     //AI(poka-yoke) 20260616 : was a silent no-op when mode/data was wrong. One
     //  Cycle runs at idle, so ShowMyMessage here is safe (does not stop a running
     //  machine). Tell the operator why, and require the same lot/2D data as Start.
-    if(HSys.Sys.RunMode!=Run_Normal && HSys.Sys.RunMode!=Run_CleanOut)
-    {
-        ShowMyMessage(LangT("One Cycle is only allowed in Normal / Clean Out mode."));
-        return;
-    }
+    //AI(secs-kyec-rcmd4) 20260728 : gates factored into OneCycleCore() so the SECS S2F41
+    //  "ONE_CYCLE" branch can share them without these modals. The operator path passes
+    //  bRequireRunning=false, so "arm one cycle then press Start" behaves exactly as before.
     AnsiString Reason;
-    if(CheckLotDataReady(Reason)==false)
+    if(OneCycleCore(false, Reason)!=ocStarted)
     {
         ShowMyMessage(LangT(Reason));
         return;
     }
     RecordProcess("ONE CYCLE pressed");
-    EventReport(SECS_EVENT.PressOneCycle);
-    ChangeRunMode(Run_OneCycle);
 }
 //---------------------------------------------------------------------------
 
@@ -2079,6 +2133,38 @@ void TfMain::DoStartArm()
 //"Confirm home?"), so we just call them - pressing physical Home now prompts too.
 void TfMain::ScanPanelKeys()
 {
+    //AI(secs-kyec-rcmd4) 20260728 : operator escape for the SECS host panel override
+    //(S2F41 PP_SIGNALTOWER / PP_MUSIC). MANDATORY, not optional : HT160 has NO global ALARM
+    //RESET handler - the key is read only inside TfNote::ScanKey and TMyMessageBox::ScanKey,
+    //both dialog-scoped - and the KYEC trigger fires while the machine is merely IDLE with no
+    //dialog up. Without this rung an operator would have no way to silence a host-driven
+    //buzzer.
+    //Placed BEFORE the screen/interlock guard block below ON PURPOSE : those guards return
+    //early for fNote / MyMessageBox (both ShowModal, so their own ScanKey owns the key and
+    //also releases the override), but ALSO for fiosetview, for fHome->Visible - a NON-modal
+    //Show - and for IsSafeLock(). The last two keep MainProc spinning and would keep the
+    //override sounding with no escape.
+    //AI(secs-audit-fix) 20260729 : the fiosetview case is NOT reachable from here at all and the
+    //old note claiming "MainProc already returned, override inert" had it backwards - MainProc's
+    //early return skips this whole function AND DoSystemMessage, so the SwMusic outputs kept
+    //their last value and an armed override stayed audible with no escape. That is now handled
+    //at the source : MainProc releases the override and calls CloseBuzzerOff() when it suspends
+    //the spin for the IO Set View (csystem.cpp).
+    //Fires ONLY when an override is actually armed, so with no override the behaviour is
+    //bit-identical to today (this key does nothing in ScanPanelKeys at present).
+    //MainProc calls ScanPanelKeys() immediately before DoSystem() -> DoSystemMessage(), so
+    //the release is honoured on this same scan.
+    static bool bWasSecsReset=false;
+    bool bSecsReset = HSys.Sen.SnFKAlarmReset.IsOn() || HSys.Sen.SnRKAlarmReset.IsOn();
+    if(bSecsReset && bWasSecsReset==false && IsSecsPanelOverrideActive())
+    {
+        ClearSecsPanelOverride();
+        CloseBuzzerOff();
+        RecordProcess("ALARM RESET pressed : SECS host panel override released");
+        EventReport(SECS_EVENT.PressAlarmReset);
+    }
+    bWasSecsReset=bSecsReset;
+
     static bool bWasStart=false;
     static bool bWasHome=false;
     static bool bWasPause=false;
@@ -2694,6 +2780,16 @@ void __fastcall TfMain::DoLotEndProcess()
 void __fastcall TfMain::EmitCleanOutOK()
 {
     EventReport(SECS_EVENT.CleanOutOK);
+}
+//---------------------------------------------------------------------------
+//AI(secs-kyec-rcmd4) 20260728 : emit S6F11 CEID27 "One Cycle Finish", the OneCycle twin of
+//EmitCleanOutOK above. CEID 27 was declared (uHGemHT160.h:37) and registered by the AddCEID
+//loop but sent from nowhere, so a host driving S2F41 ONE_CYCLE never learned the cycle ended.
+//Called from the OneCycle-finish dispatcher in csystem.cpp.
+//EventReport self-gates on USE_SECS_GEM + HSMS SELECTED, so this is a no-op when SECS is off.
+void __fastcall TfMain::EmitOneCycleOK()
+{
+    EventReport(SECS_EVENT.OneCycleOK);
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : Lot Manual Edit list helpers (multi-lot queue, UI layer)

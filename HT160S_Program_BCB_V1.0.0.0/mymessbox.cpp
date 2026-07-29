@@ -506,6 +506,10 @@ void __fastcall TMyMessageBox::btnOffBuzzerClick(TObject *Sender)
     //overwritten next tick). HT172 mymessbox.cpp Button2Click bOffBuzzer parity.
     fBuzzerOff=true;
     CloseBuzzerOff();
+    //AI(secs-kyec-rcmd4) 20260728 : acknowledging the buzzer also releases any SECS host
+    //panel override (S2F41 PP_MUSIC / PP_SIGNALTOWER), matching HT9045. Timer1 re-drives
+    //DoSystemMessage() every 10 ms, so without this the override would resume next tick.
+    ClearSecsPanelOverride();
 }
 //---------------------------------------------------------------------------
 void __fastcall TMyMessageBox::Timer1Timer(TObject *Sender)
@@ -558,6 +562,9 @@ void __fastcall TMyMessageBox::ScanKey()
     {
         fBuzzerOff=true;
         CloseBuzzerOff();
+        //AI(secs-kyec-rcmd4) 20260728 : the panel ALARM RESET key also releases any SECS host
+        //panel override (S2F41 PP_MUSIC / PP_SIGNALTOWER), matching HT9045.
+        ClearSecsPanelOverride();
     }
 
     bWasPause=bPause;

@@ -40,6 +40,11 @@ public:
     // the machine-specific GEM logic can drive the E87/AGV coordinator (poll car
     // full -> CEID272, service handshake). Base is a no-op.
     virtual void ServiceAgv();
+    //AI(secs-kyec-rcmd4-fix) 20260728 : transport -> logic notification that the HSMS link is
+    // gone (peer disconnect, socket error, Separate.req, or our own DropConnection). Lets the
+    // logic layer drop any latched host state that would otherwise outlive the host. Base is a
+    // no-op so THGem stays free of machine dependencies.
+    virtual void OnCommunicationLost();
 
     virtual void AddSV();
     virtual void AddEC();

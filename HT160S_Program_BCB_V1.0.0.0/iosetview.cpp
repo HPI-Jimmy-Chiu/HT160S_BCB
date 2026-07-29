@@ -1938,6 +1938,25 @@ void __fastcall Tfiosetview::FormShow(TObject *Sender)
 {
     (void)Sender;
     EnsureIOTableEditor();
+    //AI(secs-audit-fix) 20260729 : release the SECS host panel override (PP_SIGNALTOWER / PP_MUSIC)
+    //once, HERE, and physically silence the buzzer - and do it BEFORE BackupOutputData() below.
+    //Opening this view makes MainProc early-return (csystem.cpp), which freezes the SwMusic outputs
+    //at their last written value and kills both operator escapes (the panel ALARM RESET rung is
+    //inside the skipped ScanPanelKeys; the Maintenance Release button is on another form), so an
+    //armed override would sit here sounding with no way out. Order matters twice over :
+    //  - BEFORE the snapshot, so bBackSwitchPortData cannot record a host-driven SwMusic=ON that
+    //    the on-close RestoreOutputData would then drive back ON with the override flag already
+    //    cleared - i.e. a buzzer nobody can silence, worse than the bug this fixes.
+    //  - BEFORE the operator can toggle anything, so CloseBuzzerOff() cannot cancel a MUSIC test
+    //    they started (SwMusic1..4 are manual test buttons in this very view).
+    //A packet that arrives later leaves the flag armed but silent - nothing re-drives outputs while
+    //the spin is suspended - and MainProc resuming on close puts the machine back in charge.
+    if(IsSecsPanelOverrideActive())
+    {
+        ClearSecsPanelOverride();
+        CloseBuzzerOff();
+        RecordProcess("IO Set View opened : SECS host panel override released (machine spin suspended, no other escape)");
+    }
     BackupOutputData();
     bOutDataChange=false;
     RefreshCurrentView();

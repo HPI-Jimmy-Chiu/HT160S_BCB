@@ -87,11 +87,19 @@ struct TGemECItem
     AnsiString MaxValue;
     AnsiString DefaultValue;
 };
+//AI(secs-audit-fix) 20260729 : per-report SVID capacity. Was a bare 64, which made
+//ProcessDefineReport_S2F33 reject the WHOLE S2F33 with DRACK=0x01 whenever any report
+//carried more than 64 SVIDs. On the KYEC 2026-06-08 traffic that hit 8 of 122 messages -
+//RPTID 800 (103/104 SVIDs) and RPTID 505 (179 SVIDs) - so those two reports were never
+//defined, S2F35 silently skipped them from every CEID link, and the S6F16 reply came back
+//structurally short. HT9045 answered DRACK=0x00 to all 122. 192 covers the largest report
+//seen in the field with headroom; keep the reports-per-message cap at 64 (max seen: 3).
+#define GEM_MAX_SVID_PER_REPORT   192
 struct TGemReportItem
 {
     unsigned ReportID;
     int SVCount;
-    unsigned SVIDs[64];
+    unsigned SVIDs[GEM_MAX_SVID_PER_REPORT];
     int Mode;   //AI(secs-reportdef) 20260724 : 0=host-defined, 1=firmware-default
 };
 struct TGemCEIDItem
@@ -132,6 +140,12 @@ private:
     unsigned LocalBufferSize;           // capacity of LocalBuffer
     unsigned LocalLength;               // body length (bytes after the 4-byte len field)
     unsigned LocalLength_4;             // running write cursor (starts at 4)
+    //AI(secs-audit-fix) 20260729 : set by DataItemOut when an item will not fit LocalBuffer,
+    //cleared by InitLocalHead at the start of every message, checked by SendLocalData. Dropping
+    //the item alone would leave a frame whose LIST header declares more items than it carries -
+    //a malformed body can desync the host's parser for the rest of the session, which is worse
+    //than no reply at all. Poison the whole message instead and say so in the log.
+    bool bEncodeOverflow;               // current message overflowed the encode buffer
     unsigned int EquipmentSystemByte;   // outgoing primary message SystemByte counter
     unsigned int DeviceID;              // configured HSMS DeviceID
 
@@ -189,6 +203,12 @@ private:
     TServerSocket *ServerSocket1;     // passive mode listener (equipment default)
     TCustomWinSocket *ActiveSocket;   // currently connected peer
     TMemoryStream *RecvBuffer;        // partial-frame assembly buffer
+    //AI(secs-audit-fix) 20260729 : set by OnPeerDisconnected, read by ProcessReceiveBuffer.
+    //A handler running inside ProcessReceiveBuffer's loop can drop the link (Separate.req, or
+    //any SendLocalData that raises a socket error), and OnPeerDisconnected does
+    //RecvBuffer->Clear() - which RELEASES the block that loop cached in its local "base".
+    //Without this flag the loop kept walking freed memory and then memmove'd into it.
+    bool bRecvBufferReset;            // RecvBuffer was flushed under our feet
     bool bActiveMode;                 // true=active(client), false=passive(server)
     bool bCommStarted;                // StartCommunication() has run
     int  iHsmsState;                  // HSMS_STATE_*
@@ -255,6 +275,12 @@ public:
     void EventReport(unsigned iDataID, unsigned iCeid);
     //AI(ht160s-secsgem) 20260625 : S5F1 alarm report sender (from primitives, like EventReport).
     void SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx);
+    //AI(secs-msggap) 20260728 : host-pull report encoders for S6F15->S6F16 / S6F19->S6F20.
+    //Bodies live here (not on HT160Gem) because FindCEIDItem / FindReportItem are private -
+    //same delegate pattern as ProcessDefineReport_S2F33 <- S2F34_DefineReportAcknowledge.
+    //Pure encoders : RefreshSVData + SendLocalData + one log line, no gates, no state change.
+    void EmitEventReportBody(int Func, unsigned iDataID, unsigned iCeid);
+    void EmitIndividualReport(unsigned ReportID);
     bool IsEnableEvent(unsigned iDataID, unsigned iCeid);
     void StringOut(AnsiString Text);
     //AI(ht160s-secsgem) 20260611 : move accumulated log lines into Dest and clear

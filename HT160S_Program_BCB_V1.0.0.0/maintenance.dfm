@@ -2579,6 +2579,40 @@ object fMaintenance: TfMaintenance
       end
       object tsMaintSECS: TTabSheet
         Caption = 'SECS/GEM'
+        object pnlSecsOverride: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 120
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblSecsOverrideTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 420
+            Height = 20
+            AutoSize = False
+            Caption = 'Host Panel Override (PP_SIGNALTOWER / PP_MUSIC)'
+          end
+          object lblSecsOverrideState: TLabel
+            Left = 16
+            Top = 54
+            Width = 500
+            Height = 20
+            AutoSize = False
+            Caption = 'Override: inactive'
+          end
+          object btnSecsOverrideRelease: TButton
+            Left = 560
+            Top = 48
+            Width = 190
+            Height = 32
+            Caption = 'Release Host Override'
+            TabOrder = 0
+            OnClick = btnSecsOverrideReleaseClick
+          end
+        end
       end
       object tsMaintCOM: TTabSheet
         Caption = 'COM Port'

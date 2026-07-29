@@ -42,6 +42,7 @@ __fastcall THGem::THGem(TComponent *Owner)
     LocalBuffer = new unsigned char[LocalBufferSize];
     LocalLength = 0;
     LocalLength_4 = 4;
+    bEncodeOverflow = false;                 //AI(secs-audit-fix) 20260729
     EquipmentSystemByte = 0;
     DeviceID = 0;
     memset(&Local, 0, sizeof(Local));
@@ -67,6 +68,7 @@ __fastcall THGem::THGem(TComponent *Owner)
     bCommStarted = false;
     iHsmsState   = HSMS_STATE_NOTCONNECTED;
     RecvBuffer   = new TMemoryStream;
+    bRecvBufferReset = false;                //AI(secs-audit-fix) 20260729
 
     //AI(ht160s-secsgem) 20260611 : reconnect watchdog defaults (overridden by
     // General.ini [SECS] ReconnectInterval via SetReconnectInterval in GemInitial).
@@ -105,6 +107,16 @@ __fastcall THGem::THGem(TComponent *Owner)
 //---------------------------------------------------------------------------
 __fastcall THGem::~THGem()
 {
+    //AI(secs-audit-fix) 20260729 : drop the machine-logic back-pointer FIRST. Below we set
+    //ClientSocket1/ServerSocket1->Active=false, and ScktComp's TCustomWinSocket::Disconnect
+    //fires seDisconnect SYNCHRONOUSLY on a live socket -> ClientDisconnect ->
+    //OnPeerDisconnected() -> GemLogic->OnCommunicationLost(). That virtual call runs
+    //machine-layer code (ClearSecsPanelOverride, RecordProcess -> EventLog fopen, fNote memo)
+    //at a point where this object's LogList / SReceiveData / registries are already freed, and
+    //HT160Gem may itself already be gone : the two objects have different owners (THGem belongs
+    //to Application, HT160Gem is HSys.MyGem freed by the global SYSTEM_MODULAR dtor) and
+    //nothing sequences their teardown. Clearing the pointer here makes the whole window inert.
+    GemLogic = NULL;
     if(LogList!=NULL)
     {
         LogList->Clear();
@@ -400,6 +412,110 @@ void THGem::EventReport(unsigned iDataID, unsigned iCeid)
     }
     SendLocalData();
     FlushSecsLogToFile();   //AI(ht160s-obsv-p1) : event evidence crash-safe
+}
+//---------------------------------------------------------------------------
+//AI(secs-msggap) 20260728 : S6F16 body builder (host S6F15 Event Report Request).
+//  Same wire shape as the S6F11 event report -
+//      L,3{ U4 DATAID, U4 CEID, L,a{ L,2{ U4 RPTID, L,b{ SV values } } } }
+//  - but Func is a parameter, W=0, and the two EventReport gates are deliberately absent:
+//  the HSMS_STATE_SELECTED early-out and IsEnableEvent (S6F15 is an EXPLICIT host pull, so a
+//  CEID the host disabled for unsolicited reporting must still be answered - HT9045 has the
+//  same enable gate commented out at uHGemClass.cpp:1973, and the KYEC wire proves it would
+//  have mattered: all 3 S6F15s arrived while the host had globally disabled every event, and
+//  9045 answered in full). Unknown CEID falls out naturally as L,3{ DATAID, CEID, L,0 }
+//  because FindCEIDItem returns NULL and reportCount becomes 0; that keeps the top-level
+//  shape constant and is E5-clean, unlike HT9045's bare zero-length U4.
+//AI(secs-msggap-fix) 20260729 : dropping the SELECTED early-out is safe because the SEND is
+//  gated, NOT because the receive is - ProcessReceiveBuffer hands every well-framed DATA
+//  message to Dispatch with no iHsmsState test, so "you cannot receive an S6F15 unless
+//  SELECTED" (the original wording here) was false. SendLocalData is the real gate.
+//  Bounds: ReportCount by TGemCEIDItem (ReportIDs[32], clamped in SetCEIDContent; max seen on
+//  the KYEC wire is 12) and SVCount by TGemReportItem (GEM_MAX_SVID_PER_REPORT, clamped in
+//  SetReportIDContent). That cap was a bare 64 until 20260729 and it was NOT merely a safety
+//  bound: KYEC defines RPTID 505 with 179 SVIDs and 800 with 103, so 8 of its 122 S2F33s were
+//  rejected outright with DRACK=0x01, those reports never existed, and this very builder then
+//  answered a structurally short report for CEID 1. Do not shrink it back.
+//  EventReport() is NOT refactored to call this: the shipping S6F11 path keeps its own
+//  gates, W=1 and FlushSecsLogToFile, and is not worth destabilising for 12 shared lines.
+//---------------------------------------------------------------------------
+void THGem::EmitEventReportBody(int Func, unsigned iDataID, unsigned iCeid)
+{
+    if(GemLogic!=NULL)
+        GemLogic->RefreshSVData();
+
+    TGemCEIDItem *Ce = FindCEIDItem(iCeid);
+    int reportCount = (Ce!=NULL) ? Ce->ReportCount : 0;
+
+    unsigned uDataID = iDataID;
+    unsigned uCeid   = iCeid;
+
+    InitLocalHead(6, Func, 0);
+    DataItemOut(3, HType.LIST_TYPE, NULL);
+    DataItemOut(1, HType.UINT_4_TYPE, &uDataID);
+    DataItemOut(1, HType.UINT_4_TYPE, &uCeid);
+    DataItemOut(reportCount, HType.LIST_TYPE, NULL);
+    for(int r=0; r<reportCount; r++)
+    {
+        unsigned uRpt = Ce->ReportIDs[r];
+        TGemReportItem *Rp = FindReportItem(uRpt);
+        int svCount = (Rp!=NULL) ? Rp->SVCount : 0;
+
+        DataItemOut(2, HType.LIST_TYPE, NULL);
+        DataItemOut(1, HType.UINT_4_TYPE, &uRpt);
+        DataItemOut(svCount, HType.LIST_TYPE, NULL);
+        for(int s=0; s<svCount; s++)
+            DataItemOutSVValue(Rp->SVIDs[s]);
+    }
+    SendLocalData();
+
+    AnsiString T;
+    T.sprintf("[SECS][TX] S6F%d host pull CEID=%u reports=%d", Func, iCeid, reportCount);
+    StringOut(T);
+    FlushSecsLogToFile();
+}
+//---------------------------------------------------------------------------
+//AI(secs-msggap) 20260728 : S6F20 body builder (host S6F19 Individual Report Request).
+//  FLAT L,n of the report's SV VALUES - no RPTID echo, no per-SV wrapper. Verified on the
+//  KYEC wire: RPTID 700 -> L[21] (3/3) and 600 -> L[12] (3/3).
+//AI(secs-msggap-fix) 20260729 : the RPTID-506 story was written backwards and the real
+//  requirement is STRONGER than it claimed. Facts, recounted from the 20 KYEC logs:
+//  506 answers L[6] at 17:52 and L[5] at 19:07, so L[6] is FIRST, not "after"; BOTH sessions
+//  delete-then-redefine, so the delete is not what distinguishes them; the two SVID sets are
+//  disjoint (3800-3806 vs 3616-3677), i.e. a different report, not a grown one; and 506 also
+//  goes 5 -> 6 INSIDE one session via a plain overwrite with NO delete at all (S6F11 carries
+//  L[5], S2F33 redefines, S6F16 then carries L[6]). So n MUST come from the live registry
+//  (Rp->SVCount) on EVERY call - a cached length breaks even without a delete and even within
+//  one session. THGem::SetReportIDContent find-or-creates and OVERWRITES SVCount/SVIDs in
+//  place, and ProcessDefineReport_S2F33 maps an empty SV list to DeleteHostReport, so the
+//  registry always holds the host's latest definition. SVCount is capped at
+//  GEM_MAX_SVID_PER_REPORT by SetReportIDContent (and a larger host report is rejected earlier
+//  with DRACK=0x01), so looping over Rp->SVCount cannot run past the array.
+//  Unknown RPTID -> L,0 rather than HT9045's silent S9F7-and-no-reply : HT160 has no S9F7
+//  sender, and silence is just another T3. Unknown SVIDs inside a known report are already
+//  safe - DataItemOutSVValue emits an empty item, keeping the list length aligned (the
+//  Path-A tolerance S2F33 depends on), so no SVID validation is done here.
+//---------------------------------------------------------------------------
+void THGem::EmitIndividualReport(unsigned ReportID)
+{
+    if(GemLogic!=NULL)
+        GemLogic->RefreshSVData();
+
+    TGemReportItem *Rp = FindReportItem(ReportID);
+    int svCount = (Rp!=NULL) ? Rp->SVCount : 0;
+
+    InitLocalHead(6, 20, 0);
+    DataItemOut(svCount, HType.LIST_TYPE, NULL);
+    for(int s=0; s<svCount; s++)
+        DataItemOutSVValue(Rp->SVIDs[s]);
+    SendLocalData();
+
+    AnsiString T;
+    if(Rp==NULL)
+        T.sprintf("[SECS][TX] S6F20 RPTID=%u not defined -> L,0", ReportID);
+    else
+        T.sprintf("[SECS][TX] S6F20 RPTID=%u SVs=%d", ReportID, svCount);
+    StringOut(T);
+    FlushSecsLogToFile();
 }
 //---------------------------------------------------------------------------
 void THGem::SendAlarmS5F1(unsigned alid, unsigned char alcd, AnsiString altx)
@@ -777,16 +893,28 @@ void THGem::ReadEventReportData()
                 TGemReportItem *ex = FindReportItem(rid);
                 if(ex!=NULL && ex->Mode==1) continue;
                 AnsiString rest = body.SubString(bar+1, body.Length()-bar);
-                unsigned sv[64];
+                unsigned sv[GEM_MAX_SVID_PER_REPORT];
                 int n = 0;
-                while(rest.Trim()!="" && n<64)
+                while(rest.Trim()!="" && n<GEM_MAX_SVID_PER_REPORT)
                 {
                     int comma = rest.Pos(",");
                     AnsiString tok;
                     if(comma>0) { tok = rest.SubString(1, comma-1); rest = rest.SubString(comma+1, rest.Length()-comma); }
                     else        { tok = rest; rest = ""; }
                     unsigned s = (unsigned)atoi(tok.Trim().c_str());
-                    if(IsValidSVID(s)) sv[n++] = s;
+                    //AI(secs-audit-fix) 20260729 : keep every SVID the host defined, byte-identically
+                    //to ProcessDefineReport_S2F33's Path-A tolerance - INCLUDING 0, which that path
+                    //also accepts and SaveEventReportData also writes back. Dropping unknown SVIDs
+                    //here made the round trip lossy : a host report of only firmware-unknown SVIDs
+                    //(e.g. the on-site RPTID 504={20001,20002,20003}) was accepted with DRACK=0x00,
+                    //written to EventReportDef.ini, then silently VANISHED on the next boot because
+                    //n stayed 0 and the "if(n>0)" below skipped the whole report. A PARTIAL drop was
+                    //worse still - it shortened the report's LIST so S6F11 no longer matched what the
+                    //host defined and every later value shifted one slot. Any filter here, however
+                    //narrow, reintroduces exactly that shift, so there is none. DataItemOutSVItem
+                    //emits an empty item for an SVID the firmware does not know, so the LIST length
+                    //always matches the stored SVCount.
+                    sv[n++] = s;
                 }
                 if(n>0) SetReportIDContent(rid, (unsigned)n, sv, 0);
             }
@@ -880,7 +1008,7 @@ void THGem::ProcessDefineReport_S2F33()
     AnsiString sTmp;
     static unsigned rid[64];
     static int      svn[64];
-    static unsigned svv[64][64];
+    static unsigned svv[64][GEM_MAX_SVID_PER_REPORT];
     int nRpt = 0;
     ResetReturnCode();
     if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)              { ReportAcknowledge(0x02); return; }
@@ -898,7 +1026,7 @@ void THGem::ProcessDefineReport_S2F33()
         TGemReportItem *ex = FindReportItem(rr);
         if(ex!=NULL && ex->Mode==1)                         { ReportAcknowledge(0x03); return; }
         if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ ReportAcknowledge(0x02); return; }
-        if(b>64)                                            { ReportAcknowledge(0x01); return; }
+        if(b>GEM_MAX_SVID_PER_REPORT)                       { ReportAcknowledge(0x01); return; }
         rid[nRpt]=rr; svn[nRpt]=b;
         for(j=0; j<b; j++)
         {
@@ -1106,7 +1234,7 @@ bool THGem::SetReportIDContent(unsigned iReportID, unsigned iReportCount, unsign
     }
     int n = (int)iReportCount;
     if(n<0) n=0;
-    if(n>64) n=64;
+    if(n>GEM_MAX_SVID_PER_REPORT) n=GEM_MAX_SVID_PER_REPORT;
     p->SVCount = n;
     for(int i=0; i<n; i++)
         p->SVIDs[i] = iReportIDData[i];
@@ -1208,6 +1336,9 @@ void THGem::CreateLocalHead()
 //---------------------------------------------------------------------------
 void THGem::InitLocalHead(int Stream, int Function, int WaitBit)
 {
+    //AI(secs-audit-fix) 20260729 : every outgoing message starts here, so this is the one place
+    //that clears the encode-overflow poison flag for the message about to be built.
+    bEncodeOverflow   = false;
     Local.DeviceID    = (unsigned short int)DeviceID;
     Local.MessageID_S = (unsigned char)Stream;
     Local.MessageID_F = (unsigned char)Function;
@@ -1233,6 +1364,23 @@ void THGem::DataItemOut(int len, unsigned char Type, void *P)
 
     DataSize = (unsigned char)GetLengthOfType(Type);
     SMLLength = GetLengthByte((unsigned)(len*DataSize), SMLLengthData);
+    //AI(secs-audit-fix) 20260729 : capacity backstop. Every write below indexes LocalBuffer by
+    //LocalLength_4 with no check against LocalBufferSize (1 MB), so the encode side trusted the
+    //caller completely. That was safe while every body was firmware-shaped, but S2F33 now lets
+    //the HOST define reports of up to GEM_MAX_SVID_PER_REPORT SVIDs and S6F16/S6F11 serialize
+    //them, so body size is host-influenced for the first time. Realistic worst case is ~2
+    //orders of magnitude under 1 MB - this is a backstop, not an expected path - but a heap
+    //overrun here would be remotely triggerable. Refuse the item and say so loudly.
+    if(len<0 || DataSize<=0 ||
+       (double)LocalLength_4 + 1.0 + (double)SMLLength + (double)len*(double)DataSize > (double)LocalBufferSize)
+    {
+        AnsiString sOvf;
+        sOvf.sprintf("[SECS][TX] ENCODE OVERFLOW - message poisoned (cursor=%u len=%d size=%u cap=%u)",
+                     LocalLength_4, len, (unsigned)DataSize, LocalBufferSize);
+        StringOut(sOvf);
+        bEncodeOverflow = true;      // SendLocalData will refuse to transmit this frame
+        return;
+    }
     LocalBuffer[LocalLength_4] = Type | SMLLength;
     LocalLength_4++;
     for(i=0; i<SMLLength; i++)
@@ -1395,6 +1543,21 @@ void THGem::SendLocalData()
 {
     AnsiString S;
     bool bSent = false;
+
+    //AI(secs-audit-fix) 20260729 : refuse to transmit a frame that overflowed the encode buffer.
+    //DataItemOut dropped at least one item, so the body's LIST header now declares more items
+    //than the frame carries. A host parsing that would consume the following bytes as list
+    //members and desync for the rest of the session; letting the primary time out (T3) instead
+    //is recoverable. Unreachable with firmware-shaped bodies - this is a backstop for
+    //host-defined S2F33 reports, which are the only host-sized thing we serialize.
+    if(bEncodeOverflow)
+    {
+        S.sprintf("[SECS][TX] S%uF%u DROPPED - encode buffer overflow, frame would be malformed",
+                  (unsigned)(Local.MessageID_S & 0x7f), (unsigned)Local.MessageID_F);
+        StringOut(S);
+        FlushSecsLogToFile();
+        return;
+    }
 
     if(ActiveSocket!=NULL && iHsmsState==HSMS_STATE_SELECTED)
     {
@@ -1709,7 +1872,17 @@ void THGem::OnPeerDisconnected()
     bAwaitLinktestRsp = false;                  //AI(ht160s-secsgem) 20260611 : reset heartbeat
     if(RecvBuffer!=NULL)
         RecvBuffer->Clear();
+    //AI(secs-audit-fix) 20260729 : tell ProcessReceiveBuffer its cached base pointer just died.
+    bRecvBufferReset = true;
     StringOut("[SECS] peer disconnected");
+    //AI(secs-kyec-rcmd4-fix) 20260728 : tell the logic layer the host is gone so it can release
+    // latched host state (PP_SIGNALTOWER / PP_MUSIC panel override). KYEC arms and clears that
+    // pair seconds apart; if the link drops in between, the tower and buzzer would otherwise
+    // stay host-driven forever - the same orphan-latch failure already seen with the AGV lock.
+    // DropConnection() funnels here too, so this single hook covers peer disconnect, socket
+    // error, Separate.req and our own watchdog drop.
+    if(GemLogic!=NULL)
+        GemLogic->OnCommunicationLost();
 }
 //---------------------------------------------------------------------------
 void THGem::ReadFromPeer(TCustomWinSocket *Socket)
@@ -1747,6 +1920,13 @@ void THGem::ProcessReceiveBuffer()
     base  = (unsigned char *)RecvBuffer->Memory;
     total = (int)RecvBuffer->Size;
     consumed = 0;
+    //AI(secs-audit-fix) 20260729 : arm the "buffer pulled out from under us" detector. See the
+    //bRecvBufferReset comment in the header - a handler below can reach OnPeerDisconnected
+    //(Separate.req at HandleControlMessage, or a socket error raised by any SendLocalData
+    //inside a handler) which calls RecvBuffer->Clear() and frees the block "base" points at.
+    bRecvBufferReset = false;
+    if(base==NULL)
+        return;
 
     while((total - consumed) >= 4)
     {
@@ -1767,6 +1947,12 @@ void THGem::ProcessReceiveBuffer()
             HandleDataMessage(p, frameLen);
         else
             HandleControlMessage(p, frameLen);
+        //AI(secs-audit-fix) 20260729 : the handler dropped the link and OnPeerDisconnected
+        //already cleared RecvBuffer, so "base" is dangling and there is nothing left to
+        //compact. Bail out BEFORE touching base again or resizing the buffer - resizing here
+        //would resurrect a stream holding whatever the allocator put back.
+        if(bRecvBufferReset)
+            return;
         consumed += frameLen;
     }
 
@@ -1787,8 +1973,19 @@ void THGem::HandleControlMessage(unsigned char *Ptr, int Len)
     {
     case HSMS_STYPE_SELECT_REQ:
         SendControlReply(Ptr, HSMS_STYPE_SELECT_RSP);
-        iHsmsState = HSMS_STATE_SELECTED;
-        StringOut("[SECS] Select.req -> Select.rsp (SELECTED)");
+        //AI(secs-audit-fix) 20260729 : only promote to SELECTED if the reply actually went out.
+        //SendControlReply's SendBuf can raise a socket error, which ScktComp routes to ClientError
+        //-> DropConnection -> OnPeerDisconnected : ActiveSocket=NULL and iHsmsState=NOTCONNECTED.
+        //Overwriting that with SELECTED produced a PERMANENT dead link - Timer1Timer takes the
+        //SELECTED branch, SendLinktestReq returns immediately on ActiveSocket==NULL without arming
+        //bAwaitLinktestRsp/iT6Countdown so the T6 drop can never fire, and the reconnect watchdog
+        //skips a state >= CONNECTED, so DoReconnectAttempt never re-dials. SECS stayed dead until
+        //the program restarted while the on-screen badge still reported the link up.
+        if(ActiveSocket!=NULL)
+        {
+            iHsmsState = HSMS_STATE_SELECTED;
+            StringOut("[SECS] Select.req -> Select.rsp (SELECTED)");
+        }
         break;
     case HSMS_STYPE_LINKTEST_REQ:
         SendControlReply(Ptr, HSMS_STYPE_LINKTEST_RSP);
@@ -2244,6 +2441,12 @@ int THGem::ProcessSML(unsigned char *Ptr, int Len, int &RunLength)
     {
         StoreToReceiveString(HType.LIST_TYPE);
         RunLength++;
+        //AI(secs-audit-fix) 20260729 : bound the LENGTH FIELD itself, not just the payload.
+        //GetSMLLenthByte reads (TypeChar & 0x03) bytes at Ptr[RunLength..] with no check of its
+        //own, so a frame truncated in the middle of a length field read up to 3 bytes past it.
+        //Identical in form to the guard RenderSmlItem already has for the same read.
+        if(RunLength + (TypeChar & 0x03) > Len)
+            return -2;
         ct = GetSMLLenthByte(TypeChar, Ptr, RunLength);
         RunLength += TypeChar & 0x03;
         StoreToReceiveString((int)ct);
@@ -2264,12 +2467,27 @@ int THGem::ProcessSML(unsigned char *Ptr, int Len, int &RunLength)
             else
                 continue;
         }
+        //AI(secs-audit-fix) 20260729 : bound the scalar item's LENGTH FIELD before reading it,
+        //same as the LIST case above and as RenderSmlItem already does.
+        if(RunLength + (TypeChar & 0x03) > Len)
+            return -2;
         ItemSize = GetSMLLenthByte(TypeChar, Ptr, RunLength);
         RunLength += TypeChar & 0x03;
         if(c==HType.ASCII_TYPE)
         {
             StoreToReceiveString((int)c);
             StoreToReceiveString(ItemSize);
+            //AI(secs-audit-fix) 20260729 : frame-bounds check. This was the ONLY item branch
+            //without one - every sibling below (BINARY / BOOLEAN / U* / I* / F*) tests
+            //RunLength>=Len per byte. ItemSize is HOST-DECLARED (up to 0xFFFFFF from three
+            //length bytes), so a host that declares a longer ASCII item than it actually sent
+            //made this loop read past the frame - up to 16 MB of adjacent heap. Harmless while
+            //no handler kept the value, but the S10F3/S10F5 terminal-text handlers now sink
+            //host ASCII verbatim into the SECS text log, the EventLog CSV and SecsAlarmMessage,
+            //which turns the over-read into a data-disclosure sink that lands on disk. Reject
+            //the frame with -2 (same code the siblings use) instead of copying.
+            if(ItemSize<0 || RunLength+ItemSize>Len)
+                return -2;
             char *Temp;
             Temp = new char[ItemSize+4];
             for(j=0; j<ItemSize; j++)
@@ -2497,7 +2715,26 @@ int THGem::DataItemInSub(int len, unsigned char Type, void *P)
         temp = (char *)P;
         if(SReceiveData->Count==0)
             return -1;
-        strncpy(temp, SReceiveData->Strings[0].c_str(), len+1);
+        //AI(secs-audit-fix) 20260729 : was strncpy(temp, src, len+1). strncpy ZERO-PADS to n, so
+        //that wrote exactly len+1 bytes on EVERY call, however short the string. Now only
+        //strlen(src)+1 bytes are written, so the typical call touches far less of the caller's
+        //buffer - but be clear about what did NOT change: the CONTRACT is still
+        //"len = maximum string length, and the caller's buffer must be len+1 bytes", because a
+        //host string of exactly len characters still needs temp[len] for the terminator.
+        //HT160's own raw-buffer callers honour it (char CommandStr[256] guarded with len<256 at
+        //uHGemHT160.cpp:717/805/987, so at most 256 bytes into 256). The HT9045 idiom
+        //"char str[1024]; DataItemIn(1024, ASCII_TYPE, str);" still overflows by one byte at the
+        //boundary and must NOT be copied - clamping to len-1 here is not the answer either, since
+        //that would silently truncate the last character for every conforming caller. New code
+        //should use GetDataItemLenAndType + the DataItemIn(int, unsigned char, AnsiString&)
+        //overload, which allocates its own buffer; S10F4/S10F6 already do (uHGemHT160.cpp:1914/1955).
+        {
+            const char *src = SReceiveData->Strings[0].c_str();
+            int cp = (int)strlen(src);
+            if(cp>len) cp=len;                     // l>len already rejected above; belt and braces
+            memcpy(temp, src, cp);
+            temp[cp] = 0;
+        }
         SReceiveData->Delete(0);
     }
     else if(t==HType.BINARY_TYPE || t==HType.UINT_1_TYPE)

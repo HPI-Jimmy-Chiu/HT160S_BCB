@@ -103,6 +103,18 @@ void HTGem::Dispatch(int S, int F)
         case 7: S5F8_ListEnableAlarmAcknowledge();    return;
         }
         break;
+    //AI(secs-msggap) 20260728 : S6F15 Event Report Request / S6F19 Individual Report Request.
+    //Both were unhandled -> fell through to S9F3_Unrecognized (log line only, ZERO bytes on
+    //the wire) -> host T3 timeout. S6F17 / S6F23 stay deliberately unhandled: the KYEC host
+    //has never sent them, and with only F15/F19 listed here they keep falling through to the
+    //same S9F3 log they hit today, so this case adds no behaviour for them.
+    case 6:
+        switch(F)
+        {
+        case 15: S6F16_EventReportData();       return;
+        case 19: S6F20_IndividualReportData();  return;
+        }
+        break;
     case 7:
         switch(F)
         {
@@ -113,6 +125,10 @@ void HTGem::Dispatch(int S, int F)
         case 19: S7F20_CurrentEPPDData();                  return;
         }
         break;
+    //AI(secs-msggap) 20260728 : S10F3/S10F5 already dispatched here BEFORE this patch, but
+    //landed on the base SendUnsupported stubs, which only StringOut and transmit nothing -
+    //that is why the host T3s on stream 10 even though the case exists. Fixed by the
+    //HT160Gem overrides, not here; this case is unchanged.
     case 10:
         switch(F)
         {
@@ -122,6 +138,15 @@ void HTGem::Dispatch(int S, int F)
         break;
     case 14:
         if(F==1) { ProcessS14F1_GetAttrRequest(""); return; }
+        break;
+    //AI(secs-msggap) 20260728 : S125F1 Enable/Disable EC Data Send (KYEC private stream).
+    //Was unhandled -> S9F3 log only -> host T3. Exactly ONE S125F2 is sent per request.
+    //HT9045 sends one ack PER ECID inside its parse loop, so the KYEC captures show 46
+    //secondaries for 2 primaries per session (3 x (1 + 45) = 138 vs 6). Because
+    //InitLocalHead reuses the request SystemByte for every even Function, those 45 replies
+    //all carry the SAME transaction id - a protocol defect, not a feature. Not ported.
+    case 125:
+        if(F==1) { S125F2_EnableDisableECDataAcknowledge(); return; }
         break;
     }
     // Unhandled primary message -> report unrecognized S/F.
@@ -141,6 +166,8 @@ void HTGem::RefreshSVData(){ }
 void HTGem::RefreshSecsBadge(){ }
 //AI(ht160s-agv) 20260615 : base no-op; HT160Gem overrides to drive the AGV coordinator.
 void HTGem::ServiceAgv(){ }
+//AI(secs-kyec-rcmd4-fix) 20260728 : base no-op; HT160Gem overrides to release latched host state.
+void HTGem::OnCommunicationLost(){ }
 void HTGem::AddSV(){ }
 void HTGem::AddEC(){ }
 void HTGem::AddAlarmList(){ }

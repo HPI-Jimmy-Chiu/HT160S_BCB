@@ -184,6 +184,10 @@ __published:
     TEdit *edWebapiPath;
     TLabel *Label1;
     TTimer *tmrTowerLightBlink;
+    TPanel *pnlSecsOverride;
+    TLabel *lblSecsOverrideTitle;
+    TLabel *lblSecsOverrideState;
+    TButton *btnSecsOverrideRelease;
     TSpeedButton *spbMaintMCUDisplay;
     TTabSheet *tsMaintMCUDisplay;
     TPanel *pnlMCUSetup;
@@ -412,6 +416,7 @@ __published:
     void __fastcall RGB00Click(TObject *Sender);
     void __fastcall sbMusic1Click(TObject *Sender);
     void __fastcall tmrTowerLightBlinkTimer(TObject *Sender);
+    void __fastcall btnSecsOverrideReleaseClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall chkHardwareColorBinAreaClick(TObject *Sender);
@@ -494,6 +499,7 @@ private:
     void __fastcall RefreshFtpStatus();
     void __fastcall AddFtpLog(AnsiString Text);
     void __fastcall RefreshAmrStatus();
+    void __fastcall RefreshSecsOverrideStatus();
     void __fastcall BuildAmrInjectPanel();
     void __fastcall BuildAgvTimeoutField();
     void __fastcall ShowPasswordPage();

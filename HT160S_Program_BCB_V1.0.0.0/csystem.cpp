@@ -139,6 +139,17 @@ void MainProc()
 	//(manual IO test) is open, suspend the whole machine spin so DoSystem()/
 	//DoSystemMessage() do not re-drive outputs (tower lamp SwTowerRed/Yellow/Green,
 	//etc.) and override a manual IO test. Spin resumes when the view closes.
+	//AI(secs-audit-fix) 20260729 : an armed SECS panel override used to be left FROZEN here - this
+	//early return happens before fMain->ScanPanelKeys() and before DoSystem()->DoSystemMessage(),
+	//so nothing re-drives the SwMusic outputs and they simply RETAIN their last written value, and
+	//BOTH escapes are dead in that state (the panel ALARM RESET rung lives inside the skipped
+	//ScanPanelKeys; the Maintenance Release button is on another form). The release is deliberately
+	//NOT done here : this branch runs every scan, so it would fight a host that re-arms mid-session
+	//and would drive SwMusic1..4 - which are manual test buttons inside that very view - Off under
+	//the engineer's fingers. It is done ONCE on the open edge in Tfiosetview::FormShow, before
+	//BackupOutputData() takes the output snapshot, so the snapshot cannot capture (and the
+	//on-close RestoreOutputData cannot resurrect) a host-driven buzzer level after the flag that
+	//makes the escapes work has already been cleared.
 	if(fiosetview!=NULL && fiosetview->Visible)
 	{
 		UpdateRunControlFlag();
@@ -822,6 +833,127 @@ static void DriveSystemMusic(int MusicSel)
 	}
 }
 //---------------------------------------------------------------------------
+//AI(secs-kyec-rcmd4) 20260728 : SECS host panel override (S2F41 PP_SIGNALTOWER / PP_MUSIC).
+//Modelled on HT9045 SECS_GEM_PPSIGNALTOWER_CONTROL_flag / SECS_GEM_PPMUSIC_CONTROL_flag.
+//KYEC fires the pair ~0.3s apart (0.256-0.361 s, PP_MUSIC first) to call an operator to the
+//machine, then releases it with an EMPTY parameter list a few seconds later.
+//AI(secs-msggap-fix) 20260729 : two field readings corrected after recounting the 20 KYEC logs.
+//The trigger is a GENERIC host attention annunciator, not specifically the S10F5 "tester is
+//IDLE, priority lot waiting" text - only 3 of the 6 SET bursts follow that one; the others
+//follow "has no schedule.", "MES_Status Changed toSetUp", and an S10F3 ART-abort. And two of
+//the nine CLEARs land 0.3 s after the equipment's OWN alarm event report, so the host does use
+//this channel around alarm conditions too - the suppression gates below stand on the safety
+//argument alone. The "longest armed span 1723.8 s" figure is the longest CONTINUOUS armed
+//interval (15:02:41.838 -> 15:31:25.593) and contains three SETs and one release; the longest
+//single SET->CLEAR pair is 1131.9 s. Either way the latch outlives any operator's patience,
+//which is the only thing that argument needs.
+//Colour domain 0=off / 1=on / 2=blink; music class 1..4 -> SwMusic1..SwMusic4 (database.h).
+static bool s_bSecsTowerOverride=false;
+static int  s_iSecsTowerRed=0;
+static int  s_iSecsTowerYellow=0;
+static int  s_iSecsTowerGreen=0;
+static bool s_bSecsMusicOverride=false;
+static int  s_iSecsMusicClass=0;
+//---------------------------------------------------------------------------
+static bool SecsTowerLampOn(int State, bool BlinkPhase)
+{
+	if(State==1)
+		return true;
+	if(State==2)
+		return true;   //AI(secs-kyec-rcmd4-fix) 20260728 : host value 2 is "blink", but HT160S tower must NOT blink (user decision) -> render BLINK as STEADY ON, exactly like GetTowerLightConfigOutput (maintenance.cpp:284-285). Returning BlinkPhase here would strobe the three physical tower outputs. BlinkPhase is kept in the signature for call-site symmetry with GetTowerLightConfigOutput. //AI(secs-msggap-fix) 20260729 : recount - 5 of the 6 KYEC SET packets carry 2 on every colour (not ALL of them; 19:07:50.526 is RED=2 GREEN=0 YELLOW=0), so blink-valued packets are still the normal case and this mapping is still the hot path, but never assume the three colours share a value. The resulting operator-visible deviation (9045 blinks all three, HT160S lights all three steady) is declared in docs/SECS/HT160S_SECS_Interface_Spec_20260727.md 3.4.
+	return false;
+}
+//---------------------------------------------------------------------------
+void SetSecsTowerOverride(int Red, int Yellow, int Green)
+{
+	//A colour the host did not name keeps its previous value : HT9045 writes only the CP
+	//names present in the packet. Callers pass -1 for "not specified".
+	if(Red>=0)
+		s_iSecsTowerRed=Red;
+	if(Yellow>=0)
+		s_iSecsTowerYellow=Yellow;
+	if(Green>=0)
+		s_iSecsTowerGreen=Green;
+	s_bSecsTowerOverride=true;
+}
+//---------------------------------------------------------------------------
+void ClearSecsTowerOverride()
+{
+	//AI(secs-kyec-rcmd4-fix) 20260728 : also drop the remembered colours. SetSecsTowerOverride
+	//treats -1 as "keep previous", so leaving them set meant a later SET naming only GREEN
+	//silently resurrected the RED value from a cleared, unrelated override.
+	s_bSecsTowerOverride=false;
+	s_iSecsTowerRed=0;
+	s_iSecsTowerYellow=0;
+	s_iSecsTowerGreen=0;
+}
+//---------------------------------------------------------------------------
+void SetSecsMusicOverride(int MusicClass)
+{
+	//The S2F42 branch already validates 1..4; clamp again so no future caller can reproduce
+	//the HT9045 bug SW[SwMusic1+CLASS-1].On() with no range check, where CLASS=0 drives the
+	//switch immediately BEFORE SwMusic1.
+	if(MusicClass<1 || MusicClass>4)
+		return;
+	s_iSecsMusicClass=MusicClass;
+	s_bSecsMusicOverride=true;
+}
+//---------------------------------------------------------------------------
+void ClearSecsMusicOverride()
+{
+	//AI(secs-msggap-fix) 20260729 : dropping the flag is NOT enough - it must also silence the
+	//switch. SwMusic1..4 are latching myswitch outputs whose only scan-time driver is
+	//DriveSystemMusic(), and that call sits inside the if(bMaintAlone==false) block in
+	//DoSystemMessage. bMaintAlone means "fMaintenance visible with no dialog up", i.e. it is TRUE
+	//exactly when the operator is looking at the Maintenance "Release Host Override" button - so
+	//nothing rewrites the switch, it keeps its last written value, and the buzzer went on
+	//sounding after a release that reported success. The same freeze applies to the host's own
+	//PP_MUSIC empty-list release, to S1F16 OFF-LINE and to link-lost, and in those three cases
+	//RefreshSecsOverrideStatus() then greys the Release button out because the latch is already
+	//clear - buzzer still sounding, screen escape disabled, handler early-returns. Silencing here
+	//covers all six release paths at once instead of patching each caller.
+	//Only when it WAS armed : 5 of KYEC's 9 CLEARs arrive with nothing armed, and a no-op clear
+	//must stay a no-op rather than reach in and mute a machine-owned buzzer.
+	//Safe against the machine's own alarm tone : whenever the machine (not Maintenance) owns the
+	//panel, DriveSystemMusic re-drives the correct MusicSel on the next 10 ms tick.
+	bool bWasArmed=s_bSecsMusicOverride;
+	s_bSecsMusicOverride=false;
+	s_iSecsMusicClass=0;
+	if(bWasArmed)
+		CloseBuzzerOff();
+}
+//---------------------------------------------------------------------------
+void ClearSecsPanelOverride()
+{
+	//Operator escape : releases BOTH overrides at once, matching HT9045 which clears the pair
+	//together from the ALARM RESET key and from message-box acknowledge. HT160 callers :
+	//TfMain::ScanPanelKeys (panel ALARM RESET - the ONLY escape when no dialog is up),
+	//TfNote::BtnOffBuzzerClick, TfNote::ScanKey, TMyMessageBox::btnOffBuzzerClick,
+	//TMyMessageBox::ScanKey, TfMaintenance::btnSecsOverrideReleaseClick (screen escape),
+	//the IO-Set-View suspend rung in ProcessRunStatus, HT160Gem::S1F16_OFFLINEAcknowledge and
+	//HT160Gem::OnCommunicationLost.
+	//NOT ported : HT9045 also clears the tower flag from four unrelated RCMD branches that
+	//happen to receive an empty parameter list (START_LOT / START_AGV / AUTHORITY_CHECK /
+	//EESUG_Offest). Those are copy-paste artifacts, and KYEC does send START_AGV - porting
+	//them would let an unrelated host command silently cancel a tower override.
+	//AI(secs-msggap-fix) 20260729 : precision on the 9045 side - those four RCMD sites clear the
+	//TOWER flag ONLY, they leave the music flag armed (which is its own defect over there), and
+	//9045's genuine PAIR-clear surface is FOUR sites, not two : the ALARM RESET key rung in main,
+	//TfNote's off-buzzer, and TWO in its message box (the off-buzzer button AND a separate
+	//alarm-reset panel click). That 4-site shape is exactly why HT160 needs both a key-scan rung
+	//AND a button handler on each dialog rather than one of the two.
+	ClearSecsTowerOverride();
+	//AI(secs-msggap-fix) 20260729 : delegate instead of clearing the two music fields inline, so
+	//the buzzer-silencing in ClearSecsMusicOverride() cannot be bypassed by this path (which is
+	//the one every operator escape actually calls).
+	ClearSecsMusicOverride();
+}
+//---------------------------------------------------------------------------
+bool IsSecsPanelOverrideActive()
+{
+	return (s_bSecsTowerOverride || s_bSecsMusicOverride);
+}
+//---------------------------------------------------------------------------
 void DoSystemMessage()
 {
 	int RunState;
@@ -835,6 +967,48 @@ void DoSystemMessage()
 	GreenOn=GetTowerLightConfigOutput(RunState, 0, BlinkPhase);
 	YellowOn=GetTowerLightConfigOutput(RunState, 1, BlinkPhase);
 	RedOn=GetTowerLightConfigOutput(RunState, 2, BlinkPhase);
+
+	//AI(secs-kyec-rcmd4) 20260728 : host PP_SIGNALTOWER override replaces the per-RunState
+	//lamp table. One insertion covers BOTH the on-screen fMain->led* below and the physical
+	//SwTowerGreen/Yellow/Red outputs, because HT160 drives both from these same three bools.
+	//DELIBERATE DEVIATION from HT9045 : suppressed while an alarm Note is up, so a host
+	//"come load a lot" flash can never mask the machine's own red alarm lamp. This matters
+	//because BOTH modal dialogs re-drive DoSystemMessage() every 10 ms while MainProc is
+	//suspended (note.cpp Timer1, mymessbox.cpp Timer1), and HT160 writes the tower outputs
+	//unconditionally with no blink-phase early-out.
+	//AI(secs-kyec-rcmd4-fix) 20260728 : the fNote gate ALONE is not enough and assuming
+	//"machine red lamp <=> an alarm Note is up" is wrong - see the buzzer comment below, which
+	//says so explicitly. RunState reaches LED_ErrJam straight off the live safety sensors in
+	//GetTowerLightRunState() (EMG / power off / safe lock / safe door / air / ion fan) with NO
+	//dialog involved. Without the RunState test a host override armed before an operator opens
+	//a safety door would keep driving green while the door is open, and a host RED=0 would take
+	//the physical red output dark during EMG. Safety-derived red always wins over the host.
+	//AI(secs-audit-fix) 20260729 : TMyMessageBox added to the gate, matching the buzzer override
+	//70 lines below (which already tests both dialogs). TMyMessageBox is a first-class alarm
+	//surface on HT160 - ShowMyMessage() does DecStopAllMotor() + SystemStart=false and then
+	//ShowModal, and its Timer1 re-drives DoSystemMessage() every 10 ms while MainProc is
+	//suspended - so a host lamp override survived a popup that had just STOPPED the machine.
+	//The RunState!=LED_ErrJam test does not cover it either : GetTowerLightRunState() only
+	//reaches LED_ErrJam for EMG / power off / safe lock / safe door / air / ion fan, so an
+	//application-level alarm box with no safety sensor tripped yields LED_Pause.
+	//bFormShowNoStop EXCLUDED on purpose : ShowMyOKMessageNoStop / ShowMyMessage_Run /
+	//ShowMyMessageBox_YES_NO (mymessbox.cpp:164/176/193) set it, and those boxes deliberately do
+	//NOT stop the machine (the DecStopAllMotor block is gated on bFormShowNoStop==false,
+	//mymessbox.cpp:449). They are ordinary confirmations - "Confirm home?", "Confirm Clean Out?",
+	//"want to restore?" - so the machine-stopped justification above does not apply to them.
+	//Suppressing for those would take a host-armed RED output DARK for as long as an unrelated
+	//confirmation sits unanswered, and a YES/NO box has no OFF BUZZER escape of its own
+	//(btnOffBuzzer hidden, fScanPanel=false at mymessbox.cpp:190-192). Only a real stopping box
+	//suppresses the override. NOTE the resulting asymmetry with the buzzer gate below, which
+	//suppresses for these boxes too - that is pre-existing behaviour and left alone.
+	if(s_bSecsTowerOverride && RunState!=LED_ErrJam &&
+		(fNote==NULL || fNote->fShow==false) &&
+		(MyMessageBox==NULL || MyMessageBox->fShow==false || MyMessageBox->bFormShowNoStop))
+	{
+		GreenOn=SecsTowerLampOn(s_iSecsTowerGreen, BlinkPhase);
+		YellowOn=SecsTowerLampOn(s_iSecsTowerYellow, BlinkPhase);
+		RedOn=SecsTowerLampOn(s_iSecsTowerRed, BlinkPhase);
+	}
 
 	if(fMain!=NULL)
 	{
@@ -885,6 +1059,23 @@ void DoSystemMessage()
 			//ErrJam honours the OFF BUZZER acknowledge (HT172 bAlarmBuzzer==false -> Off).
 			if(BuzzState==LED_ErrJam && fNote!=NULL && fNote->IsBuzzerOff())
 				MusicSel=0;
+			//AI(secs-kyec-rcmd4) 20260728 : host PP_MUSIC override replaces the per-RunState
+			//buzzer selection. Placement is load-bearing in two directions :
+			//  INSIDE this bMaintAlone==false block, so while the Maintenance screen owns the
+			//  panel alone its sbMusic test buttons (which drive HSys.SwPtr[idx].On() directly)
+			//  are never fought by a host override; and
+			//  OUTSIDE DriveSystemMusic(), which PlayMessageBuzzer / PlayAlarmBuzzer share -
+			//  those are dialog FormShow kicks and must not inherit it.
+			//Suppressed during an alarm Note for the same reason as the tower override above :
+			//a stale host override must not re-sound an alarm the operator already silenced.
+			//AI(secs-kyec-rcmd4-fix) 20260728 : TMyMessageBox is the OTHER surface that owns the
+			//buzzer (it sets BuzzState=LED_Message above and pumps DoSystemMessage every 10 ms,
+			//mymessbox.cpp Timer1). Without this second gate a host override replaced the message
+			//tone and bypassed the box's own fBuzzerOff acknowledge, so the operator could not
+			//silence it. Gate on both dialogs, matching the bMaintAlone test.
+			if(s_bSecsMusicOverride && (fNote==NULL || fNote->fShow==false) &&
+				(MyMessageBox==NULL || MyMessageBox->fShow==false))
+				MusicSel=s_iSecsMusicClass;
 			DriveSystemMusic(MusicSel);
 		}
 	}
@@ -1205,6 +1396,43 @@ void MachineStop(eMachineTrigger trig)
 	HSys.Sys.SystemStart=false;
 	HSys.StopAllMotor();
 	SoftStop=true;
+	//AI(secs-kyec-rcmd4-fix) 20260728 : discard a pending One Cycle arm on a HARD stop.
+	//Run_OneCycle is a latch that only the OneCycle-finish dispatcher clears, and that
+	//dispatcher sits behind ProcessMotion's SystemStart==false early-out - so an arm that
+	//never reached SortArm's idle rung would survive the stop, make every later host
+	//ONE_CYCLE answer HCACK=4 "already armed", and silently turn the operator's next Start
+	//into place-one-then-stop. A hard stop is an abort, so the arm is discarded with it.
+	//DELIBERATELY NOT done in MachinePause : a pause is resumable and the operator expects
+	//the armed cycle to finish when they resume.
+	//AI(secs-msggap-fix) 20260729 : TWO defects in the discard as first written.
+	//(1) NEVER discard while bCleanOut is latched. OneCycleCore deliberately accepts
+	//    Run_CleanOut, so during a drain Run_OneCycle is the CARRIER of that drain : the
+	//    finish dispatcher below restores Run_CleanOut from bCleanOut and continues WITHOUT
+	//    stopping. Discarding the mode left bCleanOut=true with RunMode==Run_Normal, and
+	//    ProcessMotion Layer 4 has no Run_Normal branch for a drain - so the drain was
+	//    silently abandoned, EmitCleanOutOK and the AMR DoLotEndProcess never ran, the batch
+	//    never ended, and a later operator HOME would see the still-latched bCleanOut and drag
+	//    the machine back into Clean Out + SoftStop out of nowhere. Keep the arm in that case;
+	//    the drain owns it.
+	//(2) Discarding the MODE without clearing SortArm's bOneCycleFinish left half the state
+	//    behind. That latch is set by SortArm one scan before DoAllProcess consumes it, and
+	//    the only clearer is the dispatcher behind the SystemStart==false gate - so a stop in
+	//    that window kept it true, and the next accepted ONE_CYCLE on a running machine would
+	//    read the stale true and immediately emit an S6F11 CEID 27 for a cycle that never ran,
+	//    plus a spurious SoftStop. Clear both halves together or neither.
+	//The keep-vs-discard POLICY for the plain (non-drain) case is untouched here : that is the
+	//behaviour decision recorded at the ProcessMotion falling-edge rung below, which keeps the
+	//arm on the other 15 stop paths. This only makes the one path that discards do it wholly
+	//and never do it to a drain.
+	if(HSys.Sys.RunMode==Run_OneCycle && HSys.Sys.bCleanOut==false)
+	{
+		if(SortArmModule!=NULL)
+			SortArmModule->ClearOneCycleFinish();
+		RecordProcess("MACHINE STOP : pending One Cycle arm discarded");
+		ChangeRunMode(Run_Normal);
+	}
+	else if(HSys.Sys.RunMode==Run_OneCycle)
+		RecordProcess("MACHINE STOP : One Cycle arm KEPT (nested Clean Out drain still pending)");
 }
 //---------------------------------------------------------------------------
 //HOME abort/stop : stop motors + clear the home-done flag so a fresh full-machine
@@ -1348,6 +1576,20 @@ void ProcessMotion()
 	static bool bPrevSystemStart=false;
 	if(bPrevSystemStart && HSys.Sys.SystemStart==false)
 	{
+		//AI(secs-audit-fix) 20260729 : make a surviving One Cycle arm diagnosable. MachineStop()
+		//discards the arm, but MachineStop has exactly ONE caller in the tree (the S2F41 "STOP"
+		//RCMD), so every other way the machine stops - alarm Note, TMyMessageBox, servo alarm,
+		//panel POWER OFF, TrayArm fault, Lot End - leaves RunMode==Run_OneCycle latched on a
+		//stopped machine. Nothing clears it there: ProcessMotion returns at the SystemStart gate
+		//below so the OneCycle-finish dispatcher never runs, and DoStartArm only resets RunMode on
+		//the UNHOMED branch. The host side is now truthful regardless (OneCycleCore answers
+		//ocRejStopped -> HCACK=2 for any stopped machine, ahead of the already-armed test), but
+		//the operator's NEXT Start still becomes place-one-then-stop. Whether that arm SHOULD
+		//survive a fault stop is a machine-behaviour decision, not a code cleanup - keeping it is
+		//safer for a deliberate single-step, discarding it is more predictable for a resume - so
+		//this only records the fact and leaves the behaviour as-is.
+		if(HSys.Sys.RunMode==Run_OneCycle)
+			RecordProcess("MACHINE STOPPED with a pending One Cycle arm : arm KEPT (next Start runs one cycle then stops)");
 		if(bCalculatePauseTime==false)
 		{
 			tUPH_PauseStartTime=Now();
@@ -1509,6 +1751,27 @@ void ProcessMotion()
 	{
 		if(CheckOneCycleFinish())
 		{
+			//AI(secs-kyec-rcmd4) 20260728 : emit S6F11 CEID27 "One Cycle Finish" FIRST, mirroring
+			//the CleanOut-finish path above (EmitCleanOutOK). CEID 27 was declared and registered
+			//but sent from NOWHERE, so a host that drove S2F41 ONE_CYCLE and got HCACK=0 had no
+			//way to learn the cycle actually finished. KYEC's HT9045 emits its equivalent (CEID 41)
+			//and did so 3x on 2026-06-08 - HCACK was 0 in all eleven ONE_CYCLE cases, so the host
+			//can distinguish a real cycle ONLY by this finish event.
+			//AI(secs-msggap-fix) 20260729 : recount of that correlation - the 11 host commands split
+			//3 ACCEPTED / 8 SWALLOWED (not 2/9), and the three CEID 41s do NOT map 1:1 onto the
+			//accepted commands : one (18:51:58) follows a LOCAL OneCycle press with the nearest host
+			//command 9 min 43 s earlier, and one accepted command (19:00:19) armed and was then
+			//stranded by a HALT 0.85 s later, so it never produced a 41 at all. That stranded arm is
+			//the field evidence behind the SECS stale-arm guard in TfMain::OneCycleCore and the
+			//discard in MachineStop.
+			//TWO HOST-SIDE CAVEATS on our CEID 27 : (1) 27 means "Change Machine State" in KYEC's
+			//9045 dictionary and is its busiest event of the day (~406 sends), so a host provisioned
+			//from that dictionary MISREADS this event; (2) 9045 also emits an S5F1 (ALID 316001640
+			//"One cycle finish") alongside CEID 41 and HT160 does not, so a host keying off that
+			//ALID sees nothing. Both are declared in
+			//docs/SECS/HT160S_SECS_Interface_Spec_20260727.md as customer-confirmation items.
+			//EventReport self-gates on USE_SECS_GEM + HSMS SELECTED.
+			if(fMain!=NULL) fMain->EmitOneCycleOK();
 			//AI 20260721 : OneCycle finish. Freeze all modules (pause-like) and only re-arm
 			//the SortArm one-shot finish latch -- was InitialAllTask(), a full per-module reset
 			//(HOME-resume machinery : cursor + material wipe + AGV reassert) too heavy for a

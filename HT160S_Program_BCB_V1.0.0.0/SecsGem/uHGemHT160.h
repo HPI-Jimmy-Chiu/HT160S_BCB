@@ -75,6 +75,7 @@ public:
     virtual void RefreshSVData();
     virtual void RefreshSecsBadge();   //AI(ht160s-secsgem) 20260612 : 1s tick -> sync main-screen SECS badge to HSMS state
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
+    virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();
@@ -113,12 +114,22 @@ public:
     //AI(ht160s-secsgem) 20260715 : S5F7 List Enabled Alarm Request -> S5F8 data (all enabled)
     virtual void S5F8_ListEnableAlarmAcknowledge();
     void EmitAlarmCatalog(int Func);   // shared S5F6/S5F8 catalog emitter from mapAlarmCodeList
+    //AI(secs-msggap) 20260728 : S6F15 -> S6F16 event report pull ; S6F19 -> S6F20 report pull.
+    //Parsing only : the encoders live on THGem because FindCEIDItem/FindReportItem are private.
+    virtual void S6F16_EventReportData();
+    virtual void S6F20_IndividualReportData();
     virtual int  S7F2_ProcessProgramLoadGrant();
     virtual void S7F4_ProcessProgramAcknowledge();
     virtual void S7F6_ProcessProgramData();
     virtual void S7F6_ProcessProgramData(AnsiString FileName);
     virtual void ProcessS14F1_GetAttrRequest(AnsiString asTrayID);
     virtual unsigned char ProcessS14F2_GetAttrData();
+    //AI(secs-msggap) 20260728 : S10F3/S10F5 host terminal text -> ACKC10 ack + log only.
+    //NEVER routed to ShowMyMessage : that primitive stops all motors and clears SystemStart.
+    virtual void S10F4_TerminalDisplaySingleAcknowledge();
+    virtual void S10F6_TerminalDisplayMultiBlockAcknowledge();
+    //AI(secs-msggap) 20260728 : S125F1 -> exactly one S125F2 <B ACK>. No EC-enable table on HT160.
+    virtual void S125F2_EnableDisableECDataAcknowledge();
     virtual void ReloadParameter();
     virtual void LookForFile();
 };

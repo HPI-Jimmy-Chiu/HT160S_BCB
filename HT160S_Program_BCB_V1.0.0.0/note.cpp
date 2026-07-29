@@ -558,6 +558,11 @@ void __fastcall TfNote::BtnOffBuzzerClick(TObject *Sender)
 {
     bOffBuzzer=true;
     CloseBuzzerOff();
+    //AI(secs-kyec-rcmd4) 20260728 : acknowledging the buzzer also releases any SECS host
+    //panel override (S2F41 PP_MUSIC / PP_SIGNALTOWER), matching HT9045 which clears the pair
+    //from message-box / note acknowledge. Without it, Timer1 re-drives DoSystemMessage()
+    //100x/s and the override would come straight back.
+    ClearSecsPanelOverride();
     RecordProcess("OFF BUZZER pressed");
 }
 //---------------------------------------------------------------------------
@@ -706,6 +711,11 @@ void __fastcall TfNote::ScanKey()
         //on-screen Off Buzzer button already worked because it sets bOffBuzzer=true.
         bOffBuzzer=true;
         CloseBuzzerOff();
+        //AI(secs-kyec-rcmd4) 20260728 : the panel ALARM RESET key also releases any SECS host
+        //panel override (S2F41 PP_MUSIC / PP_SIGNALTOWER). This is HT9045's primary release
+        //site ported. The main-screen twin lives in TfMain::ScanPanelKeys for the no-dialog
+        //case, which HT9045 covers and HT160 did not.
+        ClearSecsPanelOverride();
     }
 
     bWasStart=bStart;

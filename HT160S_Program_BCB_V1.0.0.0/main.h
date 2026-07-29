@@ -21,6 +21,25 @@ enum
     MAIN_FEATURE_STATUS_COUNT = 8
 };
 
+//AI(secs-kyec-rcmd4) 20260728 : TfMain::OneCycleCore() result, mirroring eMachineStartResult
+//(csystem.h). The operator button turns anything other than ocStarted into a ShowMyMessage;
+//the SECS S2F41 "ONE_CYCLE" branch maps it to HCACK : ocStarted->0, ocRejBusy->4, rest->2.
+//AI(secs-audit-fix) 20260729 : ocRejStopped split out of ocRejBusy. HT160S's published S2F42
+//table (docs/SECS spec 3.4) is 0=ok / 1=invalid / 2=cannot perform / 4=busy, and SEMI E5 makes
+//HCACK=4 a POSITIVE ack meaning "will be performed, completion signalled later by an event".
+//A machine that is STOPPED is not busy, and with CEID 27 now emitted on cycle finish the
+//"later" promise became falsifiable : the host would wait forever for an event that can never
+//come. On the KYEC 2026-06-08 traffic this was the DOMINANT case - 8 of 11 ONE_CYCLE commands
+//arrived while the equipment reported HALT. ocRejStopped -> HCACK=2 tells the truth.
+enum eOneCycleResult
+{
+    ocStarted,
+    ocRejMode,
+    ocRejBusy,
+    ocRejStopped,
+    ocRejNotReady
+};
+
 //AI(ht160s-mainui) 20260617 : main status-badge grid limits. The SECS/SAFE/AMR
 //  badges are auto-arranged by LayoutFeatureBadges() into a COLS x ROWS grid on
 //  pnlFeatureStatus (the home screen is cramped on the machine, so the badges must
@@ -493,6 +512,8 @@ public:		// User declarations
     void HomeCore();     //AI(machine-command-layer) 20260625 : shared HOME sequence (Home button + SECS HOME)
     bool CheckLotDataReady(AnsiString &Reason);
     void ScanPanelKeys();   //AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch (HT172 ScanKey port)
+    void __fastcall EmitOneCycleOK();   //AI(secs-kyec-rcmd4) 20260728 : S6F11 CEID27 OneCycleOK (self-gates on HSMS SELECTED); called from the csystem OneCycle-finish dispatcher
+    eOneCycleResult OneCycleCore(bool bRequireRunning, AnsiString &Reason);   //AI(secs-kyec-rcmd4) 20260728 : shared One Cycle gate (operator button + SECS ONE_CYCLE); bRequireRunning is the SECS-only stale-arm guard
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfMain *fMain;

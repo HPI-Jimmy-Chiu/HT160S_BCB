@@ -22,6 +22,19 @@ void DoSystemMessage();                  //AI(ht160s-maintainer) 20260627 : expo
 //these sound the same configured "Music Select" the instant the dialog appears.
 void PlayMessageBuzzer();
 void PlayAlarmBuzzer();
+//AI(secs-kyec-rcmd4) 20260728 : SECS host panel override (S2F41 PP_SIGNALTOWER / PP_MUSIC).
+//A latched host override of the per-RunState tower-lamp + buzzer table in DoSystemMessage.
+//State is file-static in csystem.cpp and reachable ONLY through these accessors, so the
+//SECS layer cannot touch the raw flags and every release path is greppable by name.
+//Colour domain 0=off / 1=on / 2=blink; pass -1 for a colour the host did not name (keeps
+//its previous value). Music class 1..4 -> SwMusic1..SwMusic4.
+//ClearSecsPanelOverride() is the operator escape and releases BOTH at once.
+void SetSecsTowerOverride(int Red, int Yellow, int Green);
+void ClearSecsTowerOverride();
+void SetSecsMusicOverride(int MusicClass);
+void ClearSecsMusicOverride();
+void ClearSecsPanelOverride();
+bool IsSecsPanelOverrideActive();
 void ProcessRunStatus(bool bProgramStart=false);
 void ProcessMotion();
 bool DoInitialProgramStart();
