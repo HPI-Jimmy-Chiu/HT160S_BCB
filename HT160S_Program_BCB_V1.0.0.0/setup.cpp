@@ -7,6 +7,8 @@
 #include "CosFunction.h"
 #include "GeneralSetting.h"
 #include "aSortArm.h"   //AI(ht160s-pnp) 20260626 : SortArmModule global + SetPnPParameters for ApplyPnPToSortArm
+#include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID124 SaveRecipe
+#include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 #include "database.h"
 #include "mymessbox.h"   //AI(general) 20260608 : ShowMyMessageBox_YES_NO instead of Application->MessageBox
 #include "ComPort.h"   //AI(ht160s-bindisplay) 20260706 : fComPort + EnsureComPortCreated to repaint the bin panel on Save Map
@@ -1162,6 +1164,11 @@ void __fastcall TfSetup::spbRecipeSaveClick(TObject *Sender)
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(true))
         return;
+    //AI(secs-ceid-align9045) 20260729 : CEID 124 "Save Recipe". HT9045 reports it from its Setup
+    //save handler (cSetUp.cpp:3329) - the operator-initiated SAVE, not a value edit. Reported
+    //after SaveBinSettingMap succeeds so a rejected save sends nothing. HT9045 also fires CEID 45
+    //(Arm On Off) on the same line; that one is tester-only and has no HT160S mechanism.
+    EventReport(SECS_EVENT.SaveRecipe);
     RefreshRecipeList();
     RefreshRecipeStatus();
 }
@@ -1200,6 +1207,9 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
 
     WriteRecipeSetupFile(NewName);
     WriteRecipeManifest(NewName, SourceName);
+    //AI(secs-ceid-align9045) 20260729 : CEID 124 "Save Recipe" - Save As is also an operator save,
+    //so it reports the same id as spbRecipeSaveClick. Reported past every reject above.
+    EventReport(SECS_EVENT.SaveRecipe);
     RefreshRecipeList();
     SelectRecipeInList(NewName);
     RefreshRecipeStatus();

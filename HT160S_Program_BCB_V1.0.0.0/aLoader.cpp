@@ -17,6 +17,8 @@
 #include "uteach.h"
 #include "TopCcdSocket.h"
 #include "main.h"            //AI(HT160S-Maintainer) 20260609 : chkLoadTray on fMain
+#include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID66 LoadTrayFinish
+#include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260610 : LoaderYSafeDistance interlock
 #include "cEventLog.h"        //AI(ht160s-overcount-tripqueue) 20260721 : g_EventLog for INF_OVERTRAY / WRN_TRIP_NOCOUNT / WRN_TRIP_UNDELIVERED
 //---------------------------------------------------------------------------
@@ -1761,6 +1763,12 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                || HSys.Sen.SnLoader_InputHasTray.IsOn())
             {
                 TrayMotor->fHasTray=true;
+                //AI(secs-ceid-align9045) 20260729 : CEID 66 "Load Tray Finish". HT9045 reports it
+                //from asendic_Loader.cpp:778/802/830, at exactly this instant : the Loader's tray
+                //motor is marked fHasTray=true and the tray's cell data has been initialised. This
+                //is the post-godown carriage confirm, i.e. the tray is physically present and its
+                //identity is minted, so it is the same edge and not merely a similar one.
+                EventReport(SECS_EVENT.LoadTrayFinish);
                 PrepareTrayMap(LoaderNo);
                 //tag this fed tray's kind on the carriage Tray grid (born here, mirrors Color
                 //BirthIdentityTray). Identity trays get a sim TrayID; real machine leaves it

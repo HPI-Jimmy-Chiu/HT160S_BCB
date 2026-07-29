@@ -548,7 +548,7 @@ sequenceDiagram
 <td><code>L[reports]</code></td>
 <td>L[n]</td>
 <td>report 串列；可為空（無 SV 註冊時 <code>L[0]</code>）</td>
-<td>空（136–142，len=30）／13 SV（CEID 35，len=144）</td>
+<td>本 run：空（136–142，len=30）／13 SV（CEID 35，len=144）。<strong>自 2026-07-29 起卸盤事件亦帶 13 SV</strong></td>
 </tr>
 <tr>
 <td><code>W</code>-bit</td>
@@ -619,8 +619,8 @@ sequenceDiagram
 <td>136</td>
 <td>13</td>
 <td>Auto 卸盤（unload-tray / discharge）</td>
-<td><code>len=30</code>（EMPTY body）</td>
-<td>此 CEID 在設計上未綁定任何 SV（RPTID 註冊 0 個 SV），故 body 為空</td>
+<td>本 run <code>len=30</code>（EMPTY body）</td>
+<td>當時未綁定任何 SV，故 body 為空。<strong>自 2026-07-29 起（commit <code>ab1b99e</code>）改為攜帶 Report 1＝13 個 SV</strong></td>
 </tr>
 <tr>
 <td>137</td>
@@ -641,21 +641,21 @@ sequenceDiagram
 <td>4</td>
 <td>Auto 卸盤（unload-tray / discharge）</td>
 <td>EMPTY（<code>len=30</code>）</td>
-<td>同上</td>
+<td>同上。<strong>⚠ 此號已作廢</strong>：Auto4 卸盤自 commit <code>bf9d048</code> 起改為 <strong>145</strong></td>
 </tr>
 <tr>
 <td>141</td>
 <td>3</td>
 <td>Auto 卸盤（unload-tray / discharge）</td>
 <td>EMPTY（<code>len=30</code>）</td>
-<td>同上</td>
+<td>同上。<strong>⚠ 此號已作廢</strong>：Auto5 卸盤自 commit <code>bf9d048</code> 起改為 <strong>146</strong></td>
 </tr>
 <tr>
 <td>142</td>
 <td>3</td>
 <td>Auto 卸盤（unload-tray / discharge）</td>
 <td>EMPTY（<code>len=30</code>）</td>
-<td>同上</td>
+<td>同上。<strong>⚠ 此號已作廢</strong>：Auto6 卸盤自 commit <code>bf9d048</code> 起改為 <strong>147</strong></td>
 </tr>
 <tr>
 <td>272</td>
@@ -688,8 +688,13 @@ sequenceDiagram
 </tbody>
 </table>
 <blockquote>
-<p><strong>為什麼 136–142 的 report body 是空的（len=30）？</strong> 這 6 個 CEID 是 <strong>Auto 卸盤（unload-tray / discharge）事件</strong>——設備在 <code>aAuto1To6</code> 的 <code>DoDischargeTray</code> 流程以 <code>AutoCeid[6]={136,137,138,140,141,142}</code> 發出。它們在設計上 <strong>刻意不註冊任何 report SV</strong>（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位。host 只需依 CEID 認得「發生了哪個事件」即可，這是 by design，不是漏帶資料。</p>
-<p><strong>CEID 136–142 名稱</strong>：屬 Auto 卸盤（discharge）類事件，其完整名稱對照表存放於設備端 CEID registry（見 <code>HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp</code> 的 <code>AutoCeid</code> 陣列與 <code>EventReport</code> 呼叫處）。本文件不臆造個別事件名稱。</p>
+<p><strong>為什麼本 run 中 136–142 的 report body 是空的（len=30）？</strong> 這 6 個 CEID 是 <strong>Auto 卸盤（unload-tray / discharge）事件</strong>。當時它們在設計上 <strong>刻意不註冊任何 report SV</strong>（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位——這是 by design，不是漏帶資料。</p>
+<p><strong>⚠ 自 2026-07-29 起兩項都已改變（本 run 為舊版故未涵蓋）</strong>：</p>
+<ol>
+<li><strong>號碼改了</strong>：Auto4/5/6 卸盤由 <code>140/141/142</code> 更正為 <strong><code>145/146/147</code></strong>（commit <code>bf9d048</code>），以符合 HT9045 <code>EventReport_CEID.def</code> 的實際編號。現行陣列為 <code>aAuto1To6.cpp</code> 的 <code>AutoCeid[6]={136,137,138,145,146,147}</code>。<strong>本 run 出現的 140/141/142 為舊編號，現行韌體不會再送這三個號碼。</strong></li>
+<li><strong>body 不再是空的</strong>：CEID 字典整份改為 HT9045 逐字複本後（commit <code>ab1b99e</code>），這 6 個號碼與其他事件一樣註冊在 <strong>Report 1</strong>（13 個 SV），body 長度與 CEID 35 同級（<code>len=144</code>），不再是 <code>len=30</code> 的空報表。若 host 端已針對空 body 撰寫解析，請一併更新。</li>
+</ol>
+<p><strong>CEID 名稱</strong>：現行完整名稱為 HT9045 原文 <code>Auto 1..6 Unloading tray</code>，見設備端 <code>SecsGem/uHGemHT160.h</code> 的 <code>ETypeStruct</code> 與 <code>SecsGem/uHGemHT160.cpp</code> 的 <code>EventDescription</code>。</p>
 </blockquote>
 <hr />
 <h3 id="34-agv-amr-272-273-274-275-start_agv-resume-start">3.4 AGV / AMR 握手（272 / 273 / 274 / 275 + START_AGV + resume START）</h3>

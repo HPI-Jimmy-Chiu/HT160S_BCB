@@ -10,6 +10,8 @@
 #include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : text login book persistence
 #include "aAuto1To6.h"         //AI(ht160s-uph) 20260706 : AutoModule/GetStationStatus/AS_SORTING (read-only observer)
 #include "cCsvDailyLog.h"      //AI(ht160s-uph) 20260706 : PruneFolderTree + CsvQuote
+#include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID53/54 UPH record
+#include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 #include "GeneralSetting.h"    //AI(ht160s-uph) 20260706 : iLogRetentionUPHLogDays
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -409,6 +411,13 @@ void TrayUphLog_Tick()
             g_UphTrayStartPause[i]=tUPH_PauseTime;
             g_UphTrayStartIC[i]=tRunData.TrayICCnt[eAuto1+i];
             g_UphTrayID[i]=AutoModule->GetWorkingTrayID(i);
+            //AI(secs-ceid-align9045) 20260729 : CEID 53 "UPH Record Start". HT9045 reports it at
+            //the instant its UPH measurement window opens (asendic_Loader.cpp:934, right where it
+            //sets bRecordUPH=true). This is the same edge on HT160S : a station entered SORTING and
+            //the time / pause / IC baseline for a new UPH record was just snapshotted above.
+            //Frequency note : HT160S has six Auto stations, so this fires per station rather than
+            //once per machine like HT9045's single Loader. Each firing is still a real record.
+            EventReport(SECS_EVENT.UPHRecordStart);
         }
         else if(prev==AS_SORTING && cur!=AS_SORTING)
         {
@@ -441,6 +450,13 @@ void TrayUphLog_Tick()
                            FormatDateTime("hh:nn:ss", tEnd),
                            TDateTime(dPause>0.0?dPause:0.0).FormatString("hh:nn:ss"),
                            trayUPH);
+                //AI(secs-ceid-align9045) 20260729 : CEID 54 "UPH Record End". HT9045 reports it
+                //immediately after pushing the finished record onto its reportable UPH list
+                //(ainarm2.cpp:5758, right after filling fShowBinSelect->tsUPH from
+                //UPH_StringGrid). UphPushRow above is HT160S's same act, so the report goes here.
+                //Inside the trayIC>0 branch on purpose : a tray that placed no IC produces no
+                //record, and HT9045 likewise only reports a record that exists.
+                EventReport(SECS_EVENT.UPHRecordEnd);
             }
         }
         g_UphPrevStatus[i]=cur;

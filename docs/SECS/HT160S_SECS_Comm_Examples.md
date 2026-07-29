@@ -319,7 +319,7 @@ W-bit=1（要求回覆）。
 |---|---|---|---|
 | `DataID` | U4 | 資料識別；**對 host 無語意**，host 依 CEID 分派 | `1`（生產／Auto CEID）／ `0`（AGV CEID） |
 | `CEID` | U4 | 事件識別碼 | `136`（Auto 卸盤）／`272`（AGV）／`35`（car full） |
-| `L[reports]` | L[n] | report 串列；可為空（無 SV 註冊時 `L[0]`） | 空（136–142，len=30）／13 SV（CEID 35，len=144） |
+| `L[reports]` | L[n] | report 串列；可為空（無 SV 註冊時 `L[0]`） | 本 run：空（136–142，len=30）／13 SV（CEID 35，len=144）。**自 2026-07-29 起卸盤事件亦帶 13 SV** |
 | `W`-bit | header | 要求回覆 | `1`（S6F11W） |
 | `len` | bytes | S6F11 body 長度 | `30`（EMPTY，136–142）／`144`（CEID 35，Report 1＝13 SV）／`86`（CEID 272，**本 run 舊版**；**自 2026-07-13 起**，CEID 272／274 除原有 bitmap report 外另追加 report 6＝9 站 Tray Count＋9 站 Device Count 共 18 個 SV，body 長度已大於 86，本 run 早於此改動故仍顯示 86） |
 | `sys` | header（模擬器序號） | S6F11 上報序號池 | `1`（本 run S6F11 sys 為 1..53） |
@@ -342,20 +342,25 @@ W-bit=1（要求回覆）。
 
 | CEID | 次數 | 類別 | report body | 說明 |
 |---|---|---|---|---|
-| 136 | 13 | Auto 卸盤（unload-tray / discharge） | `len=30`（EMPTY body） | 此 CEID 在設計上未綁定任何 SV（RPTID 註冊 0 個 SV），故 body 為空 |
+| 136 | 13 | Auto 卸盤（unload-tray / discharge） | 本 run `len=30`（EMPTY body） | 當時未綁定任何 SV，故 body 為空。**自 2026-07-29 起（commit `ab1b99e`）改為攜帶 Report 1＝13 個 SV** |
 | 137 | 7 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
 | 138 | 4 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
-| 140 | 4 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
-| 141 | 3 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
-| 142 | 3 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上 |
+| 140 | 4 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上。**⚠ 此號已作廢**：Auto4 卸盤自 commit `bf9d048` 起改為 **145** |
+| 141 | 3 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上。**⚠ 此號已作廢**：Auto5 卸盤自 commit `bf9d048` 起改為 **146** |
+| 142 | 3 | Auto 卸盤（unload-tray / discharge） | EMPTY（`len=30`） | 同上。**⚠ 此號已作廢**：Auto6 卸盤自 commit `bf9d048` 起改為 **147** |
 | 272 | 6 | AGV AGVSupplement | 本 run `len=86`（僅 Report 2＝SVID 38219 bitmap） | 見 3.4。**自 2026-07-13 起（commit d10b9be）272 額外掛載 Report 6（全 9 站 TrayCount＋DeviceCount 共 18 個 SVID），body 較本 run 增大；本 run 為舊版故僅含 bitmap** |
 | 273 | 6 | AGV AGVLDUnLDStatus | Report 3（SVID 38220 bitmap） | 見 3.4。273 僅帶 StatusBitmap（Ready 階段尚未計數，故不掛 Report 6） |
 | 274 | 6 | AGV AGVLDUnLDFinish | Report 4（SVID 38221 bitmap）；自 2026-07-13 起另含 Report 6 | 見 3.4。**自 2026-07-13 起（commit d10b9be）274 除 bitmap 外額外掛載 Report 6，關帳回報該站實際盤數／IC 數；本 run 為舊版故未涵蓋** |
 | 35 | 1 | Auto1 "car full" edge | `len=144` | `AutoFullCeid[0]=35`，在 Report 1 註冊 13 個 SV |
 
-> **為什麼 136–142 的 report body 是空的（len=30）？** 這 6 個 CEID 是 **Auto 卸盤（unload-tray / discharge）事件**——設備在 `aAuto1To6` 的 `DoDischargeTray` 流程以 `AutoCeid[6]={136,137,138,140,141,142}` 發出。它們在設計上 **刻意不註冊任何 report SV**（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位。host 只需依 CEID 認得「發生了哪個事件」即可，這是 by design，不是漏帶資料。
+> **為什麼本 run 中 136–142 的 report body 是空的（len=30）？** 這 6 個 CEID 是 **Auto 卸盤（unload-tray / discharge）事件**。當時它們在設計上 **刻意不註冊任何 report SV**（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位——這是 by design，不是漏帶資料。
 >
-> **CEID 136–142 名稱**：屬 Auto 卸盤（discharge）類事件，其完整名稱對照表存放於設備端 CEID registry（見 `HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp` 的 `AutoCeid` 陣列與 `EventReport` 呼叫處）。本文件不臆造個別事件名稱。
+> **⚠ 自 2026-07-29 起兩項都已改變（本 run 為舊版故未涵蓋）**：
+>
+> 1. **號碼改了**：Auto4/5/6 卸盤由 `140/141/142` 更正為 **`145/146/147`**（commit `bf9d048`），以符合 HT9045 `EventReport_CEID.def` 的實際編號。現行陣列為 `aAuto1To6.cpp` 的 `AutoCeid[6]={136,137,138,145,146,147}`。**本 run 出現的 140/141/142 為舊編號，現行韌體不會再送這三個號碼。**
+> 2. **body 不再是空的**：CEID 字典整份改為 HT9045 逐字複本後（commit `ab1b99e`），這 6 個號碼與其他事件一樣註冊在 **Report 1**（13 個 SV），body 長度與 CEID 35 同級（`len=144`），不再是 `len=30` 的空報表。若 host 端已針對空 body 撰寫解析，請一併更新。
+>
+> **CEID 名稱**：現行完整名稱為 HT9045 原文 `Auto 1..6 Unloading tray`，見設備端 `SecsGem/uHGemHT160.h` 的 `ETypeStruct` 與 `SecsGem/uHGemHT160.cpp` 的 `EventDescription`。
 
 ---
 

@@ -1716,6 +1716,12 @@ void __fastcall TfMain::pnStartModeClick(TObject *Sender)
         RecordProcess("Change Initial Start Mode");
     }
 
+    //AI(secs-ceid-align9045) 20260729 : CEID 14 "Switch StartMode". HT9045 reports this from
+    //every start-mode / run-mode change point (main.cpp:835, 1012, 21328 - "Run Mode 改變都需要
+    //上報SECS GEM EVEN"). HT160S has exactly one toggle for it, this handler, and it is already
+    //gated on a stopped machine above, so one site covers the whole event.
+    EventReport(SECS_EVENT.SwitchStartMode);
+
     LoadStartModePicture();
     SaveMainRunSettingsToIni();
 }

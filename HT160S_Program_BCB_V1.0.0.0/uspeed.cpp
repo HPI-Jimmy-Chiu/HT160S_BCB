@@ -5,6 +5,8 @@
 #pragma hdrstop
 
 #include "uspeed.h"
+#include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID47 SwitchSpeed
+#include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma resource "*.dfm"
@@ -219,6 +221,7 @@ __fastcall TfSpeed::TfSpeed(TComponent* Owner)
     : TForm(Owner)
 {
     // DFM handles layout; BuildPanels is called from FormCreate (OnCreate in DFM)
+    iSpeedFingerprintOnShow=0;   //AI(secs-ceid-align9045) 20260729 : seeded here too, not only in FormShow
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260602 : layout (Panel10+ScrollBox1+buttons) is now in
@@ -303,14 +306,37 @@ void __fastcall TfSpeed::FormCreate(TObject *Sender)
     BuildPanels();  //AI(HT160S-Maintainer) 20260602 : DFM controls ready; build per-motor rows
 }
 //---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : CEID 47 "Change Handler Speed" support. HT9045 reports 47
+//from its speed-file SAVE button (cSpeed.cpp:1680) - an operator save action, not a value edit.
+//HT160S has no Save button : the page auto-saves on close, so firing on close alone would report
+//"speed changed" every time an engineer merely looked at the page. Snapshot the percentages on
+//show and compare on close, so the report means what HT9045's means. Sum+position-weight is
+//enough to catch any single-motor edit (values are 1..100).
+static int SpeedSettingFingerprint()
+{
+    int fp=0;
+    if(HSys.MotPtr==NULL)
+        return 0;
+    for(int i=0; i<HSys.iTotalMotor; i++)
+    {
+        if(HSys.MotPtr[i]==NULL)
+            continue;
+        fp += HSys.MotPtr[i]->GetPersentSpeed() * (i + 1);
+    }
+    return fp;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfSpeed::FormShow(TObject *Sender)
 {
     RefreshAll();
+    iSpeedFingerprintOnShow=SpeedSettingFingerprint();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSpeed::FormClose(TObject *Sender, TCloseAction &Action)
 {
     SaveMotorSpeedToIni();
+    if(SpeedSettingFingerprint()!=iSpeedFingerprintOnShow)
+        EventReport(SECS_EVENT.SwitchSpeed);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSpeed::FormDestroy(TObject *Sender)
