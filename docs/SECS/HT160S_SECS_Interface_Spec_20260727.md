@@ -101,7 +101,35 @@
 | S/F | 名稱 Name | 方向 | 回覆 | 本體 Body (SECS-II) | 說明 Notes |
 |---|---|---|---|---|---|
 | S6F11 | Event Report Send | E→H | (S6F12) | `L,3{ U4 DATAID, U4 CEID, L,r{ L,2{ U4 RPTID, L,{ <SV values> } } } }` | 事件觸發時送;DATAID=1 |
-| S9F3 | Unrecognized Stream/Function | E→H | — | `B[10] MHEAD` | 收到未實作的 primary 時送 |
+| S6F15 | Event Report Request (pull) | H→E | S6F16 | `U4 CEID` 或 `L,1{ U4 CEID }` | host 主動拉取單一事件 |
+| S6F16 | Event Report Data | E→H | — | 同 S6F11 本體,DATAID=1 | 未定義 CEID 回 `L,3{ DATAID, CEID, L,0 }`;解析失敗一律回 CEID=0,**不會不回覆** |
+| S6F19 | Individual Report Request | H→E | S6F20 | `U4 RPTID` 或 `L,1{ U4 RPTID }` | host 主動拉取單一報表 |
+| S6F20 | Individual Report Data | E→H | — | `L,n{ <SV values> }`(扁平,不含 RPTID) | 由**即時**登錄表取值,故 host 以 S2F33 重定義該 RPTID 後長度會跟著變;未定義回 `L,0` |
+| S9F3 | Unrecognized Stream/Function | (未上線) | — | — | **現況:本機收到未實作的 primary 時僅記錄於本機 SECS log,不送出 S9F3**。故 host 對未實作的 primary 會等到 T3 逾時而非收到 S9F3。如客戶流程需要真正送出,可另行評估補上 |
+
+### Stream 10 — 終端訊息 / Terminal Display
+
+| S/F | 名稱 Name | 方向 | 回覆 | 本體 Body (SECS-II) | 說明 Notes |
+|---|---|---|---|---|---|
+| S10F3 | Terminal Display, Single | H→E | S10F4 | `L,2{ B TID, A TEXT }` | host 送單段文字 |
+| S10F4 | Terminal Display Acknowledge | E→H | — | `B ACKC10` | ACKC10=0 已接受 |
+| S10F5 | Terminal Display, Multi-block | H→E | S10F6 | `L,2{ B TID, L,n{ A TEXT } }` | host 送多段文字 |
+| S10F6 | Terminal Display Multi Acknowledge | E→H | — | `B ACKC10` | ACKC10=0 已接受 |
+
+> **顯示行為**:HT-160S 收到後寫入 SECS log 與 EventLog,**不彈出強制視窗**。原因:handler 執行在 HSMS 接收執行緒上,本機所有訊息視窗皆為 ShowModal 且會暫停 MainProc,於此處彈窗會使 SECS 通訊本身停擺;且本機訊息視窗機制會停止所有馬達。文字內容不由韌體判讀嚴重性(現場語料證實以關鍵字或 TID 判別皆不可靠)。
+
+### Stream 125 — EC 變更回報 / EC Change Report (HT-90XX 自訂)
+
+| S/F | 名稱 Name | 方向 | 回覆 | 本體 Body (SECS-II) | 說明 Notes |
+|---|---|---|---|---|---|
+| S125F1 | Enable/Disable EC Data | H→E | S125F2 | `L,2{ B[1] ALED, L,n{ U4 ECID } }` | host 指定要回報變更的 EC。`ALED` 為 **bit-7 旗標**:`0x80`=啟用 / 未設 bit7(如 `0x01`)=停用。**外層必須是 L,2**,缺 `ALED` 會被判格式錯 |
+| S125F2 | Enable/Disable EC Data Acknowledge | E→H | — | `B` 0=接受 / 1=拒絕 | **每個 request 只回一次**(HT-90XX 為每個 ECID 各回一次,本機不沿用) |
+
+> **本機回 `ACK=1` 的兩種情況,請勿誤判為故障**:
+> (1) 本體格式不符上表;
+> (2) 清單中含**本機未註冊的 ECID**。本機只註冊 7 個 EC(§3.2:1501、2758–2763),
+> 若對未註冊的 ECID 回 0,等於承諾「該 EC 變更會回報」——本機沒有 EC 變更事件,永遠不會發生,故據實回 1
+> (與 HT-90XX 對未註冊 ECID 回 1 的行為一致)。SECS log 會列出未註冊的 ECID 清單供雙方比對。
 
 ---
 
@@ -198,7 +226,18 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 | 15 | Press Skip | 31 | Switch Real/Dummy |
 | 16 | Press Alarm Reset | | |
 
-**Auto 滿盤事件 / Auto Full:** 35=Auto1, 36=Auto2, 37=Auto3, 148=Auto4, 149=Auto5, 150=Auto6。
+**Auto 滿盤事件 / Auto Full:** 35=Auto1, 36=Auto2, 37=Auto3, 148=Auto4, 149=Auto5, 150=Auto6。(全數對齊 HT-90XX 同號同義)
+
+**Auto 出盤事件 / Auto Unloading tray:** 136=Auto1, 137=Auto2, 138=Auto3, 145=Auto4, 146=Auto5, 147=Auto6。(全數對齊 HT-90XX 同號同義)
+
+> **本組事件預設本體為空報表**:HT-160S 於各 Auto 站出盤時送出 S6F11,但**預設不攜帶任何報表**,本體為
+> `L,3{ U4 DATAID, U4 CEID, L,0 }`。這與 HT-90XX 對同一組 CEID 的行為一致(京元 2026-06-08 log 之 CEID 136 即為空報表)。
+>
+> **但 host 可自行加掛報表**:本組六個 CEID 在韌體中雖未預先綁定報表,**出盤時確實有發射點**,
+> 故 host 以 `S2F33` 定義報表後再以 `S2F35` 連結到 136/137/138/145/146/147,**下一次出盤起即會攜帶該報表的 SV 值**
+> (本機於發送時才向登錄表取值)。這一點與「本機完全沒有的 CEID」不同 —— 後者雖同樣被 `S2F35` 接受,
+> 但因無發射點而永遠不會送出。若不想加掛報表,亦可改訂閱 `274 AGVLDUnLDFinish`(已帶 Report 4 + Report 6)
+> 或以 `S1F3` 主動查詢。
 
 **AMR / AGV 材料交握事件 / AMR material handoff:**（全部 DataID=1,對齊 HT9045 / all DataID=1, aligned to HT9045)
 
@@ -237,8 +276,26 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 | `ONLINE_REMOTE` / `ONLINE` | 控制狀態→Remote(5) | — | 鏡像 66002 |
 | `ONLINE_LOCAL` | 控制狀態→Local(4) | — | 鏡像 66002 |
 | `START_AGV` | AMR 派車 prep + lock | station / `LoaderTrayCount` … | 記 intent+盤數;實際 motion 由機構/START 驅動 |
+| `ONE_CYCLE` | 執行單一循環後停機(Clean Out 進行中為例外,見下方註) | 無 (空 list) | 0=已啟動 / **2=機台未運轉**(不可執行)/ 4=已在 OneCycle 中 / 2=模式或 Lot 資料不符。**與 HT9045 不同**:9045 一律回 0,HT-160S 據實回報。註:機台未運轉一律回 2 而非 4——SEMI E5 的 HCACK=4 語意是「已受理,稍後以事件通知完成」,而停機時本機不會發出 CEID 27 完成事件,回 4 會讓 host 無限等待 |
+| `ENERGY_SAVING` | (不支援) 省電模式 | `STATE` = 0/1 | **固定回 HCACK=2**。HT-160S 無加熱器/ATC/省電子系統,語法正確亦拒絕,不謊報成功。與京元現行 HT9045 回覆一致 |
+| `PP_SIGNALTOWER` | 主機強制指定三色燈 | `RED`/`GREEN`/`YELLOW` = 0關/1亮/2閃 | 空 list = 解除 (可重複)。**請每次同時指定三色**(京元現行 host 即如此):未列出的顏色沿用「本次覆寫期間」的既有值,而解除會把三色記憶歸零,故解除後只指定一色的 SET 會使另兩色為關。未知 CP 或值超出 0..2 則整包拒絕 (HCACK=2) 且不套用。警報 Note 顯示中、訊息視窗顯示中、或機台自身處於安全異常狀態(EMG/安全門/安全鎖/斷氣/離子風扇,即 RunState=LED_ErrJam)時暫停覆寫,避免遮蔽機台紅燈。值 2(閃)在本機依既有慣例呈現為**恆亮**(HT-160S 塔燈不閃) |
+| `PP_MUSIC` | 主機強制指定蜂鳴器音效 | 單一 pair,CP 名稱為空字串 `A[0]`,值 = 1..4 | 空 list = 解除 (可重複)。CP 名稱讀取後即丟棄不比對 (京元送空字串);值超出 1..4 回 HCACK=2 |
 
-> HCACK: 0=成功 / 1=命令無效 / 2=不可執行(如機內有 IC)/ 4=busy。未列命令回 HCACK=1。
+> HCACK: 0=成功 / 1=命令無效 / 2=參數錯,或**認得命令但本機不執行**(如 `ENERGY_SAVING`、`START_AGV` 未知 CP / AMR 關閉)/ 4=busy(運轉中、機內有 IC、或已在 OneCycle)。未列命令仍回 HCACK=1。
+> **`ONE_CYCLE` 於 Clean Out(排料)進行中不會停機**:本機允許在 Clean Out 中受理 `ONE_CYCLE`(回 0),
+> 循環結束時會**回到 Clean Out 繼續排料而不停機**,但仍會送出 CEID 27「One Cycle Finish」。
+> 也就是說在 Clean Out 期間,CEID 27 代表「該循環結束」而非「機台已停」。若 host 需要「必定停機」的語意,
+> 請在非 Clean Out 狀態下發送。
+
+> **`ONE_CYCLE` 為此對照表的例外**,請逕依 §3.4 該列:對 `ONE_CYCLE` 而言「運轉中」是回 **0**(正常受理)的狀態,「已在 OneCycle」只在運轉中才回 4,「機台未運轉」回 **2**。原因是 HCACK=4 依 SEMI E5 為肯定回覆(稍後以事件通知完成),而唯有運轉中的循環才會真的送出 CEID 27 完成事件。
+
+> `PP_SIGNALTOWER` / `PP_MUSIC` 為**閂鎖式覆寫**,不會自動逾時解除。操作員解除方式:面板 ALARM RESET 鍵、警報/訊息視窗的 OFF BUZZER、或**維修畫面 SECS/GEM 分頁的「Release Host Override」按鈕**(該分頁同時顯示目前是否處於覆寫中)。此外,HSMS 連線中斷、host 送 S1F15 轉為 OFF-LINE、或操作員開啟**維修畫面的 IO Set View(手動 IO 測試)**時會**自動解除**——避免 host 消失後閂鎖無人可解,也避免手動 IO 測試期間主迴圈暫停、覆寫輸出被凍結在「蜂鳴器持續作響且無解除途徑」的狀態。
+
+> **塔燈「閃」在本機呈現為恆亮——這是客戶端看得見的差異,請一併知會現場**。
+> `PP_SIGNALTOWER` 的值域為 0=關 / 1=亮 / 2=閃,本機接受 2 但依既有慣例(HT-160S 塔燈全機不閃)**呈現為恆亮**。
+> 因此同一封 `RED=2 GREEN=2 YELLOW=2` 的封包,在 HT-90XX 是三燈同步閃爍,在 HT-160S 是三燈同時恆亮。
+> 附帶說明:host 確實會送**各色不同值**的封包(京元 2026-06-08 六筆 SET 中有一筆為 `RED=2 GREEN=0 YELLOW=0`,
+> 其餘五筆為 `2/2/2`),故本機逐色處理而非整組同值處理。
 
 ### 3.5 警報 / Alarms (ALID) — S5F1, S5F5/F6
 
@@ -271,24 +328,41 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 - **S2F35 未知 RPTID**:略過該連結(不影響其餘)。
 - **保護**:若對「已存在的機台事件(如 AMR 272-275)」連結到全部未知的 RPTID,**不覆寫**其既有綁定(避免清空)。
 
+- **CEID 編號語意差異(重要)**:HT-160S 的 CEID 1–31 與 HT-90XX **同號不同義**(例:CEID 1 在 HT-160S 為 `Handler change status`,在 HT-90XX 為 `Start Pressed`;CEID 27 在 HT-160S 為 `One Cycle Finish`,在 HT-90XX 為 `Change Machine State`)。自 20260728 起本機會回覆 `S6F15`,亦即 host 拉取 CEID 1 時會取得**本機語意**的資料,而非 HT-90XX 語意。host 端請一律以本規格 §3 的 CEID 對照為準;若 host 沿用 HT-90XX 字典,請於雙方確認後調整 host 設定或另行協議編號對照。
+
 > 換言之:host 可完整完成上線與報表定義流程;未對應到 HT-160S 實際資料的欄位會回空值,待雙方確認後再由 HT-160S 補實作或由 host 改用本規格 §3 的 SVID/CEID。
+
+#### 4.x「同一件事、不同號碼」對照(host 必讀)
+
+下列三個事件**兩邊都有,但編號不同,而且對方的號碼在本機另有他義**。這是最容易誤讀的一組:
+
+| 事件 | HT-90XX CEID | HT-160S CEID | 該號碼在對方機台的意義 |
+|---|---|---|---|
+| One Cycle 完成 | 41 | **27** | 27 在 HT-90XX = `Change Machine State` |
+| Clean Out 完成 | 42 | **28** | 28 在 HT-90XX = `Retry Pressed` |
+| Tray Feed 完成 | 49 | **29** | 29 在 HT-90XX = `Skip Pressed` |
+
+> **CEID 27 需特別注意**:自本版起 HT-160S 於 One Cycle 完成時**確實會發射 CEID 27**(先前該號碼已註冊但無任何發射點)。
+> 而 `Change Machine State` 是京元現場 HT-90XX **當天發射量最大的事件**(2026-06-08 約 406 次 S6F11)。
+> 若 host 沿用 HT-90XX 字典,會把本機的「單循環完成」解讀為「機台狀態改變」。請以本規格 §3.3 為準。
+
+> **HT-160S 未提供對應 S5F1**:HT-90XX 於 One Cycle 完成時另發一筆 S5F1(ALID `316001640`, ALTX `One cycle finish`)。
+> HT-160S 只發 S6F11 事件,不發此告警。若 host 是以該 ALID 判斷循環結束,請改為訂閱 CEID 27,或與我方確認後補上。
 
 ---
 
 ## 5. 尚未支援 / Not Yet Supported
 
-以下訊息目前**未實作**(收到會回 S9F3 或僅記錄,不影響上線)。如客戶流程需要,可依需求評估補上:
+以下訊息目前**未實作**(收到僅記錄於本機 SECS log,**不回覆任何訊息**,故 host 端會是 T3 逾時;不影響上線流程)。如客戶流程需要,可依需求評估補上:
+
+> 20260728 更新:`S6F15/F16`、`S6F19/F20`、`S10F3–F6`、`S125F1/F2` 已實作完成並移入 §2,不再屬於本節。此四組是京元現場 log (2026-06-08) 證實 host 會主動送出、而本機先前不回覆造成 T3 逾時的訊息。
 
 | 訊息 | 名稱 | 備註 |
 |---|---|---|
 | S2F23 / F24 | Trace Initialize | 以事件報表(S2F33/35/37 + S6F11)取代 |
 | S2F29 / F30 | EC Namelist | 可由現有 EC 表補回覆 |
-| S6F15 / F16 | Event Report Request(pull) | host 若改用 pull 模式再補 |
-| S6F19 / F20 | Individual Report Request | 同上 |
 | S7F1–F26 | Process Program(配方上下傳) | recipe 走本地/FTP;非 event-report 集 |
-| S10F3–F6 | Terminal Display | 終端訊息顯示 |
 | S14F1 / F2 | GetAttr(物件屬性) | |
-| S125F1 / F2 | KYEC 自訂 EC-change report | HT-90XX 自訂 stream |
 
 ---
 
@@ -309,10 +383,13 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 
 ### 7.1 已對齊 HT9045 / Aligned to HT9045
 - **訊息 Messages**:S1 / S2 / S5 / S6 基礎 GEM 全數對齊(§2)。
-- **RCMD**:`PAUSE` `START` `STOP` `HOME` `LOTSTART` `ONLINE_REMOTE` `ONLINE_LOCAL` `START_AGV`。
+- **RCMD**:`PAUSE` `START` `STOP` `HOME` `LOTSTART` `ONLINE_REMOTE` `ONLINE_LOCAL` `START_AGV` `ONE_CYCLE` `ENERGY_SAVING` `PP_SIGNALTOWER` `PP_MUSIC`。
+  - 三項宣告差異:`ONE_CYCLE` 據實回 HCACK(9045 一律 0);`ENERGY_SAVING` 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);`PP_SIGNALTOWER`/`PP_MUSIC` 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。
 - **SVID 共同段**:1001 / 1003 / 1021 / 1027 / 1518。
 - **ECID**:1501,2758–2763(Type1 tray 幾何)。
-- **CEID**:AMR 272 / 273 / 274 / 275,Auto-Full 35 / 36 / 37。
+- **CEID**:AMR 272 / 273 / 274 / 275;Auto-Full 35 / 36 / 37 / **148 / 149 / 150**;Auto-Unloadtray **136 / 137 / 138 / 145 / 146 / 147**。
+  - 上列 Auto-Full 六號與 Auto-Unloadtray 六號**皆與 HT-90XX 同號同義**(依 HT-90XX 韌體 CEID 目錄 `EventReport_CEID.def`:148/149/150 = `Auto 4/5/6 Full`,136–138/145–147 = `Auto 1–6 Unloading tray`)。
+  - 註:HT-160S 有 6 個 Auto 輸出站,故六號全部會用到。京元 2026-06-08 當天的 HT-90XX log 中,本家族只觀察到 `136`(2 次)與 `137`(3 次)實際發射(兩者皆為空報表),其餘號碼當天未出現 —— 但**編號與語意皆為 9045 韌體既有定義**,並非 HT-160S 自創,故列為「已對齊」而非「HT-160S 專屬」。
 - **AMR 資料**:Tray/Device Count(SVID 38222+ / 38228+)、Color 身分 2D(CEID 275 / SVID 38204)、事件 DataID=1 —— 皆對齊 HT9045(見 §3.3)。
 
 ### 7.2 HT-160S 專屬(9045 無對應)+ 為何特殊 / HT-160S-only + rationale
@@ -324,7 +401,6 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 | `CLEARCOUNT` | RCMD | host 遠端清除生產計數 | 9045 將 clear-count 僅作操作員事件(CEID 5),無對應 RCMD(9045 另有 `CLEAN_AUTO_SORT_COUNT`,語意不同) |
 | SVID **66000–66032** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞 |
 | SVID **38237–38245** | SVID | Auto4/5/6 的 carrier / tray / device / bin-setting | HT-160S 有 **6 個 Auto 輸出站**,9045 僅 3(SVID 到 38236);為第 4–6 站延伸 |
-| CEID **148 / 149 / 150** | CEID | Auto4/5/6 滿盤事件 | 同上:6 輸出站 vs 9045 的 3(35/36/37) |
 | CEID **1–31** 編號 | CEID | HT-160S 自有操作 / UI / 機台狀態事件集(見 §3.3) | **同號不同義**:HT-160S 的操作事件集與 9045 的 CEID 1–37 語意不同。host 以 S2F35 綁定報表到所需 CEID 時,**請依本規格 §3.3 的意義**,勿套用 9045 的 CEID 語意。AMR(272–275)與 Auto-Full(35/36/37)則同號同義。 |
 
 > **無 HT-160S 專屬的 SxFy 訊息,亦無專屬 ECID** —— HT-160S 未自創任何 SECS 訊息(§2 皆標準 GEM),ECID 全數對齊 9045。

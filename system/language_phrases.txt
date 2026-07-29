@@ -194,6 +194,8 @@ OnAlarmTime	啟動警報時間
 OnDelayTime	啟動延遲時間
 One Cycle	單次循環
 One Cycle is only allowed in Normal / Clean Out mode.	單循環僅允許於正常 / 清機模式。
+One Cycle is already armed.	已有單循環待命中。
+One Cycle from host requires the machine to be running.	主機端單循環需機台運轉中。
 Output is not bound or disabled.	輸出未綁定或已停用。
 Pad COM %s connect failed	Pad COM %s 連線失敗
 Pad Interface	Pad 介面

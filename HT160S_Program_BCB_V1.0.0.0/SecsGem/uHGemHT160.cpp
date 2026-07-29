@@ -304,7 +304,7 @@ void HT160Gem::AddCEID()
     //AI(ht160s-secsgem) 20260625 : two-stage Auto Full pre-notification. Register the
     // discrete Full CEIDs (9045-aligned : Auto1-3=35/36/37, Auto4-6=148/149/150) on
     // report 1 (machine context). Emitted from uAgvStation PollAndCall on the car-full
-    // edge. The matching Unloadtray CEIDs (136-138/140-142, fired in aAuto1To6
+    // edge. The matching Unloadtray CEIDs (136-138/145-147, fired in aAuto1To6
     // DoDischargeTray) stay unregistered/empty on purpose : lightweight + 9045-faithful.
     unsigned AutoFullCeid[6] = {35, 36, 37, 148, 149, 150};
     for(int af=0; af<6; af++)
