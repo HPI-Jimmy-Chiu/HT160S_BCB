@@ -666,43 +666,47 @@ void __fastcall TfNote::ScanKey()
 
     if(bStart && bWasStart==false)
     {
-        EventReport(SECS_EVENT.PressStartWithoutIC);
+        EventReport(SECS_EVENT.DoStart);
         BtnStartClick(this);
     }
     else if(bPause && bWasPause==false)
     {
-        EventReport(SECS_EVENT.PressPause);
+        EventReport(SECS_EVENT.DoPause);
         BtnPauseClick(this);
     }
     else if(bKey[0] && bWasSkip==false)
     {
         RecordProcess("SKIP pressed");
-        EventReport(SECS_EVENT.PressSkip);
+        EventReport(SECS_EVENT.DoSkip);
     }
     else if(bKey[1] && bWasRetry==false)
     {
         RecordProcess("RETRY pressed");
-        EventReport(SECS_EVENT.PressRetry);
+        EventReport(SECS_EVENT.DoRetry);
     }
     else if(bKey[2] && bWasTrayFeed==false)
     {
         RecordProcess("TRAY FEED pressed");
-        EventReport(SECS_EVENT.PressTrayFeed);
+        EventReport(SECS_EVENT.DoTrayFeed);
     }
     else if(bKey[3] && bWasTrayEnd==false)
     {
         RecordProcess("TRAY END pressed");
-        EventReport(SECS_EVENT.PressTrayFeed);
+        //AI(secs-ceid-align9045) 20260729 : the TRAY END key used to report DoTrayFeed, i.e.
+        //the exact same CEID as the TRAY FEED key one branch up, so the host could not tell
+        //the two panel keys apart. HT9045 has a dedicated Tray End event (CEID 31 DoTrayEnd,
+        //note.cpp DoTrayEnd) - use it. Panel behaviour is unchanged; only the reported id is.
+        EventReport(SECS_EVENT.DoTrayEnd);
     }
     else if(bKey[4] && bWasCleanOut==false)
     {
         RecordProcess("CLEAN OUT pressed");
-        EventReport(SECS_EVENT.PressCleanOut);
+        EventReport(SECS_EVENT.DoCleanOut);
     }
     else if(bReset && bWasReset==false)
     {
         RecordProcess("ALARM RESET pressed");
-        EventReport(SECS_EVENT.PressAlarmReset);
+        EventReport(SECS_EVENT.DoAlarmReset);
         //AI(HT160S-Maintainer) 20260701 : latch the OFF BUZZER acknowledge (HT172
         //note.cpp bAlarmBuzzer=false / HT9045 note AlarmReset parity) so the per-scan
         //DoSystemMessage LED_ErrJam driver stays muted. Without this latch the Timer1

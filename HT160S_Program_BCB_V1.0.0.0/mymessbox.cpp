@@ -497,6 +497,11 @@ void __fastcall TMyMessageBox::FormClose(TObject *Sender, TCloseAction &Action)
     fShow=false;
     fScanPanel=false;
     bFormShowNoStop=false;
+    //AI(secs-ceid-align9045) 20260729 : CEID 73 "Mymessbox OK" (HT9045 mymessbox.cpp:368).
+    //Routed through fMain because this unit has no SECS includes. One site covers every
+    //dismissal path (Yes / No / Pause / Esc). Self-gates on USE_SECS_GEM + HSMS SELECTED.
+    if(fMain!=NULL)
+        fMain->EmitMessageBoxClosed();
 }
 //---------------------------------------------------------------------------
 void __fastcall TMyMessageBox::btnOffBuzzerClick(TObject *Sender)

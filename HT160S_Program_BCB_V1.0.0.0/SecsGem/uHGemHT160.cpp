@@ -48,37 +48,284 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     if(HGemPtr!=NULL)
         HGemPtr->SetGemLogic(this);
 
-    EventDescription[SECS_EVENT.HandlerStatus       ] = "1 Handler change status";
-    EventDescription[SECS_EVENT.RecipeChange        ] = "2 Recipe Change";
-    EventDescription[SECS_EVENT.ClearCount          ] = "3 Press Clear Count button";
-    EventDescription[SECS_EVENT.PressStartWithoutIC ] = "4 Press Start button without IC inside handler";
-    EventDescription[SECS_EVENT.PressStartWithIC    ] = "5 Press Start button with IC inside handler";
-    EventDescription[SECS_EVENT.PressPause          ] = "6 Press Pause button";
-    EventDescription[SECS_EVENT.PressHome           ] = "7 Press Home button";
-    EventDescription[SECS_EVENT.PressOneCycle       ] = "8 Press One Cycle button";
-    EventDescription[SECS_EVENT.PressCleanOut       ] = "9 Press Clean Out button";
-    EventDescription[SECS_EVENT.PressTrayFeed       ] = "10 Press Tray Feed button";
-    EventDescription[SECS_EVENT.PressLotStart       ] = "11 Press Lot Start button";
-    EventDescription[SECS_EVENT.PressLotEnd         ] = "12 Press Lot End button";
-    EventDescription[SECS_EVENT.PressExit           ] = "13 Press Exit button";
-    EventDescription[SECS_EVENT.PressRetry          ] = "14 Press Retry button";
-    EventDescription[SECS_EVENT.PressSkip           ] = "15 Press Skip button";
-    EventDescription[SECS_EVENT.PressAlarmReset     ] = "16 Press Alarm Reset button";
-    EventDescription[SECS_EVENT.ShowAlarm           ] = "17 Show Alarm";
-    EventDescription[SECS_EVENT.ReleaseAlarm        ] = "18 Release Alarm";
-    EventDescription[SECS_EVENT.ShowMessage         ] = "19 Show Message";
-    EventDescription[SECS_EVENT.ReleaseMessage      ] = "20 Release Message";
-    EventDescription[SECS_EVENT.ChangeUser          ] = "21 Switching User Level";
-    EventDescription[SECS_EVENT.EnterSetup          ] = "22 Enter Setup Page";
-    EventDescription[SECS_EVENT.EnterMaintenPage    ] = "23 Enter Maintenance Page";
-    EventDescription[SECS_EVENT.EnterIOPage         ] = "24 Enter I/O Page";
-    EventDescription[SECS_EVENT.EnterTeach          ] = "25 Enter Teach Page";
-    EventDescription[SECS_EVENT.EnterSECSPage       ] = "26 Enter SECS GEM Page";
-    EventDescription[SECS_EVENT.OneCycleOK          ] = "27 One Cycle Finish";
-    EventDescription[SECS_EVENT.CleanOutOK          ] = "28 Clean Out Finish";
-    EventDescription[SECS_EVENT.TrayFeedOK          ] = "29 Tray Feed Finish";
-    EventDescription[SECS_EVENT.TimeEvent           ] = "30 Time Event";
-    EventDescription[SECS_EVENT.RealDummy           ] = "31 Switching Real/Dummy Mode";
+    //AI(secs-ceid-align9045) 20260729 : EventDescription is a VERBATIM copy of HT9045
+    //  uHGemHT9045.cpp HT9045Gem::HT9045Gem (272 assignments, CEID 1-275). 142/143/144 are
+    //  left unassigned exactly as HT9045 leaves them, so AddCEID registers them with an
+    //  empty alias and the .def dump matches the HT9045 firmware dump column-for-column.
+    //  Strings are HT9045's, including its own typos - do NOT "improve" them, the host
+    //  matches on them. See uHGemHT160.h ETypeStruct for the numbering contract.
+    EventDescription[SECS_EVENT.DoStart                 ] = "1 Start Pressed";
+    EventDescription[SECS_EVENT.DoPause                 ] = "2 Pause Pressed";
+    EventDescription[SECS_EVENT.DoOneCycle              ] = "3 OneCycle Pressed";
+    EventDescription[SECS_EVENT.DoCleanOut              ] = "4 CleanOut Pressed";
+    EventDescription[SECS_EVENT.DoClearCount            ] = "5 ClearCount Pressed";
+    EventDescription[SECS_EVENT.DoLotStart              ] = "6 Lot Start";
+    EventDescription[SECS_EVENT.DoLot                   ] = "7 Lot";
+    EventDescription[SECS_EVENT.DoLotEnd                ] = "8 Lot End";
+    EventDescription[SECS_EVENT.SwitchRunMode           ] = "9 Switch Real Dummy Mode";
+    EventDescription[SECS_EVENT.SwitchTesterMode        ] = "10 Switch Tester Online";
+    EventDescription[SECS_EVENT.SwitchProduction        ] = "11 Switch Production Mode";
+    EventDescription[SECS_EVENT.SwitchEngineer          ] = "12 Switch Engineer Mode";
+    EventDescription[SECS_EVENT.SwitchTemperature       ] = "13 Switch Temperature Mode";
+    EventDescription[SECS_EVENT.SwitchStartMode         ] = "14 Switch StartMode";
+    EventDescription[SECS_EVENT.SwitchSetupFile         ] = "15 Switch Setup File";
+    EventDescription[SECS_EVENT.SwitchUser              ] = "16 Switch UserLevel";
+    EventDescription[SECS_EVENT.EnterTool               ] = "17 Enter Tool Page";
+    EventDescription[SECS_EVENT.EnterConfig             ] = "18 Enter Maintenance Page";
+    EventDescription[SECS_EVENT.EnterOffset             ] = "19 Enter Offset Page";
+    EventDescription[SECS_EVENT.EnterSpeed              ] = "20 Enter Speed Page";
+    EventDescription[SECS_EVENT.EnterIO                 ] = "21 Enter IO Page";
+    EventDescription[SECS_EVENT.EnterMessage            ] = "22 Enter Message Page";
+    EventDescription[SECS_EVENT.EnterDebug              ] = "23 Enter Debug Page";
+    EventDescription[SECS_EVENT.DoExit                  ] = "24 Exit Pressed";
+    EventDescription[SECS_EVENT.DoHome                  ] = "25 Home Pressed";
+    EventDescription[SECS_EVENT.GetTestResult           ] = "26 Get Test Result";
+    EventDescription[SECS_EVENT.RunStatus               ] = "27 Change Machine State";
+    EventDescription[SECS_EVENT.DoRetry                 ] = "28 Retry Pressed";
+    EventDescription[SECS_EVENT.DoSkip                  ] = "29 Skip Pressed";
+    EventDescription[SECS_EVENT.DoAlarmReset            ] = "30 Alarm Reset Pressed";
+    EventDescription[SECS_EVENT.DoTrayEnd               ] = "31 Tray End Pressed";
+    EventDescription[SECS_EVENT.DoTrayFeed              ] = "32 Tray Feed Pressed";
+    EventDescription[SECS_EVENT.DoReset                 ] = "33 Reset Pressed";
+    EventDescription[SECS_EVENT.DoAutoClean             ] = "34 Auto Clean Start";
+    EventDescription[SECS_EVENT.Auto1Full               ] = "35 Auto1 Full";
+    EventDescription[SECS_EVENT.Auto2Full               ] = "36 Auto2 Full";
+    EventDescription[SECS_EVENT.Auto3Full               ] = "37 Auto3 Full";
+    EventDescription[SECS_EVENT.Fix1Full                ] = "38 Fix1 Full";
+    EventDescription[SECS_EVENT.Fix2Full                ] = "39 Fix2 Full";
+    EventDescription[SECS_EVENT.Fix3Full                ] = "40 Fix3 Full";
+    EventDescription[SECS_EVENT.OneCycleFinish          ] = "41 One Cycle Finish";
+    EventDescription[SECS_EVENT.CleanOutFinish          ] = "42 Clean Out Finish";
+    EventDescription[SECS_EVENT.DownloadRecipe          ] = "43 DownLoadRecipe";
+    EventDescription[SECS_EVENT.SiteOnOff               ] = "44 Site On Off";
+    EventDescription[SECS_EVENT.ArmOnOff                ] = "45 Arm On Off";
+    EventDescription[SECS_EVENT.SwitchTempData          ] = "46 Change Temp Defaultand Soak Time";
+    EventDescription[SECS_EVENT.SwitchSpeed             ] = "47 Change HandlerSpeed";
+    EventDescription[SECS_EVENT.ChangeEC                ] = "48 Change EC";
+    EventDescription[SECS_EVENT.TrayFeedFinish          ] = "49 Tray Feed Finish";
+    EventDescription[SECS_EVENT.AutoCleanFinish         ] = "50 Auto Clean Finish";
+    EventDescription[SECS_EVENT.SiteMappingStart        ] = "51 Site Mapping Start";
+    EventDescription[SECS_EVENT.SiteMappingEnd          ] = "52 Site Mapping End";
+    EventDescription[SECS_EVENT.UPHRecordStart          ] = "53 UPH Record Start";
+    EventDescription[SECS_EVENT.UPHRecordEnd            ] = "54 UPH Record End";
+    EventDescription[SECS_EVENT.InitialArtStart         ] = "55 Initial ART Start";
+    EventDescription[SECS_EVENT.TesterFT                ] = "56 Change Tester Program to FT";
+    EventDescription[SECS_EVENT.TesterRT                ] = "57 Change Tester Program to RT";
+    EventDescription[SECS_EVENT.ReadyForArt             ] = "58 Ready for ART";
+    EventDescription[SECS_EVENT.ArtReceiveTrayOK        ] = "59 ART Receive Tray OK";
+    EventDescription[SECS_EVENT.ArtReceiveTraySTART     ] = "60 ART Receive Tray START";
+    EventDescription[SECS_EVENT.ArtRTFinish             ] = "61 RT Finish";
+    EventDescription[SECS_EVENT.ArtTrayFeedFinish       ] = "62 ART Finish";
+    EventDescription[SECS_EVENT.ArtFTFinish             ] = "63 FT Finish";
+    EventDescription[SECS_EVENT.DownLoadRecipeByFTPOK   ] = "64 DownLoad Recipe by FTP OK";
+    EventDescription[SECS_EVENT.DownLoadRecipeByFTPNG   ] = "65 DownLoad Recipe by FTP NG";
+    EventDescription[SECS_EVENT.LoadTrayFinish          ] = "66 Load Tray Finish";
+    EventDescription[SECS_EVENT.TrayTestFinish          ] = "67 Tray Test Finish";
+    EventDescription[SECS_EVENT.AutoCleanClearCount     ] = "68 Auto Clean Clear Count";
+    EventDescription[SECS_EVENT.SiteMappingStop         ] = "69 Site Mapping Stop";
+    EventDescription[SECS_EVENT.BarcodeReaderEnter      ] = "70 Barcode Reader Enter";
+    EventDescription[SECS_EVENT.OTDLock                 ] = "71 OTD Lock";
+    EventDescription[SECS_EVENT.OTDUnLock               ] = "72 OTD UnLock";
+    EventDescription[SECS_EVENT.MymessboxOK             ] = "73 Mymessbox OK";
+    EventDescription[SECS_EVENT.RemoteProgramClose      ] = "74";
+    EventDescription[SECS_EVENT.ChangeTesterPrgToEQC    ] = "75";
+    EventDescription[SECS_EVENT.DoStartHasIC            ] = "76 Start Pressed HasIC";
+    EventDescription[SECS_EVENT.ReadCurrentESDData      ] = "77 Read Current ESD Data";
+    EventDescription[SECS_EVENT.JamSkipICCount          ] = "78 Jam Skip IC Count";
+    EventDescription[SECS_EVENT.REVERSED79              ] = "79 ";
+    EventDescription[SECS_EVENT.ReadNowHandlerData      ] = "80 Read Now Handler Data";
+    EventDescription[SECS_EVENT.ReadATCTemperature      ] = "81 Read ATC Temperature";
+    EventDescription[SECS_EVENT.ReadATCRefTemperature   ] = "82 Read ATC Ref Temperature";
+    EventDescription[SECS_EVENT.ReadNowEPPenconder      ] = "83 Read Now EP Penconder";
+    EventDescription[SECS_EVENT.RunStatus_FT            ] = "84 Run Status FT";
+    EventDescription[SECS_EVENT.RunStatus_RT            ] = "85 Run Status RT";
+    EventDescription[SECS_EVENT.MapNoArmHasIC           ] = "86 Map No Device Arm Has Device";
+    EventDescription[SECS_EVENT.MapHasICArmRetry        ] = "87 Map Has Device Arm Error Retry";
+    EventDescription[SECS_EVENT.MapHasICArmSkip         ] = "88 Map Has Device Arm Error Skip";
+    EventDescription[SECS_EVENT.PreAlarmMessage         ] = "89 Pre Alarm Message";
+    EventDescription[SECS_EVENT.GetTestResultAndBarcode ] = "90 Get TestResult And Barcode";
+    EventDescription[SECS_EVENT.SECSOffline             ] = "91 SECS/GEM Offline";
+    EventDescription[SECS_EVENT.SECSOnline              ] = "92 SECS/GEM Online";
+    EventDescription[SECS_EVENT.SECSOnlineRemote        ] = "93 SECS/GEM Online Remote";
+    EventDescription[SECS_EVENT.TransferBlocked         ] = "94 Transfer Blocked";
+    EventDescription[SECS_EVENT.CassetteLoadComplete    ] = "95 Cassette Load Complete";
+    EventDescription[SECS_EVENT.CassetteIDReadComplete  ] = "96 Cassette ID Read Complete";
+    EventDescription[SECS_EVENT.ReadyToProcessComplete  ] = "97 Ready To Process Complete";
+    EventDescription[SECS_EVENT.ReadyToCarrierOutLot    ] = "98 Ready To Carrier Out Lot";
+    EventDescription[SECS_EVENT.CassetteOutComplete     ] = "99 Cassette Out Complete";
+    EventDescription[SECS_EVENT.CassetteUnclamped       ] = "100 Cassette Unclamped";
+    EventDescription[SECS_EVENT.ReadyToUnload           ] = "101 Ready To Unload";
+    EventDescription[SECS_EVENT.UnloadComplete          ] = "102 Unload Complete";
+    EventDescription[SECS_EVENT.ReadyToCarrierOutTray   ] = "103 Ready To Carrier Out Tray";
+    EventDescription[SECS_EVENT.ReadyToCombinePass      ] = "104 Ready To Combine Pass";
+    EventDescription[SECS_EVENT.ReadyToCombineFail      ] = "105 Ready To Combine Fail";
+    EventDescription[SECS_EVENT.MachineNoStart          ] = "106 Machine No Start";
+    EventDescription[SECS_EVENT.ReadyToCombinePassLotEnd] = "107 Ready To Combine Pass Lot End";
+    EventDescription[SECS_EVENT.DoCSTLotStart           ] = "108 Cassette Lot Start";
+    EventDescription[SECS_EVENT.DieCountFailMessageClose] = "109 Die Count Fail Message Close";
+    EventDescription[SECS_EVENT.CleanOutTrayFeedFinish  ] = "110 Clean Out Tray Feed Finish";
+    EventDescription[SECS_EVENT.MapNoICArmAutoSkip      ] = "111 Map No Device Arm Auto Skip";
+    EventDescription[SECS_EVENT.MRRunModeChange         ] = "112 MR Run Mode Change";
+    EventDescription[SECS_EVENT.AccessModeChange        ] = "113 Access Mode Change";
+    EventDescription[SECS_EVENT.SoftwareBin             ] = "114 Software Bin";
+    EventDescription[SECS_EVENT.TrayIDChange            ] = "115 Tray ID Change";
+    EventDescription[SECS_EVENT.ReadyToLoadNoLot        ] = "116 Ready To Load No Lot";
+    EventDescription[SECS_EVENT.ReadyToLoadNoTray       ] = "117 Ready To Load No Tray";
+    EventDescription[SECS_EVENT.ReadyToLoadNoCassette   ] = "118 Ready To Load No Cassette";
+    EventDescription[SECS_EVENT.ART_SRQKIND2_FTLOTSTART ] = "119 ART SRQKIND2 FT LOTSTART";
+    EventDescription[SECS_EVENT.ART_SRQKIND4_RTLOTSTART ] = "120 ART SRQKIND4 RT LOTSTART";
+    EventDescription[SECS_EVENT.ART_SRQKIND8_LOTEND     ] = "121 ART SRQKIND6 LOTEND";
+    EventDescription[SECS_EVENT.ART_SRQKIND10_FINALLOTEND] = "122 FINAL LOTEND";
+    EventDescription[SECS_EVENT.SafeDoorOnOff           ] = "123 Safe Door On Off";
+    EventDescription[SECS_EVENT.SaveRecipe              ] = "124 Save Recipe";
+    EventDescription[SECS_EVENT.EESUGOffestSelect       ] = "125 EESUG Offest Select";
+    EventDescription[SECS_EVENT.EESUGOffestModify       ] = "126 EESUG Offest Modify";
+    EventDescription[SECS_EVENT.Backtonormal            ] = "127 Back To Normal";
+    EventDescription[SECS_EVENT.TestStart               ] = "128 Test Start";
+    EventDescription[SECS_EVENT.TestFinish              ] = "129 Test Finish";
+    EventDescription[SECS_EVENT.MaterialReceive         ] = "130 Material Receive";
+    EventDescription[SECS_EVENT.SlotMapCountOK          ] = "131 Slot Map Count OK";
+    EventDescription[SECS_EVENT.CHECK_IN                ] = "132 CHECK IN";
+    EventDescription[SECS_EVENT.CHECK_OUT               ] = "133 CHECK OUT";
+    EventDescription[SECS_EVENT.ReadyToCombineFailLotEnd] = "134 Ready To Combine Fail Lot End";
+    EventDescription[SECS_EVENT.ReadyToOHTLotEnd        ] = "135 Ready To OHT Lot End";
+    EventDescription[SECS_EVENT.Auto1Unloadtray         ] = "136 Auto 1 Unloading tray";
+    EventDescription[SECS_EVENT.Auto2Unloadtray         ] = "137 Auto 2 Unloading tray";
+    EventDescription[SECS_EVENT.Auto3Unloadtray         ] = "138 Auto 3 Unloading tray";
+    EventDescription[SECS_EVENT.DoVisualSortLotStart    ] = "139 Click lot start button for visual sort mode";
+    EventDescription[SECS_EVENT.PreLoadTray             ] = "140 Prepare Load Tray";
+    EventDescription[SECS_EVENT.GemControlStateChange   ] = "141 GEM Control State Change";
+    EventDescription[SECS_EVENT.Auto4Unloadtray         ] = "145 Auto 4 Unloading tray";
+    EventDescription[SECS_EVENT.Auto5Unloadtray         ] = "146 Auto 5 Unloading tray";
+    EventDescription[SECS_EVENT.Auto6Unloadtray         ] = "147 Auto 6 Unloading tray";
+    EventDescription[SECS_EVENT.Auto4Full               ] = "148 Auto 4 Full";
+    EventDescription[SECS_EVENT.Auto5Full               ] = "149 Auto 5 Full";
+    EventDescription[SECS_EVENT.Auto6Full               ] = "150 Auto 6 Full";
+    EventDescription[SECS_EVENT.Fix4Full                ] = "151 Fix 4 Full";
+    EventDescription[SECS_EVENT.Fix5Full                ] = "152 Fix 5 Full";
+    EventDescription[SECS_EVENT.Fix6Full                ] = "153 Fix 6 Full";
+    EventDescription[SECS_EVENT.LoadNoTray              ] = "154 Loader hasn't tray";
+    EventDescription[SECS_EVENT.LoadFullTray            ] = "155 Loader full of tray";
+    EventDescription[SECS_EVENT.LoadOnlyOneTray         ] = "156 Loader only one tray";
+    EventDescription[SECS_EVENT.Loader_ReadyToUnload    ] = "157 Loader ready to unload";
+    EventDescription[SECS_EVENT.Loader_FinishUnload     ] = "158 Loader finish unload";
+    EventDescription[SECS_EVENT.Empty_PreLoadTray       ] = "159 Empty Prepare Load Tray";
+    EventDescription[SECS_EVENT.EmptyOnlyOneTray        ] = "160 Empty only one tray";
+    EventDescription[SECS_EVENT.EmptyNoTray             ] = "161 Empty hasn't tray";
+    EventDescription[SECS_EVENT.EmptyFullTray           ] = "162 Empty full of tray";
+    EventDescription[SECS_EVENT.Color_PreLoadTray       ] = "163 Color Prepare Load Tray";
+    EventDescription[SECS_EVENT.ColorOnlyOneTray        ] = "164 Color only one tray";
+    EventDescription[SECS_EVENT.ColorNoTray             ] = "165 Color hasn't tray";
+    EventDescription[SECS_EVENT.Empty_PutTrayToAuto1    ] = "166 Empty put tray to Auto1";
+    EventDescription[SECS_EVENT.Empty_PutTrayToAuto2    ] = "167 Empty put tray to Auto2";
+    EventDescription[SECS_EVENT.Empty_PutTrayToAuto3    ] = "168 Empty put tray to Auto3";
+    EventDescription[SECS_EVENT.Empty_PutTrayToAuto4    ] = "169 Empty put tray to Auto4";
+    EventDescription[SECS_EVENT.Empty_PutTrayToAuto5    ] = "170 Empty put tray to Auto5";
+    EventDescription[SECS_EVENT.Empty_PutTrayToAuto6    ] = "171 Empty put tray to Auto6";
+    EventDescription[SECS_EVENT.Empty_PutCoverToAuto1   ] = "172 Empty put cover to Auto1";
+    EventDescription[SECS_EVENT.Empty_PutCoverToAuto2   ] = "173 Empty put cover to Auto2";
+    EventDescription[SECS_EVENT.Empty_PutCoverToAuto3   ] = "174 Empty put cover to Auto3";
+    EventDescription[SECS_EVENT.Empty_PutCoverToAuto4   ] = "175 Empty put cover to Auto4";
+    EventDescription[SECS_EVENT.Empty_PutCoverToAuto5   ] = "176 Empty put cover to Auto5";
+    EventDescription[SECS_EVENT.Empty_PutCoverToAuto6   ] = "177 Empty put cover to Auto6";
+    EventDescription[SECS_EVENT.Color_PutTrayToAuto1    ] = "178 Color put tray to Auto1";
+    EventDescription[SECS_EVENT.Color_PutTrayToAuto2    ] = "179 Color put tray to Auto2";
+    EventDescription[SECS_EVENT.Color_PutTrayToAuto3    ] = "180 Color put tray to Auto3";
+    EventDescription[SECS_EVENT.Color_PutTrayToAuto4    ] = "181 Color put tray to Auto4";
+    EventDescription[SECS_EVENT.Color_PutTrayToAuto5    ] = "182 Color put tray to Auto5";
+    EventDescription[SECS_EVENT.Color_PutTrayToAuto6    ] = "183 Color put tray to Auto6";
+    EventDescription[SECS_EVENT.Color_PutCoverToAuto1   ] = "184 Color put cover to Auto1";
+    EventDescription[SECS_EVENT.Color_PutCoverToAuto2   ] = "185 Color put cover to Auto2";
+    EventDescription[SECS_EVENT.Color_PutCoverToAuto3   ] = "186 Color put cover to Auto3";
+    EventDescription[SECS_EVENT.Color_PutCoverToAuto4   ] = "187 Color put cover to Auto4";
+    EventDescription[SECS_EVENT.Color_PutCoverToAuto5   ] = "188 Color put cover to Auto5";
+    EventDescription[SECS_EVENT.Color_PutCoverToAuto6   ] = "189 Color put cover to Auto6";
+    EventDescription[SECS_EVENT.Auto1_LoadTrayFinish    ] = "190 Auto1 load tray finish";
+    EventDescription[SECS_EVENT.Auto2_LoadTrayFinish    ] = "191 Auto2 load tray finish";
+    EventDescription[SECS_EVENT.Auto3_LoadTrayFinish    ] = "192 Auto3 load tray finish";
+    EventDescription[SECS_EVENT.Auto4_LoadTrayFinish    ] = "193 Auto4 load tray finish";
+    EventDescription[SECS_EVENT.Auto5_LoadTrayFinish    ] = "194 Auto5 load tray finish";
+    EventDescription[SECS_EVENT.Auto6_LoadTrayFinish    ] = "195 Auto6 load tray finish";
+    EventDescription[SECS_EVENT.Auto1_ReadyToUnload     ] = "196 Auto1 ready to unload";
+    EventDescription[SECS_EVENT.Auto2_ReadyToUnload     ] = "197 Auto2 ready to unload";
+    EventDescription[SECS_EVENT.Auto3_ReadyToUnload     ] = "198 Auto3 ready to unload";
+    EventDescription[SECS_EVENT.Auto4_ReadyToUnload     ] = "199 Auto4 ready to unload";
+    EventDescription[SECS_EVENT.Auto5_ReadyToUnload     ] = "200 Auto5 ready to unload";
+    EventDescription[SECS_EVENT.Auto6_ReadyToUnload     ] = "201 Auto6 ready to unload";
+    EventDescription[SECS_EVENT.Auto1NoTray             ] = "202 Auto1 hasn't tray";
+    EventDescription[SECS_EVENT.Auto2NoTray             ] = "203 Auto2 hasn't tray";
+    EventDescription[SECS_EVENT.Auto3NoTray             ] = "204 Auto3 hasn't tray";
+    EventDescription[SECS_EVENT.Auto4NoTray             ] = "205 Auto4 hasn't tray";
+    EventDescription[SECS_EVENT.Auto5NoTray             ] = "206 Auto5 hasn't tray";
+    EventDescription[SECS_EVENT.Auto6NoTray             ] = "207 Auto6 hasn't tray";
+    EventDescription[SECS_EVENT.ColorFullTray           ] = "208 Color full of tray";
+    EventDescription[SECS_EVENT.TrayEndFinish           ] = "209 Tray End Finish";
+    EventDescription[SECS_EVENT.Empty_FinishUnload      ] = "210 Empty finish unload";
+    EventDescription[SECS_EVENT.Color_FinishUnload      ] = "211 Color finish unload";
+    EventDescription[SECS_EVENT.PowerSavingStart        ] = "212 Energy Saving Start";
+    EventDescription[SECS_EVENT.PowerSavingEnd          ] = "213 Energy Saving End";
+    EventDescription[SECS_EVENT.Reserved_03             ] = "214 Reserved_03";
+    EventDescription[SECS_EVENT.Reserved_04             ] = "215 Reserved_04";
+    EventDescription[SECS_EVENT.Reserved_05             ] = "216 Reserved_05";
+    EventDescription[SECS_EVENT.Reserved_06             ] = "217 Reserved_06";
+    EventDescription[SECS_EVENT.Reserved_07             ] = "218 Reserved_07";
+    EventDescription[SECS_EVENT.Reserved_08             ] = "219 Reserved_08";
+    EventDescription[SECS_EVENT.Reserved_09             ] = "220 Reserved_09";
+    EventDescription[SECS_EVENT.Reserved_10             ] = "221 Reserved_10";
+    EventDescription[SECS_EVENT.Reserved_11             ] = "222 Reserved_11";
+    EventDescription[SECS_EVENT.Reserved_12             ] = "223 Reserved_12";
+    EventDescription[SECS_EVENT.Reserved_13             ] = "224 Reserved_13";
+    EventDescription[SECS_EVENT.Reserved_14             ] = "225 Reserved_14";
+    EventDescription[SECS_EVENT.Reserved_15             ] = "226 Reserved_15";
+    EventDescription[SECS_EVENT.Reserved_16             ] = "227 Reserved_16";
+    EventDescription[SECS_EVENT.Reserved_17             ] = "228 Reserved_17";
+    EventDescription[SECS_EVENT.Reserved_18             ] = "229 Reserved_18";
+    EventDescription[SECS_EVENT.Reserved_19             ] = "230 Reserved_19";
+    EventDescription[SECS_EVENT.Reserved_20             ] = "231 Reserved_20";
+    EventDescription[SECS_EVENT.Reserved_21             ] = "232 Reserved_21";
+    EventDescription[SECS_EVENT.Reserved_22             ] = "233 Reserved_22";
+    EventDescription[SECS_EVENT.Reserved_23             ] = "234 Reserved_23";
+    EventDescription[SECS_EVENT.Reserved_24             ] = "235 Reserved_24";
+    EventDescription[SECS_EVENT.Reserved_25             ] = "236 Reserved_25";
+    EventDescription[SECS_EVENT.Reserved_26             ] = "237 Reserved_26";
+    EventDescription[SECS_EVENT.Reserved_27             ] = "238 Reserved_27";
+    EventDescription[SECS_EVENT.Reserved_28             ] = "239 Reserved_28";
+    EventDescription[SECS_EVENT.Reserved_29             ] = "240 Reserved_29";
+    EventDescription[SECS_EVENT.Reserved_30             ] = "241 Reserved_30";
+    EventDescription[SECS_EVENT.Reserved_31             ] = "242 Reserved_31";
+    EventDescription[SECS_EVENT.Reserved_32             ] = "243 Reserved_32";
+    EventDescription[SECS_EVENT.Reserved_33             ] = "244 Reserved_33";
+    EventDescription[SECS_EVENT.Reserved_34             ] = "245 Reserved_34";
+    EventDescription[SECS_EVENT.Reserved_35             ] = "246 Reserved_35";
+    EventDescription[SECS_EVENT.Reserved_36             ] = "247 Reserved_36";
+    EventDescription[SECS_EVENT.Reserved_37             ] = "248 Reserved_37";
+    EventDescription[SECS_EVENT.Reserved_38             ] = "249 Reserved_38";
+    EventDescription[SECS_EVENT.DoStartAutoHeight       ] = "250 START Auto contact height";
+    EventDescription[SECS_EVENT.DoSecsGemIndexFail      ] = "251 SECS GEM consecutive failure";
+    EventDescription[SECS_EVENT.Reserved_39             ] = "252 Reserved_39";
+    EventDescription[SECS_EVENT.Reserved_40             ] = "253 Reserved_40";
+    EventDescription[SECS_EVENT.Reserved_41             ] = "254 Reserved_41";
+    EventDescription[SECS_EVENT.Reserved_42             ] = "255 Reserved_42";
+    EventDescription[SECS_EVENT.Reserved_43             ] = "256 Reserved_43";
+    EventDescription[SECS_EVENT.Reserved_44             ] = "257 Reserved_44";
+    EventDescription[SECS_EVENT.Reserved_45             ] = "258 Reserved_45";
+    EventDescription[SECS_EVENT.Reserved_46             ] = "259 Reserved_46";
+    EventDescription[SECS_EVENT.Reserved_47             ] = "260 Reserved_47";
+    EventDescription[SECS_EVENT.Reserved_48             ] = "261 Reserved_48";
+    EventDescription[SECS_EVENT.Reserved_49             ] = "262 Reserved_49";
+    EventDescription[SECS_EVENT.Reserved_50             ] = "263 Reserved_50";
+    EventDescription[SECS_EVENT.Reserved_51             ] = "264 Reserved_51";
+    EventDescription[SECS_EVENT.Reserved_52             ] = "265 Reserved_52";
+    EventDescription[SECS_EVENT.Reserved_53             ] = "266 Reserved_53";
+    EventDescription[SECS_EVENT.Reserved_54             ] = "267 Reserved_54";
+    EventDescription[SECS_EVENT.Reserved_55             ] = "268 Reserved_55";
+    EventDescription[SECS_EVENT.Reserved_56             ] = "269 Reserved_56";
+    EventDescription[SECS_EVENT.Reserved_57             ] = "270 Reserved_57";
+    EventDescription[SECS_EVENT.Reserved_58             ] = "271 Reserved_58";
+    EventDescription[SECS_EVENT.AGVSupplement           ] = "272 AMR Supplement";
+    EventDescription[SECS_EVENT.AGVLDUnLDStatus         ] = "273 AMR LDUnLD Status";
+    EventDescription[SECS_EVENT.AGVLDUnLDFinish         ] = "274 AMR LDUnLD Finish";
+    EventDescription[SECS_EVENT.AGVLdID                 ] = "275 AMR LD ID";
 }
 //---------------------------------------------------------------------------
 HT160Gem::~HT160Gem()
@@ -279,7 +526,20 @@ void HT160Gem::AddCEID()
     if(HGemPtr==NULL)
         return;
 
-    for(int i=SECS_EVENT.HandlerStatus; i<SECS_EVENT.TotalEvent; i++)
+    //AI(secs-ceid-align9045) 20260729 : register the FULL HT9045 dictionary (CEID 1-275),
+    // mirroring HT9045Gem::AddCEID. Two deliberate departures from HT9045, both at the
+    // REPORT-LINK layer only (the CEID numbers and aliases are byte-identical):
+    //   1) HT9045 links CEID i -> RPTID i and only ever defines RPTID 1 = {1027}, so every
+    //      id except 1 ships an empty L[0] until the host provisions S2F33/S2F35. HT160S
+    //      keeps its own report 1 (13 machine-context SVs, see AddReprot) on every id, so a
+    //      host that has NOT provisioned still gets usable data. A host that does provision
+    //      overwrites the link anyway, so this cannot diverge once S2F35 has run.
+    //   2) CEID i -> RPTID i would collide head-on with HT160S reports 2-7, which carry the
+    //      AMR P1-P9 bitmaps / tray+device counts / identity-tray 2D. CEID 2 (Pause) would
+    //      start shipping the AMR supplement bitmap and the 272-275 handshake would break.
+    // Ids whose mechanism HT160S does not have are registered but have no emit site, so
+    // they are inert : the dictionary matches HT9045, the traffic stays HT160S's.
+    for(int i=SECS_EVENT.DoStart; i<SECS_EVENT.TotalEvent; i++)
     {
         HGemPtr->SetCEIDContent(i, EventDescription[i], 1, ReportID, EquDefault);
     }
@@ -301,18 +561,13 @@ void HT160Gem::AddCEID()
     HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 2, rptFin, EquDefault);
     HGemPtr->SetCEIDContent(275, "AGVLdID",         1, rptCid, EquDefault);
 
-    //AI(ht160s-secsgem) 20260625 : two-stage Auto Full pre-notification. Register the
-    // discrete Full CEIDs (9045-aligned : Auto1-3=35/36/37, Auto4-6=148/149/150) on
-    // report 1 (machine context). Emitted from uAgvStation PollAndCall on the car-full
-    // edge. The matching Unloadtray CEIDs (136-138/145-147, fired in aAuto1To6
-    // DoDischargeTray) stay unregistered/empty on purpose : lightweight + 9045-faithful.
-    unsigned AutoFullCeid[6] = {35, 36, 37, 148, 149, 150};
-    for(int af=0; af<6; af++)
-    {
-        AnsiString DescAutoFull;
-        DescAutoFull.sprintf("Auto%d Full", af+1);
-        HGemPtr->SetCEIDContent(AutoFullCeid[af], DescAutoFull, 1, ReportID, EquDefault);
-    }
+    //AI(secs-ceid-align9045) 20260729 : the explicit Auto-Full block that used to live here
+    // (35/36/37/148/149/150) is gone - the 1-275 loop above now registers those ids straight
+    // from the HT9045 dictionary, with HT9045's own aliases ("35 Auto1 Full" ...) instead of
+    // the locally sprintf'd ones. Same for the Unloadtray ids 136-138/145-147, which used to
+    // be left unregistered on purpose : they are now registered like every other id, so they
+    // ship report 1 instead of an empty L[0]. Emit sites are unchanged (uAgvStation PollAndCall
+    // for Full, aAuto1To6 DoDischargeTray for Unloadtray).
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddReprot()
@@ -648,6 +903,14 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
 
     if(bWroteTrayForm && !bBusy)
         TrayForm.Save(RecipeManager.GetCurrentRecipeName());
+
+    //AI(secs-ceid-align9045) 20260729 : CEID 48 "Change EC". HT9045 reports this from its own
+    //S2F15 commit loop (uHGemEquipment.cpp:4021), once the new value has actually been taken.
+    //HT160S only ever commits the tray-form geometry band, so bWroteTrayForm is the exact
+    //"an EC really changed" condition. EAC!=0 (rejected / busy / out of range) writes nothing
+    //and therefore reports nothing.
+    if(bWroteTrayForm && !bBusy && EAC == 0)
+        HGemPtr->EventReport(1, SECS_EVENT.ChangeEC);
 
     // S2F16 reply : B EAC
     HGemPtr->InitLocalHead(2, 16, 0);
@@ -1284,7 +1547,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     //AI(secs-audit-fix) 20260729 : machine stopped -> 2 "cannot perform now",
                     //never 4. SEMI E5 HCACK=4 is a POSITIVE ack ("will be performed, completion
                     //signalled later by an event"), and this same change made that promise
-                    //checkable by emitting CEID 27 on cycle finish - a stopped machine will
+                    //checkable by emitting CEID 41 on cycle finish - a stopped machine will
                     //never emit it, so 4 would leave the host waiting forever. This was the
                     //dominant field case: 8 of the 11 KYEC ONE_CYCLE commands on 2026-06-08
                     //arrived while the equipment was reporting HALT.

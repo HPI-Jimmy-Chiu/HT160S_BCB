@@ -660,33 +660,53 @@ void __fastcall TfMain::FeatureBadgeSecsClick(TObject *Sender)
     ShowSecsGemLog();
 }
 //---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : the four page-entry CEIDs are reported from the button
+//handlers that OPEN each page, not from the forms' OnShow. Two reasons : the form units
+//(uOffset/uspeed/systools) do not include the SECS headers, and a re-show caused by z-order
+//or restore should not look like a fresh operator navigation. HT9045 reports these from
+//main.cpp too (24657 Speed / 24679 Offset / 24931 IO / 24954 Maintenance).
+//NOTE : HT160S's Setup page (fSetup) intentionally gets NO CEID - HT9045 has no Setup-page
+//event, and its 22/23 (Enter Message Page / Enter Debug Page) are pages HT160S does not have.
 void __fastcall TfMain::sbMaintanceClick(TObject *Sender)
 {
+    EventReport(SECS_EVENT.EnterConfig);        //18 Enter Maintenance Page
     ShowTopForm(fMaintenance, sbMaintance);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbOffsetClick(TObject *Sender)
 {
+    EventReport(SECS_EVENT.EnterOffset);        //19 Enter Offset Page
     ShowTopForm(fOffset, sbOffset);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbSpeedClick(TObject *Sender)
 {
+    EventReport(SECS_EVENT.EnterSpeed);         //20 Enter Speed Page
     ShowTopForm(fSpeed, sbSpeed);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbToolClick(TObject *Sender)
 {
+    EventReport(SECS_EVENT.EnterTool);          //17 Enter Tool Page (HT160S FormSysTools)
     ShowTopForm(FormSysTools, sbTool);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbMessageClick(TObject *Sender)
 {
+    //AI(secs-ceid-align9045) 20260729 : CEID 22 "Enter Message Page" (HT9045 has the same
+    //button). HT160S's Message button browses fNote (the alarm/note form) as a page, which is
+    //the same operator action HT9045 reports - so this id is NOT one of the "HT160S has no such
+    //page" cases. Reported from the button handler like the other four page-entry ids.
+    EventReport(SECS_EVENT.EnterMessage);
     ShowTopForm(fNote, sbMessage);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbExitClick(TObject *Sender)
 {
+    //AI(secs-ceid-align9045) 20260729 : CEID 24 "Exit Pressed" (HT9045 main.cpp:10234, which
+    //also reports on the exit path before the form actually closes). Sent here rather than in
+    //FormClose so it goes out while the SECS link is still up - FormClose tears the stack down.
+    EventReport(SECS_EVENT.DoExit);
     Close();
 }
 //---------------------------------------------------------------------------
@@ -886,6 +906,9 @@ void __fastcall TfMain::btnClearCountClick(TObject *Sender)
     }
     if(ShowMyMessageBox_YES_NO(LangT("Clear all production counts ?"))!=TMyMessageBox::msgrtnYES)
         return;
+    //AI(secs-ceid-align9045) 20260729 : CEID 5 "ClearCount Pressed" (HT9045 cSortCT.cpp:609).
+    //Reported AFTER the operator confirms, so a cancelled dialog sends nothing.
+    EventReport(SECS_EVENT.DoClearCount);
     ResetPerLotProductionCounters();
     WriteLastDataIni();
     ClearProductInfoAtLotStart();
@@ -1497,7 +1520,7 @@ void __fastcall TfMain::cb_WorkFileChange(TObject *Sender)
 
     LogText = AnsiString("Change Recipe to ")+RecipeManager.GetCurrentRecipeName();
     RecordProcess(LogText);
-    EventReport(SECS_EVENT.RecipeChange);
+    EventReport(SECS_EVENT.SwitchSetupFile);
 }
 //---------------------------------------------------------------------------
 #ifndef SOFT_SIMULATE   //AI(ht160s-password) 20260624 : login keypad helper (real build only; sim auto-grants)
@@ -1595,7 +1618,7 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
     {
         LogText = AnsiString("Change User to ")+UserRoleManager.GetLevelName();
         RecordProcess(LogText);
-        EventReport(SECS_EVENT.ChangeUser);
+        EventReport(SECS_EVENT.SwitchUser);
     }
 }
 //---------------------------------------------------------------------------
@@ -1709,7 +1732,7 @@ void __fastcall TfMain::pnRealDummyClick(TObject *Sender)
     LoadRunModePicture();
     SaveMainRunSettingsToIni();
     RecordProcess(GetRunModeLogText());
-    EventReport(SECS_EVENT.RealDummy);
+    EventReport(SECS_EVENT.SwitchRunMode);
 }
 //---------------------------------------------------------------------------
 bool __fastcall TfMain::SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText)
@@ -1817,7 +1840,7 @@ void TfMain::HomeCore()
     fHome->Show();
 
     RecordProcess("HOME pressed");
-    EventReport(SECS_EVENT.PressHome);
+    EventReport(SECS_EVENT.DoHome);
     ChangeRunMode(Run_Home);
     HSys.Sys.SystemStart=true;
     fHome->MarkSeenStart();
@@ -1900,7 +1923,7 @@ eOneCycleResult TfMain::OneCycleCore(bool bRequireRunning, AnsiString &Reason)
     //make the command permanently unusable mid-lot - its only real use.
     if(CheckLotDataReady(Reason)==false)
         return ocRejNotReady;
-    EventReport(SECS_EVENT.PressOneCycle);
+    EventReport(SECS_EVENT.DoOneCycle);
     ChangeRunMode(Run_OneCycle);
     Reason = "armed";
     return ocStarted;
@@ -1929,7 +1952,7 @@ void __fastcall TfMain::sbCleanOut1Click(TObject *Sender)
     if(HSys.Sys.RunMode==Run_Normal)
     {
         RecordProcess("CLEAN OUT pressed");
-        EventReport(SECS_EVENT.PressCleanOut);
+        EventReport(SECS_EVENT.DoCleanOut);
         HSys.Sys.bCleanOut=true;
         ChangeRunMode(Run_CleanOut);
     }    
@@ -1950,7 +1973,7 @@ void __fastcall TfMain::sbPause1Click(TObject *Sender)
     //(PressPause) stays here : it is operator-specific and MachinePause is shared with the
     //safety/EMG stop paths that must not raise a Pause event.
     if(HSys.Sys.SystemStart==true)
-        EventReport(SECS_EVENT.PressPause);
+        EventReport(SECS_EVENT.DoPause);
     MachinePause(trigOperator);
 }
 //---------------------------------------------------------------------------
@@ -2082,10 +2105,17 @@ void TfMain::DoStartArm()
 //        RecordProcess moved into MachineStart() : logs "MACHINE START by <trig>"
         tSimuData.bRunSimulation=cbEnableSimulation->Checked;                   //sync simulation IC flag from UI at lot start
 //
-//        if(HasICUnderMachine())
-//            EventReport(SECS_EVENT.PressStartWithIC);
-//        else
-//            EventReport(SECS_EVENT.PressStartWithoutIC);
+        //AI(secs-ceid-align9045) 20260729 : re-enabled. HT9045 main.cpp:28819-28828 splits the
+        //start event by whether the machine still holds material : CEID 76 "Start Pressed HasIC"
+        //when HasICUnderMachine(), else CEID 1 "Start Pressed". The KYEC host binds 12 reports to
+        //each of those two ids and subscribes x7, so leaving this commented meant the host's
+        //start anchor never arrived. HasICUnderMachine() is real on HT160S (csystem.cpp:1859,
+        //scans every VMotor's HasIC()). This is the arm path, so a start rejected by the lot/2D
+        //gate still reports nothing - same as HT9045, which also fires from the arm half only.
+        if(HasICUnderMachine())
+            EventReport(SECS_EVENT.DoStartHasIC);
+        else
+            EventReport(SECS_EVENT.DoStart);
 //
 //        if(USE_SECS_GEM && HSys.FuncB.bN04_RunCheck)
 //        {
@@ -2161,7 +2191,7 @@ void TfMain::ScanPanelKeys()
         ClearSecsPanelOverride();
         CloseBuzzerOff();
         RecordProcess("ALARM RESET pressed : SECS host panel override released");
-        EventReport(SECS_EVENT.PressAlarmReset);
+        EventReport(SECS_EVENT.DoAlarmReset);
     }
     bWasSecsReset=bSecsReset;
 
@@ -2393,7 +2423,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     // Pairs with the Lot End event in btnLotEndClick. Report 1 carries the new Current
     // Lot ID. Registry is already populated (GetLotListCount()==0 returned early above),
     // so no guard is needed. EventReport self-gates on USE_SECS_GEM + HSMS SELECTED.
-    EventReport(SECS_EVENT.PressLotStart);
+    EventReport(SECS_EVENT.DoLotStart);
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : total attempts allowed per lot during a pull-all
@@ -2746,7 +2776,7 @@ void __fastcall TfMain::DoLotEndProcess()
     // USE_SECS_GEM + HSMS SELECTED (no-op when SECS off or link down). The lot-count
     // guard mirrors HT9045's bLotStart gate : an empty Lot End press sends nothing.
     if(LotRegistry.GetLotCount()>0)
-        EventReport(SECS_EVENT.PressLotEnd);
+        EventReport(SECS_EVENT.DoLotEnd);
 
     //AI(ht160s-lot-webapi) 20260612 : stop any in-flight "pull all lots" sweep so
     // it does not walk the registry we are about to clear.
@@ -2773,23 +2803,60 @@ void __fastcall TfMain::DoLotEndProcess()
     RecordProcess("Lot data cleared (Lot End)");
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-overcount-tripqueue D3) 20260721 : emit S6F11 CEID28 "Clean Out Finish"
+//AI(ht160s-overcount-tripqueue D3) 20260721 : emit S6F11 CEID42 "Clean Out Finish"
 //(was defined but never sent). Called from csystem's CleanOut-finish BEFORE the Lot End
 //so the host sees CleanOutOK(28) then PressLotEnd(12). EventReport self-gates on
 //USE_SECS_GEM + HSMS SELECTED, so this is a no-op when SECS is off / link is down.
 void __fastcall TfMain::EmitCleanOutOK()
 {
-    EventReport(SECS_EVENT.CleanOutOK);
+    EventReport(SECS_EVENT.CleanOutFinish);
 }
 //---------------------------------------------------------------------------
-//AI(secs-kyec-rcmd4) 20260728 : emit S6F11 CEID27 "One Cycle Finish", the OneCycle twin of
-//EmitCleanOutOK above. CEID 27 was declared (uHGemHT160.h:37) and registered by the AddCEID
+//AI(secs-kyec-rcmd4) 20260728 : emit S6F11 CEID41 "One Cycle Finish", the OneCycle twin of
+//EmitCleanOutOK above. The id was 27 until the 20260729 HT9045 alignment renumbered it to 41.
 //loop but sent from nowhere, so a host driving S2F41 ONE_CYCLE never learned the cycle ended.
 //Called from the OneCycle-finish dispatcher in csystem.cpp.
 //EventReport self-gates on USE_SECS_GEM + HSMS SELECTED, so this is a no-op when SECS is off.
 void __fastcall TfMain::EmitOneCycleOK()
 {
-    EventReport(SECS_EVENT.OneCycleOK);
+    EventReport(SECS_EVENT.OneCycleFinish);
+}
+//---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : emit S6F11 CEID27 "Change Machine State". Port of
+//HT9045 main.cpp:18486, which fires whenever palMainStatus->Caption changes. HT160S has the
+//same single status writer (csystem.cpp SetMainStatus), so the change edge is detected there
+//and routed here (csystem.cpp cannot see EventReport). This was the single highest-traffic
+//event on the KYEC floor (406 S6F11/day on the 9045) and HT160S had no emit site for it.
+//EventReport self-gates on USE_SECS_GEM + HSMS SELECTED, so this is a no-op when SECS is off.
+void __fastcall TfMain::EmitRunStatusChange()
+{
+    EventReport(SECS_EVENT.RunStatus);
+}
+//---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : emit S6F11 CEID123 "Safe Door On Off". Port of HT9045
+//csystem.cpp:2775, which fires on ANY safety-door sensor edge (open or close), independent
+//of whether the machine is running. Edge tracking lives in csystem ReportSafeDoorChangeToSecs.
+void __fastcall TfMain::EmitSafeDoorChange()
+{
+    EventReport(SECS_EVENT.SafeDoorOnOff);
+}
+//---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : CEID 21 "Enter IO Page" (HT9045 main.cpp:24931). The
+//HT160S I/O view is opened from maintenance.cpp, which does not include the SECS headers,
+//so the report is routed through here like EmitCleanOutOK/EmitOneCycleOK already are.
+void __fastcall TfMain::EmitEnterIOPage()
+{
+    EventReport(SECS_EVENT.EnterIO);
+}
+//---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : CEID 73 "Mymessbox OK" (HT9045 mymessbox.cpp:368). HT9045
+//only reports it for SECS-originated alarm boxes; HT160S has no such flag on TMyMessageBox, so
+//this fires on EVERY message-box dismissal - i.e. the "message released" notification the KYEC
+//host subscribed to (it saw 7 of these on the 9045 that day). Called from mymessbox FormClose
+//so every dismissal path (Yes / No / Pause / Esc) is covered by one site.
+void __fastcall TfMain::EmitMessageBoxClosed()
+{
+    EventReport(SECS_EVENT.MymessboxOK);
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : Lot Manual Edit list helpers (multi-lot queue, UI layer)

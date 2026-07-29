@@ -27,7 +27,7 @@ enum
 //AI(secs-audit-fix) 20260729 : ocRejStopped split out of ocRejBusy. HT160S's published S2F42
 //table (docs/SECS spec 3.4) is 0=ok / 1=invalid / 2=cannot perform / 4=busy, and SEMI E5 makes
 //HCACK=4 a POSITIVE ack meaning "will be performed, completion signalled later by an event".
-//A machine that is STOPPED is not busy, and with CEID 27 now emitted on cycle finish the
+//A machine that is STOPPED is not busy, and with CEID 41 now emitted on cycle finish the
 //"later" promise became falsifiable : the host would wait forever for an event that can never
 //come. On the KYEC 2026-06-08 traffic this was the DOMINANT case - 8 of 11 ONE_CYCLE commands
 //arrived while the equipment reported HALT. ocRejStopped -> HCACK=2 tells the truth.
@@ -501,7 +501,7 @@ public:		// User declarations
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();
     void __fastcall DoLotEndProcess();   //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body (btnLotEnd + CleanOut-finish auto path)
-    void __fastcall EmitCleanOutOK();    //AI(ht160s-overcount-tripqueue D3) 20260721 : S6F11 CEID28 CleanOutOK (self-gates on HSMS SELECTED); called from csystem CleanOut-finish before Lot End
+    void __fastcall EmitCleanOutOK();    //AI(ht160s-overcount-tripqueue D3) 20260721 : S6F11 CEID42 CleanOutFinish (self-gates on HSMS SELECTED); called from csystem CleanOut-finish before Lot End
     void __fastcall RefreshEventLogView();
     void __fastcall RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status diagnostic sheet pump (throttled; called from DoSystemMessage)
     bool __fastcall SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &ErrorText);
@@ -512,7 +512,11 @@ public:		// User declarations
     void HomeCore();     //AI(machine-command-layer) 20260625 : shared HOME sequence (Home button + SECS HOME)
     bool CheckLotDataReady(AnsiString &Reason);
     void ScanPanelKeys();   //AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch (HT172 ScanKey port)
-    void __fastcall EmitOneCycleOK();   //AI(secs-kyec-rcmd4) 20260728 : S6F11 CEID27 OneCycleOK (self-gates on HSMS SELECTED); called from the csystem OneCycle-finish dispatcher
+    void __fastcall EmitOneCycleOK();   //AI(secs-kyec-rcmd4) 20260728 : S6F11 CEID41 OneCycleFinish (self-gates on HSMS SELECTED); called from the csystem OneCycle-finish dispatcher
+    void __fastcall EmitRunStatusChange();   //AI(secs-ceid-align9045) 20260729 : S6F11 CEID27 RunStatus (machine-state text changed); called from csystem SetMainStatus
+    void __fastcall EmitSafeDoorChange();    //AI(secs-ceid-align9045) 20260729 : S6F11 CEID123 SafeDoorOnOff (any safety-door sensor edge); called from csystem ReportSafeDoorChangeToSecs
+    void __fastcall EmitEnterIOPage();       //AI(secs-ceid-align9045) 20260729 : S6F11 CEID21 EnterIO; called from maintenance.cpp (that unit has no SECS includes)
+    void __fastcall EmitMessageBoxClosed();  //AI(secs-ceid-align9045) 20260729 : S6F11 CEID73 MymessboxOK; called from mymessbox.cpp FormClose
     eOneCycleResult OneCycleCore(bool bRequireRunning, AnsiString &Reason);   //AI(secs-kyec-rcmd4) 20260728 : shared One Cycle gate (operator button + SECS ONE_CYCLE); bRequireRunning is the SECS-only stale-arm guard
 };
 //---------------------------------------------------------------------------

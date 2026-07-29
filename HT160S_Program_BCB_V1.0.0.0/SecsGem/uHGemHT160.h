@@ -4,41 +4,293 @@
 //---------------------------------------------------------------------------
 #include "uHGemClass.h"
 //---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : CEID dictionary is now a VERBATIM copy of HT9045.
+//  Source of truth : D:/HT9045/HT9046LS_Code_V3.32.810_B01_20260527KeyPro_01_AutoUP/SECSGEM/
+//                    uHGemHT9045.h (enum) + uHGemHT9045.cpp (EventDescription).
+//  All 275 ids are registered so the host dictionary matches HT9045 one-for-one; ids whose
+//  mechanism does not exist on HT160S (tester / ART / site / temperature / E87 cassette /
+//  OHT / Fix station / energy saving / Reserved) are registered but never emitted.
+//  142/143/144 carry no alias in HT9045 either - kept unnamed on purpose.
+//  Numbering is FIXED by HT9045. Do not renumber, do not insert, do not reuse a slot.
 struct ETypeStruct
 {
     enum
     {
-        HandlerStatus       = 1,
-        RecipeChange        = 2,
-        ClearCount          = 3,
-        PressStartWithoutIC = 4,
-        PressStartWithIC    = 5,
-        PressPause          = 6,
-        PressHome           = 7,
-        PressOneCycle       = 8,
-        PressCleanOut       = 9,
-        PressTrayFeed       =10,
-        PressLotStart       =11,
-        PressLotEnd         =12,
-        PressExit           =13,
-        PressRetry          =14,
-        PressSkip           =15,
-        PressAlarmReset     =16,
-        ShowAlarm           =17,
-        ReleaseAlarm        =18,
-        ShowMessage         =19,
-        ReleaseMessage      =20,
-        ChangeUser          =21,
-        EnterSetup          =22,
-        EnterMaintenPage    =23,
-        EnterIOPage         =24,
-        EnterTeach          =25,
-        EnterSECSPage       =26,
-        OneCycleOK          =27,
-        CleanOutOK          =28,
-        TrayFeedOK          =29,
-        TimeEvent           =30,
-        RealDummy           =31,
+        DoStart = 1                 ,   //   1 Start Pressed
+        DoPause                     ,   //   2 Pause Pressed
+        DoOneCycle                  ,   //   3 OneCycle Pressed
+        DoCleanOut                  ,   //   4 CleanOut Pressed
+        DoClearCount                ,   //   5 ClearCount Pressed
+        DoLotStart                  ,   //   6 Lot Start
+        DoLot                       ,   //   7 Lot
+        DoLotEnd                    ,   //   8 Lot End
+        SwitchRunMode               ,   //   9 Switch Real Dummy Mode
+        SwitchTesterMode            ,   //  10 Switch Tester Online
+        SwitchProduction            ,   //  11 Switch Production Mode
+        SwitchEngineer              ,   //  12 Switch Engineer Mode
+        SwitchTemperature           ,   //  13 Switch Temperature Mode
+        SwitchStartMode             ,   //  14 Switch StartMode
+        SwitchSetupFile             ,   //  15 Switch Setup File
+        SwitchUser                  ,   //  16 Switch UserLevel
+        EnterTool                   ,   //  17 Enter Tool Page
+        EnterConfig                 ,   //  18 Enter Maintenance Page
+        EnterOffset                 ,   //  19 Enter Offset Page
+        EnterSpeed                  ,   //  20 Enter Speed Page
+        EnterIO                     ,   //  21 Enter IO Page
+        EnterMessage                ,   //  22 Enter Message Page
+        EnterDebug                  ,   //  23 Enter Debug Page
+        DoExit                      ,   //  24 Exit Pressed
+        DoHome                      ,   //  25 Home Pressed
+        GetTestResult               ,   //  26 Get Test Result
+        RunStatus                   ,   //  27 Change Machine State
+        DoRetry                     ,   //  28 Retry Pressed
+        DoSkip                      ,   //  29 Skip Pressed
+        DoAlarmReset                ,   //  30 Alarm Reset Pressed
+        DoTrayEnd                   ,   //  31 Tray End Pressed
+        DoTrayFeed                  ,   //  32 Tray Feed Pressed
+        DoReset                     ,   //  33 Reset Pressed
+        DoAutoClean                 ,   //  34 Auto Clean Start
+        Auto1Full                   ,   //  35 Auto1 Full
+        Auto2Full                   ,   //  36 Auto2 Full
+        Auto3Full                   ,   //  37 Auto3 Full
+        Fix1Full                    ,   //  38 Fix1 Full
+        Fix2Full                    ,   //  39 Fix2 Full
+        Fix3Full                    ,   //  40 Fix3 Full
+        OneCycleFinish              ,   //  41 One Cycle Finish
+        CleanOutFinish              ,   //  42 Clean Out Finish
+        DownloadRecipe              ,   //  43 DownLoadRecipe
+        SiteOnOff                   ,   //  44 Site On Off
+        ArmOnOff                    ,   //  45 Arm On Off
+        SwitchTempData              ,   //  46 Change Temp Defaultand Soak Time
+        SwitchSpeed                 ,   //  47 Change HandlerSpeed
+        ChangeEC                    ,   //  48 Change EC
+        TrayFeedFinish              ,   //  49 Tray Feed Finish
+        AutoCleanFinish             ,   //  50 Auto Clean Finish
+        SiteMappingStart            ,   //  51 Site Mapping Start
+        SiteMappingEnd              ,   //  52 Site Mapping End
+        UPHRecordStart              ,   //  53 UPH Record Start
+        UPHRecordEnd                ,   //  54 UPH Record End
+        InitialArtStart             ,   //  55 Initial ART Start
+        TesterFT                    ,   //  56 Change Tester Program to FT
+        TesterRT                    ,   //  57 Change Tester Program to RT
+        ReadyForArt                 ,   //  58 Ready for ART
+        ArtReceiveTrayOK            ,   //  59 ART Receive Tray OK
+        ArtReceiveTraySTART         ,   //  60 ART Receive Tray START
+        ArtRTFinish                 ,   //  61 RT Finish
+        ArtTrayFeedFinish           ,   //  62 ART Finish
+        ArtFTFinish                 ,   //  63 FT Finish
+        DownLoadRecipeByFTPOK       ,   //  64 DownLoad Recipe by FTP OK
+        DownLoadRecipeByFTPNG       ,   //  65 DownLoad Recipe by FTP NG
+        LoadTrayFinish              ,   //  66 Load Tray Finish
+        TrayTestFinish              ,   //  67 Tray Test Finish
+        AutoCleanClearCount         ,   //  68 Auto Clean Clear Count
+        SiteMappingStop             ,   //  69 Site Mapping Stop
+        BarcodeReaderEnter          ,   //  70 Barcode Reader Enter
+        OTDLock                     ,   //  71 OTD Lock
+        OTDUnLock                   ,   //  72 OTD UnLock
+        MymessboxOK                 ,   //  73 Mymessbox OK
+        RemoteProgramClose          ,   //  74 74
+        ChangeTesterPrgToEQC        ,   //  75 75
+        DoStartHasIC                ,   //  76 Start Pressed HasIC
+        ReadCurrentESDData          ,   //  77 Read Current ESD Data
+        JamSkipICCount              ,   //  78 Jam Skip IC Count
+        REVERSED79                  ,   //  79 REVERSED79  (no alias in HT9045)
+        ReadNowHandlerData          ,   //  80 Read Now Handler Data
+        ReadATCTemperature          ,   //  81 Read ATC Temperature
+        ReadATCRefTemperature       ,   //  82 Read ATC Ref Temperature
+        ReadNowEPPenconder          ,   //  83 Read Now EP Penconder
+        RunStatus_FT                ,   //  84 Run Status FT
+        RunStatus_RT                ,   //  85 Run Status RT
+        MapNoArmHasIC               ,   //  86 Map No Device Arm Has Device
+        MapHasICArmRetry            ,   //  87 Map Has Device Arm Error Retry
+        MapHasICArmSkip             ,   //  88 Map Has Device Arm Error Skip
+        PreAlarmMessage             ,   //  89 Pre Alarm Message
+        GetTestResultAndBarcode     ,   //  90 Get TestResult And Barcode
+        SECSOffline                 ,   //  91 SECS/GEM Offline
+        SECSOnline                  ,   //  92 SECS/GEM Online
+        SECSOnlineRemote            ,   //  93 SECS/GEM Online Remote
+        TransferBlocked             ,   //  94 Transfer Blocked
+        CassetteLoadComplete        ,   //  95 Cassette Load Complete
+        CassetteIDReadComplete      ,   //  96 Cassette ID Read Complete
+        ReadyToProcessComplete      ,   //  97 Ready To Process Complete
+        ReadyToCarrierOutLot        ,   //  98 Ready To Carrier Out Lot
+        CassetteOutComplete         ,   //  99 Cassette Out Complete
+        CassetteUnclamped           ,   // 100 Cassette Unclamped
+        ReadyToUnload               ,   // 101 Ready To Unload
+        UnloadComplete              ,   // 102 Unload Complete
+        ReadyToCarrierOutTray       ,   // 103 Ready To Carrier Out Tray
+        ReadyToCombinePass          ,   // 104 Ready To Combine Pass
+        ReadyToCombineFail          ,   // 105 Ready To Combine Fail
+        MachineNoStart              ,   // 106 Machine No Start
+        ReadyToCombinePassLotEnd    ,   // 107 Ready To Combine Pass Lot End
+        DoCSTLotStart               ,   // 108 Cassette Lot Start
+        DieCountFailMessageClose    ,   // 109 Die Count Fail Message Close
+        CleanOutTrayFeedFinish      ,   // 110 Clean Out Tray Feed Finish
+        MapNoICArmAutoSkip          ,   // 111 Map No Device Arm Auto Skip
+        MRRunModeChange             ,   // 112 MR Run Mode Change
+        AccessModeChange            ,   // 113 Access Mode Change
+        SoftwareBin                 ,   // 114 Software Bin
+        TrayIDChange                ,   // 115 Tray ID Change
+        ReadyToLoadNoLot            ,   // 116 Ready To Load No Lot
+        ReadyToLoadNoTray           ,   // 117 Ready To Load No Tray
+        ReadyToLoadNoCassette       ,   // 118 Ready To Load No Cassette
+        ART_SRQKIND2_FTLOTSTART     ,   // 119 ART SRQKIND2 FT LOTSTART
+        ART_SRQKIND4_RTLOTSTART     ,   // 120 ART SRQKIND4 RT LOTSTART
+        ART_SRQKIND8_LOTEND         ,   // 121 ART SRQKIND6 LOTEND
+        ART_SRQKIND10_FINALLOTEND   ,   // 122 FINAL LOTEND
+        SafeDoorOnOff               ,   // 123 Safe Door On Off
+        SaveRecipe                  ,   // 124 Save Recipe
+        EESUGOffestSelect           ,   // 125 EESUG Offest Select
+        EESUGOffestModify           ,   // 126 EESUG Offest Modify
+        Backtonormal                ,   // 127 Back To Normal
+        TestStart                   ,   // 128 Test Start
+        TestFinish                  ,   // 129 Test Finish
+        MaterialReceive             ,   // 130 Material Receive
+        SlotMapCountOK              ,   // 131 Slot Map Count OK
+        CHECK_IN                    ,   // 132 CHECK IN
+        CHECK_OUT                   ,   // 133 CHECK OUT
+        ReadyToCombineFailLotEnd    ,   // 134 Ready To Combine Fail Lot End
+        ReadyToOHTLotEnd            ,   // 135 Ready To OHT Lot End
+        Auto1Unloadtray             ,   // 136 Auto 1 Unloading tray
+        Auto2Unloadtray             ,   // 137 Auto 2 Unloading tray
+        Auto3Unloadtray             ,   // 138 Auto 3 Unloading tray
+        DoVisualSortLotStart        ,   // 139 Click lot start button for visual sort mode
+        PreLoadTray                 ,   // 140 Prepare Load Tray
+        GemControlStateChange       ,   // 141 GEM Control State Change
+        PickerCountWasCleared       ,   // 142 PickerCountWasCleared  (no alias in HT9045)
+        UploadPickerCount           ,   // 143 UploadPickerCount  (no alias in HT9045)
+        RequestPickerCount          ,   // 144 RequestPickerCount  (no alias in HT9045)
+        Auto4Unloadtray             ,   // 145 Auto 4 Unloading tray
+        Auto5Unloadtray             ,   // 146 Auto 5 Unloading tray
+        Auto6Unloadtray             ,   // 147 Auto 6 Unloading tray
+        Auto4Full                   ,   // 148 Auto 4 Full
+        Auto5Full                   ,   // 149 Auto 5 Full
+        Auto6Full                   ,   // 150 Auto 6 Full
+        Fix4Full                    ,   // 151 Fix 4 Full
+        Fix5Full                    ,   // 152 Fix 5 Full
+        Fix6Full                    ,   // 153 Fix 6 Full
+        LoadNoTray                  ,   // 154 Loader hasn't tray
+        LoadFullTray                ,   // 155 Loader full of tray
+        LoadOnlyOneTray             ,   // 156 Loader only one tray
+        Loader_ReadyToUnload        ,   // 157 Loader ready to unload
+        Loader_FinishUnload         ,   // 158 Loader finish unload
+        Empty_PreLoadTray           ,   // 159 Empty Prepare Load Tray
+        EmptyOnlyOneTray            ,   // 160 Empty only one tray
+        EmptyNoTray                 ,   // 161 Empty hasn't tray
+        EmptyFullTray               ,   // 162 Empty full of tray
+        Color_PreLoadTray           ,   // 163 Color Prepare Load Tray
+        ColorOnlyOneTray            ,   // 164 Color only one tray
+        ColorNoTray                 ,   // 165 Color hasn't tray
+        Empty_PutTrayToAuto1        ,   // 166 Empty put tray to Auto1
+        Empty_PutTrayToAuto2        ,   // 167 Empty put tray to Auto2
+        Empty_PutTrayToAuto3        ,   // 168 Empty put tray to Auto3
+        Empty_PutTrayToAuto4        ,   // 169 Empty put tray to Auto4
+        Empty_PutTrayToAuto5        ,   // 170 Empty put tray to Auto5
+        Empty_PutTrayToAuto6        ,   // 171 Empty put tray to Auto6
+        Empty_PutCoverToAuto1       ,   // 172 Empty put cover to Auto1
+        Empty_PutCoverToAuto2       ,   // 173 Empty put cover to Auto2
+        Empty_PutCoverToAuto3       ,   // 174 Empty put cover to Auto3
+        Empty_PutCoverToAuto4       ,   // 175 Empty put cover to Auto4
+        Empty_PutCoverToAuto5       ,   // 176 Empty put cover to Auto5
+        Empty_PutCoverToAuto6       ,   // 177 Empty put cover to Auto6
+        Color_PutTrayToAuto1        ,   // 178 Color put tray to Auto1
+        Color_PutTrayToAuto2        ,   // 179 Color put tray to Auto2
+        Color_PutTrayToAuto3        ,   // 180 Color put tray to Auto3
+        Color_PutTrayToAuto4        ,   // 181 Color put tray to Auto4
+        Color_PutTrayToAuto5        ,   // 182 Color put tray to Auto5
+        Color_PutTrayToAuto6        ,   // 183 Color put tray to Auto6
+        Color_PutCoverToAuto1       ,   // 184 Color put cover to Auto1
+        Color_PutCoverToAuto2       ,   // 185 Color put cover to Auto2
+        Color_PutCoverToAuto3       ,   // 186 Color put cover to Auto3
+        Color_PutCoverToAuto4       ,   // 187 Color put cover to Auto4
+        Color_PutCoverToAuto5       ,   // 188 Color put cover to Auto5
+        Color_PutCoverToAuto6       ,   // 189 Color put cover to Auto6
+        Auto1_LoadTrayFinish        ,   // 190 Auto1 load tray finish
+        Auto2_LoadTrayFinish        ,   // 191 Auto2 load tray finish
+        Auto3_LoadTrayFinish        ,   // 192 Auto3 load tray finish
+        Auto4_LoadTrayFinish        ,   // 193 Auto4 load tray finish
+        Auto5_LoadTrayFinish        ,   // 194 Auto5 load tray finish
+        Auto6_LoadTrayFinish        ,   // 195 Auto6 load tray finish
+        Auto1_ReadyToUnload         ,   // 196 Auto1 ready to unload
+        Auto2_ReadyToUnload         ,   // 197 Auto2 ready to unload
+        Auto3_ReadyToUnload         ,   // 198 Auto3 ready to unload
+        Auto4_ReadyToUnload         ,   // 199 Auto4 ready to unload
+        Auto5_ReadyToUnload         ,   // 200 Auto5 ready to unload
+        Auto6_ReadyToUnload         ,   // 201 Auto6 ready to unload
+        Auto1NoTray                 ,   // 202 Auto1 hasn't tray
+        Auto2NoTray                 ,   // 203 Auto2 hasn't tray
+        Auto3NoTray                 ,   // 204 Auto3 hasn't tray
+        Auto4NoTray                 ,   // 205 Auto4 hasn't tray
+        Auto5NoTray                 ,   // 206 Auto5 hasn't tray
+        Auto6NoTray                 ,   // 207 Auto6 hasn't tray
+        ColorFullTray               ,   // 208 Color full of tray
+        TrayEndFinish               ,   // 209 Tray End Finish
+        Empty_FinishUnload          ,   // 210 Empty finish unload
+        Color_FinishUnload          ,   // 211 Color finish unload
+        PowerSavingStart            ,   // 212 Energy Saving Start
+        PowerSavingEnd              ,   // 213 Energy Saving End
+        Reserved_03                 ,   // 214 Reserved_03
+        Reserved_04                 ,   // 215 Reserved_04
+        Reserved_05                 ,   // 216 Reserved_05
+        Reserved_06                 ,   // 217 Reserved_06
+        Reserved_07                 ,   // 218 Reserved_07
+        Reserved_08                 ,   // 219 Reserved_08
+        Reserved_09                 ,   // 220 Reserved_09
+        Reserved_10                 ,   // 221 Reserved_10
+        Reserved_11                 ,   // 222 Reserved_11
+        Reserved_12                 ,   // 223 Reserved_12
+        Reserved_13                 ,   // 224 Reserved_13
+        Reserved_14                 ,   // 225 Reserved_14
+        Reserved_15                 ,   // 226 Reserved_15
+        Reserved_16                 ,   // 227 Reserved_16
+        Reserved_17                 ,   // 228 Reserved_17
+        Reserved_18                 ,   // 229 Reserved_18
+        Reserved_19                 ,   // 230 Reserved_19
+        Reserved_20                 ,   // 231 Reserved_20
+        Reserved_21                 ,   // 232 Reserved_21
+        Reserved_22                 ,   // 233 Reserved_22
+        Reserved_23                 ,   // 234 Reserved_23
+        Reserved_24                 ,   // 235 Reserved_24
+        Reserved_25                 ,   // 236 Reserved_25
+        Reserved_26                 ,   // 237 Reserved_26
+        Reserved_27                 ,   // 238 Reserved_27
+        Reserved_28                 ,   // 239 Reserved_28
+        Reserved_29                 ,   // 240 Reserved_29
+        Reserved_30                 ,   // 241 Reserved_30
+        Reserved_31                 ,   // 242 Reserved_31
+        Reserved_32                 ,   // 243 Reserved_32
+        Reserved_33                 ,   // 244 Reserved_33
+        Reserved_34                 ,   // 245 Reserved_34
+        Reserved_35                 ,   // 246 Reserved_35
+        Reserved_36                 ,   // 247 Reserved_36
+        Reserved_37                 ,   // 248 Reserved_37
+        Reserved_38                 ,   // 249 Reserved_38
+        DoStartAutoHeight           ,   // 250 START Auto contact height
+        DoSecsGemIndexFail          ,   // 251 SECS GEM consecutive failure
+        Reserved_39                 ,   // 252 Reserved_39
+        Reserved_40                 ,   // 253 Reserved_40
+        Reserved_41                 ,   // 254 Reserved_41
+        Reserved_42                 ,   // 255 Reserved_42
+        Reserved_43                 ,   // 256 Reserved_43
+        Reserved_44                 ,   // 257 Reserved_44
+        Reserved_45                 ,   // 258 Reserved_45
+        Reserved_46                 ,   // 259 Reserved_46
+        Reserved_47                 ,   // 260 Reserved_47
+        Reserved_48                 ,   // 261 Reserved_48
+        Reserved_49                 ,   // 262 Reserved_49
+        Reserved_50                 ,   // 263 Reserved_50
+        Reserved_51                 ,   // 264 Reserved_51
+        Reserved_52                 ,   // 265 Reserved_52
+        Reserved_53                 ,   // 266 Reserved_53
+        Reserved_54                 ,   // 267 Reserved_54
+        Reserved_55                 ,   // 268 Reserved_55
+        Reserved_56                 ,   // 269 Reserved_56
+        Reserved_57                 ,   // 270 Reserved_57
+        Reserved_58                 ,   // 271 Reserved_58
+        AGVSupplement               ,   // 272 AMR Supplement
+        AGVLDUnLDStatus             ,   // 273 AMR LDUnLD Status
+        AGVLDUnLDFinish             ,   // 274 AMR LDUnLD Finish
+        AGVLdID                     ,   // 275 AMR LD ID
         TotalEvent
     };
 };

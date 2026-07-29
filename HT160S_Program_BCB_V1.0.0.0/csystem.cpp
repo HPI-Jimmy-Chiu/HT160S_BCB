@@ -50,6 +50,54 @@ static void SetMainStatus(AnsiString StatusText, TColor Color)
 	}
 	if(fMain->palMainStatus_En!=NULL)
 		fMain->palMainStatus_En->Caption=StatusText;
+
+	//AI(secs-ceid-align9045) 20260729 : CEID 27 "Change Machine State". HT9045 main.cpp:18473
+	//compares its cached sMachineState against palMainStatus->Caption on every scan and reports
+	//on the edge; this is the same test at HT160S's single status writer. The first call after
+	//boot moves "" -> the real status and therefore reports once, which is what HT9045 does too
+	//(its sMachineState also starts empty). EmitRunStatusChange self-gates on USE_SECS_GEM +
+	//HSMS SELECTED, so nothing goes out before the link is up.
+	static AnsiString sLastSecsStatus="";
+	if(sLastSecsStatus!=StatusText)
+	{
+		sLastSecsStatus=StatusText;
+		fMain->EmitRunStatusChange();
+	}
+}
+//---------------------------------------------------------------------------
+//AI(secs-ceid-align9045) 20260729 : CEID 123 "Safe Door On Off". Port of HT9045
+//csystem.cpp:2765-2777, which reports on a safety-door edge in EITHER direction, running or
+//not. Deliberately separate from RecordSafeDoorStates below, which only logs RISING edges
+//while the machine is STOPPED - the host wants production-time transitions and closes too.
+//
+//Tracked as one aggregate open/closed boolean off IsSafeDoorOpen() rather than HT9045's
+//per-door edges, for three reasons : (a) the S6F11 for this CEID carries report 1 (machine
+//context SVs) and has no door-id field, so per-door granularity is invisible to the host
+//anyway; (b) it reuses the single existing definition of "a door is open" instead of forking
+//a second sensor list that could drift from it; (c) IsSafeDoorOpen() already returns 0 under
+//SOFT_SIMULATE, so the simulator cannot emit phantom door events and this needs no #ifdef of
+//its own (which would rot, since dev builds keep SOFT_SIMULATE on).
+static void ReportSafeDoorChangeToSecs()
+{
+	static bool bSeeded=false;
+	static bool bWasOpen=false;
+
+	bool bOpen=(IsSafeDoorOpen()>0);
+
+	//First pass only seeds the baseline, so booting with a door already open is not
+	//reported as a transition.
+	if(bSeeded==false)
+	{
+		bSeeded=true;
+		bWasOpen=bOpen;
+		return;
+	}
+	if(bOpen!=bWasOpen)
+	{
+		bWasOpen=bOpen;
+		if(fMain!=NULL)
+			fMain->EmitSafeDoorChange();
+	}
 }
 //---------------------------------------------------------------------------
 static void UpdateRunControlFlag()
@@ -1133,6 +1181,7 @@ void DoSystem()
 		HSys.Sys.SystemStart=false;
 	DoSystemMessage();
 	RecordSafeDoorStates();
+	ReportSafeDoorChangeToSecs();   //AI(secs-ceid-align9045) 20260729 : CEID123 door-edge report (both directions, running or not)
 }
 //---------------------------------------------------------------------------
 bool CheckMotorHome()
@@ -1418,7 +1467,7 @@ void MachineStop(eMachineTrigger trig)
 	//    behind. That latch is set by SortArm one scan before DoAllProcess consumes it, and
 	//    the only clearer is the dispatcher behind the SystemStart==false gate - so a stop in
 	//    that window kept it true, and the next accepted ONE_CYCLE on a running machine would
-	//    read the stale true and immediately emit an S6F11 CEID 27 for a cycle that never ran,
+	//    read the stale true and immediately emit an S6F11 CEID 41 for a cycle that never ran,
 	//    plus a spurious SoftStop. Clear both halves together or neither.
 	//The keep-vs-discard POLICY for the plain (non-drain) case is untouched here : that is the
 	//behaviour decision recorded at the ProcessMotion falling-edge rung below, which keeps the
@@ -1705,7 +1754,7 @@ void ProcessMotion()
 	{
 		if(CheckCleanOutFinish())
 		{
-			//AI(ht160s-overcount-tripqueue D3/D6) 20260721 : emit CEID28 CleanOutOK first
+			//AI(ht160s-overcount-tripqueue D3/D6) 20260721 : emit CEID42 CleanOutFinish first
 			//(host sees Clean Out done before Lot End), in BOTH modes (self-gates on SELECTED).
 			if(fMain!=NULL) fMain->EmitCleanOutOK();
 			if(GeneralSetting.bUseAMR)

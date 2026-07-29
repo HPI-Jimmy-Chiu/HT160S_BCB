@@ -1861,7 +1861,11 @@ void __fastcall TfMaintenance::OpenIOView(TSpeedButton *Button)
         return;
     }
 //    RecordProcess("Enter IO");
-//    EventReport(SECS_EVENT.EnterIOPage);
+    //AI(secs-ceid-align9045) 20260729 : CEID 21 "Enter IO Page" (HT9045 main.cpp:24931).
+    //Routed through fMain because this unit has no SECS includes. Reported here, past the
+    //access-level reject above, so a denied entry sends nothing.
+    if(fMain!=NULL)
+        fMain->EmitEnterIOPage();
     if(fiosetview==NULL)
         fiosetview=new Tfiosetview(this);
 
