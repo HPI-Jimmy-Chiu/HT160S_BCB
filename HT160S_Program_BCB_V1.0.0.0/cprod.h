@@ -225,6 +225,10 @@ AnsiString GetTotalQuantityMagPercent();
 //cumulative fields are left alone; only the per-lot display / throughput counts
 //reset so the Auto Cnt display, UPH and SECS Scanned/Sorted represent THIS lot.
 void ResetPerLotProductionCounters();
+//AI(secs-rcmd-9045) 20260729 : per-destination sort counts only, for SECS CLEAN_AUTO_SORT_COUNT.
+//NOT interchangeable with ResetPerLotProductionCounters (see the comment at the definition).
+void ResetAutoSortCounters();
+AnsiString DescribeAutoSortCounters();
 //AI(ht160s-uph) 20260706 : per-tray + per-lot UPH logging. Non-invasive observer
 //(reads the public TAutoModule station status) + CSV under
 //<LogRoot>\UPHLog\YYYY_MM\<LotID>__<ts>\. Total UPH uses the HT172 aggregate

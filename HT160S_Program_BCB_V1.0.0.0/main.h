@@ -510,6 +510,7 @@ public:		// User declarations
     void Start();
     void DoStartArm();   //AI(machine-command-layer) 20260625 : arm half of Start; only MachineStart() calls it
     void HomeCore();     //AI(machine-command-layer) 20260625 : shared HOME sequence (Home button + SECS HOME)
+    bool CleanOutCore();   //AI(secs-rcmd-9045) 20260729 : shared Clean Out arm (Clean Out button + SECS CLEAN_OUT); false = not in Run_Normal, nothing armed
     bool CheckLotDataReady(AnsiString &Reason);
     void ScanPanelKeys();   //AI(HT160S-Maintainer) 20260617 : physical operator-panel key dispatch (HT172 ScanKey port)
     void __fastcall EmitOneCycleOK();   //AI(secs-kyec-rcmd4) 20260728 : S6F11 CEID41 OneCycleFinish (self-gates on HSMS SELECTED); called from the csystem OneCycle-finish dispatcher

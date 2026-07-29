@@ -947,6 +947,56 @@ int HT160Gem::GuiWriteTrayEC(unsigned ECID, AnsiString sValue)
     return 0;
 }
 //---------------------------------------------------------------------------
+//AI(secs-rcmd-9045) 20260729 : HT9045 host commands that exist in its S2F42 dispatch but
+//describe TESTER mechanisms HT-160S does not have - test/retest flow (ART / MRT / AQL / FT-RT
+//program switching), socket cleaning, site mapping, device-temperature offsets and EESUG
+//offsets, and yield-fail handling. Every name below was verified present in
+//D:/HT9045/HT9046LS_Code_V3.32.810_B01_20260527KeyPro_01_AutoUP/SECSGEM/uHGemHT9045.cpp.
+//
+//These answer HCACK=2 "recognised, cannot perform" rather than falling through to the
+//unknown-command HCACK=1. Reason: to a host audit, 1 reads as "this equipment has never
+//heard of the command" (suggesting a typo or a version mismatch) whereas 2 reads as "known
+//command, not available on this machine" - which is the true statement. This is the same
+//answer the existing ENERGY_SAVING branch gives, and the same answer KYEC's own HT9045 gave
+//to ENERGY_SAVING 23/23 times on 2026-06-08 without the host escalating.
+//
+//NEVER 4 here : SEMI E5 HCACK=4 is a POSITIVE ack promising a later completion event, and
+//none of these will ever produce one.
+//
+//Exact match on the trimmed name, NOT the AnsiPos prefix match the other branches use,
+//because several of these names are prefixes of each other or of live commands
+//(INITIAL_START_ART vs INITIAL_START, START_AQL vs START_AGV). A prefix test here could
+//swallow a command HT-160S actually implements.
+static bool IsTesterOnlyRcmd(AnsiString S)
+{
+    static const char *Names[] = {
+        "AUTO_RETEST",
+        "CONTINUE_RETEST_ART",
+        "CONTINUE_START_ART",
+        "CONTINUE_START_MRT",
+        "INITIAL_START_ART",
+        "INITIAL_START_MRT",
+        "RETEST_MRT",
+        "SWITCH_TO_FT",
+        "SWITCH_TO_RT",
+        "START_AQL",
+        "DEVTEMPOFFSETADJUST",
+        "TESTTEMPSETTING",
+        "EESUG_OFFSET",
+        "AUTOSITEMAP",
+        "AUTO_CLEAN",
+        "YIELD_FAIL"
+    };
+    AnsiString T = S.Trim();
+    int Count = (int)(sizeof(Names)/sizeof(Names[0]));
+    for(int i=0; i<Count; i++)
+    {
+        if(T==AnsiString(Names[i]))
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260610 : S2F41 SET_LOT_INFO variable-length multi-Lot.
 //  Reads outer L[2]{ A "SET_LOT_INFO", L[n]{ A lotID ... } }, refills
 //  LotRegistry (overwrite, D1), backfills first lot to edLotNo (D2), rejects
@@ -1161,6 +1211,74 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             {
                 ResetPerLotProductionCounters();
                 WriteLastDataIni();
+                HCACK = 0;
+            }
+        }
+        else if(S.AnsiPos("CLEAN_AUTO_SORT_COUNT")==1)
+        {
+            //AI(secs-rcmd-9045) 20260729 : HT9045 RCMD, ported. KYEC sent it TWICE on
+            // 2026-06-08, so this is a command the host really uses. HT9045
+            // (uHGemHT9045.cpp:1145) refuses while material is in the machine, then logs the
+            // per-bin counts and clears them. Same shape here.
+            // NOT the same as HT160S's own CLEARCOUNT : that one wipes the machine-level
+            // totals too (TotalIC / UPH / LoaderIC / JamCount). See ResetAutoSortCounters().
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(HasICUnderMachine())
+            {
+                HCACK = 2;                                       // material still inside -> cannot perform
+                RecordProcess("SECS CLEAN_AUTO_SORT_COUNT refused : IC still under the machine");
+            }
+            else
+            {
+                RecordProcess("SECS CLEAN_AUTO_SORT_COUNT clearing : "+DescribeAutoSortCounters());
+                ResetAutoSortCounters();
+                WriteLastDataIni();
+                HCACK = 0;
+            }
+        }
+        else if(S.AnsiPos("CLEAN_OUT")==1)
+        {
+            //AI(secs-rcmd-9045) 20260729 : HT9045 RCMD, ported. HT9045
+            // (uHGemHT9045.cpp:1460) just calls its own Clean Out button handler and answers 0.
+            // HT160S routes through TfMain::CleanOutCore() (the modal-free body shared with
+            // sbCleanOut1Click) so operator and host arm the drain through ONE path.
+            // Departure from HT9045 : it answers 0 unconditionally. HT160S's Clean Out only
+            // arms from Run_Normal, and silently answering 0 when nothing was armed would tell
+            // the host a drain started that never will, so a refused arm answers 2.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(fMain==NULL)
+                HCACK = 2;                                       // no UI context
+            else if(fMain->CleanOutCore())
+            {
+                RecordProcess("SECS CLEAN_OUT : clean-out armed by host");
+                HCACK = 0;
+            }
+            else
+            {
+                HCACK = 2;                                       // not in Run_Normal -> nothing armed
+                RecordProcess("SECS CLEAN_OUT refused : machine is not in Normal run mode");
+            }
+        }
+        else if(S.AnsiPos("HALT")==1)
+        {
+            //AI(secs-rcmd-9045) 20260729 : HT9045 RCMD, ported. HT9045
+            // (uHGemHT9045.cpp:1794) clears its SoftStart run latch - a SOFT stop, no motor
+            // stop command - and answers 2 when its remote-start precondition is not armed.
+            // So HALT maps onto HT160S's MachinePause() choke point (decelerating stop), the
+            // same one RCMD PAUSE uses, NOT MachineStop() (which hard-stops the motors and is
+            // what RCMD STOP is for). HT9045 itself aliases PAUSE and STOP into one branch
+            // (uHGemHT9045.cpp:1081), so answering HALT with the soft path is in keeping.
+            // Gate mirrors HT9045's intent : do not claim to have halted a machine that was
+            // not running.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(HSys.Sys.SystemStart==false)
+            {
+                HCACK = 2;                                       // not running -> nothing to halt
+                RecordProcess("SECS HALT refused : machine is not running");
+            }
+            else
+            {
+                MachinePause(trigSecsRemote);
                 HCACK = 0;
             }
         }
@@ -1775,6 +1893,17 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     RecordProcess("SECS PP_MUSIC : music override armed (class="+IntToStr(pmClass)+")");
                 }
             }
+        }
+        else if(IsTesterOnlyRcmd(S))
+        {
+            //AI(secs-rcmd-9045) 20260729 : a real HT9045 command for a mechanism HT-160S does
+            // not have. Consume the parameter list (so the receive buffer stays in step) and
+            // answer 2 "recognised, cannot perform". See IsTesterOnlyRcmd() for the reasoning
+            // and for why this is an exact-match list rather than a prefix test.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            HCACK = 2;
+            RecordProcess("SECS "+S.Trim()+" refused : tester-only HT9045 command, HT-160S is a sorter");
+            HGemPtr->StringOut("[SECS] RCMD "+S.Trim()+" is a tester-only HT9045 command - HCACK=2 (known, not available)");
         }
         else
         {

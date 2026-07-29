@@ -152,6 +152,43 @@ void ResetPerLotProductionCounters()
     bFirstRun=true;
 }
 //---------------------------------------------------------------------------
+//AI(secs-rcmd-9045) 20260729 : clear ONLY the per-destination sort counts, for the SECS
+//S2F41 "CLEAN_AUTO_SORT_COUNT" host command (HT9045 uHGemHT9045.cpp:1145, which clears its
+//LastSet.BinCT_ART[] per-bin counters and logs them out first).
+//
+//Deliberately NOT the same thing as ResetPerLotProductionCounters() above, which is what the
+//HT160S-specific CLEARCOUNT command uses : that one also zeroes TotalIC / UPH / LoaderIC /
+//JamCount / scanned / sorted and restarts the UPH clock. HT9045 has no CLEARCOUNT and its
+//CLEAN_AUTO_SORT_COUNT leaves the machine-level totals standing, so the two commands mean
+//different things and must not be aliased onto one another.
+//
+//Consequence to be aware of : after this runs, TotalIC no longer equals the sum of BinICCnt.
+//That divergence exists on HT9045 too, and the caller logs the pre-clear values (as HT9045
+//does) so the numbers are not lost from the record.
+void ResetAutoSortCounters()
+{
+    ZeroMemory(tRunData.BinICCnt,  sizeof(tRunData.BinICCnt));
+    ZeroMemory(tRunData.TrayICCnt, sizeof(tRunData.TrayICCnt));
+    for(int AreaIndex=0; AreaIndex<eTrayCount; AreaIndex++)
+        MachineRun.iAreaCount[AreaIndex]=0;
+}
+//---------------------------------------------------------------------------
+//AI(secs-rcmd-9045) 20260729 : one-line dump of the per-destination sort counts, so
+//CLEAN_AUTO_SORT_COUNT can record what it is about to erase (HT9045 does the same before
+//clearing). Auto1-6 + Color, matching the eTrayName order.
+AnsiString DescribeAutoSortCounters()
+{
+    AnsiString S;
+    S = "AutoSortCount";
+    for(int i=eAuto1; i<eTrayCount; i++)
+    {
+        AnsiString sOne;
+        sOne.sprintf(" T%d=%d", i, tRunData.TrayICCnt[i]);
+        S = S + sOne;
+    }
+    return S;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-password) 20260624 : the password book is now a notepad-openable
 // text file (system\login.txt, one "ID,Password,Level" line per account)
 // owned by THT160UserRoleManager. The former binary login.dat / PASS_WORD

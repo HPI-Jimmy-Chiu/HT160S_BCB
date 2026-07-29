@@ -1619,9 +1619,27 @@ will <strong>silently misread</strong> them — well-formed message, wrong seman
 </tr>
 <tr>
 <td><code>CLEARCOUNT</code></td>
-<td>清除計數</td>
+<td>清除<strong>全部</strong>生產計數</td>
 <td>—</td>
-<td></td>
+<td>HT-160S 專屬。清 TotalIC / UPH / LoaderIC / JamCount / scanned / sorted <strong>與</strong>各 Bin/Auto 分選數,並重啟 UPH 計時。運轉中回 4</td>
+</tr>
+<tr>
+<td><code>CLEAN_AUTO_SORT_COUNT</code></td>
+<td>只清<strong>各 Auto / Bin 分選數</strong></td>
+<td>—</td>
+<td>對齊 HT9045。<strong>與 <code>CLEARCOUNT</code> 語意不同,不可互換</strong>:本命令保留機台層總數(TotalIC/UPH/…),只歸零 per-Bin / per-Auto 分選數。機內仍有 IC 時回 2。清除前會把原值記入 Production log</td>
+</tr>
+<tr>
+<td><code>CLEAN_OUT</code></td>
+<td>遠端啟動排料(Clean Out)</td>
+<td>—</td>
+<td>對齊 HT9045。僅能自 <strong>Normal 運轉模式</strong>進入;非 Normal 回 2(不謊報已啟動,9045 於此處一律回 0)</td>
+</tr>
+<tr>
+<td><code>HALT</code></td>
+<td>遠端軟停(減速停止)</td>
+<td>—</td>
+<td>對齊 HT9045(9045 為清除 SoftStart 閂鎖的軟停,非硬停)。機台未運轉回 2。與 <code>STOP</code> 的差別:<code>STOP</code> 為硬停(立即停馬達),<code>HALT</code> 走與 <code>PAUSE</code> 同一減速停止路徑</td>
 </tr>
 <tr>
 <td><code>ONLINE_REMOTE</code> / <code>ONLINE</code></td>
@@ -1668,7 +1686,11 @@ will <strong>silently misread</strong> them — well-formed message, wrong seman
 </tbody>
 </table>
 <blockquote>
-<p>HCACK: 0=成功 / 1=命令無效 / 2=參數錯,或<strong>認得命令但本機不執行</strong>(如 <code>ENERGY_SAVING</code>、<code>START_AGV</code> 未知 CP / AMR 關閉)/ 4=busy(運轉中、機內有 IC、或已在 OneCycle)。未列命令仍回 HCACK=1。
+<p>HCACK: 0=成功 / 1=命令無效 / 2=參數錯,或<strong>認得命令但本機不執行</strong>(如 <code>ENERGY_SAVING</code>、<code>START_AGV</code> 未知 CP / AMR 關閉)/ 4=busy(運轉中、機內有 IC、或已在 OneCycle)。未列命令仍回 HCACK=1。</p>
+<p><strong>HT9045 的測試機專屬命令回 HCACK=2,不回 1</strong>。下列 16 個命令確實存在於 HT9045,但描述的是 HT-160S(sorter)沒有的機構(測試/重測流程 ART / MRT / AQL、FT-RT 程式切換、清針、site mapping、器件溫度與 EESUG offset、yield-fail):
+<code>AUTO_RETEST</code> <code>CONTINUE_RETEST_ART</code> <code>CONTINUE_START_ART</code> <code>CONTINUE_START_MRT</code> <code>INITIAL_START_ART</code> <code>INITIAL_START_MRT</code> <code>RETEST_MRT</code> <code>SWITCH_TO_FT</code> <code>SWITCH_TO_RT</code> <code>START_AQL</code> <code>DEVTEMPOFFSETADJUST</code> <code>TESTTEMPSETTING</code> <code>EESUG_OFFSET</code> <code>AUTOSITEMAP</code> <code>AUTO_CLEAN</code> <code>YIELD_FAIL</code>
+回 2 而非 1 的理由:對 host 稽核而言 1 讀作「本設備沒聽過這個命令」(像打錯字或版本不符),2 才是實話「認得,但本機沒有這個功能」。<strong>一律不回 4</strong> —— HCACK=4 依 SEMI E5 是肯定回覆(承諾稍後以事件通知完成),而這些命令永遠不會產生完成事件。</p>
+<p><strong>尚未實作的 HT9045 命令</strong>:<code>TRAY_FEED</code>(本機無 Tray Feed 功能 —— <code>Run_TrayFeed</code> 無 live 進入點,結束判定亦未實作)、<code>RESET</code>(HT9045 的 <code>Reset()</code> 是測試機收料回復流程:未測件送 error bin、OutArm/Shuttle/RotateKit 復位、GPIB 重置,HT-160S 無對應機構;本機最接近的遠端復位是 <code>HOME</code>)。此兩者目前落在未列命令,回 HCACK=1。
 <strong><code>ONE_CYCLE</code> 於 Clean Out(排料)進行中不會停機</strong>:本機允許在 Clean Out 中受理 <code>ONE_CYCLE</code>(回 0),
 循環結束時會<strong>回到 Clean Out 繼續排料而不停機</strong>,但仍會送出 CEID 41「One Cycle Finish」。
 也就是說在 Clean Out 期間,CEID 41 代表「該循環結束」而非「機台已停」。若 host 需要「必定停機」的語意,
@@ -1807,7 +1829,9 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <h3 id="71-ht9045-aligned-to-ht9045">7.1 已對齊 HT9045 / Aligned to HT9045</h3>
 <ul>
 <li><strong>訊息 Messages</strong>:S1 / S2 / S5 / S6 基礎 GEM 全數對齊(§2)。</li>
-<li><strong>RCMD</strong>:<code>PAUSE</code> <code>START</code> <code>STOP</code> <code>HOME</code> <code>LOTSTART</code> <code>ONLINE_REMOTE</code> <code>ONLINE_LOCAL</code> <code>START_AGV</code> <code>ONE_CYCLE</code> <code>ENERGY_SAVING</code> <code>PP_SIGNALTOWER</code> <code>PP_MUSIC</code>。</li>
+<li><strong>RCMD</strong>:<code>PAUSE</code> <code>START</code> <code>STOP</code> <code>LOTSTART</code> <code>ONLINE_REMOTE</code> <code>ONLINE_LOCAL</code> <code>START_AGV</code> <code>ONE_CYCLE</code> <code>ENERGY_SAVING</code> <code>PP_SIGNALTOWER</code> <code>PP_MUSIC</code> <code>CLEAN_OUT</code> <code>HALT</code> <code>CLEAN_AUTO_SORT_COUNT</code>。</li>
+<li><code>CLEAN_OUT</code> / <code>HALT</code> / <code>CLEAN_AUTO_SORT_COUNT</code> 為 2026-07-29 新增對齊。</li>
+<li><strong><code>HOME</code> 已自本節移出</strong> —— 經逐字查證 HT9045 的 S2F42 dispatch,其命令集為 <code>AUTHORITY_CHECK</code> <code>AUTOSITEMAP</code> <code>AUTO_CLEAN</code> <code>AUTO_RETEST</code> <code>CLEAN_AUTO_SORT_COUNT</code> <code>CLEAN_OUT</code> <code>CLEAR_LOT_INFO</code> <code>CLOSE_ONECYCLE</code> <code>CONTINUE_*</code> <code>DEVTEMPOFFSETADJUST</code> <code>EESUG_OFFSET</code> <code>HALT</code> <code>INITIAL_START*</code> <code>LOTORDER</code> <code>LOTSTART</code> <code>ONE_CYCLE</code> <code>ONLINE_LOCAL</code> <code>ONLINE_REMOTE</code> <code>PAUSE</code> <code>PP_*</code> <code>REMOTE_*</code> <code>RESET</code> <code>RETEST_MRT</code> <code>SET_LOT_INFO</code> <code>START</code> <code>START_AGV</code> <code>START_AQL</code> <code>START_LOT</code> <code>STOP</code> <code>STOP_LOT</code> <code>SUBSTRATETYPE</code> <code>SWITCH_TO_*</code> <code>TESTTEMPSETTING</code> <code>TRAY_FEED</code> <code>TRAY_MAP</code> <code>YIELD_FAIL</code> —— <strong>其中沒有 <code>HOME</code></strong>。改列 §7.2。</li>
 <li>三項宣告差異:<code>ONE_CYCLE</code> 據實回 HCACK(9045 一律 0);<code>ENERGY_SAVING</code> 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);<code>PP_SIGNALTOWER</code>/<code>PP_MUSIC</code> 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。</li>
 <li><strong>SVID 共同段</strong>:1001 / 1003 / 1021 / 1027 / 1518。</li>
 <li><strong>ECID</strong>:1501,2758–2763(Type1 tray 幾何)。</li>
@@ -1831,7 +1855,13 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <td><code>SET_LOT_INFO</code></td>
 <td>RCMD</td>
 <td>一次<strong>覆蓋式</strong>登記整批 Lot(清空後重登)</td>
-<td>9045 用 <code>START_LOT</code>(keyed)+ <code>LOTSTART</code> 按鈕;HT-160S 的 lot 模型支援批次多-Lot 一次載入,故自有此命令</td>
+<td><strong>同名不同體(不是 9045 沒有)</strong>。HT9045 的 S2F42 確實有 <code>SET_LOT_INFO</code>,但兩邊的 lot 模型與參數本體不同:HT-160S 收 <code>L,n{ A lotID }</code> 的純 Lot id 清單並覆蓋整個登錄表;9045 的版本走它自己的 keyed lot 模型。<strong>host 不可假設兩機的 <code>SET_LOT_INFO</code> 可互換</strong>,需依 §3.4 本機格式。取得真實的 9045 <code>SET_LOT_INFO</code> 樣本後再決定是否分流或改名</td>
+</tr>
+<tr>
+<td><code>HOME</code></td>
+<td>RCMD</td>
+<td>遠端回原點(等同操作員 Home 鍵)</td>
+<td><strong>9045 整棵 SECSGEM 樹查無 <code>HOME</code> 命令</strong>(見 §7.1 的完整命令集)。9045 最接近的是 <code>RESET</code>,但那是測試機收料回復流程,語意不同。保留本命令:刪掉會少一個有用的遠端功能而換不到任何對齊</td>
 </tr>
 <tr>
 <td><code>ONLINE</code>(裸)</td>
@@ -1852,16 +1882,16 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <td>sorter 特有資料,9045(tester)無對應;刻意置於 <strong>66000+ 高位段</strong>以絕不與 9045 的 SVID 段碰撞</td>
 </tr>
 <tr>
-<td>SVID <strong>38237–38245</strong></td>
+<td>SVID <strong>38208–38210</strong> ＋ <strong>38237–38245</strong></td>
 <td>SVID</td>
-<td>Auto4/5/6 的 carrier / tray / device / bin-setting</td>
-<td>HT-160S 有 <strong>6 個 Auto 輸出站</strong>,9045 僅 3(SVID 到 38236);為第 4–6 站延伸</td>
+<td>Auto4/5/6 的 carrier(38208/38209/38210)＋ tray / device / bin-setting(38237–38245),共 <strong>12 個號</strong></td>
+<td>HT-160S 有 <strong>6 個 Auto 輸出站</strong>,9045 的目錄僅到 38236(3 站);為第 4–6 站延伸。<strong>更正(2026-07-29)</strong>:舊版本節誤寫成「38237–38245 = Auto4/5/6 的 carrier/tray/device/bin-setting」—— carrier 三個號實際是 <strong>38208/38209/38210</strong>,不在 38237–38245 之內。<strong>待確認</strong>:手上的 9045 傾印只有 CEID 與 ReportID 目錄,不含 382xx,故無法證實或否證 9045 是否已定義這 12 個號;需向京元索取 9045 的 SVID 目錄傾印</td>
 </tr>
 <tr>
-<td>CEID <strong>1–31</strong> 編號</td>
+<td>~~CEID <strong>1–31</strong> 編號~~</td>
 <td>CEID</td>
-<td>HT-160S 自有操作 / UI / 機台狀態事件集(見 §3.3)</td>
-<td><strong>同號不同義</strong>:HT-160S 的操作事件集與 9045 的 CEID 1–37 語意不同。host 以 S2F35 綁定報表到所需 CEID 時,<strong>請依本規格 §3.3 的意義</strong>,勿套用 9045 的 CEID 語意。AMR(272–275)與 Auto-Full(35/36/37)則同號同義。</td>
+<td>—</td>
+<td><strong>本列已於 2026-07-29 作廢</strong>:CEID 字典整份改為 HT9045 逐字複本(1–275 全數註冊、別名逐字相同),<strong>已無「同號不同義」問題</strong>。host 可直接沿用 HT9045 的 CEID 設定;由舊版升級者請依 <strong>§3.3.5</strong> 對照表重新設定。詳見 §3.3。</td>
 </tr>
 </tbody>
 </table>

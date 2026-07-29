@@ -1953,15 +1953,26 @@ void __fastcall TfMain::sbOneCycle1Click(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
+//AI(secs-rcmd-9045) 20260729 : shared Clean Out body, factored out of sbCleanOut1Click so the
+//SECS S2F41 "CLEAN_OUT" host command can arm the same drain (HT9045 uHGemHT9045.cpp:1460 calls
+//its own BtnCleanOutClick for exactly this reason). Mirrors the OneCycleCore/HomeCore pattern:
+//no modal, no UI assumption, returns whether it armed so the caller can map the result (operator
+//-> silent no-op as before, SECS -> HCACK). The Run_Normal gate is the original one and is what
+//makes a second CLEAN_OUT while already draining a no-op rather than a restart.
+bool TfMain::CleanOutCore()
+{
+    if(HSys.Sys.RunMode!=Run_Normal)
+        return false;
+    EventReport(SECS_EVENT.DoCleanOut);
+    HSys.Sys.bCleanOut=true;
+    ChangeRunMode(Run_CleanOut);
+    return true;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::sbCleanOut1Click(TObject *Sender)
 {
-    if(HSys.Sys.RunMode==Run_Normal)
-    {
+    if(CleanOutCore())
         RecordProcess("CLEAN OUT pressed");
-        EventReport(SECS_EVENT.DoCleanOut);
-        HSys.Sys.bCleanOut=true;
-        ChangeRunMode(Run_CleanOut);
-    }    
 }
 //---------------------------------------------------------------------------
 
