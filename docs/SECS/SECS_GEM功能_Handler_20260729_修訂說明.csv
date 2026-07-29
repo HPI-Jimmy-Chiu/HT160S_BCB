@@ -1,0 +1,31 @@
+﻿SECS/GEM 功能對照表 — 修訂說明
+
+修訂日期 Revision date,2026-07-29
+來源檔 Source,"SECS_GEM功能_Handler.xlsx (客戶提供, 2026-07-23 資料夾)"
+本檔 This file,SECS_GEM功能_Handler_20260729.xlsx
+依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit bd1d785)"
+
+本次修訂內容 What changed
+1. 功能表,27 項狀態依實際韌體更新，Memo 欄補上判定依據。變更的格子以淡黃底標示。
+2. CEID 表,整份改為 HT9045 字典的逐字複本(1-275 全數註冊，別名與 HT9045 逐字相同)。新增「本機發射」欄：52 個號碼本機真的會送(綠底並標 ★)，其餘 223 個已註冊但無發射點、永不送出。
+3. SVID 表,補上 1518 Real/Dummy(本機已註冊，原表漏列)。本機共註冊 51 個 SVID。
+
+⚠ 重大變更 Breaking change
+CEID 1-31 語意全部改變,原表的 CEID 1-31(Handler change status / Recipe Change / …)為 HT-160S 舊有自訂語意，已於 2026-07-29 全部作廢，改用 HT9045 字典。host 端設定必須同步更新。
+最高風險：CEID 27 與 28,這兩個號碼在新舊字典中都存在但意思不同。舊：27=One Cycle Finish、28=Clean Out Finish；新：27=Change Machine State、28=Retry Pressed。未更新設定會被靜默誤讀(訊息格式合法、語意錯誤)。One Cycle Finish 已移到 41，Clean Out Finish 已移到 42。
+完整新舊對照,見規格書 HT160S_SECS_Interface_Spec_20260727.md/.html 的 §3.3.5。
+
+尚待貴端提供 / 確認 Open items
+1,HT9045 的 SVID 目錄傾印 — 以確認 38208-38210 / 38237-38245 這 12 個 Auto4-6 延伸號在 9045 是否已定義。
+2,一份真實的 SET_LOT_INFO 封包樣本 — 兩機同名但參數本體與 lot 模型不同，需確認是否分流或改名。
+3,貴端 host 是否會對 HT-160S 送與 HT9045 相同的 S2F33 / S2F35 provisioning。若不送，AMR 相關事件的報表內容需保留本機預設。
+4,RPTID 502 目前綁在 272/273/274/275 四個 AMR 事件上，但本機只認得其中 1 個 SVID(1518)，其餘 7 格會是空值 — 需 9045 的 SVID 目錄才能補齊。
+5,「SECS/GEM 斷線停機」與「測前停機查檢」若確定需要，請提供判定條件後排入。
+
+圖例 Legend
+O,已實作
+X,未實作
+△,部分實作 / 有替代做法(詳見 Memo)
+N/A,機構上不適用(HT-160S 為 Tray Sorter，非測試機)
+淡黃底,本次修訂變更的儲存格
+綠底 ★,CEID 表中本機真的會發射的號碼

@@ -1,0 +1,52 @@
+﻿SVID,Name
+1001,Machine Model
+1003,Software Version
+1021,UPH
+1027,System Time
+66000,Run Mode
+66001,System Running
+66002,Control State
+66010,Alarm Active
+66011,Alarm Code
+66020,Total IC
+66021,Total Sorted
+66030,Active Lot Count
+66031,Current Lot ID
+66032,Sort Mode
+38219,Supplement Bin
+38220,LD UnLD Check AGV
+38221,LD UnLD Finish AGV
+38202,Loader Carrier ID
+38222,MR Loader Tray Count
+38228,AMR Loader Device Count
+38203,Empty Carrier ID
+38223,AMR Empty Tray Count
+38229,AMR Empty Device Count
+38204,Color Carrier ID
+38224,AMR Color Tray Count
+38230,AMR Color Device Count
+38205,AUTO1 Carrier ID
+38225,AMR AUTO1 Tray Count
+38231,AMR AUTO1 Device Count
+38234,AMR AUTO1 Bin Setting
+38206,AUTO2 Carrier ID
+38226,AMR AUTO2 Tray Count
+38232,AMR AUTO2 Device Count
+38235,AMR AUTO2 Bin Setting
+38207,AUTO3 Carrier ID
+38227,AMR AUTO3 Tray Count
+38233,AMR AUTO3 Device Count
+38236,AMR AUTO3 Bin Setting
+38208,AUTO4 Carrier ID
+38237,AMR AUTO4 Tray Count
+38240,AMR AUTO4 Device Count
+38243,AMR AUTO4 Bin Setting
+38209,AUTO5 Carrier ID
+38238,AMR AUTO5 Tray Count
+38241,AMR AUTO5 Device Count
+38244,AMR AUTO5 Bin Setting
+38210,AUTO6 Carrier ID
+38239,AMR AUTO6 Tray Count
+38242,AMR AUTO6 Device Count
+38245,AMR AUTO6 Bin Setting
+1518,Real/Dummy

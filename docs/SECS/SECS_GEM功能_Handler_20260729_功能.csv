@@ -1,0 +1,49 @@
+﻿No,項目,,,Memo
+基本
+1,S1F1,Are You There Request?,O,Are You There?:'S1F1' W / .
+2,S1F3,Selected Equipment Status Request,O,GetSoftwareVersion:'S1F3' W / <L[1] /  <U4 [1] 1003> / > / .
+3,S1F11,Status Variable Name List Request,O,S1F11:'S1F11' W /   <L [0]  /   > / .
+4,S1F13,Establish Communications Request,O,ECR(FT):'S1F13' W / < L[2] /  <A[6] 'CJ_EAP'> /  <A[6] '1.0.00'> / > / .
+5,S1F15,Request OFF-LINE,O,S1F15(Off-Line):'S1F15' W / . / [20260729] 已實作。S1F15 -> S1F16 OFLACK=0，控制狀態轉 Off-Line(1)。
+6,S1F17,Request ON-LINE,O,S1F17(On-Line):'S1F17' W / .
+7,S1F23,Collection Event Namelist Request,X,[20260729] 未實作。S1 的 dispatch 無 F23 分支，會落到未識別訊息(僅記本機 log)。
+8,S2F13,Equipment Constant Request,O,GetEAPEquipmentType:'S2F13' W /   <L [1]  /     <U4 [1] 1501> /   > / .
+9,S2F15,New Equipment Constant Send,O,NewEquipmentConstantSend(SetLotInfo):'S2F15' W /   <L [1]  /     <L [2]  /       <U4 [1] 2763> /       <A [1] '5'> /     > /   > / .
+10,S2F29,Equipment Constant Namelist Request,X,S2F29:'S2F29' W /   <L [0]  /   > / .
+11,S2F33,Define Report,O,Define AMR related Report:'S2F33' W /   <L [2]  /     <U4 [1] 1> /     <L [1]  /       <L [2]  /         <U4 [1] 2000> /         <L [7]  /           <U4 [1] 38202> #Load port carrier ID /           <U4 [1] 38205> #Auto1 carrier ID /           <U4 [1] 38206> #Auto2 carrier ID /           <U4 [1] 38207> #Auto3 carrier ID /           <U4 [1] 38219> #Supplement_Bin /           <U4 [1] 38220> #LD_UnLD_Check_AGV /           <U4 [1] 38221> #LD_UnLD_Finish_AGV /         > /       > /     > /   > / .
+12,S2F35,Link Event Report,O,AGVSupplement_Link_Report:'S2F35' W /   <L [2]  /     <U4 [1] 272> /     <L [1]  /       <L [2]  /         <U4 [1] 272> /         <L [1]  /           <U4 [1] 2000> /         > /       > /     > /   > / .
+13,S2F37,Enable/Disable Event Report,O,EnableEvent:'S2F37' W /   <L [2]  /     <Boolean [1] True> /     <L [0] /  > /   > / .
+14,S5F1,Alarm Report Send,O,[20260729] 已實作。警報發生/解除各送一次；ALCD bit7 0x80=set / 0x00=clear，ALID 由警報碼雜湊產生(與 S5F6/S5F8 目錄同一來源)。
+15,S5F3,Enable/Disable Alarm Send,O,EnableAlarmSend:'S5F3' W /   <L [2]  /     <B [1] 80> /     <L [0] /  > /   > / .
+16,S5F5,List Alarms Request,O,EnhancedRCMD(ALARM):'S5F5' W /   <L [2]  /   <U4 [1] 49500724> / > / .
+17,S6F11,Event Report Send,O,Event Report Send:'S6F11' W /   <L [3]  /     <U4 [1] 1> /     <U4 [1] 6> /     <L [1]  /       <L [2]  /         <U4 [1] 1> /         <L [13]  /           <A [6] 'HT160S'> /           <A [7] '1.0.0.0'> /           <I4 [1] 886> /           <A [19] '2026/07/23 16:44:31'> /           <I4 [1] 0> /           <I4 [1] 1> /           <I4 [1] 0> /           <I4 [1] 0> /           <I4 [1] 0> /           <I4 [1] 189> /           <I4 [1] 9> /           <I4 [1] 5> /           <A [10] 'SIMU_LOT_A'> /         > /       > /     > /   > / .
+18,S6F15,Event Report Request,O,":'S6F15' W / <L [2]  /   <U4 [1] 0> /   <U4 [1] 1> / > / . / [20260729] 已實作(2026-07-28 新增)。裸 <U4 CEID> 與 L,1 包裝皆接受；未註冊的 CEID 回 L,3{DATAID,CEID,L,0}；解析失敗回 CEID=0，不會不回覆。"
+19,S6F19,Individual Report Request,O,"GetTestTimeReport:'S6F19' W /   <U4 [1] 1> / . / [20260729] 已實作(2026-07-28 新增)。回 L,n{SV 值} 扁平清單(不含 RPTID)；由即時登錄表取值，host 以 S2F33 重定義該 RPTID 後長度會跟著變。"
+20,S2F31,校時,O,[20260729] 已實作。收下並回 TIACK=0，但刻意不寫入設備時鐘(避免 host 校時與現場工單時間打架)。另有 S2F17 -> S2F18 供 host 讀取本機時間。
+資料收集
+1,機台狀態變化回報,,O,[20260729] 已實作(2026-07-29 新增)。CEID 27 Change Machine State：機台狀態文字每次變更即送 S6F11(RUNNING / PAUSE / EMG / LOCK / SAFE DOOR / AIR / MOTOR OFF / Clean Out / One Cycle …)。另 SVID 66000 RunMode、66001 SystemRunning 可主動查詢。
+2,機台編號,,O,SVID:1001 / [20260729] SVID:1001。註：1001 於 HT9045 字典為 Machine Model，本機回 'HT-160S'。若貴端需要「機台序號」，本機以 stbMain 的 HandlerID / SerialNo 管理，目前未掛 SVID，可再議。
+3,機台型號,,O,[20260729] SVID:1001 Machine Model = 'HT-160S'(與上一列同一個 SVID)。S1F2 / S1F14 的 MDLN 亦回同值。
+4,廠商軟體版本,,O,SVID:1003
+5,貨批起測時間,,△,[20260729] 無專屬 SVID。Lot 開始以 CEID 6 Lot Start 通知，該事件帶 Report 1(含 SVID 1027 System Time)，host 可由事件時間取得起測時間；另 SVID 66031 Current Lot ID、66030 Active Lot Count 可查詢。若貴端需要獨立的「起測時間」SVID，可新增(建議置於 66000 高位段)。
+6,系統時間,,O,SVID:1027
+7,機台Event回傳,,O
+8,機台Alarm回傳,,O,[20260729] 已實作。S5F1 主動上報；S5F5/S5F6 全警報目錄、S5F7/S5F8 已啟用清單、S5F3/S5F4 啟用停用皆支援。目錄由本機警報碼 SSOT 即時產生(576 碼)。
+9,測試結果,,N/A,[20260729] HT-160S 為 Tray Sorter，無測試機構，故無測試結果。分選結果以 SVID 66021 Total Sorted、各 Bin 分選數與 Production log / Soter CSV 提供。
+Remote Control
+1,S2F41,Start,O,[20260729] RCMD START。走與操作員 Start 相同的 MachineStart() 閘(Lot/2D 資料齊備才受理)。
+2,S2F41,Pause,O,[20260729] RCMD PAUSE(減速暫停)。另有 STOP(硬停，立即停馬達)與 HALT(2026-07-29 新增，對齊 HT9045 的軟停，與 PAUSE 同一路徑)。
+3,S2F41,One Cycle,O,[20260729] RCMD ONE_CYCLE。完成時送 CEID 41 One Cycle Finish。HCACK 據實回報：0=已啟動 / 2=機台未運轉或資料不符 / 4=已在 OneCycle 中(與 HT9045 一律回 0 不同，見規格書 §3.4)。
+4,S2F41,Clean Out,O,[20260729] RCMD CLEAN_OUT(2026-07-29 新增，對齊 HT9045)。僅能自 Normal 運轉模式進入，非 Normal 回 HCACK=2；排空後送 CEID 42 Clean Out Finish 再自動 Lot End。
+5,S2F41,Auto Clean,X,[20260729] 測試機專屬(清針/socket 清潔)，HT-160S 無此機構。本機認得 AUTO_CLEAN 但回 HCACK=2「認得命令、本機不執行」，不回 1、不回 4。
+6,S2F41,Download Setup File,X,[20260729] 未實作。S7F1/F3/F5 已在 dispatch 表中，但目前為 log-only skeleton，不會回覆，host 會等到 T3 逾時。若貴端需要遠端下載工作檔，需另行排入(建議同時定義檔案格式與存放位置)。
+7,S2F41,蜂鳴器控制,O,[20260729] RCMD PP_MUSIC。單一 pair、CP 名稱可為空字串，值 1..4 對應音效類別；空 list = 解除。為閂鎖式覆寫，可由面板 ALARM RESET / OFF BUZZER / 維修畫面按鈕解除，斷線亦自動解除。
+8,S2F41,三色燈控制,O,[20260729] RCMD PP_SIGNALTOWER。RED/GREEN/YELLOW = 0關/1亮/2閃；空 list = 解除。請每次同時指定三色。註：值 2(閃)本機依既有慣例呈現為恆亮(HT-160S 塔燈全機不閃)。警報/訊息顯示中或機台自身安全異常時暫停覆寫，避免遮蔽機台紅燈。
+9,S10F3,訊息顯示(單行),O,[20260729] 已實作(2026-07-28 新增)。回 ACKC10=0。顯示行為：寫入 SECS log 與 EventLog，不彈出強制視窗(本機訊息視窗為 ShowModal 且會停止所有馬達，於 HSMS 接收執行緒彈窗會使通訊本身停擺)。
+10,S10F5,訊息顯示(多行),O,[20260729] 已實作(2026-07-28 新增)。多段文字，回 ACKC10=0；顯示行為同 S10F3。
+11,權限控管,,X,[20260729] 未實作。HT9045 的 AUTHORITY_CHECK 尚未移植。本機權限為本地管理(system\login.txt，ID/密碼/層級)，切換時送 CEID 16 Switch UserLevel。
+12,密碼變更,,X,[20260729] 未實作。HT9045 的 PP_PASSWORD 尚未移植。本機密碼於維修畫面本地變更。
+13,測前停機查檢,,X,[20260729] 未實作。相關旗標(bN04_RunCheck)在本機唯一站點已註解，無 live 路徑。HT-160S 為 sorter，無「測前」概念；若貴端需要開工前自檢，需另定義查檢項目。
+其他
+1,SECS/GEM斷線停機,,△,[20260729] 部分。HSMS 斷線時本機會解除 host 的塔燈/蜂鳴器閂鎖覆寫(避免無人可解)，但不會自動停機——生產繼續。若貴端要求斷線即停機，需明確定義(斷線多久算斷、是暫停或收尾停機、是否需操作員確認)後排入。
+2,軟體自動佈署,,X,[20260729] 不走 SECS。本機以 NSIS updater 佈署(D:\HT160S_Updater_NSIS)，非 SECS/GEM 範圍。
