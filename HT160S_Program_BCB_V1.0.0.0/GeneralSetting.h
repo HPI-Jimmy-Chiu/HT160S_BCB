@@ -52,8 +52,9 @@ public:
 	//   smLotBin        : dynamic (LotID,Bin)->Auto binding built at run time
 	//                     (THT160LotBinBinding), key = the IC's Bin.
 	//   smLotPassFail   : dynamic (LotID,PASS/FAIL)->Auto binding, key = PASS(1)/
-	//                     FAIL(2) derived from Bin==BinAreaMap.PassBin, frozen at
-	//                     CCD scan. At most 2 Autos bound per lot.
+	//                     FAIL(2) from the customer per-IC DiePass (WebService#11),
+	//                     via THT160LotRegistry::GetPassFailClass, frozen at CCD
+	//                     scan. At most 2 Autos bound per lot.
 	// Edited on tsMaintHardware; changing it affects the in-memory routing core so
 	// the operator is told to restart the software. Stored in General.ini
 	// [SortMode] Mode (legacy [SortMode] UseLotBinMode read for back-compat when

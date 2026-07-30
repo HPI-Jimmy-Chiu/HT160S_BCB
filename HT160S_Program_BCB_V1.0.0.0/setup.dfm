@@ -14052,13 +14052,6 @@ object fSetup: TfSetup
               Caption = 'Default 1-6'
               OnClick = spbBinDefaultClick
             end
-            object lblPassBinTitle: TLabel
-              Left = 16
-              Top = 172
-              Width = 47
-              Height = 13
-              Caption = 'Pass Bin :'
-            end
             object cbbBinErrorArea: TComboBox
               Left = 100
               Top = 134
@@ -14075,15 +14068,6 @@ object fSetup: TfSetup
                 'Auto4'
                 'Auto5'
                 'Auto6')
-            end
-            object cbbPassBin: TComboBox
-              Left = 100
-              Top = 168
-              Width = 160
-              Height = 21
-              Style = csDropDownList
-              ItemHeight = 13
-              TabOrder = 1
             end
           end
         end

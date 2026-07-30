@@ -2021,7 +2021,9 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         //Bind on the mode's key : Bin for Lot+Bin, PASS/FAIL(1/2) for Lot+PassFail
                         //(class 0 = error/off -> no binding; read path routes it to the Error Auto).
                         {
-                            int PassClass=BinAreaMap.GetPassFailClass(Bin);
+                            //AI(ht160s-lotpassfail) 20260730 : class comes from the customer
+                            //per-IC DiePass (keyed by the 2D code), not a machine Pass Bin.
+                            int PassClass=LotRegistry.GetPassFailClass(sCode, Bin);
                             TrayMotor->SetTrayPassClass(State->CcdX, State->CcdY, PassClass);
                             if(GeneralSetting.IsLotBinSortMode())
                                 LotBinBinding.ResolveAuto(HitLotIndex, Bin);
@@ -2135,7 +2137,7 @@ void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
             TrayMotor->SetTrayManual2D(State->CcdX, State->CcdY, true);
             //AI(ht160s-lotpassfail) 20260709 : freeze class + bind on the mode key (see scan-success path).
             {
-                int PassClass=BinAreaMap.GetPassFailClass(Bin);
+                int PassClass=LotRegistry.GetPassFailClass(code, Bin);
                 TrayMotor->SetTrayPassClass(State->CcdX, State->CcdY, PassClass);
                 if(GeneralSetting.IsLotBinSortMode())
                     LotBinBinding.ResolveAuto(HitLotIndex, Bin);

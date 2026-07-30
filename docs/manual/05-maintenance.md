@@ -107,7 +107,7 @@
 | Color bin area installed | 勾選 | 是否安裝 Color bin 區硬體；勾選即時生效，關閉畫面時存檔 |
 | Use AMR | 勾選 | 是否使用 AMR；勾選即時生效，關閉畫面時存檔 |
 | Auto1~Auto6 | 勾選 | 各 Auto 啟用（僅動態模式 By Lot+Bin / By Lot+PassFail 有效）；未勾選的 Auto 在綁定新分類鍵時被跳過。勾選即時生效，但會跳提示需重新啟動軟體才乾淨生效；運轉時被鎖定 |
-| Sort Mode | 選項組（3 選項） | 切換分類模式：Normal（靜態 Bin→Auto 表）/ By Lot+Bin（動態綁定 Lot+Bin）/ By Lot+PassFail（動態綁定 Lot+PASS/FAIL，PASS/FAIL 由 Bin 是否等於 Pass Bin 導出）。切換即時生效並提示需重新啟動軟體；運轉時被鎖定。詳見第 15 章 |
+| Sort Mode | 選項組（3 選項） | 切換分類模式：Normal（靜態 Bin→Auto 表）/ By Lot+Bin（動態綁定 Lot+Bin）/ By Lot+PassFail（動態綁定 Lot+PASS/FAIL，PASS/FAIL 由每顆 IC 的 DiePass 導出）。切換即時生效並提示需重新啟動軟體；運轉時被鎖定。詳見第 15 章 |
 | Loader safe distance | 輸入 | 兩台 Loader 車的最小間距（325~650 mm）；唯讀欄，點擊以螢幕鍵盤輸入，OK 後再以 YES/NO 確認才存（以 mm 顯示/輸入）並即時存檔；運轉時被鎖定 |
 
 #### 相關參數
@@ -116,7 +116,7 @@
 | --- | --- | --- |
 | Color bin area installed | 勾/不勾 | 是否安裝 Color bin 區硬體 |
 | Use AMR | 勾/不勾 | 是否使用 AMR |
-| Sort Mode | Normal / By Lot+Bin / By Lot+PassFail；變更需重啟軟體 | 分類模式：Normal＝靜態 Bin→Auto、By Lot+Bin＝動態綁定、By Lot+PassFail＝動態綁定（依 Bin 是否等於 Pass Bin 分 PASS/FAIL） |
+| Sort Mode | Normal / By Lot+Bin / By Lot+PassFail；變更需重啟軟體 | 分類模式：Normal＝靜態 Bin→Auto、By Lot+Bin＝動態綁定、By Lot+PassFail＝動態綁定（依每顆 IC 的 DiePass 分 PASS/FAIL） |
 | Auto1~Auto6 | 各別勾選，預設皆勾選；變更需重啟 | Auto1~Auto6 各別啟用（僅動態模式有效） |
 | Loader safe distance | 325.00~650.00 mm；預設顯示 100.00 | 兩台 Loader 車最小間距，畫面以 mm 顯示/輸入 |
 

@@ -644,8 +644,10 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
 
         //AI(ht160s-lotbin) 20260615 : dump the dynamic (Lot,key)->Auto table so a snapshot
         //taken in a dynamic mode shows which Auto each pair was bound to.
-        //AI(ht160s-lotpassfail) 20260709 : 3-way mode name + PassBin. NOTE the "Bin" field
-        //below carries a PASS/FAIL class (1=PASS,2=FAIL) when SortMode is "LotPassFail".
+        //AI(ht160s-lotpassfail) 20260709 : 3-way mode name. NOTE the "Bin" field below carries
+        //a PASS/FAIL class (1=PASS,2=FAIL) when SortMode is "LotPassFail".
+        //AI(ht160s-lotpassfail) 20260730 : the PassBin dump is gone with the setting - the class
+        //now comes from each IC's DiePass, which the per-lot 2D dump above already carries.
         {
             SR_Trace("LDJ 07 before IsLot*SortMode");
             //AI(ht160s-whitelist-override) 20260717 : 4-way name off the EFFECTIVE mode (base +
@@ -663,8 +665,6 @@ void cStateRecordHT160::WriteLotDataJson(AnsiString Path, AnsiString Reason, Ans
             Lines->Add("  \"BaseSortMode\": "+IntToStr(GeneralSetting.iSortMode)+",");
             Lines->Add("  \"WhiteListActive\": "+IntToStr(GeneralSetting.bWhiteListActive?1:0)+",");
         }
-        SR_Trace("LDJ 08 before GetPassBin");
-        Lines->Add("  \"PassBin\": "+IntToStr(BinAreaMap.GetPassBin())+",");
         Lines->Add("  \"LotBinBinding\": [");
         {
             SR_Trace("LDJ 09 before GetBindingCount");
@@ -859,8 +859,7 @@ void cStateRecordHT160::WriteFeederDecisionTxt(AnsiString Path)
          + "  bColorBinAreaInstalled=" + IntToStr(GeneralSetting.bColorBinAreaInstalled ? 1 : 0)
          + "  iSortMode=" + IntToStr(GeneralSetting.iSortMode)
          + "  WhiteListActive=" + IntToStr(GeneralSetting.bWhiteListActive ? 1 : 0)
-         + "  EffSortMode=" + IntToStr(GeneralSetting.GetEffectiveSortMode())
-         + "  PassBin=" + IntToStr(BinAreaMap.GetPassBin()) + "\r\n";
+         + "  EffSortMode=" + IntToStr(GeneralSetting.GetEffectiveSortMode()) + "\r\n";
     Out += "  bUsePredictiveAutoSupply=" + IntToStr(GeneralSetting.bUsePredictiveAutoSupply ? 1 : 0)
          + "  bUseAmrRecoveryDivert=" + IntToStr(GeneralSetting.bUseAmrRecoveryDivert ? 1 : 0) + "\r\n";
     Out += "  bUseColorCcd=" + IntToStr(CosFunction.bUseColorCcd ? 1 : 0)

@@ -304,7 +304,6 @@ void THT160BinAreaMap::Clear()
 	for(Index=0; Index<HT160_BIN_ERROR_REASON_COUNT; Index++)
 		ErrorBinToArea[Index]=0;
 	ErrorBinArea=HT160_DEFAULT_ERROR_BIN_AREA;
-	PassBin=0;
 }
 //---------------------------------------------------------------------------
 bool THT160BinAreaMap::AddBinArea(int Bin, int Area)
@@ -547,7 +546,9 @@ void THT160BinAreaMap::LoadFromIni(AnsiString FileName)
 			ErrorArea=HT160_DEFAULT_ERROR_BIN_AREA;
 	}
 	SetErrorBinArea(ErrorArea);
-	PassBin=Ini->ReadInteger("BinAreaMap", "PassBin", 0);   //AI(ht160s-bin-passfail) 20260708
+	//AI(ht160s-lotpassfail) 20260730 : the [BinAreaMap] PassBin key is DEAD (the operator Pass
+	//Bin setting was removed - PASS/FAIL comes from the customer per-IC DiePass). Not read, not
+	//written; an existing key in an old recipe is simply ignored and drops out on the next save.
 	for(Bin=HT160_BIN_ERROR_2D_SCAN_FAIL; Bin<=HT160_BIN_ERROR_NO_BIN_SETTING; Bin++)
 	{
 		ErrorText=Ini->ReadString("ErrorBinAreaMap", GetErrorBinName(Bin), "Default");
@@ -585,7 +586,6 @@ void THT160BinAreaMap::SaveToIni(AnsiString FileName)
 			Ini->WriteInteger("BinAreaMap", GetAreaName(Area), GetBinByArea(Area));
 	}
 	Ini->WriteString("BinAreaMap", "ErrorBinArea", GetAreaName(GetErrorBinArea()));
-	Ini->WriteInteger("BinAreaMap", "PassBin", PassBin);   //AI(ht160s-bin-passfail) 20260708
 	Ini->EraseSection("ErrorBinAreaMap");
 	for(Index=0; Index<HT160_BIN_ERROR_REASON_COUNT; Index++)
 	{
@@ -598,28 +598,6 @@ void THT160BinAreaMap::SaveToIni(AnsiString FileName)
 		Ini->WriteInteger("ErrorBinAreaMap", GetErrorBinName(Bin)+AnsiString("Code"), Bin);
 	}
 	delete Ini;
-}
-//---------------------------------------------------------------------------
-int THT160BinAreaMap::GetPassBin()
-{
-	return PassBin;
-}
-//---------------------------------------------------------------------------
-void THT160BinAreaMap::SetPassBin(int Bin)
-{
-	PassBin=Bin;
-}
-//---------------------------------------------------------------------------
-// AI(ht160s-lotpassfail) 20260709 : PASS/FAIL classifier. Single source shared by the
-// CCD-scan freeze, the place-time log and By Lot+PassFail routing. 0=no class (error bin
-// or PassBin off -> Error Auto / blank), 1=PASS (Bin==PassBin), 2=FAIL (any other real bin).
-int THT160BinAreaMap::GetPassFailClass(int Bin)
-{
-	if(PassBin<=0)
-		return 0;
-	if(IsErrorBin(Bin))
-		return 0;
-	return (Bin==PassBin) ? 1 : 2;
 }
 //---------------------------------------------------------------------------
 void THT160BinAreaMap::LoadDefault()
@@ -1400,6 +1378,33 @@ bool THT160LotRegistry::FindIcInfo(AnsiString Code2D, TLotIcInfo &Info)
 		return false;
 	Info=*Rec;
 	return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotpassfail) 20260730 : PASS/FAIL class of one IC - see the header for the
+// contract. Reads the per-IC customer DiePass (WebService#11, 1=pass / 0=fail) straight out
+// of the backup record instead of copying the whole struct like FindIcInfo, because the CCD
+// scan path calls this once per IC. Anything that is not a recognised PASS token - including
+// an empty DiePass and an unknown 2D code - is FAIL, never class 0 : class 0 routes to the
+// Error Auto and is reserved for the error bins (2D scan fail / no bin setting).
+int THT160LotRegistry::GetPassFailClass(AnsiString Code2D, int Bin)
+{
+	if(BinAreaMap.IsErrorBin(Bin))
+		return 0;
+
+	AnsiString Code=Code2D.Trim();
+	if(Code==AnsiString(""))
+		return 2;
+	int Index=m_Code2DInfo->IndexOf(Code);
+	if(Index<0)
+		return 2;
+	TLotIcInfo *Rec=(TLotIcInfo*)m_Code2DInfo->Objects[Index];
+	if(Rec==NULL)
+		return 2;
+
+	AnsiString Die=Rec->sDiePass.Trim().UpperCase();
+	if(Die==AnsiString("1") || Die==AnsiString("P") || Die==AnsiString("PASS"))
+		return 1;
+	return 2;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : enumerate all 2D IC records of one Lot (UI /

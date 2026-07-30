@@ -111,7 +111,7 @@
 | --- | --- | --- |
 | Loader-Y 跨側安全間隔 | 預設 10000（=100mm）；`<=0` 停用 | 兩側 Loader-Y 車跨側最小安全間隔（1/100mm），設定檔 `[Safety] LoaderYSafeDistance` |
 | 模擬-Loader 疊盤盤數 | 模擬補料用 | 模擬 Loader 來料疊盤盤數（每次取盤遞減，0 缺料呼叫 AGV） |
-| 分流模式 | 0/1/2 | 分流模式；1=By Lot+Bin（2D 反查後綁定 (Lot,Bin)→Auto）、2=By Lot+PassFail（綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由 Bin==Pass Bin 導出、掃描時凍結） |
+| 分流模式 | 0/1/2 | 分流模式；1=By Lot+Bin（2D 反查後綁定 (Lot,Bin)→Auto）、2=By Lot+PassFail（綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由每顆 IC 的 DiePass 導出、掃描時凍結） |
 | 啟用 2D 條碼讀取 | 開/關 | 是否啟用 Top CCD 2D 條碼讀取與 Bin 反查（關閉只讀有無料） |
 | Loader 取盤位 Y | 教導值 | 各側 Loader-Y 取盤位（1/100mm） |
 | Loader 空盤排出位 Y | 教導值 | 各側空盤排出位 |

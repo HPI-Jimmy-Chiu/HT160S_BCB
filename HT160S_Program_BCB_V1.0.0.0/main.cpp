@@ -1058,10 +1058,11 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
     //mode, so show "PASS"/"FAIL" text there instead of the raw class number.
     bool bDynamicMode=GeneralSetting.IsDynamicBindingMode();
     bool bPassFailMode=GeneralSetting.IsLotPassFailSortMode();
-    //AI(ht160s-lotpassfail) 20260709 : PASS/FAIL label follows the configurable Pass Bin
-    //(the same source sort routing + Production_Log use), not a hardcoded 1/2. Read once
-    //here from the live BinAreaMap (the routing determinant) rather than the setup combo.
-    int PassBin=BinAreaMap.GetPassBin();
+    //AI(ht160s-lotpassfail) 20260730 : in By Lot+PassFail mode the binding's middle key IS
+    //the PASS/FAIL class frozen at CCD scan (1=PASS, 2=FAIL), so compare against the class.
+    //It used to be compared against BinAreaMap.GetPassBin() - a BIN number - which agreed
+    //with the class only by luck, when the configured Pass Bin happened to be 1. That
+    //setting is gone; PASS/FAIL is customer data (per-IC DiePass) now.
 
     for(int i=0; i<6; i++)
     {
@@ -1079,7 +1080,7 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
                 {
                     if(bPassFailMode)
                     {
-                        if(BindBin==PassBin)
+                        if(BindBin==1)
                             sBin=AnsiString("PASS");
                         else
                             sBin=AnsiString("FAIL");
@@ -1432,7 +1433,18 @@ void __fastcall TfMain::btnLoadSimuDataClick(TObject *Sender)
             CodeSeq++;
             Code=AnsiString("2D_Simu_")+IntToStr(CodeSeq);
             Bin=((CodeSeq-1)%6)+1;
-            LotRegistry.AddItem(LotID, Code, Bin, DupExistingLot);
+            //AI(ht160s-lotpassfail) 20260730 : stamp a DiePass so By Lot+PassFail stays
+            //testable on the laptop. Mirrors the customer pattern where HBin 1 is the pass
+            //bin : Bin 1 -> DiePass "1" (PASS), everything else "0" (FAIL). Without it every
+            //simulated IC would classify FAIL (a missing DiePass counts as FAIL) and a single
+            //Auto would swallow the whole simulated run.
+            AnsiString SimDiePass;
+            if(Bin==1)
+                SimDiePass="1";
+            else
+                SimDiePass="0";
+            LotRegistry.AddItemEx(LotID, Code, Bin, Bin, Bin, "", SimDiePass,
+                "", "", "", DupExistingLot);
         }
     }
 
@@ -2119,14 +2131,10 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
     // poka-yoke that blocked Start on GetBindingCount()<=0 contradicted this model (a
     // fresh order could never satisfy it -- binds are only made while running) and is
     // removed; the lot/2D-data gates above already guarantee routable data before Start.
-    //AI(ht160s-lotpassfail) 20260709 : By Lot+PassFail routes on PASS (Bin==PassBin) vs FAIL.
-    // With PassBin unset (0) every IC classifies FAIL and piles into a single Auto, so refuse
-    // to start until the operator picks a Pass Bin on the Bin Setting page.
-    if(GeneralSetting.IsLotPassFailSortMode() && BinAreaMap.GetPassBin()<=0)
-    {
-        Reason="By Lot+PassFail mode is ON but no Pass Bin is set. Set the Pass Bin on the Bin Setting page before Start !";
-        return false;
-    }
+    //AI(ht160s-lotpassfail) 20260730 : the old "no Pass Bin is set" gate is GONE together with
+    // the operator setting it guarded. By Lot+PassFail classifies on the customer per-IC
+    // DiePass now, and an IC whose DiePass is missing counts as FAIL, so no config state is
+    // left that could make every IC unclassifiable. The 2D-data gates above still apply.
     return true;
 }
 //---------------------------------------------------------------------------

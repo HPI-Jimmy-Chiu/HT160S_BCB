@@ -2224,8 +2224,8 @@ object fMaintenance: TfMaintenance
                   Caption = 
                     'Normal = static Bin->Auto recipe table.  By Lot+Bin = each (Lot,' +
                     'Bin) pair binds to an Auto dynamically.  By Lot+PassFail = PASS/' +
-                    'FAIL (vs the Pass Bin set on the Bin Setting page) binds to an A' +
-                    'uto per lot.  Mode takes effect at the next Lot Start.'
+                    'FAIL (from each IC DiePass in the loaded 2D data) binds to an Au' +
+                    'to per lot.  Mode takes effect at the next Lot Start.'
                   Font.Charset = DEFAULT_CHARSET
                   Font.Color = clNavy
                   Font.Height = -13

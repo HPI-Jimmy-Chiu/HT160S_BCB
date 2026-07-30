@@ -734,28 +734,9 @@ void __fastcall TfSetup::LoadBinMapToGrid()
     }
     RefreshBinErrorAreaOptions();
     SelectBinErrorArea(BinAreaMap.GetErrorBinArea());
-    //AI(ht160s-bin-passfail) 20260708 : Pass Bin options = 0 (OFF) + each configured routing bin.
-    if(cbbPassBin!=NULL)
-    {
-        cbbPassBin->Items->Clear();
-        cbbPassBin->Items->Add("0");
-        for(Row=1; Row<grdBinAreaMap->RowCount; Row++)
-        {
-            AnsiString PassBinStr=grdBinAreaMap->Cells[BIN_GRID_COL_BIN][Row].Trim();
-            if(PassBinStr!="" && PassBinStr!="0" && cbbPassBin->Items->IndexOf(PassBinStr)<0)
-                cbbPassBin->Items->Add(PassBinStr);
-        }
-        //AI(ht160s-lotpassfail) 20260730 : the recipe's own Pass Bin need not appear in the static
-        //grid (the dynamic modes never route through it, and the grid may be all zeros there).
-        //This is a csDropDownList, so a value it cannot list falls back to index 0 = "0" and the
-        //next save - FormClose runs one silently - would write that 0 back over the recipe. Always
-        //offer the stored value so the combo round-trips it.
-        AnsiString CurPassBinStr=IntToStr(BinAreaMap.GetPassBin());
-        if(BinAreaMap.GetPassBin()>0 && cbbPassBin->Items->IndexOf(CurPassBinStr)<0)
-            cbbPassBin->Items->Add(CurPassBinStr);
-        int PassIdx=cbbPassBin->Items->IndexOf(IntToStr(BinAreaMap.GetPassBin()));
-        cbbPassBin->ItemIndex=(PassIdx>=0)?PassIdx:0;
-    }
+    //AI(ht160s-lotpassfail) 20260730 : the Pass Bin combo is REMOVED. PASS/FAIL is decided by the
+    //customer per-IC DiePass carried in the 2D data (THT160LotRegistry::GetPassFailClass), so the
+    //machine has no Pass Bin setting to load any more.
     bLoadingBinGrid=false;
     ValidateBinSettingGrid(false);
     RefreshBinSettingStatus();
@@ -766,7 +747,6 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     int Row;
     int Area;
     int Bin;
-    int OldPassBin;
     bool ValidValue;
 
     if(grdBinAreaMap==NULL)
@@ -779,15 +759,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
         return false;
     }
 
-    //AI(ht160s-lotpassfail) 20260730 : Clear() zeroes PassBin too (CosFunction.cpp Clear()),
-    //so latch the live value and put it back before the combo block below decides what to do
-    //with it. Without this the "did the operator change it" test read 0, so in By Lot+PassFail
-    //with bindings present EVERY save looked like a change, took the reject path, and left the
-    //already-wiped PassBin=0 -> SaveDefault persisted 0 -> Start refused with "no Pass Bin is
-    //set" no matter how many times the operator saved.
-    OldPassBin=BinAreaMap.GetPassBin();
     BinAreaMap.Clear();
-    BinAreaMap.SetPassBin(OldPassBin);
     for(Row=1; Row<grdBinAreaMap->RowCount; Row++)
     {
         Area=GetBinGridAreaByRow(Row);
@@ -796,22 +768,9 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
             BinAreaMap.SetBinByArea(Bin, Area);
     }
     BinAreaMap.SetErrorBinArea(GetSelectedBinErrorArea());
-    if(cbbPassBin!=NULL)
-    {
-        int NewPassBin=StrToIntDef(cbbPassBin->Text.Trim(), 0);   //AI(ht160s-bin-passfail) 20260708
-        //AI(ht160s-lotpassfail) 20260709 : in By Lot+PassFail mode the Pass Bin IS the routing
-        //determinant. Once a lot is running (bindings are minted at CCD scan, so count>0 means
-        //in-progress) a change would re-partition it and mix PASS/FAIL parts - reject the change
-        //and keep the value the lot was bound under.
-        if(GeneralSetting.IsLotPassFailSortMode() && LotBinBinding.GetBindingCount()>0
-           && NewPassBin!=BinAreaMap.GetPassBin())
-        {
-            if(ShowResultMessage)
-                ShowMyOKMessageNoStop(LangT("Pass Bin is locked while a By Lot+PassFail lot is running. Finish the lot (Lot End) before changing it."));
-        }
-        else
-            BinAreaMap.SetPassBin(NewPassBin);
-    }
+    //AI(ht160s-lotpassfail) 20260730 : the Pass Bin save + its mid-lot lock are REMOVED with the
+    //setting. Nothing on this page can re-partition a running By Lot+PassFail lot any more : the
+    //PASS/FAIL class is customer data frozen onto the cell at CCD scan.
     BinAreaMap.SaveDefault();
     //AI(ht160s-bindisplay) 20260706 : the Error Bin area just changed in the live
     //global BinAreaMap. Sort routing reads it live, but the physical bin display
@@ -1093,8 +1052,8 @@ void __fastcall TfSetup::grdBinAreaMapSelectCell(TObject *Sender, int ACol, int 
     //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode binds Auto<->Bin dynamically at run
     //time, so the static Auto->Bin assignment must NOT be edited here (only the Error
     //Bin selection stays usable). Block the Bin column from being focused/edited.
-    //AI(ht160s-lotpassfail) 20260709 : same for By Lot+PassFail (also dynamic). The Pass Bin
-    //is picked via the separate cbbPassBin combo, not this grid column, so it stays reachable.
+    //AI(ht160s-lotpassfail) 20260709 : same for By Lot+PassFail (also dynamic). That mode needs
+    //no static Bin at all - its PASS/FAIL class comes from the customer per-IC DiePass.
     if(GeneralSetting.IsDynamicBindingMode())
     {
         CanSelect=false;

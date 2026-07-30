@@ -133,7 +133,7 @@ Loader 內部運作序列：待命 → 進料 → CCD 掃描 → 可供分類 �
 | 運轉模式（Real/Dummy） | Dummy / HasTray / Real | 運轉模式，影響感測器/CCD/拍照是否走實機路徑（三層 IO 檢查層級）；於主畫面 Real/Dummy 切換框切換，僅停機可改 |
 | 起動模式（Start Mode） | Initial / Continue | 起動模式：初始起動或續做；於 Start Mode 切換框切換，僅停機可改 |
 | AMR 模式 | 開 / 關 | AMR/AGV 堆疊模式總開關，決定堆疊順序 identity→cover→normal、滿車服務與 AGV 握手 |
-| 分流模式（Sort Mode） | Normal / By Lot+Bin / By Lot+PassFail | 分流模式：Normal（靜態 Bin→Auto 表）、By Lot+Bin（動態綁定 (Lot,Bin)→Auto）、By Lot+PassFail（動態綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由 Bin==Pass Bin 導出、掃描時凍結）。詳見第 15 章 |
+| 分流模式（Sort Mode） | Normal / By Lot+Bin / By Lot+PassFail | 分流模式：Normal（靜態 Bin→Auto 表）、By Lot+Bin（動態綁定 (Lot,Bin)→Auto）、By Lot+PassFail（動態綁定 (Lot,PASS/FAIL)→Auto，PASS/FAIL 由每顆 IC 的 DiePass 導出、掃描時凍結）。詳見第 15 章 |
 | 2D 條碼讀取 | 開 / 關 | 是否啟用 Top CCD 2D 條碼讀取與 Bin 反查（關閉則只讀有無料的 Bin） |
 | Color CCD | 開 / 關 | 關閉時 Color 跳過相機、2D 碼留空，供盤照常進行 |
 | SECS/GEM | 開 / 關 | SECS/GEM 功能旗標，決定 SECS 徽章是否顯示與可點擊 |

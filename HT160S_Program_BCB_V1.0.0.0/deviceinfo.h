@@ -27,7 +27,7 @@ enum eICRecordField
     eLotID, e2DCode,
     //AI(ht160s-ccd-manual2d) 20260626 : 1 = IC 2D operator hand-entered (appended; positions unchanged)
     eManual2D,
-    //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL vs operator Pass Bin (append; positions unchanged)
+    //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL from the customer DiePass (append; positions unchanged)
     ePassFail
 };
 

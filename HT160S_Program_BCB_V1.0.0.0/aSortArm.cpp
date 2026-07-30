@@ -1026,8 +1026,8 @@ int TSortArmModule::GetMappedAutoIndex(int BinData, int LotIndex, int PassClass,
     }
     //AI(ht160s-lotpassfail) 20260709 : By Lot+PassFail mode. The PASS/FAIL class was
     //frozen at CCD scan (Slot.PassClass, passed in via the PassClass arg) and bound to an
-    //Auto by LotBinBinding.ResolveAuto; here we only READ it. PassClass 0 (error bin /
-    //PassBin off) and ICs with no owning lot route to the Error Auto - same as Lot+Bin.
+    //Auto by LotBinBinding.ResolveAuto; here we only READ it. PassClass 0 (error bin) and
+    //ICs with no owning lot route to the Error Auto - same as Lot+Bin.
     if(GeneralSetting.IsLotPassFailSortMode())
     {
         int AutoIndex;
@@ -1598,7 +1598,7 @@ void TSortArmModule::TransferPlaceDataToAuto()
             if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)
                 tRunData.TrayICCnt[iActiveAutoIndex+1]++;
             g_DeviceInfo.AddBinInfo(SlotIndex, iActiveAutoIndex, Slot[SlotIndex].TrayData);
-            {   //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL vs operator Pass Bin.
+            {   //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL from the customer DiePass.
                 //AI(ht160s-lotpassfail) 20260709 : read the class FROZEN at CCD scan (Slot.PassClass)
                 //so the logged result matches the class the IC was actually routed on; 0 -> blank.
                 int PassClassVal=Slot[SlotIndex].PassClass;

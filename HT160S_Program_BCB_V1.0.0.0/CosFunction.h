@@ -90,7 +90,6 @@ private:
 	int AreaToBin[HT160_BIN_AREA_MAX_AREA];
 	int ErrorBinToArea[HT160_BIN_ERROR_REASON_COUNT];
 	int ErrorBinArea;
-	int PassBin;   //AI(ht160s-bin-passfail) 20260708 : bin# that counts as PASS (0 = feature off)
 
 	bool IsValidBin(int Bin);
 	bool IsValidArea(int Area);
@@ -121,13 +120,9 @@ public:
 	AnsiString GetDefaultIniFileName();
 	void LoadFromIni(AnsiString FileName);
 	void SaveToIni(AnsiString FileName);
-	int GetPassBin();
-	void SetPassBin(int Bin);
-	// AI(ht160s-lotpassfail) 20260709 : single classifier shared by the CCD-scan freeze
-	// (aLoader), the place-time PASS/FAIL log and the By Lot+PassFail routing read, so all
-	// three agree. Returns 0 = no class (error bin, or PassBin feature off) -> Error Auto /
-	// blank log ; 1 = PASS (Bin==PassBin) ; 2 = FAIL (any other real bin).
-	int GetPassFailClass(int Bin);
+	// AI(ht160s-lotpassfail) 20260730 : the operator "Pass Bin" setting is GONE. PASS/FAIL is
+	// customer data now (per-IC DiePass from WebService#11), so the classifier moved to
+	// THT160LotRegistry::GetPassFailClass - it needs the 2D code, not a bin number.
 	void LoadDefault();
 	void SaveDefault();
 };
@@ -327,6 +322,17 @@ public:
 	// Backup lookup : fetch the full per-IC record by 2D code. Returns false if
 	// the code is unknown. Not on the hot sorting path.
 	bool FindIcInfo(AnsiString Code2D, TLotIcInfo &Info);
+
+	//AI(ht160s-lotpassfail) 20260730 : PASS/FAIL classifier. Single source shared by the
+	// CCD-scan freeze (aLoader), the place-time PassFail log and the By Lot+PassFail routing
+	// read, so all three agree. The determinant is CUSTOMER data - the per-IC DiePass field
+	// of WebService#11 (1=pass / 0=fail, DB column PssFail) - NOT a machine setting; the old
+	// operator-configured "Pass Bin" was removed 2026-07-30.
+	// Returns 0 = no class (error bin only : 2D scan fail / no bin setting) -> Error Auto and
+	// blank log ; 1 = PASS (DiePass 1) ; 2 = FAIL. A missing / empty / unknown DiePass counts
+	// as FAIL by customer decision (manual 2D edits, sim data and the legacy Maps JSON carry
+	// no DiePass), so a real product is never silently mixed into the Error Auto.
+	int  GetPassFailClass(AnsiString Code2D, int Bin);
 
 	//AI(ht160s-lot-webapi) 20260612 : UI / traceability : enumerate every 2D IC
 	// record that belongs to one Lot. Out is filled with one tab-separated line

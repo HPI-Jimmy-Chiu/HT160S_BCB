@@ -153,7 +153,6 @@ Bin Setting 分頁設定「料區 (Area) → Bin 編號」的對應表，以及�
 | --- | --- | --- |
 | 料區→Bin 對應表 | 表格 | 顯示各料區的 Bin 對應（Area / Bin / Status / Note）；每列一個料區，編輯 Bin 欄；驗證後顯示 OK/Empty/Duplicate/Invalid/Error 狀態與說明 |
 | Error Bin 下拉 | 下拉 | 選擇錯誤料 (NG) 的收集料區；只列出已啟用的料區，預設為 Auto6 |
-| Pass Bin 下拉 | 下拉 | 選擇視為 PASS 的 Bin：選項為 `0`（=關閉）+ 表格中各已設定的路由 Bin。存入配方設定，決定 Production_Log 的 PassFail 欄，且為 By Lot+PassFail 分流模式的分類依據（見第 15 章）。By Lot+PassFail 的 Lot 執行中變更會被拒絕 |
 | Load Current | 按鈕 | 從預設對應表重新載入到表格 |
 | Save Map | 按鈕 | 驗證並儲存 Bin 對應表（含 Error Bin 區），顯示結果 |
 | Validate | 按鈕 | 驗證表格內容並顯示是否 OK（檢查範圍/重複/空白） |
@@ -177,7 +176,6 @@ Bin 分頁狀態欄：
 | --- | --- | --- |
 | 料區→Bin 對應 | 每區 Bin 0~999，0=未指派 | 各料區對應的 Bin 編號 |
 | Error Bin 下拉 | 已啟用之料區，預設 Auto6 | 錯誤料 (NG) 收集料區 |
-| Pass Bin 下拉 | 0（關閉）或某個已設定的 Bin | 視為 PASS 的 Bin。決定 Production_Log PassFail 欄；By Lot+PassFail 模式的分類/路由依據（該模式啟動前須 >0） |
 
 > ⚠️ 注意：Bin 值範圍為 0~999（1000 起為錯誤碼）。非數字或越界視為 `Invalid`；同一 Bin 指派到不同料區視為 `Duplicate`；驗證未通過時 **Save** 會被擋下。
 
@@ -189,9 +187,8 @@ Bin 分頁狀態欄：
 4. 按 **Validate** 檢查（範圍/重複/空白），狀態欄顯示 OK/Empty/Duplicate/Invalid/Error。
 5. 按 **Save Map** 驗證並存檔。
 6. 視需要可用 **Load Current** 重新載入、**Clear All** 全清為 0、**Default 1-N** 依序填入預設值。
-7. 若使用 By Lot+PassFail 分流，另以 **Pass Bin** 下拉選擇視為 PASS 的 Bin（存入同一配方設定）。
 
-> ⚠️ 注意：在動態分流模式（By Lot+Bin 或 By Lot+PassFail）下，整張表的 Bin 欄禁止手動編輯（Auto↔Bin 由執行時動態綁定），此時只能修改 **Error Bin**；**Pass Bin** 下拉為獨立控制項，仍可設定（惟 By Lot+PassFail 的 Lot 執行中會被鎖）。
+> ⚠️ 注意：在動態分流模式（By Lot+Bin 或 By Lot+PassFail）下，整張表的 Bin 欄禁止手動編輯（Auto↔Bin 由執行時動態綁定），此時只能修改 **Error Bin**。By Lot+PassFail 不需要在本頁做任何設定——PASS／FAIL 直接取自客戶 2D 資料中每顆 IC 的 DiePass（1=PASS／0=FAIL）。
 
 ---
 
@@ -223,9 +220,9 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 
 - **Normal 模式（預設）**：依靜態 Bin 對應表，每個 Bin 固定對到一個 Auto 區。
 - **By Lot+Bin 模式**：在 CCD 掃描時依「先到先得 (first-come-first-served)」把每組 (LotID, Bin) 綁定到下一個尚未被佔用且已啟用的 Auto，之後僅讀取此綁定來放料。
-- **By Lot+PassFail 模式**：掃描時以「Bin 是否等於 Pass Bin」把 IC 分為 PASS/FAIL，把每組 (LotID, PASS/FAIL) 先到先得綁定到 Auto；每 Lot 最多綁 2 個 Auto。分類在掃描當下凍結於料格，放料時只讀不重算。
+- **By Lot+PassFail 模式**：掃描時以「客戶 2D 資料中每顆 IC 的 DiePass（1=PASS／0=FAIL）」把 IC 分為 PASS/FAIL，把每組 (LotID, PASS/FAIL) 先到先得綁定到 Auto；每 Lot 最多綁 2 個 Auto。分類在掃描當下凍結於料格，放料時只讀不重算。
 
-模式切換與多數硬體/路由旗標的設定畫面位於維護畫面的硬體安裝頁；By Lot+PassFail 所需的 Pass Bin 於 Bin Setting 頁的 **Pass Bin** 下拉設定（見 6.4）。完整說明見第 15 章，本節一併概述。
+模式切換與多數硬體/路由旗標的設定畫面位於維護畫面的硬體安裝頁；By Lot+PassFail 不需任何機台端設定（PASS／FAIL 取自 2D 資料的 DiePass）。完整說明見第 15 章，本節一併概述。
 
 ![配方/產品設定](screenshots/screen-product.png)
 > 圖 6-2 Product / 硬體安裝頁的分流與路由設定（模式切換、Auto/吸嘴啟用、安全距離等）。（擷取方式：進入 Maintenance → Hardware install setup 頁。）
@@ -249,7 +246,6 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 | 畫面項目 | 範圍/預設 | 說明 |
 | --- | --- | --- |
 | Sort Mode | 預設 Normal | 分流模式：Normal（靜態 Bin 對應表），By Lot+Bin（動態綁定 Bin），By Lot+PassFail（動態綁定 PASS/FAIL） |
-| Pass Bin 下拉 | 預設 0（關閉） | 視為 PASS 的 Bin；By Lot+PassFail 模式的分類/路由依據（啟動前須 >0） |
 | Auto1~Auto6 | 預設全部啟用 | Auto1~Auto6 是否參與分流（綁定時跳過停用者） |
 | Nozzle1~Nozzle4 | 預設全部啟用，至少一個須啟用 | SortArm 四個吸嘴啟用（取料時跳過停用槽） |
 | Color bin area installed | 預設不勾 | 是否安裝 Color 輸出區（影響 Bin 對應表 Color 區可用性） |
@@ -268,15 +264,14 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 
 ### 6.6.4 啟用動態分流模式（By Lot+Bin / By Lot+PassFail）
 
-1. （僅 By Lot+PassFail 需要）先於 Bin Setting 頁以 **Pass Bin** 下拉設定視為 PASS 的 Bin（存入配方設定）。
-2. 於維護畫面硬體頁以 **Sort Mode** 選 By Lot+Bin 或 By Lot+PassFail，依提示重開軟體乾淨生效。
-3. 以 **Auto1~Auto6** 設定哪些 Auto 可用於分流（停用者於綁定時被跳過）。By Lot+PassFail 每 Lot 用到 2 個 Auto，建議至少保留 2 個非 Error Auto。
-4. 載入各 Lot 的 2D/Bin 資料（離線匯入或 WebAPI/SECS），使已載入的 IC 資料筆數 > 0。
-5. 按 Start。全新工單以 0 綁定啟動是正常的——綁定只在掃描時產生。By Lot+PassFail 另檢查 Pass Bin 是否 >0，未設定會擋下並提示 `By Lot+PassFail mode is ON but no Pass Bin is set. Set the Pass Bin on the Bin Setting page before Start !`。
+1. 於維護畫面硬體頁以 **Sort Mode** 選 By Lot+Bin 或 By Lot+PassFail，依提示重開軟體乾淨生效。
+2. 以 **Auto1~Auto6** 設定哪些 Auto 可用於分流（停用者於綁定時被跳過）。By Lot+PassFail 每 Lot 用到 2 個 Auto，建議至少保留 2 個非 Error Auto。
+3. 載入各 Lot 的 2D/Bin 資料（離線匯入或 WebAPI/SECS），使已載入的 IC 資料筆數 > 0。By Lot+PassFail 的 PASS／FAIL 就取自這份資料的 DiePass 欄。
+4. 按 Start。全新工單以 0 綁定啟動是正常的——綁定只在掃描時產生。
 
 ### 6.6.5 動態模式執行期綁定與放料
 
-1. Loader CCD 掃描每顆 IC：以 2D 碼反查出所屬 Lot 與 Bin，寫入該料格；同時依「Bin 是否等於 Pass Bin」計算 PASS/FAIL 並凍結於料格。
+1. Loader CCD 掃描每顆 IC：以 2D 碼反查出所屬 Lot 與 Bin，寫入該料格；同時依該顆 IC 的 DiePass 計算 PASS/FAIL 並凍結於料格（無 DiePass 資料者視為 FAIL）。
 2. 依模式綁定：By Lot+Bin 以 Bin 為鍵、By Lot+PassFail 以 PASS/FAIL 分類為鍵（分類為錯誤/關閉時不綁定）。先查既有綁定，無則以「先到先得」選最低編號、未被佔用且已啟用的非 Error Auto；全被佔用時溢位到 Error Auto。新綁定立即存檔。
 3. SortArm 放料時只讀取既有綁定、不再重新配置；By Lot+Bin 用該格 Bin、By Lot+PassFail 用該格凍結的分類查表。無所屬 Lot、錯誤 Bin（2D 掃描失敗/無 Bin 設定）或分類為 0 者導向 Error Auto；動態模式不使用 Color 區做分流。
 4. 綁定記錄會自動存檔並持久保留（記錄分流模式與各組對應到哪個 Auto）。
@@ -300,7 +295,7 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 - **Tray Division 夾限**：X/Y Division 夾限於 1~20 / 1~50，超出提示並夾限後才存。
 - **Bin 值範圍**：0~999（1000 起為錯誤碼）；非數字或越界視為 `Invalid`；同一 Bin 指派到不同料區視為 `Duplicate`；驗證未通過時 **Save** 被擋下。
 - **By Lot+Bin 鎖編輯**：By Lot+Bin 模式時，Bin 對應表的 Bin 欄不可被選取/編輯（Auto↔Bin 由執行時動態綁定）。
-- **硬體編輯鎖**：Lot 執行中鎖定 **Sort Mode** / **Auto1~Auto6** / **Nozzle1~Nozzle4** / **Color bin area installed** / **Use AMR**，避免中途改路由破壞進行中的分流；結束 Lot（未起 lot）即解鎖，標題加註 locked。（By Lot+PassFail 執行中另拒絕於 Bin Setting 頁變更 Pass Bin）
+- **硬體編輯鎖**：Lot 執行中鎖定 **Sort Mode** / **Auto1~Auto6** / **Nozzle1~Nozzle4** / **Color bin area installed** / **Use AMR**，避免中途改路由破壞進行中的分流；結束 Lot（未起 lot）即解鎖，標題加註 locked。
 - **至少一個吸嘴啟用**：偵測到全部取消時自動勾回並提示 `At least one nozzle must stay enabled.`。
 - **2D 碼全域唯一**：系統拒絕已被任一 Lot 擁有的重複 2D 碼，避免分流衝突。
 - **Start 前置檢查（防呆）**：未載入任何 2D 資料時擋下 Start；By Lot+Bin 模式開啟但無任何綁定時擋下 Start。
@@ -325,8 +320,6 @@ HT160S 把分類結果 (Bin) 導向輸出料倉（Auto1~Auto6 / Color / Error �
 | `Delete recipe <name>?` | 刪除配方的 Yes/No 確認 | 選 Yes 確認，No 取消 |
 | `Recipe saved as <name>.` | 另存配方成功提示 | 無 |
 | `No 2D data : load lot 2D/Bin data before Start !` | Start 前未載入任何 IC 的 2D/Bin 資料 | 先以離線匯入 / WebAPI / SECS 載入再 Start |
-| `By Lot+PassFail mode is ON but no Pass Bin is set. Set the Pass Bin on the Bin Setting page before Start !` | By Lot+PassFail 模式開啟但 Pass Bin=0 | 先於 Bin Setting 頁以 **Pass Bin** 下拉設定 Pass Bin 再 Start |
-| `Pass Bin is locked while a By Lot+PassFail lot is running. Finish the lot (Lot End) before changing it.` | Lot 執行中嘗試更改 Pass Bin | 先結束目前 Lot 再變更 |
 | `Sort mode changed. Please restart the software so the new classification mode takes effect cleanly.` | 切換分流模式後的提醒（非強制） | 重新啟動軟體讓新模式乾淨生效 |
 | `Auto enable changed. Please restart the software so the new Lot+Bin routing takes effect cleanly.` | 變更 Auto 啟用後的提醒（非強制） | 重新啟動軟體讓新路由乾淨生效 |
 | `At least one nozzle must stay enabled.` | 嘗試停用最後一個吸嘴 | 系統自動勾回；保留至少一個啟用的吸嘴 |
