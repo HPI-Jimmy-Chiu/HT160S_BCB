@@ -6,10 +6,10 @@
 4,S1F13,Establish Communications Request,O,ECR(FT):'S1F13' W / < L[2] /  <A[6] 'CJ_EAP'> /  <A[6] '1.0.00'> / > / .
 5,S1F15,Request OFF-LINE,O,S1F15(Off-Line):'S1F15' W / . / [20260729] 已實作。S1F15 -> S1F16 OFLACK=0，控制狀態轉 Off-Line(1)。
 6,S1F17,Request ON-LINE,O,S1F17(On-Line):'S1F17' W / .
-7,S1F23,Collection Event Namelist Request,X,[20260729] 未實作。S1 的 dispatch 無 F23 分支，會落到未識別訊息(僅記本機 log)。
+7,S1F23,Collection Event Namelist Request,O,"S1F23:'S1F23' W /   <L [0]  /   > / . / [20260730] 已實作(2026-07-30 新增)。S1F23 -> S1F24 回 L,n{L,3{U4 CEID, A CENAME, L,m{U4 VID}}}。<L[0]> 全查回全部 275 個 CEID(與 HT9045 字典逐字相同，含本機已註冊但不發射的 223 個)；指定 CEID 只回該幾筆；未註冊的 CEID 回 {CEID, '', L,0}(與 HT9045 同)。VID 清單由該 CEID 所連結的報表依序展開，順序與該事件 S6F11 內的排列一致，重複的 VID 不去除(一個 CEID 連兩張含相同 SVID 的報表時，S6F11 本來就會送兩次)。註：本訊息只是字典查詢，不等於訂閱 — 實際要收哪些事件仍由 S2F33 / S2F35 / S2F37 決定。"
 8,S2F13,Equipment Constant Request,O,GetEAPEquipmentType:'S2F13' W /   <L [1]  /     <U4 [1] 1501> /   > / .
 9,S2F15,New Equipment Constant Send,O,NewEquipmentConstantSend(SetLotInfo):'S2F15' W /   <L [1]  /     <L [2]  /       <U4 [1] 2763> /       <A [1] '5'> /     > /   > / .
-10,S2F29,Equipment Constant Namelist Request,X,S2F29:'S2F29' W /   <L [0]  /   > / .
+10,S2F29,Equipment Constant Namelist Request,O,"S2F29:'S2F29' W /   <L [0]  /   > / . / [20260730] 已實作(2026-07-30 新增)。S2F29 -> S2F30 回 L,n{L,6{U4 ECID, A ECNAME, ECMIN, ECMAX, ECDEF, A ECUNITS}}。<L[0]> 全查回全部 7 個 EC：1501 Recipe Name、2758/2759 Tray Pitch X/Y、2760/2761 Tray Start X/Y、2762/2763 Tray Division X/Y。ECMIN / ECMAX / ECDEF 以該 EC 自身宣告的型別編碼(例如 FT_8 的 Tray X Start 回 FT_8，不是 ASCII)；未宣告上下限者回該型別的零長度項目(E5「未宣告」的表示法，與 HT9045 相同)。未註冊的 ECID 回 L,6 內名稱 / 三個界限 / 單位皆為零長度。註：本訊息為唯讀查詢；EC 寫入仍走 S2F15，維持「機台閒置才受理」與「只開放 tray 幾何」兩道限制，S2F30 不會放寬可寫範圍。"
 11,S2F33,Define Report,O,Define AMR related Report:'S2F33' W /   <L [2]  /     <U4 [1] 1> /     <L [1]  /       <L [2]  /         <U4 [1] 2000> /         <L [7]  /           <U4 [1] 38202> #Load port carrier ID /           <U4 [1] 38205> #Auto1 carrier ID /           <U4 [1] 38206> #Auto2 carrier ID /           <U4 [1] 38207> #Auto3 carrier ID /           <U4 [1] 38219> #Supplement_Bin /           <U4 [1] 38220> #LD_UnLD_Check_AGV /           <U4 [1] 38221> #LD_UnLD_Finish_AGV /         > /       > /     > /   > / .
 12,S2F35,Link Event Report,O,AGVSupplement_Link_Report:'S2F35' W /   <L [2]  /     <U4 [1] 272> /     <L [1]  /       <L [2]  /         <U4 [1] 272> /         <L [1]  /           <U4 [1] 2000> /         > /       > /     > /   > / .
 13,S2F37,Enable/Disable Event Report,O,EnableEvent:'S2F37' W /   <L [2]  /     <Boolean [1] True> /     <L [0] /  > /   > / .
@@ -25,7 +25,7 @@
 2,機台編號,,O,SVID:1001 / [20260729] SVID:1001。註：1001 於 HT9045 字典為 Machine Model，本機回 'HT-160S'。若貴端需要「機台序號」，本機以 stbMain 的 HandlerID / SerialNo 管理，目前未掛 SVID，可再議。
 3,機台型號,,O,[20260729] SVID:1001 Machine Model = 'HT-160S'(與上一列同一個 SVID)。S1F2 / S1F14 的 MDLN 亦回同值。
 4,廠商軟體版本,,O,SVID:1003
-5,貨批起測時間,,△,[20260729] 無專屬 SVID。Lot 開始以 CEID 6 Lot Start 通知，該事件帶 Report 1(含 SVID 1027 System Time)，host 可由事件時間取得起測時間；另 SVID 66031 Current Lot ID、66030 Active Lot Count 可查詢。若貴端需要獨立的「起測時間」SVID，可新增(建議置於 66000 高位段)。
+5,貨批起測時間,,O,[20260730] 已實作(2026-07-30 新增)。新增 SVID 66033 Lot Start Time，格式 'yyyy/mm/dd hh:nn:ss'(與 SVID 1027 System Time 同格式，可直接比對)。於 Lot Start 當下閂鎖 — 操作面板 Lot Start 按鈕與 SECS S2F41 LOTSTART 兩條路徑都會寫入 — Lot End 清空，貨批進行中可隨時以 S1F3 回查(不會隨系統時間變動)。CEID 6 Lot Start 事件照舊發送，可作為即時通知。註1：66033 未加入預設 Report 1。該報表是每個 CEID 的預設酬載，其 13 個 SV 的內容已對貴端公布，加欄位會改變線上每一筆事件的長度；若需在事件內帶出起測時間，請以 S2F33 / S2F35 將 66033 綁進貴端自訂報表即可。註2：本欄位不做斷電保存，機台中途重開後為空，直到下一次 Lot Start；持久紀錄請以 CEID 6 事件為準。
 6,系統時間,,O,SVID:1027
 7,機台Event回傳,,O
 8,機台Alarm回傳,,O,[20260729] 已實作。S5F1 主動上報；S5F5/S5F6 全警報目錄、S5F7/S5F8 已啟用清單、S5F3/S5F4 啟用停用皆支援。目錄由本機警報碼 SSOT 即時產生(576 碼)。

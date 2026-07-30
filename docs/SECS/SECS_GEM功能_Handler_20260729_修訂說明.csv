@@ -1,6 +1,6 @@
 ﻿SECS/GEM 功能對照表 — 修訂說明
 
-修訂日期 Revision date,2026-07-29
+修訂日期 Revision date,2026-07-29 (第 1 版) / 2026-07-30 (第 2 版，本次)
 來源檔 Source,"SECS_GEM功能_Handler.xlsx (客戶提供, 2026-07-23 資料夾)"
 本檔 This file,SECS_GEM功能_Handler_20260729.xlsx
 依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit bd1d785)"
@@ -29,3 +29,13 @@ X,未實作
 N/A,機構上不適用(HT-160S 為 Tray Sorter，非測試機)
 淡黃底,本次修訂變更的儲存格
 綠底 ★,CEID 表中本機真的會發射的號碼
+
+2026-07-30 第 2 版修訂 Revision 2
+依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit 0ea94b7)"
+1. S1F23 / S1F24 Collection Event Namelist,"由「未實作」改為「已實作」。回 L,n{L,3{CEID, CENAME, L,m{VID}}}；<L[0]> 全查回全部 275 個 CEID(與 HT9045 字典一致)，未註冊的 CEID 回 {CEID, '', L,0}。此訊息為字典查詢，不影響訂閱 — 事件訂閱仍由 S2F33 / S2F35 / S2F37 決定。"
+2. S2F29 / S2F30 Equipment Constant Namelist,"由「未實作」改為「已實作」。回 L,n{L,6{ECID, ECNAME, ECMIN, ECMAX, ECDEF, ECUNITS}}；全查回 7 個 EC。三個界限以該 EC 自身型別編碼，未宣告者回該型別的零長度項目。EC 寫入仍走 S2F15，可寫範圍未放寬。"
+3. 貨批起測時間,由「△ 無專屬 SVID」改為「O」。新增 SVID 66033 Lot Start Time (yyyy/mm/dd hh:nn:ss)，Lot Start 閂鎖、Lot End 清空，面板按鈕與 SECS LOTSTART 兩條路徑皆寫入。未加入預設 Report 1(不變動既有事件酬載)。
+4. SVID 表,新增 66033 Lot Start Time。本機共註冊 52 個 SVID。
+
+本次未變動 Unchanged,CEID 表(1-275 與 52 個本機發射點皆不變)、其餘功能列狀態、預設 Report 1 的 13 個 SV 內容。
+驗證 Verification,"模擬版與真機版(關閉 SOFT_SIMULATE)建置皆 exit 0；並以 headless SECS host 對實際韌體做完整 HSMS round-trip 驗證：S1F24 全查回 L,275(30189 bytes)、CEID 6 回 13 個 VID、CEID 272 回 19 個 VID、未知 CEID 回空；S2F30 全查回 L,7 且 FT_8 界限型別正確、未知 ECID 回全零長度；SVID 66033 於 LOTSTART 前為空、之後為 2026/07/30 09:59:18，同時 SVID 1027 為 09:59:20，證明 66033 為閂鎖值而非跟著時鐘走。上機驗證待執行。"

@@ -67,6 +67,8 @@
 | S1F16 | OFF-LINE Acknowledge | E→H | — | `B OFLACK` | OFLACK=0,控制狀態→1 |
 | S1F17 | Request ON-LINE | H→E | S1F18 | (header only) | |
 | S1F18 | ON-LINE Acknowledge | E→H | — | `B ONLACK` | ONLACK=0,控制狀態→5 |
+| S1F23 | Collection Event Namelist Request | H→E | S1F24 | `L,n{ CEID }`(n=0=全部) | **本次新增 (2026-07-30)** |
+| S1F24 | Collection Event Namelist Reply | E→H | — | `L,n{ L,3{ U4 CEID, A CENAME, L,m{ U4 VID } } }` | n=0 回全部 275 個 CEID;未註冊者回 `{CEID,"",L,0}` |
 
 ### Stream 2 — 設備控制與診斷 / Equipment Control & Diagnostics
 
@@ -80,6 +82,8 @@
 | S2F18 | Date and Time Data | E→H | — | `A[16] TIME` | `YYYYMMDDhhmmsscc`,唯讀 |
 | S2F25 | Loopback Diagnostic Request | H→E | S2F26 | `B ABS` | **本次新增** |
 | S2F26 | Loopback Diagnostic Data | E→H | — | `B ABS`(echo) | 原封回送 |
+| S2F29 | Equipment Constant Namelist Request | H→E | S2F30 | `L,n{ ECID }`(n=0=全部) | **本次新增 (2026-07-30)** |
+| S2F30 | Equipment Constant Namelist Reply | E→H | — | `L,n{ L,6{ U4 ECID, A ECNAME, ECMIN, ECMAX, ECDEF, A ECUNITS } }` | 三個界限以該 EC 自身型別編碼;未宣告者回零長度項目 |
 | S2F31 | Date and Time Send | H→E | S2F32 | `A[..] TIME` | |
 | S2F32 | Date and Time Acknowledge | E→H | — | `B TIACK` | TIACK=0;**刻意不寫設備時鐘** |
 | S2F33 | Define Report | H→E | S2F34 | `L,2{ U4 DATAID, L,a{ L,2{ U4 RPTID, L,b{ U4 SVID } } } }` | 見 §4;**容忍未知 SVID** |
@@ -174,6 +178,7 @@
 | 66030 | Active Lot Count | I4 | 目前載入 Lot 數 |
 | 66031 | Current Lot ID | A | 首個 Lot ID |
 | 66032 | Sort Mode | I4 | 0=Normal 1=LotBin 2=LotPassFail 3=WhiteList |
+| 66033 | Lot Start Time | A | `yyyy/mm/dd hh:nn:ss`,Lot Start 閂鎖、Lot End 清空;未加入預設 Report 1 |
 
 **AMR / AGV 段 / AMR band (38xxx):**
 
@@ -533,10 +538,11 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 
 > 20260728 更新:`S6F15/F16`、`S6F19/F20`、`S10F3–F6`、`S125F1/F2` 已實作完成並移入 §2,不再屬於本節。此四組是京元現場 log (2026-06-08) 證實 host 會主動送出、而本機先前不回覆造成 T3 逾時的訊息。
 
+> 20260730 更新:`S1F23/F24`(Collection Event Namelist)與 `S2F29/F30`(EC Namelist)已實作完成並移入 §2,不再屬於本節。兩者皆為唯讀的字典查詢:S1F23 不影響事件訂閱(訂閱仍由 S2F33/F35/F37 決定),S2F29 不放寬 EC 可寫範圍(寫入仍走 S2F15 的閒置閘與 tray 幾何白名單)。
+
 | 訊息 | 名稱 | 備註 |
 |---|---|---|
 | S2F23 / F24 | Trace Initialize | 以事件報表(S2F33/35/37 + S6F11)取代 |
-| S2F29 / F30 | EC Namelist | 可由現有 EC 表補回覆 |
 | S7F1–F26 | Process Program(配方上下傳) | recipe 走本地/FTP;非 event-report 集 |
 | S14F1 / F2 | GetAttr(物件屬性) | |
 
@@ -578,7 +584,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 | `HOME` | RCMD | 遠端回原點(等同操作員 Home 鍵) | **9045 整棵 SECSGEM 樹查無 `HOME` 命令**(見 §7.1 的完整命令集)。9045 最接近的是 `RESET`,但那是測試機收料回復流程,語意不同。保留本命令:刪掉會少一個有用的遠端功能而換不到任何對齊 |
 | `ONLINE`(裸) | RCMD | = `ONLINE_REMOTE` 別名 | 便利別名;9045 僅有 `ONLINE_REMOTE` / `ONLINE_LOCAL` |
 | `CLEARCOUNT` | RCMD | host 遠端清除生產計數 | 9045 將 clear-count 僅作操作員事件(CEID 5,HT-160S 自 2026-07-29 起同號同義且會發射),無對應 RCMD(9045 另有 `CLEAN_AUTO_SORT_COUNT`,語意不同) |
-| SVID **66000–66032** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞 |
+| SVID **66000–66033** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032)、LotStartTime(66033) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞 |
 | SVID **38208–38210** ＋ **38237–38245** | SVID | Auto4/5/6 的 carrier(38208/38209/38210)＋ tray / device / bin-setting(38237–38245),共 **12 個號** | HT-160S 有 **6 個 Auto 輸出站**,9045 的目錄僅到 38236(3 站);為第 4–6 站延伸。**更正(2026-07-29)**:舊版本節誤寫成「38237–38245 = Auto4/5/6 的 carrier/tray/device/bin-setting」—— carrier 三個號實際是 **38208/38209/38210**,不在 38237–38245 之內。**待確認**:手上的 9045 傾印只有 CEID 與 ReportID 目錄,不含 382xx,故無法證實或否證 9045 是否已定義這 12 個號;需向京元索取 9045 的 SVID 目錄傾印 |
 | ~~CEID **1–31** 編號~~ | CEID | — | **本列已於 2026-07-29 作廢**:CEID 字典整份改為 HT9045 逐字複本(1–275 全數註冊、別名逐字相同),**已無「同號不同義」問題**。host 可直接沿用 HT9045 的 CEID 設定;由舊版升級者請依 **§3.3.5** 對照表重新設定。詳見 §3.3。 |
 
