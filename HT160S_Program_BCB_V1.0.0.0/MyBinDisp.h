@@ -19,6 +19,17 @@
 // AI(ht160s-maintainer) 20260615 : HT160 addressable LED units (per P0 lock):
 // 0=Empty 1=Loader 2..7=Auto1..6 8=Color.
 #define BIN_DISP_UNIT_COUNT 9
+// AI(ht160s-bindisplay) 20260730 : physical bus address per lane, for hardware /
+// Modbus-sniffer lookup. Unit index (Addr, 0..8 above) -> slave address =
+// Addr+32 decimal, sent as 2-hex-digit ASCII (wAddr in MyBinDisp.cpp WriteBin/
+// WriteColor/ReadVersion; the Addr>=10 -> Addr+38 branch there never fires for
+// HT160's 9 units). TMyBinDispTFT::iAddArrayTFT[i]=0x20+i uses the identical
+// scheme. Concrete table:
+//   index 0 Empty   -> addr 0x20 (32)     index 5 Auto4  -> addr 0x25 (37)
+//   index 1 Loader  -> addr 0x21 (33)     index 6 Auto5  -> addr 0x26 (38)
+//   index 2 Auto1   -> addr 0x22 (34)     index 7 Auto6  -> addr 0x27 (39)
+//   index 3 Auto2   -> addr 0x23 (35)     index 8 Color  -> addr 0x28 (40)
+//   index 4 Auto3   -> addr 0x24 (36)
 //----------------------------------------------------------------------------
 // Abstract base: per-unit bin display state machine driven by Spin().
 // Concrete serial protocol lives in the subclass (TMyBinDispHT9046).

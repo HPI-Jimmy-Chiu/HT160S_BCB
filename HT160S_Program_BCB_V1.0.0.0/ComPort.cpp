@@ -228,6 +228,8 @@ static int BinTextToValue(AnsiString s)
 //The error Auto is BinAreaMap.GetErrorBinArea() (set on the Bin page, fixed
 //during a lot). Area enum -> unit index by (unit = area - 1):
 //  Empty=1->0 Loader=2->1 Auto1=3->2 ... Auto6=8->7 Color=9->8.
+//Physical bus address per unit index (0x20+index) : see the table in
+//MyBinDisp.h next to BIN_DISP_UNIT_COUNT.
 void TfComPort::ApplyBinDisplayConfig()
 {
     static const int BIN_COLOR_RED   = 1;
