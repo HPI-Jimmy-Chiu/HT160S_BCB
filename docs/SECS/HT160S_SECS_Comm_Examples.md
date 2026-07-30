@@ -74,7 +74,11 @@ HT160S 採用半導體業界標準的三層 SECS/GEM 堆疊。由下而上分別
 
 **連線（connect）→ 設定 lot（set lot）→ 啟動生產（production）→ AGV 補料握手（AGV）→ 警報上報（alarm）→ 結束連線（teardown）**。
 
-下圖即依此順序呈現 host ↔ equipment 的訊息序列，涵蓋：TCP+Select → SET_LOT_INFO → LOTSTART（含 WebAPI pull）→ START → 生產事件迴圈（S6F11；AGV 272→START_AGV→273→274→resume START）→ 警報 S5F1 → Separate。讀完此圖，再進第 3 章看每一步的 body 格式與實際 log，會更容易對位。
+下圖即依此順序呈現 host ↔ equipment 的訊息序列，涵蓋：TCP+Select → SET_LOT_INFO → LOTSTART（含 WebAPI pull）→ START → 生產事件迴圈（S6F11；AGV 272→START_AGV→273→274→resume START）→ 警報 S5F1 → CLEAR_LOT_INFO 結批 → Separate。讀完此圖，再進第 3 章看每一步的 body 格式與實際 log，會更容易對位。
+
+> 圖中的 `LOTSTART` **不帶 lot id**（2026-07-30 起；Lot 身分一律由 `SET_LOT_INFO` 設定），結批的
+> `CLEAR_LOT_INFO` 亦為同日新增。第 3 章的逐則 log 取自變更前的舊 run，故其 body 仍帶 lot 清單——
+> 以本圖與 3.2 的表格為現行合約。
 
 ```mermaid
 sequenceDiagram
@@ -91,9 +95,11 @@ sequenceDiagram
     end
 
     Note over H,E: Lot 設定與啟動 (S2F41 trio)
-    H->>E: S2F41 SET_LOT_INFO (W=1)
+    H->>E: S2F41 SET_LOT_INFO (W=1) 疊加登記 Lot
     E->>H: S2F42 HCACK=0
-    H->>E: S2F41 LOTSTART (W=1)
+    H->>E: S2F41 LOTSTART (W=1) 無參數 L[0]
+    E->>H: S6F11 CEID=6 Lot Start
+    H->>E: S6F12 ACKC6=0
     E-->>E: Lot WebAPI pull (2D/Bin reconcile, HTTP 200)
     E->>H: S2F42 HCACK=0
     H->>E: S2F41 START (W=1)
@@ -101,9 +107,14 @@ sequenceDiagram
 
     Note over H,E: 生產事件上報
     loop 生產 Auto 卸盤 events
-        E->>H: S6F11 EventReport CEID=136..142 (W=1)
+        E->>H: S6F11 EventReport CEID=136-138 / 145-147 (W=1)
         H->>E: S6F12 ACKC6=0
     end
+
+    Note over H,E: 批次中途補拉 2D-Bin (可重複)
+    H->>E: S2F41 LOTSTART (W=1) 批已開
+    E-->>E: Lot WebAPI pull only (不做任何初始化)
+    E->>H: S2F42 HCACK=0
 
     Note over H,E: AGV/AMR 握手 (每站一輪)
     E->>H: S6F11 CEID=272 AGVSupplement (target=Pn)
@@ -120,6 +131,12 @@ sequenceDiagram
     E->>H: S5F1 Alarm ALCD=0 (CLEAR)
     H->>E: S5F2 ACKC5=0
 
+    Note over H,E: 結批 (host 端 Lot End)
+    H->>E: S2F41 CLEAR_LOT_INFO (W=1)
+    E->>H: S6F11 CEID=8 Lot End
+    H->>E: S6F12 ACKC6=0
+    E->>H: S2F42 HCACK=0 (停機且機內無 IC)
+
     Note over H,E: 連線結束
     H->>E: Separate.req (host-side teardown)
 ```
@@ -127,6 +144,8 @@ sequenceDiagram
 > **看圖重點**：
 > - 連線是 **設備撥入 → Host 送 Select.req**（對應 1.2 的方向說明）。
 > - Lot 設定是 **三連發（trio）**：SET_LOT_INFO → LOTSTART → START，三者各有分工（見 3.2）。
+>   `SET_LOT_INFO` 給身分（疊加）、`LOTSTART` 開批＋拉 2D/Bin（不帶身分、可重複）、`START` 才讓機構動。
+>   完整生命週期還有第四支：`CLEAR_LOT_INFO` 結批（唯一會退掉 Lot 的命令）。
 > - 每一輪 AGV 握手結尾的 resume `START` 回的是 **HCACK=4 而非 0**——這是 **正常的誠實互鎖**，不是錯誤（見 3.4）。
 > - 結尾的 `Separate.req` 由 Host 端送出，且本範例中發生在設備已關閉之後（見 3.6）。
 

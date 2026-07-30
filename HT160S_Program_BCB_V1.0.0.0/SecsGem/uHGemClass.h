@@ -51,7 +51,10 @@ public:
     // moment. Called from BOTH the manual Lot Start / Lot End buttons and the SECS LOTSTART
     // accept path. Latched, NOT recomputed in RefreshSVData : the host must be able to read
     // back WHEN the lot started, not what time it is now. Base is a no-op.
-    virtual void NoteLotStartTime(bool bStarted);
+    //AI(secs-lotstarttime-persist) 20260730 : sWhen (already formatted) overrides "now", so a
+    // power-on work-order restore can re-latch the ORIGINAL start time instead of the resume
+    // moment. Empty = stamp now.
+    virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");
 
     virtual void AddSV();
     virtual void AddEC();

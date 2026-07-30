@@ -290,6 +290,15 @@ public:
 	//number of items dropped (0 = that Lot had no 2D data, or the Lot is unknown).
 	int  ClearLotItems(AnsiString LotID);
 
+	//AI(secs-lot-multilot) 20260730 : how many REGISTERED lots have no routable 2D code at
+	//all, i.e. nothing in the reverse index points at them. Answers the pre-Start question
+	//"is every declared lot actually sortable?" - the single-lot GetLotIcList check it
+	//replaces could only prove it for one lot, so a second declared lot with no 2D map
+	//passed the gate and had its whole output dumped into the Error Auto. Tested against
+	//m_Code2DIndex (what FindByCode2D consults at run time), not the per-IC backup list.
+	//FirstLotID receives the first offending lot id so the refusal can name it.
+	int  CountLotsWithoutItems(AnsiString &FirstLotID);
+
 	// Add one 2D->Bin item.  Returns false if Code2D already exists globally
 	// (duplicate); DupExistingLot is set to the Lot that already owns the code.
 	bool AddItem(AnsiString LotID, AnsiString Code2D, int Bin, AnsiString &DupExistingLot);

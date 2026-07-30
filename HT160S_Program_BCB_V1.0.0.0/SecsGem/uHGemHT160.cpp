@@ -448,13 +448,26 @@ void HT160Gem::RefreshSVData()
     svUPH           = tRunData.UPH;
 
     svLotCount      = LotRegistry.GetLotCount();
+    //AI(secs-lot-multilot) 20260730 : walk to the first NON-BLANK slot. This read raw slot 0,
+    // the only slot walker in the tree that did not skip freed slots (RemoveLot deliberately
+    // leaves a blank slot in place so the packed indices other modules hold stay valid). After
+    // the first lot was removed, 66031 answered "" while 66030 still answered >0 - and 66031
+    // rides report 1, the default payload of EVERY CEID, so the host saw a blank current lot
+    // on every event. Semantics are unchanged and still as published: "first registered lot".
+    svCurrentLot = "";
     if(svLotCount>0)
     {
-        TLotRunInfo *Lot = LotRegistry.GetLot(0);
-        svCurrentLot = (Lot!=NULL) ? Lot->sLotID : AnsiString("");
+        int SlotCount = LotRegistry.GetLotSlotCount();
+        for(int LotSlot=0; LotSlot<SlotCount; LotSlot++)
+        {
+            TLotRunInfo *Lot = LotRegistry.GetLot(LotSlot);
+            if(Lot!=NULL && Lot->sLotID.Trim()!="")
+            {
+                svCurrentLot = Lot->sLotID;
+                break;
+            }
+        }
     }
-    else
-        svCurrentLot = "";
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260612 : 1s tick from THGem::Timer1Timer. Sync the main-
@@ -1028,16 +1041,24 @@ void HT160Gem::S2F30_EquipmentConstantNamelistReply()
 //  LOTSTART accept path, so the host reads the same value whichever way the lot began.
 //  Format matches SVID 1027 System Time ("yyyy/mm/dd hh:nn:ss") so a host can compare
 //  the two without reformatting.
-//  NOT persisted: a power cycle mid-lot leaves it empty until the next Lot Start. The
-//  event stream is the durable record (CEID 6 carries the moment); this SV exists so a
+//  The event stream is the durable record (CEID 6 carries the moment); this SV exists so a
 //  host that connected late, or that wants to re-read, can still ask.
+//AI(secs-lotstarttime-persist) 20260730 : it IS persisted now. main.cpp writes the stamp into
+//  the work-order meta file at Lot Start and re-latches it here via sWhen when the operator
+//  chooses to inherit a work order after a power cycle - an inherited lot is still open, so an
+//  empty 66033 was a lie. sWhen is passed through VERBATIM (already formatted by the original
+//  latch) so no reformatting or locale can shift it, and it is NEVER derived from
+//  tRunData.StartTime or Now(): those would answer a plausible but wrong moment (the resume, or
+//  the previous lot). No stored stamp -> stay empty, which is the documented "between lots" value.
 //---------------------------------------------------------------------------
-void HT160Gem::NoteLotStartTime(bool bStarted)
+void HT160Gem::NoteLotStartTime(bool bStarted, AnsiString sWhen)
 {
-    if(bStarted)
-        svLotStartTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
-    else
+    if(bStarted==false)
         svLotStartTime = "";
+    else if(sWhen.Trim()!="")
+        svLotStartTime = sWhen;
+    else
+        svLotStartTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : S2F15 New Equipment Constant Send -> S2F16.

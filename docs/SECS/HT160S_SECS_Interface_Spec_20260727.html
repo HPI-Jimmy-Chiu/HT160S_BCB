@@ -744,7 +744,7 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 <td>66033</td>
 <td>Lot Start Time</td>
 <td>A</td>
-<td><code>yyyy/mm/dd hh:nn:ss</code>,Lot Start 閂鎖、Lot End 清空;未加入預設 Report 1</td>
+<td><code>yyyy/mm/dd hh:nn:ss</code>,Lot Start 閂鎖、Lot End 清空;未加入預設 Report 1。<strong>跨電源保存</strong>(20260730 起):工單隨機台重開並由操作員選擇「繼承」時,本值會以<strong>原始開批時刻</strong>還原(不是復電時刻);未繼承或無紀錄則維持空字串——空字串是「批與批之間」的正式值,寧可空也不給一個看似合理但錯誤的時間</td>
 </tr>
 </tbody>
 </table>
@@ -1621,15 +1621,21 @@ will <strong>silently misread</strong> them — well-formed message, wrong seman
 <tbody>
 <tr>
 <td><code>SET_LOT_INFO</code></td>
-<td>覆蓋式登記 Lot</td>
-<td>Lot id list</td>
-<td>清空後重登;不啟動運轉</td>
+<td><strong>唯一</strong>的 Lot 資訊設定命令(<strong>疊加式</strong>)</td>
+<td><code>L,n{ A custLot }</code> 或 <code>L,n{ L,2{ A custLot, A kyecLot } }</code></td>
+<td><strong>20260730 起改為疊加</strong>:不再清空既有工單。同一 Lot id 只保留一筆(沿用原 slot、index 與計數)。同一 Lot 若改帶<strong>不同的 KYEC 批號</strong>,會退掉該 Lot 舊的 2D/Bin 明細(此情形機內尚有 IC 時回 <strong>4</strong>)。登錄表會超過 64 筆回 <strong>2</strong>(不再靜默丟批)。不啟動運轉</td>
 </tr>
 <tr>
 <td><code>LOTSTART</code></td>
-<td>累加式登記 Lot + 預取 2D/Bin</td>
-<td>Lot id list</td>
-<td>不啟動運轉(啟動仍為 operator-gated)</td>
+<td>開批 / 補拉 2D-Bin(<strong>不帶 Lot id</strong>)</td>
+<td>無(空 list;京元 HT9045 現場實測即為 <code>L[0]</code>)</td>
+<td><strong>20260730 起對齊 HT9045</strong>(<code>uHGemHT9045.cpp:2081</code>):一律回 <strong>HCACK=0</strong>,不帶、也不設定任何 Lot 身分(Lot 資訊一律由 <code>SET_LOT_INFO</code> 設定;清單內若仍帶 lot id 會被忽略並記 log),可重複下達。<strong>批未開</strong>→執行全套開批初始化(per-lot 計數 / UPH 資料夾 / Soter buffer / 產品資訊 / (Lot,Bin)→Auto 綁定 / 66033 / CEID 6)+ 拉 2D/Bin;<strong>批已開</strong>→只拉 2D/Bin,不做任何初始化。唯二回非 0 的情況都來自 HT-160S 專屬的 <code>SORTMODE</code> pair:格式或值錯誤回 2;批已開時要換 sort mode、或 WhiteList 模式要重載檔案回 4。不啟動運轉(啟動仍為 operator-gated / <code>START</code>)</td>
+</tr>
+<tr>
+<td><code>CLEAR_LOT_INFO</code></td>
+<td>結批(host 版 Lot End)</td>
+<td>—</td>
+<td>對齊 HT9045(<code>uHGemHT9045.cpp:2431</code>)。走與面板 Lot End <strong>同一條</strong> <code>DoLotEndProcess</code>:記錄 UPH、發 CEID 8、歸檔 LotStory、清空工單 / (Lot,Bin) 綁定 / WhiteList 覆蓋、取消在途 WebAPI pull。運轉中回 <strong>1</strong>、機內仍有 IC 回 <strong>2</strong>(皆為 9045 語意)。<strong><code>SET_LOT_INFO</code> 改疊加之後,這是唯一會退掉 Lot 的命令</strong></td>
 </tr>
 <tr>
 <td><code>START</code></td>
@@ -1817,8 +1823,6 @@ HT-160S 只發 S6F11 事件,不發此告警。若 host 是以該 ALID 判斷循�
 <p>以下訊息目前<strong>未實作</strong>(收到僅記錄於本機 SECS log,<strong>不回覆任何訊息</strong>,故 host 端會是 T3 逾時;不影響上線流程)。如客戶流程需要,可依需求評估補上:</p>
 <blockquote>
 <p>20260728 更新:<code>S6F15/F16</code>、<code>S6F19/F20</code>、<code>S10F3–F6</code>、<code>S125F1/F2</code> 已實作完成並移入 §2,不再屬於本節。此四組是京元現場 log (2026-06-08) 證實 host 會主動送出、而本機先前不回覆造成 T3 逾時的訊息。</p>
-</blockquote>
-<blockquote>
 <p>20260730 更新:<code>S1F23/F24</code>(Collection Event Namelist)與 <code>S2F29/F30</code>(EC Namelist)已實作完成並移入 §2,不再屬於本節。兩者皆為唯讀的字典查詢:S1F23 不影響事件訂閱(訂閱仍由 S2F33/F35/F37 決定),S2F29 不放寬 EC 可寫範圍(寫入仍走 S2F15 的閒置閘與 tray 幾何白名單)。</p>
 </blockquote>
 <table>
@@ -1865,8 +1869,9 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <h3 id="71-ht9045-aligned-to-ht9045">7.1 已對齊 HT9045 / Aligned to HT9045</h3>
 <ul>
 <li><strong>訊息 Messages</strong>:S1 / S2 / S5 / S6 基礎 GEM 全數對齊(§2)。</li>
-<li><strong>RCMD</strong>:<code>PAUSE</code> <code>START</code> <code>STOP</code> <code>LOTSTART</code> <code>ONLINE_REMOTE</code> <code>ONLINE_LOCAL</code> <code>START_AGV</code> <code>ONE_CYCLE</code> <code>ENERGY_SAVING</code> <code>PP_SIGNALTOWER</code> <code>PP_MUSIC</code> <code>CLEAN_OUT</code> <code>HALT</code> <code>CLEAN_AUTO_SORT_COUNT</code>。</li>
+<li><strong>RCMD</strong>:<code>PAUSE</code> <code>START</code> <code>STOP</code> <code>LOTSTART</code> <code>CLEAR_LOT_INFO</code> <code>ONLINE_REMOTE</code> <code>ONLINE_LOCAL</code> <code>START_AGV</code> <code>ONE_CYCLE</code> <code>ENERGY_SAVING</code> <code>PP_SIGNALTOWER</code> <code>PP_MUSIC</code> <code>CLEAN_OUT</code> <code>HALT</code> <code>CLEAN_AUTO_SORT_COUNT</code>。</li>
 <li><code>CLEAN_OUT</code> / <code>HALT</code> / <code>CLEAN_AUTO_SORT_COUNT</code> 為 2026-07-29 新增對齊。</li>
+<li><code>LOTSTART</code> 於 2026-07-30 改為與 9045 逐字對齊(無參數、無條件 HCACK=0、可重複下達);<code>CLEAR_LOT_INFO</code>(host 版 Lot End)為同日新增對齊。兩者合起來構成 host 端完整的開批 / 結批一對。</li>
 <li><strong><code>HOME</code> 已自本節移出</strong> —— 經逐字查證 HT9045 的 S2F42 dispatch,其命令集為 <code>AUTHORITY_CHECK</code> <code>AUTOSITEMAP</code> <code>AUTO_CLEAN</code> <code>AUTO_RETEST</code> <code>CLEAN_AUTO_SORT_COUNT</code> <code>CLEAN_OUT</code> <code>CLEAR_LOT_INFO</code> <code>CLOSE_ONECYCLE</code> <code>CONTINUE_*</code> <code>DEVTEMPOFFSETADJUST</code> <code>EESUG_OFFSET</code> <code>HALT</code> <code>INITIAL_START*</code> <code>LOTORDER</code> <code>LOTSTART</code> <code>ONE_CYCLE</code> <code>ONLINE_LOCAL</code> <code>ONLINE_REMOTE</code> <code>PAUSE</code> <code>PP_*</code> <code>REMOTE_*</code> <code>RESET</code> <code>RETEST_MRT</code> <code>SET_LOT_INFO</code> <code>START</code> <code>START_AGV</code> <code>START_AQL</code> <code>START_LOT</code> <code>STOP</code> <code>STOP_LOT</code> <code>SUBSTRATETYPE</code> <code>SWITCH_TO_*</code> <code>TESTTEMPSETTING</code> <code>TRAY_FEED</code> <code>TRAY_MAP</code> <code>YIELD_FAIL</code> —— <strong>其中沒有 <code>HOME</code></strong>。改列 §7.2。</li>
 <li>三項宣告差異:<code>ONE_CYCLE</code> 據實回 HCACK(9045 一律 0);<code>ENERGY_SAVING</code> 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);<code>PP_SIGNALTOWER</code>/<code>PP_MUSIC</code> 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。</li>
 <li><strong>SVID 共同段</strong>:1001 / 1003 / 1021 / 1027 / 1518。</li>
@@ -1890,8 +1895,8 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <tr>
 <td><code>SET_LOT_INFO</code></td>
 <td>RCMD</td>
-<td>一次<strong>覆蓋式</strong>登記整批 Lot(清空後重登)</td>
-<td><strong>同名不同體(不是 9045 沒有)</strong>。HT9045 的 S2F42 確實有 <code>SET_LOT_INFO</code>,但兩邊的 lot 模型與參數本體不同:HT-160S 收 <code>L,n{ A lotID }</code> 的純 Lot id 清單並覆蓋整個登錄表;9045 的版本走它自己的 keyed lot 模型。<strong>host 不可假設兩機的 <code>SET_LOT_INFO</code> 可互換</strong>,需依 §3.4 本機格式。取得真實的 9045 <code>SET_LOT_INFO</code> 樣本後再決定是否分流或改名</td>
+<td><strong>疊加式</strong>登記 Lot,並且是本機<strong>唯一</strong>的 Lot 資訊設定入口(2026-07-30 起)</td>
+<td><strong>同名不同體(不是 9045 沒有)</strong>。HT9045 的 S2F42 確實有 <code>SET_LOT_INFO</code>,但兩邊的 lot 模型與參數本體不同:HT-160S 收 <code>L,n{ A custLot }</code>(或 <code>L,2{custLot,kyecLot}</code> 配對)並<strong>疊加</strong>進登錄表、同 id 留一筆;9045 的版本收 <code>L,2{("LOT_INFO", XML), ("DISPLAY", str)}</code>,走它自己的 SPIL XML lot 模型(<code>uHGemHT9045.cpp:2183</code>)。<strong>host 不可假設兩機的 <code>SET_LOT_INFO</code> 可互換</strong>,需依 §3.4 本機格式。另註:京元 2026-06-08 全日 log 中 host <strong>從未送過</strong> <code>SET_LOT_INFO</code>——該線的 Lot 身分是 host 用 <code>S10F5</code> 終端訊息告知操作員、由人輸入機台,再由機台回報給 host</td>
 </tr>
 <tr>
 <td><code>HOME</code></td>

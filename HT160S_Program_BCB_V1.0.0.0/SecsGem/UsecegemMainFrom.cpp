@@ -146,12 +146,12 @@ void EventReport(unsigned Ceid)
 //  Deliberately NOT gated on USE_SECS_GEM (unlike EventReport): stamping a string costs
 //  nothing, and gating it would leave 66033 empty for the whole lot if the operator turns
 //  SECS on after Lot Start. Only the NULL check is load-bearing.
-void NoteLotStartTime(bool bStarted)
+void NoteLotStartTime(bool bStarted, AnsiString sWhen)
 {
     if(HSys.MyGem==NULL)
         return;
 
-    HSys.MyGem->NoteLotStartTime(bStarted);
+    HSys.MyGem->NoteLotStartTime(bStarted, sWhen);
 }
 //---------------------------------------------------------------------------
 unsigned ComputeAlarmAlid(AnsiString Code)

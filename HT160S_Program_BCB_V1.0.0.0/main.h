@@ -450,6 +450,13 @@ private:	// User declarations
     bool bUpdatingMainSelections;
     int  iLastSecsBadgeState;
     int  iLastSortModeBadge;   //AI(ht160s-whitelist-override) 20260717 : edge-trigger guard for the sort-mode badge
+    //AI(secs-lot-multilot) 20260730 : the ACTIVE lot, latched at Lot Start and cleared at Lot
+    //End. Production labelling (Production_Log batch, UPH folder, Soter arming, Loader lot key,
+    //WhiteList KYEC stamp) reads this via ActiveLotID(), NOT edLotNo - edLotNo is a live TEdit
+    //that the operator types into and that a Lot-list click follows, so with several lots
+    //registered it drifted mid-run. Per-IC lot identity never came from here : it is resolved
+    //from the 2D reverse lookup (FindByCode2D -> tray cell -> SortArm slot) and stays that way.
+    AnsiString m_sActiveLot;
     bool bLotApiPullActive;
     AnsiString sLotApiPullLot;
     bool bLotApiPullAll;
@@ -501,6 +508,12 @@ public:		// User declarations
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();
     void __fastcall LotStartCore(AnsiString FirstLot, AnsiString Origin);   //AI(secs-lot-additive) 20260730 : shared modal-free Lot-Start body (btnLotStart + SECS LOTSTART); caller registers the lots
+    AnsiString __fastcall ActiveLotID();   //AI(secs-lot-multilot) 20260730 : latched active lot (m_sActiveLot), falling back to edLotNo when no lot has been opened yet
+    //AI(secs-lotstarttime-persist) 20260730 : work-order-scoped metadata beside WorkOrder.json
+    //(currently only the Lot Start time behind SVID 66033). Same lifecycle as WorkOrder.json.
+    void __fastcall SaveWorkOrderLotStartTime(AnsiString sWhen);
+    AnsiString __fastcall LoadWorkOrderLotStartTime();
+    void __fastcall ClearWorkOrderMeta();
     void __fastcall DoLotEndProcess();   //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body (btnLotEnd + CleanOut-finish auto path)
     void __fastcall EmitCleanOutOK();    //AI(ht160s-overcount-tripqueue D3) 20260721 : S6F11 CEID42 CleanOutFinish (self-gates on HSMS SELECTED); called from csystem CleanOut-finish before Lot End
     void __fastcall RefreshEventLogView();

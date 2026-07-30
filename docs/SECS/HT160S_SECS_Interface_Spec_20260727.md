@@ -178,7 +178,7 @@
 | 66030 | Active Lot Count | I4 | 目前載入 Lot 數 |
 | 66031 | Current Lot ID | A | 首個 Lot ID |
 | 66032 | Sort Mode | I4 | 0=Normal 1=LotBin 2=LotPassFail 3=WhiteList |
-| 66033 | Lot Start Time | A | `yyyy/mm/dd hh:nn:ss`,Lot Start 閂鎖、Lot End 清空;未加入預設 Report 1 |
+| 66033 | Lot Start Time | A | `yyyy/mm/dd hh:nn:ss`,Lot Start 閂鎖、Lot End 清空;未加入預設 Report 1。**跨電源保存**(20260730 起):工單隨機台重開並由操作員選擇「繼承」時,本值會以**原始開批時刻**還原(不是復電時刻);未繼承或無紀錄則維持空字串——空字串是「批與批之間」的正式值,寧可空也不給一個看似合理但錯誤的時間 |
 
 **AMR / AGV 段 / AMR band (38xxx):**
 

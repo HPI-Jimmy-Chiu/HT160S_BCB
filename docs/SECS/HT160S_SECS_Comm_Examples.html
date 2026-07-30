@@ -162,7 +162,12 @@
 <h2 id="2">2. 通訊流程總覽</h2>
 <p>在逐則拆解訊息之前，先用一張圖看完整個故事。一個完整 lot run 的訊息走向，是一條清楚的時間線：</p>
 <p><strong>連線（connect）→ 設定 lot（set lot）→ 啟動生產（production）→ AGV 補料握手（AGV）→ 警報上報（alarm）→ 結束連線（teardown）</strong>。</p>
-<p>下圖即依此順序呈現 host ↔ equipment 的訊息序列，涵蓋：TCP+Select → SET_LOT_INFO → LOTSTART（含 WebAPI pull）→ START → 生產事件迴圈（S6F11；AGV 272→START_AGV→273→274→resume START）→ 警報 S5F1 → Separate。讀完此圖，再進第 3 章看每一步的 body 格式與實際 log，會更容易對位。</p>
+<p>下圖即依此順序呈現 host ↔ equipment 的訊息序列，涵蓋：TCP+Select → SET_LOT_INFO → LOTSTART（含 WebAPI pull）→ START → 生產事件迴圈（S6F11；AGV 272→START_AGV→273→274→resume START）→ 警報 S5F1 → CLEAR_LOT_INFO 結批 → Separate。讀完此圖，再進第 3 章看每一步的 body 格式與實際 log，會更容易對位。</p>
+<blockquote>
+<p>圖中的 <code>LOTSTART</code> <strong>不帶 lot id</strong>（2026-07-30 起；Lot 身分一律由 <code>SET_LOT_INFO</code> 設定），結批的
+<code>CLEAR_LOT_INFO</code> 亦為同日新增。第 3 章的逐則 log 取自變更前的舊 run，故其 body 仍帶 lot 清單——
+以本圖與 3.2 的表格為現行合約。</p>
+</blockquote>
 <pre class="mermaid">
 sequenceDiagram
     participant H as HOST / EAP (ACTIVE)
@@ -178,9 +183,11 @@ sequenceDiagram
     end
 
     Note over H,E: Lot 設定與啟動 (S2F41 trio)
-    H->>E: S2F41 SET_LOT_INFO (W=1)
+    H->>E: S2F41 SET_LOT_INFO (W=1) 疊加登記 Lot
     E->>H: S2F42 HCACK=0
-    H->>E: S2F41 LOTSTART (W=1)
+    H->>E: S2F41 LOTSTART (W=1) 無參數 L[0]
+    E->>H: S6F11 CEID=6 Lot Start
+    H->>E: S6F12 ACKC6=0
     E-->>E: Lot WebAPI pull (2D/Bin reconcile, HTTP 200)
     E->>H: S2F42 HCACK=0
     H->>E: S2F41 START (W=1)
@@ -188,9 +195,14 @@ sequenceDiagram
 
     Note over H,E: 生產事件上報
     loop 生產 Auto 卸盤 events
-        E->>H: S6F11 EventReport CEID=136..142 (W=1)
+        E->>H: S6F11 EventReport CEID=136-138 / 145-147 (W=1)
         H->>E: S6F12 ACKC6=0
     end
+
+    Note over H,E: 批次中途補拉 2D-Bin (可重複)
+    H->>E: S2F41 LOTSTART (W=1) 批已開
+    E-->>E: Lot WebAPI pull only (不做任何初始化)
+    E->>H: S2F42 HCACK=0
 
     Note over H,E: AGV/AMR 握手 (每站一輪)
     E->>H: S6F11 CEID=272 AGVSupplement (target=Pn)
@@ -207,6 +219,12 @@ sequenceDiagram
     E->>H: S5F1 Alarm ALCD=0 (CLEAR)
     H->>E: S5F2 ACKC5=0
 
+    Note over H,E: 結批 (host 端 Lot End)
+    H->>E: S2F41 CLEAR_LOT_INFO (W=1)
+    E->>H: S6F11 CEID=8 Lot End
+    H->>E: S6F12 ACKC6=0
+    E->>H: S2F42 HCACK=0 (停機且機內無 IC)
+
     Note over H,E: 連線結束
     H->>E: Separate.req (host-side teardown)
 </pre>
@@ -214,6 +232,8 @@ sequenceDiagram
 <p><strong>看圖重點</strong>：
 - 連線是 <strong>設備撥入 → Host 送 Select.req</strong>（對應 1.2 的方向說明）。
 - Lot 設定是 <strong>三連發（trio）</strong>：SET_LOT_INFO → LOTSTART → START，三者各有分工（見 3.2）。
+  <code>SET_LOT_INFO</code> 給身分（疊加）、<code>LOTSTART</code> 開批＋拉 2D/Bin（不帶身分、可重複）、<code>START</code> 才讓機構動。
+  完整生命週期還有第四支：<code>CLEAR_LOT_INFO</code> 結批（唯一會退掉 Lot 的命令）。
 - 每一輪 AGV 握手結尾的 resume <code>START</code> 回的是 <strong>HCACK=4 而非 0</strong>——這是 <strong>正常的誠實互鎖</strong>，不是錯誤（見 3.4）。
 - 結尾的 <code>Separate.req</code> 由 Host 端送出，且本範例中發生在設備已關閉之後（見 3.6）。</p>
 </blockquote>
@@ -338,10 +358,17 @@ sequenceDiagram
 <p><strong>用途</strong>：這是 host 對設備下達 <strong>Host Command（S2F41）</strong> 的核心三連發（trio）。Host 透過 S2F41 依序設定 lot 清單、啟動 lot（觸發 WebAPI 2D/Bin 對帳）、最後啟動生產。設備一律以 <strong>S2F42</strong> 回覆，body 內含 <strong>HCACK</strong> 回覆碼。</p>
 <blockquote>
 <p><strong>為什麼分成三個命令、而且順序固定？</strong> 三者刻意分工、職責不重疊，host 可分階段控制與檢查：
-- <strong>SET_LOT_INFO</strong> = 「告訴設備這批要做哪些 lot」（純資料登錄，<strong>會清空並覆寫</strong> 既有 lot 清單）。
-- <strong>LOTSTART</strong> = 「叫設備去拉這些 lot 的 2D/Bin 對帳資料」（觸發 WebAPI pull，但<strong>不會讓機構動作</strong>）。
+- <strong>SET_LOT_INFO</strong> = 「告訴設備這批要做哪些 lot」（純資料登錄，<strong>不會讓機構動作</strong>）。
+- <strong>LOTSTART</strong> = 「開批 ＋ 叫設備去拉這些 lot 的 2D/Bin 對帳資料」（觸發 WebAPI pull，但<strong>不會讓機構動作</strong>）。
 - <strong>START</strong> = 「真正開始生產」（讓 motion 動起來）。</p>
 <p>把「登錄資料」「拉對帳資料」「啟動 motion」拆開，host 可以在 START 之前先確認 lot 清單與 WebAPI 對帳都成功，再決定是否啟動，降低誤啟動風險。</p>
+<p><strong>⚠ 2026-07-30 語意變更（本章下方的 log 是變更前的舊 run，僅供 body 結構參考）</strong>
+依京元現場 HT9045 全日 log 校準後，trio 的分工改為：
+- <strong><code>SET_LOT_INFO</code></strong> 成為<strong>唯一</strong>的 Lot 資訊設定入口，且改為<strong>疊加</strong>（不再清空覆寫），同 lot id 只留一筆。
+- <strong><code>LOTSTART</code></strong> <strong>不再攜帶也不再設定 lot 身分</strong>（京元 host 實際送的就是空 list <code>L[0]</code>），一律回 <code>HCACK=0</code>、
+  可重複下達。<strong>批未開</strong>→執行整套開批初始化＋拉 2D/Bin；<strong>批已開</strong>→只拉 2D/Bin、不做任何初始化。
+- 新增 <strong><code>CLEAR_LOT_INFO</code></strong>（對齊 9045）＝ host 端結批，是唯一會退掉 lot 的命令。
+詳見 <code>HT160S_SECS_Interface_Spec_20260727.md</code> §3.4。</p>
 </blockquote>
 <p><strong>格式／body 結構（SEMI E5）</strong>：</p>
 <p>S2F41 通用結構（<strong>RCMD</strong> = Remote Command，命令名稱；<strong>CPNAME/CPVAL</strong> = 參數名稱/值）：</p>
@@ -369,13 +396,18 @@ sequenceDiagram
 <tbody>
 <tr>
 <td><code>SET_LOT_INFO</code></td>
-<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code></td>
-<td>lot 清單；<strong>CLEARS+overwrites</strong> LotRegistry（清空並覆寫，非附加）</td>
+<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code>，或 KYEC 雙批號配對 <code>L[2]{ A "SET_LOT_INFO", L[n]{ L[2]{ A custLot, A kyecLot } } }</code></td>
+<td>lot 清單。<strong>2026-07-30 起改為疊加（additive）</strong>：不再 Clear 既有 LotRegistry，同 lot id 留一筆（沿用原 slot 與計數）。同 lot 改帶不同 KYEC 批號時會退掉該 lot 舊的 2D 明細（機內有 IC 時回 <code>HCACK=4</code>）；登錄表會滿（64）時回 2</td>
 </tr>
 <tr>
 <td><code>LOTSTART</code></td>
-<td><code>L[2]{ A "LOTSTART", L[n]{ A lotID } }</code></td>
-<td>additive（附加，不 Clear）；觸發 HT160 Lot WebAPI pull（<code>StartLotWebApiPullAll</code>，拉取全部已註冊 lot）做 2D/Bin reconcile；<strong>不啟動 motion</strong>（仍需 operator Start 才動作）。<strong>自 2026-07 起</strong>，LOTSTART 亦視為「host 端的 Lot Start」：接受後會清零 per-run 生產計數、開啟 UPH log、清空 ProductInfo 並回填 active lot（<code>uHGemHT160.cpp:843-863</code>）；本 run 為舊版故未涵蓋此行為</td>
+<td><code>L[2]{ A "LOTSTART", L[0] }</code>（京元現場實際形式）；亦可選帶 HT-160S 專屬 <code>L[2]{ A "SORTMODE", A "NORMAL"\|"WHITELIST" }</code></td>
+<td><strong>2026-07-30 起不再攜帶 lot 身分</strong>（清單內的 lot id 會被忽略並記 log，lot 一律由 <code>SET_LOT_INFO</code> 設定）。一律回 <code>HCACK=0</code>、可重複下達。<strong>批未開</strong>→整套開批初始化（per-run 計數歸零、UPH log、Soter buffer、ProductInfo、(Lot,Bin)→Auto 綁定、SVID 66033、CEID 6）＋ <code>StartLotWebApiPullAll</code> 拉全部 lot 的 2D/Bin；<strong>批已開</strong>→只拉 2D/Bin、不做任何初始化。<strong>不啟動 motion</strong>（仍需 <code>START</code> / operator Start）。唯二非 0 回覆皆來自 <code>SORTMODE</code> pair（格式或值錯誤 2；批已開要換模式或 WhiteList 要重載檔案 4）</td>
+</tr>
+<tr>
+<td><code>CLEAR_LOT_INFO</code></td>
+<td><code>L[2]{ A "CLEAR_LOT_INFO", L[0] }</code></td>
+<td><strong>2026-07-30 新增</strong>，對齊 9045 = host 端結批（走面板 Lot End 同一條 <code>DoLotEndProcess</code>）。運轉中回 1、機內有 IC 回 2。<code>SET_LOT_INFO</code> 改疊加後，這是唯一會退掉 lot 的命令</td>
 </tr>
 <tr>
 <td><code>START</code></td>
@@ -1799,7 +1831,7 @@ sequenceDiagram
 </tr>
 <tr>
 <td>RCMD</td>
-<td>Remote Command（S2F41 命令名稱）。現行設備 S2F41 dispatch 接受：<code>SET_LOT_INFO</code>、<code>LOTSTART</code>、<code>START</code>、<code>START_AGV</code>、<code>STOP</code>、<code>PAUSE</code>、<code>HOME</code>、<code>CLEARCOUNT</code>、<code>ONLINE_REMOTE</code>/<code>ONLINE</code>、<code>ONLINE_LOCAL</code>；未列於此者回 <code>HCACK=1</code>（unknown command）。本手冊來源 run 僅觸發 trio + START_AGV，其餘命令未於本 run 出現（<code>uHGemHT160.cpp:681-967</code>）</td>
+<td>Remote Command（S2F41 命令名稱）。現行設備 S2F41 dispatch 接受（2026-07-30 現況，共 18 支）：<code>SET_LOT_INFO</code>、<code>LOTSTART</code>、<code>CLEAR_LOT_INFO</code>、<code>START</code>、<code>START_AGV</code>、<code>STOP</code>、<code>PAUSE</code>、<code>HALT</code>、<code>HOME</code>、<code>ONE_CYCLE</code>、<code>CLEAN_OUT</code>、<code>CLEARCOUNT</code>、<code>CLEAN_AUTO_SORT_COUNT</code>、<code>ENERGY_SAVING</code>、<code>PP_SIGNALTOWER</code>、<code>PP_MUSIC</code>、<code>ONLINE_REMOTE</code>/<code>ONLINE</code>、<code>ONLINE_LOCAL</code>；未列於此者回 <code>HCACK=1</code>（unknown command）。本手冊來源 run 僅觸發 trio + START_AGV，其餘命令未於本 run 出現（<code>SecsGem\uHGemHT160.cpp</code> 的 <code>S2F42_Host_Command_Acknowledge</code>）</td>
 </tr>
 <tr>
 <td>CPNAME / CPVAL</td>

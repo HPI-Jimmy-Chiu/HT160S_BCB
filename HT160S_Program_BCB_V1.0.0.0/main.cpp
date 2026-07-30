@@ -2048,12 +2048,23 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
     //AI(ht160s-whitelist) 20260727 : prefer the exact refusal recorded by LoadWhiteListFile
     // (e.g. a lot with no KYECLotID) - the generic text sends the FE hunting for a missing
     // file that is actually present but invalid.
+    //AI(secs-lot-multilot) 20260730 : test the RECORDED refusal on its own, ahead of the
+    // "registry is empty" test below. Every previous whitelist refusal happened inside
+    // LoadWhiteListFile, which Clear()s the registry first, so GetItemCount()<=0 was always
+    // true and the two conditions were effectively one. The new multi-lot refusal deliberately
+    // does NOT clear (it must not destroy the declared lots), so tying the reason to an empty
+    // registry would have logged it and thrown it away, letting Start proceed in WhiteList mode
+    // with whatever map happened to be loaded and WhiteList.json never read. gWhiteListLoadError
+    // is cleared at the top of every LoadWhiteListFile attempt and at Lot End, so it is only
+    // non-empty when the LAST attempt genuinely failed.
+    if(GeneralSetting.IsWhiteListSortMode() && gWhiteListLoadError!=AnsiString(""))
+    {
+        Reason=gWhiteListLoadError;
+        return false;
+    }
     if(GeneralSetting.IsWhiteListSortMode() && LotRegistry.GetItemCount()<=0)
     {
-        if(gWhiteListLoadError!=AnsiString(""))
-            Reason=gWhiteListLoadError;
-        else
-            Reason="WhiteList mode is ON but HT160S_WhiteList\\WhiteList.json is missing or empty !";
+        Reason="WhiteList mode is ON but HT160S_WhiteList\\WhiteList.json is missing or empty !";
         return false;
     }
     //AI(ht160s-lot-webapi) 20260612 : Start safety gate. Refuse to start the
@@ -2071,16 +2082,34 @@ bool TfMain::CheckLotDataReady(AnsiString &Reason)
         return false;
     }
     //AI(machine-command-layer) 20260625 : the global GetItemCount() above only proves SOME
-    //lot has 2D data. Verify the ACTIVE lot (edLotNo) itself has 2D/Bin loaded, else a
-    //SECS name-only lot coexisting with another lot's data would pass and start with no
-    //routable data. GetLotIcList filters by sLotID and returns the per-lot record count.
+    //lot has 2D data, so the per-lot proof below is what actually protects the run.
+    //AI(secs-lot-multilot) 20260730 : that per-lot proof used to test ONE lot - whatever
+    //edLotNo happened to hold. Now that SET_LOT_INFO is additive and several lots coexist,
+    //that was wrong in both directions:
+    //  * FALSE PASS - the far worse one. Host declares LOT_A + LOT_B, LOT_B's WebAPI pull
+    //    fails its retries, edLotNo is LOT_A, so Start is ALLOWED. Every physical LOT_B unit
+    //    then misses FindByCode2D in aLoader and is either dumped SILENTLY into the Error
+    //    Auto (WhiteList / skip-unknown-2D armed) or raises a blocking WAR0475 modal per IC.
+    //    The only trace was MachineRun.iUnknown2D, which nothing displays.
+    //  * FALSE BLOCK - a single click on the Lot list retargets edLotNo (see sgLotListClick),
+    //    so inspecting another lot mid-run could refuse the next Start / One Cycle.
+    //Test EVERY registered lot instead, and name the offender. Deliberately STRICTER than
+    //before: a declared lot with no 2D map cannot be sorted, so starting with one is never
+    //right. The reason text separates "still downloading" from "gave up" so the operator
+    //knows whether to wait or to fix the data.
     {
-        TStringList *IcList=new TStringList;
-        int IcCount=LotRegistry.GetLotIcList(edLotNo->Text, IcList);
-        delete IcList;
-        if(IcCount<=0)
+        AnsiString MissingLot="";
+        int Missing=LotRegistry.CountLotsWithoutItems(MissingLot);
+        if(Missing>0)
         {
-            Reason="No 2D data for lot "+edLotNo->Text+" : load this lot's 2D/Bin before Start !";
+            Reason="No 2D data for lot "+MissingLot;
+            if(Missing>1)
+                Reason=Reason+" (and "+IntToStr(Missing-1)+" more)";
+            if(bLotApiPullAll==true || bLotApiPullActive==true)
+                Reason=Reason+" : Lot WebAPI pull still in progress, wait for it to finish !";
+            else
+                Reason=Reason+" : load this lot's 2D/Bin before Start !";
+            RecordProcess("Start refused : "+Reason);
             return false;
         }
     }
@@ -2143,11 +2172,16 @@ void TfMain::DoStartArm()
 //        {
             HSys.Sys.SystemStart=true;                                              //20140411 wei
             SoftStart=true;
-            g_DeviceInfo.OnLotStart(edLotNo->Text, Now());                          //AI(HT160S-Maintainer) 20260603 : start per-IC production trace batch
-            TrayUphLog_EnsureActive(edLotNo->Text);   //AI(ht160s-uph) 20260708 : 172-aligned arm-on-run (idempotent; skips if Lot Start/SECS already armed or on resume)
-            g_SoterOutput.EnsureActive(edLotNo->Text);
+            //AI(secs-lot-multilot) 20260730 : label with the LATCHED active lot, not the live
+            //edLotNo TEdit. These four run on EVERY Start including a pause/resume, and
+            //g_DeviceInfo.OnLotStart is NOT idempotent (it re-derives the Production_Log file
+            //name and ClearBatch()es), so a drifted edLotNo used to split the trace into a
+            //second, wrongly-named CSV on resume and discard in-flight per-IC records.
+            g_DeviceInfo.OnLotStart(ActiveLotID(), Now());                           //AI(HT160S-Maintainer) 20260603 : start per-IC production trace batch
+            TrayUphLog_EnsureActive(ActiveLotID());   //AI(ht160s-uph) 20260708 : 172-aligned arm-on-run (idempotent; skips if Lot Start/SECS already armed or on resume)
+            g_SoterOutput.EnsureActive(ActiveLotID());
             if(LoaderModule!=NULL)
-                LoaderModule->SetCurrentLotNumber(edLotNo->Text);                   //AI(HT160S-Maintainer) 20260604 : P3 2D->Bin lookup keyed by lot number
+                LoaderModule->SetCurrentLotNumber(ActiveLotID());                   //AI(HT160S-Maintainer) 20260604 : P3 2D->Bin lookup keyed by lot number
 //        }
 //
         if(fAllMotorHome==false)
@@ -2400,6 +2434,17 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
 //pushes the grid rows, and on the SECS side SET_LOT_INFO is the only lot-identity setter,
 //so LOTSTART starts whatever the registry already holds. Never shows a modal : the SECS
 //path runs on the HSMS receive thread and a popup there stalls the link.
+//AI(secs-lot-multilot) 20260730 : the active lot, for everything that needs ONE work-order
+//label. Prefers the value latched at Lot Start; falls back to edLotNo so paths that run
+//before any Lot Start (a bare machine Start, a boot restore whose latch is empty) keep the
+//old behaviour instead of suddenly labelling with "".
+AnsiString __fastcall TfMain::ActiveLotID()
+{
+    if(m_sActiveLot.Trim()!=AnsiString(""))
+        return m_sActiveLot;
+    return (edLotNo!=NULL) ? edLotNo->Text.Trim() : AnsiString("");
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
 {
     //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode. A fresh Lot Start clears all
@@ -2430,6 +2475,10 @@ void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
 
     //AI(secs-lot-additive) 20260730 : NULL-guarded now that the SECS LOTSTART path calls this.
     //This is the one place the ACTIVE lot is (re)targeted - a lot list refresh must not do it.
+    //AI(secs-lot-multilot) 20260730 : LATCH it. Everything that needs one work-order label reads
+    //ActiveLotID() from here on, so a later click / keystroke in edLotNo cannot move the running
+    //work order. edLotNo is still set for the operator and for the 2D editor.
+    m_sActiveLot=FirstLot;
     if(edLotNo!=NULL)
         edLotNo->Text=FirstLot;
     //AI(ht160s-lot-webapi) 20260612 : Stage 4 : at lot start, pull EVERY lot's
@@ -2443,7 +2492,27 @@ void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
     // saves on the valid path, so skip the unconditional save when it refused the file.
     bool bWhiteListOk=true;
     if(GeneralSetting.IsWhiteListSortMode())
-        bWhiteListOk=LoadWhiteListFile();
+    {
+        //AI(secs-lot-multilot) 20260730 : WhiteList is a SINGLE-lot overlay and its file is
+        //authoritative - LoadWhiteListFile Clear()s the whole registry before it even checks the
+        //file exists, and it stamps EVERY IC in the file with ONE expected KYEC lot (ActiveLotID).
+        //With SET_LOT_INFO now additive, a host that declared several lots and armed the overlay
+        //would have the extra lots wiped with no log line, or have a perfectly valid file rejected
+        //because its per-lot KYECLotID cannot equal one stamp. Refuse BEFORE the Clear, with a
+        //reason CheckLotDataReady will show, instead of silently discarding declared work. This
+        //mirrors the mid-lot refusal the SECS LOTSTART handler already answers HCACK=4 for.
+        if(LotRegistry.GetLotCount()>1)
+        {
+            gWhiteListLoadError="WhiteList mode supports ONE lot ; "
+                                +IntToStr(LotRegistry.GetLotCount())
+                                +" lots are registered. Remove the extra lots or turn WhiteList off.";
+            g_EventLog.Log("WRN_WHITELIST_REJECT", gWhiteListLoadError);
+            RecordProcess("WhiteList: "+gWhiteListLoadError);
+            bWhiteListOk=false;
+        }
+        else
+            bWhiteListOk=LoadWhiteListFile();
+    }
     else
         StartLotWebApiPullAll();
     //AI(HT160S-Maintainer) 20260608 : need1 : persist the started work order so
@@ -2454,7 +2523,12 @@ void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
 
     //AI(secs-lotstarttime) 20260730 : latch SVID 66033 Lot Start Time BEFORE the event, so a
     // host that answers CEID 6 with an immediate S1F3 already reads THIS lot's start time.
-    NoteLotStartTime(true);
+    //AI(secs-lotstarttime-persist) 20260730 : format the stamp ONCE and use the same string for
+    // the SV and for the work-order meta file, so the two can never disagree. Persisting it is
+    // what lets an inherited work order answer 66033 after a power cycle instead of "".
+    AnsiString sLotStartStamp=Now().FormatString("yyyy/mm/dd hh:nn:ss");
+    NoteLotStartTime(true, sLotStartStamp);
+    SaveWorkOrderLotStartTime(sLotStartStamp);
     //AI(ht160s-secsgem) 20260714 : notify host a new lot has started (S6F11 CEID 6 Lot Start).
     // Pairs with the Lot End event in DoLotEndProcess. Report 1 carries the new Current
     // Lot ID. Registry is already populated (GetLotListCount()==0 returned early above),
@@ -2571,7 +2645,11 @@ bool __fastcall TfMain::LoadWhiteListFile()
     // disagrees with it - otherwise a manual operator who typed the customer lot would silently sort
     // under it and drop the KYEC identity from the report - and (b) the loader below stamps it as
     // the registry key, exactly like the WebAPI pull (LoadFromJsonString(Body, ..., sLotApiPullLot)).
-    AnsiString sKyecStamp = edLotNo->Text.Trim();
+    //AI(secs-lot-multilot) 20260730 : the LATCHED active lot, not the live TEdit. This value
+    //becomes the registry KEY for every IC in the file (LoadFromJsonString stamp) AND the
+    //expected-KYEC value the validator compares each lot against, so a drifted edLotNo would
+    //re-key the whole routing table or reject a valid file outright.
+    AnsiString sKyecStamp = ActiveLotID();
     AnsiString vReason="";
     if(!LotRegistry.ValidateWhiteListJson(text, vReason, sKyecStamp))
     {
@@ -2815,8 +2893,14 @@ void __fastcall TfMain::DoLotEndProcess()
     //order is cleared, then persist the final counts (item 7 lastdata).
     tRunData.LotEndTime=Now();
     tRunData.UPH=GetCalculateUPH(tRunData.LotEndTime);
-    RecordProcess("End of Lot: Lot="+edLotNo->Text+", TotalIC="+IntToStr(tRunData.TotalIC)+", UPH="+IntToStr(tRunData.UPH));
-    TrayUphLog_OnLotEnd(edLotNo->Text, tRunData.TotalIC, tRunData.UPH);
+    //AI(secs-lot-multilot) 20260730 : ActiveLotID(), so the closing record names the lot the
+    //work order was OPENED with even if the operator has since typed in / clicked another lot.
+    //NOTE the TotalIC / UPH numbers are work-order-wide (tRunData.TotalIC counts every placed
+    //IC with no lot in scope), so with several lots this row credits them all to the opening
+    //lot. That is pre-existing and log-only - no reader in the tree - and per-lot accounting
+    //would be a new feature, not part of this fix.
+    RecordProcess("End of Lot: Lot="+ActiveLotID()+", TotalIC="+IntToStr(tRunData.TotalIC)+", UPH="+IntToStr(tRunData.UPH));
+    TrayUphLog_OnLotEnd(ActiveLotID(), tRunData.TotalIC, tRunData.UPH);
     g_SoterOutput.OnLotEnd();
     FreezeProductInfoAtLotEnd();
     WriteLastDataIni();
@@ -2876,10 +2960,16 @@ void __fastcall TfMain::DoLotEndProcess()
     //next work order starts with a clean dynamic table (also persisted empty).
     LotBinBinding.Clear();
     LotBinBinding.SaveToIni();
+    //AI(secs-lot-multilot) 20260730 : release the active-lot latch with the work order, so the
+    //next Lot Start re-latches instead of inheriting the finished lot's name.
+    m_sActiveLot="";
     if(edLotNo!=NULL)
         edLotNo->Text="";
     RefreshLotListFromRegistry();
     DeleteFile(GetWorkOrderFileName());
+    //AI(secs-lotstarttime-persist) 20260730 : the meta file follows WorkOrder.json exactly, so a
+    //finished lot's start time cannot be re-latched by a later restore.
+    ClearWorkOrderMeta();
     RecordProcess("Lot data cleared (Lot End)");
 }
 //---------------------------------------------------------------------------
@@ -3007,6 +3097,83 @@ static AnsiString GetLastLotListFileName()
 static AnsiString GetWorkOrderFileName()
 {
     return HSys.CurrentDir + AnsiString("\\HT160S_LotInfo\\WorkOrder.json");
+}
+//---------------------------------------------------------------------------
+//AI(secs-lotstarttime-persist) 20260730 : work-order-scoped metadata that is NOT per-lot and
+//therefore has no home in WorkOrder.json (whose schema is the customer 2DIDHistory shape,
+//shared with the WebAPI and WhiteList parsers - adding our own root key there would leak into
+//a customer-facing contract). Lives beside WorkOrder.json so it shares its exact lifecycle:
+//written at Lot Start, deleted wherever WorkOrder.json is deleted, read only when the operator
+//chooses to INHERIT. Currently one key : the Lot Start time behind SVID 66033.
+static AnsiString GetWorkOrderMetaFileName()
+{
+    return HSys.CurrentDir + AnsiString("\\HT160S_LotInfo\\WorkOrder.meta.ini");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::SaveWorkOrderLotStartTime(AnsiString sWhen)
+{
+    AnsiString fn=GetWorkOrderMetaFileName();
+    ForceDirectories(ExtractFilePath(fn));
+    TIniFile *Ini=new TIniFile(fn);
+    try
+    {
+        try
+        {
+            // WriteString, never WriteDateTime : the value is the already-formatted
+            // "yyyy/mm/dd hh:nn:ss" stamp the SV answers, and a locale short-date would reshape it.
+            Ini->WriteString("WorkOrder", "LotStartTime", sWhen);
+        }
+        catch(...)
+        {
+            //AI(secs-lotstarttime-persist) 20260730 : a METADATA write must never abort a Lot
+            //Start. TIniFile::WriteString raises when the folder/file is read-only, the disk is
+            //full or the file is locked, and this call sits between the 66033 latch and the
+            //CEID 6 emit : on the SECS path LotStartCore runs inside the S2F41 handler, so an
+            //escaping exception would leave the S2F42 reply unsent (host T3 timeout) with the
+            //lot already open, and on the button path it would show a raw VCL error instead of
+            //a Lot Start. Degrade to "not persisted", which the restore side already tolerates
+            //(no stored stamp -> 66033 stays empty).
+            RecordProcess("WorkOrder meta write failed ; SVID 66033 will not survive a power cycle");
+        }
+    }
+    __finally
+    {
+        delete Ini;
+    }
+}
+//---------------------------------------------------------------------------
+AnsiString __fastcall TfMain::LoadWorkOrderLotStartTime()
+{
+    AnsiString fn=GetWorkOrderMetaFileName();
+    if(!FileExists(fn))
+        return AnsiString("");
+    AnsiString sWhen="";
+    TIniFile *Ini=new TIniFile(fn);
+    try
+    {
+        try
+        {
+            sWhen=Ini->ReadString("WorkOrder", "LotStartTime", "");
+        }
+        catch(...)
+        {
+            //AI(secs-lotstarttime-persist) 20260730 : same reasoning as the write side - this
+            //runs inside the startup restore, and an unreadable meta file must degrade to
+            //"no stored stamp", never abort the work-order restore.
+            sWhen="";
+            RecordProcess("WorkOrder meta read failed ; SVID 66033 stays empty");
+        }
+    }
+    __finally
+    {
+        delete Ini;
+    }
+    return sWhen.Trim();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::ClearWorkOrderMeta()
+{
+    DeleteFile(GetWorkOrderMetaFileName());
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::SaveWorkOrder()
@@ -3155,7 +3322,10 @@ void __fastcall TfMain::SaveLastLotList()
             SavedCount++;
         }
         Ini->WriteInteger("LotList", "Count", SavedCount);
-        Ini->WriteString("LotList", "ActiveLot", (edLotNo!=NULL) ? edLotNo->Text.Trim() : AnsiString(""));
+        //AI(secs-lot-multilot) 20260730 : persist the LATCHED active lot. It used to save
+        //whatever edLotNo held, so a mid-run click on the Lot list changed which lot a later
+        //restore came back as.
+        Ini->WriteString("LotList", "ActiveLot", ActiveLotID());
     }
     __finally
     {
@@ -3807,6 +3977,9 @@ void __fastcall TfMain::RestoreLastWorkOrder()
                 DeleteFile(GetWorkOrderFileName());
             LotBinBinding.Clear();
             LotBinBinding.SaveToIni();
+            //AI(secs-lotstarttime-persist) 20260730 : a fresh start is not an open lot - drop the
+            //stored Lot Start time with the rest of the work order so 66033 stays empty.
+            ClearWorkOrderMeta();
             //AI(ht160s-whitelist-override) 20260717 : fresh start also clears the WhiteList overlay.
             GeneralSetting.SetWhiteListActive(false);
             GeneralSetting.SaveWhiteListOverlay();
@@ -3833,6 +4006,24 @@ void __fastcall TfMain::RestoreLastWorkOrder()
             {
                 MachineRun.bRunning=true;
                 MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
+                //AI(secs-lot-multilot) 20260730 : re-latch the active lot too. LoadWorkOrder /
+                //LoadLastLotList have already put the stored active lot into edLotNo, so adopt it
+                //as the latch; the work order is open again and ActiveLotID() must not fall back
+                //to a box the operator is free to retype.
+                m_sActiveLot=(edLotNo!=NULL) ? edLotNo->Text.Trim() : AnsiString("");
+                //AI(secs-lotstarttime-persist) 20260730 : an inherited lot is still OPEN, so
+                //SVID 66033 must answer the ORIGINAL start time rather than "". Re-latch the
+                //stored stamp verbatim. If nothing was stored (work order predates this, or the
+                //meta file was lost) leave it empty - the documented "between lots" value beats a
+                //confidently wrong timestamp derived from Now() or tRunData.StartTime.
+                AnsiString sStoredStart=LoadWorkOrderLotStartTime();
+                if(sStoredStart!=AnsiString(""))
+                {
+                    NoteLotStartTime(true, sStoredStart);
+                    RecordProcess("Startup: restored Lot Start Time (SVID 66033) = "+sStoredStart);
+                }
+                else
+                    RecordProcess("Startup: no stored Lot Start Time ; SVID 66033 stays empty");
             }
             RecordProcess("Startup: operator chose to inherit last work order");
         }
@@ -3948,6 +4139,12 @@ void __fastcall TfMain::sgLotListClick(TObject *Sender)
 
     if(sgLotList->Cells[0][SelectedRow].Trim()!="")
     {
+        //AI(secs-lot-multilot) 20260730 : this assignment is deliberately left alone. It used to
+        //be a hazard - edLotNo doubled as the ACTIVE-lot pointer, so clicking a row just to LOOK
+        //at another lot's 2D list (the documented double-click workflow, and the single click
+        //fires first) silently retargeted the running work order. The active lot is now LATCHED
+        //at Lot Start in m_sActiveLot / ActiveLotID(), so edLotNo is once again only the manual
+        //Add/Edit-Lot field and the 2D-editor target, and following the click here is correct.
         edLotNo->Text=sgLotList->Cells[0][SelectedRow];
         Reload2DBinGridFromRegistry();   //AI(ht160s-2dbin-manual) 20260628 : picking a lot refreshes the 2D grid
     }

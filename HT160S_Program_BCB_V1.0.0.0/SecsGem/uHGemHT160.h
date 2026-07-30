@@ -331,7 +331,7 @@ public:
     virtual void RefreshSecsBadge();   //AI(ht160s-secsgem) 20260612 : 1s tick -> sync main-screen SECS badge to HSMS state
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
     virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
-    virtual void NoteLotStartTime(bool bStarted);//AI(secs-lotstarttime) 20260730 : latch/clear SVID 66033 Lot Start Time
+    virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");//AI(secs-lotstarttime) 20260730 : latch/clear SVID 66033 Lot Start Time (sWhen = restored stamp, "" = now)
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();

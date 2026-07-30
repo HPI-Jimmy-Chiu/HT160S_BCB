@@ -10,6 +10,9 @@
 #include "MachineType.h"
 #include "cJSON.h"
 #include <IniFiles.hpp>
+//AI(secs-lot-multilot) 20260730 : EventLog line from the data layer. Declared here rather than
+//including note.h, which drags a VCL form header into what is otherwise a pure data unit.
+extern void RecordProcess(AnsiString S);
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -1095,6 +1098,41 @@ int THT160LotRegistry::ClearLotItems(AnsiString LotID)
 	return Dropped;
 }
 //---------------------------------------------------------------------------
+//AI(secs-lot-multilot) 20260730 : count registered lots that nothing in the reverse index
+//points at. One pass over m_Code2DIndex marks the lot slots that have routable codes, then
+//one walk of the slots (skipping freed ones) reports those left unmarked. Cheap and exact :
+//m_Code2DIndex IS what FindByCode2D reads on the sorting path, so a lot marked here as
+//having items is genuinely routable. See the header for why this replaced a per-lot
+//GetLotIcList call (O(slots x records) with a Trim + 9-field concat per record).
+int THT160LotRegistry::CountLotsWithoutItems(AnsiString &FirstLotID)
+{
+	bool bHasItems[HT160_MAX_LOT];
+	int i;
+
+	FirstLotID="";
+	ZeroMemory(bHasItems, sizeof(bHasItems));
+	for(i=0;i<m_Code2DIndex->Count;i++)
+	{
+		int LotIndex, Bin;
+		UnpackRef((int)m_Code2DIndex->Objects[i], LotIndex, Bin);
+		if(LotIndex>=0 && LotIndex<HT160_MAX_LOT)
+			bHasItems[LotIndex]=true;
+	}
+
+	int Missing=0;
+	for(i=0;i<m_LotCount;i++)
+	{
+		if(m_Lots[i].sLotID.Trim()==AnsiString(""))
+			continue;                 // freed slot, not a registered lot
+		if(bHasItems[i]==true)
+			continue;
+		Missing++;
+		if(FirstLotID==AnsiString(""))
+			FirstLotID=m_Lots[i].sLotID;
+	}
+	return Missing;
+}
+//---------------------------------------------------------------------------
 bool THT160LotRegistry::RenameLot(AnsiString OldLotID, AnsiString NewLotID)
 {
 	AnsiString NewKey=NewLotID.Trim();
@@ -1922,7 +1960,18 @@ int THT160LotBinBinding::ResolveAuto(int LotIndex, int Bin)
 		}
 	}
 	if(Chosen<0)
+	{
 		Chosen=ErrorAuto;   // all non-Error Autos taken -> overflow to Error Auto
+		//AI(secs-lot-multilot) 20260730 : say so. This branch routes GOOD product into the
+		//Error Auto and was completely silent : the place-time overflow trace code (1004) is
+		//only stamped in Lot+PassFail mode, not in the By Lot+Bin mode this function serves.
+		//It is reachable much sooner now that SET_LOT_INFO is additive - 6 non-Error Autos
+		//minus the Error Auto leaves 5 bindable pairs, so two lots with three bins already
+		//overflow on the 6th (Lot,Bin) pair. Fires once per NEW pair (the binding is cached
+		//and persisted right below), so it cannot flood the log.
+		RecordProcess("Lot+Bin: no free Auto for (Lot "+LotID+", Bin "+IntToStr(Bin)
+		              +") - routed to the Error Auto");
+	}
 
 	m_List->AddObject(MakeKey(LotID, Bin), (TObject*)(Chosen+1));
 	SaveToIni();
