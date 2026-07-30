@@ -313,6 +313,9 @@ private:
     int        svUPH;            // tRunData.UPH
     int        svLotCount;       // LotRegistry.GetLotCount()
     AnsiString svCurrentLot;     // first registered Lot ID ("" if none)
+    //AI(secs-lotstarttime) 20260730 : SVID 66033. LATCHED by NoteLotStartTime, deliberately
+    // NOT refreshed in RefreshSVData - it must answer "when did this lot start", not "now".
+    AnsiString svLotStartTime;   // "yyyy/mm/dd hh:nn:ss" of Lot Start ("" between lots)
     AnsiString svSoftwareVersion;// application software version (constant, 9045 SVID 1003)
     //AI(ht160s-secsgem) 20260611 : EC snapshot member. Recipe name has no single
     // stable address (lives behind RecipeManager getter/normalizer), so S2F14
@@ -328,6 +331,7 @@ public:
     virtual void RefreshSecsBadge();   //AI(ht160s-secsgem) 20260612 : 1s tick -> sync main-screen SECS badge to HSMS state
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
     virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
+    virtual void NoteLotStartTime(bool bStarted);//AI(secs-lotstarttime) 20260730 : latch/clear SVID 66033 Lot Start Time
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();
@@ -335,6 +339,9 @@ public:
     virtual void AddReprot();
     virtual void S1F4_SelectedStatusReply();
     virtual void S1F12_StatusVariableNamelistReply();//AI(ht160s-secsgem) 20260611 : S1F11->S1F12 SV namelist
+    //AI(secs-namelist) 20260730 : S1F23->S1F24 CEID namelist / S2F29->S2F30 EC namelist.
+    virtual void S1F24_CollectionEventNamelist();
+    virtual void S2F30_EquipmentConstantNamelistReply();
     //AI(ht160s-secsgem) 20260625 : S1F1 are-you-there -> S1F2 on-line data
     virtual void S1F2_OnLineData();
     //AI(ht160s-secsgem) 20260625 : S1F13 establish-comm -> S1F14 connect-request ack

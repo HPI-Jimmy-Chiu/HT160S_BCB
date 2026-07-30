@@ -142,6 +142,18 @@ void EventReport(unsigned Ceid)
     HGem->EventReport(1, Ceid);
 }
 //---------------------------------------------------------------------------
+//AI(secs-lotstarttime) 20260730 : SVID 66033 Lot Start Time latch.
+//  Deliberately NOT gated on USE_SECS_GEM (unlike EventReport): stamping a string costs
+//  nothing, and gating it would leave 66033 empty for the whole lot if the operator turns
+//  SECS on after Lot Start. Only the NULL check is load-bearing.
+void NoteLotStartTime(bool bStarted)
+{
+    if(HSys.MyGem==NULL)
+        return;
+
+    HSys.MyGem->NoteLotStartTime(bStarted);
+}
+//---------------------------------------------------------------------------
 unsigned ComputeAlarmAlid(AnsiString Code)
 {
     //AI(ht160s-secsgem) 20260715 : SSOT for the S5 ALID. 31-polynomial hash of the alarm

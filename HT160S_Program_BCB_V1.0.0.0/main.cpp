@@ -2436,10 +2436,16 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
         SaveWorkOrder();
     RecordProcess("LOT START pressed");
 
-    //AI(ht160s-secsgem) 20260714 : notify host a new lot has started (S6F11 CEID 11).
-    // Pairs with the Lot End event in btnLotEndClick. Report 1 carries the new Current
+    //AI(secs-lotstarttime) 20260730 : latch SVID 66033 Lot Start Time BEFORE the event, so a
+    // host that answers CEID 6 with an immediate S1F3 already reads THIS lot's start time.
+    NoteLotStartTime(true);
+    //AI(ht160s-secsgem) 20260714 : notify host a new lot has started (S6F11 CEID 6 Lot Start).
+    // Pairs with the Lot End event in DoLotEndProcess. Report 1 carries the new Current
     // Lot ID. Registry is already populated (GetLotListCount()==0 returned early above),
     // so no guard is needed. EventReport self-gates on USE_SECS_GEM + HSMS SELECTED.
+    //AI(secs-ceid-align9045) 20260730 : this comment said "CEID 11" and named btnLotEndClick
+    // before the 20260729 HT9045 renumber. SECS_EVENT.DoLotStart has been 6 ever since, and the
+    // Lot End button routes through DoLotEndProcess. Code was always right; the comment was stale.
     EventReport(SECS_EVENT.DoLotStart);
 }
 //---------------------------------------------------------------------------
@@ -2787,13 +2793,19 @@ void __fastcall TfMain::DoLotEndProcess()
     FreezeProductInfoAtLotEnd();
     WriteLastDataIni();
 
-    //AI(ht160s-secsgem) 20260714 : notify host this lot has ended (S6F11 CEID 12).
+    //AI(ht160s-secsgem) 20260714 : notify host this lot has ended (S6F11 CEID 8 Lot End).
     // Fire BEFORE LotRegistry.Clear() below so report 1's snapshot still carries the
     // ending lot (Current Lot ID / Total IC / UPH). EventReport self-gates on
     // USE_SECS_GEM + HSMS SELECTED (no-op when SECS off or link down). The lot-count
     // guard mirrors HT9045's bLotStart gate : an empty Lot End press sends nothing.
+    //AI(secs-ceid-align9045) 20260730 : this comment said "CEID 12" before the 20260729 HT9045
+    // renumber; SECS_EVENT.DoLotEnd has been 8 ever since. Code unchanged, comment corrected.
     if(LotRegistry.GetLotCount()>0)
         EventReport(SECS_EVENT.DoLotEnd);
+    //AI(secs-lotstarttime) 20260730 : clear SVID 66033 AFTER the Lot End event, so the lot's
+    // start time stays readable right up to the moment the work order closes. Unconditional
+    // (NOT under the lot-count guard): an empty Lot End press must not leave a stale timestamp.
+    NoteLotStartTime(false);
 
     //AI(ht160s-lot-webapi) 20260612 : stop any in-flight "pull all lots" sweep so
     // it does not walk the registry we are about to clear.

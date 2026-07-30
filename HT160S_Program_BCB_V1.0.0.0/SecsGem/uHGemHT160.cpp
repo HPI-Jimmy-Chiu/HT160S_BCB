@@ -41,6 +41,7 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     svUPH           = 0;
     svLotCount      = 0;
     svCurrentLot    = "";
+    svLotStartTime  = "";            //AI(secs-lotstarttime) 20260730 : latched by NoteLotStartTime, not by RefreshSVData
     svSoftwareVersion = "1.0.0.0";   // keep in step with ht160s.cpp GemInitial("HT160S","1.0.0.0")
     ecRecipeName    = "";
 
@@ -382,6 +383,14 @@ void HT160Gem::AddSV()
     // -- Current Lot (66030-66039) --
     HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
     HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
+    //AI(secs-lotstarttime) 20260730 : customer checklist "vendor lot start time". Latched at
+    // Lot Start (manual button OR SECS LOTSTART), cleared at Lot End. Same text format as SVID
+    // 1027 System Time. Deliberately NOT added to firmware report 1 : that report is the default
+    // payload of EVERY CEID and its 13-SV shape is published in the customer interface spec, so
+    // widening it would change every event on the wire. A host that wants the start time inside
+    // an event binds 66033 into its own report with S2F33 + S2F35; otherwise S1F3 reads it back
+    // at any time during the lot.
+    HGemPtr->SetSVDataPointer(66033, HType.ASCII_TYPE, "Lot Start Time", "", &svLotStartTime, "yyyy/mm/dd hh:nn:ss when the current work order started (empty between lots)");
     //AI(ht160s-whitelist) 20260716 : Q6 host read-back of the active sort mode. Bound to the
     // live config int (stable global address, read at serialize time) so a SORTMODE switch via
     // S2F41 LOTSTART is confirmable by S1F3. No RefreshSVData mirror : not a per-cycle snapshot.
@@ -830,6 +839,205 @@ void HT160Gem::S1F12_StatusVariableNamelistReply()
         HGemPtr->DataItemOut(HType.ASCII_TYPE, un);
     }
     HGemPtr->SendLocalData();
+}
+//---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : S1F23 Collection Event Namelist Request -> S1F24.
+//  Request  L,n { U4 CEID }        n<=0 -> EVERY registered CEID.
+//  Reply    L,n { L,3 { U4 CEID, A CENAME, L,m { U4 VID } } }.
+//  Read-only : touches no machine state, changes no report link, enables no event.
+//  Unknown CEID -> { CEID, "", L,0 } so the top-level shape stays constant (HT9045
+//  answers the same way; see its S1F24 "no such CEID" branch).
+//
+//  FULL DUMP is deliberate. AddCEID registers all 275 HT9045 ids, and only 52 of them
+//  have an emit site on HT160S - this reply lists all 275 anyway:
+//    - HT9045 dumps its whole dictionary too, so a host that diffs the two machines'
+//      namelists sees one dictionary, which is the entire point of the 20260729 align.
+//    - The namelist is NOT a subscription. The host binds what it wants with S2F33 +
+//      S2F35 and arms it with S2F37, so a wider namelist cannot make an unemitted CEID
+//      start arriving. Trimming to the 52 would instead hide ids the host may legitimately
+//      pre-define reports against (e.g. for a later firmware that does emit them).
+//  Size: 275 x (name + report 1's 13 VIDs) is ~35 KB against the 1 MB encode buffer, and
+//  DataItemOut's overflow backstop poisons the message rather than truncating it.
+//---------------------------------------------------------------------------
+void HT160Gem::S1F24_CollectionEventNamelist()
+{
+    int n, len, i;
+    unsigned char Type;
+    AnsiString S;
+    unsigned reqList[512];
+    int reqCount = 0;
+
+    if(HGemPtr==NULL)
+        return;
+
+    HGemPtr->ResetReturnCode();
+
+    if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1)
+    {
+        // malformed request -> reply empty list (same policy as S1F12)
+        HGemPtr->InitLocalHead(1, 24, 0);
+        HGemPtr->DataItemOut(0, HType.LIST_TYPE, NULL);
+        HGemPtr->SendLocalData();
+        return;
+    }
+
+    if(n<=0)
+    {
+        int total = HGemPtr->GetCEIDCount();
+        for(i=0; i<total && reqCount<512; i++)
+            reqList[reqCount++] = HGemPtr->GetCEIDByIndex(i);
+        if(total > reqCount)
+        {
+            AnsiString sCap;
+            sCap.sprintf("[SECS][TX] S1F24 CEID list capped at %d of %d registered", reqCount, total);
+            HGemPtr->StringOut(sCap);
+        }
+    }
+    else
+    {
+        // read requested CEIDs first (this consumes the receive buffer)
+        for(i=0; i<n && reqCount<512; i++)
+        {
+            if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+                break;
+            S = "";
+            if(HGemPtr->DataItemIn(len, Type, S)==1)
+                reqList[reqCount++] = (unsigned)StrToIntDef(S, 0);
+            else
+                reqList[reqCount++] = 0;
+        }
+    }
+
+    HGemPtr->InitLocalHead(1, 24, 0);
+    HGemPtr->DataItemOut(reqCount, HType.LIST_TYPE, NULL);
+    for(i=0; i<reqCount; i++)
+    {
+        unsigned CEID = reqList[i];
+        AnsiString nm = HGemPtr->GetCEIDAlias(CEID);
+        //AI(secs-namelist) 20260730 : 1024 covers 32 linked reports of the firmware-shaped
+        // sizes with headroom; a host-defined monster report set can still overrun it, so
+        // say so in the log instead of shipping a silently short VID list.
+        unsigned vidList[1024];
+        int vidCount = HGemPtr->GetCEIDVidList(CEID, vidList, 1024);
+        if(vidCount >= 1024)
+        {
+            AnsiString sTrunc;
+            sTrunc.sprintf("[SECS][TX] S1F24 CEID %u VID list TRUNCATED at %d", CEID, vidCount);
+            HGemPtr->StringOut(sTrunc);
+        }
+
+        HGemPtr->DataItemOut(3, HType.LIST_TYPE, NULL);
+        HGemPtr->DataItemOut(1, HType.UINT_4_TYPE, &CEID);
+        HGemPtr->DataItemOut(HType.ASCII_TYPE, nm);
+        HGemPtr->DataItemOut(vidCount, HType.LIST_TYPE, NULL);
+        for(int v=0; v<vidCount; v++)
+        {
+            unsigned VID = vidList[v];
+            HGemPtr->DataItemOut(1, HType.UINT_4_TYPE, &VID);
+        }
+    }
+    HGemPtr->SendLocalData();
+}
+//---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : S2F29 Equipment Constant Namelist Request -> S2F30.
+//  Request  L,n { U4 ECID }        n<=0 -> EVERY registered EC.
+//  Reply    L,n { L,6 { U4 ECID, A ECNAME, ECMIN, ECMAX, ECDEF, A ECUNITS } }.
+//  ECMIN / ECMAX / ECDEF are encoded in the EC's OWN declared type (HT9045 shape), so a
+//  FT_8 tray dimension reports FT_8 limits, not ASCII. An EC that declares no limit ships
+//  a ZERO-LENGTH item of that type - E5's "no limit declared" - which is what HT9045 emits
+//  when its Min/Max/Default pointer is NULL. Today only 1501 declares a default ("Default")
+//  and the six tray-form ECs declare a default of "0"; no EC declares min/max yet, so most
+//  rows carry three empty items. That is a registration-data gap, not a protocol gap: fill
+//  the limits in AddEC and this reply follows with no code change.
+//  Unknown ECID -> L,6 { ECID, "", <0-len>, <0-len>, <0-len>, "" } (GetECType answers ASCII
+//  for an unknown id, so the empty items are well-typed).
+//  Read-only : reports the registry only. Host EC WRITES still go through S2F15, which keeps
+//  its idle-gate and its "tray geometry only" whitelist - S2F30 does not widen what is settable.
+//---------------------------------------------------------------------------
+void HT160Gem::S2F30_EquipmentConstantNamelistReply()
+{
+    int n, len, i;
+    unsigned char Type;
+    AnsiString S;
+    unsigned reqList[512];
+    int reqCount = 0;
+
+    if(HGemPtr==NULL)
+        return;
+
+    HGemPtr->ResetReturnCode();
+
+    if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1)
+    {
+        // malformed request -> reply empty list (same policy as S1F12 / S1F24)
+        HGemPtr->InitLocalHead(2, 30, 0);
+        HGemPtr->DataItemOut(0, HType.LIST_TYPE, NULL);
+        HGemPtr->SendLocalData();
+        return;
+    }
+
+    if(n<=0)
+    {
+        int total = HGemPtr->GetECCount();
+        for(i=0; i<total && reqCount<512; i++)
+            reqList[reqCount++] = HGemPtr->GetECIDByIndex(i);
+        if(total > reqCount)
+        {
+            AnsiString sCap;
+            sCap.sprintf("[SECS][TX] S2F30 EC list capped at %d of %d registered", reqCount, total);
+            HGemPtr->StringOut(sCap);
+        }
+    }
+    else
+    {
+        // read requested ECIDs first (this consumes the receive buffer)
+        for(i=0; i<n && reqCount<512; i++)
+        {
+            if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+                break;
+            S = "";
+            if(HGemPtr->DataItemIn(len, Type, S)==1)
+                reqList[reqCount++] = (unsigned)StrToIntDef(S, 0);
+            else
+                reqList[reqCount++] = 0;
+        }
+    }
+
+    HGemPtr->InitLocalHead(2, 30, 0);
+    HGemPtr->DataItemOut(reqCount, HType.LIST_TYPE, NULL);
+    for(i=0; i<reqCount; i++)
+    {
+        unsigned ECID = reqList[i];
+        unsigned char ecType = HGemPtr->GetECType(ECID);
+        AnsiString nm = HGemPtr->GetECName(ECID);
+        AnsiString un = HGemPtr->GetECUnit(ECID);
+
+        HGemPtr->DataItemOut(6, HType.LIST_TYPE, NULL);
+        HGemPtr->DataItemOut(1, HType.UINT_4_TYPE, &ECID);
+        HGemPtr->DataItemOut(HType.ASCII_TYPE, nm);
+        HGemPtr->DataItemOutTypedText(ecType, HGemPtr->GetECMinValue(ECID));
+        HGemPtr->DataItemOutTypedText(ecType, HGemPtr->GetECMaxValue(ECID));
+        HGemPtr->DataItemOutTypedText(ecType, HGemPtr->GetECDefaultValue(ECID));
+        HGemPtr->DataItemOut(HType.ASCII_TYPE, un);
+    }
+    HGemPtr->SendLocalData();
+}
+//---------------------------------------------------------------------------
+//AI(secs-lotstarttime) 20260730 : latch / clear SVID 66033 Lot Start Time.
+//  Called from the manual Lot Start + Lot End buttons (main.cpp) and from the SECS
+//  LOTSTART accept path, so the host reads the same value whichever way the lot began.
+//  Format matches SVID 1027 System Time ("yyyy/mm/dd hh:nn:ss") so a host can compare
+//  the two without reformatting.
+//  NOT persisted: a power cycle mid-lot leaves it empty until the next Lot Start. The
+//  event stream is the durable record (CEID 6 carries the moment); this SV exists so a
+//  host that connected late, or that wants to re-read, can still ask.
+//---------------------------------------------------------------------------
+void HT160Gem::NoteLotStartTime(bool bStarted)
+{
+    if(bStarted)
+        svLotStartTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
+    else
+        svLotStartTime = "";
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : S2F15 New Equipment Constant Send -> S2F16.
@@ -1430,6 +1638,9 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         //equivalent of pressing Lot Start, so zero the per-run production
                         //counters too (gated idle : SystemStart==false and no IC inside).
                         ResetPerLotProductionCounters();
+                        //AI(secs-lotstarttime) 20260730 : same latch as the manual Lot Start button,
+                        //so SVID 66033 answers regardless of which path opened the work order.
+                        NoteLotStartTime(true);
                         //AI(ht160s-uph) 20260706 : open the per-tray/lot UPH log folder.
                         TrayUphLog_OnLotStart(FirstLot);
                         //AI(ht160s-soter) 20260714 : host LOTSTART is the SECS analog of the manual Lot

@@ -79,6 +79,7 @@ void HTGem::Dispatch(int S, int F)
         case 13: S1F14_ConnectRequestAcknowledge();  return;
         case 15: S1F16_OFFLINEAcknowledge();         return;//AI(secs-offline) 20260727 : S1F15 Request OFF-LINE -> S1F16 OFLACK
         case 17: S1F18_ONLINEAcknowledge();          return;//AI(secs-online) 20260724 : S1F17 Request ONLINE -> S1F18 ONLACK
+        case 23: S1F24_CollectionEventNamelist();    return;//AI(secs-namelist) 20260730 : S1F23 Collection Event Namelist Request -> S1F24
         }
         break;
     case 2:
@@ -90,6 +91,7 @@ void HTGem::Dispatch(int S, int F)
         case 41: S2F42_Host_Command_Acknowledge();   return;
         case 13: S2F14_EquipmentConstanData();       return;
         case 15: S2F16_NewEquipmentConstantSendAcknowledge(); return;//AI(ht160s-secsgem) 20260611 : EC write
+        case 29: S2F30_EquipmentConstantNamelistReply();      return;//AI(secs-namelist) 20260730 : S2F29 EC Namelist Request -> S2F30
         case 33: S2F34_DefineReportAcknowledge();             return;//AI(secs-reportdef) 20260724 : Define Report
         case 35: S2F36_LinkEventReportAcknowledge();          return;//AI(secs-reportdef) 20260724 : Link Event Report
         case 37: S2F38_EnableDisableEventReportAcknowledge(); return;//AI(secs-reportdef) 20260724 : Enable/Disable Event
@@ -168,6 +170,8 @@ void HTGem::RefreshSecsBadge(){ }
 void HTGem::ServiceAgv(){ }
 //AI(secs-kyec-rcmd4-fix) 20260728 : base no-op; HT160Gem overrides to release latched host state.
 void HTGem::OnCommunicationLost(){ }
+//AI(secs-lotstarttime) 20260730 : base no-op; HT160Gem overrides to latch SVID 66033.
+void HTGem::NoteLotStartTime(bool /*bStarted*/){ }
 void HTGem::AddSV(){ }
 void HTGem::AddEC(){ }
 void HTGem::AddAlarmList(){ }

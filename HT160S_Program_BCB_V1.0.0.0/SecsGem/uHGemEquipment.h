@@ -308,6 +308,25 @@ public:
     AnsiString GetECName(unsigned ECID);
     AnsiString GetECUnit(unsigned ECID);
     AnsiString GetECValueString(unsigned ECID);   // bound EC live value as text
+    //AI(secs-namelist) 20260730 : S2F30 EC namelist - declared limits + SECS type by ECID.
+    //  The three limits are stored as TEXT at registration (SetECDataPointer) and are
+    //  encoded in the EC's OWN type on the wire, so they need both getters and GetECType.
+    AnsiString GetECMinValue(unsigned ECID);
+    AnsiString GetECMaxValue(unsigned ECID);
+    AnsiString GetECDefaultValue(unsigned ECID);
+    unsigned char GetECType(unsigned ECID);
+    bool IsValidECID(unsigned ECID);
+    //AI(secs-namelist) 20260730 : encode ONE scalar of the given SECS type from text.
+    //  Empty text -> zero-length item of that type ("no limit declared"), never a LIST.
+    void DataItemOutTypedText(unsigned char Type, AnsiString sValue);
+    //AI(secs-namelist) 20260730 : S1F24 CEID namelist support. GetCEIDVidList flattens the
+    //  CEID -> linked reports -> SVIDs chain here because FindCEIDItem / FindReportItem are
+    //  private (same reason the S6F16 / S6F20 encoders live on THGem).
+    int  GetCEIDCount();
+    unsigned GetCEIDByIndex(int Index);
+    AnsiString GetCEIDAlias(unsigned CEID);
+    bool IsValidCEID(unsigned CEID);
+    int  GetCEIDVidList(unsigned CEID, unsigned *Out, int MaxOut);
     void RefreshSVSnapshot();                      // GemLogic->RefreshSVData() for live SV
     AnsiString GetEndpointAddress();               // configured HSMS address (read-only view)
     AnsiString GetEndpointPort();

@@ -23,6 +23,10 @@ public:
 //---------------------------------------------------------------------------
 extern TFSECS *FSECS;
 void EventReport(unsigned Ceid);
+//AI(secs-lotstarttime) 20260730 : latch (true) / clear (false) SVID 66033 Lot Start Time
+//  from the production layer. Thin forwarder to HSys.MyGem so main.cpp keeps including
+//  only this header, exactly like EventReport / AlarmReport.
+void NoteLotStartTime(bool bStarted);
 //AI(ht160s-secsgem) 20260625 : S5F1 alarm report (set/clear) glue, mirrors EventReport.
 void AlarmReport(AnsiString Code, AnsiString Message, bool bSet);
 //AI(ht160s-secsgem) 20260715 : SSOT ALID hash shared by S5F1 + the S5F6/S5F8 alarm catalog.

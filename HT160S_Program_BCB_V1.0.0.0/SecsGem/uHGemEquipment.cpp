@@ -799,6 +799,143 @@ AnsiString THGem::GetECValueString(unsigned ECID)
     return ItemValueToString(Item->Type, Item->Ptr);
 }
 //---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : S2F30 EC namelist read-back. The limits are the TEXT
+//  supplied at SetECDataPointer time; "" means the EC declares no such limit.
+AnsiString THGem::GetECMinValue(unsigned ECID)
+{
+    TGemECItem *Item = FindECItem(ECID);
+    return (Item!=NULL) ? Item->MinValue : AnsiString("");
+}
+//---------------------------------------------------------------------------
+AnsiString THGem::GetECMaxValue(unsigned ECID)
+{
+    TGemECItem *Item = FindECItem(ECID);
+    return (Item!=NULL) ? Item->MaxValue : AnsiString("");
+}
+//---------------------------------------------------------------------------
+AnsiString THGem::GetECDefaultValue(unsigned ECID)
+{
+    TGemECItem *Item = FindECItem(ECID);
+    return (Item!=NULL) ? Item->DefaultValue : AnsiString("");
+}
+//---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : declared SECS type of a registered EC. An unknown ECID
+//  answers ASCII so the S2F30 unknown-ECID row ships zero-length ASCII limits, which
+//  is the shape HT9045 emits for an EC it cannot resolve.
+unsigned char THGem::GetECType(unsigned ECID)
+{
+    TGemECItem *Item = FindECItem(ECID);
+    return (Item!=NULL) ? Item->Type : HType.ASCII_TYPE;
+}
+//---------------------------------------------------------------------------
+bool THGem::IsValidECID(unsigned ECID)
+{
+    return (FindECItem(ECID)!=NULL);
+}
+//---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : encode ONE scalar of the given type from its text form.
+//  Type coverage mirrors WriteECValueByString / ItemValueToString so an EC round-trips
+//  through S2F30 (read limits) and S2F15 (write value) with the same type mapping.
+//  Empty text -> zero-length item of that type: E5 "this EC declares no limit", and the
+//  same thing HT9045 sends when its Min/Max/Default pointer is NULL.
+void THGem::DataItemOutTypedText(unsigned char Type, AnsiString sValue)
+{
+    if(sValue.Trim()=="")
+    {
+        DataItemOut(0, Type, NULL);
+        return;
+    }
+    if(Type==HType.ASCII_TYPE || Type==HType.JIS_TYPE)
+    {
+        DataItemOut(Type, sValue);
+        return;
+    }
+    if(Type==HType.FT_8_TYPE)
+    {
+        double d = StrToFloatDef(sValue, 0.0);
+        DataItemOut(1, Type, &d);
+        return;
+    }
+    if(Type==HType.FT_4_TYPE)
+    {
+        float f = (float)StrToFloatDef(sValue, 0.0);
+        DataItemOut(1, Type, &f);
+        return;
+    }
+    if(Type==HType.BOOLEAN_TYPE)
+    {
+        unsigned char b = (StrToIntDef(sValue, 0)!=0) ? 1 : 0;
+        DataItemOut(1, Type, &b);
+        return;
+    }
+    if(Type==HType.BINARY_TYPE || Type==HType.INT_1_TYPE || Type==HType.UINT_1_TYPE)
+    {
+        unsigned char c = (unsigned char)StrToIntDef(sValue, 0);
+        DataItemOut(1, Type, &c);
+        return;
+    }
+    if(Type==HType.INT_2_TYPE || Type==HType.UINT_2_TYPE)
+    {
+        short s = (short)StrToIntDef(sValue, 0);
+        DataItemOut(1, Type, &s);
+        return;
+    }
+    int i = StrToIntDef(sValue, 0);
+    DataItemOut(1, Type, &i);        // INT_4 / UINT_4 default (matches WriteECValueByString)
+}
+//---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : S1F24 CEID namelist read-back.
+int THGem::GetCEIDCount()
+{
+    return (CEIDList!=NULL) ? CEIDList->Count : 0;
+}
+//---------------------------------------------------------------------------
+unsigned THGem::GetCEIDByIndex(int Index)
+{
+    if(CEIDList==NULL || Index<0 || Index>=CEIDList->Count) return 0;
+    return ((TGemCEIDItem*)CEIDList->Items[Index])->CEID;
+}
+//---------------------------------------------------------------------------
+AnsiString THGem::GetCEIDAlias(unsigned CEID)
+{
+    TGemCEIDItem *Item = FindCEIDItem(CEID);
+    return (Item!=NULL) ? Item->Alias : AnsiString("");
+}
+//---------------------------------------------------------------------------
+bool THGem::IsValidCEID(unsigned CEID)
+{
+    return (FindCEIDItem(CEID)!=NULL);
+}
+//---------------------------------------------------------------------------
+//AI(secs-namelist) 20260730 : flatten CEID -> linked reports -> SVIDs for S1F24.
+//  Order follows the CEID's ReportIDs[] then each report's SVIDs[], i.e. exactly the
+//  order those SVs appear in the S6F11 body for this event, so a host can diff the
+//  namelist against a received report positionally.
+//  Duplicates are NOT removed: HT9045 does not remove them either (it concatenates
+//  every linked report's variable column), and a CEID linked to two reports that share
+//  an SVID really does ship that SVID twice in S6F11.
+//  Returns the number written. A full buffer is a TRUNCATION - the caller must say so
+//  rather than silently shipping a short list.
+int THGem::GetCEIDVidList(unsigned CEID, unsigned *Out, int MaxOut)
+{
+    if(Out==NULL || MaxOut<=0)
+        return 0;
+    TGemCEIDItem *Ce = FindCEIDItem(CEID);
+    if(Ce==NULL)
+        return 0;
+
+    int n = 0;
+    for(int r=0; r<Ce->ReportCount && n<MaxOut; r++)
+    {
+        TGemReportItem *Rp = FindReportItem(Ce->ReportIDs[r]);
+        if(Rp==NULL)
+            continue;
+        for(int s=0; s<Rp->SVCount && n<MaxOut; s++)
+            Out[n++] = Rp->SVIDs[s];
+    }
+    return n;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : trigger a live SV snapshot (same path the host
 //  S1F4/S6F11 uses) so the GUI shows current machine values.
 void THGem::RefreshSVSnapshot()
