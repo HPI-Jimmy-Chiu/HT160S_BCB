@@ -1257,27 +1257,24 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                 {
                     HCACK = 2;                                   // empty list -> param error
                 }
-                else if(HSys.Sys.SystemStart==true || HasICUnderMachine()==true)
-                {
-                    HCACK = 4;                                   // producing / IC inside -> busy
-                }
                 else if(n>HT160_MAX_LOT)
                 {
-                    HCACK = 2;                                   // exceeds capacity -> param error
+                    HCACK = 2;                                   // one packet cannot exceed capacity
                 }
-                else if(fMain!=NULL && fMain->ArchiveDiscardedWorkOrder("SECS_SETLOT")==false)
-                {
-                    //AI(ht160s-workorder-backup) 20260630 : prior work order could not be
-                    //archived (real data + disk/log-path failure). Refuse rather than
-                    //destroy it untraceably; host can retry once storage recovers. A
-                    //first-ever load (nothing to archive) returns true and is NOT refused.
-                    HCACK = 4;
-                    RecordProcess("SECS SET_LOT_INFO refused : work-order backup failed");
-                }
+                //AI(secs-lot-additive) 20260730 : the blanket "producing / IC inside -> HCACK=4"
+                // guard and the ArchiveDiscardedWorkOrder gate that used to sit here are BOTH gone.
+                // Both existed because SET_LOT_INFO was a destructive OVERWRITE (Clear + refill).
+                // It is now purely ADDITIVE, so it destroys nothing: appending a lot to a live
+                // multi-lot order is safe (AddLot appends or reuses a freed slot, existing slot
+                // INDICES never move, and tray cells / SortArm slots hold those indices as raw
+                // ints), and there is nothing left to archive. The one case that still destroys
+                // data - re-declaring an existing Lot under a DIFFERENT KYEC batch, which retires
+                // that Lot's 2D->Bin list - keeps a busy guard, applied below AFTER the parse so
+                // it only fires for packets that actually retire something.
                 else
                 {
                     //AI(ht160s-ftp) 20260721 : parse into local buffers FIRST, commit atomically
-                    // (Clear + AddLot) ONLY after the whole list parses cleanly. A mid-list reject
+                    // ONLY after the whole list parses cleanly. A mid-list reject
                     // (HCACK!=0) then leaves the prior work order untouched, so the host's "rejected"
                     // belief matches the machine. Mirrors the LOTSTART buffer-then-commit path; the
                     // previous code Cleared before the loop and committed incrementally, leaving a
@@ -1348,33 +1345,100 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         nBuf++;
                     }
 
-                    // Commit atomically only on a clean parse (mirrors LOTSTART). On any reject the
-                    // prior work order is left intact, matching the host's HCACK=2 belief.
+                    //AI(secs-lot-additive) 20260730 : admission checks on the PARSED list, before
+                    // anything is committed. Two things the old overwrite semantics made
+                    // impossible and additive semantics make mandatory:
+                    //  1) real capacity. The per-packet n>HT160_MAX_LOT test above is not enough
+                    //     once lots accumulate; AddLot returns -1 when the registry is full and
+                    //     the old commit loop ignored that, so the host got HCACK=0 for lots the
+                    //     machine had silently dropped. Count the genuinely NEW ids and refuse the
+                    //     whole packet if they would not fit.
+                    //  2) a KYEC batch change on an EXISTING lot. That retires the lot's old
+                    //     2D->Bin list (see the commit loop), which must never happen with that
+                    //     lot's material still in the machine.
                     if(HCACK==0)
                     {
-                        LotRegistry.Clear();                     // D1 overwrite, now AFTER a clean parse
-                        //AI(ht160s-lotbin) 20260722 : a SET_LOT_INFO work-order overwrite must
-                        // ALSO drop the prior order's dynamic (Lot,Bin)->Auto bindings, mirroring
-                        // the manual Lot Start (main.cpp LotBinBinding.Clear/SaveToIni). Otherwise
-                        // the stale bindings keep IsAutoBound holding Autos, so the new order's
-                        // (Lot,Bin) gets routed to the Error Auto. Guarded by the same clean-parse
-                        // HCACK==0 gate as the LotRegistry overwrite, so a rejected list leaves
-                        // both intact. LOTSTART stays additive (mid-lot resume) and does NOT clear.
-                        LotBinBinding.Clear();
-                        LotBinBinding.SaveToIni();
+                        int nNewLots = 0;
+                        int nRetire  = 0;
                         for(int j=0; j<nBuf; j++)
                         {
-                            int iLotIdx = LotRegistry.AddLot(bufCust[j], HT160_LOT_SOURCE_SECS, "", "");
-                            if(iLotIdx>=0)
+                            int iExist = LotRegistry.FindLotIndex(bufCust[j]);
+                            if(iExist<0)
                             {
-                                //AI(ht160s-ftp) 20260721 : carry the KYEC batch id like the 2D-JSON
-                                // path sets Substage; "" -> Soter renders "NA" (col7 / FTP token).
-                                TLotRunInfo *pLot = LotRegistry.GetLot(iLotIdx);
-                                if(pLot!=NULL)
-                                    pLot->sKyecLotID = bufKyec[j];
+                                nNewLots++;
+                                continue;
                             }
-                            if(j==0 && fMain!=NULL)
-                                fMain->edLotNo->Text = bufCust[j]; // D2 backfill first lot
+                            TLotRunInfo *pOld = LotRegistry.GetLot(iExist);
+                            if(pOld!=NULL
+                               && bufKyec[j].Trim()!=""
+                               && pOld->sKyecLotID.Trim()!=""
+                               && pOld->sKyecLotID.Trim()!=bufKyec[j].Trim())
+                                nRetire++;
+                        }
+                        if(LotRegistry.GetLotCount()+nNewLots > HT160_MAX_LOT)
+                        {
+                            HCACK = 2;                           // registry would overflow -> param error
+                            RecordProcess("SECS SET_LOT_INFO refused : lot registry full ("
+                                          +IntToStr(LotRegistry.GetLotCount())+"+"+IntToStr(nNewLots)
+                                          +" > "+IntToStr(HT160_MAX_LOT)+")");
+                        }
+                        else if(nRetire>0 && HasICUnderMachine()==true)
+                        {
+                            HCACK = 4;                           // would retire live 2D data -> busy
+                            RecordProcess("SECS SET_LOT_INFO refused : KYEC batch change with IC still under the machine");
+                        }
+                    }
+
+                    // Commit atomically only on a clean parse + clean admission. On any reject the
+                    // prior work order is left intact, matching the host's HCACK!=0 belief.
+                    if(HCACK==0)
+                    {
+                        //AI(secs-lot-additive) 20260730 : ADDITIVE. No LotRegistry.Clear() and no
+                        // LotBinBinding.Clear() here any more - SET_LOT_INFO declares lots, it does
+                        // not open or close a work order. Lot END (DoLotEndProcess, reachable from
+                        // the operator button, the AMR CleanOut-finish path and the new
+                        // CLEAR_LOT_INFO host command) remains the ONLY thing that clears them.
+                        // AddLot is already dedupe-keep-existing (CosFunction.cpp:978-994), so a
+                        // re-sent lot id keeps its slot, its index and its per-bin counters.
+                        for(int j=0; j<nBuf; j++)
+                        {
+                            //AI(secs-lot-additive) 20260730 : resolve "did this lot already exist"
+                            // BEFORE AddLot, otherwise AddLot has already created it and every lot
+                            // looks new.
+                            bool bExisted = (LotRegistry.FindLotIndex(bufCust[j])>=0);
+                            int iLotIdx = LotRegistry.AddLot(bufCust[j], HT160_LOT_SOURCE_SECS, "", "");
+                            if(iLotIdx<0)
+                            {
+                                // Unreachable after the capacity check above; never fail silently.
+                                HCACK = 2;
+                                RecordProcess("SECS SET_LOT_INFO : AddLot rejected '"+bufCust[j]+"'");
+                                break;
+                            }
+                            TLotRunInfo *pLot = LotRegistry.GetLot(iLotIdx);
+                            if(pLot==NULL)
+                                continue;
+
+                            AnsiString sNewKyec = bufKyec[j].Trim();
+                            AnsiString sOldKyec = pLot->sKyecLotID.Trim();
+                            //AI(secs-lot-additive) 20260730 : a CHANGED KYEC batch id under the same
+                            // customer lot means a different physical batch, so the previous batch's
+                            // 2D->Bin list must stop routing - additive merging would otherwise leave
+                            // codes that are absent from the new list still routable on their old bin.
+                            // Unchanged (or newly supplied) batch id = a refresh: keep the data.
+                            if(bExisted && sNewKyec!="" && sOldKyec!="" && sNewKyec!=sOldKyec)
+                            {
+                                int nDropped = LotRegistry.ClearLotItems(bufCust[j]);
+                                RecordProcess("SECS SET_LOT_INFO : lot "+bufCust[j]+" KYEC batch "
+                                              +sOldKyec+" -> "+sNewKyec+", retired "
+                                              +IntToStr(nDropped)+" 2D items");
+                            }
+                            //AI(secs-lot-additive) 20260730 : only OVERWRITE the stored KYEC batch id
+                            // when the host actually supplied one. It used to be assigned
+                            // unconditionally, so a legacy bare-ASCII re-send of an existing lot wiped
+                            // the batch identity and persisted "" into WorkOrder.json. Mirrors the JSON
+                            // parser, which also only writes the field when it is present.
+                            if(sNewKyec!="")
+                                pLot->sKyecLotID = sNewKyec;
                         }
                     }
                 }
@@ -1419,6 +1483,43 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             {
                 ResetPerLotProductionCounters();
                 WriteLastDataIni();
+                HCACK = 0;
+            }
+        }
+        else if(S.AnsiPos("CLEAR_LOT_INFO")==1)
+        {
+            //AI(secs-lot-additive) 20260730 : the host-side LOT END, ported from HT9045
+            // (uHGemHT9045.cpp:2431-2454), which refuses while running (HCACK=1) or with material
+            // inside (HCACK=2) and otherwise clears the lot info + the 2D list. HT160S routes it
+            // through DoLotEndProcess() - the SAME body the operator's Lot End button and the AMR
+            // CleanOut-finish path use - so host and operator close a work order through ONE path
+            // (UPH record, CEID 8, LotStory archive, LotRegistry.Clear, LotBinBinding.Clear,
+            // WhiteList overlay revert, in-flight WebAPI pull cancel).
+            //
+            // This command is REQUIRED now that SET_LOT_INFO is additive: it is the only thing that
+            // retires lots, so without it the registry would grow to HT160_MAX_LOT and stay there.
+            // DoLotEndProcess shows no modal, so it is safe on the HSMS receive path.
+            // Not sent by KYEC on 2026-06-08 (that line ends lots from the panel), so this is a
+            // capability, not a regression risk.
+            HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
+            if(HSys.Sys.SystemStart==true)
+            {
+                HCACK = 1;                                       // 9045 parity : running -> 1
+                RecordProcess("SECS CLEAR_LOT_INFO refused : machine is running");
+            }
+            else if(HasICUnderMachine()==true)
+            {
+                HCACK = 2;                                       // 9045 parity : IC inside -> 2
+                RecordProcess("SECS CLEAR_LOT_INFO refused : IC still under the machine");
+            }
+            else if(fMain==NULL)
+            {
+                HCACK = 2;                                       // no UI context
+            }
+            else
+            {
+                RecordProcess("SECS CLEAR_LOT_INFO : lot end by host");
+                fMain->DoLotEndProcess();
                 HCACK = 0;
             }
         }
@@ -1508,166 +1609,163 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
         }
         else if(S.AnsiPos("LOTSTART")==1)
         {
-            //AI(ht160s-lot-webapi) 20260612 : Stage 4 : LOTSTART host command (ref
-            // HT9045 899 S2F42 LOTSTART). Inner L[n] of ASCII Lot id(s) (usually 1).
-            // We register the lot(s) (additive : no Clear, unlike SET_LOT_INFO) and
-            // kick off a NON-blocking Lot WebAPI pull for the first lot's 2D/Bin data.
-            // We do NOT auto-start machine motion : starting motion stays operator-
-            // gated (safety-critical). No modal dialog : this runs on the HSMS/VCL
-            // receive path and a popup would stall SECS communication.
+            //AI(secs-lot-additive) 20260730 : LOTSTART realigned to HT9045 (uHGemHT9045.cpp:2081-2087,
+            // which simply presses its own Lot Start button and answers HCACK=0 unconditionally, with
+            // no busy guard and no parameters). The KYEC host sends L[0] EVERY time - verified on the
+            // whole 2026-06-08 floor log, SECSGEM_TextLog_16.txt:526, _17.txt:2165, _18.txt:8277 - and
+            // never sends SET_LOT_INFO at all, so the old "inner L[n] of lot ids, reject if empty"
+            // shape answered HCACK=2 to every real host LOTSTART and the batch could not start.
+            //
+            // Contract now:
+            //  * carries NO lot identity. SET_LOT_INFO is the ONLY lot-info setter; any ASCII item
+            //    here is consumed and IGNORED (counted + logged), never registered.
+            //  * answers HCACK=0. The ONLY non-zero answers come from HT160S's own SORTMODE
+            //    extension, which HT9045 does not have - so a 9045-shaped message ALWAYS gets 0.
+            //  * may be repeated freely : HT160S is a multi-lot machine and this is how the host
+            //    refreshes 2D/Bin data mid-lot.
+            //  * branches on the lot lifecycle state:
+            //        lot CLOSED -> full per-lot init (LotStartCore) + 2D/Bin exchange
+            //        lot OPEN   -> NO init, 2D/Bin exchange only
+            //    "open" is MachineRun.bRunning (cprod.h:194 : set only by a Lot Start, cleared only
+            //    by DoLotEndProcess - pause / alarm / stop / HOME never touch it) OR'd with
+            //    HasICUnderMachine(). The OR is a safety widening, not a nicety: if material is in
+            //    the machine the lot is de-facto open, and running the full init would clear the
+            //    (Lot,Bin)->Auto bindings and per-lot counters under that material - mis-routing it
+            //    and mislabelling its trace.
+            int  nIgnoredLots = 0;
+            int  pairLen;
+            AnsiString PendingSortMode = "";      // "" = no SORTMODE pair present
+            bool bLotOpen = (MachineRun.bRunning==true || HasICUnderMachine()==true);
+            HCACK = 0;                                           // 9045 parity : unconditional accept
             if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
             {
-                sRxDetail = "lots=" + IntToStr(n);
-                if(n<=0)
+                for(i=0; i<n; i++)
                 {
-                    HCACK = 2;                                   // empty list -> param error
-                }
-                else if(HSys.Sys.SystemStart==true || HasICUnderMachine()==true)
-                {
-                    HCACK = 4;                                   // producing / IC inside -> busy
-                }
-                else
-                {
-                    //AI(ht160s-whitelist) 20260716 : Phase 2 -- the inner list carries ASCII
-                    // lot ids (as before) plus at most one optional L[2]{ A"SORTMODE", A value }
-                    // pair (value NORMAL|WHITELIST) that switches the sort mode for this lot.
-                    // Lots are buffered (not committed) until the whole list parses AND the busy
-                    // guard passes, so a malformed pair or a mode-change-while-running rejects the
-                    // entire packet with no ghost lot left registered. A plain lot-only list
-                    // behaves exactly as before (same lots, same order, same HCACK).
-                    AnsiString FirstLot = "";
-                    AnsiString bufLots[HT160_MAX_LOT];
-                    int nBuf = 0;
-                    int pairLen;
-                    AnsiString PendingSortMode = "";      // "" = no SORTMODE pair seen
-                    HCACK = 0;
-                    for(i=0; i<n; i++)
+                    if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+                        break;                                   // truncated : stop reading, still ACK
+                    if(Type==HType.LIST_TYPE)
                     {
-                        if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
+                        //AI(ht160s-whitelist) 20260716 : the optional L[2]{ A"SORTMODE", A value }
+                        // pair (NORMAL|WHITELIST), HT160S's own extension. Kept because it is the
+                        // shipped WhiteList contract with the customer.
+                        if(HGemPtr->GetDataItemLenAndTypeAndDelete(pairLen, HType.LIST_TYPE)!=1 || pairLen!=2)
                         {
-                            HCACK = 2;                       // truncated list -> param error
+                            HCACK = 2;                           // malformed pair : cannot be honoured
                             break;
                         }
-                        if(Type==HType.LIST_TYPE)
+                        AnsiString cpName="", cpVal="";
+                        if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                            HGemPtr->DataItemIn(len, Type, cpName);
+                        if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
+                            HGemPtr->DataItemIn(len, Type, cpVal);
+                        if(cpName.Trim().UpperCase()!="SORTMODE")
                         {
-                            if(HGemPtr->GetDataItemLenAndTypeAndDelete(pairLen, HType.LIST_TYPE)!=1 || pairLen!=2)
-                            {
-                                HCACK = 2;                   // malformed SORTMODE pair -> param error
-                                break;
-                            }
-                            AnsiString cpName="", cpVal="";
-                            if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
-                                HGemPtr->DataItemIn(len, Type, cpName);
-                            if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
-                                HGemPtr->DataItemIn(len, Type, cpVal);
-                            if(cpName.Trim().UpperCase()!="SORTMODE")
-                            {
-                                HCACK = 2;                   // only the SORTMODE pair is recognized
-                                break;
-                            }
-                            AnsiString sMode = cpVal.Trim().UpperCase();
-                            if(sMode!="NORMAL" && sMode!="WHITELIST")
-                            {
-                                HCACK = 2;                   // value out of domain
-                                break;
-                            }
-                            PendingSortMode = sMode;         // duplicate pair -> last one wins
-                        }
-                        else if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
-                        {
-                            if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)!=1)
-                            {
-                                HCACK = 2;                   // read failure -> param error
-                                break;
-                            }
-                            if(nBuf>=HT160_MAX_LOT)
-                            {
-                                HCACK = 2;                   // more lots than capacity -> param error
-                                break;
-                            }
-                            bufLots[nBuf++] = AnsiString(str);
-                            if(FirstLot=="")
-                                FirstLot = AnsiString(str);
-                        }
-                        else
-                        {
-                            HCACK = 2;                       // type mismatch -> param error
+                            HCACK = 2;                           // only SORTMODE is recognized
                             break;
                         }
+                        AnsiString sMode = cpVal.Trim().UpperCase();
+                        if(sMode!="NORMAL" && sMode!="WHITELIST")
+                        {
+                            HCACK = 2;                           // value out of domain
+                            break;
+                        }
+                        PendingSortMode = sMode;                 // duplicate pair -> last one wins
                     }
-                    //AI(ht160s-whitelist) 20260716 : a SORTMODE pair with no lot is malformed
-                    // (the switch rides along with a Lot Start, per the customer spec).
-                    if(HCACK==0 && PendingSortMode!="" && nBuf==0)
-                        HCACK = 2;
-                    //AI(ht160s-whitelist) 20260716 : a SORTMODE change is only safe fully idle. The
-                    // command-level guard above (SystemStart/HasICUnderMachine) is weaker than the
-                    // UI Sort-mode lock : a lot can be Started (bRunning) with no IC yet under the
-                    // machine. Reject the whole packet as busy rather than switch the classification
-                    // model mid-lot. (No pair -> unchanged additive lot-registration behavior.)
-                    if(HCACK==0 && PendingSortMode!="" && MachineRun.bRunning==true)
-                        HCACK = 4;
-                    if(HCACK==0)
+                    else if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
                     {
-                        //AI(ht160s-whitelist) 20260716 : list parsed + guards passed -> commit the
-                        // buffered lots (order preserved), then apply the host sort-mode switch
-                        // BEFORE the 2D-source load decision below so this lot loads via the newly
-                        // selected mode.
-                        int k;
-                        for(k=0; k<nBuf; k++)
-                            LotRegistry.AddLot(bufLots[k], HT160_LOT_SOURCE_SECS, "", "");
-                        //AI(ht160s-whitelist-override) 20260717 : WhiteList is a per-lot OVERLAY, not a
-                        // base mode. Set it on EVERY accepted LOTSTART : WHITELIST arms it for THIS lot;
-                        // NORMAL *or NO SORTMODE pair* disarms (base production mode). Per the customer
-                        // spec the host must send SORTMODE=WHITELIST for every whitelist lot, so a no-pair
-                        // LOTSTART means base - disarming here stops WhiteList leaking into a subsequent
-                        // no-pair lot (adversarial review 2026-07-17 MAJOR). The accept path is idle-gated
-                        // (SystemStart==false && !HasICUnderMachine above) and pair+bRunning is already
-                        // rejected, so this never flips routing on in-flight material. Do NOT write the
-                        // base iSortMode; persist the overlay (work-order lifecycle, NOT sticky
-                        // General.ini) and keep the maintenance selector + Main badge in sync.
-                        GeneralSetting.SetWhiteListActive(PendingSortMode=="WHITELIST");
-                        GeneralSetting.SaveWhiteListOverlay();
-                        if(fMaintenance!=NULL)
-                            fMaintenance->SyncSortModeSelectorFromSetting();
-                        if(fMain!=NULL)
-                            fMain->UpdateSortModeFeatureBadge();
+                        //AI(secs-lot-additive) 20260730 : lot ids are NO LONGER registered from here.
+                        // Consume the item so the stream stays aligned, count it for the log/echo.
+                        if(HGemPtr->DataItemIn(len, HType.ASCII_TYPE, str)!=1)
+                            break;
+                        nIgnoredLots++;
                     }
-                    if(HCACK==0 && FirstLot!="" && fMain!=NULL)
+                    else
                     {
-                        //AI(ht160s-lot-reset) 20260706 : SECS LOTSTART is the host-side
-                        //equivalent of pressing Lot Start, so zero the per-run production
-                        //counters too (gated idle : SystemStart==false and no IC inside).
-                        ResetPerLotProductionCounters();
-                        //AI(secs-lotstarttime) 20260730 : same latch as the manual Lot Start button,
-                        //so SVID 66033 answers regardless of which path opened the work order.
-                        NoteLotStartTime(true);
-                        //AI(ht160s-uph) 20260706 : open the per-tray/lot UPH log folder.
-                        TrayUphLog_OnLotStart(FirstLot);
-                        //AI(ht160s-soter) 20260714 : host LOTSTART is the SECS analog of the manual Lot
-                        //Start button; force clear+arm a fresh Soter buffer for the new lot (mirrors main.cpp).
-                        g_SoterOutput.OnLotStart(FirstLot);
-                        fMain->ClearProductInfoAtLotStart();
-                        fMain->edLotNo->Text = FirstLot;         // active lot backfill
-                        fMain->RefreshLotListFromRegistry();
-                        //AI(ht160s-2dbin-manual) 20260628 : persist the SECS-registered lots
-                        //(the 2D items themselves arrive via the WebAPI pull below, which
-                        //also calls SaveWorkOrder in PollLotDataWebApi).
-                        fMain->SaveWorkOrder();
-                        //AI(ht160s-lot-webapi) 20260612 : pull EVERY registered lot's
-                        // 2D/Bin data (matches the manual LotStart path). Previously
-                        // only the first lot was pulled, so SET_LOT_INFO/LOTSTART lots
-                        // 2..n arrived with no 2D items.
-                        //AI(ht160s-whitelist) 20260715 : WhiteList mode loads the local WhiteList.json instead of the WebAPI pull.
-                        if(GeneralSetting.IsWhiteListSortMode())
-                            fMain->LoadWhiteListFile();
-                        else
-                            fMain->StartLotWebApiPullAll();            // async, no modal
+                        break;                                   // unknown item : stop reading, still ACK
                     }
                 }
             }
-            else
+            sRxDetail = "ignored_lotids=" + IntToStr(nIgnoredLots)
+                      + " sortmode=" + (PendingSortMode==""?AnsiString("-"):PendingSortMode)
+                      + " lot_open=" + AnsiString(bLotOpen?"Y":"N");
+            if(nIgnoredLots>0)
+                RecordProcess("SECS LOTSTART : "+IntToStr(nIgnoredLots)
+                              +" lot id(s) in the packet ignored - use SET_LOT_INFO to declare lots");
+
+            //AI(ht160s-whitelist) 20260716 : a sort-mode change is only safe with the lot closed.
+            // Reject the whole packet rather than switch the classification model mid-lot.
+            if(HCACK==0 && PendingSortMode!="" && bLotOpen==true)
+                HCACK = 4;
+            //AI(secs-lot-additive) 20260730 : the mid-lot "exchange" in WhiteList mode would be
+            // LoadWhiteListFile(), and that Clear()s the WHOLE registry before it even checks the
+            // file exists (main.cpp, deliberate : the local file is authoritative at lot open). Doing
+            // that with a lot open empties the routing table under live material - and permanently if
+            // the file is missing or invalid. Refuse this one case instead. The WebAPI path is a
+            // non-destructive merge and stays allowed.
+            if(HCACK==0 && bLotOpen==true && GeneralSetting.IsWhiteListSortMode())
             {
-                HCACK = 1;                                       // bad list format
+                HCACK = 4;
+                RecordProcess("SECS LOTSTART refused : WhiteList mode cannot re-load its file with a lot open");
+            }
+
+            if(HCACK==0 && fMain!=NULL)
+            {
+                //AI(ht160s-whitelist-override) 20260717 : WhiteList is a per-lot OVERLAY.
+                //AI(secs-lot-additive) 20260730 : apply it ONLY when the pair is actually present.
+                // It used to be written on EVERY accepted LOTSTART, so a bare repeat (which the host
+                // now sends routinely just to refresh 2D data) silently DISARMED a whitelist lot
+                // mid-run and flipped the 2D source and the reject semantics with it.
+                if(PendingSortMode!="")
+                {
+                    GeneralSetting.SetWhiteListActive(PendingSortMode=="WHITELIST");
+                    GeneralSetting.SaveWhiteListOverlay();
+                    if(fMaintenance!=NULL)
+                        fMaintenance->SyncSortModeSelectorFromSetting();
+                    fMain->UpdateSortModeFeatureBadge();
+                }
+
+                if(bLotOpen==false)
+                {
+                    //---- lot CLOSED : open it. Full per-lot init + 2D/Bin exchange. ----
+                    // LotStartCore is the SAME body the operator's Lot Start button runs (counters,
+                    // UPH folder, Soter buffer, product-info, (Lot,Bin) bindings, bRunning, work-order
+                    // save, SVID 66033 latch, CEID 6) and it also performs the 2D/Bin exchange.
+                    // It does NOT register lots - SET_LOT_INFO already did that.
+                    AnsiString FirstLot = "";
+                    int SlotCount = LotRegistry.GetLotSlotCount();
+                    for(int k=0; k<SlotCount; k++)
+                    {
+                        TLotRunInfo *pLot = LotRegistry.GetLot(k);
+                        if(pLot!=NULL && pLot->sLotID.Trim()!="")
+                        {
+                            FirstLot = pLot->sLotID.Trim();
+                            break;
+                        }
+                    }
+                    if(FirstLot=="")
+                    {
+                        //AI(secs-lot-additive) 20260730 : nothing declared yet. Still HCACK=0 (9045
+                        // parity - it presses its Lot Start button whatever the state), but there is
+                        // no lot to open and nothing to exchange. Idempotent : the next LOTSTART
+                        // after a SET_LOT_INFO opens the lot normally.
+                        RecordProcess("SECS LOTSTART : no lot declared (send SET_LOT_INFO first) - nothing started");
+                    }
+                    else
+                    {
+                        fMain->LotStartCore(FirstLot, "by secs-remote");
+                        fMain->RefreshLotListFromRegistry();
+                    }
+                }
+                else
+                {
+                    //---- lot OPEN : exchange only, no initialisation. ----
+                    // Deliberately does NOT touch counters, the UPH folder, the Soter buffer, the
+                    // (Lot,Bin) bindings or bRunning. StartLotWebApiPullAll folds into a sweep that
+                    // is already in flight rather than restarting the cursor.
+                    RecordProcess("SECS LOTSTART : lot already open - 2D/Bin exchange only, no re-init");
+                    fMain->RefreshLotListFromRegistry();
+                    fMain->StartLotWebApiPullAll();              // async, no modal
+                }
             }
         }
         else if(S=="START")

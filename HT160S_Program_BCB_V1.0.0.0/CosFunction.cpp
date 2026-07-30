@@ -1054,6 +1054,47 @@ bool THT160LotRegistry::RemoveLot(AnsiString LotID)
 	return true;
 }
 //---------------------------------------------------------------------------
+//AI(secs-lot-additive) 20260730 : RemoveLot's two purge loops WITHOUT freeing the slot.
+//Retires a Lot's 2D->Bin data while the Lot itself, its index and its counters survive.
+//See the header for why the index must survive (tray cells store it as a raw int).
+int THT160LotRegistry::ClearLotItems(AnsiString LotID)
+{
+	int Index=FindLotIndex(LotID);
+	if(Index<0)
+		return 0;
+
+	int Dropped=0;
+
+	// Drop every reverse-index entry that points at this Lot (stops routing).
+	for(int i=m_Code2DIndex->Count-1;i>=0;i--)
+	{
+		int LotIndex, Bin;
+		UnpackRef((int)m_Code2DIndex->Objects[i], LotIndex, Bin);
+		if(LotIndex==Index)
+		{
+			m_Code2DIndex->Delete(i);
+			Dropped++;
+		}
+	}
+
+	// Drop + free every per-IC backup record owned by this Lot.
+	AnsiString LotKey=m_Lots[Index].sLotID.Trim();
+	for(int i=m_Code2DInfo->Count-1;i>=0;i--)
+	{
+		TLotIcInfo *Info=(TLotIcInfo*)m_Code2DInfo->Objects[i];
+		if(Info!=NULL && Info->sLotID.Trim()==LotKey)
+		{
+			delete Info;
+			m_Code2DInfo->Delete(i);
+		}
+	}
+
+	// The plan quantity described the retired list ; the sorted counters describe
+	// physical work already done and are deliberately NOT reset.
+	m_Lots[Index].iPlanQty=0;
+	return Dropped;
+}
+//---------------------------------------------------------------------------
 bool THT160LotRegistry::RenameLot(AnsiString OldLotID, AnsiString NewLotID)
 {
 	AnsiString NewKey=NewLotID.Trim();

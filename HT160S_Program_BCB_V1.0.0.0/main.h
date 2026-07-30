@@ -500,6 +500,7 @@ public:		// User declarations
     void __fastcall ShowTrayUphHistory();    //AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172 UPH_StringGrid parity)
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();
+    void __fastcall LotStartCore(AnsiString FirstLot, AnsiString Origin);   //AI(secs-lot-additive) 20260730 : shared modal-free Lot-Start body (btnLotStart + SECS LOTSTART); caller registers the lots
     void __fastcall DoLotEndProcess();   //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body (btnLotEnd + CleanOut-finish auto path)
     void __fastcall EmitCleanOutOK();    //AI(ht160s-overcount-tripqueue D3) 20260721 : S6F11 CEID42 CleanOutFinish (self-gates on HSMS SELECTED); called from csystem CleanOut-finish before Lot End
     void __fastcall RefreshEventLogView();

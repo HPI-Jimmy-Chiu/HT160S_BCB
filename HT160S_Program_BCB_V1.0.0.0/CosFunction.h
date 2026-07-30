@@ -282,6 +282,14 @@ public:
 	bool RemoveLot(AnsiString LotID);
 	bool RenameLot(AnsiString OldLotID, AnsiString NewLotID);
 
+	//AI(secs-lot-additive) 20260730 : retire every 2D item owned by one Lot but KEEP the
+	//lot slot (identity, per-bin counters, and above all the SLOT INDEX, which tray cells
+	//and SortArm slots hold as a raw integer). RemoveLot cannot be used for this : it frees
+	//the slot. Used when SET_LOT_INFO re-declares an existing Lot under a DIFFERENT KYEC
+	//batch id, where the previous batch's 2D->Bin list must stop routing. Returns the
+	//number of items dropped (0 = that Lot had no 2D data, or the Lot is unknown).
+	int  ClearLotItems(AnsiString LotID);
+
 	// Add one 2D->Bin item.  Returns false if Code2D already exists globally
 	// (duplicate); DupExistingLot is set to the Lot that already owns the code.
 	bool AddItem(AnsiString LotID, AnsiString Code2D, int Bin, AnsiString &DupExistingLot);

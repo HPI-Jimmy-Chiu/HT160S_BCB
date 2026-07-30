@@ -2389,6 +2389,19 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
             FirstLot=LotText;
     }
 
+    LotStartCore(FirstLot, "pressed");
+}
+//---------------------------------------------------------------------------
+//AI(secs-lot-additive) 20260730 : modal-free Lot-Start body, shared by the operator
+//button above and the SECS S2F41 LOTSTART handler (SecsGem\uHGemHT160.cpp). Everything
+//from "a lot is now open" onward lives here so the two entries cannot drift : the SECS
+//path used to hand-roll a SUBSET of this list (no LotBinBinding clear, no Lot-Start-time
+//latch, no CEID 6). Lot REGISTRATION deliberately stays with the caller - the button
+//pushes the grid rows, and on the SECS side SET_LOT_INFO is the only lot-identity setter,
+//so LOTSTART starts whatever the registry already holds. Never shows a modal : the SECS
+//path runs on the HSMS receive thread and a popup there stalls the link.
+void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
+{
     //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode. A fresh Lot Start clears all
     //dynamic (Lot,Bin)->Auto bindings so Autos are re-bound first-come-first-served
     //for this work order. (Mid-lot RESTART resumes via the machine START button,
@@ -2415,7 +2428,10 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     MachineRun.bRunning=true;
     MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
 
-    edLotNo->Text=FirstLot;
+    //AI(secs-lot-additive) 20260730 : NULL-guarded now that the SECS LOTSTART path calls this.
+    //This is the one place the ACTIVE lot is (re)targeted - a lot list refresh must not do it.
+    if(edLotNo!=NULL)
+        edLotNo->Text=FirstLot;
     //AI(ht160s-lot-webapi) 20260612 : Stage 4 : at lot start, pull EVERY lot's
     // 2D/Bin data from the customer WebAPI (async, no modal). Shared helper so the
     // SECS S2F42 LOTSTART handler pulls every lot too (not just the first).
@@ -2434,7 +2450,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     //the next power-on can restore it (see RestoreLastWorkOrder / FormShow).
     if(bWhiteListOk)
         SaveWorkOrder();
-    RecordProcess("LOT START pressed");
+    RecordProcess("LOT START "+Origin);
 
     //AI(secs-lotstarttime) 20260730 : latch SVID 66033 Lot Start Time BEFORE the event, so a
     // host that answers CEID 6 with an immediate S1F3 already reads THIS lot's start time.
@@ -2595,6 +2611,18 @@ void __fastcall TfMain::StartLotWebApiPullAll()
     EnsureLotWebApiClientCreated();
     if(LotWebApiClient!=NULL && LotWebApiClient->GetUsePull())
     {
+        //AI(secs-lot-additive) 20260730 : do NOT restart a sweep that is still running. The host
+        //may now send LOTSTART repeatedly (that is how it refreshes 2D/Bin data mid-lot), and each
+        //call used to slam the cursor back to 0 while a request was in flight : StartNextLotApiPull
+        //would target slot 0, RequestLotDataFromWebApi would find the single-request client busy and
+        //drop it with NO retry armed, and the in-flight response would then advance the cursor past
+        //slot 0 - so that lot silently finished the sweep with zero 2D items and every one of its
+        //units would route to the Error Auto. A sweep already in flight will visit every slot anyway.
+        if(bLotApiPullAll==true)
+        {
+            RecordProcess("Lot WebAPI pull-all already in flight; new request folded into it");
+            return;
+        }
         bLotApiPullAll=true;
         iLotApiPullCursor=0;
         iLotApiRetryCount=0;
@@ -2812,6 +2840,29 @@ void __fastcall TfMain::DoLotEndProcess()
     bLotApiPullAll=false;
     iLotApiPullCursor=0;
     iLotApiRetryCount=0;
+
+    //AI(ht160s-lot-webapi) 20260722 : also abort a SINGLE pull already on the wire.
+    // Clearing bLotApiPullAll (above) is not enough : PollLotDataWebApi's own guard is
+    // bLotApiPullActive, not bLotApiPullAll, so a sweep pull still in flight when Lot End
+    // fires would land in the lower half, LoadFromJsonString the response into the registry
+    // we Clear() just below, and SaveWorkOrder re-write WorkOrder.json - re-adding the lot the
+    // operator just ended. Drop the active flag AND Cancel() the client (closes the socket,
+    // returns iState to IDLE) so the stale response is never consumed, and so the next Lot
+    // Start's pull is not blocked by a still-"busy" client. Guarded on bLotApiPullActive : the
+    // maintenance manual fetch (bLotApiResultPending) uses the same single-request client but is
+    // display-only (never touches LotRegistry), and cannot be in flight at the same time as a
+    // production pull, so this leaves that diagnostic path alone.
+    //AI(secs-lot-additive) 20260730 : same hunk as fix/lot-end-inflight-webapi-cancel (22d1ac1),
+    // brought onto this branch because the new host lot lifecycle makes the window ROUTINE rather
+    // than an operator slip : LOTSTART is now the host's mid-lot 2D refresh and CLEAR_LOT_INFO is
+    // the host lot end, so "refresh then clear" inside the client's 8 s request window is a normal
+    // host sequence - and the host would get HCACK=0 for a clear that then silently un-did itself.
+    if(bLotApiPullActive==true)
+    {
+        bLotApiPullActive=false;
+        if(LotWebApiClient!=NULL)
+            LotWebApiClient->Cancel();
+    }
 
     //AI(ht160s-lot-webapi) 20260612 : Lot End clears the whole work order so the
     // next lot starts clean. Clear() drops every Lot slot, the 2D-code index and
@@ -3198,8 +3249,20 @@ void __fastcall TfMain::RefreshLotListFromRegistry()
     }
     if(sgLotList->RowCount<2)
         sgLotList->RowCount=2;
+    //AI(secs-lot-additive) 20260730 : do NOT retarget an active lot. This used to assign
+    //FirstLotID unconditionally, which is invisible with one lot but wrong the moment lots
+    //accumulate : SET_LOT_INFO is now ADDITIVE, so every later refresh snapped edLotNo back
+    //to the OLDEST registry slot - and edLotNo keys the pre-Start 2D check
+    //(CheckLotDataReady), the Production_Log batch, the Soter arming, the Loader lot key and
+    //the WhiteList KYEC stamp, so all five silently pointed at the wrong lot. Fill it only
+    //when it is unset or has gone stale (its lot is no longer registered, e.g. after a Lot
+    //End clear), which keeps every legacy single-lot caller behaving exactly as before.
     if(edLotNo!=NULL && FirstLotID!=AnsiString(""))
-        edLotNo->Text=FirstLotID;
+    {
+        AnsiString Active=edLotNo->Text.Trim();
+        if(Active==AnsiString("") || LotRegistry.FindLotIndex(Active)<0)
+            edLotNo->Text=FirstLotID;
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-2dbin-manual) 20260628 : manual 2D/Bin editor (ts2DBinManual tab).
@@ -3758,6 +3821,19 @@ void __fastcall TfMain::RestoreLastWorkOrder()
         }
         else
         {
+            //AI(secs-lot-additive) 20260730 : an inherited work order is an OPEN lot, so
+            //re-latch the lot-lifecycle flag. MachineRun.bRunning is in-memory only and used
+            //to come back false after a power cycle, which meant (a) the 2D/Bin editor and
+            //the hardware/sort-mode page unlocked mid-lot, and (b) - now that the SECS
+            //LOTSTART branch keys off it - a host LOTSTART would classify a resumed lot as
+            //"Lot End state" and run the FULL init, wiping the very LotBinBinding table and
+            //per-lot counters this restore just brought back. Only the resume answer sets it;
+            //the "start fresh" branch above cleared the registry and must stay Lot-End.
+            if(LotRegistry.GetLotCount()>0)
+            {
+                MachineRun.bRunning=true;
+                MachineRun.iActiveLotCount=LotRegistry.GetLotCount();
+            }
             RecordProcess("Startup: operator chose to inherit last work order");
         }
     }

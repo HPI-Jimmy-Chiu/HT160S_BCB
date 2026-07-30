@@ -196,11 +196,19 @@ sequenceDiagram
 **用途**：這是 host 對設備下達 **Host Command（S2F41）** 的核心三連發（trio）。Host 透過 S2F41 依序設定 lot 清單、啟動 lot（觸發 WebAPI 2D/Bin 對帳）、最後啟動生產。設備一律以 **S2F42** 回覆，body 內含 **HCACK** 回覆碼。
 
 > **為什麼分成三個命令、而且順序固定？** 三者刻意分工、職責不重疊，host 可分階段控制與檢查：
-> - **SET_LOT_INFO** = 「告訴設備這批要做哪些 lot」（純資料登錄，**會清空並覆寫** 既有 lot 清單）。
-> - **LOTSTART** = 「叫設備去拉這些 lot 的 2D/Bin 對帳資料」（觸發 WebAPI pull，但**不會讓機構動作**）。
+> - **SET_LOT_INFO** = 「告訴設備這批要做哪些 lot」（純資料登錄，**不會讓機構動作**）。
+> - **LOTSTART** = 「開批 ＋ 叫設備去拉這些 lot 的 2D/Bin 對帳資料」（觸發 WebAPI pull，但**不會讓機構動作**）。
 > - **START** = 「真正開始生產」（讓 motion 動起來）。
 >
 > 把「登錄資料」「拉對帳資料」「啟動 motion」拆開，host 可以在 START 之前先確認 lot 清單與 WebAPI 對帳都成功，再決定是否啟動，降低誤啟動風險。
+
+> **⚠ 2026-07-30 語意變更（本章下方的 log 是變更前的舊 run，僅供 body 結構參考）**
+> 依京元現場 HT9045 全日 log 校準後，trio 的分工改為：
+> - **`SET_LOT_INFO`** 成為**唯一**的 Lot 資訊設定入口，且改為**疊加**（不再清空覆寫），同 lot id 只留一筆。
+> - **`LOTSTART`** **不再攜帶也不再設定 lot 身分**（京元 host 實際送的就是空 list `L[0]`），一律回 `HCACK=0`、
+>   可重複下達。**批未開**→執行整套開批初始化＋拉 2D/Bin；**批已開**→只拉 2D/Bin、不做任何初始化。
+> - 新增 **`CLEAR_LOT_INFO`**（對齊 9045）＝ host 端結批，是唯一會退掉 lot 的命令。
+> 詳見 `HT160S_SECS_Interface_Spec_20260727.md` §3.4。
 
 **格式／body 結構（SEMI E5）**：
 
@@ -225,8 +233,9 @@ L[2]
 
 | RCMD | body 結構 | 語意 |
 |---|---|---|
-| `SET_LOT_INFO` | `L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }` | lot 清單；**CLEARS+overwrites** LotRegistry（清空並覆寫，非附加） |
-| `LOTSTART` | `L[2]{ A "LOTSTART", L[n]{ A lotID } }` | additive（附加，不 Clear）；觸發 HT160 Lot WebAPI pull（`StartLotWebApiPullAll`，拉取全部已註冊 lot）做 2D/Bin reconcile；**不啟動 motion**（仍需 operator Start 才動作）。**自 2026-07 起**，LOTSTART 亦視為「host 端的 Lot Start」：接受後會清零 per-run 生產計數、開啟 UPH log、清空 ProductInfo 並回填 active lot（`uHGemHT160.cpp:843-863`）；本 run 為舊版故未涵蓋此行為 |
+| `SET_LOT_INFO` | `L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }`，或 KYEC 雙批號配對 `L[2]{ A "SET_LOT_INFO", L[n]{ L[2]{ A custLot, A kyecLot } } }` | lot 清單。**2026-07-30 起改為疊加（additive）**：不再 Clear 既有 LotRegistry，同 lot id 留一筆（沿用原 slot 與計數）。同 lot 改帶不同 KYEC 批號時會退掉該 lot 舊的 2D 明細（機內有 IC 時回 `HCACK=4`）；登錄表會滿（64）時回 2 |
+| `LOTSTART` | `L[2]{ A "LOTSTART", L[0] }`（京元現場實際形式）；亦可選帶 HT-160S 專屬 `L[2]{ A "SORTMODE", A "NORMAL"\|"WHITELIST" }` | **2026-07-30 起不再攜帶 lot 身分**（清單內的 lot id 會被忽略並記 log，lot 一律由 `SET_LOT_INFO` 設定）。一律回 `HCACK=0`、可重複下達。**批未開**→整套開批初始化（per-run 計數歸零、UPH log、Soter buffer、ProductInfo、(Lot,Bin)→Auto 綁定、SVID 66033、CEID 6）＋ `StartLotWebApiPullAll` 拉全部 lot 的 2D/Bin；**批已開**→只拉 2D/Bin、不做任何初始化。**不啟動 motion**（仍需 `START` / operator Start）。唯二非 0 回覆皆來自 `SORTMODE` pair（格式或值錯誤 2；批已開要換模式或 WhiteList 要重載檔案 4） |
+| `CLEAR_LOT_INFO` | `L[2]{ A "CLEAR_LOT_INFO", L[0] }` | **2026-07-30 新增**，對齊 9045 = host 端結批（走面板 Lot End 同一條 `DoLotEndProcess`）。運轉中回 1、機內有 IC 回 2。`SET_LOT_INFO` 改疊加後，這是唯一會退掉 lot 的命令 |
 | `START` | `L[2]{ A "START", L[0] }` | start/resume 生產；與 START_AGV 刻意分開（原因見 3.4）；於 CEID 274 Finish 後送出 |
 
 > `SET_LOT_INFO` 由 `ht160s_presets._set_lot_info` 建構，預設 5 個 lot `SIMU_LOT_A..E`；`LOTSTART` 由 `_lot_start` 建構；`START` 由 `_start` 建構。
@@ -865,7 +874,7 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 | ACKC6 | Event Report ACK（S6F12 回覆碼） |
 | COMMACK | Establish Communications Request Acknowledge（S1F14 回覆碼；S1F13→S1F14，0=accepted/1=denied） |
 | EAC | Equipment Acknowledge Code（S2F38 Enable/Disable Event Report ACK） |
-| RCMD | Remote Command（S2F41 命令名稱）。現行設備 S2F41 dispatch 接受：`SET_LOT_INFO`、`LOTSTART`、`START`、`START_AGV`、`STOP`、`PAUSE`、`HOME`、`CLEARCOUNT`、`ONLINE_REMOTE`/`ONLINE`、`ONLINE_LOCAL`；未列於此者回 `HCACK=1`（unknown command）。本手冊來源 run 僅觸發 trio + START_AGV，其餘命令未於本 run 出現（`uHGemHT160.cpp:681-967`） |
+| RCMD | Remote Command（S2F41 命令名稱）。現行設備 S2F41 dispatch 接受（2026-07-30 現況，共 18 支）：`SET_LOT_INFO`、`LOTSTART`、`CLEAR_LOT_INFO`、`START`、`START_AGV`、`STOP`、`PAUSE`、`HALT`、`HOME`、`ONE_CYCLE`、`CLEAN_OUT`、`CLEARCOUNT`、`CLEAN_AUTO_SORT_COUNT`、`ENERGY_SAVING`、`PP_SIGNALTOWER`、`PP_MUSIC`、`ONLINE_REMOTE`/`ONLINE`、`ONLINE_LOCAL`；未列於此者回 `HCACK=1`（unknown command）。本手冊來源 run 僅觸發 trio + START_AGV，其餘命令未於本 run 出現（`SecsGem\uHGemHT160.cpp` 的 `S2F42_Host_Command_Acknowledge`） |
 | CPNAME / CPVAL | Command Parameter Name / Value（S2F41 參數名稱／值） |
 | AGV / AMR | Automated Guided Vehicle / Autonomous Mobile Robot；自動物料搬運車 |
 | EAP | Equipment Automation Program；客戶端 host 自動化程式 |

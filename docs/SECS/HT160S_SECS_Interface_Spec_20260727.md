@@ -438,8 +438,9 @@ right column = this revision's id (= HT-90XX's).
 
 | RCMD | 動作 | 參數 CP | 說明 |
 |---|---|---|---|
-| `SET_LOT_INFO` | 覆蓋式登記 Lot | Lot id list | 清空後重登;不啟動運轉 |
-| `LOTSTART` | 累加式登記 Lot + 預取 2D/Bin | Lot id list | 不啟動運轉(啟動仍為 operator-gated) |
+| `SET_LOT_INFO` | **唯一**的 Lot 資訊設定命令(**疊加式**) | `L,n{ A custLot }` 或 `L,n{ L,2{ A custLot, A kyecLot } }` | **20260730 起改為疊加**:不再清空既有工單。同一 Lot id 只保留一筆(沿用原 slot、index 與計數)。同一 Lot 若改帶**不同的 KYEC 批號**,會退掉該 Lot 舊的 2D/Bin 明細(此情形機內尚有 IC 時回 **4**)。登錄表會超過 64 筆回 **2**(不再靜默丟批)。不啟動運轉 |
+| `LOTSTART` | 開批 / 補拉 2D-Bin(**不帶 Lot id**) | 無(空 list;京元 HT9045 現場實測即為 `L[0]`) | **20260730 起對齊 HT9045**(`uHGemHT9045.cpp:2081`):一律回 **HCACK=0**,不帶、也不設定任何 Lot 身分(Lot 資訊一律由 `SET_LOT_INFO` 設定;清單內若仍帶 lot id 會被忽略並記 log),可重複下達。**批未開**→執行全套開批初始化(per-lot 計數 / UPH 資料夾 / Soter buffer / 產品資訊 / (Lot,Bin)→Auto 綁定 / 66033 / CEID 6)+ 拉 2D/Bin;**批已開**→只拉 2D/Bin,不做任何初始化。唯二回非 0 的情況都來自 HT-160S 專屬的 `SORTMODE` pair:格式或值錯誤回 2;批已開時要換 sort mode、或 WhiteList 模式要重載檔案回 4。不啟動運轉(啟動仍為 operator-gated / `START`) |
+| `CLEAR_LOT_INFO` | 結批(host 版 Lot End) | — | 對齊 HT9045(`uHGemHT9045.cpp:2431`)。走與面板 Lot End **同一條** `DoLotEndProcess`:記錄 UPH、發 CEID 8、歸檔 LotStory、清空工單 / (Lot,Bin) 綁定 / WhiteList 覆蓋、取消在途 WebAPI pull。運轉中回 **1**、機內仍有 IC 回 **2**(皆為 9045 語意)。**`SET_LOT_INFO` 改疊加之後,這是唯一會退掉 Lot 的命令** |
 | `START` | 遠端啟動運轉 | — | 需 RUN CHECK / idle 條件 |
 | `STOP` | 停機(收尾) | — | |
 | `PAUSE` | 暫停 | — | = SystemStart=false, SoftStop=true |
@@ -565,8 +566,9 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 
 ### 7.1 已對齊 HT9045 / Aligned to HT9045
 - **訊息 Messages**:S1 / S2 / S5 / S6 基礎 GEM 全數對齊(§2)。
-- **RCMD**:`PAUSE` `START` `STOP` `LOTSTART` `ONLINE_REMOTE` `ONLINE_LOCAL` `START_AGV` `ONE_CYCLE` `ENERGY_SAVING` `PP_SIGNALTOWER` `PP_MUSIC` `CLEAN_OUT` `HALT` `CLEAN_AUTO_SORT_COUNT`。
+- **RCMD**:`PAUSE` `START` `STOP` `LOTSTART` `CLEAR_LOT_INFO` `ONLINE_REMOTE` `ONLINE_LOCAL` `START_AGV` `ONE_CYCLE` `ENERGY_SAVING` `PP_SIGNALTOWER` `PP_MUSIC` `CLEAN_OUT` `HALT` `CLEAN_AUTO_SORT_COUNT`。
   - `CLEAN_OUT` / `HALT` / `CLEAN_AUTO_SORT_COUNT` 為 2026-07-29 新增對齊。
+  - `LOTSTART` 於 2026-07-30 改為與 9045 逐字對齊(無參數、無條件 HCACK=0、可重複下達);`CLEAR_LOT_INFO`(host 版 Lot End)為同日新增對齊。兩者合起來構成 host 端完整的開批 / 結批一對。
   - **`HOME` 已自本節移出** —— 經逐字查證 HT9045 的 S2F42 dispatch,其命令集為 `AUTHORITY_CHECK` `AUTOSITEMAP` `AUTO_CLEAN` `AUTO_RETEST` `CLEAN_AUTO_SORT_COUNT` `CLEAN_OUT` `CLEAR_LOT_INFO` `CLOSE_ONECYCLE` `CONTINUE_*` `DEVTEMPOFFSETADJUST` `EESUG_OFFSET` `HALT` `INITIAL_START*` `LOTORDER` `LOTSTART` `ONE_CYCLE` `ONLINE_LOCAL` `ONLINE_REMOTE` `PAUSE` `PP_*` `REMOTE_*` `RESET` `RETEST_MRT` `SET_LOT_INFO` `START` `START_AGV` `START_AQL` `START_LOT` `STOP` `STOP_LOT` `SUBSTRATETYPE` `SWITCH_TO_*` `TESTTEMPSETTING` `TRAY_FEED` `TRAY_MAP` `YIELD_FAIL` —— **其中沒有 `HOME`**。改列 §7.2。
   - 三項宣告差異:`ONE_CYCLE` 據實回 HCACK(9045 一律 0);`ENERGY_SAVING` 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);`PP_SIGNALTOWER`/`PP_MUSIC` 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。
 - **SVID 共同段**:1001 / 1003 / 1021 / 1027 / 1518。
@@ -580,7 +582,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 
 | 項目 Item | 類別 | 用途 Purpose | 為何 HT-160S 專屬 Why HT-160S-specific |
 |---|---|---|---|
-| `SET_LOT_INFO` | RCMD | 一次**覆蓋式**登記整批 Lot(清空後重登) | **同名不同體(不是 9045 沒有)**。HT9045 的 S2F42 確實有 `SET_LOT_INFO`,但兩邊的 lot 模型與參數本體不同:HT-160S 收 `L,n{ A lotID }` 的純 Lot id 清單並覆蓋整個登錄表;9045 的版本走它自己的 keyed lot 模型。**host 不可假設兩機的 `SET_LOT_INFO` 可互換**,需依 §3.4 本機格式。取得真實的 9045 `SET_LOT_INFO` 樣本後再決定是否分流或改名 |
+| `SET_LOT_INFO` | RCMD | **疊加式**登記 Lot,並且是本機**唯一**的 Lot 資訊設定入口(2026-07-30 起) | **同名不同體(不是 9045 沒有)**。HT9045 的 S2F42 確實有 `SET_LOT_INFO`,但兩邊的 lot 模型與參數本體不同:HT-160S 收 `L,n{ A custLot }`(或 `L,2{custLot,kyecLot}` 配對)並**疊加**進登錄表、同 id 留一筆;9045 的版本收 `L,2{("LOT_INFO", XML), ("DISPLAY", str)}`,走它自己的 SPIL XML lot 模型(`uHGemHT9045.cpp:2183`)。**host 不可假設兩機的 `SET_LOT_INFO` 可互換**,需依 §3.4 本機格式。另註:京元 2026-06-08 全日 log 中 host **從未送過** `SET_LOT_INFO`——該線的 Lot 身分是 host 用 `S10F5` 終端訊息告知操作員、由人輸入機台,再由機台回報給 host |
 | `HOME` | RCMD | 遠端回原點(等同操作員 Home 鍵) | **9045 整棵 SECSGEM 樹查無 `HOME` 命令**(見 §7.1 的完整命令集)。9045 最接近的是 `RESET`,但那是測試機收料回復流程,語意不同。保留本命令:刪掉會少一個有用的遠端功能而換不到任何對齊 |
 | `ONLINE`(裸) | RCMD | = `ONLINE_REMOTE` 別名 | 便利別名;9045 僅有 `ONLINE_REMOTE` / `ONLINE_LOCAL` |
 | `CLEARCOUNT` | RCMD | host 遠端清除生產計數 | 9045 將 clear-count 僅作操作員事件(CEID 5,HT-160S 自 2026-07-29 起同號同義且會發射),無對應 RCMD(9045 另有 `CLEAN_AUTO_SORT_COUNT`,語意不同) |
