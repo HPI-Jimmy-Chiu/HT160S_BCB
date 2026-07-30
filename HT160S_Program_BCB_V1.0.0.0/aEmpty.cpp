@@ -17,6 +17,12 @@
 //---------------------------------------------------------------------------
 TEmptyModule *EmptyModule=NULL;
 //---------------------------------------------------------------------------
+//AI(ht160s-empty-place-handshake) 20260730 : how close the EmptyY carrier encoder must be to a
+//taught stop to count as PARKED (1/100mm). MoveTo's own arrival window is +/-5 card pulses,
+//which at M03's GearRatio 0.9 is under 0.06mm, so 0.50mm is a generous band that still excludes
+//every mid-travel reading between the two stops (feed 1.00mm / discharge 836.00mm).
+static const int EMPTY_CARRIER_PARK_TOL=50;
+//---------------------------------------------------------------------------
 TEmptyModule::TEmptyModule()
 {
     InitialFlag();
@@ -251,16 +257,19 @@ bool TEmptyModule::MoveEmptyY(int Position)
         return false;
     }
 
-    #ifndef SOFT_SIMULATE
-    int TrayArmPos=0;
-    if(HSys.Mot.MTrayArmX!=NULL)
-        TrayArmPos=HSys.Mot.MTrayArmX->ReadEncoderPos();
-    if(HSys.Cyn.C_TrayArmZ_Up.IsOn()==false &&
-       (TrayArmPos+500)>=Teach.TrayXArmToEmptyXPosition)
-    {
-        return false;
-    }
-    #endif
+    //AI(ht160s-empty-place-handshake) 20260730 : the legacy cross-module TrayArm interlock was
+    //REMOVED here (user decision). It read MTrayArmX's encoder plus C_TrayArmZ_Up and refused the
+    //move while the head was not confirmed up and (TrayArmPos+500)>=TrayXArmToEmptyXPosition.
+    //Three defects made it a liability rather than a protection:
+    //  1) SILENT and unbounded - a bare return false, no alarm, no EventLog, no timeout, so a head
+    //     left down parked the Empty ladder forever (the on-site "moved only one step").
+    //  2) One-sided >= with no upper bound - a head down at ANY taught column (Loader 222.00 up to
+    //     Color 1730.82) froze Empty Y although none of those can reach the Empty corridor.
+    //  3) Blind at the one place that matters - MTrayArmX homes at 0 and the trip line was 11.37mm,
+    //     so a Z-up loss at the HOME park (only 16.37mm from the Empty column) was never caught.
+    //Protection now lives on the side that actually lowers into the shared space : TrayArm must pass
+    //IsRearReadyForPlace() (clamps released + neither ladder mid-handoff + carrier parked) before it
+    //goes down. Do NOT reintroduce a hardware peek here - extend that handshake predicate instead.
 
     return HSys.Mot.MEmptyY->MotorMove(Position);
 }
@@ -1223,6 +1232,54 @@ bool TEmptyModule::IsRearReadyForPick()
 {
     RefreshStateFromSensors();
     return ComputeRearPickReadyNoRefresh();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-empty-place-handshake) 20260730 : positive PARKED confirmation for the EmptyY carrier.
+//The carrier is a two-stop shuttle, so an encoder anywhere other than a taught stop means it is
+//mid-travel (or a move was aborted). The front/rear tray sensors are at FIXED lane positions and
+//therefore cannot tell where the moving carrier is - that is exactly why a peer must not judge the
+//station from the tray sensors alone. Pure read, no side effects.
+bool TEmptyModule::IsCarrierParked()
+{
+    if(IsSoftSimulate())
+        return true;
+    if(HSys.Mot.MEmptyY==NULL)
+        return false;
+    int Pos=HSys.Mot.MEmptyY->ReadEncoderPos();
+    int dFeed=Pos-Teach.EmptyCarFeedTrayYPosition;
+    int dDisc=Pos-Teach.EmptyCarDischargeTrayYPosition;
+    if(dFeed<0)
+        dFeed=-dFeed;
+    if(dDisc<0)
+        dDisc=-dDisc;
+    return (dFeed<=EMPTY_CARRIER_PARK_TOL || dDisc<=EMPTY_CARRIER_PARK_TOL);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-empty-place-handshake) 20260730 : may a peer LOWER a head onto the Empty rear right now?
+//The place-side counterpart of ComputeRearPickReadyNoRefresh, which has carried these gates since
+//20260705 while the place side had only "rear sensor says empty" - strictly weaker, and blind to the
+//two windows where the carrier is hauling a CLAMPED tray past the fixed rear sensor (DoFeedTray case
+//4000 front->discharge, DoGoUpTray case 5000 discharge->front). In both the sensor reads OFF while a
+//tray physically sits on the carrier, so a peer that trusted the sensor lowered onto that tray.
+//The clamp out-bits are the decisive term : a tray riding the carrier is by definition a CLAMPED
+//tray, whatever the carrier position or the fixed sensor says.
+//Deliberately does NOT block on Status==ES_RETURNING : DoEmpty case 3000 parks with Status still
+//ES_RETURNING while it waits for the peer's NotifyTrayXToEmptyFinish, so blocking on it would make
+//both sides wait for each other forever. Motion is excluded by the ladder cursors + parked check.
+//This asks only "is the rear safe to descend onto" - the caller still owns the rear-empty test.
+bool TEmptyModule::IsRearReadyForPlace()
+{
+    if(Status==ES_FEEDING)
+        return false;   //feed ladder owns the rear
+    if(FeedTask!=1 && FeedTask!=13000)
+        return false;   //feed ladder mid-handoff (idle=1, done=13000)
+    if(GoUpTask!=1)
+        return false;   //return/drain ladder mid-haul (single idle terminal is GoUpTask==1)
+    if(HSys.Cyn.C_Empty_LeanOnTray.GetOutBit() || HSys.Cyn.C_Empty_PushTray.GetOutBit())
+        return false;   //transport clamps still actuated : the carrier still owns a tray
+    if(IsCarrierParked()==false)
+        return false;   //carrier mid-travel : a moving carrier can still strike a lowered head
+    return true;
 }
 //---------------------------------------------------------------------------
 bool TEmptyModule::IsReturnTrayRequested()

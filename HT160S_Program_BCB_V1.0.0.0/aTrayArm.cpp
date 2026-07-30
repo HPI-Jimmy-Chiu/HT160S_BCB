@@ -706,9 +706,11 @@ bool TTrayArmModule::DoPick(int Flag)
                 {
                     //AI(ht160s-trayarm-empty-handoff) 20260701 : wait here (Z still UP) until the
                     //Empty rear tray is present AND not being returned by the carrier. Producer-owned
-                    //readiness predicate replaces the magic-70000 encoder threshold. Deadlock-safe vs
-                    //the MoveEmptyY symmetric guard because we hold Z-UP (that guard only blocks EmptyY
-                    //while TrayArm Z is DOWN at the Empty X).
+                    //readiness predicate replaces the magic-70000 encoder threshold.
+                    //AI(ht160s-empty-place-handshake) 20260730 : the old "deadlock-safe vs the MoveEmptyY
+                    //symmetric guard because we hold Z-UP" note is retired - that Empty-side hardware peek
+                    //no longer exists. This wait cannot deadlock for a simpler reason now : nothing on the
+                    //Empty side inspects TrayArm at all, so a waiting arm can never gate EmptyY.
                     if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
                     {
                         OnPickGateBlocked("Empty");   //AI(ht160s-rearready-p0) 20260705 : watchdog tick while blocked
@@ -725,8 +727,9 @@ bool TTrayArmModule::DoPick(int Flag)
                     //the carrier was still delivering / the transport clamps were still engaged - the
                     //same collision class as the onsite issue-C that IsRearReadyForPick() fixed on the
                     //AMR=0 path. Identity trays come from Color (IsPickFromColor()==true) and are
-                    //excluded here : their readiness is Color's own bTrayReady latch. Deadlock-safe :
-                    //we hold Z-UP and MoveEmptyY only blocks EmptyY while TrayArm Z is DOWN at Empty X.
+                    //excluded here : their readiness is Color's own bTrayReady latch.
+                    //AI(ht160s-empty-place-handshake) 20260730 : deadlock-safe because the Empty side no
+                    //longer inspects TrayArm at all (the MoveEmptyY hardware peek was removed).
                     if(EmptyModule!=NULL && EmptyModule->IsRearReadyForPick()==false)
                     {
                         OnPickGateBlocked("Empty");   //AI(ht160s-rearready-p0) 20260705 : watchdog tick while blocked
@@ -1121,18 +1124,27 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
         case 500:
             if(TryDivertCarriedTrayToAuto())   //AI(ht160s-divert) 20260703 : retarget during the (possibly long) rear-clear wait
                 break;
-            //AI(ht160s-status) 20260703 : anti-collision (on-site status==1 intent, concern B).
-            //Do NOT lower onto the Empty rear while its carrier is actively FEEDING a tray there
-            //- during the feed motion bRearHasTray has not latched yet (set at DoFeedTray case
-            //7000), so the IsRearHasTray()==false gate below alone would let TrayArm dive into
-            //the arriving carrier. Real-machine only; ES_FEEDING clears when the feed completes.
-            if(IsSoftSimulate()==false && EmptyModule!=NULL && EmptyModule->GetStatus()==ES_FEEDING)
+            //AI(ht160s-empty-place-handshake) 20260730 : HARD block, deliberately placed BEFORE the
+            //rear-clear test below - as another OR term inside that if() it would WEAKEN the gate
+            //instead of tightening it. IsRearReadyForPlace() supersedes the old ES_FEEDING-only
+            //check (it still blocks ES_FEEDING) and adds what the place side never had : transport
+            //clamps released, neither feed nor return ladder mid-handoff, carrier parked at a taught
+            //stop. The clamp term is the decisive one : the rear sensor sits at a FIXED lane position
+            //so it reads OFF while the carrier hauls a CLAMPED tray past it (DoFeedTray case 4000
+            //front->discharge, DoGoUpTray case 5000 discharge->front), and trusting the sensor alone
+            //lowered this head onto that tray. EmptyModule==NULL now BLOCKS instead of passing : this
+            //is an anti-collision gate, so a missing peer must fail CLOSED (it used to be an OR term
+            //that sent the head straight down). The Empty-side hardware peek that used to back this
+            //up from the other direction (MoveEmptyY's MTrayArmX encoder + C_TrayArmZ_Up test) was
+            //removed on the same pass - see the comment in TEmptyModule::MoveEmptyY.
+            if(EmptyModule==NULL ||
+               (IsSoftSimulate()==false && EmptyModule->IsRearReadyForPlace()==false))
             {
                 OnPlaceGateBlocked("Empty");   //AI(ht160s-home-resume-p0) 20260710 : watchdog tick while blocked
                 break;
             }
             //Wait until EmptyTray has raised and cleared its rear before depositing.
-            if(EmptyModule==NULL || EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
+            if(EmptyModule->IsRearHasTray()==false || IsSoftSimulate())
             {
                 ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : gate passed -- close the watchdog window
                 Status=TAS_PLACING;   //AI(ht160s-status) 20260703 : deposit ladder starts

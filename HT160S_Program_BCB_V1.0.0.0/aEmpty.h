@@ -72,6 +72,8 @@ public:
     bool IsRearHasTray();
     bool IsCleanOutFinish();   //AI(cleanout) 20260701 : Empty CleanOut-drain finish (TrayArm done + flow clear + rise cylinders home)
     bool IsRearReadyForPick();   //AI(ht160s-trayarm-empty-handoff) 20260701 : present AND not being returned; model-independent successor to the TrayArm magic-position gate
+    bool IsCarrierParked();      //AI(ht160s-empty-place-handshake) 20260730 : carrier encoder is at a taught stop (the fixed lane sensors cannot locate a MOVING carrier)
+    bool IsRearReadyForPlace();  //AI(ht160s-empty-place-handshake) 20260730 : safe for a peer to LOWER onto the rear now; place-side counterpart of IsRearReadyForPick
     bool IsReturnTrayRequested();
     void SetRearHasTray(bool bHasTray);
     TMyTray GetSourceTray();   //AI(ht160s-tray-source) : return-by-value deep copy of the rear tray grid for TrayArm
