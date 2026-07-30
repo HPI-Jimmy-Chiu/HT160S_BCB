@@ -745,6 +745,14 @@ void __fastcall TfSetup::LoadBinMapToGrid()
             if(PassBinStr!="" && PassBinStr!="0" && cbbPassBin->Items->IndexOf(PassBinStr)<0)
                 cbbPassBin->Items->Add(PassBinStr);
         }
+        //AI(ht160s-lotpassfail) 20260730 : the recipe's own Pass Bin need not appear in the static
+        //grid (the dynamic modes never route through it, and the grid may be all zeros there).
+        //This is a csDropDownList, so a value it cannot list falls back to index 0 = "0" and the
+        //next save - FormClose runs one silently - would write that 0 back over the recipe. Always
+        //offer the stored value so the combo round-trips it.
+        AnsiString CurPassBinStr=IntToStr(BinAreaMap.GetPassBin());
+        if(BinAreaMap.GetPassBin()>0 && cbbPassBin->Items->IndexOf(CurPassBinStr)<0)
+            cbbPassBin->Items->Add(CurPassBinStr);
         int PassIdx=cbbPassBin->Items->IndexOf(IntToStr(BinAreaMap.GetPassBin()));
         cbbPassBin->ItemIndex=(PassIdx>=0)?PassIdx:0;
     }
@@ -758,6 +766,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     int Row;
     int Area;
     int Bin;
+    int OldPassBin;
     bool ValidValue;
 
     if(grdBinAreaMap==NULL)
@@ -770,7 +779,15 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
         return false;
     }
 
+    //AI(ht160s-lotpassfail) 20260730 : Clear() zeroes PassBin too (CosFunction.cpp Clear()),
+    //so latch the live value and put it back before the combo block below decides what to do
+    //with it. Without this the "did the operator change it" test read 0, so in By Lot+PassFail
+    //with bindings present EVERY save looked like a change, took the reject path, and left the
+    //already-wiped PassBin=0 -> SaveDefault persisted 0 -> Start refused with "no Pass Bin is
+    //set" no matter how many times the operator saved.
+    OldPassBin=BinAreaMap.GetPassBin();
     BinAreaMap.Clear();
+    BinAreaMap.SetPassBin(OldPassBin);
     for(Row=1; Row<grdBinAreaMap->RowCount; Row++)
     {
         Area=GetBinGridAreaByRow(Row);
