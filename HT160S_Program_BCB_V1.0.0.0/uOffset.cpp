@@ -14,6 +14,8 @@
 #include "uQwertyKey.h"
 #include "CosFunction.h"
 #include "mymessbox.h"
+#include "cEventLog.h"           //AI(ht160s-offset-audit) 20260731 : offset change history sink
+#include "UserRoleManager.h"     //AI(ht160s-offset-audit) 20260731 : who made the change
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma resource "*.dfm"
@@ -28,9 +30,12 @@ __fastcall TfOffset::TfOffset(TComponent* Owner)
     OffsetItemCount=0;
     popGrid=NULL;
     popRow=-1;
+    bOffsetBaseCaptured=false;
+    memset(OffsetBaseVal, 0, sizeof(OffsetBaseVal));
     BuildUI();
     InitialOffsetParameter();
     OpenWorkFile();
+    SnapshotOffsetValues();   //AI(ht160s-offset-audit) 20260731 : baseline for the change history
 }
 //---------------------------------------------------------------------------
 void TfOffset::BuildUI()
@@ -510,6 +515,54 @@ void __fastcall TfOffset::FormShowHandler(TObject *Sender)
 {
     (void)Sender;
     OpenWorkFile();
+    SnapshotOffsetValues();   //AI(ht160s-offset-audit) 20260731 : OpenWorkFile reloads from the .ofs and silently discards any un-Applied edit, so re-baseline here
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-offset-audit) 20260731 : capture the CURRENTLY PERSISTED values as the change-history
+//baseline. Called after every OpenWorkFile (form show / construct) and after every successful
+//save, so the baseline always mirrors what is on disk.
+void TfOffset::SnapshotOffsetValues()
+{
+    int i;
+    for(i=0; i<OffsetItemCount && i<OFFSET_MAX_ITEM; i++)
+    {
+        if(OffsetPara[i].iPara==NULL)
+            OffsetBaseVal[i]=0;
+        else
+            OffsetBaseVal[i]=*OffsetPara[i].iPara;
+    }
+    bOffsetBaseCaptured=true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-offset-audit) 20260731 : HT9045-style parameter change history (handlerlog.cpp
+//TMyLog::Compare_Diff shape : user / field / old => new). One EventLog row per CHANGED field,
+//written at APPLY time - never at edit time. Keypad-accepted values live only in the in-RAM
+//Offset struct; btnExit just Close()s and the next FormShow reloads the .ofs, silently dropping
+//them, so an edit-time log would record changes that never happened. Nothing here can stop the
+//machine or block the save : logging is write-only and must never become a new failure mode.
+void TfOffset::LogOffsetChanges(AnsiString sAction)
+{
+    AnsiString sUser;
+    AnsiString sMsg;
+    int i;
+
+    if(bOffsetBaseCaptured==false)
+        return;
+    sUser=UserRoleManager.GetUserID();
+    if(sUser.Trim()=="")
+        sUser="(no login)";
+    for(i=0; i<OffsetItemCount && i<OFFSET_MAX_ITEM; i++)
+    {
+        if(OffsetPara[i].iPara==NULL)
+            continue;
+        if(*OffsetPara[i].iPara==OffsetBaseVal[i])
+            continue;
+        sMsg=sAction+AnsiString(" | user=")+sUser
+            +AnsiString(" | ")+OffsetPara[i].GroupName+AnsiString(".")+OffsetPara[i].Caption
+            +AnsiString(" : ")+FormatOffsetText(OffsetBaseVal[i])
+            +AnsiString(" => ")+FormatOffsetText(*OffsetPara[i].iPara);
+        g_EventLog.Log("PARAM_OFFSET", sMsg, OffsetPara[i].Caption);
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::btnApplyClick(TObject *Sender)
@@ -519,7 +572,17 @@ void __fastcall TfOffset::btnApplyClick(TObject *Sender)
         return;
     SaveWorkFile();
     UpdateAllParameter();
-    ShowMyMessage(LangT("Offset saved and applied."));
+    //AI(ht160s-offset-audit) 20260731 : the completion popup that used to sit here was
+    //ShowMyMessage(), i.e. the STOPPING alarm surface - it calls DecStopAllMotor() and clears
+    //SystemStart before it even paints, keeps the buzzer button visible so it beeps, and drives
+    //the tower light to Pause. The machine alarmed and stopped in order to announce that a save
+    //SUCCEEDED, and together with the YES/NO confirm above that is the "offset jumps two alarms"
+    //the operator reported on site 20260730 (SECS CEID 19 -> 73 -> 73, three visits, ~1 s apart).
+    //Feedback is now a non-modal caption, and the change itself is recorded to the EventLog
+    //(HT9045 parameter-history alignment) instead of being announced and then forgotten.
+    LogOffsetChanges("Offset apply");
+    SnapshotOffsetValues();
+    lblExplain->Caption=LangT("Offset saved and applied.");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::btnReAlignClick(TObject *Sender)
@@ -589,7 +652,12 @@ void __fastcall TfOffset::btnReAlignClick(TObject *Sender)
     SaveWorkFile();
     UpdateAllParameter();
     RefreshGrids();
-    ShowMyMessage(LangT("Re-alignment done: offset folded into base teach."));
+    //AI(ht160s-offset-audit) 20260731 : same swap as btnApply - a success notice must not run the
+    //stopping alarm box. Re-alignment is the destructive one (it rewrites system\tech.ini and
+    //zeroes all 56 offsets), so its every field change is worth a history row.
+    LogOffsetChanges("Offset re-align (folded into base teach)");
+    SnapshotOffsetValues();
+    lblExplain->Caption=LangT("Re-alignment done: offset folded into base teach.");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::btnExitClick(TObject *Sender)
@@ -605,7 +673,10 @@ void __fastcall TfOffset::btnClearClick(TObject *Sender)
         return;
     memset(&Offset, 0, sizeof(Offset));
     RefreshGrids();
-    ShowMyMessage(LangT("All offsets cleared. Press Apply to save and take effect, or Exit to discard."));
+    //AI(ht160s-offset-audit) 20260731 : Clear All writes NOTHING to disk, yet it used to run the
+    //stopping alarm box too. No history row here on purpose - the zeros are not persisted until
+    //Apply, and btnApply's LogOffsetChanges will record them against the same on-disk baseline.
+    lblExplain->Caption=LangT("All offsets cleared. Press Apply to save and take effect, or Exit to discard.");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfOffset::SetMaxClick(TObject *Sender)

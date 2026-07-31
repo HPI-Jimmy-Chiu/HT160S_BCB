@@ -128,6 +128,10 @@ private:
     OFFSET_PARA OffsetPara[OFFSET_MAX_ITEM];
     int OffsetItemCount;
     bool bUIBuilt;
+    int OffsetBaseVal[OFFSET_MAX_ITEM];
+    bool bOffsetBaseCaptured;
+    void SnapshotOffsetValues();
+    void LogOffsetChanges(AnsiString sAction);
     void BuildUI();
     void ConfigureGrid(TStringGrid *Grid);
     void ResetGrid(TStringGrid *Grid);
