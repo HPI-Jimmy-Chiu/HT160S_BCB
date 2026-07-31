@@ -764,6 +764,22 @@ bool TLoaderModule::IsContinuousFeed()
     return true;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-cleanout-amr) 20260731 : "the SOURCE has no more trays to hand over." SOURCE ONLY --
+//deliberately does NOT consult SnLoader_InputHasTray. Draining a tray still at the input is
+//exactly what Clean Out exists to do, so it must never veto the DECISION to enter Clean Out.
+//On site 20260730 the AMR auto-CleanOut branch used IsSupplyCarDry() and so kept falling through
+//to the MES0920 operator prompt (the "Clean out?" button) whenever a tray sat at the input while
+//the car was already dry. IsSupplyCarDry() (source AND input) stays the CleanOut RETIRE gate,
+//where the input term is load-bearing : it keeps the side alive to self-collect a stranded front
+//tray (see the DoLoader comment above the retire guard), and it is the gate's own guarantee that
+//no tray is abandoned. Two callers, opposite requirements -- hence two predicates.
+bool TLoaderModule::IsSupplySourceDry()
+{
+    if(IsSoftSimulate())
+        return (IsContinuousFeed()==false);
+    return (HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOff());
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::IsSupplyCarDry()
 {
     //AI(ht160s-loader) 20260706 : "the supply car has no more trays to feed." Extracted from
@@ -772,6 +788,8 @@ bool TLoaderModule::IsSupplyCarDry()
     //Real: source InputEnd AND the input has-tray point must BOTH read empty (a disabled point
     //counts as empty) -- a side is NOT retired while a tray still sits at the input, so every
     //tray inside the machine is processed before CleanOut finishes.
+    //AI(ht160s-cleanout-amr) 20260731 : the input term applies to the RETIRE gate ONLY. The
+    //CleanOut ENTRY decision now calls IsSupplySourceDry() instead -- see that function.
     if(IsSoftSimulate())
         return (IsContinuousFeed()==false);
 
@@ -974,6 +992,17 @@ bool TLoaderModule::IsAllCleanOutFinish()
 {
     //AI(HT160S-Maintainer) 20260605 : both Loader sides have drained in CleanOut.
     if(Side[0].bCleanOutFinish==false || Side[1].bCleanOutFinish==false)
+        return false;
+    //AI(ht160s-cleanout-latch) 20260731 : never declare the Loader drained while a Y carriage is
+    //still holding a tray. Every sensor test below reads a SHARED FIXED point (front feed, rear
+    //output, supply car) - none of them can see product already clamped on a carriage. On site
+    //20260730 17:32 both sides read fHasTray=1 with CleanOutFin=1. Software-flag test, no sensor,
+    //so it holds in sim/DUMMY too. Paired with the un-retire clear in DoLoader : a side that is
+    //back on the ladder drops its latch, so this test is the backstop for a retired-but-loaded
+    //side rather than the primary guard.
+    if(HSys.VMot.MMLoaderY_1!=NULL && HSys.VMot.MMLoaderY_1->fHasTray)
+        return false;
+    if(HSys.VMot.MMLoaderY_2!=NULL && HSys.VMot.MMLoaderY_2->fHasTray)
         return false;
     //AI(cleanout) 20260701 : physical residual + supply-car gate. The old check trusted
     //only the per-side software carriage flag and could finish with a tray still parked at
@@ -1300,14 +1329,40 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
        iYOwner[GetSideIndex(LoaderNo)]==LOADER_Y_OWNER_NONE)
     {
         bool bSupplyCarDry = IsSupplyCarDry();
+        bool bDestackInFlight;
         //AI(cleanout) 20260701 : do NOT retire a side while its last tray's rear discharge is still
         //in flight. DoDischargeTray clears the carriage (fHasTray=false) at case 3000 but only
         //retreats the carriage + clears bRearDischargeInProgress at case 4000. Retiring here (Task=1;
         //return) between 3000 and 4000 would abandon the discharge, leaving bRearDischargeInProgress
         //latched true forever -> IsRearReadyForPick() never true -> TrayArm can never recover the
         //rear tray -> bRearHasTray never clears -> IsAllCleanOutFinish hangs. Let the discharge finish.
-        if(TrayMotor->fHasTray==false && bSupplyCarDry && bRearDischargeInProgress==false)
+        //AI(ht160s-cleanout-preempt) 20260731 : the rear-discharge carve-out above had NO front-feed
+        //twin. This guard runs BEFORE switch(Task), so it preempts an in-flight DoFeedTray from any
+        //DoLoader task; tray identity is minted late (FeedTask 9500) so fHasTray is still false all
+        //through a feed AND a destack, and the guard fires believing the side is idle. Two resources
+        //were then abandoned with no owner and no alarm :
+        //  (1) the shared front station, taken at DoFeedTray case 100 and released ONLY at case 10000
+        //      -> the other side blocks forever at AcquireFrontOwner while this side blocks it right
+        //      back at the OtherState->Status==LS_FEEDING gate below. Circular wait, only a HOME
+        //      clears iFrontOwner. Observed on site 20260730 14:48-14:56 (iFrontOwner=2, Side1
+        //      Feed=100 FEEDING, Side2 Task=100 IDLE, both stuck 296 s, survived a Pause + a Start).
+        //  (2) the front destacker, left with rise-1 EXTENDED; its only retract is
+        //      DoFrontDestackDown case 7, reachable only via FeedTask 4100 -> the case-10
+        //      IsInputHasTrayTrustworthy() hold deadlocks. Observed on site 20260730 17:35 (Feed=10
+        //      Destack=5, "P1 Loader: ready=0", MES0925).
+        //So : release the station on the way out, and refuse to retire while the destack window is
+        //open. Do NOT widen the FeedTask list to 9000/9500 - that re-creates the CleanOut wedge the
+        //case-9000 comment records as already fixed once.
+        bDestackInFlight = (State->FeedTask==4000 || State->FeedTask==4100 ||
+                            State->FeedTask==8200 || State->FeedTask==8300);
+        if(TrayMotor->fHasTray==false && bSupplyCarDry &&
+           bRearDischargeInProgress==false && bDestackInFlight==false)
         {
+            if(State->FeedTask!=1)
+                RecordProcess("CLEANOUT retire preempts feed: Loader"+IntToStr(LoaderNo)+
+                    " FeedTask="+IntToStr(State->FeedTask)+" - releasing the front station");   //AI(ht160s-cleanout-preempt)
+            ReleaseFrontOwner(LoaderNo);
+            State->FeedTask=1;
             State->bCleanOutFinish=true;
             State->Status=LS_IDLE;
             Task=1;
@@ -1315,6 +1370,19 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         }
         //supply car still has stock (or carriage still loaded) : do NOT finish; the switch
         //below re-runs the normal feed/sort/discharge flow so the car drains first.
+    }
+
+    //AI(ht160s-cleanout-latch) 20260731 : reaching here in CleanOut means this side did NOT retire
+    //on this tick - either the guard above failed a term, or it was skipped entirely because SortArm
+    //owns this side's Y (the RunMode/iYOwner test). bCleanOutFinish is otherwise cleared ONLY by
+    //ResetSide (InitLoader, i.e. a HOME), so a side that un-retires through the iYOwner skip keeps
+    //flying "finished" while it feeds a fresh tray. On site 20260730 17:32 BOTH sides read
+    //fHasTray=1 with CleanOutFin=1 - a CleanOut that would have reported the machine drained with
+    //product still on both carriages. A side back on the ladder is not finished; say so.
+    if(HSys.Sys.RunMode==Run_CleanOut && State->bCleanOutFinish)
+    {
+        State->bCleanOutFinish=false;
+        RecordProcess("CLEANOUT un-retire: Loader"+IntToStr(LoaderNo)+" resumed the ladder");   //AI(ht160s-cleanout-latch)
     }
 
     if(State->bTrayEmpty)
@@ -1350,8 +1418,16 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
                 //holding a tray (that was the earlier strict-alternation fHasTray form, since dropped).
                 //IsLoaderYMoveSafe stays the per-move collision backstop for the both-loaded case.
                 //Operator confirmed on-machine 20260624 : the two cars run without interfering.
+                //AI(ht160s-cleanout-preempt) 20260731 : do NOT latch LS_FEEDING unless the shared
+                //front station is actually takeable by this side. Latching first and only finding
+                //out at DoFeedTray case 100 that the other side still owns iFrontOwner closes a
+                //circular wait, because the owner side is itself gated on OtherState->Status right
+                //here. Redundant in every clean flow (the owner holds the lock only between case
+                //100 and case 10000, during which it is already LS_FEEDING) - this is the backstop
+                //for a lock that leaked, and it must ship WITH the release above, never alone.
                 if(OtherState->Status==LS_FEEDING ||
-                   OtherState->Status==LS_CCD_SCAN)
+                   OtherState->Status==LS_CCD_SCAN ||
+                   (iFrontOwner!=0 && iFrontOwner!=LoaderNo))
                 {
                     break;
                 }
@@ -1717,9 +1793,14 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     //(freezing the destack at DoLoader case 100) so we would not reach here mid-
                     //placing; the bAmrLocked==false guard makes that explicit. CleanOut completion
                     //still runs its existing finish path (auto Lot End is the later S6/D1-D6 step).
+                    //AI(ht160s-cleanout-amr) 20260731 : SOURCE-only test here. IsSupplyCarDry()
+                    //also required SnLoader_InputHasTray clear, so a tray still at the input
+                    //vetoed the automatic decision and dropped through to the MES0920 prompt
+                    //below - the "Clean out?" question the operator hit on site 20260730 in AMR
+                    //mode. A tray at the input is what Clean Out is FOR; it must not veto entry.
                     if(HSys.Sys.RunMode==Run_Normal
                        && bAmrLocked==false
-                       && IsSupplyCarDry())
+                       && IsSupplySourceDry())
                     {
                         RecordProcess("AUTO CleanOut: Loader source dry, AMR car-window elapsed, no new car (side "+
                             IntToStr(LoaderNo)+")");   //AI(ht160s-obsv)

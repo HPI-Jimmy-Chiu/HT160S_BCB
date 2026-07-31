@@ -122,7 +122,8 @@ private:
     bool IsSoftSimulate();
     bool IsContinuousFeed();   //AI(HT160S-Maintainer) 20260609 : chkLoadTray simulate-feed gate
     bool IsInputHasTrayTrustworthy();   //AI(ht160s-anti-ghost-d) 20260720 : SnLoader_InputHasTray valid only when front rise-1 is confirmed retracted
-    bool IsSupplyCarDry();     //AI(ht160s-loader) 20260706 : supply car empty for this side (InputEnd + input HasTray both empty; sim=chkLoadTray)
+    bool IsSupplyCarDry();     //AI(ht160s-loader) 20260706 : supply car empty for this side (InputEnd + input HasTray both empty; sim=chkLoadTray) -- the CleanOut RETIRE gate
+    bool IsSupplySourceDry();  //AI(ht160s-cleanout-amr) 20260731 : SOURCE ONLY (InputEnd; sim=chkLoadTray) -- the CleanOut ENTRY decision, must NOT be vetoed by a tray still at the input
     int ReadTopCcdBin(int LoaderNo, int CellX, int CellY, bool &bOk);
     AnsiString ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, bool &bOk);
     void BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor);   //AI(ht160s-ccd-manual2d) : operator manual Top CCD 2D bind loop
