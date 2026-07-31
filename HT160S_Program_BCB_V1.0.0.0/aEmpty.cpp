@@ -430,9 +430,21 @@ void TEmptyModule::DoEmpty(int &Task)
         case 3000:
             if(DoGoUpTray(1))
             {
-                bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-return finished (tray back at front, rear cleared); lift the pick block
+                //AI(ht160s-empty-return-latch) 20260731 : do NOT drop the interlock while the
+                //return is still OWED. This park restarts the second haul via DoGoUpTray(1)
+                //from the idle terminal, and ONLY DoGoUpTray(Flag==0) re-arms this flag, so
+                //clearing it here left the whole second leg unprotected -- while
+                //NotifyTrayXToEmptyFinish had already overwritten ES_RETURNING -> ES_REAR_READY.
+                //TrayArm then passed IsRearReadyForPick and clamped the very tray the carrier
+                //was re-clamping (onsite 20260730 16:58, alarm 600 on C_Empty_PushTray).
+                //Safe to hold: the only readers are IsCleanOutFinish (already blocked by
+                //bReturnTray on the same line) and ComputeRearPickReadyNoRefresh, which is
+                //called ONLY from the TrayArm pick gate -- no Empty ladder reads it, and the
+                //deposit this park waits for is gated by IsRearReadyForPlace, not by the pick
+                //predicate. So there is no self-block.
                 if(bReturnTray && bTrayXToEmptyFinish==false)
-                    return;
+                    return;            //still owed the second leg : LEAVE the latch true
+                bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-return finished (tray back at front, rear cleared); lift the pick block
                 //AI(ht160s-home-resume-cg4) 20260713 : Empty mirror of the Color CG-4
                 //close-out blind-spot guard. NotifyTrayXToEmptyFinish sets bRearHasTray +
                 //bTrayXToEmptyFinish together, but a late Notify can commit with the tray
