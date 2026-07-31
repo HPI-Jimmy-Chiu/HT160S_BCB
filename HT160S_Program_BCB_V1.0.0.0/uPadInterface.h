@@ -51,26 +51,27 @@ typedef struct
 class TfPadInterface : public TForm
 {
 __published:
+    TPanel *pn_PadInterfaceTitle;
+    TButton *sb_PadInterface_Exit;
+    TPanel *pn_PadInterface_Bottom;
+    TLabel *lb_PadInterface_ManualSend;
+    TEdit *ed_PadInterface_ManualSend;
+    TButton *sb_PadInterface_ManualSend;
+    TButton *btnResetCom;
+    TButton *btnClearLog;
+    TCheckBox *cb_PadInterface_PadLedBling;
+    TMemo *Memo_PadInterface;
+    TPageControl *pc_PadInterface;
+    TTabSheet *tsPadFront;
+    TTabSheet *tsPadRear;
+    TPanel *pn_PadInterface_Front;
+    TPanel *pn_PadInterface_Rear;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall sb_PadInterface_ManualSendClick(TObject *Sender);
     void __fastcall ClearLog1Click(TObject *Sender);
     void __fastcall sb_PadInterface_ExitClick(TObject *Sender);
 private:
-    TPanel *pn_PadInterfaceTitle;
-    TPageControl *pc_PadInterface;
-    TTabSheet *tsPadFront;
-    TTabSheet *tsPadRear;
-    TPanel *pn_PadInterface_Front;
-    TPanel *pn_PadInterface_Rear;
-    TButton *sb_PadInterface_Exit;
-    TButton *sb_PadInterface_ManualSend;
-    TButton *btnResetCom;
-    TButton *btnClearLog;
-    TEdit *ed_PadInterface_ManualSend;
-    TCheckBox *cb_PadInterface_PadLedBling;
-    TMemo *Memo_PadInterface;
-
     void BuildUI();
     void BuildPadPage(TPanel *ParentPanel, int BaseIndex, int Count);
     void AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col);

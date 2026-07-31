@@ -21,6 +21,7 @@ USEFORM("note.cpp", fNote);
 USEFORM("database.cpp", DataModule1);
 USEFORM("ComPort.cpp", fComPort);
 USEFORM("SecsGem\uHGemLogForm.cpp", fSecsGemLog);
+USEFORM("uPadInterface.cpp", fPadInterface);
 //---------------------------------------------------------------------------
 #include "AutomationServer.h"
 #include "aLoader.h"

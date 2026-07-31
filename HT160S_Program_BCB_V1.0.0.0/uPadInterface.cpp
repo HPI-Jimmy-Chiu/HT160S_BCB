@@ -13,6 +13,7 @@
 #pragma link "SPComm"
 #pragma link "MyLed"
 #pragma link "BtnPanelLane"
+#pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 TfPadInterface *fPadInterface = NULL;
 //---------------------------------------------------------------------------
@@ -103,7 +104,7 @@ void PAD_PTR::SetItem(TMyLed *_mlEvent, TBtnPanelLane *_btnEvent, AnsiString _Pa
 }
 //---------------------------------------------------------------------------
 __fastcall TfPadInterface::TfPadInterface(TComponent* Owner)
-    : TForm(Owner, 0)
+    : TForm(Owner)
 {
     InitialVariable();
     BuildUI();
@@ -147,115 +148,21 @@ void TfPadInterface::InitialVariable()
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260731 : static skeleton moved to uPadInterface.dfm
+//(DFM-first convention). Only the runtime language pass (LangT) and the
+//table-driven pad grid (PadButtonDefs -> PadItem) stay code-built.
 void TfPadInterface::BuildUI()
 {
-    TPanel *BottomPanel;
-    TLabel *LabelPtr;
-
     Caption=LangT("Pad Interface");
-    Width=840;
-    Height=610;
-    Position=poDesigned;
-    OnShow=FormShow;
-    OnClose=FormClose;
-
-    pn_PadInterfaceTitle=new TPanel(this);
-    pn_PadInterfaceTitle->Parent=this;
-    pn_PadInterfaceTitle->Align=alTop;
-    pn_PadInterfaceTitle->Height=40;
     pn_PadInterfaceTitle->Caption=LangT("Pad Interface");
-    pn_PadInterfaceTitle->Font->Style=TFontStyles()<<fsBold;
-
-    sb_PadInterface_Exit=new TButton(this);
-    sb_PadInterface_Exit->Parent=pn_PadInterfaceTitle;
     sb_PadInterface_Exit->Caption=LangT("Exit");
-    sb_PadInterface_Exit->Width=80;
-    sb_PadInterface_Exit->Height=26;
-    sb_PadInterface_Exit->Left=pn_PadInterfaceTitle->Width-90;
-    sb_PadInterface_Exit->Top=7;
-    sb_PadInterface_Exit->Anchors=TAnchors()<<akTop<<akRight;
-    sb_PadInterface_Exit->OnClick=sb_PadInterface_ExitClick;
-
-    BottomPanel=new TPanel(this);
-    BottomPanel->Parent=this;
-    BottomPanel->Align=alBottom;
-    BottomPanel->Height=150;
-    BottomPanel->BevelOuter=bvNone;
-
-    LabelPtr=new TLabel(this);
-    LabelPtr->Parent=BottomPanel;
-    LabelPtr->Caption=LangT("Manual Send");
-    LabelPtr->Left=8;
-    LabelPtr->Top=10;
-
-    ed_PadInterface_ManualSend=new TEdit(this);
-    ed_PadInterface_ManualSend->Parent=BottomPanel;
-    ed_PadInterface_ManualSend->Left=92;
-    ed_PadInterface_ManualSend->Top=6;
-    ed_PadInterface_ManualSend->Width=230;
-    ed_PadInterface_ManualSend->Text="t051400000000";
-
-    sb_PadInterface_ManualSend=new TButton(this);
-    sb_PadInterface_ManualSend->Parent=BottomPanel;
+    lb_PadInterface_ManualSend->Caption=LangT("Manual Send");
     sb_PadInterface_ManualSend->Caption=LangT("Send");
-    sb_PadInterface_ManualSend->Left=330;
-    sb_PadInterface_ManualSend->Top=5;
-    sb_PadInterface_ManualSend->Width=70;
-    sb_PadInterface_ManualSend->OnClick=sb_PadInterface_ManualSendClick;
-
-    btnResetCom=new TButton(this);
-    btnResetCom->Parent=BottomPanel;
     btnResetCom->Caption=LangT("Reset COM");
-    btnResetCom->Left=408;
-    btnResetCom->Top=5;
-    btnResetCom->Width=82;
-    btnResetCom->OnClick=sb_PadInterface_ManualSendClick;
-
-    btnClearLog=new TButton(this);
-    btnClearLog->Parent=BottomPanel;
     btnClearLog->Caption=LangT("Clear Log");
-    btnClearLog->Left=498;
-    btnClearLog->Top=5;
-    btnClearLog->Width=82;
-    btnClearLog->OnClick=ClearLog1Click;
-
-    cb_PadInterface_PadLedBling=new TCheckBox(this);
-    cb_PadInterface_PadLedBling->Parent=BottomPanel;
     cb_PadInterface_PadLedBling->Caption=LangT("Blink LED");
-    cb_PadInterface_PadLedBling->Left=590;
-    cb_PadInterface_PadLedBling->Top=9;
-    cb_PadInterface_PadLedBling->Width=100;
-
-    Memo_PadInterface=new TMemo(this);
-    Memo_PadInterface->Parent=BottomPanel;
-    Memo_PadInterface->Left=8;
-    Memo_PadInterface->Top=36;
-    Memo_PadInterface->Width=BottomPanel->Width-16;
-    Memo_PadInterface->Height=BottomPanel->Height-44;
-    Memo_PadInterface->Anchors=TAnchors()<<akLeft<<akTop<<akRight<<akBottom;
-    Memo_PadInterface->ScrollBars=ssVertical;
-
-    pc_PadInterface=new TPageControl(this);
-    pc_PadInterface->Parent=this;
-    pc_PadInterface->Align=alClient;
-
-    tsPadFront=new TTabSheet(this);
-    tsPadFront->PageControl=pc_PadInterface;
     tsPadFront->Caption=LangT("Front Pad");
-
-    tsPadRear=new TTabSheet(this);
-    tsPadRear->PageControl=pc_PadInterface;
     tsPadRear->Caption=LangT("Rear Pad");
-
-    pn_PadInterface_Front=new TPanel(this);
-    pn_PadInterface_Front->Parent=tsPadFront;
-    pn_PadInterface_Front->Align=alClient;
-    pn_PadInterface_Front->BevelOuter=bvNone;
-
-    pn_PadInterface_Rear=new TPanel(this);
-    pn_PadInterface_Rear->Parent=tsPadRear;
-    pn_PadInterface_Rear->Align=alClient;
-    pn_PadInterface_Rear->BevelOuter=bvNone;
 
     BuildPadPage(pn_PadInterface_Front, 0, 14);
     BuildPadPage(pn_PadInterface_Rear, 14, 17);
