@@ -193,21 +193,28 @@ void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col
     if(Index<0 || Index>=CheckPadItem)
         return;
 
-    LeftBase=18+(Col*390);
-    TopBase=18+(Row*48);
+    //AI(ht160s-maintainer) 20260731 : the grid has to fit the tab-sheet client
+    //(816x353 at this form size) without scrollbars, with slack for theme/DPI
+    //variation in the caption and tab-strip heights. 8 rows reach
+    //18+7*40+32 = 330 and the rear page's 3rd column reaches 18+2*260+250 = 788.
+    //The old 48/390 pitch overflowed both, hiding front One Cycle and rear
+    //Retry / T Start / Rear Enable. Item content only reaches x=174, so the
+    //narrower cell costs nothing.
+    LeftBase=18+(Col*260);
+    TopBase=18+(Row*40);
 
     ItemPanel=new TPanel(this);
     ItemPanel->Parent=ParentPanel;
     ItemPanel->Left=LeftBase;
     ItemPanel->Top=TopBase;
-    ItemPanel->Width=360;
-    ItemPanel->Height=38;
+    ItemPanel->Width=250;
+    ItemPanel->Height=32;
     ItemPanel->BevelOuter=bvLowered;
 
     LedPtr=new TMyLed(this);
     LedPtr->Parent=ItemPanel;
     LedPtr->Left=8;
-    LedPtr->Top=10;
+    LedPtr->Top=8;
     LedPtr->Width=26;
     LedPtr->Height=16;
     LedPtr->Alias=PadButtonDefs[Index].InputName;
@@ -217,9 +224,9 @@ void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col
     BtnPtr=new TBtnPanelLane(this);
     BtnPtr->Parent=ItemPanel;
     BtnPtr->Left=44;
-    BtnPtr->Top=6;
+    BtnPtr->Top=4;
     BtnPtr->Width=130;
-    BtnPtr->Height=26;
+    BtnPtr->Height=24;
     BtnPtr->Caption=LangT(PadButtonDefs[Index].Caption);
     BtnPtr->Alias=PadButtonDefs[Index].PadName;
     BtnPtr->Tag=PadButtonDefs[Index].PanelTag;

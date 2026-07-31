@@ -1,9 +1,9 @@
 object fPadInterface: TfPadInterface
   Left = 220
   Top = 120
-  Width = 840
-  Height = 610
   Caption = 'Pad Interface'
+  ClientHeight = 571
+  ClientWidth = 824
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,7 +18,7 @@ object fPadInterface: TfPadInterface
   object pn_PadInterfaceTitle: TPanel
     Left = 0
     Top = 0
-    Width = 832
+    Width = 824
     Height = 40
     Align = alTop
     Caption = 'Pad Interface'
@@ -30,7 +30,7 @@ object fPadInterface: TfPadInterface
     ParentFont = False
     TabOrder = 0
     object sb_PadInterface_Exit: TButton
-      Left = 742
+      Left = 734
       Top = 7
       Width = 80
       Height = 26
@@ -42,8 +42,8 @@ object fPadInterface: TfPadInterface
   end
   object pn_PadInterface_Bottom: TPanel
     Left = 0
-    Top = 433
-    Width = 832
+    Top = 421
+    Width = 824
     Height = 150
     Align = alBottom
     BevelOuter = bvNone
@@ -101,7 +101,7 @@ object fPadInterface: TfPadInterface
     object Memo_PadInterface: TMemo
       Left = 8
       Top = 36
-      Width = 816
+      Width = 808
       Height = 106
       Anchors = [akLeft, akTop, akRight, akBottom]
       ScrollBars = ssVertical
@@ -111,8 +111,8 @@ object fPadInterface: TfPadInterface
   object pc_PadInterface: TPageControl
     Left = 0
     Top = 40
-    Width = 832
-    Height = 393
+    Width = 824
+    Height = 381
     ActivePage = tsPadFront
     Align = alClient
     TabOrder = 2
@@ -121,8 +121,8 @@ object fPadInterface: TfPadInterface
       object pn_PadInterface_Front: TPanel
         Left = 0
         Top = 0
-        Width = 824
-        Height = 365
+        Width = 816
+        Height = 353
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
@@ -133,8 +133,8 @@ object fPadInterface: TfPadInterface
       object pn_PadInterface_Rear: TPanel
         Left = 0
         Top = 0
-        Width = 824
-        Height = 365
+        Width = 816
+        Height = 353
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
