@@ -555,3 +555,66 @@ HT172 原版（移植來源）：`D:\HT172\HT172_Program_V1.0.25.0_20260420\main
 | `docs/plan/onsite-0731-kyec-secs/s1f3_polls.json` | 8 次 S1F3 詢問與我方回覆 |
 | `docs/plan/onsite-0731-kyec-secs/secs_message_samples.txt` | 26 種訊息各一則樣本 |
 | `docs/plan/onsite-0731-kyec-secs/parse_secs.py` | 可重跑的 SML 解析器 |
+
+---
+
+## 12. 2026-08-01 追加查證（4 題，66 個 agent 全數複驗）
+
+### 12.1 S1F15 / S1F17 能不能拒絕？（9045 查證）
+
+| | 9045 能拒絕？ | 機制 |
+|---|---|---|
+| **S1F15 OFF-LINE** | **不能，永遠回 0** | 全樹只有一個 S1F16 實作，acknowledge byte 是**字面 0 且從未被重新賦值**。沒有 checkbox、沒有 ini key、沒有密碼閘、沒有 `CUSTOMER_CODE` #ifdef 碰它 |
+| **S1F17 ON-LINE** | **可以** | `uHGemClass.cpp:426-442`：`if(bOnLine) Command=2; else if(GemCheckBoxAcceptHostOnlineRequest->Checked){...Command=0;} else Command=1;` |
+
+9045 的那個 checkbox：`GemCheckBoxAcceptHostOnlineRequest`，Caption `'Accept OnLine Req'`（`SECSGEM\uHGemEquipment.dfm:291-297`，TabSheet3 'Normal'），由 `TFSECS::GemSBSetupClick` → `HGem->ShowModal()` 開啟，無密碼閘。持久化於 `SYSTEM\secs_gem.ini [GEM] AcceptHostOnlineRequest`，**預設 true**（出廠即「總是接受」）。
+
+**但 ONLACK 不是「我現在不接受命令」**：它是**儲存的操作員偏好**，不是任何即時機台狀態。平台為「機台條件拒絕」保留的程式化掛鉤 `THGem::SetCanAcceptHostOnLineRequest()`（`uHGemEquipment.cpp:5825-5827`）是**空函式**、零呼叫者。
+
+**更關鍵**：9045 上 GEM control state 對任何 KYEC 廠區**不 gate 任何 host 命令**——S2F41 RCMD 在 off-line 與 on-line 下被同等執行。唯一的 control-state gate 是 `CC_TFME_CHINA` 專屬。HT160S 的 `iControlState` 也是 write-only（唯一讀者是 SVID 66002 註冊），**這半邊本來就已經對齊**。
+
+**建議：兩個拒絕都不要做。**
+- OFLACK 拒絕：沒有合法拒絕碼（⚠ 此點為 DERIVED，未讀 SEMI E5 原文，對客戶引用前需查證）；會拿掉 OFF-LINE 目前唯一有用的效果（釋放塔燈/蜂鳴器的 host latch），那是操作員的 SECS 側逃生口；且規格書已對客戶承諾無條件回 0。
+- ONLACK 拒絕：**更危險**。07-31 線上 S1F17 是 host provisioning 爆發的**第一個訊息**，拒絕它會中止整批報表定義，SVID 覆蓋率會比現在的 6.9% 更低。
+
+**真正的缺口是「HT160S 的 OFF-LINE 是裝飾性的」**——要修是讓 OFF-LINE **做事**，不是拒絕它。做什麼仍需 §10 第 1 項的客戶確認。
+
+### 12.2 SECS 閒置紀錄政策（已改，commit 0ade92d）
+
+9045 在 passive listening 無 host 時**輸出零行 log**（`DoOpenCommuncation` passive 分支 `uHGemEquipment.cpp:3548-3598` 零 `StringOut`，該區域無 `CUSTOMER_CODE` guard，非廠區專屬），KYEC 整日現場 log 亦印證。HT160S 七條斷線/連線路徑**每一條都已有邊緣行**，週期行對任何一條都不是必要的。
+
+已移除 30 分鐘心跳。保留**每日每 process run 一行**標記，理由單一且具體：`FlushSecsLogToFile` 對空 buffer early-out，所以全日無 SECS 流量的日子**根本不會建立當日資料夾**，`CaptureSecsLog` 於是在 State Record 裡**完全不放 SecsLog 資料夾**——與「SECS logging 壞了」無法區分。07-31 00:00-14:19 正是此例。
+
+**代價（已寫進原始碼註解）**：斷線邊緣落在**前一天**的中斷，無法再單靠此檔測量時長。同一 session 內起訖的中斷仍精確（兩個邊緣時間戳相減）。**此項刻意推翻 §3.1(c) 標為「必做」的低頻心跳**，取捨已記錄。
+
+### 12.3 DoAuto 拆成六個 per-Auto action？—— 不建議
+
+**Loader 的類比不成立。** Loader 是真正的雙線道到底：`DoLoader(int LoaderNo, int &Task)`（`aLoader.h:149`）吃明確的線道號，每一條子梯形圖都住在 `TLoaderSideState Side[2]`（`aLoader.h:23-41,:59`），擁有 per-side 的 FeedTask/CcdTask/DischargeTask/DestackTask 與 per-side HTimer。
+
+**Auto 沒有等價物**：`TAutoStationState`（`aAuto1To6.h:34-44`）**完全沒有 task 成員**；模組持有的是**各一份** FeedTask、DischargeTask、CleanOutTask、DischargeSubTask、iFeedAuto、iDischargeAuto、FeedDelay、DischargeDelay（`aAuto1To6.h:50-57,:80-82`）。
+
+`DoAuto()` 既不 round-robin 也不每次迭代六台：它是嚴格線性的相位梯形圖 `1→100→1000→(2000 feed)→3000→(4000 discharge)→1`（`aAuto1To6.cpp:1666-1753`），**feed 與 discharge 在時間上互斥**，每個相位由 first-match 掃描（`FindFeedAuto` / `FindDischargeAuto`）挑**恰好一台**。所以那個單一 Tag **確實序列化了六台**——而那個序列化正是目前讓共用游標安全的唯一原因。
+
+**只拆 Tag 不拆游標 = 注入 bug**：兩個並行 feed 會在 `DoFeedTray` case 7000（`aAuto1To6.cpp:713-723`，蓋 tray Kind + 2D TrayID + `Car[].CarID`）互相蓋錯 AMR 出料車身分與 SECS DeviceCount——在「擁有出料站的模組」上造成靜默資料損毀。
+
+其他反對理由：真正的節流點是**單一 TrayArm 與單一 SortArm**（六台 Auto 硬體本就獨立，但供應者只有一組）；而且拆完 State Record 會變成**六份灌爆的 task history 取代一份**，診斷變差不是變好。
+
+**已改做真正划算的那一手**（commit `0ade92d`）：把 Auto 的共用游標與 per-station `TrayReq=` / `CarTrays=` 傾印出來。
+
+### 12.4 「TrayArm 夾了空盤、Auto 缺盤卻沒被叫去放」—— 不是 task 不及時
+
+**H1（延遲）在結構上就不成立，H2（設定 + 優先權）成立。** 三個獨立量測：
+
+1. **當下根本沒有需求**：16:38:37 那格六台 Auto **全部 `CarHasTray=1`**，被 `aAuto1To6.cpp:1243` 擋掉，其餘七道閘全過。沒有任何一台在要盤。
+2. **就算有需求也沒用**：現場 `UseAMR=1` + `UseAmrRecoveryDivert=0` 讓 `bMaySupplyAuto` 恆 false（`aTrayArm.cpp:1007-1008`），目的地在 `DecidePlaceDestAfterPick` 被**無條件**寫成 `TAPLACE_EMPTY`（`:1038`）——`FindTrayRequestAuto` **根本不會被呼叫**。飛行中改道也被同一組旗標在 `:1067-1068` 直接 return false。
+3. **派工延遲是毫秒級**：Auto 梯形圖平均 **4.07 ms** 換一次 Task（最大間隔 19 ms）；TrayArm 十趟工作有八趟在閒置後 **≤14 ms** 就派到工作。決定性反證：`16:38:08.912→16:38:20.346` 有 **11.434 秒** TrayArm 完全閒置、Empty rear 有盤、`DecideJob` 約被重算 **2,789 次**卻一個工作都派不出來——真有 Auto 要盤，這 11.4 秒早就抓到了。
+
+**而且需求是單調的**：`GetTrayRequest` 不由任何 task step「舉起」，它是**純狀態函式**；需求一旦升起就不會自己消失（只能被送盤消掉，或被 AMR 鎖／車滿 sensor／CleanOut 關掉）。這在結構上否定了「需求在兩次決策點之間閃現又被錯過」。
+
+**但現象描述是對的，機制是優先權排隊**：`DecideJob` 的 Priority 1（`aTrayArm.cpp:565`）永遠先做 Loader 回收，且**沒有任何飢餓保護**。一趟 Loader 回收獨佔手臂實測 **20.937 s / 20.734 s**，一趟供料只要 **9.4-11.6 s**。所以「手臂拿著空盤、Auto 缺盤、卻不送過去」在現場看起來就是不及時，程式上卻是被設定鎖死的路徑。
+
+**順帶查到（非本題主線）**：`General.ini [AMR] CoverTray3..8 / IdentityTray3..8` 的 per-Auto 設定**不會**影響 Auto 的堆疊需求——`GetNextTrayKindForAuto` 是硬編的 identity→cover→normal。
+
+**待確認**：使用者實際觀察的時間點。乾淨的生產窗口只有 `16:35:47-16:38:33`；若指的是 14:36-14:51，那段被 40013/40023/40033 三個 TrayArm 汽缸警報主導，節拍不可用、結論可能不同。
+
+**待人裁決**：`DecideJob` Priority 1 要不要讓路。`:565` 的原始理由是「先清 Loader rear 讓 Loader 能繼續進料」，改優先權會反向壓 Loader 吞吐。**建議先開 `UseAmrRecoveryDivert` 觀察一輪，不要同時動優先權**，否則兩個變數混在一起無法歸因。
