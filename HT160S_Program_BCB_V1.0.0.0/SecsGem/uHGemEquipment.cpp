@@ -76,7 +76,7 @@ __fastcall THGem::THGem(TComponent *Owner)
     iReconnectInterval = 5;                  // seconds; 0 = disabled
     iReconnectCountdown= 0;
     iReconnectAttempts = 0;
-    iIdleLogCountdown  = SECS_IDLE_LOG_SECONDS;   //AI(ht160s-secsgem) 20260801 : rare link-down breadcrumb
+    iIdleLogDay        = 0;                       //AI(ht160s-secsgem) 20260801 : no "no host" marker written yet
 
     //AI(ht160s-secsgem) 20260611 : Linktest heartbeat / T6 timeout defaults
     // (overridden by General.ini [SECS] LinktestInterval / T6Timeout).
@@ -294,7 +294,6 @@ void THGem::DoReconnectAttempt()
             ServerSocket1->Active = true;         // re-open listen socket
             if(iReconnectAttempts < 1000000000)
                 iReconnectAttempts++;
-            iIdleLogCountdown = SECS_IDLE_LOG_SECONDS;
             S.sprintf("[SECS] listen socket re-opened #%d (passive :%d)",
                       iReconnectAttempts, port);
             StringOut(S);
@@ -302,15 +301,28 @@ void THGem::DoReconnectAttempt()
         }
 
         //AI(ht160s-secsgem) 20260801 : bound listener, no host. Nothing to retry, so stay
-        //  quiet apart from an occasional marker. The connect/disconnect edges are already
-        //  logged by OnPeerConnected / OnPeerDisconnected.
-        if(iReconnectInterval > 0)
-            iIdleLogCountdown -= iReconnectInterval;
-        else
-            iIdleLogCountdown = 0;
-        if(iIdleLogCountdown <= 0)
+        //  silent - HT9045's passive branch (DoOpenCommuncation, its uHGemEquipment.cpp
+        //  :3548-3598) logs nothing here either, and the link edges are already recorded by
+        //  OnPeerConnected / OnPeerDisconnected / DropConnection / ServerClientError.
+        //
+        //  ONE marker per calendar day per process run is kept, and only for this reason:
+        //  FlushSecsLogToFile early-outs on an empty buffer, so a day with no SECS traffic
+        //  at all never creates D:\HT160S_Log\SECS_GEM\<yyyy_mm_dd>\ - and CaptureSecsLog
+        //  then ships NO SecsLog folder in the State Record, which is indistinguishable
+        //  from "SECS logging is broken". 2026-07-31 00:00-14:19 is exactly that case.
+        //  This is not a periodic heartbeat; it is proof the log itself is alive.
+        //
+        //  COST, stated so nobody rediscovers it the hard way: an outage can no longer be
+        //  measured from this file alone when the disconnect edge fell on a PREVIOUS day.
+        //  For the 07-31 outage the disconnect happened on 07-30, so the day marker says
+        //  "listening, no host on 07-31" but not for how long. Outages that start and end
+        //  inside one session are still exact - subtract the two edge timestamps.
+        Word wIdleY, wIdleMo, wIdleD;
+        DecodeDate(Now(), wIdleY, wIdleMo, wIdleD);
+        int iToday = (int)wIdleY * 10000 + (int)wIdleMo * 100 + (int)wIdleD;
+        if(iIdleLogDay != iToday)
         {
-            iIdleLogCountdown = SECS_IDLE_LOG_SECONDS;
+            iIdleLogDay = iToday;
             S.sprintf("[SECS] listening :%d, no host connected", port);
             StringOut(S);
         }
@@ -1787,7 +1799,6 @@ void THGem::StartCommunication()
     bWantComm           = true;
     iReconnectAttempts  = 0;
     iReconnectCountdown = iReconnectInterval;
-    iIdleLogCountdown   = SECS_IDLE_LOG_SECONDS;
 
     if(bCommStarted)
         return;
@@ -2029,7 +2040,6 @@ void THGem::OnPeerConnected(TCustomWinSocket *Socket)
     ActiveSocket = Socket;
     iHsmsState   = HSMS_STATE_CONNECTED;
     iReconnectCountdown = iReconnectInterval;   //AI(ht160s-secsgem) 20260611 : arm for next drop
-    iIdleLogCountdown   = SECS_IDLE_LOG_SECONDS;//AI(ht160s-secsgem) 20260801 : fresh window for the next outage
     bAwaitLinktestRsp   = false;                //AI(ht160s-secsgem) 20260611 : reset heartbeat
     iLinktestCountdown  = iLinktestInterval;
     if(RecvBuffer!=NULL)

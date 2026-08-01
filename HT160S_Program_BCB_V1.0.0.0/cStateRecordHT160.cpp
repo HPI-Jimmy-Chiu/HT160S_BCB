@@ -1150,6 +1150,12 @@ void cStateRecordHT160::WriteSortArmDecisionTxt(AnsiString Path)
 
     if(AutoModule!=NULL)
     {
+        //AI(auto-obsv) 20260801 : module cursors first. All six stations share ONE
+        //FeedTask / DischargeTask / CleanOutTask and one iFeedAuto / iDischargeAuto, so
+        //"which Auto is the module actually serving" is a module fact, not a station fact,
+        //and it was in no snapshot at all until now.
+        Out += AutoModule->DescribeModule();
+        Out += "------------------------------------------------------------\r\n";
         int n = AutoModule->GetStationCount();
         for(int i=0; i<n; i++)
             Out += AutoModule->DescribeStation(i);

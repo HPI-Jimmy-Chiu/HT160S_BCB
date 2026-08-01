@@ -1472,6 +1472,27 @@ int TAutoModule::GetStationStatus(int Index)
     return State[Index].Status;
 }
 //---------------------------------------------------------------------------
+//AI(auto-obsv) 20260801 : the Auto module cursors. Unlike the Loader - whose per-side
+//FeedTask/CcdTask/DischargeTask/DestackTask are already in FeederDecision.txt - none of
+//these appeared in any State Record, even though ALL SIX stations share them. DoAuto is a
+//strictly linear phase ladder (1 -> 100 -> 1000 -> 2000 feed -> 3000 -> 4000 discharge -> 1)
+//in which feed and discharge are mutually exclusive and each phase serves exactly ONE
+//station, chosen by FindFeedAuto / FindDischargeAuto. iFeedAuto and iDischargeAuto are
+//therefore the answer to "which Auto is the module actually working on right now", which
+//no snapshot could previously answer.
+AnsiString TAutoModule::DescribeModule()
+{
+    AnsiString s;
+    s  = "[AutoModule] (cursors SHARED by all six stations)\r\n";
+    s += "  FeedTask="      + IntToStr(FeedTask)
+       + "  iFeedAuto="     + IntToStr(iFeedAuto)
+       + "  DischargeTask=" + IntToStr(DischargeTask)
+       + "  DischargeSub="  + IntToStr(DischargeSubTask)
+       + "  iDischargeAuto="+ IntToStr(iDischargeAuto)
+       + "  CleanOutTask="  + IntToStr(CleanOutTask) + "\r\n";
+    return s;
+}
+//---------------------------------------------------------------------------
 AnsiString TAutoModule::DescribeStation(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
@@ -1490,6 +1511,14 @@ AnsiString TAutoModule::DescribeStation(int Index)
        + "  WorkingKind=" + IntToStr(WorkingKind[Index]) + "\r\n";
     //AI(ht160s-obsv-p0) 20260720 : discharge-gate blockers - a post-resume "full forever"
     //station is diagnosable only if the gate inputs are in the dump.
+    //AI(auto-obsv) 20260801 : the two inputs that decide whether this station is asking for
+    //a tray at all. TrayReq is GetTrayRequest() itself - the exact value TrayArm dispatch
+    //reads - so "why was TrayArm not sent here" becomes a one-line read instead of an
+    //eight-gate reconstruction by elimination. CarTrays (Car[].iTrayCount) was dumped
+    //NOWHERE in the tree, yet it is what selects identity vs cover vs normal for the next
+    //tray, so it also decides whether an AMR-recovery divert could ever match this station.
+    s += "  TrayReq="   + IntToStr(GetTrayRequest(Index))
+       + "  CarTrays="  + IntToStr(Car[Index].iTrayCount) + "\r\n";
     s += "  ResidueClear=" + IntToStr(State[Index].bResidueClear ? 1 : 0)
        + "  DischTail="    + IntToStr(bDischargeTailPending[Index] ? 1 : 0)
        + "  RearKind="     + IntToStr(RearKind[Index])

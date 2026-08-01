@@ -159,6 +159,7 @@ public:
     //for the Store Hangup SortArmDecision.txt (why SortArm cannot place / Auto cannot discharge).
     int        GetStationCount();
     AnsiString DescribeStation(int Index);
+    AnsiString DescribeModule();   //AI(auto-obsv) 20260801 : the six-station SHARED cursors (dumped nowhere before)
     AnsiString GetWorkingTrayID(int Index);  //AI(ht160s-motion-view) 20260618 : 2D TrayID at working pos for Unload Auto-info ID panel
 
     bool TestGoUpOnce(int Index, int Flag);   //AI(general) 20260617 : Teach Advanced single-cylinder FrontRise GoUp once (no GoDown)
