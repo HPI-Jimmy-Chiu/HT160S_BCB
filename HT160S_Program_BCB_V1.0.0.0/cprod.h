@@ -77,6 +77,20 @@ extern int         g_UphRecentCount;
 extern bool        g_UphRowsDirty;
 
 extern int GetJamRateDenom();
+//AI(jamrate) 20260801 : KYEC on-site note 6 "jam rate". The three storage fields
+//(JamCount / JamRate / JamRateDenom) were ported from HT172 but the counter, the formula
+//and the display never were, so JamCount was only ever assigned 0 and JamRate had no
+//producer at all outside the ctor. These are the mechanism: ONE choke point for the
+//numerator, one place that computes the rate, and the existing per-lot reset for the clear.
+//Model is HT172's: jams per JamRateDenom (10000) units placed, NOT HT9045's per-tray MUBF.
+//  jam sources (start set, per customer): SortArm pick-suck failure at the Loader, and a
+//  held-IC fall-down (drop) detected at pick or in transit.
+void AddJamCount(AnsiString Reason);
+//AI(jamrate) 20260801 : recompute tRunData.JamRate from the live counters. Numerator and
+//denominator share one epoch by construction - ResetPerLotProductionCounters zeroes
+//JamCount and TotalIC together - so this needs no separate baseline (unlike UPH, whose
+//denominator epoch is re-stamped independently; see g_iUphBaseIC).
+void RefreshJamRate();
 //---------------------------------------------------------------------------
 class TLatchCycleTime
 {

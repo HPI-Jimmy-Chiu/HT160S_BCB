@@ -2303,7 +2303,7 @@ object fMain: TfMain
                   Align = alLeft
                   ColCount = 3
                   DefaultColWidth = 105
-                  DefaultRowHeight = 16
+                  DefaultRowHeight = 14
                   FixedCols = 0
                   RowCount = 6
                   FixedRows = 0

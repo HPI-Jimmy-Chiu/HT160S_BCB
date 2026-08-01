@@ -876,7 +876,8 @@ static AnsiString FmtCarKinds(int t, int id0, int cv0)
 //AI(ht160s-uph) 20260707 : sgProductInfo row indices (mirror HT172 IncludeAllHeader
 // e-enum: Lot Start / Lot End / Alarm Time / Pause Time / UPH). File-scope enum
 // (this is a .cpp, not the form class body).
-enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH, PI_TotalTime, PI_AutoSkip };
+//AI(jamrate) 20260801 : PI_Jam added last so no existing row index moves.
+enum { PI_LotStart=0, PI_LotEnd, PI_AlarmTime, PI_PauseTime, PI_UPH, PI_TotalTime, PI_AutoSkip, PI_Jam };
 //AI(ht160s-uph) 20260708 : Lot End time + final UPH + UPH-denominator time are shown only
 //AFTER a lot ends (blank during a running lot). false at Lot Start, true at Lot End finalize.
 static bool bLotEnded=false;
@@ -929,6 +930,33 @@ void __fastcall TfMain::FreezeProductInfoAtLotEnd()
 // LIVE cumulative UPH (TotalIC / productive-hours, pause excluded) written to
 // tRunData.UPH so the screen AND SECS SVID 1021 track running UPH. The frozen
 // end-of-lot value is still (re)computed at Clean Out finish and End of Lot.
+//AI(loadtotal) 20260801 : KYEC on-site note 7 "Load and total number is zero". The two
+//panels above the Bin column were ported from HT172 as DFM objects but the two assignment
+//lines at the tail of HT172 ShowBinCount() (HT172 main.cpp:2438-2439) were not, so both
+//kept their design-time literal "0" forever - a repo-wide grep for palloadingCount /
+//palUnloadingCount found only the DFM and the main.h declarations, no ->Caption= anywhere.
+//The other half of the same note was tRunData.LoaderIC never being incremented, fixed at
+//aSortArm.cpp TransferPickDataFromLoader.
+//
+//SEMANTICS, stated plainly because it matters to the operator: both counters live in
+//tRunData and are zeroed by ResetPerLotProductionCounters, i.e. by Lot Start / SECS
+//LOTSTART / the Clear All button - NOT by Lot End. So they read "since the last lot start
+//or clear", and on a machine driven with START + LOT END only they carry across lots and
+//across power cycles (tRunData is restored from lastdata.dat at boot, by explicit design).
+//That is the same epoch SVID 66020 / 1101 / 1102 already report to the host, so the screen
+//and the host now agree. Whether Lot End should also zero them is a separate, customer-
+//visible decision recorded in docs/plan/onsite-0731-kyec-triage-20260801.md.
+//
+//Write-only-on-change, matching ShowUnloadAutoInfo, so the panels do not flicker. Explicit
+//IntToStr rather than HT172's implicit AnsiString(int) into TPanel::Caption.
+void __fastcall TfMain::ShowBinCntInfo()
+{
+    AnsiString sLoad =IntToStr(tRunData.LoaderIC);
+    AnsiString sTotal=IntToStr(tRunData.TotalIC);
+    if(palloadingCount  !=NULL && palloadingCount->Caption  !=sLoad ) palloadingCount->Caption  =sLoad;
+    if(palUnloadingCount!=NULL && palUnloadingCount->Caption!=sTotal) palUnloadingCount->Caption=sTotal;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMain::ShowProductInfo()
 {
     if(sgProductInfo==NULL)
@@ -944,15 +972,29 @@ void __fastcall TfMain::ShowProductInfo()
         sgProductInfo->Cells[0][PI_UPH      ]="UPH :";
         sgProductInfo->Cells[2][PI_UPH      ]="Unit / Hr";
         sgProductInfo->Cells[0][PI_TotalTime]="UPH Time :";
-        sgProductInfo->RowCount=7;
+        //AI(jamrate) 20260801 : 8 rows. The grid is Align=alLeft inside Panel1, so its
+        //Height is overwritten with the parent client height at runtime and cannot be
+        //raised from code; Panel1 itself cannot grow either - its parent Panel9 has only
+        //~17 px of slack (alTop 4+141+141+291 = 577, alBottom 116+122 = 238, client 832).
+        //So the row fits by trimming DefaultRowHeight 16 -> 14 in the DFM: 8*(14+1) = 120,
+        //exactly the grid height, where 7*(16+1) = 119 was before.
+        sgProductInfo->RowCount=8;
         sgProductInfo->Cells[0][PI_AutoSkip]="Auto Skip :";
         sgProductInfo->Cells[2][PI_AutoSkip]="pcs";
+        sgProductInfo->Cells[0][PI_Jam]="Jam :";
     }
     sgProductInfo->Cells[1][PI_LotStart ]=FormatDateTime("hh:nn:ss", tRunData.StartTime);
     sgProductInfo->Cells[1][PI_LotEnd   ]=bLotEnded ? FormatDateTime("hh:nn:ss", tRunData.LotEndTime) : AnsiString("");
     sgProductInfo->Cells[1][PI_AlarmTime]=FormatDateTime("hh:nn:ss", tRunData.AlarmTime);
     sgProductInfo->Cells[1][PI_PauseTime]=tUPH_PauseTime.FormatString("hh:nn:ss");
     sgProductInfo->Cells[1][PI_AutoSkip]=IntToStr(tRunData.iAutoSkipCount);
+    //AI(jamrate) 20260801 : the CALCULATE half. Recomputed every repaint rather than only
+    //at each AddJamCount, so the rate also tracks the growing denominator between jams.
+    //Shown unconditionally (not inside the SystemStart guard below) so the figure survives
+    //a stop for the operator to read - it is a lot statistic, not a live-only reading.
+    RefreshJamRate();
+    sgProductInfo->Cells[1][PI_Jam]=IntToStr(tRunData.JamCount);
+    sgProductInfo->Cells[2][PI_Jam]=AnsiString().sprintf("%.1f/%d", tRunData.JamRate, GetJamRateDenom());
     if(HSys.Sys.SystemStart && bFirstRun==false && tRunData.TotalIC>0)
     {
         // AI(ht160s-uph) 20260709 : small-sample warm-up guard. Early in a lot the

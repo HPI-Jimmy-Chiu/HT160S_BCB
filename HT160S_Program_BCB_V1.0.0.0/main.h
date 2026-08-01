@@ -504,6 +504,7 @@ public:		// User declarations
     void __fastcall ShowUnloadAutoInfo();   //AI(ht160s-motion-view) 20260618 : fill Unload Auto1~6 Bin/Lot/ID/Cnt panels
     void __fastcall ShowCarTrayCount();      //AI(ht160s-agv) 20260624 : PanelMain6 header per-zone trays-on-AMR-car count
     void __fastcall ShowProductInfo();       //AI(ht160s-uph) 20260707 : live Lot/UPH product-info grid (HT172 sgProductInfo parity)
+    void __fastcall ShowBinCntInfo();        //AI(loadtotal) 20260801 : the Load / Total panels above the Bin column (HT172 ShowBinCount tail)
     void __fastcall ShowTrayUphHistory();    //AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172 UPH_StringGrid parity)
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();

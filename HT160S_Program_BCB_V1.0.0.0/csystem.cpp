@@ -278,6 +278,8 @@ void MainProc()
 	if(fMain!=NULL)
 		fMain->ShowProductInfo();      //AI(ht160s-uph) 20260707 : live Lot/UPH product-info grid + live UPH cell
 	if(fMain!=NULL)
+		fMain->ShowBinCntInfo();       //AI(loadtotal) 20260801 : Load / Total panels above the Bin column
+	if(fMain!=NULL)
 		fMain->ShowTrayUphHistory();   //AI(ht160s-uph) 20260707 : rolling per-tray UPH history grid
 
 	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive any in-flight Lot WebAPI pull.

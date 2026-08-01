@@ -1742,6 +1742,11 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
     if(iFirstDrop<0)
         return false;   //every OFF nozzle recovered within the window : rejected glitch
 
+    //AI(jamrate) 20260801 : jam source 2 of 2 - "SortArm suck dropped an IC". Placed after
+    //the iFirstDrop<0 early-return above, so a single noisy vacuum read that recovered
+    //inside FALLDOWN_LOST_MS is NOT counted - only a confirmed drop is.
+    AddJamCount(bAtPick?AnsiString("SortArm IC dropped at pick"):AnsiString("SortArm IC dropped in transit"));
+
     HSys.StopAllMotor();   //MC88X1 : real decel-stop ALL (DecStopAllMotor is a no-op here)
 
     //breadcrumb : dropped cell tray Row/Col (+2D) into the alarm region so it is shown + logged
@@ -1887,6 +1892,13 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
                     //AI(ht160s-pick-retry) 20260702 : count the failed stroke and lift Z to
                     //safe FIRST - both the silent auto-retry and the operator alarm happen
                     //with the nozzle parked up, never pressed on the IC (HT172 case 500/350).
+                    //AI(jamrate) 20260801 : jam source 1 of 2 - "Loader pick up error".
+                    //Counted per FAILED PICK STROKE, i.e. here rather than at case 54
+                    //(retries exhausted), because a stroke that only succeeds on the
+                    //second attempt is still a pick failure the machine suffered - and
+                    //catching those is the whole point of a rate used as an early warning.
+                    //Move this to case 54 if the customer wants only operator-visible jams.
+                    AddJamCount("SortArm pick suck fail at Loader"+IntToStr(iActiveLoaderNo));
                     iPickRetryCount++;
                     PickTask=52;
                 }

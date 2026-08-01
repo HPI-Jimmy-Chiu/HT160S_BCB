@@ -56,6 +56,39 @@ int GetJamRateDenom()
     return tRunData.JamRateDenom;
 }
 //---------------------------------------------------------------------------
+//AI(jamrate) 20260801 : the ONE numerator choke point. Every jam event in the machine goes
+//through here so the definition lives in a single place and every bump leaves an EventLog
+//line naming what happened - a jam rate whose events cannot be listed afterwards is not
+//auditable.
+//
+//The REALLY gate is ported from HT9045 (note.cpp:277 gates its own jam counter on
+//LastSet.iRealDummy==REALLY): dummy and tray-only runs must not pollute a production KPI.
+//The same field is published as SVID 1518.
+//
+//Deliberately NOT the HT172/HT9045 "alarm code starts with JAM" rule. On HT160S the codes
+//that actually stop the line are MES/CYL/SUC; only two JAM* codes fired in the whole
+//2026-07-31 shift, so a code-prefix rule would under-report badly. The customer named the
+//two events they care about instead, and those are wired at their source.
+void AddJamCount(AnsiString Reason)
+{
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return;
+    tRunData.JamCount++;
+    RefreshJamRate();
+    RecordProcess("JAM #"+IntToStr(tRunData.JamCount)+" : "+Reason);
+}
+//---------------------------------------------------------------------------
+//AI(jamrate) 20260801 : jams per JamRateDenom (default 10000) units placed - HT172's model
+//(HT172 main.cpp:1922). Guarded on a non-zero denominator; before the first placement the
+//rate stays 0 rather than dividing by zero or reporting a meaningless spike.
+void RefreshJamRate()
+{
+    if(tRunData.TotalIC>0)
+        tRunData.JamRate=((double)tRunData.JamCount/(double)tRunData.TotalIC)*(double)GetJamRateDenom();
+    else
+        tRunData.JamRate=0.0;
+}
+//---------------------------------------------------------------------------
 int TLatchCycleTime::LatchCycleTime(bool Start)
 {
     if(Start)
@@ -146,6 +179,10 @@ void ResetPerLotProductionCounters()
     tRunData.UPH=0;
     tRunData.LoaderIC=0;
     tRunData.JamCount=0;
+    //AI(jamrate) 20260801 : the CLEAR half of the mechanism. JamCount was already zeroed
+    //here, but JamRate was not - it had no producer at all, so nobody noticed it would have
+    //survived a lot change as a stale figure once one existed.
+    tRunData.JamRate=0.0;
     tRunData.iAutoSkipCount=0;
     tRunData.StartTime=Now();
 
