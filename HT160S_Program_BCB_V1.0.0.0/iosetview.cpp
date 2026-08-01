@@ -924,6 +924,22 @@ void Tfiosetview::SaveIoTableFromGrid()
         HSys.LoadCylinderParameterFromDataBase();
         HSys.LoadSwitchParameterFromDataBase();
         HSys.LoadSuckerParameterFromDataBase();
+        //AI(ht160s-alarm-code-rebind) 20260731 : LoadCylinderParameterFromDataBase rewrites
+        //EVERY cylinder's OnAlarmCode/OffAlarmCode to the raw i*100 / i*100+1 scheme
+        //(database.cpp:1349-1350). At startup that is immediately overwritten by
+        //CreateSystemAlarmCode (database.cpp:794 then :799 - they are a PAIR); here the second
+        //half was missing, so PRESSING THE UPDATE BUTTON on this screen (sbUpdateClick ->
+        //SaveIoTableFromGrid; merely opening the screen does NOT do it) reverted the whole
+        //registry for the rest of the session. Two levels of damage : the i*100 codes are absent
+        //from mapAlarmCodeList, so all 39 cylinders degraded to note.cpp's "Cylinder Error Code
+        //Undefine Error" branch with no message, remedy or flush panel; and cylinder index 0 -
+        //C_TrayArmZ_Up - gets OnAlarmCode = 0*100 = 0, where SetCylinderAlarm returns immediately
+        //on AlarmCode==0 (mycylin.cpp:101-102), so its push-timeout alarm went fully SILENT.
+        //Side effects to know about : CreateSystemAlarmCode clears and rebuilds mapNameToAlarm +
+        //mapAlarmCodeList and rewrites system\AlarmList.csv. Safe here because MainProc is frozen
+        //for the whole session on this screen, nothing else writes those maps, and SecsGem is
+        //timer-driven with no worker thread - if that ever changes, this call must be gated.
+        HSys.CreateSystemAlarmCode();
         if(IOTableDeletedTags!=NULL)
             IOTableDeletedTags->Clear();
         LoadIoTable((cbbType==NULL)?0:cbbType->ItemIndex, (cbbLane==NULL)?0:cbbLane->ItemIndex, 0);
