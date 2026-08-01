@@ -76,6 +76,7 @@ __fastcall THGem::THGem(TComponent *Owner)
     iReconnectInterval = 5;                  // seconds; 0 = disabled
     iReconnectCountdown= 0;
     iReconnectAttempts = 0;
+    iIdleLogCountdown  = SECS_IDLE_LOG_SECONDS;   //AI(ht160s-secsgem) 20260801 : rare link-down breadcrumb
 
     //AI(ht160s-secsgem) 20260611 : Linktest heartbeat / T6 timeout defaults
     // (overridden by General.ini [SECS] LinktestInterval / T6Timeout).
@@ -248,18 +249,30 @@ void THGem::DoReconnectAttempt()
     //AI(ht160s-secsgem) 20260611 : one reconnect try - re-dial (active) or
     //  re-listen (passive).  Wrapped in try/catch so a socket exception cannot
     //  break the 1s timer loop.
+    //AI(ht160s-secsgem) 20260801 : KYEC on-site note 1 "SECS passive unconnect record".
+    //  In PASSIVE mode the socket work below is guarded on !ServerSocket1->Active, and
+    //  after StartCommunication() that flag is never cleared again (the only other writers
+    //  are the ctor, the dtor and the uncalled StopCommunication(); DropConnection guards
+    //  on bActiveMode, and OnPeerDisconnected / the Separate.req handler close only
+    //  ActiveSocket). So the body was unreachable and this function did nothing but bump a
+    //  counter and print - yet the StringOut sat OUTSIDE the guard and fired every
+    //  iReconnectInterval. On 2026-07-31 that produced 883 lines / 62 KB and left 14 of the
+    //  day's 17 hourly SECS log files with zero real content.
+    //  Fix: only count and report an attempt when one actually happened. Keep a rare
+    //  breadcrumb while the link is down - the counter's continuity is what made that day's
+    //  14 h 18 min outage provable, so the record must not disappear entirely.
     int port = atoi(sDefaultPort.c_str());
     if(port <= 0)
         port = 5000;
-    //AI(ht160s-secsgem) 20260611 : cap the attempt counter so a machine left
-    //  running for weeks without a host cannot overflow a signed int.
-    if(iReconnectAttempts < 1000000000)
-        iReconnectAttempts++;
     AnsiString S;
     try
     {
         if(bActiveMode)
         {
+            //AI(ht160s-secsgem) 20260801 : active mode genuinely re-dials on every pass,
+            //  so every pass IS an attempt and stays worth one line.
+            if(iReconnectAttempts < 1000000000)   // cap : weeks without a host must not overflow
+                iReconnectAttempts++;
             if(ClientSocket1 != NULL)
             {
                 ClientSocket1->Active  = false;       // drop any half-open socket
@@ -269,18 +282,38 @@ void THGem::DoReconnectAttempt()
             }
             S.sprintf("[SECS] reconnect #%d (active dial %s:%d)",
                       iReconnectAttempts, sDefaultAddress.c_str(), port);
+            StringOut(S);
+            return;
         }
-        else
+
+        if(ServerSocket1 != NULL && !ServerSocket1->Active)
         {
-            if(ServerSocket1 != NULL && !ServerSocket1->Active)
-            {
-                ServerSocket1->Port   = port;
-                ServerSocket1->Active = true;         // re-open listen socket
-            }
-            S.sprintf("[SECS] reconnect #%d (passive listen :%d)",
+            //AI(ht160s-secsgem) 20260801 : the listener really was down - this is a real
+            //  recovery action and the only passive case worth counting.
+            ServerSocket1->Port   = port;
+            ServerSocket1->Active = true;         // re-open listen socket
+            if(iReconnectAttempts < 1000000000)
+                iReconnectAttempts++;
+            iIdleLogCountdown = SECS_IDLE_LOG_SECONDS;
+            S.sprintf("[SECS] listen socket re-opened #%d (passive :%d)",
                       iReconnectAttempts, port);
+            StringOut(S);
+            return;
         }
-        StringOut(S);
+
+        //AI(ht160s-secsgem) 20260801 : bound listener, no host. Nothing to retry, so stay
+        //  quiet apart from an occasional marker. The connect/disconnect edges are already
+        //  logged by OnPeerConnected / OnPeerDisconnected.
+        if(iReconnectInterval > 0)
+            iIdleLogCountdown -= iReconnectInterval;
+        else
+            iIdleLogCountdown = 0;
+        if(iIdleLogCountdown <= 0)
+        {
+            iIdleLogCountdown = SECS_IDLE_LOG_SECONDS;
+            S.sprintf("[SECS] listening :%d, no host connected", port);
+            StringOut(S);
+        }
     }
     catch(...)
     {
@@ -1754,6 +1787,7 @@ void THGem::StartCommunication()
     bWantComm           = true;
     iReconnectAttempts  = 0;
     iReconnectCountdown = iReconnectInterval;
+    iIdleLogCountdown   = SECS_IDLE_LOG_SECONDS;
 
     if(bCommStarted)
         return;
@@ -1995,6 +2029,7 @@ void THGem::OnPeerConnected(TCustomWinSocket *Socket)
     ActiveSocket = Socket;
     iHsmsState   = HSMS_STATE_CONNECTED;
     iReconnectCountdown = iReconnectInterval;   //AI(ht160s-secsgem) 20260611 : arm for next drop
+    iIdleLogCountdown   = SECS_IDLE_LOG_SECONDS;//AI(ht160s-secsgem) 20260801 : fresh window for the next outage
     bAwaitLinktestRsp   = false;                //AI(ht160s-secsgem) 20260611 : reset heartbeat
     iLinktestCountdown  = iLinktestInterval;
     if(RecvBuffer!=NULL)

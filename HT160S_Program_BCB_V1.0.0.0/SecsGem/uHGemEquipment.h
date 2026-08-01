@@ -57,6 +57,10 @@ class HTGem;   //AI(ht160s-secsgem) 20260610 : forward decl for dispatch back-po
 #define HSMS_STATE_NOTCONNECTED 0
 #define HSMS_STATE_CONNECTED    1
 #define HSMS_STATE_SELECTED     2
+//AI(ht160s-secsgem) 20260801 : how often to note "listening, still no host" while the link
+//  is down. Deliberately coarse (30 min) : the per-interval line it replaces was 60 s on
+//  site and swamped the log, but a total silence would make a multi-hour outage invisible.
+#define SECS_IDLE_LOG_SECONDS  1800
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : Form-less SV/EC/CEID/Report registration model.
 //  HT172 kept these in GUI TStringGrid; HT160 THGem has no form, so the registry
@@ -220,6 +224,10 @@ private:
     int  iReconnectInterval;          // seconds between reconnect attempts (0=disabled)
     int  iReconnectCountdown;         // seconds left until next attempt
     int  iReconnectAttempts;          // attempts since StartCommunication()
+    //AI(ht160s-secsgem) 20260801 : seconds left until the next "still no host" breadcrumb
+    //  while the link is down. Passive mode has nothing to retry (see DoReconnectAttempt),
+    //  so the old per-interval line was pure noise; this keeps a rare timeline marker.
+    int  iIdleLogCountdown;
     void DoReconnectAttempt();        // re-dial (active) or re-listen (passive)
 
     //AI(ht160s-secsgem) 20260611 : HSMS Linktest heartbeat + T6 timeout so a
