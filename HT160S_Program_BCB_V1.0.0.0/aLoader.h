@@ -25,7 +25,7 @@ struct TLoaderSideState
     int FeedTask;
     int CcdTask;
     int DischargeTask;
-    int DestackTask;        //AI(general) 20260617 : front-destacker sub-step (shared by DoFeedTray + TestGoDownTray)
+    int DestackTask;        //AI(general) 20260617 : front-destacker sub-step for the PRODUCTION feed only. AI(20260731) : the Teach Advanced test drives the same DoFrontDestackDown() helper but through its OWN TestDownTask cursor - the FUNCTION is shared, this FIELD is not.
     bool bTrayEmpty;
     bool bCcdLeftToRight;
     int CcdX;

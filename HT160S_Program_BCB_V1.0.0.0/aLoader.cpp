@@ -168,7 +168,7 @@ void TLoaderModule::InitialFlag(bool bKeepMaterial)
 //windows (CcdDelay Top-CCD scan timeout + FeedWaitTimer source-dry AMR wait MES0920) so a machine pause taken mid-scan is not
 //charged against the timeout budget -- no false CCD-timeout on resume. Called from
 //csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
-//pause/resume edges, alongside Cylinder[]/SortArmSuck.
+//pause/resume edges, alongside HSys.CynPtr[]/SortArmSuck.
 void TLoaderModule::PauseTimeoutTimers()
 {
     Side[0].CcdDelay.Pause();
@@ -1542,6 +1542,12 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
         State->FeedWaitTimer.Clear();
         State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) 20260720 : fresh feed must not inherit a stale rise1 wait
         State->Rise1WaitTimer.Clear();
+        //AI(ht160s-cleanout-preempt) 20260731 : diagnostic hygiene, not a behaviour fix. DestackTask
+        //is only ever set to 1 at case 4000, so an abandoned destack leaves 5/6 latched here and the
+        //FeederDecision dump reports "Destack=5" on a side that is idle - which is exactly how the
+        //07-30 records read. Every consumer re-seeds it at case 4000 before use, so clearing it here
+        //changes nothing functional and makes the state record tell the truth.
+        State->DestackTask=1;
         return true;
     }
     if(OtherState->Status==LS_FEEDING ||
@@ -1610,7 +1616,17 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             //AI(ht160s-home-resume-lk1) 20260713 : orphan-tray self-collect on resume. A
             //HOME taken between the destack landing (case 8300 clamps the tray on the
             //carriage) and the identity mint (case 9500) leaves a tray PHYSICALLY on the
-            //carriage while fHasTray was reset false by InitialFlag. uHome's fHasTray-keyed
+            //carriage with no fHasTray to match, because the mint at 9500 never ran.
+            //AI(ht160s-cleanout-preempt) 20260731 : the line above used to read "while fHasTray
+            //was reset false by InitialFlag". That is WRONG and was misleading this whole family
+            //of investigations : TLoaderModule::InitialFlag (and the ResetSide it calls) touch
+            //only Side[] cursors, the rear hold, iFrontOwner and iYOwner - never
+            //MMLoaderY_1/2->fHasTray. The ONE writer outside aLoader.cpp is uHome.cpp:923
+            //PV->ClearTray(), on the unparked-carry operator-removal fallback armed at
+            //uHome.cpp:493 (Loader Y disabled / not a servo / in alarm, so the car could not park
+            //its tray). So the carriage flag SURVIVES an ordinary HOME, but NOT a HOME where the
+            //carriage could not park - which is exactly the HOME this branch has to heal after.
+            //uHome's fHasTray-keyed
             //removal hint cannot see it, and the destack path below (case 100 -> 4000) would
             //drop a SECOND tray onto it (clamps/cuts it + scatters IC). Route straight to the
             //confirm-then-mint case 9500 instead, reusing the CleanOut case-9000 self-collect
