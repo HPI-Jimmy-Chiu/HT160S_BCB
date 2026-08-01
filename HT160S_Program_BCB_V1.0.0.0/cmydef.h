@@ -64,6 +64,14 @@ extern bool bPadEverCommunicated;
 extern bool bCalculatePauseTime;
 extern TDateTime tUPH_PauseTime;
 extern TDateTime tUPH_PauseStartTime;
+//AI(secs-onsite0731) 20260801 : UPH numerator baseline (def cmydef.cpp). Snapshot of
+//tRunData.TotalIC taken in the SAME bFirstRun block that re-stamps tRunData.StartTime, so
+//GetCalculateUPH divides a per-window count by a per-window clock instead of a cumulative
+//count by a per-session clock.
+extern int g_iUphBaseIC;
+//AI(secs-onsite0731) 20260801 : main-screen status caption mirror, published as SVID 1011
+//"Machine State" (9045-aligned). Written only by SetMainStatus() in csystem.cpp.
+extern AnsiString g_sMachineStateText;
 //---------------------------------------------------------------------------
 enum eTrayName                  //使用的Harware Bin數量與名稱
 {

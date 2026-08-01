@@ -1535,6 +1535,17 @@ void TSortArmModule::TransferPickDataFromLoader()
             TMySucker *Sucker=GetSucker(SlotIndex);
             TrayMotor->SetTraySingleData(Slot[SlotIndex].PickX, Slot[SlotIndex].PickY, EMPTY_IC);
             g_DeviceInfo.AddInputInfo(SlotIndex, Slot[SlotIndex].PickY, Slot[SlotIndex].PickX, "");
+            //AI(secs-onsite0731) 20260801 : KYEC on-site note 7 "Load and total number is
+            //zero". tRunData.LoaderIC was declared, cleared and persisted but NEVER
+            //incremented anywhere in the tree, so the main-screen "Load" panel and the
+            //host's RPTID 501 slot 1 (SVID 1101 Loader Count) were both starved. This is
+            //the structural twin of HT172 MySortArmParameter::AddLoadingCount (HT172
+            //aSortArm.cpp:2351), whose DFM panels were ported here but whose two
+            //assignments and this increment were not. Counted once per IC actually lifted
+            //off a Loader tray: bCanPick is dropped by SkipErroredPickCells/ClearSlot for
+            //every failed slot, and the three callers of this function are mutually
+            //exclusive, so a retry cannot double-count.
+            tRunData.LoaderIC++;
             //AI(ht160s-lotbin) 20260615 : record this IC's owning Lot + 2D code on the
             //production trace line. Empty for ICs picked without a 2D lookup (Normal mode
             //or pre-feature data) - the columns simply stay blank.

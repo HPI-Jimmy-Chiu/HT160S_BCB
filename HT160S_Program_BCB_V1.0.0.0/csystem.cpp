@@ -51,6 +51,16 @@ static void SetMainStatus(AnsiString StatusText, TColor Color)
 	if(fMain->palMainStatus_En!=NULL)
 		fMain->palMainStatus_En->Caption=StatusText;
 
+	//AI(secs-onsite0731) 20260801 : mirror for SVID 1011 "Machine State". HT9045 binds its
+	//SVID 1011 directly to fMain->palMainStatus (uHGemHT9045_SV.cpp:71) via a TObject*
+	//overload of SetSVDataPointer that HT160S does not have - its only overload takes void*
+	//and DataItemOutSVItem casts an ASCII Ptr straight to AnsiString*, so handing it a
+	//TPanel* would be a wild read. Mirroring here instead keeps the SECS serialize path off
+	//VCL entirely, and survives a rename of palMainStatus or a divergence of the bilingual
+	//palMainStatus_En. Value domain: HALT/INIT/HOMING/Clean Out/Tray Feed/One Cycle/RUNNING/
+	//LOCK/EMG/MOTOR OFF/SAFE DOOR/AIR/PAUSE (see ProcessRunStatus below).
+	g_sMachineStateText=StatusText;
+
 	//AI(secs-ceid-align9045) 20260729 : CEID 27 "Change Machine State". HT9045 main.cpp:18473
 	//compares its cached sMachineState against palMainStatus->Caption on every scan and reports
 	//on the edge; this is the same test at HT160S's single status writer. The first call after
@@ -1763,6 +1773,15 @@ void ProcessMotion()
 		tRunData.StartTime=Now();
 		tUPH_PauseTime=StrToTime("00:00:00");
 		bCalculatePauseTime=false;
+		//AI(secs-onsite0731) 20260801 : latch the UPH numerator at the SAME instant the
+		//denominator epoch is re-stamped. tRunData.TotalIC survives power cycles by design
+		//(main.cpp ReadLastDataIni, "cumulative ... KEPT even on a fresh start (user choice)")
+		//while StartTime does not, so without this the ratio mixes two different epochs - on
+		//2026-07-31 UPH decayed 5131 -> 2305 while only 13 ICs were placed, and the 16:29 Lot
+		//End reported 2026 against a true 99. Deliberately placed INSIDE this block, not in
+		//the boot path, so the Run_TrayFeed finish below (which also sets bFirstRun=true
+		//without zeroing TotalIC) is covered by the same latch.
+		g_iUphBaseIC=tRunData.TotalIC;
 	}
 
 	if(HSys.Sys.RunMode==Run_CleanOut)
@@ -1972,7 +1991,14 @@ int GetCalculateUPH(TDateTime tEndTime)
 	double dSeconds=tElapsed.operator double()*86400.0;
 	if(dSeconds<=0.0)
 		return 0;
-	return (int)((double)tRunData.TotalIC*3600.0/dSeconds);
+	//AI(secs-onsite0731) 20260801 : count only the units placed since the epoch that
+	//tRunData.StartTime marks (see the bFirstRun block in ProcessMotion). TotalIC itself
+	//stays cumulative - it is published as SVID 66020 and the customer's HT9045 is
+	//cumulative too - so the baseline is subtracted here rather than zeroing the counter.
+	int iWindowIC=tRunData.TotalIC-g_iUphBaseIC;
+	if(iWindowIC<0)
+		iWindowIC=0;
+	return (int)((double)iWindowIC*3600.0/dSeconds);
 }
 //---------------------------------------------------------------------------
 void RecordSafeDoorStates()

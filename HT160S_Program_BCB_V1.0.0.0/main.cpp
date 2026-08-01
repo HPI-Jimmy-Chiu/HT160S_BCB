@@ -963,7 +963,12 @@ void __fastcall TfMain::ShowProductInfo()
         int iUphMinN=GeneralSetting.iUphMinSampleIC;
         if(iUphMinN<=0)
             iUphMinN=(SortArmModule!=NULL) ? (SortArmModule->GetTrayXCount()*SortArmModule->GetTrayYCount()) : 0;
-        if(iUphMinN>0 && tRunData.TotalIC<iUphMinN)
+        // AI(secs-onsite0731) 20260801 : test the WINDOW count, not the cumulative one.
+        // tRunData.TotalIC survives power cycles, so on any boot with carry-over this guard
+        // was already satisfied by stale units (on site: 317 against a MinSampleIC of 0 ->
+        // auto tray-cell count) and the first-minutes spike shipped to the screen and to
+        // SVID 1021 anyway - it failed in precisely the case it was written for.
+        if(iUphMinN>0 && (tRunData.TotalIC-g_iUphBaseIC)<iUphMinN)
         {
             tRunData.UPH=0;
             sgProductInfo->Cells[1][PI_UPH]="--";

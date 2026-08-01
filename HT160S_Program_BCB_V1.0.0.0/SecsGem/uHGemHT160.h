@@ -313,6 +313,14 @@ private:
     int        svUPH;            // tRunData.UPH
     int        svLotCount;       // LotRegistry.GetLotCount()
     AnsiString svCurrentLot;     // first registered Lot ID ("" if none)
+    //AI(secs-onsite0731) 20260801 : the seven-of-eight empty slots of the KYEC host's
+    // RPTID 502 were the operator's on-site notes 3 and 4. These three close the ones whose
+    // data HT160S already owns. svActiveLot is SEPARATE from svCurrentLot on purpose:
+    // svCurrentLot rides firmware report 1, whose 13-SV shape is published in the customer
+    // interface spec and means "first registered lot"; 1006 must be the ACTIVE lot.
+    AnsiString svActiveLot;      // TfMain::ActiveLotID()      -> SVID 1006 Lot ID
+    AnsiString svMachineState;   // g_sMachineStateText mirror -> SVID 1011 Machine State
+    int        svLoaderIC;       // tRunData.LoaderIC          -> SVID 1101 Loader Count
     //AI(secs-lotstarttime) 20260730 : SVID 66033. LATCHED by NoteLotStartTime, deliberately
     // NOT refreshed in RefreshSVData - it must answer "when did this lot start", not "now".
     AnsiString svLotStartTime;   // "yyyy/mm/dd hh:nn:ss" of Lot Start ("" between lots)

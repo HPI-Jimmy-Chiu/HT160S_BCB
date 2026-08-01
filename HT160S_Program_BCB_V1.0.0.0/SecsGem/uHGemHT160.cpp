@@ -351,12 +351,37 @@ void HT160Gem::AddSV()
     // Version, 1021 UPH, 1027 System Time) so a shared host SVID table works across
     // machines. HT160-specific run/alarm/output/lot SVs are relocated to a high
     // 66000+ band (9045 max SVID 65095 + 1000, rounded) so they can never collide
-    // with 9045's 1010-1190 count region or any future 9045 SVID growth.
+    // with the 9045 1010-1190 band or any future 9045 SVID growth.
+    //AI(secs-onsite0731) 20260801 : the comment here used to call 1010-1190 a "count region",
+    // which is wrong and is exactly what made 1011 look deliberately skipped. 9045 uses
+    // 1010 "Machine Pre State" and 1011 "Machine State" (uHGemHT9045_SV.cpp:70-71); the
+    // count SVIDs the KYEC host asks for are 1101/1102 (RPTID 501). Both bands are 9045's.
     // -- 9045-aligned common band --
     HGemPtr->SetSVDataPointer(1001, HType.ASCII_TYPE, "Machine Model", "", &HandlerPath, "machine model name (9045 SVID 1001)");
     HGemPtr->SetSVDataPointer(1003, HType.ASCII_TYPE, "Software Version", "", &svSoftwareVersion, "application software version (9045 SVID 1003)");
     HGemPtr->SetSVDataPointer(1021, HType.INT_4_TYPE, "UPH", "pcs/hr", &svUPH, "units per hour (9045 SVID 1021)");
     HGemPtr->SetSVDataPointer(1027, HType.ASCII_TYPE, "System Time", "", &sSystemTime, "current system time (9045 SVID 1027)");
+
+    //AI(secs-onsite0731) 20260801 : KYEC on-site notes 3, 4 and 7. The CJ_EAP host defines
+    // RPTID 502 = {1006,1007,1011,3,1501,1517,1518,1513} and RPTID 501 = {1101..1108,
+    // 16296..16299}, then binds 502 to 22 CEIDs (including 272-275 and the top-traffic
+    // CEID 27) and 501 to five. On 2026-07-31 HT160S answered 1 of 8 and 0 of 12.
+    // These four are the slots whose data HT160S already owns:
+    //   1006 Lot ID       - 9045 ECID 1006 -> fLotInfo->edtSysLotID (uHGemHT9045_EC.cpp:57),
+    //                       proven on the wire by the 2026-06-08 S2F15 carrying "LQ50SIJAG2"
+    //   1011 Machine State- 9045 SVID 1011 -> fMain->palMainStatus (uHGemHT9045_SV.cpp:71)
+    //   1101 Loader Count - tRunData.LoaderIC (the same counter the dead main-screen "Load"
+    //                       panel wants; see aSortArm.cpp TransferPickDataFromLoader)
+    //   1102 Output Total - MachineRun.iTotalSorted, already published as 66021; 1102 is a
+    //                       pure alias so the host's own report resolves without renumbering
+    // Still missing from 502 and tracked in docs/plan/onsite-0731-kyec-triage-20260801.md:
+    // 1007 Operator ID, 1501 Setup File, 3 GemClock (format differs from 1027), 1517 Start
+    // Mode (9045 value domain is 12-valued - needs a KYEC mapping). 1513 Tester On/Off is a
+    // legitimate "no": HT160S is a sorter and has no tester mechanism.
+    HGemPtr->SetSVDataPointer(1006, HType.ASCII_TYPE, "Lot ID", "", &svActiveLot, "active lot id (9045 ECID/SVID 1006 Lot ID)");
+    HGemPtr->SetSVDataPointer(1011, HType.ASCII_TYPE, "Machine State", "", &svMachineState, "main-screen status text (9045 SVID 1011)");
+    HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "Loader Count", "pcs", &svLoaderIC, "ICs picked off Loader trays (9045 SVID 1101)");
+    HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin (9045 SVID 1102; same value as 66021)");
 
     //AI(secs-gem-std) 20260727 : SVID 1518 Real/Dummy, 9045-aligned. Bound DIRECTLY to the live
     // HSys.LastSet.iRealDummy (int; DUMMY=0 / HAS_TRAY=1 / REALLY=2 already match the 9045
@@ -446,6 +471,15 @@ void HT160Gem::RefreshSVData()
     svTotalIC       = tRunData.TotalIC;
     svTotalSorted   = MachineRun.iTotalSorted;
     svUPH           = tRunData.UPH;
+    svLoaderIC      = tRunData.LoaderIC;
+
+    //AI(secs-onsite0731) 20260801 : SVID 1011 Machine State and 1006 Lot ID, the two the
+    // operator called out on 2026-07-31. The host binds RPTID 502 to 22 CEIDs including
+    // CEID 27 "Change Machine State" - the highest-traffic event of the day - and got an
+    // empty item in slot 3 every time. g_sMachineStateText is mirrored at SetMainStatus()
+    // (csystem.cpp), so no VCL property is read on this path.
+    svMachineState  = g_sMachineStateText;
+    svActiveLot     = (fMain!=NULL) ? fMain->ActiveLotID() : AnsiString("");
 
     svLotCount      = LotRegistry.GetLotCount();
     //AI(secs-lot-multilot) 20260730 : walk to the first NON-BLANK slot. This read raw slot 0,

@@ -50,4 +50,18 @@ bool bPadEverCommunicated=false;
 bool bCalculatePauseTime=false;
 TDateTime tUPH_PauseTime;
 TDateTime tUPH_PauseStartTime;
+//AI(secs-onsite0731) 20260801 : UPH numerator baseline. tRunData.TotalIC is deliberately
+//KEPT across power cycles (main.cpp ReadLastDataIni, "user choice") while tRunData.StartTime
+//is re-stamped on the first production cycle of every session (csystem.cpp bFirstRun block).
+//Dividing one by the other is meaningless : on 2026-07-31 SVID 1021 reported 2026 UPH for a
+//window in which 17 units were placed (truth 99, i.e. 20x over). This latches TotalIC at the
+//same instant StartTime is re-stamped so the ratio covers ONE window. Lives here beside
+//bFirstRun/tUPH_PauseTime because both csystem.cpp and main.cpp need it - a file-scope static
+//in csystem.cpp would not link.
+int g_iUphBaseIC=0;
+//AI(secs-onsite0731) 20260801 : mirror of the main-screen status caption for SVID 1011
+//"Machine State" (9045 binds its SVID 1011 straight to fMain->palMainStatus). Written at the
+//single writer SetMainStatus() so the SECS serialize path never reads a VCL property, and so
+//it keeps working if palMainStatus is renamed or the bilingual palMainStatus_En diverges.
+AnsiString g_sMachineStateText="";
 //---------------------------------------------------------------------------
