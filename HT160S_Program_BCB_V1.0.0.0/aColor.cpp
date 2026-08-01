@@ -141,7 +141,7 @@ int TColorModule::GetHomeHaulTargetY()
 //window (ScanDelay CCD shot) so a machine pause taken mid-scan is not charged
 //against the timeout budget -- no false scan-timeout on resume. Called from
 //csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
-//pause/resume edges, alongside Cylinder[]/SortArmSuck. Add future Color timeout
+//pause/resume edges, alongside HSys.CynPtr[]/SortArmSuck. Add future Color timeout
 //timers here; csystem needs no change.
 void TColorModule::PauseTimeoutTimers()
 {

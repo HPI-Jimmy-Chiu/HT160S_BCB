@@ -1568,8 +1568,18 @@ static void ProcessHomeLifecycle()
 static void PauseActuatorTimeoutTimers()
 {
 	int i, r, c;
-	for(i=0; i<MaxCylinderItem; i++)
-		Cylinder[i].Delay.Pause();
+	//AI(ht160s-pause-cylinder) 20260731 : this loop used to walk the GLOBAL Cylinder[] array
+	//(mycylin.cpp:13). That array is never initialised and is referenced NOWHERE else in the
+	//program - every real cylinder lives in HSys.Cyn, reached through CynPtr (database.cpp:767
+	//CynPtr=(TMyCylinder *)&Cyn). So the pause froze 200 dead objects while every real cylinder
+	//Delay kept running: a stroke parked mid-confirm (Task 50 waiting on a reed, or Task 101 in
+	//its settle delay) either alarmed with zero grace on resume, or reported done off a timer
+	//that expired while the machine stood still. The sucker loop below was always correct.
+	if(HSys.CynPtr!=NULL)
+	{
+		for(i=0; i<HSys.iTotalCylinder; i++)
+			HSys.CynPtr[i].Delay.Pause();
+	}
 	for(r=0; r<MAX_SUCKER_ROW; r++)
 		for(c=0; c<MAX_SUCKER_COL; c++)
 			HSys.Suck.SortArmSuck.Suck[r][c].Delay.Pause();
@@ -1595,8 +1605,13 @@ static void PauseActuatorTimeoutTimers()
 static void ReStartActuatorTimeoutTimers()
 {
 	int i, r, c;
-	for(i=0; i<MaxCylinderItem; i++)
-		Cylinder[i].Delay.ReStart();
+	//AI(ht160s-pause-cylinder) 20260731 : resume twin of PauseActuatorTimeoutTimers - see the
+	//comment there for why the global Cylinder[] array was the wrong target.
+	if(HSys.CynPtr!=NULL)
+	{
+		for(i=0; i<HSys.iTotalCylinder; i++)
+			HSys.CynPtr[i].Delay.ReStart();
+	}
 	for(r=0; r<MAX_SUCKER_ROW; r++)
 		for(c=0; c<MAX_SUCKER_COL; c++)
 			HSys.Suck.SortArmSuck.Suck[r][c].Delay.ReStart();

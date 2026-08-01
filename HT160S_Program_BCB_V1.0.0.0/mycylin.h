@@ -22,6 +22,7 @@ class TMyCylinder
 {
 private:
     int Task;
+    int iLastDir;   //AI(ht160s-cylinder-dir) 20260731 : 0=none 1=push 2=pop. Task is SHARED by Push() and Pop(); a direction change must re-arm it or the confirm+watchdog are skipped.
     int OnOff;
     int iOnLeft;
     int iOnTop;
@@ -67,7 +68,6 @@ public:
     void UpdateSimulateCompomentPosition(bool bFlag);
 };
 //---------------------------------------------------------------------------
-extern class TMyCylinder Cylinder[MaxCylinderItem];
 void InitialCylinderName();
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260623 : shared cylinder/sensor "ready" predicates,

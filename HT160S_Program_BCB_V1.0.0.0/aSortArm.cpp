@@ -126,7 +126,7 @@ bool TSortArmModule::PnpSettleElapsed()
 //timers (ResidueDelay[]) so a machine pause taken during a place residue re-suck wait is
 //not charged against the settle budget -- no false residue verdict on resume. Called from
 //csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart pause/
-//resume edges, alongside Cylinder[]/SortArmSuck.
+//resume edges, alongside HSys.CynPtr[]/SortArmSuck.
 void TSortArmModule::PauseTimeoutTimers()
 {
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)

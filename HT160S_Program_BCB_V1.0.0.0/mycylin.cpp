@@ -10,7 +10,11 @@
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
-class TMyCylinder Cylinder[MaxCylinderItem];
+//AI(ht160s-pause-cylinder) 20260731 : the global Cylinder[MaxCylinderItem] array that
+//lived here is DELETED. It was never initialised and, after the pause/resume loops in
+//csystem.cpp were pointed at HSys.CynPtr where the real cylinders live, it had zero
+//readers project-wide. Keeping a plausible-looking decoy next to the real thing is what
+//made the pause bug survive this long. Every cylinder is HSys.Cyn / HSys.CynPtr.
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260623 : shared "ready" predicates (decl in mycylin.h).
 //  Moved here from aAuto1To6.cpp static helpers so all cart modules share them.
@@ -138,6 +142,7 @@ __fastcall TMyCylinder::TMyCylinder()
     EnableAtDataBase=false;
     bInitialOk=false;
     Task=1;
+    iLastDir=0;   //AI(ht160s-cylinder-dir) 20260731
     OnOff=2;
     OnAlarmCode=0;
     OffAlarmCode=0;
@@ -199,6 +204,19 @@ bool TMyCylinder::Push()
     #ifdef SOFT_SIMULATE
     return true;
     #else
+    //AI(ht160s-cylinder-dir) 20260731 : Task is SHARED by Push() and Pop(), and BOTH the
+    //in-position confirm and the timeout watchdog live only inside the if(Task==1) arm block
+    //below. A stroke abandoned mid-flight (the ladder was preempted, HOMEd, or a modal aborted
+    //it) leaves Task at 50 or 101; driving the OTHER direction then skipped the arm entirely
+    //and fell into this direction's case 101 on the PREVIOUS stroke's stale Delay, returning
+    //true without ever reading the reed and without arming any alarm. Re-arm on a direction
+    //change. A same-direction re-entry is untouched, so no stroke that works today changes.
+    if(iLastDir!=1)
+    {
+        Task=1;
+        Delay.Clear();
+        iLastDir=1;
+    }
     if(Enable==false && Task==1)
         Task=100;
 
@@ -301,6 +319,19 @@ bool TMyCylinder::Pop()
     #ifdef SOFT_SIMULATE
     return true;
     #else
+    //AI(ht160s-cylinder-dir) 20260731 : Task is SHARED by Push() and Pop(), and BOTH the
+    //in-position confirm and the timeout watchdog live only inside the if(Task==1) arm block
+    //below. A stroke abandoned mid-flight (the ladder was preempted, HOMEd, or a modal aborted
+    //it) leaves Task at 50 or 101; driving the OTHER direction then skipped the arm entirely
+    //and fell into this direction's case 101 on the PREVIOUS stroke's stale Delay, returning
+    //true without ever reading the reed and without arming any alarm. Re-arm on a direction
+    //change. A same-direction re-entry is untouched, so no stroke that works today changes.
+    if(iLastDir!=2)
+    {
+        Task=1;
+        Delay.Clear();
+        iLastDir=2;
+    }
     if(Enable==false && Task==1)
         Task=100;
 

@@ -98,7 +98,7 @@ void HTimer::ReStart()
 //free-running ComPort spin (no SystemStart gate) and MUST keep running while the
 //machine is paused -- pausing them deadlocks their Spin state machines. Pause is
 //done SCOPED, per actuator, in csystem.cpp::PauseActuatorTimeoutTimers /
-//ReStartActuatorTimeoutTimers over Cylinder[] + SortArmSuck, wired to the
+//ReStartActuatorTimeoutTimers over HSys.CynPtr[0..iTotalCylinder) + SortArmSuck, wired to the
 //SystemStart pause/resume edges. The per-instance Pause()/ReStart() above are
 //correct (iPauseLen compensation); do NOT add a TList registry here that would
 //capture the comm timers without redoing that risk analysis.

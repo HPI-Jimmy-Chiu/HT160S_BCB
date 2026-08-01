@@ -126,7 +126,7 @@ bool TEmptyModule::IsSoftSimulate()
 //timer (AmrFeedWaitTimer -> MES1022 on expiry) so a machine pause taken during the AMR
 //refill wait is not charged against the wait budget -- no premature timeout alarm on
 //resume. Called from csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on
-//the SystemStart pause/resume edges, alongside Cylinder[]/SortArmSuck (mirrors Color).
+//the SystemStart pause/resume edges, alongside HSys.CynPtr[]/SortArmSuck (mirrors Color).
 void TEmptyModule::PauseTimeoutTimers()
 {
     AmrFeedWaitTimer.Pause();
