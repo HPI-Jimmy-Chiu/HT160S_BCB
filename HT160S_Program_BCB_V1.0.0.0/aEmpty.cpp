@@ -431,19 +431,28 @@ void TEmptyModule::DoEmpty(int &Task)
             if(DoGoUpTray(1))
             {
                 //AI(ht160s-empty-return-latch) 20260731 : do NOT drop the interlock while the
-                //return is still OWED. This park restarts the second haul via DoGoUpTray(1)
-                //from the idle terminal, and ONLY DoGoUpTray(Flag==0) re-arms this flag, so
-                //clearing it here left the whole second leg unprotected -- while
-                //NotifyTrayXToEmptyFinish had already overwritten ES_RETURNING -> ES_REAR_READY.
-                //TrayArm then passed IsRearReadyForPick and clamped the very tray the carrier
-                //was re-clamping (onsite 20260730 16:58, alarm 600 on C_Empty_PushTray).
-                //Safe to hold: the only readers are IsCleanOutFinish (already blocked by
-                //bReturnTray on the same line) and ComputeRearPickReadyNoRefresh, which is
-                //called ONLY from the TrayArm pick gate -- no Empty ladder reads it, and the
-                //deposit this park waits for is gated by IsRearReadyForPlace, not by the pick
-                //predicate. So there is no self-block.
+                //return is still OWED. ONLY DoGoUpTray(Flag==0) re-arms this flag, so clearing
+                //it early left the second leg unprotected -- while NotifyTrayXToEmptyFinish had
+                //already overwritten ES_RETURNING -> ES_REAR_READY. TrayArm then passed
+                //IsRearReadyForPick and clamped the very tray the carrier was re-clamping
+                //(onsite 20260730 16:58, alarm 600 on C_Empty_PushTray).
+                //AI(empty-accept-in-place) 20260802 : the park itself moved. Parking HERE
+                //re-runs DoGoUpTray(1) from its idle terminal every scan, so the moment the
+                //deposit set bRearHasTray the restarted ladder hauled the just-deposited tray
+                //rear->front, and DoFeedTray then dragged it straight back -- 8.54 s and three
+                //835 mm traverses per recycled tray (measured, 2026-07-31 TaskHistory), with
+                //zero production purpose. The user ruling: a deposited tray STAYS at the rear;
+                //rear->front exists to CLEAR the rear before a deposit, not after one.
+                //So production parks in case 3500, which never touches the ladder.
+                //CleanOut keeps the old park : during the drain the deposit genuinely must be
+                //hauled up into the front magazine, and that path stays byte-identical.
                 if(bReturnTray && bTrayXToEmptyFinish==false)
-                    return;            //still owed the second leg : LEAVE the latch true
+                {
+                    if(HSys.Sys.RunMode==Run_CleanOut)
+                        return;        //CleanOut drain : old park, ladder re-runs, haul happens
+                    Task=3500;         //production : park with the ladder IDLE (GoUpTask==1)
+                    return;
+                }
                 bRearReturnInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : rear-return finished (tray back at front, rear cleared); lift the pick block
                 //AI(ht160s-home-resume-cg4) 20260713 : Empty mirror of the Color CG-4
                 //close-out blind-spot guard. NotifyTrayXToEmptyFinish sets bRearHasTray +
@@ -459,6 +468,46 @@ void TEmptyModule::DoEmpty(int &Task)
                 }
                 bReturnTray=false;
                 Status=(bRearHasTray ? ES_REAR_READY : ES_IDLE);   //AI(ht160s-status) 20260703
+                Task=1;
+            }
+            break;
+        case 3500:
+            //AI(empty-accept-in-place) 20260802 : production park for an OWED return. The
+            //carrier is parked with the GoUp ladder at its idle terminal (we can only get
+            //here from case 3000 via DoGoUpTray(1)==true), so TrayArm's place gate
+            //IsRearReadyForPlace (GoUpTask==1 + clamps popped + carrier parked) passes and
+            //the deposit lands while we sit still. No DoGoUpTray call in this case - that
+            //is the whole point: nothing re-arms the rear->front haul, so the deposited
+            //tray is accepted IN PLACE and TrayArm can pick it straight back for the next
+            //supply job. bRearReturnInProgress stays TRUE for the entire wait (c80c7ea's
+            //invariant), which keeps the rear un-pickable until the accept below formally
+            //publishes it; the place side never keyed on that flag, so the deposit is not
+            //blocked. Both exits clear the latch in the same pass that re-opens the ladder
+            //(Task=1), and only from this parked posture - never mid-haul.
+            if(bReturnTray==false)
+            {
+                //AI(empty-accept-in-place) 20260802 : TrayArm diverted the carried tray to
+                //an Auto mid-flight (CancelReturnTray) : the deposit is never coming. Close
+                //out exactly like the old completion, or this park deadlocks - and a stuck
+                //bRearReturnInProgress fails BOTH ComputeRearPickReadyNoRefresh and
+                //IsRearReadyForPlace, starving the whole station.
+                bRearReturnInProgress=false;
+                Status=(bRearHasTray ? ES_REAR_READY : ES_IDLE);   //AI(ht160s-status) same rectify as case 3000
+                Task=1;
+                break;
+            }
+            if(bTrayXToEmptyFinish)
+            {
+                //AI(empty-accept-in-place) 20260802 : deposit arrived - accept it in place.
+                //BirthRearTray adopts the software identity (grid + fHasTray) that the old
+                //flow repaired only as a side effect of the round trip; on real hardware
+                //RefreshStateFromSensors already birthed it on the rear-sensor edge, so this
+                //matters for SOFT_SIMULATE/DUMMY where Refresh early-outs. Re-birth is
+                //harmless (content is all EMPTY_IC either way).
+                BirthRearTray();
+                bRearReturnInProgress=false;
+                bReturnTray=false;
+                Status=ES_REAR_READY;   //AI(ht160s-status) : deposited tray re-enters the supply pool at the rear
                 Task=1;
             }
             break;
