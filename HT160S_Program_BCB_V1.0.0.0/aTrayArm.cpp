@@ -227,6 +227,15 @@ AnsiString TTrayArmModule::DescribeState()
        + "  PlaceWaitArmed=" + IntToStr(bPlaceWaitArmed ? 1 : 0)
        + "  bCleanOutFinish=" + IntToStr(bCleanOutFinish ? 1 : 0)
        + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
+    //AI(trayarm-obsv) 20260802 : the DECISION-instant record (see LatchPlaceDecision).
+    //This line reads the latched string only - no sensor refresh on the dump path.
+    //Plain if/else, not a ternary : a ternary yielding AnsiString has crashed BCB6 here.
+    s += "  LastPlaceDecision=";
+    if(sLastPlaceDecision=="")
+        s += "none";
+    else
+        s += sLastPlaceDecision;
+    s += "\r\n";
     return s;
 }
 //---------------------------------------------------------------------------
@@ -973,6 +982,31 @@ bool TTrayArmModule::DoPlace(int Flag)
     return false;
 }
 //---------------------------------------------------------------------------
+//AI(trayarm-obsv) 20260802 : record the destination decision AND the demand it saw, at the
+//instant it was made. GetTrayRequest is a pure state read (it and everything it calls -
+//IsOutputCarFullForAmr, GetNextTrayKindForAuto - write nothing; its RefreshAutoState is the
+//same idempotent sensor refresh DoAuto performs every pass), so sampling all six here adds
+//no latch and no behaviour. Values: -1 = wants nothing, 0/1/2 = Normal/Identity/Cover.
+void TTrayArmModule::LatchPlaceDecision(AnsiString Where)
+{
+    AnsiString sReqs="";
+    for(int a=0; a<6; a++)
+    {
+        if(a>0)
+            sReqs+=",";
+        if(AutoModule!=NULL)
+            sReqs+=IntToStr(AutoModule->GetTrayRequest(a));
+        else
+            sReqs+="?";
+    }
+    sLastPlaceDecision=FormatDateTime("hh:nn:ss.zzz", Now())
+        +" "+Where
+        +" kind="+IntToStr(iDeliverKind)
+        +" dest="+IntToStr(PlaceDest)
+        +" autoTgt="+IntToStr(iAutoTarget)
+        +" autoReq=["+sReqs+"]";
+}
+//---------------------------------------------------------------------------
 void TTrayArmModule::DecidePlaceDestAfterPick()
 {
     //AI(HT160S-Maintainer) 20260606 : called once the Loader empty tray is in hand. The
@@ -996,6 +1030,7 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
         iAutoTarget=-1;
         if(ColorModule!=NULL)
             ColorModule->RequestReadIdentityTray();
+        LatchPlaceDecision("decide");   //AI(trayarm-obsv) 20260802
         return;
     }
     bool bSupplyAuto=false;
@@ -1042,6 +1077,7 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
         if(EmptyModule!=NULL)
             EmptyModule->RequestReturnTray();
     }
+    LatchPlaceDecision("decide");   //AI(trayarm-obsv) 20260802 : covers both the Auto and the Empty branch
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-divert) 20260703 : mid-flight divert (user efficiency request). While the arm
@@ -1080,6 +1116,7 @@ bool TTrayArmModule::TryDivertCarriedTrayToAuto()
     iAutoTarget=idx;
     PlaceDest=TAPLACE_AUTO;
     PlaceTask=1;
+    LatchPlaceDecision("divert");   //AI(trayarm-obsv) 20260802 : mid-flight re-decision, latch it too
     //AI(ht160s-amr-divert) 20260719 : low-frequency breadcrumb (at most one per recovery
     //job) so sim / on-machine runs can confirm the divert actually fired.
     g_EventLog.Log("TA_DIVERT",

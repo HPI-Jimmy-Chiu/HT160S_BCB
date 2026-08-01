@@ -104,6 +104,14 @@ private:
     int GetChannelHandoffX(int Channel);           //eTrayArmChannel -> Teach.TrayXArmTo*XPosition
     bool ChannelPlaceClear(int Channel);           //place destination rear is clear (anti-clash gate)
     AnsiString GetChannelName(int Channel);        //display name for status/alarm text
+    //AI(trayarm-obsv) 20260802 : one-line latch of the LAST place-destination decision,
+    //stamped at the DECISION instant (not the snapshot instant). A State Record is taken
+    //seconds after the moment that matters, and the 2026-07-31 analysis could not say what
+    //the six Autos wanted when the arm chose Empty over an Auto - it had to be reconstructed
+    //by elimination. This records it: time, kind, dest, target, and all six GetTrayRequest
+    //values as the dispatch saw them. Printed by DescribeState into FeederDecision.txt.
+    AnsiString sLastPlaceDecision;
+    void LatchPlaceDecision(AnsiString Where);
 
 public:
     TTrayArmModule();
