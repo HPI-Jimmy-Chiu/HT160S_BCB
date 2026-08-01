@@ -8,6 +8,11 @@
 //   - CurrentTasks.txt : current Task of every module + last change time
 //   - MachineState.ini : RunMode / SystemStart / Recipe / Lot / live Tags
 //   - Snapshot.ini     : trigger reason / time / version
+//   - MotionDetail.ini : per-motor cmd/enc/tgt + amplifier status + axis lock owner
+//   - IoDetail.txt     : LIVE sweep of every cylinder / sensor / switch / sucker
+//   - LotData.json     : lot registry + every 2D code with its Bin data
+//   - FeederDecision.txt / SortArmDecision.txt : per-module latched decision state
+//   - EventLog\ SecsLog\ WebApi log : the narrative that goes with the state
 //   - MachineConfig\   : full copy of system\ config + current recipe folder
 // then compresses the whole folder into  D:\HT160S_StateRecord\<stamp>.zip .
 //
@@ -70,6 +75,13 @@ private:
     //AI(ht160s-state-record-analysis) 20260612 : motor positions + SortArm sub-task +
     //  sucker vacuum, so "sucker not raised during move" is diagnosable from a snapshot.
     void       WriteMotionDetailIni(AnsiString Path);
+    //AI(ht160s-state-record-analysis) 20260801 : whole-registry IO photo - every cylinder
+    //  (out bit + BOTH reed sensors + a derived verdict), every sensor (LIVE level, not a
+    //  module latch), every switch, every sucker. Before this, a snapshot carried 5 of 39
+    //  cylinder out-bits and no reed at all, and the ~18 sensor values it did carry were
+    //  mostly module beliefs - which is why the 07-30 Loader investigation had to reach
+    //  every IsSupplySourceDry() conclusion by elimination.
+    void       WriteIoDetailTxt(AnsiString Path);
     //AI(ht160s-state-record-analysis) 20260616 : SortArm held-IC routing + per-Auto
     //  working-tray cell map, so the place/discharge threshold-mismatch deadlock is
     //  diagnosable offline (which cell blocks the held pattern) without re-running config.

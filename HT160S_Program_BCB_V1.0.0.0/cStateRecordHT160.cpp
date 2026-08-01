@@ -38,6 +38,34 @@ static void SR_Trace(const char *Msg)
     fclose(f);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260801 : fixed-width formatting helpers for the IO
+//dump. Loops rather than a ternary, because a ternary that yields an AnsiString has
+//crashed BCB6 elsewhere in this tree.
+static AnsiString SR_PadR(AnsiString S, int Width)
+{
+    while(S.Length() < Width)
+        S += " ";
+    return S;
+}
+//---------------------------------------------------------------------------
+static AnsiString SR_PadL(AnsiString S, int Width)
+{
+    while(S.Length() < Width)
+        S = " " + S;
+    return S;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260801 : tri-state IO cell. -1 means the point is
+//DISABLED in IO_Table.csv, where printing "0" would be a lie.
+static AnsiString SR_Tri(int V)
+{
+    if(V < 0)
+        return "-";
+    if(V == 0)
+        return "0";
+    return "1";
+}
+//---------------------------------------------------------------------------
 cStateRecordHT160::cStateRecordHT160()
 {
     ModuleCount = 0;
@@ -730,8 +758,63 @@ void cStateRecordHT160::WriteMotionDetailIni(AnsiString Path)
         Val += ", enc=" + IntToStr(M->ReadEncoderPos());
         Val += ", tgt=" + IntToStr(M->TargetPosition);
         Val += ", home=" + IntToStr(M->bHomeFlag ? 1 : 0);
+        //AI(ht160s-state-record-analysis) 20260801 : 'err' is ONLY the soft-limit reject
+        //flag (bErrorMove is set solely when CheckSoftLimit rejects a target), so it reads
+        //0 while a latched servo alarm has stopped the machine - on 2026-07-31 all 20 axes
+        //showed err=0 with SystemStart=0 and the snapshot could not tell an operator stop
+        //from a servo fault. Keep the old key for any existing parser, add the real
+        //amplifier/status layer beside it. Same key, longer value: anything that splits on
+        //", " and looks for "cmd=" is unaffected.
         Val += ", err=" + IntToStr(M->bErrorMove ? 1 : 0);
+        Val += ", limrej=" + IntToStr(M->bErrorMove ? 1 : 0);
+        Val += ", hfin=" + IntToStr(M->bHomeFinish ? 1 : 0);
+        Val += ", en=" + IntToStr(M->GetEnable() ? 1 : 0);
+        Val += ", svalm=" + IntToStr(M->ReadServoAlarmOn() ? 1 : 0);
+        Val += ", erridx=" + IntToStr(M->GetErrorIndex());
+        Val += ", spd=" + IntToStr(M->GetSpeed());
+        Val += ", pct=" + IntToStr(M->GetPersentSpeed());
+        Val += ", slim=" + IntToStr(M->GetSoftLimitN()) + ".." + IntToStr(M->GetSoftLimitP());
+        Val += ", lastHome=" + IntToStr(M->GetLastHomePos());
+        //Led[] is free: ScanAllMotorStatus() already refreshes all axes every MainProc
+        //cycle. Order is HTMotor.h: CW HOME CCW EMG ALM SCW SCCW SVALM INPOS Z SVON.
+        AnsiString Leds = "";
+        for(int b=0; b<iMotLedTotalCnt; b++)
+        {
+            if(M->Led[b])
+                Leds += "1";
+            else
+                Leds += "0";
+        }
+        Val += ", led=" + Leds;
+        Val += ", locks=" + IntToStr(M->GetLockCount());
         Ini->WriteString("Motors", Key, Val);
+    }
+
+    //AI(ht160s-state-record-analysis) 20260801 : who owns each axis. TMyMotor::Lock()
+    //already records the claiming function and Task; it was simply never dumped, so a
+    //stalled axis could not be attributed to a caller. Written ONLY for locked axes, so
+    //the normal snapshot gains zero keys.
+    for(int lm=0; lm<HSys.iTotalMotor; lm++)
+    {
+        TTrayMotor *M = (HSys.MotPtr!=NULL) ? HSys.MotPtr[lm] : NULL;
+        if(M==NULL)
+            continue;
+        int LockN = M->GetLockCount();
+        if(LockN <= 0)
+            continue;
+
+        AnsiString LKey = M->Alias;
+        if(LKey==AnsiString(""))
+            LKey = "Motor" + IntToStr(lm);
+
+        AnsiString LVal = "";
+        for(int li=0; li<LockN; li++)
+        {
+            if(li > 0)
+                LVal += " | ";
+            LVal += M->GetLockString(li);
+        }
+        Ini->WriteString("MotorLocks", LKey, LVal);
     }
 
     // ---- [SortArm] : sub-task + Z-safe readout ----
@@ -787,14 +870,257 @@ void cStateRecordHT160::WriteMotionDetailIni(AnsiString Path)
         {
             for(int c=0; c<Kit.MaxItemC; c++)
             {
+                //AI(ht160s-state-record-analysis) 20260801 : 'vac=' was a permanently-zero
+                //dead field - TMySucker::Status has exactly one writer in the whole tree
+                //(the constructor, setting it false) and this line was its only reader, so
+                //every snapshot ever taken reported vac=0 on every nozzle. That is the one
+                //value the 2026-07-23 "nozzle in position but no vacuum" investigation
+                //needed. Report the driver's real state instead: the two output bits (RAM)
+                //and the LIVE vacuum sensor. Full per-nozzle detail is in IoDetail.txt;
+                //this stays so the historical key keeps a truthful value.
+                TMySucker *P = &Kit.Suck[r][c];
+                int iVac = -1;
+                if(P->Sensor.Enable)
+                {
+                    iVac = 0;
+                    if(P->Sensor.IsOn())
+                        iVac = 1;
+                }
                 AnsiString SK = "S" + IntToStr(r) + "_" + IntToStr(c);
-                AnsiString SV = "vac=" + IntToStr(Kit.Suck[r][c].Status ? 1 : 0);
+                AnsiString SV = "on=" + IntToStr(P->GetOnBit() ? 1 : 0);
+                SV += ", off=" + IntToStr(P->GetOffBit() ? 1 : 0);
+                SV += ", vac=" + SR_Tri(iVac);
                 Ini->WriteString(KitSection, SK, SV);
             }
         }
     }
 
     delete Ini;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260801 : IoDetail.txt - the whole-registry IO photo.
+//
+//WHY: a State Record used to carry 5 of 39 cylinder out-bits (all from one module's
+//DescribeState, added ad hoc for one past investigation) and NO reed sensor at all, so
+//"the cylinder did not reach position" could never be separated from "the reed is dead".
+//The ~18 sensor values it did carry are module LATCHES (aColor.cpp says so in-source),
+//i.e. what the module believes - which is exactly the fact that cannot be cross-checked.
+//
+//READS ARE LIVE AND MUST STAY THAT WAY: every level here goes through TMySensor::IsOn(),
+//never a GetStatus()-style accessor. TMySucker::GetStatus() and friends return true
+//unconditionally when HSys.LastSet.iRealDummy != REALLY, which would paint an all-green
+//picture on any DUMMY/HAS_TRAY bench - the same trap that made iosetview switch to
+//Sensor.IsOn(). Equally, nothing here calls a module helper (IsRearReadyForPick,
+//RefreshStateFromSensors, ...): those WRITE module latches, and a dump must not.
+//
+//SAFETY: single-threaded (MainProc and the UI are the same VCL thread), so no locking is
+//needed and no race is possible. Cost is ~138 enabled bit reads, roughly 8 MainProc
+//cycles' worth, against a snapshot that already blocks this thread for seconds. Outputs
+//(switch/cylinder out bits) are pure RAM and cost no card traffic. Bounded for-loops only,
+//no blocking, no modal.
+void cStateRecordHT160::WriteIoDetailTxt(AnsiString Path)
+{
+    FILE *f = fopen(Path.c_str(), "wb");
+    if(f==NULL)
+        return;
+
+    AnsiString L;
+    L  = "HT160S IO detail (live registry sweep)\r\n";
+    L += "SampleTime=" + FormatDateTime("hh:nn:ss.zzz", Now()) + "\r\n";
+    L += "Levels are LIVE reads (TMySensor::IsOn). '-' = point disabled in IO_Table.csv.\r\n";
+    L += "\r\n";
+    fwrite(L.c_str(), 1, L.Length(), f);
+
+    // ---- [Cylinders] ----
+    L  = "[Cylinders] total=" + IntToStr(HSys.iTotalCylinder) + "\r\n";
+    L += "Idx | Name                           | En | Out | SnOn | SnOff | Verdict     | OnTmo | OffTmo | OnDly | OffDly | AlmOn | AlmOff\r\n";
+    L += "----+--------------------------------+----+-----+------+-------+-------------+-------+--------+-------+--------+-------+-------\r\n";
+    fwrite(L.c_str(), 1, L.Length(), f);
+    for(int c=0; c<HSys.iTotalCylinder; c++)
+    {
+        if(HSys.CynPtr==NULL)
+            break;
+        TMyCylinder *C = &HSys.CynPtr[c];
+
+        int iOut  = 0;
+        if(C->GetOutBit())
+            iOut = 1;
+
+        //NB TMyCylinder::IsOn() reads OnSensor, IsOff() reads OffSensor - both are
+        //"that reed is asserted", not logical opposites.
+        int iSnOn = -1;
+        if(C->OnSensor.Enable)
+        {
+            iSnOn = 0;
+            if(C->IsOn())
+                iSnOn = 1;
+        }
+        int iSnOff = -1;
+        if(C->OffSensor.Enable)
+        {
+            iSnOff = 0;
+            if(C->IsOff())
+                iSnOff = 1;
+        }
+
+        //Verdict is DERIVED here; it adds no machine state. It exists so an operator's
+        //alarm number maps straight to a row and to a physical reading.
+        AnsiString Verdict;
+        if(iSnOn < 0 && iSnOff < 0)
+            Verdict = "NO_SENSOR";
+        else if(iSnOn == 1 && iSnOff == 1)
+            Verdict = "CONTRADICT";
+        else if(iOut == 1 && iSnOn == 1)
+            Verdict = "OUT_OK";
+        else if(iOut == 0 && iSnOff == 1)
+            Verdict = "IN_OK";
+        else if(iOut == 1 && iSnOn == 0)
+            Verdict = "UNCONFIRMED";
+        else if(iOut == 0 && iSnOn == 1)
+            Verdict = "MISMATCH";
+        else
+            Verdict = "-";
+
+        AnsiString Name = C->CylinderName;
+        if(Name==AnsiString(""))
+            Name = "Cyl" + IntToStr(c);
+
+        L  = SR_PadL(IntToStr(c), 3);
+        L += " | " + SR_PadR(Name, 30);
+        L += " | " + SR_PadL(SR_Tri(C->Enable ? 1 : 0), 2);
+        L += " | " + SR_PadL(SR_Tri(iOut), 3);
+        L += " | " + SR_PadL(SR_Tri(iSnOn), 4);
+        L += " | " + SR_PadL(SR_Tri(iSnOff), 5);
+        L += " | " + SR_PadR(Verdict, 11);
+        L += " | " + SR_PadL(IntToStr(C->OnAlarmTime), 5);
+        L += " | " + SR_PadL(IntToStr(C->OffAlarmTime), 6);
+        L += " | " + SR_PadL(IntToStr(C->OnDelayTime), 5);
+        L += " | " + SR_PadL(IntToStr(C->OffDelayTime), 6);
+        //Alarm codes are formatted 4<idx:03d><err:1d>, so printing them lets a reported
+        //number (e.g. 40020) be resolved to this exact row without opening the source.
+        L += " | " + SR_PadL(IntToStr(C->OnAlarmCode), 5);
+        L += " | " + SR_PadL(IntToStr(C->OffAlarmCode), 6);
+        L += "\r\n";
+        fwrite(L.c_str(), 1, L.Length(), f);
+    }
+
+    // ---- [Sensors] ----
+    L  = "\r\n[Sensors] total=" + IntToStr(HSys.iTotalSensor) + "\r\n";
+    L += "Idx | Name                           | En | Typ | Address              | Live\r\n";
+    L += "----+--------------------------------+----+-----+----------------------+-----\r\n";
+    fwrite(L.c_str(), 1, L.Length(), f);
+    for(int s=0; s<HSys.iTotalSensor; s++)
+    {
+        if(HSys.SenPtr==NULL)
+            break;
+        TMySensor *S = &HSys.SenPtr[s];
+
+        int iLive = -1;
+        if(S->Enable)
+        {
+            iLive = 0;
+            if(S->IsOn())
+                iLive = 1;
+        }
+
+        //Type is printed alongside the level because IsOn() inverts unless Type==1 - with
+        //both, the raw wire level is recoverable.
+        AnsiString Addr;
+        if(S->Input!=NULL)
+        {
+            Addr = "Lane" + IntToStr(S->Input->GetLane())
+                 + " IP" + IntToStr(S->Input->GetIP())
+                 + " P"  + IntToStr(S->Input->GetPort())
+                 + " B"  + IntToStr(S->Input->GetBit());
+        }
+        else
+        {
+            Addr = "Card" + IntToStr(S->Card)
+                 + " P"   + IntToStr(S->Port)
+                 + " B"   + IntToStr(S->Bit);
+        }
+
+        AnsiString Name = S->Name;
+        if(Name==AnsiString(""))
+            Name = "Sen" + IntToStr(s);
+
+        L  = SR_PadL(IntToStr(s), 3);
+        L += " | " + SR_PadR(Name, 30);
+        L += " | " + SR_PadL(SR_Tri(S->Enable ? 1 : 0), 2);
+        L += " | " + SR_PadL(IntToStr(S->Type), 3);
+        L += " | " + SR_PadR(Addr, 20);
+        L += " | " + SR_PadL(SR_Tri(iLive), 4);
+        L += "\r\n";
+        fwrite(L.c_str(), 1, L.Length(), f);
+    }
+
+    // ---- [Switches] : pure RAM, zero card traffic ----
+    L  = "\r\n[Switches] total=" + IntToStr(HSys.iTotalSwitch) + "\r\n";
+    L += "Idx | Name                           | En | Out\r\n";
+    L += "----+--------------------------------+----+----\r\n";
+    fwrite(L.c_str(), 1, L.Length(), f);
+    for(int w=0; w<HSys.iTotalSwitch; w++)
+    {
+        if(HSys.SwPtr==NULL)
+            break;
+        TMySwitch *W = &HSys.SwPtr[w];
+
+        AnsiString Name = W->Name;
+        if(Name==AnsiString(""))
+            Name = "Sw" + IntToStr(w);
+
+        L  = SR_PadL(IntToStr(w), 3);
+        L += " | " + SR_PadR(Name, 30);
+        L += " | " + SR_PadL(SR_Tri(W->Enable ? 1 : 0), 2);
+        L += " | " + SR_PadL(SR_Tri(W->OutValue ? 1 : 0), 3);
+        L += "\r\n";
+        fwrite(L.c_str(), 1, L.Length(), f);
+    }
+
+    // ---- [Suckers] : the live vacuum level MotionDetail.ini never had ----
+    L  = "\r\n[Suckers] totalKit=" + IntToStr(HSys.iTotalSucker) + "\r\n";
+    L += "Kit | R | C | Name                     | OnBit | OffBit | Vac | SensorName\r\n";
+    L += "----+---+---+--------------------------+-------+--------+-----+-----------\r\n";
+    fwrite(L.c_str(), 1, L.Length(), f);
+    for(int k=0; k<HSys.iTotalSucker; k++)
+    {
+        if(HSys.SuckPtr==NULL)
+            break;
+        TMyKitSuck &Kit = HSys.SuckPtr[k];
+        for(int r=0; r<Kit.MaxItemR; r++)
+        {
+            for(int cc=0; cc<Kit.MaxItemC; cc++)
+            {
+                TMySucker *P = &Kit.Suck[r][cc];
+
+                int iVac = -1;
+                if(P->Sensor.Enable)
+                {
+                    iVac = 0;
+                    if(P->Sensor.IsOn())
+                        iVac = 1;
+                }
+
+                AnsiString Name = P->SuckerName;
+                if(Name==AnsiString(""))
+                    Name = "Suck" + IntToStr(r) + "_" + IntToStr(cc);
+
+                L  = SR_PadL(IntToStr(k), 3);
+                L += " | " + SR_PadL(IntToStr(r), 1);
+                L += " | " + SR_PadL(IntToStr(cc), 1);
+                L += " | " + SR_PadR(Name, 24);
+                L += " | " + SR_PadL(SR_Tri(P->GetOnBit() ? 1 : 0), 5);
+                L += " | " + SR_PadL(SR_Tri(P->GetOffBit() ? 1 : 0), 6);
+                L += " | " + SR_PadL(SR_Tri(iVac), 3);
+                L += " | " + P->SensorName;
+                L += "\r\n";
+                fwrite(L.c_str(), 1, L.Length(), f);
+            }
+        }
+    }
+
+    fflush(f);
+    fclose(f);
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-state-record-analysis) 20260616 : SortArmDecision.txt - the place/discharge
@@ -1021,8 +1347,23 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
         return false;
 
     SR_Trace("=== TriggerSnapshot start ===");
+    //AI(ht160s-state-record-analysis) 20260801 : VOLATILE READERS FIRST. Motor positions
+    //and IO levels are queried from the card live, so every millisecond spent writing
+    //something else first makes them staler relative to the trigger instant. LotData.json
+    //alone walks every lot slot and every 2D item (13.5 kB on site) and used to run BEFORE
+    //the motion dump. Everything below the volatile block is latched or already on disk and
+    //cannot change while we run - the module ladders are on this same single thread and are
+    //therefore frozen for the whole snapshot.
+    //NB the two TrayArm triggers decel-stop before snapshotting, but the StuckWatchdog and
+    //the manual button do not, so ordering matters most in exactly the cases that catch a
+    //live fault.
     WriteSnapshotIni    (TempDir + "Snapshot.ini",    Reason, Stamp);
     SR_Trace("TS after WriteSnapshotIni");
+    WriteMotionDetailIni(TempDir + "MotionDetail.ini");   //AI(ht160s-state-record-analysis) 20260612 : motor pos + SortArm sub-task + sucker vacuum
+    SR_Trace("TS after WriteMotionDetailIni");
+    WriteIoDetailTxt    (TempDir + "IoDetail.txt");       //AI(ht160s-state-record-analysis) 20260801 : whole-registry cylinder/sensor/switch/sucker sweep
+    SR_Trace("TS after WriteIoDetailTxt");
+
     WriteTaskHistoryCsv (TempDir + "TaskHistory.csv");
     SR_Trace("TS after WriteTaskHistoryCsv");
     WriteCurrentTasksTxt(TempDir + "CurrentTasks.txt");
@@ -1031,7 +1372,6 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
     SR_Trace("TS after WriteMachineStateIni");
     WriteLotDataJson    (TempDir + "LotData.json",     Reason, Stamp);   //AI(ht160s-lot-webapi) 20260612 : full lot + 2D detail as JSON
     SR_Trace("TS after WriteLotDataJson");
-    WriteMotionDetailIni(TempDir + "MotionDetail.ini");   //AI(ht160s-state-record-analysis) 20260612 : motor pos + SortArm sub-task + sucker vacuum
     WriteSortArmDecisionTxt(TempDir + "SortArmDecision.txt");   //AI(ht160s-state-record-analysis) 20260616 : held-IC routing + per-Auto cell map (place/discharge deadlock evidence)
     WriteFeederDecisionTxt(TempDir + "FeederDecision.txt");   //AI(ht160s-state-record-analysis) 20260622 : Color/Empty/Loader latch + config-gate dump
     CaptureConfig       (TempDir + "MachineConfig\\");
