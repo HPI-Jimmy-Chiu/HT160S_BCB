@@ -326,6 +326,12 @@ private:
     // HT9045's eRunStartMode is 0=Continuous / 1=Initial. The two are exactly INVERTED, so
     // this member holds the translated value and the raw flag is never published directly.
     int        svStartMode;      // 9045-numbered start mode   -> SVID 1517 Start Mode
+    //AI(secs-skipiccount) 20260802 : SVID 37010 "Enter Skip IC Count". NOT a live counter -
+    // it is LATCHED to the number the operator typed at the last SKIP, and CEID 78 is fired
+    // immediately after, exactly as HT9045 does (note.cpp:2185-2189, iJamSkipIC = the entered
+    // value, then EventReport). Deliberately not refreshed in RefreshSVData: the host must
+    // read "how many were removed at that alarm", not a running total.
+    int        svSkipICCount;    // operator-entered removal   -> SVID 37010 Enter Skip IC Count
     //AI(secs-lotstarttime) 20260730 : SVID 66033. LATCHED by NoteLotStartTime, deliberately
     // NOT refreshed in RefreshSVData - it must answer "when did this lot start", not "now".
     AnsiString svLotStartTime;   // "yyyy/mm/dd hh:nn:ss" of Lot Start ("" between lots)
@@ -345,6 +351,11 @@ public:
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
     virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
     virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");//AI(secs-lotstarttime) 20260730 : latch/clear SVID 66033 Lot Start Time (sWhen = restored stamp, "" = now)
+    //AI(secs-skipiccount) 20260802 : latch SVID 37010 then fire CEID 78, in that order -
+    // the event exists only to carry that number, so the value must be in place first.
+    // Called from the alarm chokepoint in note.cpp when the operator clears with SKIP and
+    // General.ini [SECS] AskSkipICCount is on.
+    virtual void ReportSkipICCount(int iCount);
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();

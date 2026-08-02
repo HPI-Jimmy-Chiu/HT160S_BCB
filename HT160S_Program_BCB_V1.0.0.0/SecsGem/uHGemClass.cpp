@@ -172,6 +172,7 @@ void HTGem::ServiceAgv(){ }
 void HTGem::OnCommunicationLost(){ }
 //AI(secs-lotstarttime) 20260730 : base no-op; HT160Gem overrides to latch SVID 66033.
 void HTGem::NoteLotStartTime(bool /*bStarted*/, AnsiString /*sWhen*/){ }
+void HTGem::ReportSkipICCount(int /*iCount*/){ }   //AI(secs-skipiccount) 20260802
 void HTGem::AddSV(){ }
 void HTGem::AddEC(){ }
 void HTGem::AddAlarmList(){ }

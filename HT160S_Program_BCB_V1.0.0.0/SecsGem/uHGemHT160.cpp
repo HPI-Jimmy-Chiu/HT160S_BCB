@@ -388,6 +388,12 @@ void HT160Gem::AddSV()
     // that wants the domain can pull it with S2F29->S2F30; HT160S only ever produces 0 or 1
     // because the other seven are test-handler modes (retest / site map / QA / EQC).
     HGemPtr->SetSVDataPointer(1517, HType.INT_4_TYPE, "Start Mode", "", &svStartMode, "0=Continuous Start 1=Initial Start (9045 SVID/ECID 1517 numbering)");
+    //AI(secs-skipiccount) 20260802 : the payload of the host's RPTID 517, which it binds to
+    // CEID 78. 9045 defines 37010 "Enter Skip IC Count" -> &iJamSkipIC (uHGemHT9045_SV.cpp:681),
+    // the number the operator TYPED when asked how many ICs they took out of the tray while
+    // clearing a jam. Without this SVID a CEID 78 would carry an empty report, which is the
+    // whole reason the event exists - so the two ship together.
+    HGemPtr->SetSVDataPointer(37010, HType.INT_4_TYPE, "Enter Skip IC Count", "pcs", &svSkipICCount, "ICs the operator removed at the last SKIP (9045 SVID 37010)");
 
     //AI(secs-gem-std) 20260727 : SVID 1518 Real/Dummy, 9045-aligned. Bound DIRECTLY to the live
     // HSys.LastSet.iRealDummy (int; DUMMY=0 / HAS_TRAY=1 / REALLY=2 already match the 9045
@@ -1103,6 +1109,20 @@ void HT160Gem::S2F30_EquipmentConstantNamelistReply()
 //  latch) so no reformatting or locale can shift it, and it is NEVER derived from
 //  tRunData.StartTime or Now(): those would answer a plausible but wrong moment (the resume, or
 //  the previous lot). No stored stamp -> stay empty, which is the documented "between lots" value.
+//---------------------------------------------------------------------------
+//AI(secs-skipiccount) 20260802 : latch SVID 37010 then fire CEID 78. Order matters and is
+//  copied from HT9045 (note.cpp:2188-2189 sets iJamSkipIC, THEN EventReport): the host's
+//  RPTID 517 is exactly {37010}, so firing first would deliver the previous alarm's number.
+//  Negative input is clamped - the operator cancelling is handled by the caller, which does
+//  not call this at all.
+void HT160Gem::ReportSkipICCount(int iCount)
+{
+    if(iCount < 0)
+        iCount = 0;
+    svSkipICCount = iCount;
+    if(HGemPtr != NULL)
+        HGemPtr->EventReport(1, SECS_EVENT.JamSkipICCount);
+}
 //---------------------------------------------------------------------------
 void HT160Gem::NoteLotStartTime(bool bStarted, AnsiString sWhen)
 {

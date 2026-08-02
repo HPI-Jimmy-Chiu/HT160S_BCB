@@ -183,6 +183,14 @@ public:
 	//Escalate 0 -> 1 -> 2 -> 6 on the machine: the only thing software cannot predict is
 	//whether plant air can drive several Lean+Push+FrontRise strokes at once.
 	int iAutoConcurrency;
+	//AI(secs-skipiccount) 20260802 : ask the operator how many ICs they physically removed
+	//when they clear an alarm with SKIP, and publish it as SVID 37010 + CEID 78 for the
+	//host's inventory reconciliation. HT9045 does this unconditionally (note.cpp:2178,
+	//"Many ICs Taken Out From The Tray :"), but on HT-160S it puts an EXTRA DIALOG on a
+	//path the operator hits every day, so it is opt-in.
+	//  false (default) = no prompt, no CEID 78. Behaviour bit-identical to today.
+	//  true            = prompt on SKIP, then report the number.
+	bool bAskSkipICCount;
 	int iHomeReacquireOffsetCnt;
 	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
 	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)

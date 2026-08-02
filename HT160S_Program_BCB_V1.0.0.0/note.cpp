@@ -9,6 +9,9 @@
 #include "mymessbox.h"
 #include "SecsGem/UsecegemMainFrom.h"
 #include "SecsGem/uHGemHT160.h"
+#include "GeneralSetting.h"   //AI(secs-skipiccount) 20260802 : [SECS] AskSkipICCount gate
+#include "uQwertyKey.h"       //AI(secs-skipiccount) 20260802 : operator numeric prompt
+#include "language.h"         //AI(secs-skipiccount) 20260802 : LangT for the prompt title
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "HTray"
@@ -844,6 +847,48 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
         default:          sRecovery="START";     break;
     }
     g_EventLog.LogRecovery(sRecovery, iPauseSec, Code, Message);
+
+    //AI(secs-skipiccount) 20260802 : SVID 37010 + CEID 78 "Jam Skip IC Count". When the
+    //operator clears an alarm with SKIP the machine writes material off, and KYEC's host
+    //subscribes to CEID 78 -> RPTID 517 -> {37010} to reconcile its inventory. HT9045 asks
+    //"Many ICs Taken Out From The Tray :" at the same point (note.cpp:2178) and reports what
+    //the operator typed; that TYPED number is the entire payload, which is why the prompt and
+    //the event cannot be separated - firing CEID 78 without it sends an empty report.
+    //
+    //OPT-IN, and default OFF, because this is an EXTRA DIALOG on a path the operator hits
+    //every day: General.ini [SECS] AskSkipICCount. With it off nothing here runs and the
+    //behaviour is bit-identical to before.
+    //
+    //Placed AFTER LogRecovery so the EventLog row is already written even if the operator
+    //cancels the prompt, and after ShowModal so no second modal is ever open at once.
+    //Cancel -> report nothing (an unanswered prompt is not "zero removed"; zero would be a
+    //claim we cannot make). Deliberately NOT gated on the alarm being a JAM* code: on
+    //HT-160S the inventory-relevant moment is the SKIP itself, whatever raised it - a
+    //pick-fail SKIP writes cells off exactly like a jam does.
+    if(fNote->ReturnCode==K_SKIP && GeneralSetting.bAskSkipICCount &&
+       HSys.MyGem!=NULL && fMain!=NULL && fQwertyKey!=NULL)
+    {
+        TEdit *Scratch=new TEdit(fMain);
+        try
+        {
+            Scratch->Parent=fMain;
+            Scratch->Visible=false;
+            Scratch->Text="0";
+            if(fQwertyKey->ShowQwertyKey(Scratch, N_INTEGER, 0, true, 0.0, 9999.0,
+                                         LangT("How many ICs were taken out of the tray?")))
+            {
+                int iRemoved=Scratch->Text.ToIntDef(0);
+                HSys.MyGem->ReportSkipICCount(iRemoved);
+                RecordProcess(AnsiString().sprintf("SKIP IC count : %d (alarm %s)",
+                                                   iRemoved, Code.c_str()));
+            }
+        }
+        __finally
+        {
+            delete Scratch;
+        }
+    }
+
     return fNote->ReturnCode;
 }
 //---------------------------------------------------------------------------

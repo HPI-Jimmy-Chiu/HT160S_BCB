@@ -56,6 +56,12 @@ public:
     // moment. Empty = stamp now.
     virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");
 
+    //AI(secs-skipiccount) 20260802 : machine-specific hook - latch SVID 37010 with the
+    // number of ICs the operator removed at a SKIP, then fire CEID 78. Declared here so
+    // the alarm chokepoint can call it through HSys.MyGem (an HTGem*), matching the
+    // NoteLotStartTime convention above. Base is a no-op.
+    virtual void ReportSkipICCount(int iCount);
+
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();
