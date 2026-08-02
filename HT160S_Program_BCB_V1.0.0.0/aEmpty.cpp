@@ -223,7 +223,30 @@ void TEmptyModule::RefreshStateFromSensors()
     bool bHasRearSensor=false;
     bool bRearState=false;
 
-    if(HSys.Sen.SnEmpty_InputHasTray.Enable==true)
+    //AI(ht160s-front-sensor-validity) 20260802 : the FRONT read has the mirror-image of the
+    //rear defect fixed in 92e8bc3. Mechanism owner, recorded at
+    //docs/plan/home-posture-manifest-plan-20260720.md:4 and :55 : "rise1 falsely lights
+    //InputHasTray" - the front rise-1 cylinder lifts the tray stack across the sensor beam,
+    //so a "tray present" read means nothing while rise1 is extended. The read is valid only
+    //while rise1 is confirmed RETRACTED.
+    //The Loader already has this (IsInputHasTrayTrustworthy + a WAIT and a named MES0925,
+    //anti-ghost-d 20260720). Empty deliberately takes the LIGHT form - hold the last latched
+    //state, no wait, no new alarm - because the failure modes are not comparable : Loader's
+    //case 10 MINTS identity data off this read (a ghost tray reaches case 9500 and is later
+    //empty-sucked), whereas Empty only writes a latch. Every downstream hazard here already
+    //has a belt : a clamp closing on air fails DoClampTray's OnSensor confirm and returns 2
+    //(push miss), and a rise1 stuck up raises its own named 40xxx cylinder timeout. Worst
+    //case left is a starved supply that is already alarmed - never a collision, never minted
+    //data.
+    //Enable-gate copied from the Loader predicate : a machine whose rise1 Off-reed is not
+    //installed cannot confirm the position, so treat the read as trustworthy rather than
+    //stalling the front forever ("a disabled point never blocks").
+    //NOT affected : DoGoDownTray case 700's MES1024 confirm reads the sensor directly and
+    //only after rise1 has been popped (case 500) and settled (case 600), so it is valid by
+    //construction and keeps working unchanged.
+    bool bFrontReadValid=(HSys.Cyn.C_Empty_FrontRiseTray_1.OffSensor.Enable==false) ||
+                          HSys.Cyn.C_Empty_FrontRiseTray_1.OffSensor.IsOn();
+    if(HSys.Sen.SnEmpty_InputHasTray.Enable==true && bFrontReadValid)
         bFrontHasTray=HSys.Sen.SnEmpty_InputHasTray.IsOn();
 
     if(HSys.Sen.SnEmpty_OutputBottomHasTray.Enable==true)
