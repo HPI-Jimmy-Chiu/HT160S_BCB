@@ -876,6 +876,25 @@ bool TEmptyModule::DoGoUpTray(int Flag)
                 GoUpTask=1000;   //no front tray -> rear-handling terminal only, no empty raise
                 break;
             }
+            //AI(empty-accept-in-place) 20260802 : re-examination follow-up. The front
+            //restack (cases 100-600) exists to FREE THE CARRIER so the rear tray can be
+            //clamped and hauled forward. When a return finds the rear GENUINELY empty
+            //there is nothing to haul - and since d89d755 the deposit stays on the rear
+            //rest, so the carrier no longer needs to be emptied for it either. The old
+            //design needed this restack because the deposit itself was going to be hauled
+            //onto the carrier at the front; that reason is gone. Skipping it saves a full
+            //rise/separate choreography now plus the matching destack later (~4 s + ~4 s
+            //per occurrence, measured on 2026-07-31 GoDown = 3.959 s).
+            //Gated on bReturnTray so the CleanOut/bLotFinish drain (which enters GoUp with
+            //bReturnTray false and genuinely must push every tray up into the magazine)
+            //keeps the restack; the RunMode guard is the belt for a return that overlaps
+            //a CleanOut transition. bRearHasTray here is the just-refreshed, Z-up-gated
+            //read from the line above, so a phantom cannot re-enable the restack path.
+            if(bReturnTray && bRearHasTray==false && HSys.Sys.RunMode!=Run_CleanOut)
+            {
+                GoUpTask=1000;   //rear empty : nothing to make room for, keep the front tray staged
+                break;
+            }
             GoUpTask=100;
             break;
 
