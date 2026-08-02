@@ -89,6 +89,10 @@
   48 <strong>早已實作</strong>（我的發射點掃描漏抓了 <code>EventReport(1, SECS_EVENT.X)</code> 這種帶
   <code>1,</code> 前綴的寫法）；78 <strong>需要一個目前不存在的操作員輸入框</strong>才有意義。
   CEID <strong>70</strong> 的語意也已從 9045 原始碼定案，結論與第一版的兩種猜測都不同。
+  <hr style="border:0;border-top:1px solid var(--line);margin:10px 0">
+  <strong>2026-08-02 第二次更新 — CEID 78 已裁定並實作完成</strong>（commit <code>8082f0f</code>）<br>
+  §三 描述的 (a)(b)(c) 三個動作全部已做。整個功能<strong>預設關閉</strong>（<code>[SECS] AskSkipICCount=false</code>），
+  所以「警報路徑多一個對話框」這個行為改變只在現場明確開啟後才發生；未開啟前，機台行為與舊版逐位相同。
 </div>
 
 <h2>一、結論：20 個裡沒有任何一個是「補一行就好」</h2>
@@ -159,6 +163,12 @@ host_reports_S2F33.csv : RPTID 517 &nbsp;→&nbsp; { SVID 37010 }<br>
 
 <p><strong>要做就是一個真功能，不是一行發射</strong>：(a) 在 jam-SKIP 路徑加「你從盤裡拿走幾顆？」輸入框、
 (b) 新增 SVID 37010 綁那個數字、(c) 才發 CEID 78。</p>
+<div class="note" style="border-left-color:var(--good)">
+  <strong>✅ 2026-08-02：上述 (a)(b)(c) 已全數實作</strong>（commit <code>8082f0f</code>）<br>
+  下面那個「會在每天走到的警報路徑多一個對話框」的顧慮，是用<strong>設定旗標</strong>解決的：
+  <code>[SECS] AskSkipICCount</code> 預設 <code>false</code>，未開啟時完全不會跳輸入框、也不會發 CEID 78；要用時在 <code>General.ini</code> 把它改成 <code>1</code> 即可。<br>
+  操作員按取消（不填）則不發任何事件——沒回答的問題不等於「拿走 0 顆」。
+</div>
 
 <div class="note">
   ⚠ (a) 會<strong>在操作員每天都會走到的警報路徑上多一個對話框</strong>——這是行為改變，需要人裁定，
@@ -259,12 +269,13 @@ host_reports_S2F33.csv : RPTID 517 &nbsp;→&nbsp; { SVID 37010 }<br>
 <table>
 <tr><th>順序</th><th>項目</th><th>阻塞</th><th>工作量</th></tr>
 <tr><td>1</td><td><strong>發文請京元改 RPTID 524 綁定</strong>，並加訂我們已在發的 16 個事件</td><td><strong>需京元</strong></td><td><strong>零（我方）</strong></td></tr>
-<tr><td>2</td><td>CEID 78 —— <strong>需人裁定</strong>：要不要在 jam-SKIP 路徑加操作員輸入框 + SVID 37010</td><td><strong>需裁定</strong></td><td>中（含 UI 行為改變）</td></tr>
+<tr><td>2</td><td>CEID 78 —— <strong>已裁定並實作完成</strong>：jam-SKIP 路徑加操作員輸入框 + SVID 37010，預設關閉 <code>[SECS] AskSkipICCount=false</code></td><td><strong style="color:var(--good)">✅ 8082f0f</strong></td><td>已完成（上機待驗）</td></tr>
 <tr><td>3</td><td>CEID 49 Tray Feed Finish（需先實作 <code>CheckAllTrayFeedFinish()</code>，目前是回 false 的 stub）</td><td>無</td><td>中</td></tr>
 </table>
 </div>
 <div class="note bad">
   <strong>第一版列的「CEID 48、78 各補一行」已作廢</strong>：48 早已實作，78 需要新功能。
+  （CEID 78 後來經使用者裁定而實作，但它確實不是「一行發射」，而是一個帶設定旗標的新功能。）<br>
   修訂後，這 20 個裡<strong>沒有任何一個是我方可以單方面、低成本補完的</strong>——
   真正划算的一手在第 1 項，而且工作量在京元那邊。
 </div>
