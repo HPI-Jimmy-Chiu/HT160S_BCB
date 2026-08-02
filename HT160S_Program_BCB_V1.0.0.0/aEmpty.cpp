@@ -233,6 +233,29 @@ void TEmptyModule::RefreshStateFromSensors()
             bRearState=true;
     }
 
+    //AI(ht160s-rear-sensor-validity) 20260802 : the rear read is NOT always trustworthy.
+    //Mechanism owner, recorded at docs/plan/home-posture-manifest-plan-20260720.md:4 and :55 :
+    //"TrayArm Z-down falsely lights OutputBottomHasTray"; the reading is valid only while
+    //"TrayArm is not at this station OR its Z is already up". Nothing here honoured that, so a
+    //TrayArm head lowered over the Empty rear made this latch read TRAY PRESENT on an empty
+    //rest. Two consequences, both reported from the machine :
+    //  - the false->true edge below called BirthRearTray(), inventing a phantom tray in the
+    //    software grid (Motion View then shows a tray that is not there), and
+    //  - DoGoUpTray case 1000 took the haul branch on that phantom, so the carrier drove to
+    //    the discharge stop, closed LeanOnTray + PushTray on thin air and drove to the feed
+    //    stop - the "rear has no tray but the clamps push and it moves to front" report.
+    //Gate on Z-up ALONE, deliberately NOT on Z-up + an X-proximity window like MoveColorY /
+    //MoveLoaderY use. Those are COLLISION interlocks and can afford a tight window; this is a
+    //READ-VALIDITY question, and the Empty column sits only 16.37 mm from the TrayArm home
+    //park - the very case the old +500 window provably missed (see MoveEmptyY's note on why
+    //that interlock was removed). Z-down anywhere simply means "hold the last known state" :
+    //no motion is blocked and no ladder can be frozen by it, and only the TrayArm can change
+    //what sits on the Empty rear, so while its head is down elsewhere nothing is being missed.
+    //Latch writers (NotifyTrayXToEmptyFinish / SetRearHasTray) are unaffected - they run after
+    //TrayArm has confirmed its Z lift, which is exactly when the read becomes valid again.
+    if(bHasRearSensor && HSys.Cyn.C_TrayArmZ_Up.IsOn()==false)
+        bHasRearSensor=false;   //TrayArm head down : reading untrustworthy, keep the latch
+
     if(bHasRearSensor)
     {
         //AI(ht160s-tray-source) : in REALLY mode a tray can latch present from the sensor
