@@ -172,6 +172,17 @@ public:
 	int iLoaderDestackSettleMs;
 	int iAutoPushConfirmSettleMs;
 	int iAutoDischargePostYSettleMs;
+	//AI(auto-per-station) 20260802 : how many Auto stations may have a feed/discharge ladder
+	//in flight at the same time. The six output stations are mechanically independent (six
+	//separate MAutoY axes, no shared rail, no ownership token - see Mot_Table M06-M11), but
+	//historically ONE linear ladder served them one at a time, so Auto2 waited on Auto1.
+	//  0 = LEGACY. The original single linear ladder, bit for bit. This is the rollback:
+	//      one ini value and a restart, no firmware change.
+	//  1..6 = per-station ladders, at most this many running concurrently.
+	//      6 = fully independent, which is the stated requirement.
+	//Escalate 0 -> 1 -> 2 -> 6 on the machine: the only thing software cannot predict is
+	//whether plant air can drive several Lean+Push+FrontRise strokes at once.
+	int iAutoConcurrency;
 	int iHomeReacquireOffsetCnt;
 	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
 	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)

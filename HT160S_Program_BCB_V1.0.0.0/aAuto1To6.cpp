@@ -71,6 +71,7 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
     //AI(auto-per-station) 20260802 : per-station ladder cursors reset together.
     for(int ResetIndex=0; ResetIndex<AUTO_STATION_COUNT; ResetIndex++)
     {
+        StationTask[ResetIndex]=0;   //AI(auto-per-station) 20260802 : no ladder in flight
         FeedTask[ResetIndex]=1;
         DischargeTask[ResetIndex]=1;
         DischargeSubTask[ResetIndex]=1;
@@ -143,29 +144,42 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
 //commit is NOT idempotent (car ledger increments), it must run exactly once.
 bool TAutoModule::HomeDrainTick()
 {
-    if(iFeedAuto>=0 && iFeedAuto<AUTO_STATION_COUNT &&
-       (FeedTask[iFeedAuto]==6000 || FeedTask[iFeedAuto]==7000))
+    //AI(auto-per-station) 20260802 : scan EVERY station, not just the one the serial lap
+    //happened to pick. In per-station mode up to six feed commits and six eject tails can
+    //be outstanding when HOME lands; the single-cursor version would have finished one and
+    //silently abandoned the rest, leaving committed trays software-blind.
+    bool bAllFeedCommitted=true;
+    for(int DrainIndex=0; DrainIndex<AUTO_STATION_COUNT; DrainIndex++)
     {
-        FeedTask[iFeedAuto]=7000;
-        if(DoFeedTray(iFeedAuto, 1))
-            FeedTask[iFeedAuto]=1;
+        if(FeedTask[DrainIndex]!=6000 && FeedTask[DrainIndex]!=7000)
+            continue;
+        FeedTask[DrainIndex]=7000;
+        if(DoFeedTray(DrainIndex, 1))
+        {
+            FeedTask[DrainIndex]=1;
+            StationTask[DrainIndex]=0;
+        }
         else
-            return false;
+            bAllFeedCommitted=false;
     }
+    if(bAllFeedCommitted==false)
+        return false;
     //AI(ht160s-home-resume-drain) 20260713 : AD-1 discharge-tail latch. The eject tail
     //(DischargeTask 5000-6100 = MoveAutoY-to-feed + FrontRise) is a MOTOR phase a drain
     //cannot pump; the working tray was committed at DoDischargeTray case 1000 and the
     //clamps released at 3000/4000, so the tray sits free at the output with no live
     //discharge candidate (FindDischargeAuto needs bFullIC, cleared at 1000). Latch the
     //station; DoAuto case 3000 finishes the eject on resume (latch survives keep-material).
-    if(iDischargeAuto>=0 && iDischargeAuto<AUTO_STATION_COUNT &&
-       (DischargeTask[iDischargeAuto]==5000 || DischargeTask[iDischargeAuto]==6000 ||
-        DischargeTask[iDischargeAuto]==6100))
+    //AI(auto-per-station) 20260802 : latch EVERY station sitting in the eject tail.
+    for(int TailIndex=0; TailIndex<AUTO_STATION_COUNT; TailIndex++)
     {
-        if(bDischargeTailPending[iDischargeAuto]==false)
-            RecordProcess("HOME-DRAIN Auto: discharge-tail latched (Auto"+IntToStr(iDischargeAuto+1)+
-                " DischargeTask="+IntToStr(DischargeTask[iDischargeAuto])+")");   //AI(ht160s-obsv-p0) : latch edge only (drain ticks every scan)
-        bDischargeTailPending[iDischargeAuto]=true;
+        if(DischargeTask[TailIndex]!=5000 && DischargeTask[TailIndex]!=6000 &&
+           DischargeTask[TailIndex]!=6100)
+            continue;
+        if(bDischargeTailPending[TailIndex]==false)
+            RecordProcess("HOME-DRAIN Auto: discharge-tail latched (Auto"+IntToStr(TailIndex+1)+
+                " DischargeTask="+IntToStr(DischargeTask[TailIndex])+")");   //AI(ht160s-obsv-p0) : latch edge only (drain ticks every scan)
+        bDischargeTailPending[TailIndex]=true;
     }
     //AI(ht160s-home-resume-drain) 20260713 : AD-2 FrontRise convergence. uHome homes only
     //MAutoY and InitialFlag only resets the DischargeSubTask cursor, so a riser left On by
@@ -499,6 +513,97 @@ int TAutoModule::FindDischargeAuto()
             return Index;
     }
     return -1;
+}
+//---------------------------------------------------------------------------
+//AI(auto-per-station) 20260802 : FindDischargeAuto's three gates, asked of ONE station.
+bool TAutoModule::IsDischargeEligible(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    if(bAmrLocked[Index])
+        return false;
+    return (State[Index].bFullIC && State[Index].bResidueClear);
+}
+//---------------------------------------------------------------------------
+//AI(auto-per-station) 20260802 : THE per-station engine. Each of the six output stations
+//owns its feed/discharge ladder and steps it once per call, so Auto2 no longer waits for
+//Auto1 to finish - the stated requirement. Safe because the ladders are now parameterised
+//by station index (nothing reads a shared cursor) and the six Y axes are mechanically
+//independent: Mot_Table M06-M11 give MAutoY_1..6 their own MC88X1 axes with no shared rail
+//and no ownership token, and DoAllAutoCleanOut has always commanded all six in one scan.
+//
+//Concurrency caps how many ladders may be IN FLIGHT at once. A station already running is
+//never suspended - the cap only refuses to START a new one - so no ladder can be stranded
+//mid-stroke by lowering the value. Returns true when every station is idle.
+bool TAutoModule::ServiceStations(bool bNoNewJobs)
+{
+    int Index;
+    int iInFlight=0;
+    for(Index=0; Index<AUTO_STATION_COUNT; Index++)
+        if(StationTask[Index]!=0)
+            iInFlight++;
+    bool bAllIdle=(iInFlight==0);
+
+    int iCap=GeneralSetting.iAutoConcurrency;
+    if(iCap>AUTO_STATION_COUNT)
+        iCap=AUTO_STATION_COUNT;
+
+    for(Index=0; Index<AUTO_STATION_COUNT; Index++)
+    {
+        switch(StationTask[Index])
+        {
+            case 0:
+                if(bNoNewJobs)
+                    break;
+                //AI(ht160s-home-resume-drain) : AD-1 tail first. A HOME that landed in the
+                //eject tail left a committed tray free at the output with bFullIC already
+                //cleared, so IsDischargeEligible can never rediscover it - the latch is the
+                //only way back. Per station here, where the legacy ladder could only ever
+                //consume ONE tail per lap.
+                if(bDischargeTailPending[Index])
+                {
+                    bDischargeTailPending[Index]=false;
+                    RecordProcess("HOME-RESUME Auto: discharge-tail consumed (Auto"+IntToStr(Index+1)+") - re-enter eject at 5000");
+                    DischargeTask[Index]=5000;
+                    StationTask[Index]=4000;
+                    iInFlight++;
+                    break;
+                }
+                if(iInFlight>=iCap)
+                    break;
+                if(IsFeedEligible(Index))
+                {
+                    DoFeedTray(Index, 0);
+                    StationTask[Index]=2000;
+                    iInFlight++;
+                }
+                else if(IsDischargeEligible(Index))
+                {
+                    DoDischargeTray(Index, 0);
+                    StationTask[Index]=4000;
+                    iInFlight++;
+                }
+                break;
+
+            case 2000:
+                if(DoFeedTray(Index, 1))
+                    StationTask[Index]=0;
+                break;
+
+            case 4000:
+                if(DoDischargeTray(Index, 1))
+                    StationTask[Index]=0;
+                break;
+
+            default:
+                //AI(ht160s-ladder-guard) : number-without-action trap, same posture as the
+                //module ladder - log it and re-idle rather than stall silently.
+                LogLadderFault("Auto.Station"+IntToStr(Index+1), StationTask[Index]);
+                StationTask[Index]=0;
+                break;
+        }
+    }
+    return bAllIdle;
 }
 //---------------------------------------------------------------------------
 int TAutoModule::FindEmptyRearForTrayArm()
@@ -1520,7 +1625,8 @@ AnsiString TAutoModule::DescribeModule()
     s  = "[AutoModule] (cursors SHARED by all six stations)\r\n";
     //AI(auto-per-station) 20260802 : feed/discharge cursors are per station now; the two
     //i*Auto values are dispatch-only (which station the serial lap picked).
-    s += "  CleanOutTask="  + IntToStr(CleanOutTask)
+    s += "  Concurrency="   + IntToStr(GeneralSetting.iAutoConcurrency)
+       + "  CleanOutTask="  + IntToStr(CleanOutTask)
        + "  iFeedAuto="     + IntToStr(iFeedAuto)
        + "  iDischargeAuto="+ IntToStr(iDischargeAuto) + "\r\n";
     for(int DumpIndex=0; DumpIndex<AUTO_STATION_COUNT; DumpIndex++)
@@ -1528,7 +1634,10 @@ AnsiString TAutoModule::DescribeModule()
         s += "  Auto" + IntToStr(DumpIndex+1)
            + " FeedTask="      + IntToStr(FeedTask[DumpIndex])
            + "  DischargeTask=" + IntToStr(DischargeTask[DumpIndex])
-           + "  DischargeSub="  + IntToStr(DischargeSubTask[DumpIndex]) + "\r\n";
+           + "  DischargeSub="  + IntToStr(DischargeSubTask[DumpIndex])
+           + "  StationTask="   + IntToStr(StationTask[DumpIndex])
+           + "  FeedElig="      + IntToStr(IsFeedEligible(DumpIndex) ? 1 : 0)
+           + "  DischElig="     + IntToStr(IsDischargeEligible(DumpIndex) ? 1 : 0) + "\r\n";
     }
     return s;
 }
@@ -1730,6 +1839,36 @@ void TAutoModule::DoAuto(int &Task)
         //(sensor + SortArm re-checked) is what csystem / TrayArm consult for true completion.
         ServiceCleanOutResidualWatchdog();
         return;
+    }
+
+    //AI(auto-per-station) 20260802 : per-station mode. The module ladder keeps ONLY the
+    //once-per-cycle housekeeping and the CleanOut drain; the six feed/discharge ladders
+    //run independently in ServiceStations(). Concurrency==0 falls through to the original
+    //linear ladder below, bit for bit - that is the on-site rollback.
+    if(GeneralSetting.iAutoConcurrency>0)
+    {
+        if(HSys.Sys.RunMode==Run_CleanOut)
+        {
+            //Hand over to the module-wide drain ONLY once every station ladder is idle.
+            //DoAllAutoCleanOut drives all six Y axes and pops all six clamp pairs; letting
+            //it start while a station is mid-transfer would command a conflicting Y target
+            //and release a tray in flight. Start nothing new, drain what is running.
+            if(ServiceStations(true)==false)
+                return;
+            //all idle : fall through to the legacy switch, whose case 100 owns CleanOut
+        }
+        else
+        {
+            //CheckAutoTray refreshes State[] from the sensors; FindFeedAuto is called for
+            //its SIDE EFFECT only - it is the sole maintainer of State[*].bRearCanUse,
+            //which IsDrainedForAmr and the CleanOut residual watchdog both read.
+            CheckAutoTray();
+            ServiceCarFull();
+            FindFeedAuto();
+            ServiceStations(false);
+            Task=1;   //module ladder parks; the stations own the work now
+            return;
+        }
     }
 
     switch(Task)

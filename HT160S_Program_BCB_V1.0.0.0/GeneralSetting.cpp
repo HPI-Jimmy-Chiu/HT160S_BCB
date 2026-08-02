@@ -113,6 +113,7 @@ void THT160GeneralSetting::SetDefault()
 	iColorDestackSettleMs=500;
 	iLoaderDestackSettleMs=1000;
 	iAutoPushConfirmSettleMs=500;
+	iAutoConcurrency=0;   //AI(auto-per-station) 20260802 : 0 = legacy single ladder (see header)
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
 	iHomeDrainTimeoutSec=15;
@@ -231,6 +232,11 @@ void THT160GeneralSetting::Load()
 	iColorDestackSettleMs=Ini->ReadInteger("SettleDelay", "ColorDestackSettleMs", 500);
 	iLoaderDestackSettleMs=Ini->ReadInteger("SettleDelay", "LoaderDestackSettleMs", 1000);
 	iAutoPushConfirmSettleMs=Ini->ReadInteger("SettleDelay", "AutoPushConfirmSettleMs", 500);
+	//AI(auto-per-station) 20260802 : clamped 0..6 so a typo cannot ask for a station that
+	//does not exist. 0 keeps the legacy ladder, which is the on-site rollback value.
+	iAutoConcurrency=Ini->ReadInteger("Auto", "Concurrency", 0);
+	if(iAutoConcurrency<0) iAutoConcurrency=0;
+	if(iAutoConcurrency>6) iAutoConcurrency=6;
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
 	iHomeReacquireOffsetCnt=Ini->ReadInteger("HomeResume", "ReacquireOffsetCnt", 100);
 	iHomeDrainTimeoutSec=Ini->ReadInteger("HomeResume", "DrainTimeoutSec", 15);
@@ -316,6 +322,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "ColorDestackSettleMs", iColorDestackSettleMs);
 	Ini->WriteInteger("SettleDelay", "LoaderDestackSettleMs", iLoaderDestackSettleMs);
 	Ini->WriteInteger("SettleDelay", "AutoPushConfirmSettleMs", iAutoPushConfirmSettleMs);
+	Ini->WriteInteger("Auto", "Concurrency", iAutoConcurrency);
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
 	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);

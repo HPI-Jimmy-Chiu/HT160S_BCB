@@ -58,6 +58,11 @@ private:
     //Parallel [6] arrays rather than members of TAutoStationState, matching the convention this
     //module already uses for bAmrLocked[6] / RearKind[6] / RearGrid[6] (that struct holds only
     //the sensor booleans RefreshAutoState rewrites every pass).
+    //AI(auto-per-station) 20260802 : per-station ladder PHASE, for the concurrent mode.
+    //0 = this station has no ladder in flight; 2000 = feed running; 4000 = discharge
+    //running. Mirrors the module ladder's own phase numbers so a State Record reads the
+    //same either way. Stays 0 throughout while [Auto] Concurrency = 0 (legacy mode).
+    int StationTask[6];
     int FeedTask[6];
     int DischargeTask[6];
     int DischargeSubTask[6];  //AI(general) 20260617 : FrontRise sub-step (per station since 20260802)
@@ -122,6 +127,14 @@ private:
     //cannot be used for a re-validation because it REWRITES State[*].bRearCanUse for all six
     //stations as a side effect; this asks the same question without touching anything.
     bool IsFeedEligible(int Index);
+    //AI(auto-per-station) 20260802 : the FindDischargeAuto terms for ONE station, without
+    //the first-match scan. Same three gates, so per-station mode admits exactly the
+    //stations the legacy scan would have admitted - just without making them queue.
+    bool IsDischargeEligible(int Index);
+    //AI(auto-per-station) 20260802 : step every station's own ladder once. Returns true
+    //when NO station has a ladder in flight - that is the hand-over condition CleanOut
+    //waits on. bNoNewJobs starts nothing new and only drains what is already running.
+    bool ServiceStations(bool bNoNewJobs);
     bool DoAllAutoCleanOut(int Flag);
     bool AllStationsDrainLatched();                 //AI(cleanout) 20260706 : pure per-station drain latch (DoAuto stop-gate)
     void ServiceCleanOutResidualWatchdog();         //AI(cleanout) 20260706 : EventLog-only residual notice (log-once per episode)
