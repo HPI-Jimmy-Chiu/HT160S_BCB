@@ -267,7 +267,19 @@ void TColorModule::RefreshStateFromSensors()
         //mirroring TEmptyModule (bFrontHasTray=SnEmpty_InputHasTray.IsOn()). SnColor_InputHasTray
         //is the same hardware role as SnEmpty_InputHasTray, so bFrontHasTray tracks it directly
         //(was a logical-only latch -- the divergence from Empty).
-        bFrontHasTray=HSys.Sen.SnColor_InputHasTray.IsOn();
+        //AI(ht160s-front-sensor-validity) 20260802 : same rise1 gate as Empty (E1). This
+        //block says it mirrors TEmptyModule - it mirrored the missing gate too. The front
+        //rise-1 cylinder lifts the stack across the beam, so the read is valid only while
+        //rise1 is confirmed retracted; otherwise keep the last latched state.
+        //Light form for the same reason as Empty : Color only writes a latch here, it does
+        //not mint identity data the way the Loader's case 10 does.
+        //NOT affected : DoGoDownTray case 700's MES1424 confirm runs after rise1 is popped
+        //and settled, so its RefreshStateFromSensors call sees the gate open and updates
+        //normally - the confirm keeps its full strength.
+        bool bFrontReadValid=(HSys.Cyn.C_Color_FrontRiseTray_1.OffSensor.Enable==false) ||
+                              HSys.Cyn.C_Color_FrontRiseTray_1.OffSensor.IsOn();
+        if(bFrontReadValid)
+            bFrontHasTray=HSys.Sen.SnColor_InputHasTray.IsOn();
     }
 
     if(HSys.Sen.SnColor_InputFullTray.Enable==true)
