@@ -83,67 +83,112 @@
   為什麼沒發、該不該補。
 </div>
 
-<h2>一、結論：20 個「缺口」裡，真缺口只有 2 個</h2>
+<div class="note bad">
+  <strong>2026-08-02 修訂 — 本文第一版有兩處錯誤</strong><br>
+  第一版把 CEID <strong>48</strong> 與 <strong>78</strong> 列為「可補、零阻塞」，逐條查證後<strong>兩項都不成立</strong>：
+  48 <strong>早已實作</strong>（我的發射點掃描漏抓了 <code>EventReport(1, SECS_EVENT.X)</code> 這種帶
+  <code>1,</code> 前綴的寫法）；78 <strong>需要一個目前不存在的操作員輸入框</strong>才有意義。
+  CEID <strong>70</strong> 的語意也已從 9045 原始碼定案，結論與第一版的兩種猜測都不同。
+</div>
+
+<h2>一、結論：20 個裡沒有任何一個是「補一行就好」</h2>
 
 <div class="big">
-  <div><div class="n" style="color:var(--muted)">4</div><div class="l">A 假缺口<br>有發射點，當天沒觸發</div></div>
-  <div><div class="n" style="color:var(--good)">2</div><div class="l">B 可補<br>零外部阻塞</div></div>
-  <div><div class="n" style="color:var(--warn)">1</div><div class="l">C 需確認語意</div></div>
-  <div><div class="n" style="color:var(--info)">12</div><div class="l">D 機構不存在<br>正確的「沒有」</div></div>
+  <div><div class="n" style="color:var(--muted)">5</div><div class="l">A 假缺口<br>有發射點，當天沒觸發</div></div>
+  <div><div class="n" style="color:var(--warn)">1</div><div class="l">B 需新功能<br>缺 host 要的那個數字</div></div>
+  <div><div class="n" style="color:var(--info)">13</div><div class="l">D 機構不存在<br>正確的「沒有」</div></div>
   <div><div class="n" style="color:var(--bad)">1</div><div class="l">E host 自己關掉</div></div>
 </div>
 
-<h2>二、<span class="pill p-a">A</span> 假缺口（4 個）— 我方有發射點，當天只是沒觸發</h2>
+<h2>二、<span class="pill p-a">A</span> 假缺口（5 個）— 我方有發射點，當天只是沒觸發</h2>
 <div class="tablewrap">
 <table>
 <tr><th>CEID</th><th>名稱</th><th>HT-160S 發射點</th><th>9045 06-08</th></tr>
 <tr><td><strong>9</strong></td><td>Switch Real Dummy Mode</td><td><code>SECS_EVENT.SwitchRunMode</code></td><td>未發</td></tr>
 <tr><td><strong>14</strong></td><td>Switch StartMode</td><td><code>main.cpp:1782</code></td><td>發 16 次</td></tr>
 <tr><td><strong>15</strong></td><td>Switch Setup File</td><td><code>SECS_EVENT.SwitchSetupFile</code></td><td>發 1 次</td></tr>
+<tr><td><strong>48</strong></td><td>Change EC</td><td><strong><code>uHGemHT160.cpp:1194</code></strong>（20260729 已加）</td><td>未發</td></tr>
 <tr><td><strong>275</strong></td><td>AMR LD ID</td><td><code>uAgvStation.cpp:217</code></td><td>發 2 次</td></tr>
 </table>
 </div>
-<p>這四個只是 07-31 當天<strong>沒有人切 Real/Dummy、沒切 Start Mode、沒換 recipe、沒有身分盤上傳</strong>。
+<p>這五個只是 07-31 當天<strong>沒有人切 Real/Dummy、沒切 Start Mode、沒換 recipe、沒改 EC、沒有身分盤上傳</strong>。
 機台一旦做這些動作就會發。</p>
-<div class="note">
-  <strong>掃描陷阱</strong>：CEID 275 我第一次掃發射點時<strong>漏抓</strong>——它用<strong>字面值</strong>
-  <code>EventReport(1, 275)</code> 而非 <code>SECS_EVENT</code> 常數。
-  日後盤點發射點時，兩種寫法都要涵蓋。
+<div class="note bad">
+  <strong>發射點掃描的兩個盲點（我自己踩過，記下來）</strong><br>
+  HT-160S 的 <code>EventReport</code> 有<strong>三種寫法</strong>，只掃其中一種會漏判：
+  <ol style="margin:6px 0">
+    <li><code>EventReport(SECS_EVENT.X)</code></li>
+    <li><code>EventReport(1, SECS_EVENT.X)</code> ← <strong>CEID 48 漏在這裡</strong></li>
+    <li><code>EventReport(1, 275)</code> 字面值 ← <strong>CEID 275 漏在這裡</strong></li>
+  </ol>
+  另有陣列式 <code>EventReport(1, AutoCeid[i])</code> / <code>AutoFullCeid[i]</code> 需人工展開。
 </div>
 
-<h2>三、<span class="pill p-b">B</span> 可補，且我方零阻塞（2 個）</h2>
+<h2>三、<span class="pill p-c">B</span> CEID 78 — 有發射時機，但沒有 host 要的那個數字</h2>
 
-<h3>CEID 48 — Change EC（設定值被修改）</h3>
-<ul>
-  <li><strong>現況</strong>：無發射點，但<strong>我們已經在處理 S2F15 的 EC 寫入</strong>
-      （<code>uHGemHT160.cpp:1120</code> 的 <code>ECID&gt;=2758 &amp;&amp; ECID&lt;=2763</code> 閘）。</li>
-  <li><strong>補法</strong>：S2F15 寫入成功後發 CEID 48。工作量極小。</li>
-  <li><strong>價值</strong>：host 訂了它，代表在意「誰改了機台參數」——可稽核性，MES 常見需求。</li>
-</ul>
+<p>第一版說「兩個資料源本週剛好都到位，補一行就好」——<strong>那是錯的</strong>。從 host 自己的訂閱回推：</p>
 
-<h3>CEID 78 — Jam Skip IC Count（卡料／跳過顆數）</h3>
-<ul>
-  <li><strong>現況</strong>：無發射點，但<strong>兩個資料源本週剛好都到位</strong>——
-      <code>tRunData.JamCount</code>（本週建立的 jam 機制）與 <code>tRunData.iAutoSkipCount</code>（既有）。</li>
-  <li><strong>價值</strong>：接上操作員筆記第 6 條「jam rate」的同一條資料鏈，host 端也能收到。</li>
-</ul>
+<div class="card mono" style="font-size:.85rem;line-height:1.9">
+host_links_S2F35.csv&nbsp;&nbsp;&nbsp;: CEID 78 &nbsp;→&nbsp; RPTID 517<br>
+host_reports_S2F33.csv : RPTID 517 &nbsp;→&nbsp; { SVID 37010 }<br>
+9045 uHGemHT9045_SV.cpp:681 : SVID 37010 = <strong>"Enter Skip IC Count"</strong> → <code>&amp;iJamSkipIC</code>
+</div>
 
-<h2>四、<span class="pill p-c">C</span> 語意需確認（1 個）</h2>
-<h3>CEID 70 — Barcode Reader Enter</h3>
-<ul>
-  <li><strong>9045 06-08 發了 13 次</strong>——當天第 6 高頻事件，顯然是實際在用的功能。</li>
-  <li><strong>語意不確定</strong>：可能是「操作員進入條碼輸入頁面」，也可能是「讀取器讀到資料」。</li>
-  <li>HT-160S 有 Top/Color CCD 的 2D 讀取，也有 <code>uQwertyKey</code> 條碼輸入介面，
-      <strong>兩種語意都可能對應</strong>——補錯邊等於送假資料。</li>
-  <li><strong>動作</strong>：查 9045 觸發點確認語意後再決定。<strong>我方可自查，不必問京元。</strong></li>
-</ul>
+<p><strong>9045 的完整流程</strong>（<code>note.cpp:2170-2189</code>）：</p>
+<ol>
+  <li>操作員在<strong>卡料警報</strong>選 <strong>SKIP</strong></li>
+  <li>機台跳出輸入框 <strong>「Many ICs Taken Out From The Tray :」</strong></li>
+  <li>操作員<strong>手動輸入</strong>他從盤裡拿走幾顆 → <code>iJamSkipICCount</code></li>
+  <li><code>iJamSkipIC = iJamSkipICCount</code></li>
+  <li><strong>才</strong>發 CEID 78</li>
+</ol>
 
-<h2>五、<span class="pill p-d">D</span> 分選機無此機構（12 個）— 正確的「沒有」</h2>
+<div class="note bad">
+  <strong>CEID 78 的全部意義，就是載那個「操作員手動拿走幾顆」的數字</strong>——用途是 MES 的庫存對帳。
+  沒有那個輸入框、沒有 SVID 37010，<strong>發 CEID 78 只會送出一個空事件</strong>。
+</div>
+
+<div class="tablewrap">
+<table>
+<tr><th>我們有的</th><th>是什麼</th><th>能不能當 37010 用</th></tr>
+<tr><td><code>tRunData.iAutoSkipCount</code></td><td><strong>機台</strong>在 SortArm 取料失敗時<strong>自動</strong>跳過的格數</td><td>❌ 不同的量（機台判定 vs 操作員申報）</td></tr>
+<tr><td><code>tRunData.JamCount</code></td><td>本週建立的 jam 事件計數</td><td>❌ 是「發生幾次卡料」，不是「拿走幾顆 IC」</td></tr>
+<tr><td>操作員輸入框</td><td><strong>不存在</strong></td><td>—</td></tr>
+</table>
+</div>
+
+<p><strong>要做就是一個真功能，不是一行發射</strong>：(a) 在 jam-SKIP 路徑加「你從盤裡拿走幾顆？」輸入框、
+(b) 新增 SVID 37010 綁那個數字、(c) 才發 CEID 78。</p>
+
+<div class="note">
+  ⚠ (a) 會<strong>在操作員每天都會走到的警報路徑上多一個對話框</strong>——這是行為改變，需要人裁定，
+  不應由我單方面加。<strong>替代方案（送 <code>iAutoSkipCount</code>）我不建議</strong>：SVID 名稱是
+  <code>"Enter Skip IC Count"</code>，<em>Enter</em> 就是「操作員輸入」的意思，
+  塞機台自算的數字進去會誤導 host。
+</div>
+
+<h2>四、CEID 70 — 語意已定案，結論是「我們沒有」</h2>
+<p>第一版猜「可能是進入條碼頁、也可能是讀到條碼」。<strong>兩個都不對</strong>。從 9045 原始碼定案：</p>
+<div class="tablewrap">
+<table>
+<tr><th>觸發點</th><th>情境</th></tr>
+<tr><td><code>BarcodeReader.cpp:107</code></td><td>操作員在條碼輸入框按 <strong>ENTER</strong> → 字串存進 <code>asSecsGemBarCode</code></td></tr>
+<tr><td><code>mymessbox.cpp:1334</code></td><td><strong>ID／密碼驗證對話框</strong>輸入後 → 同樣存進 <code>asSecsGemBarCode</code></td></tr>
+</table>
+</div>
+<p>也就是說 CEID 70 = <strong>「操作員用條碼槍／鍵盤輸入了一個字串（工號、密碼、料號）並按 ENTER」</strong>，
+目的是把那個字串交給 host。它<strong>不是</strong> 2D 盤碼讀取。</p>
+<p><strong>HT-160S 沒有這個東西</strong>：我們的批號來自 WebAPI 與 CCD 的 2D 讀取，不是操作員條碼輸入；
+操作員身分變更我們已有 <strong>CEID 16 Switch UserLevel</strong> 在發。
+→ <strong>歸入 D 類，不實作。</strong></p>
+
+<h2>五、<span class="pill p-d">D</span> 分選機／9045 專屬機構（13 個）— 正確的「沒有」</h2>
 <div class="tablewrap">
 <table>
 <tr><th>CEID</th><th>名稱</th><th>為什麼分選機沒有</th><th>9045 06-08</th></tr>
 <tr><td>10</td><td>Switch Tester Online</td><td>沒有測試機連線</td><td>未發</td></tr>
 <tr><td>13</td><td>Switch Temperature Mode</td><td>沒有控溫機構</td><td>未發</td></tr>
+<tr><td>70</td><td>Barcode Reader Enter</td><td>操作員條碼／密碼輸入，我們沒有這條輸入鏈（見 §四）</td><td>發 13 次</td></tr>
 <tr><td>26</td><td>Get Test Result</td><td>沒有測試結果（我們的 bin 來自 WebAPI/2D，不是測試）</td><td>發 12 次</td></tr>
 <tr><td>34</td><td>Auto Clean Start</td><td>9045 的 auto-clean 是<strong>測試接點清潔</strong>；我們的 Clean Out 是<strong>排盤</strong>，不同概念且已有 CEID 4/42</td><td>發 1 次</td></tr>
 <tr><td>44</td><td>Site On Off</td><td>沒有測試 site</td><td><strong>發 31 次</strong></td></tr>
@@ -209,16 +254,19 @@
 </ul>
 <p>其餘 13 個全是 ART／FT／contact-height 等測試機流程。</p>
 
-<h2>九、建議執行順序</h2>
+<h2>九、建議執行順序（修訂）</h2>
 <div class="tablewrap">
 <table>
 <tr><th>順序</th><th>項目</th><th>阻塞</th><th>工作量</th></tr>
-<tr><td>1</td><td>CEID 48 Change EC（S2F15 寫入成功後發）</td><td>無</td><td>小</td></tr>
-<tr><td>2</td><td>CEID 78 Jam Skip IC Count（接本週的 jam 計數）</td><td>無</td><td>小</td></tr>
-<tr><td>3</td><td>CEID 70 語意查證（讀 9045 觸發點）→ 決定補不補</td><td>無（我方自查）</td><td>小</td></tr>
-<tr><td>4</td><td>發文請京元改 RPTID 524 綁定，並加訂我們已在發的 16 個</td><td><strong>需京元</strong></td><td>零（我方）</td></tr>
-<tr><td>5</td><td>CEID 49 Tray Feed Finish（需先實作 <code>CheckAllTrayFeedFinish()</code>）</td><td>無</td><td>中</td></tr>
+<tr><td>1</td><td><strong>發文請京元改 RPTID 524 綁定</strong>，並加訂我們已在發的 16 個事件</td><td><strong>需京元</strong></td><td><strong>零（我方）</strong></td></tr>
+<tr><td>2</td><td>CEID 78 —— <strong>需人裁定</strong>：要不要在 jam-SKIP 路徑加操作員輸入框 + SVID 37010</td><td><strong>需裁定</strong></td><td>中（含 UI 行為改變）</td></tr>
+<tr><td>3</td><td>CEID 49 Tray Feed Finish（需先實作 <code>CheckAllTrayFeedFinish()</code>，目前是回 false 的 stub）</td><td>無</td><td>中</td></tr>
 </table>
+</div>
+<div class="note bad">
+  <strong>第一版列的「CEID 48、78 各補一行」已作廢</strong>：48 早已實作，78 需要新功能。
+  修訂後，這 20 個裡<strong>沒有任何一個是我方可以單方面、低成本補完的</strong>——
+  真正划算的一手在第 1 項，而且工作量在京元那邊。
 </div>
 
 <div class="foot">
