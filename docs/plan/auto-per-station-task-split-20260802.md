@@ -225,3 +225,50 @@ P1 無需回退（行為不變）。P2 的回退是 `General.ini [Auto] Concurre
 本文採信的每一條都經我本人重新開檔覆核（§3 表格）；其餘僅供 P2 立案時的起點，
 **實作前必須逐條重驗**。原始發現保存於工作區 journal
 `wf_0a6adbc6-391/journal.jsonl`。
+
+
+---
+
+## 11. 執行結果（2026-08-02 當日更新）
+
+使用者裁定：**「實際需求是不用等，兩個沒有相關性」**，並確認 Auto 流道上永遠只有一盤在跑不變。
+依此執行，兩個 commit：
+
+### P1 `e0f66d0` — 參數化（行為位元不變）
+見 §4。梯形圖改吃站別索引，`Car[Index]` 天生正確，`Car[]` 蓋錯的危害結構性消失。
+
+### P2 `911622f` — 六站獨立，`[Auto] Concurrency` 閘門
+
+**設計改為 SHAPE B（單一 action + 內部六條梯形圖），不是計畫原本寫的 SHAPE A。** 三個理由都經覆核：
+
+1. **SHAPE A 會踩開機地雷**：`cSelfCheck.cpp:16` `EXPECTED_MOTION_ACTION_COUNT=7`，
+   `ht160s.cpp:259-266` 在 `ValidateWiring` 失敗時直接中止 WinMain。
+2. **action 順序是 load-bearing**（程式假設 Auto 在 TrayArm 之前），附加五個會把五站放到邊界錯邊。
+3. **Loader 前例不成立**：Loader 是兩線道但**共用**前站與 Y 軌；六個 Auto 是完全獨立硬體。
+
+SHAPE B 三個都避開，且達成同樣的六站獨立。
+
+**設定**：`General.ini [Auto] Concurrency`，clamp 0..6
+- `0`（預設）= 原本的線性梯形圖，**位元不變**。這就是回退：改一個值 + 重啟，不動韌體。
+- `1..6` = per-station 梯形圖，最多 N 條同時在跑。`6` = 完全獨立。
+- **已在跑的站永遠不會被中止**——閘門只拒絕「開新的」，所以調低數值不可能讓梯形圖卡在半途。
+
+**三個 blocker 的處置**
+
+| 危害 | 處置 |
+|---|---|
+| `Car[]` 蓋錯 | P1 已根治（索引參數化）。**沒有 P1 就做 P2 會直接汙染 AMR 出料車身分與 SECS DeviceCount** |
+| CleanOut 入口競態 | CleanOut 改為「不開新工作、等 `ServiceStations(true)` 回報全站 idle」才交棒給 `DoAllAutoCleanOut` |
+| HOME 尾單只 latch 一個 | `HomeDrainTick` 改掃全部六站：每個 6000/7000 的 feed commit 都代跑，每個 5000-6100 的 eject 尾都 latch；`ServiceStations` 在 resume 時**逐站**消耗 |
+
+**`bRearCanUse` 仍被維護**：`FindFeedAuto()` 是它唯一的寫入者，而 `IsDrainedForAmr` 與
+CleanOut 殘料監看都會讀，所以 per-station 模式仍每 cycle 呼叫它一次**純取副作用**，
+實際選站改用非變異的 `IsFeedEligible` / `IsDischargeEligible`。
+
+**新增觀測**：`DescribeModule` 現在傾印 `Concurrency` 以及每站的
+`StationTask` / `FeedElig` / `DischElig`——這就是量化實際效益所需的數據。
+
+### 上機建議
+0 → 1 → 2 → 6 逐步放大，每階段存一次 State Record 看 `FeedElig`/`DischElig` 有幾站同時為 1。
+**軟體唯一無法預測的是氣壓餘裕**（數支 Lean+Push+FrontRise 同時動作），這正是閘門存在的理由；
+現有 `SnAirIsEnough` 互鎖把失效模式限縮成停機擾動而非撞機。
