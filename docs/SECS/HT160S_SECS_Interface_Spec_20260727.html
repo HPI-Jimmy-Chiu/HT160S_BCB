@@ -621,7 +621,7 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 <h2 id="3-data-dictionary">3. 資料字典 / Data Dictionary</h2>
 <blockquote>
 <p>⚠️ <strong>CEID 編號(§3.3)自 2026-07-29 起與 HT-90XX 完全相同</strong>,host 可直接沿用 HT-90XX 的 CEID 設定,
-但須注意本機只有其中 52 個號碼有發射點(§3.3.1),其餘 223 個雖已註冊卻永遠不會送出(§3.3.2)。</p>
+但須注意本機只有其中 53 個號碼有發射點(§3.3.1，其中 CEID 78 為條件發射、預設關閉),其餘 222 個雖已註冊卻永遠不會送出(§3.3.2)。</p>
 <p>⚠️ <strong>SVID 編號(§3.1)仍為本機自有</strong>,與 HT-90XX (tester) 不同。若 host 依 HT-90XX 字典設定報表內容,
 請依 §3.1 重新對應;HT-160S 的 S2F33/S2F35 會<strong>容忍</strong>未知的 SVID(見 §4),但那些欄位會回空值。</p>
 </blockquote>
@@ -943,8 +943,10 @@ meanings published in the 2026-07-27 and earlier revisions are withdrawn.</stron
 per this section; see §3.3.5 for the old-to-new mapping.</p>
 </blockquote>
 <h4 id="331-events-this-equipment-actually-sends">3.3.1 本機實際會發射的事件 / Events this equipment actually sends</h4>
-<p>以下 <strong>52</strong> 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。</p>
-<p>The following <strong>52</strong> ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.</p>
+<p>以下 <strong>53</strong> 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
+其中 <strong>CEID 78 為條件發射</strong>，出廠預設關閉，其餘 52 個不受設定影響。</p>
+<p>The following <strong>53</strong> ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
+<strong>CEID 78 is conditional</strong> (off by default); the other 52 are not gated by any setting.</p>
 <table>
 <thead>
 <tr>
@@ -1130,6 +1132,11 @@ per this section; see §3.3.5 for the old-to-new mapping.</p>
 <td>Start 且機內<strong>有</strong> IC</td>
 </tr>
 <tr>
+<td>78</td>
+<td>Jam Skip IC Count</td>
+<td>條件發射：以 SKIP 解除警報且操作員輸入取出顆數（需 General.ini <code>[SECS] AskSkipICCount=1</code>，預設關閉）</td>
+</tr>
+<tr>
 <td>123</td>
 <td>Safe Door On Off</td>
 <td>安全門開↔關<strong>任一方向</strong>邊緣(運轉中與停機中皆送)</td>
@@ -1168,9 +1175,9 @@ per this section; see §3.3.5 for the old-to-new mapping.</p>
 <li><strong>CEID 73</strong> 於<strong>每一次</strong>訊息框關閉皆送(HT-90XX 僅對 SECS 來源的警報框送)。</li>
 </ul>
 <h4 id="332-registered-but-never-sent">3.3.2 已註冊但本機不會發射的事件 / Registered but never sent</h4>
-<p>號碼 1–275 之中,上表以外的 <strong>223</strong> 個號碼<strong>皆已註冊</strong>(有別名、可被 <code>S2F35</code> 連結、可被 <code>S2F37</code> 啟用/停用),
+<p>號碼 1–275 之中,上表以外的 <strong>222</strong> 個號碼<strong>皆已註冊</strong>(有別名、可被 <code>S2F35</code> 連結、可被 <code>S2F37</code> 啟用/停用),
 但 HT-160S <strong>沒有對應機構,永遠不會送出</strong>。這是為了讓 host 的字典與 HT-90XX 完全一致而刻意保留的。</p>
-<p>Every id in 1–275 not listed above — <strong>223</strong> of them — <strong>is registered</strong> (it has an alias, can be linked by
+<p>Every id in 1–275 not listed above — <strong>222</strong> of them — <strong>is registered</strong> (it has an alias, can be linked by
 <code>S2F35</code>, can be enabled/disabled by <code>S2F37</code>) but HT-160S <strong>has no such mechanism and will never send it</strong>.
 They are kept registered on purpose so the host dictionary matches HT-90XX exactly.</p>
 <p>主要類別 / Main categories:</p>
@@ -1773,7 +1780,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 <p><strong>保護</strong>:若對「已存在的機台事件(如 AMR 272-275)」連結到全部未知的 RPTID,<strong>不覆寫</strong>其既有綁定(避免清空)。</p>
 </li>
 <li>
-<p><strong>CEID 編號語意差異 —— 已於 2026-07-29 解除</strong>:先前 HT-160S 的 CEID 1–31 與 HT-90XX 同號不同義,現已整份改為 HT-90XX 字典的逐字複本(§3.3),<strong>同號同義</strong>。host 可直接沿用 HT-90XX 的 CEID 設定;<code>S6F15</code> 拉取任一號碼取得的語意亦與 HT-90XX 相同。唯一需注意的是本機只有 52 個號碼有發射點(§3.3.1)。<strong>由舊版升級的 host 必須依 §3.3.5 重新設定</strong>,尤其 CEID 27 / 28。</p>
+<p><strong>CEID 編號語意差異 —— 已於 2026-07-29 解除</strong>:先前 HT-160S 的 CEID 1–31 與 HT-90XX 同號不同義,現已整份改為 HT-90XX 字典的逐字複本(§3.3),<strong>同號同義</strong>。host 可直接沿用 HT-90XX 的 CEID 設定;<code>S6F15</code> 拉取任一號碼取得的語意亦與 HT-90XX 相同。唯一需注意的是本機只有 53 個號碼有發射點(§3.3.1)。<strong>由舊版升級的 host 必須依 §3.3.5 重新設定</strong>,尤其 CEID 27 / 28。</p>
 </li>
 </ul>
 <blockquote>

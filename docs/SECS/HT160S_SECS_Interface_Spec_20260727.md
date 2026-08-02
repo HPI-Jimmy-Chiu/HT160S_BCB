@@ -147,7 +147,7 @@
 ## 3. 資料字典 / Data Dictionary
 
 > ⚠️ **CEID 編號(§3.3)自 2026-07-29 起與 HT-90XX 完全相同**,host 可直接沿用 HT-90XX 的 CEID 設定,
-> 但須注意本機只有其中 52 個號碼有發射點(§3.3.1),其餘 223 個雖已註冊卻永遠不會送出(§3.3.2)。
+> 但須注意本機只有其中 53 個號碼有發射點(§3.3.1，其中 CEID 78 為條件發射、預設關閉),其餘 222 個雖已註冊卻永遠不會送出(§3.3.2)。
 >
 > ⚠️ **SVID 編號(§3.1)仍為本機自有**,與 HT-90XX (tester) 不同。若 host 依 HT-90XX 字典設定報表內容,
 > 請依 §3.1 重新對應;HT-160S 的 S2F33/S2F35 會**容忍**未知的 SVID(見 §4),但那些欄位會回空值。
@@ -233,9 +233,11 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 
 #### 3.3.1 本機實際會發射的事件 / Events this equipment actually sends
 
-以下 **52** 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
+以下 **53** 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
+其中 **CEID 78 為條件發射**，出廠預設關閉，其餘 52 個不受設定影響。
 
-The following **52** ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
+The following **53** ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
+**CEID 78 is conditional** (off by default); the other 52 are not gated by any setting.
 
 | CEID | 名稱 / Name | HT-160S 發射時機 / When it is sent |
 |---|---|---|
@@ -274,6 +276,7 @@ The following **52** ids have a real emit site on HT-160S. Ids and names are HT-
 | 66 | Load Tray Finish | Loader 盤到位確認 + 盤身分產生 |
 | 73 | Mymessbox OK | 訊息框關閉(Yes / No / Pause / Esc 任一路徑) |
 | 76 | Start Pressed HasIC | Start 且機內**有** IC |
+| 78 | Jam Skip IC Count | 條件發射：以 SKIP 解除警報且操作員輸入取出顆數（需 General.ini `[SECS] AskSkipICCount=1`，預設關閉） |
 | 123 | Safe Door On Off | 安全門開↔關**任一方向**邊緣(運轉中與停機中皆送) |
 | 124 | Save Recipe | Setup 頁 Save 或 Save As 成功 |
 | 136 / 137 / 138 | Auto1 / Auto2 / Auto3 Unloading tray | Auto 出盤 |
@@ -289,10 +292,10 @@ The following **52** ids have a real emit site on HT-160S. Ids and names are HT-
 
 #### 3.3.2 已註冊但本機不會發射的事件 / Registered but never sent
 
-號碼 1–275 之中,上表以外的 **223** 個號碼**皆已註冊**(有別名、可被 `S2F35` 連結、可被 `S2F37` 啟用/停用),
+號碼 1–275 之中,上表以外的 **222** 個號碼**皆已註冊**(有別名、可被 `S2F35` 連結、可被 `S2F37` 啟用/停用),
 但 HT-160S **沒有對應機構,永遠不會送出**。這是為了讓 host 的字典與 HT-90XX 完全一致而刻意保留的。
 
-Every id in 1–275 not listed above — **223** of them — **is registered** (it has an alias, can be linked by
+Every id in 1–275 not listed above — **222** of them — **is registered** (it has an alias, can be linked by
 `S2F35`, can be enabled/disabled by `S2F37`) but HT-160S **has no such mechanism and will never send it**.
 They are kept registered on purpose so the host dictionary matches HT-90XX exactly.
 
@@ -510,7 +513,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 - **S2F35 未知 RPTID**:略過該連結(不影響其餘)。
 - **保護**:若對「已存在的機台事件(如 AMR 272-275)」連結到全部未知的 RPTID,**不覆寫**其既有綁定(避免清空)。
 
-- **CEID 編號語意差異 —— 已於 2026-07-29 解除**:先前 HT-160S 的 CEID 1–31 與 HT-90XX 同號不同義,現已整份改為 HT-90XX 字典的逐字複本(§3.3),**同號同義**。host 可直接沿用 HT-90XX 的 CEID 設定;`S6F15` 拉取任一號碼取得的語意亦與 HT-90XX 相同。唯一需注意的是本機只有 52 個號碼有發射點(§3.3.1)。**由舊版升級的 host 必須依 §3.3.5 重新設定**,尤其 CEID 27 / 28。
+- **CEID 編號語意差異 —— 已於 2026-07-29 解除**:先前 HT-160S 的 CEID 1–31 與 HT-90XX 同號不同義,現已整份改為 HT-90XX 字典的逐字複本(§3.3),**同號同義**。host 可直接沿用 HT-90XX 的 CEID 設定;`S6F15` 拉取任一號碼取得的語意亦與 HT-90XX 相同。唯一需注意的是本機只有 53 個號碼有發射點(§3.3.1)。**由舊版升級的 host 必須依 §3.3.5 重新設定**,尤其 CEID 27 / 28。
 
 > 換言之:host 可完整完成上線與報表定義流程;未對應到 HT-160S 實際資料的欄位會回空值,待雙方確認後再由 HT-160S 補實作或由 host 改用本規格 §3 的 SVID/CEID。
 
