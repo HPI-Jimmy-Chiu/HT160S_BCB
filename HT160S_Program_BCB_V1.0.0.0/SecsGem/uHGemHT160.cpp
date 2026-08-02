@@ -382,6 +382,12 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1011, HType.ASCII_TYPE, "Machine State", "", &svMachineState, "main-screen status text (9045 SVID 1011)");
     HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "Loader Count", "pcs", &svLoaderIC, "ICs picked off Loader trays (9045 SVID 1101)");
     HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin (9045 SVID 1102; same value as 66021)");
+    //AI(secs-startmode) 20260802 : slot 6 of the host's RPTID 502. Value is 9045-numbered
+    // (see RefreshSVData) : 0=Continuous Start, 1=Initial Start. HT9045 declares this one as
+    // an EC with min 0 / max 8 and carries the whole legend in its EC description, so a host
+    // that wants the domain can pull it with S2F29->S2F30; HT160S only ever produces 0 or 1
+    // because the other seven are test-handler modes (retest / site map / QA / EQC).
+    HGemPtr->SetSVDataPointer(1517, HType.INT_4_TYPE, "Start Mode", "", &svStartMode, "0=Continuous Start 1=Initial Start (9045 SVID/ECID 1517 numbering)");
 
     //AI(secs-gem-std) 20260727 : SVID 1518 Real/Dummy, 9045-aligned. Bound DIRECTLY to the live
     // HSys.LastSet.iRealDummy (int; DUMMY=0 / HAS_TRAY=1 / REALLY=2 already match the 9045
@@ -480,6 +486,19 @@ void HT160Gem::RefreshSVData()
     // (csystem.cpp), so no VCL property is read on this path.
     svMachineState  = g_sMachineStateText;
     svActiveLot     = (fMain!=NULL) ? fMain->ActiveLotID() : AnsiString("");
+
+    //AI(secs-startmode) 20260802 : SVID 1517 Start Mode, translated into HT9045's numbering.
+    // HT160S : HSys.LastSet.iStartMode 0=Initial Start, 1=Continue (pnStartModeClick toggles
+    //          it, main.cpp:1767-1775; clamped to 0..1 on load at main.cpp:84-85).
+    // HT9045 : eRunStartMode 0=rsmContinuStart, 1=rsmInitialStart (MachineType.h:531-533).
+    // The two are exactly INVERTED, so publishing the raw flag would tell the host the
+    // opposite of the truth. Translate here; never bind &HSys.LastSet.iStartMode directly.
+    // Only these two values exist on a sorter - 9045's 2..8 (retest / site-map / QA / EQC)
+    // are test-handler modes with no sorter equivalent, and its own EC caps the range at 8.
+    if(HSys.LastSet.iStartMode==0)
+        svStartMode = 1;   // HT160S Initial  -> 9045 rsmInitialStart
+    else
+        svStartMode = 0;   // HT160S Continue -> 9045 rsmContinuStart
 
     svLotCount      = LotRegistry.GetLotCount();
     //AI(secs-lot-multilot) 20260730 : walk to the first NON-BLANK slot. This read raw slot 0,

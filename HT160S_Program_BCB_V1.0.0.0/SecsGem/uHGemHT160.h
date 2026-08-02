@@ -321,6 +321,11 @@ private:
     AnsiString svActiveLot;      // TfMain::ActiveLotID()      -> SVID 1006 Lot ID
     AnsiString svMachineState;   // g_sMachineStateText mirror -> SVID 1011 Machine State
     int        svLoaderIC;       // tRunData.LoaderIC          -> SVID 1101 Loader Count
+    //AI(secs-startmode) 20260802 : SVID 1517 Start Mode, in HT9045's NUMBERING, not ours.
+    // HSys.LastSet.iStartMode is 0=Initial / 1=Continue (clamped 0..1 at main.cpp:84-85);
+    // HT9045's eRunStartMode is 0=Continuous / 1=Initial. The two are exactly INVERTED, so
+    // this member holds the translated value and the raw flag is never published directly.
+    int        svStartMode;      // 9045-numbered start mode   -> SVID 1517 Start Mode
     //AI(secs-lotstarttime) 20260730 : SVID 66033. LATCHED by NoteLotStartTime, deliberately
     // NOT refreshed in RefreshSVData - it must answer "when did this lot start", not "now".
     AnsiString svLotStartTime;   // "yyyy/mm/dd hh:nn:ss" of Lot Start ("" between lots)
