@@ -293,6 +293,18 @@ void TColorModule::RefreshStateFromSensors()
             bOutputState=true;
     }
 
+    //AI(ht160s-rear-sensor-validity) 20260802 : same defect, same fix as Empty (92e8bc3).
+    //The mechanism note (docs/plan/home-posture-manifest-plan-20260720.md:4,:55) applies to
+    //the fixed rear sensors generally: a TrayArm head lowered over the rest falsely lights
+    //them. TrayArm serves the Color rear from BOTH sides - it places identity trays for the
+    //scan (RequestReadIdentityTray contract) and picks them back after - so its head is over
+    //this sensor routinely. Without the gate a lowered head invented a phantom rear tray
+    //exactly as it did at Empty. Hold the last latched state while Z is down; the receive
+    //ladder's own latch writes (NotifyTrayXToEmptyFinish / case-7000 commit) are direct
+    //latch assignments and are unaffected.
+    if(bHasOutputSensor && HSys.Cyn.C_TrayArmZ_Up.IsOn()==false)
+        bHasOutputSensor=false;   //TrayArm head down : reading untrustworthy, keep the latch
+
     if(bHasOutputSensor)
         bRearHasTray=bOutputState;
     else if(IsSoftSimulate())
