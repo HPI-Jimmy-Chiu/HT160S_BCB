@@ -47,12 +47,27 @@ class TAutoModule
 {
 private:
     TAutoStationState State[6];
-    int FeedTask;
-    int DischargeTask;
-    int CleanOutTask;
-    int DischargeSubTask;     //AI(general) 20260617 : FrontRise sub-step (shared by DoDischargeTray + TestGoUpOnce)
+    //AI(auto-per-station) 20260802 : the feed / discharge ladder cursors are now PER STATION.
+    //They used to be module scalars, which meant every station-keyed read inside DoFeedTray /
+    //DoDischargeTray went through the shared iFeedAuto / iDischargeAuto. That was only safe
+    //because DoAuto is a linear phase ladder that serves exactly one station at a time - an
+    //accidental property, and the thing that made DoFeedTray case 7000 able to stamp the WRONG
+    //Car[] Kind / TrayID / CarID / iTrayCount (and therefore the wrong SECS DeviceCount on
+    //CEID 272/273/274) the moment a second station ever overlapped. Parameterising the ladders
+    //by station index removes that failure mode structurally.
+    //Parallel [6] arrays rather than members of TAutoStationState, matching the convention this
+    //module already uses for bAmrLocked[6] / RearKind[6] / RearGrid[6] (that struct holds only
+    //the sensor booleans RefreshAutoState rewrites every pass).
+    int FeedTask[6];
+    int DischargeTask[6];
+    int DischargeSubTask[6];  //AI(general) 20260617 : FrontRise sub-step (per station since 20260802)
+    int CleanOutTask;         //module-wide : DoAllAutoCleanOut is a six-station lockstep drain
     int TestUpTask;           //AI(general) 20260617 : Teach Advanced single-cylinder GoUp-once test
     HTimer TestDelay;         //AI(general) 20260617 : Teach Advanced GoUp-once settle delay
+    //AI(auto-per-station) 20260802 : DISPATCH cursors only - they record which station the
+    //serial DoAuto ladder picked for this lap. NOTHING inside DoFeedTray / DoDischargeTray
+    //reads them any more; those take the station as a parameter. Keep it that way: a ladder
+    //that reads a shared cursor is exactly the bug this change removed.
     int iFeedAuto;
     int iDischargeAuto;
     bool bCleanOutCheck[6];
@@ -77,9 +92,9 @@ private:
     AnsiString RearTrayID[6];     //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the identity tray TrayArm placed at rear (from Color CCD)
     AnsiString WorkingTrayID[6];  //AI(HT160S-Maintainer) 20260608 : 2D TrayID of the tray now at the working position
     TMyTray RearGrid[6];          //AI(ht160s-tray-source) : per-cell grid TrayArm staged at rear (copied into working tray at DoFeedTray c7000)
-    HTimer FeedDelay;
-    HTimer DischargeDelay;
-    HTimer CleanOutDelay;
+    HTimer FeedDelay[6];        //AI(auto-per-station) 20260802 : per-station settle timer
+    HTimer DischargeDelay[6];   //AI(auto-per-station) 20260802 : per-station settle timer
+    HTimer CleanOutDelay;       //module-wide, with CleanOutTask
 
     bool IsSoftSimulate();
     TTrayMotor *GetAutoMotor(int Index);
@@ -99,8 +114,14 @@ private:
     void CheckAutoTray();
     int FindFeedAuto();
     int FindDischargeAuto();
-    bool DoFeedTray(int Flag);
-    bool DoDischargeTray(int Flag);
+    //AI(auto-per-station) 20260802 : Index is the station this ladder drives. Every field it
+    //touches is keyed on Index, so two stations can never stamp each other's Car[].
+    bool DoFeedTray(int Index, int Flag);
+    bool DoDischargeTray(int Index, int Flag);
+    //AI(auto-per-station) 20260802 : non-mutating per-station feed predicate. FindFeedAuto()
+    //cannot be used for a re-validation because it REWRITES State[*].bRearCanUse for all six
+    //stations as a side effect; this asks the same question without touching anything.
+    bool IsFeedEligible(int Index);
     bool DoAllAutoCleanOut(int Flag);
     bool AllStationsDrainLatched();                 //AI(cleanout) 20260706 : pure per-station drain latch (DoAuto stop-gate)
     void ServiceCleanOutResidualWatchdog();         //AI(cleanout) 20260706 : EventLog-only residual notice (log-once per episode)

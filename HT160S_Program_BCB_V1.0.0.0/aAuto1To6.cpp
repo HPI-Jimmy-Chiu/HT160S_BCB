@@ -68,15 +68,19 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
 {
     TTrayMotor *TrayMotor=NULL;
 
-    FeedTask=1;
-    DischargeTask=1;
+    //AI(auto-per-station) 20260802 : per-station ladder cursors reset together.
+    for(int ResetIndex=0; ResetIndex<AUTO_STATION_COUNT; ResetIndex++)
+    {
+        FeedTask[ResetIndex]=1;
+        DischargeTask[ResetIndex]=1;
+        DischargeSubTask[ResetIndex]=1;
+        FeedDelay[ResetIndex].Clear();
+        DischargeDelay[ResetIndex].Clear();
+    }
     CleanOutTask=1;
     iFeedAuto=-1;
     iDischargeAuto=-1;
-    FeedDelay.Clear();
-    DischargeDelay.Clear();
     CleanOutDelay.Clear();
-    DischargeSubTask=1;
     TestUpTask=1;
     TestDelay.Clear();
 
@@ -140,11 +144,11 @@ void TAutoModule::InitialFlag(bool bKeepMaterial)
 bool TAutoModule::HomeDrainTick()
 {
     if(iFeedAuto>=0 && iFeedAuto<AUTO_STATION_COUNT &&
-       (FeedTask==6000 || FeedTask==7000))
+       (FeedTask[iFeedAuto]==6000 || FeedTask[iFeedAuto]==7000))
     {
-        FeedTask=7000;
-        if(DoFeedTray(1))
-            FeedTask=1;
+        FeedTask[iFeedAuto]=7000;
+        if(DoFeedTray(iFeedAuto, 1))
+            FeedTask[iFeedAuto]=1;
         else
             return false;
     }
@@ -155,11 +159,12 @@ bool TAutoModule::HomeDrainTick()
     //discharge candidate (FindDischargeAuto needs bFullIC, cleared at 1000). Latch the
     //station; DoAuto case 3000 finishes the eject on resume (latch survives keep-material).
     if(iDischargeAuto>=0 && iDischargeAuto<AUTO_STATION_COUNT &&
-       (DischargeTask==5000 || DischargeTask==6000 || DischargeTask==6100))
+       (DischargeTask[iDischargeAuto]==5000 || DischargeTask[iDischargeAuto]==6000 ||
+        DischargeTask[iDischargeAuto]==6100))
     {
         if(bDischargeTailPending[iDischargeAuto]==false)
             RecordProcess("HOME-DRAIN Auto: discharge-tail latched (Auto"+IntToStr(iDischargeAuto+1)+
-                " DischargeTask="+IntToStr(DischargeTask)+")");   //AI(ht160s-obsv-p0) : latch edge only (drain ticks every scan)
+                " DischargeTask="+IntToStr(DischargeTask[iDischargeAuto])+")");   //AI(ht160s-obsv-p0) : latch edge only (drain ticks every scan)
         bDischargeTailPending[iDischargeAuto]=true;
     }
     //AI(ht160s-home-resume-drain) 20260713 : AD-2 FrontRise convergence. uHome homes only
@@ -469,6 +474,19 @@ int TAutoModule::FindFeedAuto()
     return -1;
 }
 //---------------------------------------------------------------------------
+//AI(auto-per-station) 20260802 : the same test FindFeedAuto applies, WITHOUT its side
+//effect. FindFeedAuto REWRITES State[*].bRearCanUse for all six stations, so it must not
+//be used to re-validate one station mid-ladder. The caller is responsible for having
+//refreshed state this pass (DoAuto case 1000 does, via FindFeedAuto).
+bool TAutoModule::IsFeedEligible(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    if(State[Index].bCarHasTray)
+        return false;
+    return (State[Index].bRearHasTray && bRearDeliveredPending[Index]);
+}
+//---------------------------------------------------------------------------
 int TAutoModule::FindDischargeAuto()
 {
     for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
@@ -541,8 +559,13 @@ void TAutoModule::SetRearHasTrayFromTrayArm(int Index, bool bHasTray)
         State[Index].Status=AS_IDLE;         //AI(ht160s-status) 20260703 : staged latch withdrawn
 }
 //---------------------------------------------------------------------------
-bool TAutoModule::DoFeedTray(int Flag)
+//AI(auto-per-station) 20260802 : Index names the station this ladder drives, replacing
+//the module-shared Index that every case used to read. Selection happens once, in
+//DoAuto case 1000; case 100 only re-validates that the chosen station is still eligible.
+bool TAutoModule::DoFeedTray(int Index, int Flag)
 {
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return true;
     TTrayMotor *TrayMotor=NULL;
     TMyCylinder *PushCylinder=NULL;
     TMyCylinder *LeanCylinder=NULL;
@@ -552,24 +575,28 @@ bool TAutoModule::DoFeedTray(int Flag)
 
     if(Flag==0)
     {
-        FeedTask=1;
-        iFeedAuto=-1;
-        FeedDelay.Clear();
+        FeedTask[Index]=1;
+        FeedDelay[Index].Clear();
         return true;
     }
 
-    switch(FeedTask)
+    switch(FeedTask[Index])
     {
         case 1:
-            FeedTask=100;
+            FeedTask[Index]=100;
             break;
 
         case 100:
-            iFeedAuto=FindFeedAuto();
-            if(iFeedAuto<0)
+            //AI(auto-per-station) 20260802 : was Index=FindFeedAuto() here. The choice
+            //is made by DoAuto case 1000 now; this re-validates it with the non-mutating
+            //predicate. Behaviour note: if the chosen station stopped being eligible in
+            //the one scan between selection and here, this abandons the lap (DoAuto
+            //re-selects next pass, ~4 ms) where the old code would have silently switched
+            //to whatever station FindFeedAuto returned instead. Strictly safer.
+            if(IsFeedEligible(Index)==false)
                 return true;
-            State[iFeedAuto].Status=AS_LOADING;   //AI(ht160s-status) 20260703 : ladder owns this station before any Y motion
-            FeedTask=200;
+            State[Index].Status=AS_LOADING;   //AI(ht160s-status) 20260703 : ladder owns this station before any Y motion
+            FeedTask[Index]=200;
             break;
 
         case 200:
@@ -586,26 +613,26 @@ bool TAutoModule::DoFeedTray(int Flag)
             //  Skip  = discard the staged rear data and abort this feed (TrayArm will
             //          re-supply on demand). NO Y motion on Skip.
             if(IsSoftSimulate()
-               || IsSensorOnReady(GetOutputBottomHasTray(iFeedAuto)))
+               || IsSensorOnReady(GetOutputBottomHasTray(Index)))
             {
-                FeedTask=1000;
+                FeedTask[Index]=1000;
             }
             else
             {
-                ErrorText.sprintf("Auto%d: rear tray data transferred but no-tray sensor. Remove any stranded tray; if no tray, check the rear tray sensor. Retry=recheck sensor, Skip=clear tray data", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("JAM%d11", 11+iFeedAuto), ErrorText, GetOutputBottomHasTray(iFeedAuto), true, K_SKIP|K_RETRY);
+                ErrorText.sprintf("Auto%d: rear tray data transferred but no-tray sensor. Remove any stranded tray; if no tray, check the rear tray sensor. Retry=recheck sensor, Skip=clear tray data", Index+1);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d11", 11+Index), ErrorText, GetOutputBottomHasTray(Index), true, K_SKIP|K_RETRY);
                 if(Ret==K_SKIP)
                 {
                     //AI(ht160s-tray-source) 20260625 : clear the staged rear data so the
                     //next cycle does not re-feed a phantom tray. Mirrors the field reset
                     //in DoFeedTray case7000 / DoDischargeTray case1000 / cleanout case7000.
-                    State[iFeedAuto].bRearHasTray=false;
-                    State[iFeedAuto].bRearCanUse=false;
-                    bRearDeliveredPending[iFeedAuto]=false;
-                    RearGrid[iFeedAuto].Clear();
-                    RearKind[iFeedAuto]=eTrayKindNormal;
-                    RearTrayID[iFeedAuto]="";
-                    State[iFeedAuto].Status=AS_IDLE;   //AI(ht160s-status) 20260703 : feed aborted, nothing staged
+                    State[Index].bRearHasTray=false;
+                    State[Index].bRearCanUse=false;
+                    bRearDeliveredPending[Index]=false;
+                    RearGrid[Index].Clear();
+                    RearKind[Index]=eTrayKindNormal;
+                    RearTrayID[Index]="";
+                    State[Index].Status=AS_IDLE;   //AI(ht160s-status) 20260703 : feed aborted, nothing staged
                     return true;
                 }
                 //K_RETRY (or any other) : stay in case 200 and re-read next cycle.
@@ -613,58 +640,58 @@ bool TAutoModule::DoFeedTray(int Flag)
             break;
 
         case 1000:
-            if(MoveAutoY(iFeedAuto, GetAutoFeedY(iFeedAuto)))
-                FeedTask=3000;
+            if(MoveAutoY(Index, GetAutoFeedY(Index)))
+                FeedTask[Index]=3000;
             break;
 
         case 3000:
-            BottomSensor=GetOutputBottomHasTray(iFeedAuto);
+            BottomSensor=GetOutputBottomHasTray(Index);
             if(IsSoftSimulate() || IsSensorOnReady(BottomSensor))
-                FeedTask=4000;
+                FeedTask[Index]=4000;
             else
             {
-                ErrorText.sprintf("Auto%d Feed Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("WAR%d30", 11+iFeedAuto), ErrorText, BottomSensor, true, K_RETRY);
+                ErrorText.sprintf("Auto%d Feed Tray Miss", Index+1);
+                Ret=ShowMyError(AnsiString().sprintf("WAR%d30", 11+Index), ErrorText, BottomSensor, true, K_RETRY);
                 if(Ret==K_RETRY)
-                    FeedTask=1000;
+                    FeedTask[Index]=1000;
             }
             break;
 
         case 4000:
-            LeanCylinder=GetLean(iFeedAuto);
+            LeanCylinder=GetLean(Index);
             if(LeanCylinder!=NULL && (LeanCylinder->Push() || IsSoftSimulate()))
-                FeedTask=5000;
+                FeedTask[Index]=5000;
             break;
 
         case 5000:
-            PushCylinder=GetPush(iFeedAuto);
+            PushCylinder=GetPush(Index);
             if(PushCylinder!=NULL && (PushCylinder->Push() || IsSoftSimulate()))
             {
-                FeedDelay.SetMS(GeneralSetting.iAutoPushConfirmSettleMs);
-                FeedDelay.On();
-                FeedTask=5100;
+                FeedDelay[Index].SetMS(GeneralSetting.iAutoPushConfirmSettleMs);
+                FeedDelay[Index].On();
+                FeedTask[Index]=5100;
             }
             break;
 
         case 5100:
-            if(FeedDelay.Off())
+            if(FeedDelay[Index].Off())
             {
-                PushCylinder=GetPush(iFeedAuto);
+                PushCylinder=GetPush(Index);
                 if(IsCylinderOnReady(PushCylinder, IsSoftSimulate()))
-                    FeedTask=6000;
+                    FeedTask[Index]=6000;
                 else
-                    FeedTask=5200;
+                    FeedTask[Index]=5200;
             }
             break;
 
         case 5200:
-            PushCylinder=GetPush(iFeedAuto);
+            PushCylinder=GetPush(Index);
             if(PushCylinder!=NULL && (PushCylinder->Pop() || IsSoftSimulate()))
             {
-                ErrorText.sprintf("Auto%d Push Tray Miss", iFeedAuto+1);
-                Ret=ShowMyError(AnsiString().sprintf("JAM%d02", 11+iFeedAuto), ErrorText, &PushCylinder->OnSensor, true, K_RETRY);
+                ErrorText.sprintf("Auto%d Push Tray Miss", Index+1);
+                Ret=ShowMyError(AnsiString().sprintf("JAM%d02", 11+Index), ErrorText, &PushCylinder->OnSensor, true, K_RETRY);
                 if(Ret==K_RETRY)
-                    FeedTask=5000;
+                    FeedTask[Index]=5000;
             }
             break;
 
@@ -677,65 +704,68 @@ bool TAutoModule::DoFeedTray(int Flag)
             //first placement. NULL-guard falls back to the raw FirstSortY; the SortArm still
             //issues the authoritative absolute place move, so a non-Row0 first cell only forgoes
             //the optimization -- it cannot mis-place.
-            if(MoveAutoY(iFeedAuto,
+            if(MoveAutoY(Index,
                          (SortArmModule!=NULL)
-                             ? SortArmModule->GetSortArmCellY(GetAutoFirstSortY(iFeedAuto), 0)
-                             : GetAutoFirstSortY(iFeedAuto)))
-                FeedTask=7000;
+                             ? SortArmModule->GetSortArmCellY(GetAutoFirstSortY(Index), 0)
+                             : GetAutoFirstSortY(Index)))
+                FeedTask[Index]=7000;
             break;
 
         case 7000:
-            TrayMotor=GetAutoVMotor(iFeedAuto);
+            TrayMotor=GetAutoVMotor(Index);
             if(TrayMotor!=NULL)
             {
                 //AI(ht160s-tray-source) : receive the grid TrayArm staged at rear (born at
                 //Empty/Color) instead of fabricating a fresh EMPTY_IC tray here. DoFeedTray
                 //only PROMOTES rear->working; occupancy (fHasTray) is owned here. RearGrid is
                 //default EMPTY_IC/Normal if a feed ever runs without a staged delivery.
-                TrayMotor->Tray.CopyFrom(RearGrid[iFeedAuto]);
+                TrayMotor->Tray.CopyFrom(RearGrid[Index]);
                 TrayMotor->fHasTray=true;
                 TrayMotor->Refresh();   //AI(ht160s-tray-source) : InitNewTray used to Refresh; keep MotionView in sync
             }
-            State[iFeedAuto].bCarHasTray=true;
-            State[iFeedAuto].bRearHasTray=false;
-            State[iFeedAuto].bRearCanUse=false;
-            State[iFeedAuto].bFullIC=false;
-            bRearDeliveredPending[iFeedAuto]=false;  //AI(general) 20260608 : Stage0 rear tray consumed
-            State[iFeedAuto].Status=AS_SORTING;   //AI(ht160s-status) 20260703 : rear promoted to working
+            State[Index].bCarHasTray=true;
+            State[Index].bRearHasTray=false;
+            State[Index].bRearCanUse=false;
+            State[Index].bFullIC=false;
+            bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 rear tray consumed
+            State[Index].Status=AS_SORTING;   //AI(ht160s-status) 20260703 : rear promoted to working
             //AI(HT160S-Maintainer) 20260605 : AMR stack-order bookkeeping. Record the tray
             //pulled up to the working position into the output car. If it is an identity or
             //cover tray (cannot hold IC) flag it full immediately so it discharges to the
             //stack without SortArm. SortArm is gated separately by IsReadyForSortArmPlace.
             if(GeneralSetting.bUseAMR)
             {
-                WorkingKind[iFeedAuto]=RearKind[iFeedAuto];
-                WorkingTrayID[iFeedAuto]=RearTrayID[iFeedAuto];   //AI(HT160S-Maintainer) 20260608 : carry 2D TrayID to working tray
-                int n=Car[iFeedAuto].iTrayCount;
+                WorkingKind[Index]=RearKind[Index];
+                WorkingTrayID[Index]=RearTrayID[Index];   //AI(HT160S-Maintainer) 20260608 : carry 2D TrayID to working tray
+                int n=Car[Index].iTrayCount;
                 if(n>=0 && n<MAX_TRAY_PER_CAR)
                 {
-                    Car[iFeedAuto].Tray[n].SetKind((eTrayKind)WorkingKind[iFeedAuto]);
-                    Car[iFeedAuto].Tray[n].TrayID=WorkingTrayID[iFeedAuto];   //AI(HT160S-Maintainer) 20260608 : stamp 2D TrayID onto stack tray
+                    Car[Index].Tray[n].SetKind((eTrayKind)WorkingKind[Index]);
+                    Car[Index].Tray[n].TrayID=WorkingTrayID[Index];   //AI(HT160S-Maintainer) 20260608 : stamp 2D TrayID onto stack tray
                     //AI(HT160S-Maintainer) 20260608 : the identity tray (stack tray[0]) carries
                     //the car/lot 2D code; copy it to the car so the whole stack is identified.
-                    if(WorkingKind[iFeedAuto]==eTrayKindIdentity)
-                        Car[iFeedAuto].CarID=WorkingTrayID[iFeedAuto];
-                    Car[iFeedAuto].iTrayCount=n+1;
+                    if(WorkingKind[Index]==eTrayKindIdentity)
+                        Car[Index].CarID=WorkingTrayID[Index];
+                    Car[Index].iTrayCount=n+1;
                 }
-                if(WorkingKind[iFeedAuto]!=eTrayKindNormal)
+                if(WorkingKind[Index]!=eTrayKindNormal)
                 {
-                    State[iFeedAuto].bFullIC=true;
-                    State[iFeedAuto].Status=AS_FULL;   //AI(ht160s-status) 20260703 : identity/cover discharges without SortArm
+                    State[Index].bFullIC=true;
+                    State[Index].Status=AS_FULL;   //AI(ht160s-status) 20260703 : identity/cover discharges without SortArm
                 }
             }
             else
-                WorkingKind[iFeedAuto]=eTrayKindNormal;
+                WorkingKind[Index]=eTrayKindNormal;
             return true;
     }
     return false;
 }
 //---------------------------------------------------------------------------
-bool TAutoModule::DoDischargeTray(int Flag)
+//AI(auto-per-station) 20260802 : Index names the station, replacing shared Index.
+bool TAutoModule::DoDischargeTray(int Index, int Flag)
 {
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return true;
     TTrayMotor *TrayMotor=NULL;
     TMyCylinder *PushCylinder=NULL;
     TMyCylinder *LeanCylinder=NULL;
@@ -745,12 +775,11 @@ bool TAutoModule::DoDischargeTray(int Flag)
     // Unregistered on purpose: EventReport sends S6F11 with an empty report list,
     // which is exactly what 9045 does for these CEIDs (KYEC log 2026-06-08 CEID 136).
     int AutoCeid[6]={136, 137, 138, 145, 146, 147};
-    int &Task = DischargeTask;
+    int &Task = DischargeTask[Index];
     if(Flag==0)
     {
         Task=1;
-        iDischargeAuto=-1;
-        DischargeDelay.Clear();
+        DischargeDelay[Index].Clear();
         return true;
     }
 
@@ -761,52 +790,54 @@ bool TAutoModule::DoDischargeTray(int Flag)
             break;
 
         case 100:
-            iDischargeAuto=FindDischargeAuto();
-            if(iDischargeAuto<0)
+            //AI(auto-per-station) 20260802 : selection moved to DoAuto case 3000; this
+            //re-validates against the same terms FindDischargeAuto uses.
+            if(bAmrLocked[Index] ||
+               State[Index].bFullIC==false || State[Index].bResidueClear==false)
                 return true;
-            State[iDischargeAuto].Status=AS_DISCHARGING;   //AI(ht160s-status) 20260703
+            State[Index].Status=AS_DISCHARGING;   //AI(ht160s-status) 20260703
             Task=1000;
             break;
 
         case 1000:
-            if(MoveAutoY(iDischargeAuto, GetAutoDischargeY(iDischargeAuto)))
+            if(MoveAutoY(Index, GetAutoDischargeY(Index)))
             {
-                TrayMotor=GetAutoVMotor(iDischargeAuto);
+                TrayMotor=GetAutoVMotor(Index);
                 if(TrayMotor!=NULL)
                 {
-                    iAmrDeviceCount[iDischargeAuto]+=TrayMotor->Tray.CountIC();   //AI(ht160s-agv-devicecount) 20260713 : tally this tray's ICs into the car running total BEFORE ClearTray wipes it (Car.Tray grids are never filled, so the old car-sum was always 0)
+                    iAmrDeviceCount[Index]+=TrayMotor->Tray.CountIC();   //AI(ht160s-agv-devicecount) 20260713 : tally this tray's ICs into the car running total BEFORE ClearTray wipes it (Car.Tray grids are never filled, so the old car-sum was always 0)
                     TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
                 }
-                State[iDischargeAuto].bFullIC=false;
-                State[iDischargeAuto].bResidueClear=true;   //AI(ht160s-residue) 20260624 : fresh tray on discharge
-                State[iDischargeAuto].bCarHasTray=false;
-                State[iDischargeAuto].bRearHasTray=false;
-                bRearDeliveredPending[iDischargeAuto]=false;  //AI(general) 20260608 : Stage0 latch clear
-                RearGrid[iDischargeAuto].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
-                State[iDischargeAuto].bFrontHasTray=true;
+                State[Index].bFullIC=false;
+                State[Index].bResidueClear=true;   //AI(ht160s-residue) 20260624 : fresh tray on discharge
+                State[Index].bCarHasTray=false;
+                State[Index].bRearHasTray=false;
+                bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 latch clear
+                RearGrid[Index].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
+                State[Index].bFrontHasTray=true;
                 if(HGem!=NULL)
-                    HGem->EventReport(1, AutoCeid[iDischargeAuto]);
+                    HGem->EventReport(1, AutoCeid[Index]);
                 Task=3000;
             }
             break;
 
         case 3000:
-            PushCylinder=GetPush(iDischargeAuto);
+            PushCylinder=GetPush(Index);
             if(PushCylinder!=NULL && (PushCylinder->Pop() || IsSoftSimulate()))
                 Task=4000;
             break;
 
         case 4000:
-            LeanCylinder=GetLean(iDischargeAuto);
+            LeanCylinder=GetLean(Index);
             if(LeanCylinder!=NULL && (LeanCylinder->Pop() || IsSoftSimulate()))
                 Task=5000;
             break;
 
         case 5000:
-            if(MoveAutoY(iDischargeAuto, GetAutoFeedY(iDischargeAuto)))
+            if(MoveAutoY(Index, GetAutoFeedY(Index)))
             {
-                DischargeDelay.SetMS(GeneralSetting.iAutoDischargePostYSettleMs);
-                DischargeDelay.On();
+                DischargeDelay[Index].SetMS(GeneralSetting.iAutoDischargePostYSettleMs);
+                DischargeDelay[Index].On();
                 Task=6000;
             }
             break;
@@ -815,20 +846,20 @@ bool TAutoModule::DoDischargeTray(int Flag)
             //AI(general) 20260617 : post-Y settle done; the FrontRise On->settle->Off now
             //lives in the shared DoFrontRiseOnce so Teach Advanced TestGoUpOnce drives the
             //identical cylinder action as this production discharge.
-            if(DischargeDelay.Off())
+            if(DischargeDelay[Index].Off())
             {
-                DischargeSubTask=1;
+                DischargeSubTask[Index]=1;
                 Task=6100;
             }
             break;
 
         case 6100:
-            if(DoFrontRiseOnce(iDischargeAuto, DischargeSubTask, DischargeDelay))
+            if(DoFrontRiseOnce(Index, DischargeSubTask[Index], DischargeDelay[Index]))
             {
                 //AI(ht160s-status) 20260703 : user decision - the station reads IDLE only
                 //after the FULL discharge tail (Y retreated + FrontRise pumped), later
                 //than the legacy flag clears at case 1000. Readers flip in phase 5b.
-                State[iDischargeAuto].Status=AS_IDLE;
+                State[Index].Status=AS_IDLE;
                 return true;
             }
             break;
@@ -864,16 +895,19 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
         //then run the GoUp ladder below, which stacks every working tray onto this Auto's
         //own output car.
         case 500:
-            DoFeedTray(0);
+            //AI(auto-per-station) 20260802 : select here (was inside DoFeedTray case 100).
+            iFeedAuto=FindFeedAuto();
+            DoFeedTray(iFeedAuto, 0);
             CleanOutTask=600;
             break;
 
         case 600:
-            if(DoFeedTray(1))
+            if(DoFeedTray(iFeedAuto, 1))
             {
-                if(FindFeedAuto()>=0)
+                iFeedAuto=FindFeedAuto();
+                if(iFeedAuto>=0)
                 {
-                    DoFeedTray(0);   //another delivered rear tray : pull it in too
+                    DoFeedTray(iFeedAuto, 0);   //another delivered rear tray : pull it in too
                     break;
                 }
                 CleanOutTask=100;
@@ -1484,12 +1518,18 @@ AnsiString TAutoModule::DescribeModule()
 {
     AnsiString s;
     s  = "[AutoModule] (cursors SHARED by all six stations)\r\n";
-    s += "  FeedTask="      + IntToStr(FeedTask)
+    //AI(auto-per-station) 20260802 : feed/discharge cursors are per station now; the two
+    //i*Auto values are dispatch-only (which station the serial lap picked).
+    s += "  CleanOutTask="  + IntToStr(CleanOutTask)
        + "  iFeedAuto="     + IntToStr(iFeedAuto)
-       + "  DischargeTask=" + IntToStr(DischargeTask)
-       + "  DischargeSub="  + IntToStr(DischargeSubTask)
-       + "  iDischargeAuto="+ IntToStr(iDischargeAuto)
-       + "  CleanOutTask="  + IntToStr(CleanOutTask) + "\r\n";
+       + "  iDischargeAuto="+ IntToStr(iDischargeAuto) + "\r\n";
+    for(int DumpIndex=0; DumpIndex<AUTO_STATION_COUNT; DumpIndex++)
+    {
+        s += "  Auto" + IntToStr(DumpIndex+1)
+           + " FeedTask="      + IntToStr(FeedTask[DumpIndex])
+           + "  DischargeTask=" + IntToStr(DischargeTask[DumpIndex])
+           + "  DischargeSub="  + IntToStr(DischargeSubTask[DumpIndex]) + "\r\n";
+    }
     return s;
 }
 //---------------------------------------------------------------------------
@@ -1712,9 +1752,14 @@ void TAutoModule::DoAuto(int &Task)
             break;
 
         case 1000:
-            if(FindFeedAuto()>=0)
+            //AI(auto-per-station) 20260802 : the station is chosen HERE and carried in the
+            //dispatch cursor for this lap; the ladder itself is parameterised. FindFeedAuto
+            //is still the selector (and still refreshes State[*].bRearCanUse as before), so
+            //selection order is unchanged.
+            iFeedAuto=FindFeedAuto();
+            if(iFeedAuto>=0)
             {
-                DoFeedTray(0);
+                DoFeedTray(iFeedAuto, 0);
                 Task=2000;
             }
             else
@@ -1722,7 +1767,7 @@ void TAutoModule::DoAuto(int &Task)
             break;
 
         case 2000:
-            if(DoFeedTray(1))
+            if(DoFeedTray(iFeedAuto, 1))
                 Task=3000;
             break;
 
@@ -1749,13 +1794,15 @@ void TAutoModule::DoAuto(int &Task)
                 bDischargeTailPending[iTail]=false;
                 RecordProcess("HOME-RESUME Auto: discharge-tail consumed (Auto"+IntToStr(iTail+1)+") - re-enter eject at 5000");   //AI(ht160s-obsv-p0)
                 iDischargeAuto=iTail;
-                DischargeTask=5000;
+                DischargeTask[iTail]=5000;
                 Task=4000;
                 break;
             }
-            if(FindDischargeAuto()>=0)
+            //AI(auto-per-station) 20260802 : same shape as case 1000 - select here, pass in.
+            iDischargeAuto=FindDischargeAuto();
+            if(iDischargeAuto>=0)
             {
-                DoDischargeTray(0);
+                DoDischargeTray(iDischargeAuto, 0);
                 Task=4000;
             }
             else
@@ -1764,7 +1811,7 @@ void TAutoModule::DoAuto(int &Task)
         }
 
         case 4000:
-            if(DoDischargeTray(1))
+            if(DoDischargeTray(iDischargeAuto, 1))
                 Task=1;
             break;
 
