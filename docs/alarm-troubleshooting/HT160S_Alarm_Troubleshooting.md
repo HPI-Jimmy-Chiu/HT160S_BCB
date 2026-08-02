@@ -75,92 +75,76 @@
 | `C_Empty_PushTray` | 40063 | 40060 | `C_Empty_PushTray_On` | `C_Empty_PushTray_Off` | — |
 | `C_Empty_LeanOnTray` | 40073 | 40070 | `C_Empty_LeanOnTray_On` | `C_Empty_LeanOnTray_Off` | — |
 | `C_Empty_FrontSeparateTray_1` | 40083 | 40080 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
-| `C_Empty_RearRiseTray` | 40093 | 40090 | `C_Empty_RearRiseTray_On` | `C_Empty_RearRiseTray_Off` | — |
-| `C_Empty_RearSeparateTray_1` | 40103 | 40100 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
 
 
 #### Loader 進料
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Loader_FrontRiseTray_1` | 40113 | 40110 | `C_Loader_FrontRiseTray_1_On` | `C_Loader_FrontRiseTray_1_Off` | — |
-| `C_Loader_FrontRiseTray_2` | 40123 | 40120 | `C_Loader_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
-| `C_Loader1_PushTray` | 40133 | 40130 | `C_Loader1_PushTray_On` | `C_Loader1_PushTray_Off` | — |
-| `C_Loader2_PushTray` | 40143 | 40140 | `C_Loader2_PushTray_On` | `C_Loader2_PushTray_Off` | — |
-| `C_Loader1_LeanOnTray` | 40153 | 40150 | `C_Loader1_LeanOnTray_On` | `C_Loader1_LeanOnTray_Off` | — |
-| `C_Loader2_LeanOnTray` | 40163 | 40160 | `C_Loader2_LeanOnTray_On` | `C_Loader2_LeanOnTray_Off` | — |
-| `C_Loader_FrontSeparateTray_1` | 40173 | 40170 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
-| `C_Loader_RearRiseTray` | 40183 | 40180 | `C_Loader_RearRiseTray_On` | `C_Loader_RearRiseTray_Off` | — |
+| `C_Loader_FrontRiseTray_1` | 40093 | 40090 | `C_Loader_FrontRiseTray_1_On` | `C_Loader_FrontRiseTray_1_Off` | — |
+| `C_Loader_FrontRiseTray_2` | 40103 | 40100 | `C_Loader_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_Loader1_PushTray` | 40113 | 40110 | `C_Loader1_PushTray_On` | `C_Loader1_PushTray_Off` | — |
+| `C_Loader2_PushTray` | 40123 | 40120 | `C_Loader2_PushTray_On` | `C_Loader2_PushTray_Off` | — |
+| `C_Loader1_LeanOnTray` | 40133 | 40130 | `C_Loader1_LeanOnTray_On` | `C_Loader1_LeanOnTray_Off` | — |
+| `C_Loader2_LeanOnTray` | 40143 | 40140 | `C_Loader2_LeanOnTray_On` | `C_Loader2_LeanOnTray_Off` | — |
+| `C_Loader_FrontSeparateTray_1` | 40153 | 40150 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
 
 
 #### Color 覆蓋盤/色帶供給
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Color_FrontRiseTray_1` | 40493 | 40490 | `C_Color_FrontRiseTray_1_On` | `C_Color_FrontRiseTray_1_Off` | — |
-| `C_Color_FrontRiseTray_2` | 40503 | 40500 | `C_Color_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
-| `C_Color_PushTray` | 40513 | 40510 | `C_Color_PushTray_On` | `C_Color_PushTray_Off` | — |
-| `C_Color_LeanOnTray` | 40523 | 40520 | `C_Color_LeanOnTray_On` | `C_Color_LeanOnTray_Off` | — |
-| `C_Color_RearRiseTray` | 40533 | 40530 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
-| `C_Color_FrontSeparateTray_1` | 40543 | 40540 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
+| `C_Color_FrontRiseTray_1` | 40343 | 40340 | `C_Color_FrontRiseTray_1_On` | `C_Color_FrontRiseTray_1_Off` | — |
+| `C_Color_FrontRiseTray_2` | 40353 | 40350 | `C_Color_FrontRiseTray_2_On` | （無此感測器） | 無縮回到位感測器 |
+| `C_Color_PushTray` | 40363 | 40360 | `C_Color_PushTray_On` | `C_Color_PushTray_Off` | — |
+| `C_Color_LeanOnTray` | 40373 | 40370 | `C_Color_LeanOnTray_On` | `C_Color_LeanOnTray_Off` | — |
+| `C_Color_FrontSeparateTray_1` | 40383 | 40380 | （無此感測器） | （無此感測器） | 無到位感測器，僅靠時間判斷（不發到位警報） |
 
 
 #### Auto1 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Auto1_FrontRiseTray` | 40193 | 40190 | `C_Auto1_FrontRiseTray_On` | `C_Auto1_FrontRiseTray_Off` | — |
-| `C_Auto1_PushTray` | 40203 | 40200 | `C_Auto1_PushTray_On` | `C_Auto1_PushTray_Off` | — |
-| `C_Auto1_LeanOnTray` | 40213 | 40210 | `C_Auto1_LeanOnTray_On` | `C_Auto1_LeanOnTray_Off` | — |
-| `C_Auto1_RearRiseTray` | 40223 | 40220 | `C_Auto1_RearRiseTray_On` | `C_Auto1_RearRiseTray_Off` | — |
-| `C_Auto1_FrontSeparateTray_1` | 40233 | 40230 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Auto1_FrontRiseTray` | 40163 | 40160 | `C_Auto1_FrontRiseTray_On` | `C_Auto1_FrontRiseTray_Off` | — |
+| `C_Auto1_PushTray` | 40173 | 40170 | `C_Auto1_PushTray_On` | `C_Auto1_PushTray_Off` | — |
+| `C_Auto1_LeanOnTray` | 40183 | 40180 | `C_Auto1_LeanOnTray_On` | `C_Auto1_LeanOnTray_Off` | — |
 
 
 #### Auto2 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Auto2_FrontRiseTray` | 40243 | 40240 | `C_Auto2_FrontRiseTray_On` | `C_Auto2_FrontRiseTray_Off` | — |
-| `C_Auto2_PushTray` | 40253 | 40250 | `C_Auto2_PushTray_On` | `C_Auto2_PushTray_Off` | — |
-| `C_Auto2_LeanOnTray` | 40263 | 40260 | `C_Auto2_LeanOnTray_On` | `C_Auto2_LeanOnTray_Off` | — |
-| `C_Auto2_RearRiseTray` | 40273 | 40270 | `C_Auto2_RearRiseTray_On` | `C_Auto2_RearRiseTray_Off` | — |
-| `C_Auto2_FrontSeparateTray_1` | 40283 | 40280 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Auto2_FrontRiseTray` | 40193 | 40190 | `C_Auto2_FrontRiseTray_On` | `C_Auto2_FrontRiseTray_Off` | — |
+| `C_Auto2_PushTray` | 40203 | 40200 | `C_Auto2_PushTray_On` | `C_Auto2_PushTray_Off` | — |
+| `C_Auto2_LeanOnTray` | 40213 | 40210 | `C_Auto2_LeanOnTray_On` | `C_Auto2_LeanOnTray_Off` | — |
 
 
 #### Auto3 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Auto3_FrontRiseTray` | 40293 | 40290 | `C_Auto3_FrontRiseTray_On` | `C_Auto3_FrontRiseTray_Off` | — |
-| `C_Auto3_PushTray` | 40303 | 40300 | `C_Auto3_PushTray_On` | `C_Auto3_PushTray_Off` | — |
-| `C_Auto3_LeanOnTray` | 40313 | 40310 | `C_Auto3_LeanOnTray_On` | `C_Auto3_LeanOnTray_Off` | — |
-| `C_Auto3_RearRiseTray` | 40323 | 40320 | `C_Auto3_RearRiseTray_On` | `C_Auto3_RearRiseTray_Off` | — |
-| `C_Auto3_FrontSeparateTray_1` | 40333 | 40330 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Auto3_FrontRiseTray` | 40223 | 40220 | `C_Auto3_FrontRiseTray_On` | `C_Auto3_FrontRiseTray_Off` | — |
+| `C_Auto3_PushTray` | 40233 | 40230 | `C_Auto3_PushTray_On` | `C_Auto3_PushTray_Off` | — |
+| `C_Auto3_LeanOnTray` | 40243 | 40240 | `C_Auto3_LeanOnTray_On` | `C_Auto3_LeanOnTray_Off` | — |
 
 
 #### Auto4 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Auto4_FrontRiseTray` | 40343 | 40340 | `C_Auto4_FrontRiseTray_On` | `C_Auto4_FrontRiseTray_Off` | — |
-| `C_Auto4_PushTray` | 40353 | 40350 | `C_Auto4_PushTray_On` | `C_Auto4_PushTray_Off` | — |
-| `C_Auto4_LeanOnTray` | 40363 | 40360 | `C_Auto4_LeanOnTray_On` | `C_Auto4_LeanOnTray_Off` | — |
-| `C_Auto4_RearRiseTray` | 40373 | 40370 | `C_Auto4_RearRiseTray_On` | `C_Auto4_RearRiseTray_Off` | — |
-| `C_Auto4_FrontSeparateTray_1` | 40383 | 40380 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Auto4_FrontRiseTray` | 40253 | 40250 | `C_Auto4_FrontRiseTray_On` | `C_Auto4_FrontRiseTray_Off` | — |
+| `C_Auto4_PushTray` | 40263 | 40260 | `C_Auto4_PushTray_On` | `C_Auto4_PushTray_Off` | — |
+| `C_Auto4_LeanOnTray` | 40273 | 40270 | `C_Auto4_LeanOnTray_On` | `C_Auto4_LeanOnTray_Off` | — |
 
 
 #### Auto5 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Auto5_FrontRiseTray` | 40393 | 40390 | `C_Auto5_FrontRiseTray_On` | `C_Auto5_FrontRiseTray_Off` | — |
-| `C_Auto5_PushTray` | 40403 | 40400 | `C_Auto5_PushTray_On` | `C_Auto5_PushTray_Off` | — |
-| `C_Auto5_LeanOnTray` | 40413 | 40410 | `C_Auto5_LeanOnTray_On` | `C_Auto5_LeanOnTray_Off` | — |
-| `C_Auto5_RearRiseTray` | 40423 | 40420 | `C_Auto5_RearRiseTray_On` | `C_Auto5_RearRiseTray_Off` | — |
-| `C_Auto5_FrontSeparateTray_1` | 40433 | 40430 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Auto5_FrontRiseTray` | 40283 | 40280 | `C_Auto5_FrontRiseTray_On` | `C_Auto5_FrontRiseTray_Off` | — |
+| `C_Auto5_PushTray` | 40293 | 40290 | `C_Auto5_PushTray_On` | `C_Auto5_PushTray_Off` | — |
+| `C_Auto5_LeanOnTray` | 40303 | 40300 | `C_Auto5_LeanOnTray_On` | `C_Auto5_LeanOnTray_Off` | — |
 
 
 #### Auto6 出料站
 | 汽缸 | 伸出碼 | 縮回碼 | 伸出到位感測器 | 縮回到位感測器 | 說明 |
 |---|---|---|---|---|---|
-| `C_Auto6_FrontRiseTray` | 40443 | 40440 | `C_Auto6_FrontRiseTray_On` | `C_Auto6_FrontRiseTray_Off` | — |
-| `C_Auto6_PushTray` | 40453 | 40450 | `C_Auto6_PushTray_On` | `C_Auto6_PushTray_Off` | — |
-| `C_Auto6_LeanOnTray` | 40463 | 40460 | `C_Auto6_LeanOnTray_On` | `C_Auto6_LeanOnTray_Off` | — |
-| `C_Auto6_RearRiseTray` | 40473 | 40470 | `C_Auto6_RearRiseTray_On` | `C_Auto6_RearRiseTray_Off` | — |
-| `C_Auto6_FrontSeparateTray_1` | 40483 | 40480 | （無此感測器） | （無此感測器） | 本機未安裝／未使用 |
+| `C_Auto6_FrontRiseTray` | 40313 | 40310 | `C_Auto6_FrontRiseTray_On` | `C_Auto6_FrontRiseTray_Off` | — |
+| `C_Auto6_PushTray` | 40323 | 40320 | `C_Auto6_PushTray_On` | `C_Auto6_PushTray_Off` | — |
+| `C_Auto6_LeanOnTray` | 40333 | 40330 | `C_Auto6_LeanOnTray_On` | `C_Auto6_LeanOnTray_Off` | — |
 
 
 ---

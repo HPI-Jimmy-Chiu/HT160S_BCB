@@ -2,7 +2,7 @@
 
 資料來源：`system/IO_Table.csv`（機台設定檔，2026-07-16 重生）。位址格式 Lane/IP/Port/Bit（IP=W 為寫出型點位）。IO_Table.csv 無中文標籤欄，畫面顯示名稱由程式以「前綴＋Alias」慣例產生。最終位址請以機台 State Record 內 MachineConfig\system 副本核對（repo 工作副本與機台副本可能 drift）。
 
-## Cylinder（55 點）
+## Cylinder（39 點）
 | Alias | Lane | IP | Port | Bit | InType | 啟用 | OnDelay | OffDelay | Note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C_TrayArmZ_Up | 0 | 0 | 2 | 5 | 1 | 是 | 5 | 5 |  |
@@ -14,8 +14,6 @@
 | C_Empty_PushTray | 0 | 8 | 0 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Empty_LeanOnTray | 0 | 8 | 0 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Empty_FrontSeparateTray_1 | 0 | 8 | 0 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Empty_RearRiseTray | 0 | 8 | 0 | 7 | 1 | 是 | 5 | 5 |  |
-| C_Empty_RearSeparateTray_1 | 0 | 8 | 1 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Loader_FrontRiseTray_1 | 0 | 8 | 1 | 4 | 1 | 是 | 5000 | 5000 |  |
 | C_Loader_FrontRiseTray_2 | 0 | 8 | 3 | 7 | 1 | 是 | 5000 | 5000 |  |
 | C_Loader1_PushTray | 0 | 8 | 1 | 5 | 1 | 是 | 5 | 5 |  |
@@ -23,43 +21,29 @@
 | C_Loader1_LeanOnTray | 0 | 8 | 1 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Loader2_LeanOnTray | 0 | 8 | 2 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Loader_FrontSeparateTray_1 | 0 | 8 | 2 | 1 | 1 | 是 | 5000 | 5000 |  |
-| C_Loader_RearRiseTray | 0 | 8 | 2 | 5 | 1 | 是 | 5000 | 5000 |  |
 | C_Auto1_FrontRiseTray | 0 | 8 | 2 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_PushTray | 0 | 8 | 2 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_LeanOnTray | 0 | 8 | 3 | 0 | 1 | 是 | 5 | 5 |  |
-| C_Auto1_RearRiseTray | 0 | 8 | 3 | 1 | 1 | 是 | 5 | 5 |  |
-| C_Auto1_FrontSeparateTray_1 | 0 | 8 | 3 | 2 | 1 | 否 | 5 | 5 |  |
 | C_Auto2_FrontRiseTray | 0 | 8 | 2 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_PushTray | 0 | 8 | 3 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_LeanOnTray | 0 | 8 | 3 | 2 | 1 | 是 | 5 | 5 |  |
-| C_Auto2_RearRiseTray | 0 | 9 | 0 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Auto2_FrontSeparateTray_1 | 0 | 9 | 0 | 4 | 1 | 否 | 5 | 5 |  |
 | C_Auto3_FrontRiseTray | 0 | 9 | 1 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_PushTray | 0 | 9 | 1 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_LeanOnTray | 0 | 9 | 1 | 2 | 1 | 是 | 5 | 5 |  |
-| C_Auto3_RearRiseTray | 0 | 9 | 1 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Auto3_FrontSeparateTray_1 | 0 | 9 | 1 | 4 | 1 | 否 | 5 | 5 |  |
 | C_Auto4_FrontRiseTray | 0 | 9 | 2 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_PushTray | 0 | 9 | 2 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_LeanOnTray | 0 | 9 | 2 | 2 | 1 | 是 | 5 | 5 |  |
-| C_Auto4_RearRiseTray | 0 | 9 | 2 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Auto4_FrontSeparateTray_1 | 0 | 9 | 2 | 4 | 1 | 否 | 5 | 5 |  |
 | C_Auto5_FrontRiseTray | 0 | 9 | 3 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_PushTray | 0 | 9 | 3 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_LeanOnTray | 0 | 9 | 3 | 2 | 1 | 是 | 5 | 5 |  |
-| C_Auto5_RearRiseTray | 0 | 9 | 3 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Auto5_FrontSeparateTray_1 | 0 | 9 | 3 | 4 | 1 | 否 | 5 | 5 |  |
 | C_Auto6_FrontRiseTray | 0 | W | 0 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_PushTray | 0 | W | 0 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_LeanOnTray | 0 | W | 0 | 4 | 1 | 是 | 5 | 5 |  |
-| C_Auto6_RearRiseTray | 0 | W | 0 | 5 | 1 | 是 | 5 | 5 |  |
-| C_Auto6_FrontSeparateTray_1 | 0 | W | 0 | 6 | 1 | 否 | 5 | 5 |  |
 | C_Color_LeanOnTray | 0 | W | 1 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Color_PushTray | 0 | W | 1 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Color_FrontRiseTray_1 | 0 | W | 0 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Color_FrontRiseTray_2 | 0 | W | 1 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Color_FrontSeparateTray_1 | 0 | W | 1 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Color_RearRiseTray |  |  |  |  | 0 | 否 | 5 | 5 |  |
 
 ## Switch（41 點）
 | Alias | Lane | IP | Port | Bit | InType | 啟用 | OnDelay | OffDelay | Note |
@@ -219,7 +203,7 @@
 | SnRKManualTStart |  |  |  |  | 0 | 否 |  |  | COMM_PAD |
 | SnRKSafeLock |  |  |  |  | 0 | 否 |  |  | COMM_PAD |
 
-## Cylinder_On（55 點）
+## Cylinder_On（39 點）
 | Alias | Lane | IP | Port | Bit | InType | 啟用 | OnDelay | OffDelay | Note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C_TrayArmZ_Up_On | 0 | 0 | 1 | 5 | 1 | 是 | 5 | 5 |  |
@@ -229,92 +213,68 @@
 | C_Empty_FrontRiseTray_2_On | 0 | 1 | 0 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Empty_PushTray_On | 0 | 1 | 0 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Empty_LeanOnTray_On | 0 | 1 | 1 | 0 | 1 | 是 | 5 | 5 |  |
-| C_Empty_RearRiseTray_On | 0 | 1 | 1 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Loader_FrontRiseTray_1_On | 0 | 2 | 0 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Loader_FrontRiseTray_2_On | 0 | 1 | 1 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Loader1_PushTray_On | 0 | 1 | 2 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Loader2_PushTray_On | 0 | 1 | 2 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Loader1_LeanOnTray_On | 0 | 1 | 3 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Loader2_LeanOnTray_On | 0 | 1 | 3 | 2 | 1 | 是 | 5 | 5 |  |
-| C_Loader_RearRiseTray_On | 0 | 1 | 3 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_FrontRiseTray_On | 0 | 3 | 0 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_PushTray_On | 0 | 3 | 0 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_LeanOnTray_On | 0 | 3 | 1 | 0 | 1 | 是 | 5 | 5 |  |
-| C_Auto1_RearRiseTray_On | 0 | 3 | 1 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_FrontRiseTray_On | 0 | 3 | 1 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_PushTray_On | 0 | 3 | 2 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_LeanOnTray_On | 0 | 3 | 2 | 6 | 1 | 是 | 5 | 5 |  |
-| C_Auto2_RearRiseTray_On | 0 | 3 | 3 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_FrontRiseTray_On | 0 | 3 | 3 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_PushTray_On | 0 | 3 | 3 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_LeanOnTray_On | 0 | 4 | 0 | 4 | 1 | 是 | 5 | 5 |  |
-| C_Auto3_RearRiseTray_On | 0 | 4 | 1 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_FrontRiseTray_On | 0 | 5 | 0 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_PushTray_On | 0 | 5 | 0 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_LeanOnTray_On | 0 | 5 | 1 | 0 | 1 | 是 | 5 | 5 |  |
-| C_Auto4_RearRiseTray_On | 0 | 5 | 1 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_FrontRiseTray_On | 0 | 5 | 1 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_PushTray_On | 0 | 5 | 2 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_LeanOnTray_On | 0 | 5 | 2 | 6 | 1 | 是 | 5 | 5 |  |
-| C_Auto5_RearRiseTray_On | 0 | 5 | 3 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_FrontRiseTray_On | 0 | 5 | 3 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_PushTray_On | 0 | 5 | 3 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_LeanOnTray_On | 0 | 6 | 0 | 4 | 1 | 是 | 5 | 5 |  |
-| C_Auto6_RearRiseTray_On | 0 | 6 | 1 | 0 | 1 | 是 | 5 | 5 |  |
 | C_TrayArmZ_Down_On | 0 | 0 | 1 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Color_LeanOnTray_On | 0 | 6 | 2 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Color_PushTray_On | 0 | 6 | 1 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Color_FrontRiseTray_1_On | 0 | 6 | 2 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Color_FrontRiseTray_2_On | 0 | 6 | 1 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Empty_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Empty_RearSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Loader_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto1_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto2_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto3_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto4_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto5_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto6_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Color_RearRiseTray_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Color_FrontSeparateTray_1_On |  |  |  |  | 0 | 否 | 5 | 5 |  |
 
-## Cylinder_Off（55 點）
+## Cylinder_Off（39 點）
 | Alias | Lane | IP | Port | Bit | InType | 啟用 | OnDelay | OffDelay | Note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C_Empty_FrontRiseTray_1_Off | 0 | 1 | 0 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Empty_PushTray_Off | 0 | 1 | 0 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Empty_LeanOnTray_Off | 0 | 1 | 1 | 1 | 1 | 是 | 5 | 5 |  |
-| C_Empty_RearRiseTray_Off | 0 | 1 | 1 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Loader_FrontRiseTray_1_Off | 0 | 1 | 1 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Loader1_PushTray_Off | 0 | 1 | 2 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Loader2_PushTray_Off | 0 | 1 | 2 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Loader1_LeanOnTray_Off | 0 | 1 | 3 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Loader2_LeanOnTray_Off | 0 | 1 | 3 | 3 | 1 | 是 | 5 | 5 |  |
-| C_Loader_RearRiseTray_Off | 0 | 1 | 3 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_FrontRiseTray_Off | 0 | 3 | 0 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_PushTray_Off | 0 | 3 | 0 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Auto1_LeanOnTray_Off | 0 | 3 | 1 | 1 | 1 | 是 | 5 | 5 |  |
-| C_Auto1_RearRiseTray_Off | 0 | 3 | 1 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_FrontRiseTray_Off | 0 | 3 | 1 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_PushTray_Off | 0 | 3 | 2 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto2_LeanOnTray_Off | 0 | 3 | 2 | 7 | 1 | 是 | 5 | 5 |  |
-| C_Auto2_RearRiseTray_Off | 0 | 3 | 3 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_FrontRiseTray_Off | 0 | 3 | 3 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_PushTray_Off | 0 | 3 | 3 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Auto3_LeanOnTray_Off | 0 | 4 | 0 | 5 | 1 | 是 | 5 | 5 |  |
-| C_Auto3_RearRiseTray_Off | 0 | 4 | 1 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_FrontRiseTray_Off | 0 | 5 | 0 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_PushTray_Off | 0 | 5 | 0 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Auto4_LeanOnTray_Off | 0 | 5 | 1 | 1 | 1 | 是 | 5 | 5 |  |
-| C_Auto4_RearRiseTray_Off | 0 | 5 | 1 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_FrontRiseTray_Off | 0 | 5 | 1 | 7 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_PushTray_Off | 0 | 5 | 2 | 0 | 1 | 是 | 5 | 5 |  |
 | C_Auto5_LeanOnTray_Off | 0 | 5 | 2 | 7 | 1 | 是 | 5 | 5 |  |
-| C_Auto5_RearRiseTray_Off | 0 | 5 | 3 | 3 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_FrontRiseTray_Off | 0 | 5 | 3 | 5 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_PushTray_Off | 0 | 5 | 3 | 6 | 1 | 是 | 5 | 5 |  |
 | C_Auto6_LeanOnTray_Off | 0 | 6 | 0 | 5 | 1 | 是 | 5 | 5 |  |
-| C_Auto6_RearRiseTray_Off | 0 | 6 | 1 | 1 | 1 | 是 | 5 | 5 |  |
 | C_Color_LeanOnTray_Off | 0 | 6 | 2 | 2 | 1 | 是 | 5 | 5 |  |
 | C_Color_PushTray_Off | 0 | 6 | 1 | 4 | 1 | 是 | 5 | 5 |  |
 | C_Color_FrontRiseTray_1_Off | 0 | 6 | 1 | 3 | 1 | 是 | 5 | 5 |  |
@@ -323,17 +283,9 @@
 | C_TrayArm_RearClamp_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Empty_FrontRiseTray_2_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Empty_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Empty_RearSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Loader_FrontRiseTray_2_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Loader_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto1_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto2_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto3_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto4_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto5_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Auto6_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_TrayArmZ_Down_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
-| C_Color_RearRiseTray_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Color_FrontRiseTray_2_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 | C_Color_FrontSeparateTray_1_Off |  |  |  |  | 0 | 否 | 5 | 5 |  |
 
