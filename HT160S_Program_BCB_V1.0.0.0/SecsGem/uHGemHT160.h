@@ -300,6 +300,13 @@ class HT160Gem : public HTGem
 {
 private:
     AnsiString sSystemTime;
+    //AI(secs-bclass-0803) 20260803 : SVID 3 GemClock. SEPARATE member from sSystemTime on
+    // purpose - 3 is the GEM-standard clock and HT9045 puts a 16-char SEMI E5 TIME
+    // "YYYYMMDDhhmmsscc" on the wire (uHGemEquipment.cpp:325 with iTimeFormat=1), which the
+    // KYEC host has read in RPTID 502 slot 4 all day. Aliasing sSystemTime here (as
+    // docs/plan/secs-9045-porting-20260729/svid-ownership.md:103 proposed) would push a
+    // 19-char "yyyy/mm/dd hh:nn:ss" into a slot the host parses as E5 TIME.
+    AnsiString sGemClock;
     int iControlState;
     //AI(ht160s-secsgem) 20260611 : SV snapshot members refreshed just before each
     // S6F11 / S1F4 serialize, so SetSVDataPointer can bind a stable address while
@@ -335,6 +342,12 @@ private:
     //AI(secs-lotstarttime) 20260730 : SVID 66033. LATCHED by NoteLotStartTime, deliberately
     // NOT refreshed in RefreshSVData - it must answer "when did this lot start", not "now".
     AnsiString svLotStartTime;   // "yyyy/mm/dd hh:nn:ss" of Lot Start ("" between lots)
+    //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time, the SAME latch as 66033 but in
+    // HT9045's wire format "yyyy-mm-dd hh:nn:ss" (9045 sprintf cprod.cpp:693-694; the KYEC
+    // 2026-06-08 S6F16 carried A[19] "2026-06-07 12:57:32" in RPTID 508 slot 3). 66033 keeps
+    // its slash format because that format is PUBLISHED to the customer in
+    // docs/SECS/HT160S_SECS_Interface_Spec_20260727.md, so 1009 needs its own copy.
+    AnsiString svLotStartTime9045;// "yyyy-mm-dd hh:nn:ss" of Lot Start ("" between lots)
     AnsiString svSoftwareVersion;// application software version (constant, 9045 SVID 1003)
     //AI(ht160s-secsgem) 20260611 : EC snapshot member. Recipe name has no single
     // stable address (lives behind RecipeManager getter/normalizer), so S2F14

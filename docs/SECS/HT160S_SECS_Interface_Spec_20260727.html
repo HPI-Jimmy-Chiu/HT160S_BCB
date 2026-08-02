@@ -24,18 +24,25 @@ a{color:#0969da}
 <h1 id="ht-160s-secsgem-secsgem-interface-specification">HT-160S SECS/GEM 介面規格書 / SECS/GEM Interface Specification</h1>
 <blockquote>
 <p><strong>機型 Model:</strong> HT-160S (Tray Sorter) &nbsp;|&nbsp; <strong>MDLN:</strong> <code>HT-160S</code> &nbsp;|&nbsp; <strong>SOFTREV:</strong> <code>1.0.0.0</code>
-<strong>文件版本 Doc rev:</strong> 2026-07-29
+<strong>文件版本 Doc rev:</strong> 2026-08-03
 <strong>依據 Based on:</strong> current firmware build (branch <code>feat/iosetview-172-refactor</code>)</p>
 <p>本規格反映 HT-160S <strong>目前實作</strong>的 SECS-II / GEM 介面。命令面向 HT-90XX (HT9045) 對齊;
 <strong>CEID 字典自 2026-07-29 起為 HT-90XX 的逐字複本</strong>(號碼 1–275 全數註冊,別名逐字相同,見 §3.3);
-<strong>SVID 字典仍為 HT-160S 自有</strong>(sorter 語意,見 §3.1)。
+<strong>SVID 字典為「共同段對齊 HT-90XX + 本機自有高位段」兩部分</strong>(見 §3.1):凡 HT-90XX 有同概念的資料,
+一律沿用 HT-90XX 的號碼、型別與線上格式;sorter 特有、tester 無對應的資料放在 66xxx / 38xxx 段。
 This document describes the SECS-II / GEM interface <strong>as currently implemented</strong> on HT-160S.
 The command surface is aligned to HT-90XX. <strong>As of 2026-07-29 the CEID dictionary is a verbatim copy of
-HT-90XX's</strong> (ids 1–275 all registered, aliases character-identical, §3.3); the SVID dictionary remains
-HT-160S-specific (§3.1).</p>
+HT-90XX's</strong> (ids 1–275 all registered, aliases character-identical, §3.3). The SVID dictionary has two
+parts (§3.1): a common band that reuses HT-90XX's ids, types and wire formats wherever the same concept
+exists, and HT-160S-specific high bands (66xxx / 38xxx) for sorter data a tester has no equivalent for.</p>
 <p>⚠️ <strong>2026-07-29 為 breaking change</strong>:舊版宣告的 CEID 1–31 語意已作廢,host 端必須依 <strong>§3.3.5 對照表</strong>
 重新設定。最高風險為 CEID <strong>27</strong> 與 <strong>28</strong> —— 新舊字典都有這兩個號碼但意思不同,未更新會靜默誤讀。
 A host that is not re-provisioned will silently misread CEID <strong>27</strong> and <strong>28</strong>.</p>
+<p><strong>2026-08-03 修訂(僅新增,無 breaking change)/ Revision 2026-08-03 (additive only):</strong> 補齊 19 個
+host 已在引用、但本機先前回空 item 的 SVID —— <strong>3</strong>(GemClock)、<strong>1002</strong>(Machine ID)、<strong>1009</strong>
+(Lot Start Time)、<strong>1103–1105</strong>(Auto1–3 Count)、<strong>1501</strong>(Setup File)、<strong>2758–2763</strong>(Type 1 Tray
+幾何),以及本機自有段的 <strong>66022–66027</strong>(Auto1–6 Count)。號碼、型別與線上格式皆比對 HT-90XX 原始碼
+與京元現場 log 後對齊。同時更正 §6 對 SVID 1006 的錯誤描述。詳見 §3.1。</p>
 </blockquote>
 <hr />
 <h2 id="0-conventions">0. 閱讀慣例 / Conventions</h2>
@@ -638,16 +645,46 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 </thead>
 <tbody>
 <tr>
+<td>3</td>
+<td>GemClock</td>
+<td>A</td>
+<td>設備當前時間,<strong>SEMI E5 16 字元 <code>YYYYMMDDhhmmsscc</code></strong>(與 HT-90XX 的 <code>iTimeFormat=1</code> 同格式,也與本機 S2F18 回覆同格式)。與 1027 是<strong>同一時刻的兩種格式</strong>,不可互換;百分秒欄固定 <code>00</code></td>
+</tr>
+<tr>
 <td>1001</td>
 <td>Machine Model</td>
 <td>A</td>
 <td>機型名 = HT-160S</td>
 </tr>
 <tr>
+<td>1002</td>
+<td>Machine ID</td>
+<td>A</td>
+<td>機台識別碼,取自 <code>General.ini [MachineIdentity] HandlerID</code>。<strong>出廠預設為空字串</strong>——這是操作員在維護頁輸入的欄位,未輸入前本值為空(不是故障)。HT-90XX 只有一個識別字串,HT-160S 有三個(機型 / Handler ID / 序號),本號回的是 <strong>Handler ID</strong></td>
+</tr>
+<tr>
 <td>1003</td>
 <td>Software Version</td>
 <td>A</td>
 <td>軟體版本</td>
+</tr>
+<tr>
+<td>1006</td>
+<td>Lot ID</td>
+<td>A</td>
+<td>目前作用中的批號</td>
+</tr>
+<tr>
+<td>1009</td>
+<td>Lot Start Time</td>
+<td>A</td>
+<td>開批時刻,<strong>HT-90XX 線上格式 <code>yyyy-mm-dd hh:nn:ss</code>(破折號)</strong>。與 66033 同一個閂鎖、同一時刻,只是分隔符不同(66033 維持既有斜線格式不變);批與批之間為空字串</td>
+</tr>
+<tr>
+<td>1011</td>
+<td>Machine State</td>
+<td>A</td>
+<td>主畫面狀態文字</td>
 </tr>
 <tr>
 <td>1021</td>
@@ -659,7 +696,49 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 <td>1027</td>
 <td>System Time</td>
 <td>A</td>
-<td>系統時間</td>
+<td>系統時間,<code>yyyy/mm/dd hh:nn:ss</code>(另見 SVID 3)</td>
+</tr>
+<tr>
+<td>1101</td>
+<td>Loader Count</td>
+<td>I4</td>
+<td>自 Loader 盤取出的 IC 數</td>
+</tr>
+<tr>
+<td>1102</td>
+<td>Output Total Count</td>
+<td>I4</td>
+<td>已分選入 Bin 的 IC 數(= 66021)</td>
+</tr>
+<tr>
+<td>1103</td>
+<td>Auto1 Count</td>
+<td>I4</td>
+<td>放入 Auto1 出料盤的 IC 數(= 66022)</td>
+</tr>
+<tr>
+<td>1104</td>
+<td>Auto2 Count</td>
+<td>I4</td>
+<td>放入 Auto2 出料盤的 IC 數(= 66023)</td>
+</tr>
+<tr>
+<td>1105</td>
+<td>Auto3 Count</td>
+<td>I4</td>
+<td>放入 Auto3 出料盤的 IC 數(= 66024)</td>
+</tr>
+<tr>
+<td>1501</td>
+<td>Setup File</td>
+<td>A</td>
+<td>目前 recipe / setup 檔名。<strong>同號的 ECID 1501 指向同一份資料</strong>(見 §3.2 說明)</td>
+</tr>
+<tr>
+<td>1517</td>
+<td>Start Mode</td>
+<td>I4</td>
+<td>0=Continuous Start / 1=Initial Start(HT-90XX 編號)</td>
 </tr>
 <tr>
 <td>1518</td>
@@ -667,8 +746,55 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 <td>I4</td>
 <td>0=Dummy / 1=Tray Only / 2=Real</td>
 </tr>
+<tr>
+<td>2758</td>
+<td>Type 1 Tray Pitch X</td>
+<td>F8</td>
+<td>盤格 X 間距,<strong>mm</strong>。<strong>同號的 ECID 2758 指向同一份資料</strong></td>
+</tr>
+<tr>
+<td>2759</td>
+<td>Type 1 Tray Pitch Y</td>
+<td>F8</td>
+<td>盤格 Y 間距,mm</td>
+</tr>
+<tr>
+<td>2760</td>
+<td>Type 1 Tray Start Position X</td>
+<td>F8</td>
+<td>盤格 X 起點,mm</td>
+</tr>
+<tr>
+<td>2761</td>
+<td>Type 1 Tray Start Position Y</td>
+<td>F8</td>
+<td>盤格 Y 起點,mm</td>
+</tr>
+<tr>
+<td>2762</td>
+<td>Type 1 Tray Division X</td>
+<td>I4</td>
+<td>盤格 X 數(無單位)</td>
+</tr>
+<tr>
+<td>2763</td>
+<td>Type 1 Tray Division Y</td>
+<td>I4</td>
+<td>盤格 Y 數(無單位)</td>
+</tr>
+<tr>
+<td>37010</td>
+<td>Enter Skip IC Count</td>
+<td>I4</td>
+<td>操作員在上一次 SKIP 時輸入的取出 IC 數</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>關於 1103–1105 的兩點必讀 / Two notes on 1103–1105</strong>
+1. <strong>HT-160S 有六個 Auto 站</strong>,而 HT-90XX 的 1103–1105 只到 Auto3、其後 1106–1108 叫 <strong>Fix1–3</strong>。要不要把 HT-160S 的 Auto4–6 對映到 Fix1–3 是<strong>雙方商務決定</strong>,本機<strong>不單方面實作</strong>,因此 host 報表中的 1106–1108 會維持空 item。Auto4–6 的產出<strong>並未隱藏</strong>:六站全數公佈於本機自有的 <strong>66022–66027</strong>,host 以 S2F33 綁該段即可讀到完整分布。
+2. <strong>1102 與 1103–1105 的總和不保證相等。</strong> HT-90XX 的 1102 就是該陣列的和;HT-160S 的 1102 在<strong>掃碼/配 Bin 階段</strong>累加,1103–1105 在<strong>放料階段</strong>累加,且 1102 為 RAM 值(復電歸零)而 1101/1103–1105 隨機台保存。請勿以「總和相符」作為對帳條件。</p>
+</blockquote>
 <p><strong>HT-160S 自有高位段 / HT-160S-specific high band (66000+):</strong></p>
 <table>
 <thead>
@@ -721,6 +847,42 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 <td>Total Sorted</td>
 <td>I4</td>
 <td>已分選 IC 數</td>
+</tr>
+<tr>
+<td>66022</td>
+<td>Auto1 Count</td>
+<td>I4</td>
+<td>放入 Auto1 出料盤的 IC 數(= 9045 編號的 SVID 1103)</td>
+</tr>
+<tr>
+<td>66023</td>
+<td>Auto2 Count</td>
+<td>I4</td>
+<td>放入 Auto2 出料盤的 IC 數(= 1104)</td>
+</tr>
+<tr>
+<td>66024</td>
+<td>Auto3 Count</td>
+<td>I4</td>
+<td>放入 Auto3 出料盤的 IC 數(= 1105)</td>
+</tr>
+<tr>
+<td>66025</td>
+<td>Auto4 Count</td>
+<td>I4</td>
+<td>放入 Auto4 出料盤的 IC 數(<strong>9045 無對應號碼</strong>,9045 第 4 站叫 Fix1)</td>
+</tr>
+<tr>
+<td>66026</td>
+<td>Auto5 Count</td>
+<td>I4</td>
+<td>放入 Auto5 出料盤的 IC 數(9045 第 5 站叫 Fix2)</td>
+</tr>
+<tr>
+<td>66027</td>
+<td>Auto6 Count</td>
+<td>I4</td>
+<td>放入 Auto6 出料盤的 IC 數(9045 第 6 站叫 Fix3)</td>
 </tr>
 <tr>
 <td>66030</td>
@@ -930,6 +1092,10 @@ A host that is not re-provisioned will silently misread CEID <strong>27</strong>
 </table>
 <blockquote>
 <p>S2F15 寫入僅在機台 idle(非運轉、機內無 IC)時接受(EAC=2 否則);目前僅 tray-geometry 段可寫,Recipe(1501)唯讀。</p>
+<p><strong>2026-08-03:同號的 SVID 已可讀 / Same ids are now readable as SVIDs too.</strong> SECS-II 的 SVID 與 ECID
+是兩個獨立命名空間。本機先前只把 1501 與 2758–2763 註冊在 <strong>EC</strong> 命名空間,而 host 是以 <strong>SVID</strong>
+路徑(S1F3 / S6F11 報表)讀它們,因此那些槽位一直回空 item。本版已在 SV 命名空間補註冊<strong>同號、同型別、
+指向同一份資料</strong>的七個號碼(見 §3.1),兩條路徑的值恆等,不會出現不一致。</p>
 </blockquote>
 <h3 id="33-collection-events-ceid-s6f11">3.3 事件 / Collection Events (CEID) — S6F11</h3>
 <blockquote>
@@ -1863,7 +2029,8 @@ HT-160S 只發 S6F11 事件,不發此告警。若 host 是以該 ALID 判斷循�
 <ul>
 <li><strong>命令面 / Command surface</strong>:S1/S2/S5/S6 的基礎 GEM 訊息與 HT-90XX 對齊(見 §2)。</li>
 <li><strong>字典面 / Dictionary</strong>:HT-160S 為 tray sorter,無 tester 站位/測試結果/接觸次數等概念,故:</li>
-<li>HT-90XX 的 tester 專屬 SVID(如 1420 32-site 測試結果、6001/6002 Arm 接觸次數、1006/1007 Socket ID)<strong>在 HT-160S 無對應</strong>,以容忍機制回空值或請 host 移除。</li>
+<li>HT-90XX 的 tester 專屬 SVID(如 1420 32-site 測試結果、6001/6002 Arm 接觸次數、1007 Operator ID、1513 Tester On/Off、1151–1156 各站良率、16296–16299 各 site 累計)<strong>在 HT-160S 無對應</strong>,以容忍機制回空值或請 host 移除。</li>
+<li><strong>更正(2026-08-03)</strong>:本條先前把 <strong>1006</strong> 一併列為「tester 專屬、無對應」並建議 host 移除,那是錯的——1006 在 HT-90XX 是 <strong>Lot ID</strong>(不是 Socket ID),HT-160S <strong>自 2026-08-01 起已實作</strong>並回目前作用中的批號(§3.1)。請<strong>不要</strong>從報表定義中移除 1006。同理 1007 是 <strong>Operator ID</strong>,不是 Socket ID;它確實無對應,但原因是 HT-160S 沒有操作員身分欄位可回。</li>
 <li>HT-160S 的機台狀態/產出/AMR 資料集中於 66xxx 與 38xxx 段(§3.1)。</li>
 <li><strong>建議</strong>:host 端請依本規格 §3 對應 HT-160S 實際 SVID/CEID;無法對應者(tester 專屬)由雙方確認後移除或以容忍空值處理。</li>
 </ul>
@@ -1881,7 +2048,7 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <li><code>LOTSTART</code> 於 2026-07-30 改為與 9045 逐字對齊(無參數、無條件 HCACK=0、可重複下達);<code>CLEAR_LOT_INFO</code>(host 版 Lot End)為同日新增對齊。兩者合起來構成 host 端完整的開批 / 結批一對。</li>
 <li><strong><code>HOME</code> 已自本節移出</strong> —— 經逐字查證 HT9045 的 S2F42 dispatch,其命令集為 <code>AUTHORITY_CHECK</code> <code>AUTOSITEMAP</code> <code>AUTO_CLEAN</code> <code>AUTO_RETEST</code> <code>CLEAN_AUTO_SORT_COUNT</code> <code>CLEAN_OUT</code> <code>CLEAR_LOT_INFO</code> <code>CLOSE_ONECYCLE</code> <code>CONTINUE_*</code> <code>DEVTEMPOFFSETADJUST</code> <code>EESUG_OFFSET</code> <code>HALT</code> <code>INITIAL_START*</code> <code>LOTORDER</code> <code>LOTSTART</code> <code>ONE_CYCLE</code> <code>ONLINE_LOCAL</code> <code>ONLINE_REMOTE</code> <code>PAUSE</code> <code>PP_*</code> <code>REMOTE_*</code> <code>RESET</code> <code>RETEST_MRT</code> <code>SET_LOT_INFO</code> <code>START</code> <code>START_AGV</code> <code>START_AQL</code> <code>START_LOT</code> <code>STOP</code> <code>STOP_LOT</code> <code>SUBSTRATETYPE</code> <code>SWITCH_TO_*</code> <code>TESTTEMPSETTING</code> <code>TRAY_FEED</code> <code>TRAY_MAP</code> <code>YIELD_FAIL</code> —— <strong>其中沒有 <code>HOME</code></strong>。改列 §7.2。</li>
 <li>三項宣告差異:<code>ONE_CYCLE</code> 據實回 HCACK(9045 一律 0);<code>ENERGY_SAVING</code> 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);<code>PP_SIGNALTOWER</code>/<code>PP_MUSIC</code> 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。</li>
-<li><strong>SVID 共同段</strong>:1001 / 1003 / 1021 / 1027 / 1518。</li>
+<li><strong>SVID 共同段</strong>:3 / 1001 / 1002 / 1003 / 1006 / 1009 / 1011 / 1021 / 1027 / 1101 / 1102 / 1103 / 1104 / 1105 / 1501 / 1517 / 1518 / 2758–2763 / 37010(號碼、型別與線上格式皆對齊 HT-90XX)。</li>
 <li><strong>ECID</strong>:1501,2758–2763(Type1 tray 幾何)。</li>
 <li><strong>CEID</strong>:AMR 272 / 273 / 274 / 275;Auto-Full 35 / 36 / 37 / <strong>148 / 149 / 150</strong>;Auto-Unloadtray <strong>136 / 137 / 138 / 145 / 146 / 147</strong>。</li>
 <li>上列 Auto-Full 六號與 Auto-Unloadtray 六號<strong>皆與 HT-90XX 同號同義</strong>(依 HT-90XX 韌體 CEID 目錄 <code>EventReport_CEID.def</code>:148/149/150 = <code>Auto 4/5/6 Full</code>,136–138/145–147 = <code>Auto 1–6 Unloading tray</code>)。</li>
@@ -1926,8 +2093,8 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <tr>
 <td>SVID <strong>66000–66033</strong></td>
 <td>SVID</td>
-<td>機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032)、LotStartTime(66033)</td>
-<td>sorter 特有資料,9045(tester)無對應;刻意置於 <strong>66000+ 高位段</strong>以絕不與 9045 的 SVID 段碰撞</td>
+<td>機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、<strong>Auto1–6 Count(66022–66027)</strong>、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032)、LotStartTime(66033)</td>
+<td>sorter 特有資料,9045(tester)無對應;刻意置於 <strong>66000+ 高位段</strong>以絕不與 9045 的 SVID 段碰撞。66022–66027 之所以存在:9045 只給三個 Auto 編號,第 4–6 站在 9045 叫 Fix1–3,對映屬商務決定,故本機在自有段公佈<strong>完整六站</strong>,不預設該對映</td>
 </tr>
 <tr>
 <td>SVID <strong>38208–38210</strong> ＋ <strong>38237–38245</strong></td>

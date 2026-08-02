@@ -30,6 +30,7 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
 {
     iControlState = 0;
     sSystemTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
+    sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
 
     //AI(ht160s-secsgem) 20260611 : init SV snapshot members (refreshed on demand)
     svRunMode       = 0;
@@ -42,6 +43,7 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     svLotCount      = 0;
     svCurrentLot    = "";
     svLotStartTime  = "";            //AI(secs-lotstarttime) 20260730 : latched by NoteLotStartTime, not by RefreshSVData
+    svLotStartTime9045 = "";         //AI(secs-bclass-0803) : SVID 1009, same latch reformatted to 9045's dashes in RefreshSVData
     svSoftwareVersion = "1.0.0.0";   // keep in step with ht160s.cpp GemInitial("HT160S","1.0.0.0")
     ecRecipeName    = "";
 
@@ -362,6 +364,28 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1021, HType.INT_4_TYPE, "UPH", "pcs/hr", &svUPH, "units per hour (9045 SVID 1021)");
     HGemPtr->SetSVDataPointer(1027, HType.ASCII_TYPE, "System Time", "", &sSystemTime, "current system time (9045 SVID 1027)");
 
+    //AI(secs-bclass-0803) 20260803 : three more slots of the KYEC host's own reports, all
+    // grounded on the 2026-06-08 KYEC 9045 wire dump (under D:/backup_version/HT9046/KYEC/
+    // 20260626/2026_06_08) so the TYPE and FORMAT match what the host has been parsing:
+    //   3    GemClock       - GEM-standard clock, RPTID 502 slot 4. Wire = A[16]
+    //                         "2026060818000489" (SEMI E5 TIME YYYYMMDDhhmmsscc). NOT 1027's
+    //                         19-char slash format - see the sGemClock comment in the header.
+    //                         The centisecond field is a constant "00" (same as the shipping
+    //                         S2F18 reply); length and character set stay legal E5 TIME.
+    //   1002 Machine ID     - RPTID 518/519 + S1F3. 9045 binds ONE identity string
+    //                         (IniConfig.sGPIBMachineID) into which KYEC typed "HT-1295".
+    //                         HT160S has three (model / handler id / serial no) and the
+    //                         handler id is the operator-set machine identity, so 1002 gets
+    //                         that one; 1001 already carries the model. NOTE FOR COMMISSIONING:
+    //                         General.ini [MachineIdentity] HandlerID ships EMPTY, so until an
+    //                         FAE types it on the maintenance page the host reads A[0] "".
+    //                         Registering it is what makes typing it have any effect.
+    //   1009 Lot Start Time - RPTID 508 slot 3. Wire = A[19] "2026-06-07 12:57:32" (dashes).
+    //                         Same latch as HT160S's own 66033, reformatted in RefreshSVData.
+    HGemPtr->SetSVDataPointer(3,    HType.ASCII_TYPE, "GemClock", "", &sGemClock, "equipment clock, SEMI 16-char TIME YYYYMMDDhhmmsscc (GEM-standard SVID 3; 1027 is the same instant in yyyy/mm/dd hh:nn:ss)");
+    HGemPtr->SetSVDataPointer(1002, HType.ASCII_TYPE, "Machine ID", "", &GeneralSetting.sHandlerID, "handler id from General.ini [MachineIdentity] HandlerID (9045 SVID 1002; empty until commissioned)");
+    HGemPtr->SetSVDataPointer(1009, HType.ASCII_TYPE, "Lot Start Time", "", &svLotStartTime9045, "yyyy-mm-dd hh:nn:ss when the current work order started, 9045 wire format (9045 SVID 1009; same latch as 66033, empty between lots)");
+
     //AI(secs-onsite0731) 20260801 : KYEC on-site notes 3, 4 and 7. The CJ_EAP host defines
     // RPTID 502 = {1006,1007,1011,3,1501,1517,1518,1513} and RPTID 501 = {1101..1108,
     // 16296..16299}, then binds 502 to 22 CEIDs (including 272-275 and the top-traffic
@@ -382,6 +406,34 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1011, HType.ASCII_TYPE, "Machine State", "", &svMachineState, "main-screen status text (9045 SVID 1011)");
     HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "Loader Count", "pcs", &svLoaderIC, "ICs picked off Loader trays (9045 SVID 1101)");
     HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin (9045 SVID 1102; same value as 66021)");
+    //AI(secs-bclass-0803) 20260803 : slots 3-5 of the host's RPTID 501, 9045 names "Auto1/2/3
+    // Count". Bound to tRunData.TrayICCnt, NOT to MachineRun.iAreaCount which is what
+    // docs/plan/secs-9045-porting-20260729/svid-ownership.md:110-112 recommended:
+    // iAreaCount has FOUR references in the whole tree and ZERO increments (cprod.cpp:45,
+    // :174, :210 all zero it), so binding it would have published three permanent zeros -
+    // the same defect class as tRunData.LoaderIC before 20260801. TrayICCnt[eAuto1..3] is the
+    // live counter (++ at aSortArm.cpp on each placed OK IC, shown on the main screen at
+    // main.cpp, and the per-tray UPH feed at cprod.cpp reads it).
+    // TWO CAVEATS THAT MUST STAY IN THE CUSTOMER SPEC BOOK, NOT BE PAPERED OVER HERE:
+    //  (a) EPOCH. HT9045's 1103-1108 come from the disk-persisted LastSet.BinCT and survive lot
+    //      changes and power cycles. On HT160S every count in this band is zeroed together by
+    //      ResetPerLotProductionCounters() at each Lot Start, but they do NOT agree across a
+    //      POWER CYCLE : 1101 and 1103-1105 live in tRunData, which WriteLastDataFile persists
+    //      to lastdata.dat, while 1102 reads MachineRun.iTotalSorted, which is RAM-only and
+    //      comes back as 0. Verified on the wire 20260803 (S1F3 after a fresh app start
+    //      answered 1101=0 1102=0 but 1103..1105=1). So 1103-1105 are actually CLOSER to
+    //      9045's semantics than the already-shipped 1102 is; do not "fix" it by making
+    //      1103-1105 volatile.
+    //  (b) PARTITION. On HT9045 1102 == sum(1103..1108) by construction (its 1102 IS the sum
+    //      of that array). HT160S has SIX Auto stations and only Auto1-3 have a 9045 number
+    //      that is not a business decision - 1106-1108 are 9045's "Fix1-3" and mapping them
+    //      onto HT160S Auto4-6 is KYEC's call, not ours. So slots 6-8 of RPTID 501 stay empty
+    //      and the eight slots do NOT add up to 1102 on a lot that uses Auto4-6. Auto4-6
+    //      output is NOT hidden: all six stations are published on HT160S's own authoritative
+    //      66022-66027 band below, which is where a host can read the full picture today.
+    HGemPtr->SetSVDataPointer(1103, HType.INT_4_TYPE, "Auto1 Count", "pcs", &tRunData.TrayICCnt[eAuto1], "ICs placed into the Auto1 output tray (9045 SVID 1103; same value as 66022)");
+    HGemPtr->SetSVDataPointer(1104, HType.INT_4_TYPE, "Auto2 Count", "pcs", &tRunData.TrayICCnt[eAuto2], "ICs placed into the Auto2 output tray (9045 SVID 1104; same value as 66023)");
+    HGemPtr->SetSVDataPointer(1105, HType.INT_4_TYPE, "Auto3 Count", "pcs", &tRunData.TrayICCnt[eAuto3], "ICs placed into the Auto3 output tray (9045 SVID 1105; same value as 66024)");
     //AI(secs-startmode) 20260802 : slot 6 of the host's RPTID 502. Value is 9045-numbered
     // (see RefreshSVData) : 0=Continuous Start, 1=Initial Start. HT9045 declares this one as
     // an EC with min 0 / max 8 and carries the whole legend in its EC description, so a host
@@ -401,6 +453,32 @@ void HT160Gem::AddSV()
     // with no snapshot. The KYEC CJ_EAP host references SVID 1518 in report RPTID 502.
     HGemPtr->SetSVDataPointer(1518, HType.INT_4_TYPE, "Real/Dummy", "", &HSys.LastSet.iRealDummy, "0=Dummy 1=Tray Only 2=Real (9045 SVID 1518)");
 
+    //AI(secs-bclass-0803) 20260803 : SVID 1501 Setup File - slot 5 of the host's RPTID 502 and
+    // also in 518/519, plus a direct S1F3 poll. HT160S already had 1501 in the EC namespace
+    // (AddEC below, bound to &ecRecipeName), but HT160S's SetECDataPointer does NOT also
+    // register an SV the way HT9045's does, so every SVID read of 1501 answered an empty item.
+    // Registering the SAME pointer here closes that asymmetry with no new data source.
+    // The RefreshSVData mirror is MANDATORY, not cosmetic: ecRecipeName was only ever assigned
+    // in S2F14_EquipmentConstanData, and the KYEC host sent ZERO S2F13 across the whole
+    // 2026-06-08 session, so without the mirror this SV would answer A[0] "" forever.
+    HGemPtr->SetSVDataPointer(1501, HType.ASCII_TYPE, "Setup File", "", &ecRecipeName, "active recipe / setup file name (9045 SVID/ECID 1501 Setup File; host RPTID 502 slot 5)");
+
+    //AI(secs-bclass-0803) 20260803 : Type 1 Tray geometry, 9045 SVID/ECID 2758-2763. Same
+    // asymmetry as 1501 - HT160S has these six as ECs (AddEC below) bound straight to the live
+    // THT160TrayForm, but the host reads them as SVIDs (S1F3 every ~5 s on the 9045, plus
+    // RPTID 505/800), so the SV namespace answered empty. Same pointers, same types, same
+    // UNIT: mm on both machines, pinned three ways - 9045 declares "mm" and multiplies by 100
+    // to reach machine 1/100mm, HT160S stores mm in setup.ini and its consumers do the same
+    // *100.0, and the 2026-06-08 KYEC wire values (XPitch 0 / YPitch 102 / XStart 67.95 /
+    // YStart 55.5 / XDiv 1 / YDiv 3) are the same magnitudes HT160S's own recipe holds for the
+    // same physical tray. No 1/100mm mismatch, no snapshot needed (stable global struct).
+    HGemPtr->SetSVDataPointer(2758, HType.FT_8_TYPE,  "Type 1 Tray Pitch X",          "mm", &TrayForm.XPitch,    "tray X pitch, mm (9045 SVID/ECID 2758)");
+    HGemPtr->SetSVDataPointer(2759, HType.FT_8_TYPE,  "Type 1 Tray Pitch Y",          "mm", &TrayForm.YPitch,    "tray Y pitch, mm (9045 SVID/ECID 2759)");
+    HGemPtr->SetSVDataPointer(2760, HType.FT_8_TYPE,  "Type 1 Tray Start Position X", "mm", &TrayForm.XStart,    "tray X start position, mm (9045 SVID/ECID 2760)");
+    HGemPtr->SetSVDataPointer(2761, HType.FT_8_TYPE,  "Type 1 Tray Start Position Y", "mm", &TrayForm.YStart,    "tray Y start position, mm (9045 SVID/ECID 2761)");
+    HGemPtr->SetSVDataPointer(2762, HType.INT_4_TYPE, "Type 1 Tray Division X",       "",   &TrayForm.XDivision, "tray columns / X cell count (9045 SVID/ECID 2762)");
+    HGemPtr->SetSVDataPointer(2763, HType.INT_4_TYPE, "Type 1 Tray Division Y",       "",   &TrayForm.YDivision, "tray rows / Y cell count (9045 SVID/ECID 2763)");
+
     //AI(ht160s-secsgem) 20260612 : HT160 custom high band (66000+). Values are
     // snapshotted into the sv* members by RefreshSVData() right before each
     // serialize, so the bound address stays valid while the reported value tracks
@@ -417,6 +495,18 @@ void HT160Gem::AddSV()
     // -- Output / production (66020-66029) --
     HGemPtr->SetSVDataPointer(66020, HType.INT_4_TYPE, "Total IC", "pcs", &svTotalIC, "total IC processed this lot/run");
     HGemPtr->SetSVDataPointer(66021, HType.INT_4_TYPE, "Total Sorted", "pcs", &svTotalSorted, "total IC sorted into a bin");
+    //AI(secs-bclass-0803) 20260803 : per-Auto output counts for ALL SIX HT160S stations, on
+    // HT160S's own band. 9045 only numbers three Autos (1103-1105, registered above) and calls
+    // the next three "Fix1-3" (1106-1108), and mapping those onto HT160S Auto4-6 is a business
+    // decision for KYEC. Publishing the full six here means Auto4/5/6 output is readable TODAY
+    // without pre-empting that decision: a host binds 66022-66027 with its own S2F33. Same
+    // pointers as 1103-1105 for the first three, so the two bands can never disagree.
+    HGemPtr->SetSVDataPointer(66022, HType.INT_4_TYPE, "Auto1 Count", "pcs", &tRunData.TrayICCnt[eAuto1], "ICs placed into the Auto1 output tray (= 9045-numbered SVID 1103)");
+    HGemPtr->SetSVDataPointer(66023, HType.INT_4_TYPE, "Auto2 Count", "pcs", &tRunData.TrayICCnt[eAuto2], "ICs placed into the Auto2 output tray (= 9045-numbered SVID 1104)");
+    HGemPtr->SetSVDataPointer(66024, HType.INT_4_TYPE, "Auto3 Count", "pcs", &tRunData.TrayICCnt[eAuto3], "ICs placed into the Auto3 output tray (= 9045-numbered SVID 1105)");
+    HGemPtr->SetSVDataPointer(66025, HType.INT_4_TYPE, "Auto4 Count", "pcs", &tRunData.TrayICCnt[eAuto4], "ICs placed into the Auto4 output tray (no 9045 number - 9045 calls slot 4 Fix1)");
+    HGemPtr->SetSVDataPointer(66026, HType.INT_4_TYPE, "Auto5 Count", "pcs", &tRunData.TrayICCnt[eAuto5], "ICs placed into the Auto5 output tray (no 9045 number - 9045 calls slot 5 Fix2)");
+    HGemPtr->SetSVDataPointer(66027, HType.INT_4_TYPE, "Auto6 Count", "pcs", &tRunData.TrayICCnt[eAuto6], "ICs placed into the Auto6 output tray (no 9045 number - 9045 calls slot 6 Fix3)");
     // -- Current Lot (66030-66039) --
     HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
     HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
@@ -473,6 +563,14 @@ void HT160Gem::AddSV()
 void HT160Gem::RefreshSVData()
 {
     sSystemTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
+    //AI(secs-bclass-0803) 20260803 : SVID 3 GemClock. Same instant as 1027 above, in the
+    // 16-char SEMI E5 TIME the host parses (identical recipe to the shipping S2F18 reply).
+    // Must NOT alias sSystemTime - see the sGemClock comment in uHGemHT160.h.
+    sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";
+    //AI(secs-bclass-0803) 20260803 : SVID 1501 Setup File. MANDATORY - ecRecipeName was only
+    // assigned in S2F14_EquipmentConstanData, and the KYEC host never sends S2F13, so without
+    // this the SV would answer an empty string. Pure string getter, no VCL, no file IO.
+    ecRecipeName = RecipeManager.GetCurrentRecipeName();
 
     svRunMode       = (int)HSys.Sys.RunMode;
     svSystemRunning = HSys.Sys.SystemStart ? 1 : 0;
@@ -527,6 +625,30 @@ void HT160Gem::RefreshSVData()
             }
         }
     }
+
+    //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time in HT9045's wire format. Derived
+    // from the SAME latch as 66033 (NoteLotStartTime), never from Now() and never from
+    // tRunData.StartTime - the host asked when the LOT started, and the latch is the only value
+    // that survives a restore. 66033 keeps its published slash format, so reformat a copy.
+    // Rewritten by POSITION, not by character replacement : FormatString's '/' and ':' are the
+    // locale DateSeparator / TimeSeparator PLACEHOLDERS, so a StringReplace("/","-") would be a
+    // silent no-op on a machine whose regional separators differ. The 19-char field layout is
+    // fixed by the format string, so the positions are locale-invariant even when the two
+    // separator characters are not. Deliberately OUTSIDE the if(svLotCount>0) block above :
+    // Lot End empties the registry, and freezing this inside the guard would leave 1009
+    // reporting the closed lot's timestamp forever.
+    svLotStartTime9045 = "";
+    if(svLotStartTime.Length()==19)
+    {
+        svLotStartTime9045 = svLotStartTime.SubString(1,4) + "-"
+                           + svLotStartTime.SubString(6,2) + "-"
+                           + svLotStartTime.SubString(9,2) + " "
+                           + svLotStartTime.SubString(12,2) + ":"
+                           + svLotStartTime.SubString(15,2) + ":"
+                           + svLotStartTime.SubString(18,2);
+    }
+    else if(svLotStartTime.Trim()!="")
+        svLotStartTime9045 = svLotStartTime;   // unexpected shape - pass through, never fabricate
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260612 : 1s tick from THGem::Timer1Timer. Sync the main-
