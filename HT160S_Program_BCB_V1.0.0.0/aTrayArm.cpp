@@ -1038,7 +1038,11 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
     //opt-in flag on, a recovered plain Normal tray may supply an Auto whose own
     //GetTrayRequest asks for a Normal tray (car already stacked identity+cover), so
     //the stack order is never violated. Carried cover still recycles to Empty and
-    //identity was routed to Color above. Flag off (default) = legacy always-recycle.
+    //identity was routed to Color above. Flag off (default) = recycle AT THIS POINT.
+    //AI(ht160s-divert-late) 20260803 : "flag off = always recycle" is NO LONGER true end to end -
+    //the deposit-point re-check in DoPlaceToEmpty case 500 is ungated and can still hand the tray
+    //to an Auto. See the CONSEQUENCE paragraph in TryDivertCarriedTrayToAuto for why that is
+    //deliberate. Flag off now means "do not re-route early", not "never reaches an Auto".
     bool bMaySupplyAuto=(GeneralSetting.bUseAMR==false) ||
                         (GeneralSetting.bUseAmrRecoveryDivert && iDeliverKind==eTrayKindNormal);
     if(bMaySupplyAuto && AutoModule!=NULL)
@@ -1168,10 +1172,12 @@ bool TTrayArmModule::TryDivertCarriedTrayToAuto(bool bAtEmptyDeposit)
     //DoFeedTray routes cover/identity trays straight to discharge (IsReadyForSortArmPlace refuses
     //IC on them) - stamping Normal on a tray the car counts as its cover would put IC in it.
     //On the LATE path the 2D id is also cleared, to keep the documented contract at case 4000
-    //("empty for cover/normal") and to match what the deposit+repick path would have produced :
-    //the idle reset (aTrayArm.cpp:102) clears iDeliverTrayID before the next Empty-sourced job is
-    //dispatched, so an Empty-sourced cover/normal delivery always carries an empty id. The early
-    //path deliberately keeps its id - that is shipped behaviour and is not this change's business.
+    //("empty for cover/normal"). Belt and braces, NOT a fix : only a Loader-recovery job can reach
+    //DoPlaceToEmpty, DoPick case 4000 took the id from LoaderModule->GetRearTrayID(), and the
+    //Loader forces Tray.TrayID="" on every non-identity tray (aLoader.cpp:1936-1937) while this
+    //divert requires iDeliverKind==Normal - so the value is already empty when we get here. Kept
+    //because the kind we stamp is now the Auto's, not ours, and a future kind widening must not
+    //silently publish a work tray's id as a cover carrier id. The early path is left alone.
     iDeliverKind=kind;
     if(bAtEmptyDeposit)
         iDeliverTrayID="";
