@@ -23,7 +23,7 @@ public:
 //---------------------------------------------------------------------------
 extern TFSECS *FSECS;
 void EventReport(unsigned Ceid);
-//AI(secs-lotstarttime) 20260730 : latch (true) / clear (false) SVID 66033 Lot Start Time
+//AI(secs-lotstarttime) 20260730 : latch (true) / clear (false) SVID 1009 Lot Start Time
 //  from the production layer. Thin forwarder to HSys.MyGem so main.cpp keeps including
 //  only this header, exactly like EventReport / AlarmReport.
 //AI(secs-lotstarttime-persist) 20260730 : sWhen lets a caller supply the moment instead of

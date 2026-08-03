@@ -347,14 +347,18 @@ private:
     // value, then EventReport). Deliberately not refreshed in RefreshSVData: the host must
     // read "how many were removed at that alarm", not a running total.
     int        svSkipICCount;    // operator-entered removal   -> SVID 37010 Enter Skip IC Count
-    //AI(secs-lotstarttime) 20260730 : SVID 66033. LATCHED by NoteLotStartTime, deliberately
-    // NOT refreshed in RefreshSVData - it must answer "when did this lot start", not "now".
+    //AI(secs-lotstarttime) 20260730 : the Lot Start latch. LATCHED by NoteLotStartTime,
+    // deliberately NOT refreshed in RefreshSVData - it must answer "when did this lot start",
+    // not "now".
+    //AI(secs-svid-dedupe) 20260803 : this member no longer has an SVID of its own. It was
+    // SVID 66033 until the customer ruled that duplicated information collapses onto the
+    // HT9045 number; it now lives on as the INTERNAL latch, in slash format because that is
+    // the shape main.cpp persists into the work-order meta file and re-feeds on inherit.
     AnsiString svLotStartTime;   // "yyyy/mm/dd hh:nn:ss" of Lot Start ("" between lots)
-    //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time, the SAME latch as 66033 but in
-    // HT9045's wire format "yyyy-mm-dd hh:nn:ss" (9045 sprintf cprod.cpp:693-694; the KYEC
-    // 2026-06-08 S6F16 carried A[19] "2026-06-07 12:57:32" in RPTID 508 slot 3). 66033 keeps
-    // its slash format because that format is PUBLISHED to the customer in
-    // docs/SECS/HT160S_SECS_Interface_Spec_20260727.md, so 1009 needs its own copy.
+    //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time - the latch above in HT9045's
+    // wire format "yyyy-mm-dd hh:nn:ss" (9045 sprintf cprod.cpp:693-694; the KYEC 2026-06-08
+    // S6F16 carried A[19] "2026-06-07 12:57:32" in RPTID 508 slot 3). Converted in RefreshSVData
+    // rather than in the latch so the persisted slash format is never disturbed.
     AnsiString svLotStartTime9045;// "yyyy-mm-dd hh:nn:ss" of Lot Start ("" between lots)
     AnsiString svSoftwareVersion;// application software version (constant, 9045 SVID 1003)
     //AI(ht160s-secsgem) 20260611 : EC snapshot member. Recipe name has no single
@@ -372,7 +376,7 @@ public:
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
     virtual void PollGemControlState();//AI(secs-controlstate) 20260803 : 1s tick -> SVID 4/9 + CEID 141/91/92/93 on a control-state edge
     virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
-    virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");//AI(secs-lotstarttime) 20260730 : latch/clear SVID 66033 Lot Start Time (sWhen = restored stamp, "" = now)
+    virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");//AI(secs-lotstarttime) 20260730 : latch/clear the Lot Start Time behind SVID 1009 (sWhen = restored stamp, "" = now)
     //AI(secs-skipiccount) 20260802 : latch SVID 37010 then fire CEID 78, in that order -
     // the event exists only to carry that number, so the value must be in place first.
     // Called from the alarm chokepoint in note.cpp when the operator clears with SKIP and

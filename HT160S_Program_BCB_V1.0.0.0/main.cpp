@@ -2576,11 +2576,11 @@ void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
         SaveWorkOrder();
     RecordProcess("LOT START "+Origin);
 
-    //AI(secs-lotstarttime) 20260730 : latch SVID 66033 Lot Start Time BEFORE the event, so a
+    //AI(secs-lotstarttime) 20260730 : latch SVID 1009 Lot Start Time BEFORE the event, so a
     // host that answers CEID 6 with an immediate S1F3 already reads THIS lot's start time.
     //AI(secs-lotstarttime-persist) 20260730 : format the stamp ONCE and use the same string for
     // the SV and for the work-order meta file, so the two can never disagree. Persisting it is
-    // what lets an inherited work order answer 66033 after a power cycle instead of "".
+    // what lets an inherited work order answer 1009 after a power cycle instead of "".
     AnsiString sLotStartStamp=Now().FormatString("yyyy/mm/dd hh:nn:ss");
     NoteLotStartTime(true, sLotStartStamp);
     SaveWorkOrderLotStartTime(sLotStartStamp);
@@ -2969,7 +2969,7 @@ void __fastcall TfMain::DoLotEndProcess()
     // renumber; SECS_EVENT.DoLotEnd has been 8 ever since. Code unchanged, comment corrected.
     if(LotRegistry.GetLotCount()>0)
         EventReport(SECS_EVENT.DoLotEnd);
-    //AI(secs-lotstarttime) 20260730 : clear SVID 66033 AFTER the Lot End event, so the lot's
+    //AI(secs-lotstarttime) 20260730 : clear SVID 1009 AFTER the Lot End event, so the lot's
     // start time stays readable right up to the moment the work order closes. Unconditional
     // (NOT under the lot-count guard): an empty Lot End press must not leave a stale timestamp.
     NoteLotStartTime(false);
@@ -3159,7 +3159,7 @@ static AnsiString GetWorkOrderFileName()
 //shared with the WebAPI and WhiteList parsers - adding our own root key there would leak into
 //a customer-facing contract). Lives beside WorkOrder.json so it shares its exact lifecycle:
 //written at Lot Start, deleted wherever WorkOrder.json is deleted, read only when the operator
-//chooses to INHERIT. Currently one key : the Lot Start time behind SVID 66033.
+//chooses to INHERIT. Currently one key : the Lot Start time behind SVID 1009.
 static AnsiString GetWorkOrderMetaFileName()
 {
     return HSys.CurrentDir + AnsiString("\\HT160S_LotInfo\\WorkOrder.meta.ini");
@@ -3182,13 +3182,13 @@ void __fastcall TfMain::SaveWorkOrderLotStartTime(AnsiString sWhen)
         {
             //AI(secs-lotstarttime-persist) 20260730 : a METADATA write must never abort a Lot
             //Start. TIniFile::WriteString raises when the folder/file is read-only, the disk is
-            //full or the file is locked, and this call sits between the 66033 latch and the
+            //full or the file is locked, and this call sits between the 1009 latch and the
             //CEID 6 emit : on the SECS path LotStartCore runs inside the S2F41 handler, so an
             //escaping exception would leave the S2F42 reply unsent (host T3 timeout) with the
             //lot already open, and on the button path it would show a raw VCL error instead of
             //a Lot Start. Degrade to "not persisted", which the restore side already tolerates
-            //(no stored stamp -> 66033 stays empty).
-            RecordProcess("WorkOrder meta write failed ; SVID 66033 will not survive a power cycle");
+            //(no stored stamp -> 1009 stays empty).
+            RecordProcess("WorkOrder meta write failed ; SVID 1009 will not survive a power cycle");
         }
     }
     __finally
@@ -3216,7 +3216,7 @@ AnsiString __fastcall TfMain::LoadWorkOrderLotStartTime()
             //runs inside the startup restore, and an unreadable meta file must degrade to
             //"no stored stamp", never abort the work-order restore.
             sWhen="";
-            RecordProcess("WorkOrder meta read failed ; SVID 66033 stays empty");
+            RecordProcess("WorkOrder meta read failed ; SVID 1009 stays empty");
         }
     }
     __finally
@@ -4033,7 +4033,7 @@ void __fastcall TfMain::RestoreLastWorkOrder()
             LotBinBinding.Clear();
             LotBinBinding.SaveToIni();
             //AI(secs-lotstarttime-persist) 20260730 : a fresh start is not an open lot - drop the
-            //stored Lot Start time with the rest of the work order so 66033 stays empty.
+            //stored Lot Start time with the rest of the work order so 1009 stays empty.
             ClearWorkOrderMeta();
             //AI(ht160s-whitelist-override) 20260717 : fresh start also clears the WhiteList overlay.
             GeneralSetting.SetWhiteListActive(false);
@@ -4067,7 +4067,7 @@ void __fastcall TfMain::RestoreLastWorkOrder()
                 //to a box the operator is free to retype.
                 m_sActiveLot=(edLotNo!=NULL) ? edLotNo->Text.Trim() : AnsiString("");
                 //AI(secs-lotstarttime-persist) 20260730 : an inherited lot is still OPEN, so
-                //SVID 66033 must answer the ORIGINAL start time rather than "". Re-latch the
+                //SVID 1009 must answer the ORIGINAL start time rather than "". Re-latch the
                 //stored stamp verbatim. If nothing was stored (work order predates this, or the
                 //meta file was lost) leave it empty - the documented "between lots" value beats a
                 //confidently wrong timestamp derived from Now() or tRunData.StartTime.
@@ -4075,10 +4075,10 @@ void __fastcall TfMain::RestoreLastWorkOrder()
                 if(sStoredStart!=AnsiString(""))
                 {
                     NoteLotStartTime(true, sStoredStart);
-                    RecordProcess("Startup: restored Lot Start Time (SVID 66033) = "+sStoredStart);
+                    RecordProcess("Startup: restored Lot Start Time (SVID 1009) = "+sStoredStart);
                 }
                 else
-                    RecordProcess("Startup: no stored Lot Start Time ; SVID 66033 stays empty");
+                    RecordProcess("Startup: no stored Lot Start Time ; SVID 1009 stays empty");
             }
             RecordProcess("Startup: operator chose to inherit last work order");
         }

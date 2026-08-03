@@ -1,8 +1,66 @@
 SVID,Name
+3,GemClock
+4,GemControlState
+9,PreviousGemControlState
 1001,Machine Model
+1002,Machine ID
 1003,Software Version
+1006,Lot ID
+1009,Lot Start Time
+1011,Machine State
 1021,UPH
 1027,System Time
+1101,Loader Count
+1102,Output Total Count
+1103,Auto1 Count
+1104,Auto2 Count
+1105,Auto3 Count
+1501,Setup File
+1517,Start Mode
+1518,Real/Dummy
+2758,Type 1 Tray Pitch X
+2759,Type 1 Tray Pitch Y
+2760,Type 1 Tray Start Position X
+2761,Type 1 Tray Start Position Y
+2762,Type 1 Tray Division X
+2763,Type 1 Tray Division Y
+37010,Enter Skip IC Count
+38202,Loader Carrier ID
+38203,Empty Carrier ID
+38204,Color Carrier ID
+38205,AUTO1 Carrier ID
+38206,AUTO2 Carrier ID
+38207,AUTO3 Carrier ID
+38208,AUTO4 Carrier ID
+38209,AUTO5 Carrier ID
+38210,AUTO6 Carrier ID
+38219,Supplement Bin
+38220,LD UnLD Check AGV
+38221,LD UnLD Finish AGV
+38222,AMR Loader Tray Count
+38223,AMR Empty Tray Count
+38224,AMR Color Tray Count
+38225,AMR AUTO1 Tray Count
+38226,AMR AUTO2 Tray Count
+38227,AMR AUTO3 Tray Count
+38228,AMR Loader Device Count
+38229,AMR Empty Device Count
+38230,AMR Color Device Count
+38231,AMR AUTO1 Device Count
+38232,AMR AUTO2 Device Count
+38233,AMR AUTO3 Device Count
+38234,AMR AUTO1 Bin Setting
+38235,AMR AUTO2 Bin Setting
+38236,AMR AUTO3 Bin Setting
+38237,AMR AUTO4 Tray Count
+38238,AMR AUTO5 Tray Count
+38239,AMR AUTO6 Tray Count
+38240,AMR AUTO4 Device Count
+38241,AMR AUTO5 Device Count
+38242,AMR AUTO6 Device Count
+38243,AMR AUTO4 Bin Setting
+38244,AMR AUTO5 Bin Setting
+38245,AMR AUTO6 Bin Setting
 66000,Run Mode
 66001,System Running
 66002,Control State
@@ -10,71 +68,9 @@ SVID,Name
 66011,Alarm Code
 66020,Total IC
 66021,Total Sorted
-66030,Active Lot Count
-66031,Current Lot ID
-66032,Sort Mode
-38219,Supplement Bin
-38220,LD UnLD Check AGV
-38221,LD UnLD Finish AGV
-38202,Loader Carrier ID
-38222,AMR Loader Tray Count
-38228,AMR Loader Device Count
-38203,Empty Carrier ID
-38223,AMR Empty Tray Count
-38229,AMR Empty Device Count
-38204,Color Carrier ID
-38224,AMR Color Tray Count
-38230,AMR Color Device Count
-38205,AUTO1 Carrier ID
-38225,AMR AUTO1 Tray Count
-38231,AMR AUTO1 Device Count
-38234,AMR AUTO1 Bin Setting
-38206,AUTO2 Carrier ID
-38226,AMR AUTO2 Tray Count
-38232,AMR AUTO2 Device Count
-38235,AMR AUTO2 Bin Setting
-38207,AUTO3 Carrier ID
-38227,AMR AUTO3 Tray Count
-38233,AMR AUTO3 Device Count
-38236,AMR AUTO3 Bin Setting
-38208,AUTO4 Carrier ID
-38237,AMR AUTO4 Tray Count
-38240,AMR AUTO4 Device Count
-38243,AMR AUTO4 Bin Setting
-38209,AUTO5 Carrier ID
-38238,AMR AUTO5 Tray Count
-38241,AMR AUTO5 Device Count
-38244,AMR AUTO5 Bin Setting
-38210,AUTO6 Carrier ID
-38239,AMR AUTO6 Tray Count
-38242,AMR AUTO6 Device Count
-38245,AMR AUTO6 Bin Setting
-1518,Real/Dummy
-66033,Lot Start Time
-1006,Lot ID
-1011,Machine State
-1101,Loader Count
-1102,Output Total Count
-1517,Start Mode
-37010,Enter Skip IC Count
-3,GemClock
-1002,Machine ID
-1009,Lot Start Time
-1103,Auto1 Count
-1104,Auto2 Count
-1105,Auto3 Count
-1501,Setup File
-2758,Type 1 Tray Pitch X
-2759,Type 1 Tray Pitch Y
-2760,Type 1 Tray Start Position X
-2761,Type 1 Tray Start Position Y
-2762,Type 1 Tray Division X
-2763,Type 1 Tray Division Y
-66022,Auto1 Count
-66023,Auto2 Count
-66024,Auto3 Count
 66025,Auto4 Count
 66026,Auto5 Count
 66027,Auto6 Count
-4,GemControlState
-9,PreviousGemControlState
+66030,Active Lot Count
+66031,Current Lot ID
+66032,Sort Mode

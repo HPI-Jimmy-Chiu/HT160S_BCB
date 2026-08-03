@@ -48,8 +48,8 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     svUPH           = 0;
     svLotCount      = 0;
     svCurrentLot    = "";
-    svLotStartTime  = "";            //AI(secs-lotstarttime) 20260730 : latched by NoteLotStartTime, not by RefreshSVData
-    svLotStartTime9045 = "";         //AI(secs-bclass-0803) : SVID 1009, same latch reformatted to 9045's dashes in RefreshSVData
+    svLotStartTime  = "";            //AI(secs-lotstarttime) 20260730 : internal latch (slash format), set by NoteLotStartTime, not by RefreshSVData ; no SVID of its own since 20260803
+    svLotStartTime9045 = "";         //AI(secs-bclass-0803) : SVID 1009, the latch above reformatted to 9045's dashes in RefreshSVData
     svSoftwareVersion = "1.0.0.0";   // keep in step with ht160s.cpp GemInitial("HT160S","1.0.0.0")
     ecRecipeName    = "";
 
@@ -397,10 +397,15 @@ void HT160Gem::AddSV()
     //                         ships EMPTY, so until an FAE types it on the maintenance page the
     //                         host reads A[0] "". Registering it is what makes typing it count.
     //   1009 Lot Start Time - RPTID 508 slot 3. Wire = A[19] "2026-06-07 12:57:32" (dashes).
-    //                         Same latch as HT160S's own 66033, reformatted in RefreshSVData.
+    //                         THE ONLY published lot start time since 20260803. HT160S also had
+    //                         its own 66033 carrying the SAME latch in slash format; that number
+    //                         was retired as a pure duplicate on the customer's "one concept ->
+    //                         one HT9045 number" ruling. The latch member itself (svLotStartTime,
+    //                         slash format) stays : it is what the WorkOrder meta file persists
+    //                         and what RefreshSVData reformats into this SV.
     HGemPtr->SetSVDataPointer(3,    HType.ASCII_TYPE, "GemClock", "", &sGemClock, "equipment clock, SEMI 16-char TIME YYYYMMDDhhmmsscc (GEM-standard SVID 3; 1027 is the same instant in yyyy/mm/dd hh:nn:ss)");
     HGemPtr->SetSVDataPointer(1002, HType.ASCII_TYPE, "Machine ID", "", &GeneralSetting.sHandlerID, "handler id from General.ini [MachineIdentity] HandlerID (9045 SVID 1002; empty until commissioned)");
-    HGemPtr->SetSVDataPointer(1009, HType.ASCII_TYPE, "Lot Start Time", "", &svLotStartTime9045, "yyyy-mm-dd hh:nn:ss when the current work order started, 9045 wire format (9045 SVID 1009; same latch as 66033, empty between lots)");
+    HGemPtr->SetSVDataPointer(1009, HType.ASCII_TYPE, "Lot Start Time", "", &svLotStartTime9045, "yyyy-mm-dd hh:nn:ss when the current work order started, 9045 wire format (9045 SVID 1009; latched at Lot Start, empty between lots)");
 
     //AI(secs-onsite0731) 20260801 : KYEC on-site notes 3, 4 and 7. The CJ_EAP host defines
     // RPTID 502 = {1006,1007,1011,3,1501,1517,1518,1513} and RPTID 501 = {1101..1108,
@@ -445,11 +450,15 @@ void HT160Gem::AddSV()
     //      that is not a business decision - 1106-1108 are 9045's "Fix1-3" and mapping them
     //      onto HT160S Auto4-6 is KYEC's call, not ours. So slots 6-8 of RPTID 501 stay empty
     //      and the eight slots do NOT add up to 1102 on a lot that uses Auto4-6. Auto4-6
-    //      output is NOT hidden: all six stations are published on HT160S's own authoritative
-    //      66022-66027 band below, which is where a host can read the full picture today.
-    HGemPtr->SetSVDataPointer(1103, HType.INT_4_TYPE, "Auto1 Count", "pcs", &tRunData.TrayICCnt[eAuto1], "ICs placed into the Auto1 output tray (9045 SVID 1103; same value as 66022)");
-    HGemPtr->SetSVDataPointer(1104, HType.INT_4_TYPE, "Auto2 Count", "pcs", &tRunData.TrayICCnt[eAuto2], "ICs placed into the Auto2 output tray (9045 SVID 1104; same value as 66023)");
-    HGemPtr->SetSVDataPointer(1105, HType.INT_4_TYPE, "Auto3 Count", "pcs", &tRunData.TrayICCnt[eAuto3], "ICs placed into the Auto3 output tray (9045 SVID 1105; same value as 66024)");
+    //      output is NOT hidden: those three stations are published on HT160S's own band as
+    //      66025-66027 (see below), so the full six-station picture is 1103/1104/1105 +
+    //      66025/66026/66027.
+    //AI(secs-svid-dedupe) 20260803 : these three ARE the Auto1-3 counts now - the parallel
+    // 66022/66023/66024 registrations that pointed at the same three cells were removed on the
+    // customer's ruling "same information -> one number, and that number is HT9045's".
+    HGemPtr->SetSVDataPointer(1103, HType.INT_4_TYPE, "Auto1 Count", "pcs", &tRunData.TrayICCnt[eAuto1], "ICs placed into the Auto1 output tray (9045 SVID 1103)");
+    HGemPtr->SetSVDataPointer(1104, HType.INT_4_TYPE, "Auto2 Count", "pcs", &tRunData.TrayICCnt[eAuto2], "ICs placed into the Auto2 output tray (9045 SVID 1104)");
+    HGemPtr->SetSVDataPointer(1105, HType.INT_4_TYPE, "Auto3 Count", "pcs", &tRunData.TrayICCnt[eAuto3], "ICs placed into the Auto3 output tray (9045 SVID 1105)");
     //AI(secs-startmode) 20260802 : slot 6 of the host's RPTID 502. Value is 9045-numbered
     // (see RefreshSVData) : 0=Continuous Start, 1=Initial Start. HT9045 declares this one as
     // an EC with min 0 / max 8 and carries the whole legend in its EC description, so a host
@@ -511,29 +520,32 @@ void HT160Gem::AddSV()
     // -- Output / production (66020-66029) --
     HGemPtr->SetSVDataPointer(66020, HType.INT_4_TYPE, "Total IC", "pcs", &svTotalIC, "total IC processed this lot/run");
     HGemPtr->SetSVDataPointer(66021, HType.INT_4_TYPE, "Total Sorted", "pcs", &svTotalSorted, "total IC sorted into a bin");
-    //AI(secs-bclass-0803) 20260803 : per-Auto output counts for ALL SIX HT160S stations, on
-    // HT160S's own band. 9045 only numbers three Autos (1103-1105, registered above) and calls
-    // the next three "Fix1-3" (1106-1108), and mapping those onto HT160S Auto4-6 is a business
-    // decision for KYEC. Publishing the full six here means Auto4/5/6 output is readable TODAY
-    // without pre-empting that decision: a host binds 66022-66027 with its own S2F33. Same
-    // pointers as 1103-1105 for the first three, so the two bands can never disagree.
-    HGemPtr->SetSVDataPointer(66022, HType.INT_4_TYPE, "Auto1 Count", "pcs", &tRunData.TrayICCnt[eAuto1], "ICs placed into the Auto1 output tray (= 9045-numbered SVID 1103)");
-    HGemPtr->SetSVDataPointer(66023, HType.INT_4_TYPE, "Auto2 Count", "pcs", &tRunData.TrayICCnt[eAuto2], "ICs placed into the Auto2 output tray (= 9045-numbered SVID 1104)");
-    HGemPtr->SetSVDataPointer(66024, HType.INT_4_TYPE, "Auto3 Count", "pcs", &tRunData.TrayICCnt[eAuto3], "ICs placed into the Auto3 output tray (= 9045-numbered SVID 1105)");
+    //AI(secs-bclass-0803) 20260803 : per-Auto output counts for the three HT160S stations that
+    // HT9045 has NO number for. 9045 numbers only three Autos (1103-1105, registered above) and
+    // calls the next three "Fix1-3" (1106-1108); mapping those onto HT160S Auto4-6 is a business
+    // decision for KYEC, so until that ruling lands Auto4/5/6 live here, on HT160S's own band.
+    //AI(secs-svid-dedupe) 20260803 : this band used to START at 66022 and republish Auto1-3
+    // through the SAME tRunData.TrayICCnt cells as 1103-1105. The customer ruled that duplicated
+    // information must collapse onto the HT9045 number, so 66022/66023/66024 were removed and
+    // this band now begins at 66025. The gap at 66022-66024 is DELIBERATE: do not reuse those
+    // three numbers for anything else - a host configured before 20260803 may still have them
+    // bound to "Auto1-3 Count" and would silently misread whatever took their place.
     HGemPtr->SetSVDataPointer(66025, HType.INT_4_TYPE, "Auto4 Count", "pcs", &tRunData.TrayICCnt[eAuto4], "ICs placed into the Auto4 output tray (no 9045 number - 9045 calls slot 4 Fix1)");
     HGemPtr->SetSVDataPointer(66026, HType.INT_4_TYPE, "Auto5 Count", "pcs", &tRunData.TrayICCnt[eAuto5], "ICs placed into the Auto5 output tray (no 9045 number - 9045 calls slot 5 Fix2)");
     HGemPtr->SetSVDataPointer(66027, HType.INT_4_TYPE, "Auto6 Count", "pcs", &tRunData.TrayICCnt[eAuto6], "ICs placed into the Auto6 output tray (no 9045 number - 9045 calls slot 6 Fix3)");
     // -- Current Lot (66030-66039) --
     HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
     HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
-    //AI(secs-lotstarttime) 20260730 : customer checklist "vendor lot start time". Latched at
-    // Lot Start (manual button OR SECS LOTSTART), cleared at Lot End. Same text format as SVID
-    // 1027 System Time. Deliberately NOT added to firmware report 1 : that report is the default
-    // payload of EVERY CEID and its 13-SV shape is published in the customer interface spec, so
-    // widening it would change every event on the wire. A host that wants the start time inside
-    // an event binds 66033 into its own report with S2F33 + S2F35; otherwise S1F3 reads it back
-    // at any time during the lot.
-    HGemPtr->SetSVDataPointer(66033, HType.ASCII_TYPE, "Lot Start Time", "", &svLotStartTime, "yyyy/mm/dd hh:nn:ss when the current work order started (empty between lots)");
+    //AI(secs-svid-dedupe) 20260803 : 66033 "Lot Start Time" USED TO SIT HERE. It carried the
+    // same NoteLotStartTime latch as SVID 1009, differing only in separator (66033 slashes,
+    // 1009 HT9045's dashes), so it was removed on the customer's "one concept -> one HT9045
+    // number" ruling; 1009 is now the only published lot start time. Do NOT reuse 66033.
+    // The LATCH is untouched : svLotStartTime still holds the slash-format stamp, still rides
+    // the WorkOrder meta file across a power cycle, and RefreshSVData still reformats it into
+    // svLotStartTime9045 for 1009. Only the registration went away.
+    // Neither number was ever in firmware report 1 (its 13-SV shape is published to the
+    // customer), so no event payload changes shape - a host that wants the start time inside an
+    // event binds 1009 with S2F33 + S2F35; otherwise S1F3 reads it back during the lot.
     //AI(ht160s-whitelist) 20260716 : Q6 host read-back of the active sort mode. Bound to the
     // live config int (stable global address, read at serialize time) so a SORTMODE switch via
     // S2F41 LOTSTART is confirmable by S1F3. No RefreshSVData mirror : not a per-cycle snapshot.
@@ -643,9 +655,10 @@ void HT160Gem::RefreshSVData()
     }
 
     //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time in HT9045's wire format. Derived
-    // from the SAME latch as 66033 (NoteLotStartTime), never from Now() and never from
-    // tRunData.StartTime - the host asked when the LOT started, and the latch is the only value
-    // that survives a restore. 66033 keeps its published slash format, so reformat a copy.
+    // from the NoteLotStartTime latch, never from Now() and never from tRunData.StartTime - the
+    // host asked when the LOT started, and the latch is the only value that survives a restore.
+    // The latch itself stays in slash format (that is what the WorkOrder meta file persists and
+    // re-feeds on inherit), so reformat a COPY here rather than rewriting svLotStartTime.
     // Rewritten by POSITION, not by character replacement : FormatString's '/' and ':' are the
     // locale DateSeparator / TimeSeparator PLACEHOLDERS, so a StringReplace("/","-") would be a
     // silent no-op on a machine whose regional separators differ. The 19-char field layout is
@@ -1286,17 +1299,19 @@ void HT160Gem::S2F30_EquipmentConstantNamelistReply()
     HGemPtr->SendLocalData();
 }
 //---------------------------------------------------------------------------
-//AI(secs-lotstarttime) 20260730 : latch / clear SVID 66033 Lot Start Time.
+//AI(secs-lotstarttime) 20260730 : latch / clear the Lot Start Time behind SVID 1009.
 //  Called from the manual Lot Start + Lot End buttons (main.cpp) and from the SECS
 //  LOTSTART accept path, so the host reads the same value whichever way the lot began.
-//  Format matches SVID 1027 System Time ("yyyy/mm/dd hh:nn:ss") so a host can compare
-//  the two without reformatting.
+//  The LATCH is stored in SVID 1027's slash format ("yyyy/mm/dd hh:nn:ss") - that is the shape
+//  the WorkOrder meta file persists and re-feeds on inherit. RefreshSVData converts a copy into
+//  HT9045's dash format for SVID 1009, which is the only number published since 20260803
+//  (66033 carried this same latch in slash format and was retired as a duplicate).
 //  The event stream is the durable record (CEID 6 carries the moment); this SV exists so a
 //  host that connected late, or that wants to re-read, can still ask.
 //AI(secs-lotstarttime-persist) 20260730 : it IS persisted now. main.cpp writes the stamp into
 //  the work-order meta file at Lot Start and re-latches it here via sWhen when the operator
 //  chooses to inherit a work order after a power cycle - an inherited lot is still open, so an
-//  empty 66033 was a lie. sWhen is passed through VERBATIM (already formatted by the original
+//  empty Lot Start Time was a lie. sWhen is passed through VERBATIM (already formatted by the original
 //  latch) so no reformatting or locale can shift it, and it is NEVER derived from
 //  tRunData.StartTime or Now(): those would answer a plausible but wrong moment (the resume, or
 //  the previous lot). No stored stamp -> stay empty, which is the documented "between lots" value.
@@ -2014,7 +2029,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     //---- lot CLOSED : open it. Full per-lot init + 2D/Bin exchange. ----
                     // LotStartCore is the SAME body the operator's Lot Start button runs (counters,
                     // UPH folder, Soter buffer, product-info, (Lot,Bin) bindings, bRunning, work-order
-                    // save, SVID 66033 latch, CEID 6) and it also performs the 2D/Bin exchange.
+                    // save, SVID 1009 latch, CEID 6) and it also performs the 2D/Bin exchange.
                     // It does NOT register lots - SET_LOT_INFO already did that.
                     AnsiString FirstLot = "";
                     int SlotCount = LotRegistry.GetLotSlotCount();

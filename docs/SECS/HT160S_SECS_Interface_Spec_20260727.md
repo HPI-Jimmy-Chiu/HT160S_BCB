@@ -21,13 +21,22 @@
 > **2026-08-03 修訂(僅新增,無 breaking change)/ Revision 2026-08-03 (additive only):** 補齊 19 個
 > host 已在引用、但本機先前回空 item 的 SVID —— **3**(GemClock)、**1002**(Machine ID)、**1009**
 > (Lot Start Time)、**1103–1105**(Auto1–3 Count)、**1501**(Setup File)、**2758–2763**(Type 1 Tray
-> 幾何),以及本機自有段的 **66022–66027**(Auto1–6 Count)。號碼、型別與線上格式皆比對 HT-90XX 原始碼
+> 幾何),以及本機自有段的 **66025–66027**(Auto4–6 Count)。號碼、型別與線上格式皆比對 HT-90XX 原始碼
 > 與京元現場 log 後對齊。同時更正 §6 對 SVID 1006 的錯誤描述。詳見 §3.1。
 >
 > **同日追加(仍為僅新增):控制狀態改用 HT-90XX 編號** —— 新增 **SVID 4 GemControlState**
 > (1=Off-Line / 2=On-Line Local / 3=On-Line Remote,U1)與 **SVID 9 PreviousGemControlState**,
 > 並在狀態變更時發 **CEID 141** 與 **91 / 92 / 93**(此四個號碼先前已註冊但無發射點)。既有的
 > SVID 66002 保留不變(GEM 標準值域 1/4/5)。詳見 §1、§3.1、§3.3.1。
+>
+> ⚠️ **同日追加(此項為 breaking change):重複資訊收斂到 HT-90XX 編號** —— 依「相同功能使用同一
+> 編號」的原則,四個與 HT-90XX 號碼**同值、同來源**的本機自有號碼已**移除**:
+> **66022 / 66023 / 66024**(Auto1–3 Count,與 **1103 / 1104 / 1105** 指向同一組計數器)與
+> **66033**(Lot Start Time,與 **1009** 為同一個閂鎖、同一時刻,僅分隔符不同)。
+> 這四個號碼自本版起**不再註冊**,S1F3 查詢會得到「未知 SVID」而非數值,S1F11 名稱表也不再列出。
+> **若貴端已在 S2F33 報表定義中綁定這四個號碼,請改綁 1103 / 1104 / 1105 / 1009。**
+> Auto4–6 仍在本機自有段 **66025–66027**(HT-90XX 無對應號碼),號碼不變;
+> 這三個號碼與被移除的 66022–66024 **不會遞補、不會重新編號**。詳見 §3.1。
 
 ---
 
@@ -186,15 +195,15 @@
 | 1002 | Machine ID | A | 機台識別碼,取自 `General.ini [MachineIdentity] HandlerID`(維護頁的 **Handler ID** 欄)。HT-90XX 只有一個識別字串,HT-160S 有三個(機型 / Handler ID / 序號);**本號回 Handler ID,此為 2026-08-03 定案**(機型已由 1001 提供,序號另議)。⚠ **出廠預設為空字串**——這是現場輸入的欄位,未輸入前本值為空 `A[0]`,不是故障;請於機台交機時填入 |
 | 1003 | Software Version | A | 軟體版本 |
 | 1006 | Lot ID | A | 目前作用中的批號 |
-| 1009 | Lot Start Time | A | 開批時刻,**HT-90XX 線上格式 `yyyy-mm-dd hh:nn:ss`(破折號)**。與 66033 同一個閂鎖、同一時刻,只是分隔符不同(66033 維持既有斜線格式不變);批與批之間為空字串 |
+| 1009 | Lot Start Time | A | 開批時刻,**HT-90XX 線上格式 `yyyy-mm-dd hh:nn:ss`(破折號)**;批與批之間為空字串。Lot Start 當下閂鎖(操作面板 Lot Start 按鈕與 SECS `LOTSTART` 兩條路徑皆寫入)、Lot End 清空,貨批進行中可隨時以 S1F3 回查,**不會隨系統時間變動**。未加入預設 Report 1;需在事件內帶出起測時間請以 S2F33 / S2F35 綁進貴端自訂報表。**跨電源保存**:工單隨機台重開並由操作員選擇「繼承」時,本值會以**原始開批時刻**還原(不是復電時刻);未繼承、工單建立於本功能之前、或中繼檔讀寫失敗則維持空字串——空字串是「批與批之間」的正式值,寧可空也不給一個看似合理但錯誤的時間。**2026-08-03 起本號為唯一的開批時刻**(原本同值的 66033 已移除) |
 | 1011 | Machine State | A | 主畫面狀態文字 |
 | 1021 | UPH | I4 | 每小時產出 |
 | 1027 | System Time | A | 系統時間,`yyyy/mm/dd hh:nn:ss`(另見 SVID 3) |
 | 1101 | Loader Count | I4 | 自 Loader 盤取出的 IC 數 |
 | 1102 | Output Total Count | I4 | 已分選入 Bin 的 IC 數(= 66021) |
-| 1103 | Auto1 Count | I4 | 放入 Auto1 出料盤的 IC 數(= 66022) |
-| 1104 | Auto2 Count | I4 | 放入 Auto2 出料盤的 IC 數(= 66023) |
-| 1105 | Auto3 Count | I4 | 放入 Auto3 出料盤的 IC 數(= 66024) |
+| 1103 | Auto1 Count | I4 | 放入 Auto1 出料盤的 IC 數(**2026-08-03 起為唯一編號**,原同值的 66022 已移除) |
+| 1104 | Auto2 Count | I4 | 放入 Auto2 出料盤的 IC 數(原同值的 66023 已移除) |
+| 1105 | Auto3 Count | I4 | 放入 Auto3 出料盤的 IC 數(原同值的 66024 已移除) |
 | 1501 | Setup File | A | 目前 recipe / setup 檔名。**同號的 ECID 1501 指向同一份資料**(見 §3.2 說明) |
 | 1517 | Start Mode | I4 | 0=Continuous Start / 1=Initial Start(HT-90XX 編號) |
 | 1518 | Real/Dummy | I4 | 0=Dummy / 1=Tray Only / 2=Real |
@@ -207,7 +216,7 @@
 | 37010 | Enter Skip IC Count | I4 | 操作員在上一次 SKIP 時輸入的取出 IC 數 |
 
 > **關於 1103–1105 的兩點必讀 / Two notes on 1103–1105**
-> 1. **HT-160S 有六個 Auto 站**,而 HT-90XX 的 1103–1105 只到 Auto3、其後 1106–1108 叫 **Fix1–3**。要不要把 HT-160S 的 Auto4–6 對映到 Fix1–3 是**雙方商務決定**,本機**不單方面實作**,因此 host 報表中的 1106–1108 會維持空 item。Auto4–6 的產出**並未隱藏**:六站全數公佈於本機自有的 **66022–66027**,host 以 S2F33 綁該段即可讀到完整分布。
+> 1. **HT-160S 有六個 Auto 站**,而 HT-90XX 的 1103–1105 只到 Auto3、其後 1106–1108 叫 **Fix1–3**。要不要把 HT-160S 的 Auto4–6 對映到 Fix1–3 是**雙方商務決定**,本機**不單方面實作**,因此 host 報表中的 1106–1108 會維持空 item。Auto4–6 的產出**並未隱藏**:這三站公佈於本機自有的 **66025–66027**(HT-90XX 無對應號碼),host 以 S2F33 綁該段即可讀到。**六站完整分布 = 1103 / 1104 / 1105 + 66025 / 66026 / 66027。**(2026-08-03 前 Auto1–3 另有一組同值的 66022–66024,已因「重複資訊收斂到 HT-90XX 編號」移除。)
 > 2. **1102 與 1103–1105 的總和不保證相等。** HT-90XX 的 1102 就是該陣列的和;HT-160S 的 1102 在**掃碼/配 Bin 階段**累加,1103–1105 在**放料階段**累加,且 1102 為 RAM 值(復電歸零)而 1101/1103–1105 隨機台保存。請勿以「總和相符」作為對帳條件。
 
 **HT-160S 自有高位段 / HT-160S-specific high band (66000+):**
@@ -221,16 +230,19 @@
 | 66011 | Alarm Code | I4 | 目前警報碼(0=無) |
 | 66020 | Total IC | I4 | 本批/本輪處理 IC 數 |
 | 66021 | Total Sorted | I4 | 已分選 IC 數 |
-| 66022 | Auto1 Count | I4 | 放入 Auto1 出料盤的 IC 數(= 9045 編號的 SVID 1103) |
-| 66023 | Auto2 Count | I4 | 放入 Auto2 出料盤的 IC 數(= 1104) |
-| 66024 | Auto3 Count | I4 | 放入 Auto3 出料盤的 IC 數(= 1105) |
-| 66025 | Auto4 Count | I4 | 放入 Auto4 出料盤的 IC 數(**9045 無對應號碼**,9045 第 4 站叫 Fix1) |
+| 66025 | Auto4 Count | I4 | 放入 Auto4 出料盤的 IC 數(**9045 無對應號碼**,9045 第 4 站叫 Fix1)。Auto1–3 請讀 **1103 / 1104 / 1105** |
 | 66026 | Auto5 Count | I4 | 放入 Auto5 出料盤的 IC 數(9045 第 5 站叫 Fix2) |
 | 66027 | Auto6 Count | I4 | 放入 Auto6 出料盤的 IC 數(9045 第 6 站叫 Fix3) |
 | 66030 | Active Lot Count | I4 | 目前載入 Lot 數 |
 | 66031 | Current Lot ID | A | 首個 Lot ID |
 | 66032 | Sort Mode | I4 | 0=Normal 1=LotBin 2=LotPassFail 3=WhiteList |
-| 66033 | Lot Start Time | A | `yyyy/mm/dd hh:nn:ss`,Lot Start 閂鎖、Lot End 清空;未加入預設 Report 1。**跨電源保存**(20260730 起):工單隨機台重開並由操作員選擇「繼承」時,本值會以**原始開批時刻**還原(不是復電時刻);未繼承或無紀錄則維持空字串——空字串是「批與批之間」的正式值,寧可空也不給一個看似合理但錯誤的時間 |
+
+> ⚠️ **本段 2026-08-03 移除的號碼 / Retired on 2026-08-03**
+> **66022 / 66023 / 66024**(Auto1–3 Count)與 **66033**(Lot Start Time)已**不再註冊**。這四個號碼
+> 與 HT-90XX 的 **1103 / 1104 / 1105** 及 **1009** 是同一份資料的第二種編號,依「相同功能使用同一
+> 編號」的原則收斂到 HT-90XX 的號碼。**請改綁 1103 / 1104 / 1105 / 1009。**
+> 這四個號碼**保留空號、不再挪作他用**——若貴端設定未更新,S1F3 會回「未知 SVID」(空 item),
+> 不會回到別的資料上,故不存在靜默誤讀的風險。
 
 **AMR / AGV 段 / AMR band (38xxx):**
 
@@ -503,7 +515,7 @@ right column = this revision's id (= HT-90XX's).
 | RCMD | 動作 | 參數 CP | 說明 |
 |---|---|---|---|
 | `SET_LOT_INFO` | **唯一**的 Lot 資訊設定命令(**疊加式**) | `L,n{ A custLot }` 或 `L,n{ L,2{ A custLot, A kyecLot } }` | **20260730 起改為疊加**:不再清空既有工單。同一 Lot id 只保留一筆(沿用原 slot、index 與計數)。同一 Lot 若改帶**不同的 KYEC 批號**,會退掉該 Lot 舊的 2D/Bin 明細(此情形機內尚有 IC 時回 **4**)。登錄表會超過 64 筆回 **2**(不再靜默丟批)。不啟動運轉 |
-| `LOTSTART` | 開批 / 補拉 2D-Bin(**不帶 Lot id**) | 無(空 list;京元 HT9045 現場實測即為 `L[0]`) | **20260730 起對齊 HT9045**(`uHGemHT9045.cpp:2081`):一律回 **HCACK=0**,不帶、也不設定任何 Lot 身分(Lot 資訊一律由 `SET_LOT_INFO` 設定;清單內若仍帶 lot id 會被忽略並記 log),可重複下達。**批未開**→執行全套開批初始化(per-lot 計數 / UPH 資料夾 / Soter buffer / 產品資訊 / (Lot,Bin)→Auto 綁定 / 66033 / CEID 6)+ 拉 2D/Bin;**批已開**→只拉 2D/Bin,不做任何初始化。唯二回非 0 的情況都來自 HT-160S 專屬的 `SORTMODE` pair:格式或值錯誤回 2;批已開時要換 sort mode、或 WhiteList 模式要重載檔案回 4。不啟動運轉(啟動仍為 operator-gated / `START`) |
+| `LOTSTART` | 開批 / 補拉 2D-Bin(**不帶 Lot id**) | 無(空 list;京元 HT9045 現場實測即為 `L[0]`) | **20260730 起對齊 HT9045**(`uHGemHT9045.cpp:2081`):一律回 **HCACK=0**,不帶、也不設定任何 Lot 身分(Lot 資訊一律由 `SET_LOT_INFO` 設定;清單內若仍帶 lot id 會被忽略並記 log),可重複下達。**批未開**→執行全套開批初始化(per-lot 計數 / UPH 資料夾 / Soter buffer / 產品資訊 / (Lot,Bin)→Auto 綁定 / 1009 開批時刻 / CEID 6)+ 拉 2D/Bin;**批已開**→只拉 2D/Bin,不做任何初始化。唯二回非 0 的情況都來自 HT-160S 專屬的 `SORTMODE` pair:格式或值錯誤回 2;批已開時要換 sort mode、或 WhiteList 模式要重載檔案回 4。不啟動運轉(啟動仍為 operator-gated / `START`) |
 | `CLEAR_LOT_INFO` | 結批(host 版 Lot End) | — | 對齊 HT9045(`uHGemHT9045.cpp:2431`)。走與面板 Lot End **同一條** `DoLotEndProcess`:記錄 UPH、發 CEID 8、歸檔 LotStory、清空工單 / (Lot,Bin) 綁定 / WhiteList 覆蓋、取消在途 WebAPI pull。運轉中回 **1**、機內仍有 IC 回 **2**(皆為 9045 語意)。**`SET_LOT_INFO` 改疊加之後,這是唯一會退掉 Lot 的命令** |
 | `START` | 遠端啟動運轉 | — | 需 RUN CHECK / idle 條件 |
 | `STOP` | 停機(收尾) | — | |
@@ -651,7 +663,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 | `HOME` | RCMD | 遠端回原點(等同操作員 Home 鍵) | **9045 整棵 SECSGEM 樹查無 `HOME` 命令**(見 §7.1 的完整命令集)。9045 最接近的是 `RESET`,但那是測試機收料回復流程,語意不同。保留本命令:刪掉會少一個有用的遠端功能而換不到任何對齊 |
 | `ONLINE`(裸) | RCMD | = `ONLINE_REMOTE` 別名 | 便利別名;9045 僅有 `ONLINE_REMOTE` / `ONLINE_LOCAL` |
 | `CLEARCOUNT` | RCMD | host 遠端清除生產計數 | 9045 將 clear-count 僅作操作員事件(CEID 5,HT-160S 自 2026-07-29 起同號同義且會發射),無對應 RCMD(9045 另有 `CLEAN_AUTO_SORT_COUNT`,語意不同) |
-| SVID **66000–66033** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、**Auto1–6 Count(66022–66027)**、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032)、LotStartTime(66033) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞。66022–66027 之所以存在:9045 只給三個 Auto 編號,第 4–6 站在 9045 叫 Fix1–3,對映屬商務決定,故本機在自有段公佈**完整六站**,不預設該對映 |
+| SVID **66000–66032** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、**Auto4–6 Count(66025–66027)**、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞。66025–66027 之所以存在:9045 只給三個 Auto 編號,第 4–6 站在 9045 叫 Fix1–3,對映屬商務決定,故本機在自有段公佈第 4–6 站,不預設該對映。**2026-08-03 移除**:66022–66024(Auto1–3 Count,與 1103–1105 同值)與 66033(Lot Start Time,與 1009 同值)—— 重複資訊收斂到 HT-90XX 編號,空號不再挪用 |
 | SVID **38208–38210** ＋ **38237–38245** | SVID | Auto4/5/6 的 carrier(38208/38209/38210)＋ tray / device / bin-setting(38237–38245),共 **12 個號** | HT-160S 有 **6 個 Auto 輸出站**,9045 的目錄僅到 38236(3 站);為第 4–6 站延伸。**更正(2026-07-29)**:舊版本節誤寫成「38237–38245 = Auto4/5/6 的 carrier/tray/device/bin-setting」—— carrier 三個號實際是 **38208/38209/38210**,不在 38237–38245 之內。**待確認**:手上的 9045 傾印只有 CEID 與 ReportID 目錄,不含 382xx,故無法證實或否證 9045 是否已定義這 12 個號;需向京元索取 9045 的 SVID 目錄傾印 |
 | ~~CEID **1–31** 編號~~ | CEID | — | **本列已於 2026-07-29 作廢**:CEID 字典整份改為 HT9045 逐字複本(1–275 全數註冊、別名逐字相同),**已無「同號不同義」問題**。host 可直接沿用 HT9045 的 CEID 設定;由舊版升級者請依 **§3.3.5** 對照表重新設定。詳見 §3.3。 |
 

@@ -142,9 +142,9 @@ void EventReport(unsigned Ceid)
     HGem->EventReport(1, Ceid);
 }
 //---------------------------------------------------------------------------
-//AI(secs-lotstarttime) 20260730 : SVID 66033 Lot Start Time latch.
+//AI(secs-lotstarttime) 20260730 : SVID 1009 Lot Start Time latch.
 //  Deliberately NOT gated on USE_SECS_GEM (unlike EventReport): stamping a string costs
-//  nothing, and gating it would leave 66033 empty for the whole lot if the operator turns
+//  nothing, and gating it would leave 1009 empty for the whole lot if the operator turns
 //  SECS on after Lot Start. Only the NULL check is load-bearing.
 void NoteLotStartTime(bool bStarted, AnsiString sWhen)
 {

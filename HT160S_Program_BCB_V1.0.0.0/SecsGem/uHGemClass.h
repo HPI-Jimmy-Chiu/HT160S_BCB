@@ -56,7 +56,7 @@ public:
     virtual void OnCommunicationLost();
 
     //AI(secs-lotstarttime) 20260730 : production -> logic notification that the current work
-    // order has started (true) or ended (false), so SVID 66033 Lot Start Time can latch the
+    // order has started (true) or ended (false), so SVID 1009 Lot Start Time can latch the
     // moment. Called from BOTH the manual Lot Start / Lot End buttons and the SECS LOTSTART
     // accept path. Latched, NOT recomputed in RefreshSVData : the host must be able to read
     // back WHEN the lot started, not what time it is now. Base is a no-op.

@@ -402,7 +402,7 @@ sequenceDiagram
 <tr>
 <td><code>LOTSTART</code></td>
 <td><code>L[2]{ A "LOTSTART", L[0] }</code>（京元現場實際形式）；亦可選帶 HT-160S 專屬 <code>L[2]{ A "SORTMODE", A "NORMAL"\|"WHITELIST" }</code></td>
-<td><strong>2026-07-30 起不再攜帶 lot 身分</strong>（清單內的 lot id 會被忽略並記 log，lot 一律由 <code>SET_LOT_INFO</code> 設定）。一律回 <code>HCACK=0</code>、可重複下達。<strong>批未開</strong>→整套開批初始化（per-run 計數歸零、UPH log、Soter buffer、ProductInfo、(Lot,Bin)→Auto 綁定、SVID 66033、CEID 6）＋ <code>StartLotWebApiPullAll</code> 拉全部 lot 的 2D/Bin；<strong>批已開</strong>→只拉 2D/Bin、不做任何初始化。<strong>不啟動 motion</strong>（仍需 <code>START</code> / operator Start）。唯二非 0 回覆皆來自 <code>SORTMODE</code> pair（格式或值錯誤 2；批已開要換模式或 WhiteList 要重載檔案 4）</td>
+<td><strong>2026-07-30 起不再攜帶 lot 身分</strong>（清單內的 lot id 會被忽略並記 log，lot 一律由 <code>SET_LOT_INFO</code> 設定）。一律回 <code>HCACK=0</code>、可重複下達。<strong>批未開</strong>→整套開批初始化（per-run 計數歸零、UPH log、Soter buffer、ProductInfo、(Lot,Bin)→Auto 綁定、SVID 1009 開批時刻、CEID 6）＋ <code>StartLotWebApiPullAll</code> 拉全部 lot 的 2D/Bin；<strong>批已開</strong>→只拉 2D/Bin、不做任何初始化。<strong>不啟動 motion</strong>（仍需 <code>START</code> / operator Start）。唯二非 0 回覆皆來自 <code>SORTMODE</code> pair（格式或值錯誤 2；批已開要換模式或 WhiteList 要重載檔案 4）</td>
 </tr>
 <tr>
 <td><code>CLEAR_LOT_INFO</code></td>

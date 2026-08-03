@@ -171,7 +171,7 @@ void HTGem::ServiceAgv(){ }
 void HTGem::PollGemControlState(){ }   //AI(secs-controlstate) 20260803
 //AI(secs-kyec-rcmd4-fix) 20260728 : base no-op; HT160Gem overrides to release latched host state.
 void HTGem::OnCommunicationLost(){ }
-//AI(secs-lotstarttime) 20260730 : base no-op; HT160Gem overrides to latch SVID 66033.
+//AI(secs-lotstarttime) 20260730 : base no-op; HT160Gem overrides to latch SVID 1009.
 void HTGem::NoteLotStartTime(bool /*bStarted*/, AnsiString /*sWhen*/){ }
 void HTGem::ReportSkipICCount(int /*iCount*/){ }   //AI(secs-skipiccount) 20260802
 void HTGem::AddSV(){ }
