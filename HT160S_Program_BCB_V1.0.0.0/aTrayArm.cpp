@@ -1092,36 +1092,81 @@ void TTrayArmModule::DecidePlaceDestAfterPick()
 //Normal-for-Normal kind match (identity/cover carried trays keep their legacy return
 //routes). On success the Empty return reservation is released via
 //CancelReturnTray and the DoPlace dispatch re-enters the Auto ladder at case 1.
-bool TTrayArmModule::TryDivertCarriedTrayToAuto()
+bool TTrayArmModule::TryDivertCarriedTrayToAuto(bool bAtEmptyDeposit)
 {
     if(HSys.Sys.RunMode==Run_CleanOut)
-        return false;
-    //AI(ht160s-amr-divert) 20260719 : opt-in AMR divert (General.ini [SortMode]
-    //UseAmrRecoveryDivert). Only a plain Normal carried tray may divert, and only to an
-    //Auto whose own GetTrayRequest asks for a Normal tray (car already holds identity+
-    //cover), so the AMR stack order is never violated.
-    if(GeneralSetting.bUseAMR && GeneralSetting.bUseAmrRecoveryDivert==false)
         return false;
     if(iDeliverKind!=eTrayKindNormal)
         return false;
     if(AutoModule==NULL)
         return false;
-    int kind=eTrayReqNone;
-    int idx=AutoModule->FindTrayRequestAuto(kind, eTrayKindNormal);
-    if(idx<0 || kind!=eTrayKindNormal)
+    //AI(ht160s-amr-divert) 20260719 : opt-in AMR divert (General.ini [SortMode]
+    //UseAmrRecoveryDivert). Only a plain Normal carried tray may divert, and only to an
+    //Auto whose own GetTrayRequest asks for a Normal tray (car already holds identity+
+    //cover), so the AMR stack order is never violated.
+    //AI(ht160s-divert-late) 20260803 : the flag gates the EARLY divert only (pick time and the
+    //X traverse) - that one genuinely RE-ROUTES a tray that was heading for the Empty pool, which
+    //is the behaviour the customer opted into per-machine. The LATE divert (bAtEmptyDeposit, i.e.
+    //DoPlaceToEmpty case 500 : arm parked at the Empty X, head still UP, nothing deposited yet) is
+    //a different proposition and is NOT gated : its alternative is to lower the head, release the
+    //tray onto the Empty rear, and have the very next DecideJob pass pick that SAME tray back off
+    //that SAME rear for the SAME Auto (DoPlaceToEmpty case 4000 -> NotifyTrayXToEmptyFinish puts
+    //the rear back in the supply pool, and DecideJob's AMR branch sources cover/normal from
+    //exactly there - aTrayArm.cpp:638). The two outcomes are identical by construction; only the
+    //deposit+repick round trip differs. This is the on-site 20260803 observation "TrayArm puts the
+    //empty tray down at the Empty rear and immediately clamps it back up".
+    if(bAtEmptyDeposit==false &&
+       GeneralSetting.bUseAMR && GeneralSetting.bUseAmrRecoveryDivert==false)
         return false;
+    int kind=eTrayReqNone;
+    int idx;
+    if(bAtEmptyDeposit)
+    {
+        //AI(ht160s-divert-late) 20260803 : ask EXACTLY the question DecideJob would ask one tick
+        //after the deposit - the unfiltered demand scan (aTrayArm.cpp:621) - so the Auto we pick
+        //is the one that would have got this tray anyway. Then accept only the kinds that would
+        //have been served FROM THE EMPTY REAR : cover and normal. Identity is refused because its
+        //source is Color (IsPickFromColor), so for identity the deposit is NOT wasted motion and
+        //the legacy recycle must stand.
+        idx=AutoModule->FindTrayRequestAuto(kind);
+        if(idx<0)
+            return false;
+        if(kind!=eTrayKindNormal && kind!=eTrayKindCover)
+            return false;
+    }
+    else
+    {
+        idx=AutoModule->FindTrayRequestAuto(kind, eTrayKindNormal);
+        if(idx<0 || kind!=eTrayKindNormal)
+            return false;
+    }
     if(EmptyModule!=NULL)
         EmptyModule->CancelReturnTray();
     ClearPlaceGateWatch();   //AI(ht160s-home-resume-p0) 20260710 : retargeted -- the Empty rear-clear wait (and its watchdog) is abandoned
     iAutoTarget=idx;
+    //AI(ht160s-divert-late) 20260803 : adopt the kind the target Auto actually asked for. On the
+    //early path this is a no-op (kind is always Normal there); on the late path it is what lets a
+    //carried Normal tray serve a COVER request - the physically identical hand-off, because
+    //DecideJob would have sourced that cover tray from the Empty rear too. The kind must be
+    //adopted, not assumed, because DoPlaceToAuto case 4000 stamps it into Auto RearKind and
+    //DoFeedTray routes cover/identity trays straight to discharge (IsReadyForSortArmPlace refuses
+    //IC on them) - stamping Normal on a tray the car counts as its cover would put IC in it.
+    //On the LATE path the 2D id is also cleared, to keep the documented contract at case 4000
+    //("empty for cover/normal") and to match what the deposit+repick path would have produced :
+    //the idle reset (aTrayArm.cpp:102) clears iDeliverTrayID before the next Empty-sourced job is
+    //dispatched, so an Empty-sourced cover/normal delivery always carries an empty id. The early
+    //path deliberately keeps its id - that is shipped behaviour and is not this change's business.
+    iDeliverKind=kind;
+    if(bAtEmptyDeposit)
+        iDeliverTrayID="";
     PlaceDest=TAPLACE_AUTO;
     PlaceTask=1;
-    LatchPlaceDecision("divert");   //AI(trayarm-obsv) 20260802 : mid-flight re-decision, latch it too
+    LatchPlaceDecision(bAtEmptyDeposit?"divert-late":"divert");   //AI(trayarm-obsv) 20260802 : mid-flight re-decision, latch it too
     //AI(ht160s-amr-divert) 20260719 : low-frequency breadcrumb (at most one per recovery
     //job) so sim / on-machine runs can confirm the divert actually fired.
     g_EventLog.Log("TA_DIVERT",
-                   AnsiString().sprintf("TrayArm carried-tray divert -> Auto%d (AMR=%d kind=%d)",
-                                        idx+1, GeneralSetting.bUseAMR?1:0, kind));
+                   AnsiString().sprintf("TrayArm carried-tray divert -> Auto%d (AMR=%d kind=%d late=%d)",
+                                        idx+1, GeneralSetting.bUseAMR?1:0, kind, bAtEmptyDeposit?1:0));
     return true;
 }
 //---------------------------------------------------------------------------
@@ -1152,14 +1197,14 @@ bool TTrayArmModule::DoPlaceToEmpty(int Flag)
     {
         case 1:
         case 10:
-            if(TryDivertCarriedTrayToAuto())   //AI(ht160s-divert) 20260703 : retarget while traversing (Z up, clamps closed)
+            if(TryDivertCarriedTrayToAuto(false))   //AI(ht160s-divert) 20260703 : retarget while traversing (Z up, clamps closed)
                 break;
             if(DoMoveToStationZSafe(Teach.TrayXArmToEmptyXPosition, PlaceTask))
                 PlaceTask=500;
             break;
 
         case 500:
-            if(TryDivertCarriedTrayToAuto())   //AI(ht160s-divert) 20260703 : retarget during the (possibly long) rear-clear wait
+            if(TryDivertCarriedTrayToAuto(true))   //AI(ht160s-divert-late) 20260803 : LAST check before the head goes down - see the function comment
                 break;
             //AI(ht160s-empty-place-handshake) 20260730 : HARD block, deliberately placed BEFORE the
             //rear-clear test below - as another OR term inside that if() it would WEAKEN the gate

@@ -87,7 +87,7 @@ private:
     bool DoPlaceToEmpty(int Flag);     //AI(HT160S-Maintainer) 20260606 : recycle carried tray to EmptyTray rear
     bool DoPlaceToColor(int Flag);     //AI(HT160S-Maintainer) 20260625 : return identity tray to Color rear (mirrors DoPlaceToEmpty)
     void DecidePlaceDestAfterPick();   //AI(HT160S-Maintainer) 20260606 : Loader-recovery : choose supply Auto vs recycle Empty
-    bool TryDivertCarriedTrayToAuto(); //AI(ht160s-divert) 20260703 : mid-flight re-check - carried tray retargets to a requesting Auto before the Empty deposit
+    bool TryDivertCarriedTrayToAuto(bool bAtEmptyDeposit); //AI(ht160s-divert) 20260703 : mid-flight re-check - carried tray retargets to a requesting Auto before the Empty deposit. AI(ht160s-divert-late) 20260803 : bAtEmptyDeposit=true is the ungated last check at the deposit point (cover OR normal), false is the flag-gated early re-route (normal only)
     int GetPickSourceX();              //AI(HT160S-Maintainer) 20260606 : pick X for current job (Loader/Color/Empty)
     int GetAutoX(int Index);
     int GetColorX();                   //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup X
