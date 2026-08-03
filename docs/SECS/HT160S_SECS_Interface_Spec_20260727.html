@@ -105,7 +105,15 @@ Auto4–6 仍在本機自有段 <strong>66025–66027</strong>(HT-90XX 無對應
 </li>
 <li>型號 / 版本 由 S1F2 與 S1F14 回報:<code>MDLN = HT-160S</code>,<code>SOFTREV = 1.0.0.0</code>。</li>
 <li><strong>GEM 控制狀態 Control State</strong> —— 同一個狀態以<strong>兩種編號</strong>公佈:<strong>SVID 4 / 9</strong>(HT-90XX 值域,建議 host 使用)與既有的 <strong>SVID 66002</strong>(GEM 標準值域,不變更)。變更時送 <strong>CEID 141</strong>,緊接著送 <strong>91 / 92 / 93</strong> 中對應新狀態的一個(與 HT-90XX 同順序)。</li>
-<li>⚠ <strong>控制狀態目前不作為命令閘門</strong>:本機在 Off-Line / On-Line Local 狀態下仍會受理並執行 S2F41 遠端命令。這與 HT-90XX 現行行為一致(其控制狀態閘僅對另一家客戶代碼生效)。若需依 GEM 規範在 Off-Line 拒絕命令,請告知三件事:要拒絕哪些命令(全部,或保留 <code>ONLINE_*</code> 以免無法上線)、拒絕時回哪個 HCACK、On-Line Local 是否也拒絕。</li>
+<li>⚠ <strong>控制狀態目前不作為命令閘門</strong>:本機在 Off-Line / On-Line Local 狀態下仍會受理並執行 S2F41 遠端命令。
+  <strong>與 HT-90XX 的對照(2026-08-03 逐段查證後更正前版敘述)</strong>:HT-90XX 的 S2F41 處理器同樣<strong>沒有</strong>任何控制狀態檢查
+  (其 <code>S2F42_Host_Command_Acknowledge</code> 全函式查無 <code>bOnLine</code> / <code>GemControlState</code>),這一點兩機一致;但 HT-90XX
+  <strong>另有兩項本機沒有的控制狀態機制</strong>——(1) 對 host 的 S1F17 有<strong>操作員否決權</strong>:已在線回 <code>ONLACK=2</code>、
+  操作員勾選 <code>AcceptHostOnlineRequest</code> 才回 <code>0</code>、未勾選回 <strong><code>1</code> 拒絕</strong>(本機一律硬回 <code>0</code>);
+  (2) <strong>離線時不主動發送</strong>事件與警報。前版寫「其控制狀態閘僅對另一家客戶代碼生效」只對「S/F 收訊閘門」成立,
+  對上述兩項並不成立,特此更正。
+  若需依 GEM 規範在 Off-Line 拒絕命令,尚待貴端確認三件事:要拒絕哪些命令(全部,或保留 <code>ONLINE_*</code> 以免無法上線)、
+  拒絕時回哪個 HCACK、On-Line Local 是否也拒絕。</li>
 <li>事件 / 警報推播(S6F11 / S5F1)僅在 <strong>HSMS SELECTED</strong> 時送出。</li>
 <li>標準上線序列(host):<code>S1F13 → S1F17 → S2F37(disable all) → S5F3 → S2F33(define) → S2F35(link) → S2F37(enable)</code>,全數支援(見 §2、§4)。</li>
 </ul>
