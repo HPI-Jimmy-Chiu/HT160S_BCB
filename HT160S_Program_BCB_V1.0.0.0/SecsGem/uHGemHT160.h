@@ -308,6 +308,14 @@ private:
     // 19-char "yyyy/mm/dd hh:nn:ss" into a slot the host parses as E5 TIME.
     AnsiString sGemClock;
     int iControlState;
+    //AI(secs-controlstate) 20260803 : HT9045-numbered view of the same control state, published
+    // as SVID 4 / 9. unsigned char + U1 on the wire because that is exactly what HT9045 does
+    // (uHGemEquipment.cpp SetSVDataPointer(4, UINT_1_TYPE, ...) over an unsigned char member),
+    // and the VALUE DOMAIN is 9045's, not GEM's : 1=Off-Line, 2=On-Line Local, 3=On-Line Remote.
+    // iControlState above keeps the GEM-standard 1/4/5 domain it has always published on 66002 -
+    // that number is already in the customer spec, so it is not re-encoded here.
+    unsigned char svGemControlState;      // SVID 4 GemControlState
+    unsigned char svGemControlPreState;   // SVID 9 PreviousGemControlState
     //AI(ht160s-secsgem) 20260611 : SV snapshot members refreshed just before each
     // S6F11 / S1F4 serialize, so SetSVDataPointer can bind a stable address while
     // the value still tracks live machine data (avoids binding bool/enum/form ptr).
@@ -362,6 +370,7 @@ public:
     virtual void RefreshSVData();
     virtual void RefreshSecsBadge();   //AI(ht160s-secsgem) 20260612 : 1s tick -> sync main-screen SECS badge to HSMS state
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
+    virtual void PollGemControlState();//AI(secs-controlstate) 20260803 : 1s tick -> SVID 4/9 + CEID 141/91/92/93 on a control-state edge
     virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
     virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");//AI(secs-lotstarttime) 20260730 : latch/clear SVID 66033 Lot Start Time (sWhen = restored stamp, "" = now)
     //AI(secs-skipiccount) 20260802 : latch SVID 37010 then fire CEID 78, in that order -

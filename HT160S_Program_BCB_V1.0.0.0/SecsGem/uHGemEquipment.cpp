@@ -196,6 +196,14 @@ void __fastcall THGem::Timer1Timer(TObject *Sender)
     if(GemLogic != NULL)
         GemLogic->ServiceAgv();
 
+    //AI(secs-controlstate) 20260803 : publish the GEM control state and fire its change events
+    //  each tick (SVID 4 / 9, CEID 141 + 91/92/93), mirroring how HT9045 detects the edge in its
+    //  own periodic pass. Before the bWantComm guard for the same reason as the AGV tick above :
+    //  the latch must track the state even while the link is down, and EventReport itself no-ops
+    //  unless HSMS is SELECTED.
+    if(GemLogic != NULL)
+        GemLogic->PollGemControlState();
+
     //AI(ht160s-secsgem) 20260611 : batch-flush pending SECS log lines to disk
     //  every tick.  Done first (before the bWantComm guard) so logs are written
     //  even while the link is down / reconnecting.

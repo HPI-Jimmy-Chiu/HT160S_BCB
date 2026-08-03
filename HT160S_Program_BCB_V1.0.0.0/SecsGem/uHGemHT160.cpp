@@ -29,6 +29,12 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     : HTGem(Path, HGemTmp)
 {
     iControlState = 0;
+    //AI(secs-controlstate) 20260803 : HT9045 starts its GemControlState at 1 (Off-Line) and only
+    // fires the change events on an edge, so seed both to 1. iControlState's own 0 is left alone :
+    // it is a legacy "no host transition yet" value on the already-published SVID 66002, and
+    // MapGemControlState9045() folds it into Off-Line for SVID 4 rather than re-encoding 66002.
+    svGemControlState    = 1;
+    svGemControlPreState = 1;
     sSystemTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
     sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
 
@@ -364,6 +370,15 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1021, HType.INT_4_TYPE, "UPH", "pcs/hr", &svUPH, "units per hour (9045 SVID 1021)");
     HGemPtr->SetSVDataPointer(1027, HType.ASCII_TYPE, "System Time", "", &sSystemTime, "current system time (9045 SVID 1027)");
 
+    //AI(secs-controlstate) 20260803 : GEM control state on HT9045's OWN numbers, per the customer's
+    // 2026-08-03 instruction "same function must use the same id". HT9045 publishes 4 = current and
+    // 9 = previous, both U1, both in the 1=Off-Line / 2=On-Line Local / 3=On-Line Remote domain
+    // (its uHGemEquipment.cpp SV block). HT160S keeps 66002 as well : that id is already in the
+    // customer spec book with the GEM-standard 1/4/5 domain, so it is NOT re-encoded - the two ids
+    // report the same state in two numberings, and SVID 4 is the one a 9045-numbered host reads.
+    HGemPtr->SetSVDataPointer(4, HType.UINT_1_TYPE, "GemControlState",         "", &svGemControlState,    "1=Off-Line 2=On-Line Local 3=On-Line Remote (9045 SVID 4; same state as 66002 in 9045 numbering)");
+    HGemPtr->SetSVDataPointer(9, HType.UINT_1_TYPE, "PreviousGemControlState", "", &svGemControlPreState, "control state before the last change, same domain as SVID 4 (9045 SVID 9)");
+
     //AI(secs-bclass-0803) 20260803 : three more slots of the KYEC host's own reports, all
     // grounded on the 2026-06-08 KYEC 9045 wire dump (under D:/backup_version/HT9046/KYEC/
     // 20260626/2026_06_08) so the TYPE and FORMAT match what the host has been parsing:
@@ -674,6 +689,59 @@ void HT160Gem::ServiceAgv()
     AgvCoord.RefreshBinSettings();
     AgvCoord.PollAndCall(HGemPtr);
     AgvCoord.ServiceHandshake(HGemPtr);
+}
+//---------------------------------------------------------------------------
+//AI(secs-controlstate) 20260803 : fold HT160S's GEM-standard control state (66002 : 1 Off-Line /
+// 4 On-Line Local / 5 On-Line Remote, plus a legacy 0 before the first host transition) into
+// HT9045's own domain for SVID 4 / 9 (1 / 2 / 3). Kept as one function so every caller agrees.
+static unsigned char MapGemControlState9045(int iGemStdState)
+{
+    if(iGemStdState==5) return 3;   // On-Line Remote
+    if(iGemStdState==4) return 2;   // On-Line Local
+    return 1;                       // 1 = Off-Line; 0 = no host transition yet -> Off-Line
+}
+//---------------------------------------------------------------------------
+//AI(secs-controlstate) 20260803 : 1s tick from THGem::Timer1Timer. Publish the control state on
+// HT9045's numbers and fire its change events, per the customer's 2026-08-03 instruction to use
+// the same id for the same function. HT9045 does exactly this in its own periodic pass : on any
+// change it sends CEID 141 GEM Control State Change, then one of CEID 91 / 92 / 93 for the new
+// state. Those four emit sites live in HT9045's FRAMEWORK file as literal-value EventReport(1, n)
+// calls, which is why an earlier scan of HT9045's application trees concluded - wrongly - that
+// 9045 never sends them.
+//
+// Why a periodic edge-detector and not a call at each of the four iControlState writes :
+//   * two of the writes are inside S2F42_Host_Command_Acknowledge (ONLINE / ONLINE_LOCAL), which
+//     has NOT yet built its HCACK reply at that point. Firing an S6F11 there would put the event
+//     on the wire ahead of the reply to the command that caused it, and would re-enter the shared
+//     encode buffer mid-parse.
+//   * a future fifth write site gets the events for free instead of silently missing them.
+// EventReport already no-ops unless HSMS is SELECTED, and honours the host's S2F37 enable state,
+// so nothing extra is gated here.
+void HT160Gem::PollGemControlState()
+{
+    if(HGemPtr==NULL)
+        return;
+
+    unsigned char uNew = MapGemControlState9045(iControlState);
+    if(uNew==svGemControlState)
+        return;
+
+    svGemControlPreState = svGemControlState;
+    svGemControlState    = uNew;
+
+    AnsiString sLog;
+    sLog.sprintf("[SECS] GEM control state %d -> %d (66002=%d) : CEID 141 + %d",
+                 (int)svGemControlPreState, (int)svGemControlState, iControlState,
+                 (int)(uNew==1 ? 91 : (uNew==2 ? 92 : 93)));
+    HGemPtr->StringOut(sLog);
+
+    HGemPtr->EventReport(1, SECS_EVENT.GemControlStateChange);   // 141, every change
+    if(uNew==1)
+        HGemPtr->EventReport(1, SECS_EVENT.SECSOffline);         // 91
+    else if(uNew==2)
+        HGemPtr->EventReport(1, SECS_EVENT.SECSOnline);          // 92
+    else
+        HGemPtr->EventReport(1, SECS_EVENT.SECSOnlineRemote);    // 93
 }
 //---------------------------------------------------------------------------
 void HT160Gem::AddEC()

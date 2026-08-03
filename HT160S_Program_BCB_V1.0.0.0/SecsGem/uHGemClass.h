@@ -40,6 +40,15 @@ public:
     // the machine-specific GEM logic can drive the E87/AGV coordinator (poll car
     // full -> CEID272, service handshake). Base is a no-op.
     virtual void ServiceAgv();
+
+    //AI(secs-controlstate) 20260803 : called once per second from THGem::Timer1Timer so the
+    // machine-specific GEM logic can publish the GEM control state (SVID 4 / 9) and fire the
+    // change events (CEID 141 + 91/92/93) on an edge. Deliberately a periodic edge-detector,
+    // exactly as HT9045 does it, NOT a call inside each message handler : the state is written
+    // from four different places and firing an S6F11 from inside S2F42 would push an event out
+    // ahead of the HCACK reply it is still building. Base is a no-op.
+    virtual void PollGemControlState();
+
     //AI(secs-kyec-rcmd4-fix) 20260728 : transport -> logic notification that the HSMS link is
     // gone (peer disconnect, socket error, Separate.req, or our own DropConnection). Lets the
     // logic layer drop any latched host state that would otherwise outlive the host. Base is a

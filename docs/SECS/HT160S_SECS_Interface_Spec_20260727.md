@@ -23,6 +23,11 @@
 > (Lot Start Time)、**1103–1105**(Auto1–3 Count)、**1501**(Setup File)、**2758–2763**(Type 1 Tray
 > 幾何),以及本機自有段的 **66022–66027**(Auto1–6 Count)。號碼、型別與線上格式皆比對 HT-90XX 原始碼
 > 與京元現場 log 後對齊。同時更正 §6 對 SVID 1006 的錯誤描述。詳見 §3.1。
+>
+> **同日追加(仍為僅新增):控制狀態改用 HT-90XX 編號** —— 新增 **SVID 4 GemControlState**
+> (1=Off-Line / 2=On-Line Local / 3=On-Line Remote,U1)與 **SVID 9 PreviousGemControlState**,
+> 並在狀態變更時發 **CEID 141** 與 **91 / 92 / 93**(此四個號碼先前已註冊但無發射點)。既有的
+> SVID 66002 保留不變(GEM 標準值域 1/4/5)。詳見 §1、§3.1、§3.3.1。
 
 ---
 
@@ -44,14 +49,18 @@
 - **HSMS-SS**,設備端為 **passive**(host 主動撥入 / equipment is passive, host connects in)。
 - Port / Device(Session) ID:見 `system\ComPort.ini`(現場觀察 on-site observed: **port 6000, Device ID = 1**)。
 - 型號 / 版本 由 S1F2 與 S1F14 回報:`MDLN = HT-160S`,`SOFTREV = 1.0.0.0`。
-- **GEM 控制狀態 Control State**(鏡像於 SVID 66002 / mirrored in SVID 66002):
-  | 值 | 狀態 | 進入方式 |
-  |---|---|---|
-  | 1 | Off-Line | S1F15/F16,或 RCMD `ONLINE_LOCAL` 前 |
-  | 4 | On-Line Local | RCMD `ONLINE_LOCAL` |
-  | 5 | On-Line Remote | S1F17/F18,或 RCMD `ONLINE_REMOTE`/`ONLINE` |
+- **GEM 控制狀態 Control State** —— 同一個狀態以**兩種編號**公佈:**SVID 4 / 9**(HT-90XX 值域,建議 host 使用)與既有的 **SVID 66002**(GEM 標準值域,不變更)。變更時送 **CEID 141**,緊接著送 **91 / 92 / 93** 中對應新狀態的一個(與 HT-90XX 同順序)。
+- ⚠ **控制狀態目前不作為命令閘門**:本機在 Off-Line / On-Line Local 狀態下仍會受理並執行 S2F41 遠端命令。這與 HT-90XX 現行行為一致(其控制狀態閘僅對另一家客戶代碼生效)。若需依 GEM 規範在 Off-Line 拒絕命令,請告知三件事:要拒絕哪些命令(全部,或保留 `ONLINE_*` 以免無法上線)、拒絕時回哪個 HCACK、On-Line Local 是否也拒絕。
 - 事件 / 警報推播(S6F11 / S5F1)僅在 **HSMS SELECTED** 時送出。
 - 標準上線序列(host):`S1F13 → S1F17 → S2F37(disable all) → S5F3 → S2F33(define) → S2F35(link) → S2F37(enable)`,全數支援(見 §2、§4)。
+
+**控制狀態對照 / Control state map:**
+
+| SVID 4 值 | SVID 66002 值 | 狀態 | 進入方式 | 變更時發射 |
+|---|---|---|---|---|
+| 1 | 1(開機且尚無 host 交握時為 0) | Off-Line | S1F15/F16,或 RCMD `ONLINE_LOCAL` 前 | CEID 141 + 91 |
+| 2 | 4 | On-Line Local | RCMD `ONLINE_LOCAL` | CEID 141 + 92 |
+| 3 | 5 | On-Line Remote | S1F17/F18,或 RCMD `ONLINE_REMOTE`/`ONLINE` | CEID 141 + 93 |
 
 ---
 
@@ -166,6 +175,8 @@
 
 | SVID | 名稱 Name | 型別 | 說明 |
 |---|---|---|---|
+| 4 | GemControlState | U1 | GEM 控制狀態,**HT-90XX 值域**:1=Off-Line / 2=On-Line Local / 3=On-Line Remote。與 66002 是**同一個狀態的兩種編號**(66002 用 GEM 標準值域 1/4/5,為既有已公佈號碼,不變更);9045-編號的 host 請讀本號。變更時會送 CEID 141 + 91/92/93 |
+| 9 | PreviousGemControlState | U1 | 上一次變更前的控制狀態,值域同 SVID 4 |
 | 3 | GemClock | A | 設備當前時間,**SEMI E5 16 字元 `YYYYMMDDhhmmsscc`**(與 HT-90XX 的 `iTimeFormat=1` 同格式,也與本機 S2F18 回覆同格式)。與 1027 是**同一時刻的兩種格式**,不可互換;百分秒欄固定 `00` |
 | 1001 | Machine Model | A | 機型名 = HT-160S |
 | 1002 | Machine ID | A | 機台識別碼,取自 `General.ini [MachineIdentity] HandlerID`(維護頁的 **Handler ID** 欄)。HT-90XX 只有一個識別字串,HT-160S 有三個(機型 / Handler ID / 序號);**本號回 Handler ID,此為 2026-08-03 定案**(機型已由 1001 提供,序號另議)。⚠ **出廠預設為空字串**——這是現場輸入的欄位,未輸入前本值為空 `A[0]`,不是故障;請於機台交機時填入 |
@@ -275,11 +286,13 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 
 #### 3.3.1 本機實際會發射的事件 / Events this equipment actually sends
 
-以下 **53** 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
-其中 **CEID 78 為條件發射**，出廠預設關閉，其餘 52 個不受設定影響。
+以下 **57** 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
+其中 **CEID 78 為條件發射**，出廠預設關閉，其餘 56 個不受設定影響。
+(2026-08-03 由 53 增為 57:新增控制狀態變更事件 **141** 與 **91 / 92 / 93**,見表末。)
 
-The following **53** ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
-**CEID 78 is conditional** (off by default); the other 52 are not gated by any setting.
+The following **57** ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
+**CEID 78 is conditional** (off by default); the other 56 are not gated by any setting.
+(53 -> 57 on 2026-08-03: control-state change events **141** and **91 / 92 / 93** were added.)
 
 | CEID | 名稱 / Name | HT-160S 發射時機 / When it is sent |
 |---|---|---|
@@ -324,6 +337,8 @@ The following **53** ids have a real emit site on HT-160S. Ids and names are HT-
 | 136 / 137 / 138 | Auto1 / Auto2 / Auto3 Unloading tray | Auto 出盤 |
 | 145 / 146 / 147 | Auto4 / Auto5 / Auto6 Unloading tray | Auto 出盤 |
 | 148 / 149 / 150 | Auto4 / Auto5 / Auto6 Full | Auto 車滿(需 `bUseAMR=1`) |
+| **141** | GEM Control State Change | **控制狀態每次變更即送**(2026-08-03 新增)。狀態值見 SVID 4 / 9 |
+| **91 / 92 / 93** | SECS/GEM Offline / Online / Online Remote | **同一次變更會在 141 之後再送這三者中對應新狀態的一個**(2026-08-03 新增)。與 HT-90XX 同順序 |
 | 272 / 273 / 274 / 275 | AMR Supplement / LDUnLD Status / LDUnLD Finish / LD ID | 見 §3.3.4 |
 
 **頻率提醒 / Frequency notes**
@@ -617,7 +632,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
   - `LOTSTART` 於 2026-07-30 改為與 9045 逐字對齊(無參數、無條件 HCACK=0、可重複下達);`CLEAR_LOT_INFO`(host 版 Lot End)為同日新增對齊。兩者合起來構成 host 端完整的開批 / 結批一對。
   - **`HOME` 已自本節移出** —— 經逐字查證 HT9045 的 S2F42 dispatch,其命令集為 `AUTHORITY_CHECK` `AUTOSITEMAP` `AUTO_CLEAN` `AUTO_RETEST` `CLEAN_AUTO_SORT_COUNT` `CLEAN_OUT` `CLEAR_LOT_INFO` `CLOSE_ONECYCLE` `CONTINUE_*` `DEVTEMPOFFSETADJUST` `EESUG_OFFSET` `HALT` `INITIAL_START*` `LOTORDER` `LOTSTART` `ONE_CYCLE` `ONLINE_LOCAL` `ONLINE_REMOTE` `PAUSE` `PP_*` `REMOTE_*` `RESET` `RETEST_MRT` `SET_LOT_INFO` `START` `START_AGV` `START_AQL` `START_LOT` `STOP` `STOP_LOT` `SUBSTRATETYPE` `SWITCH_TO_*` `TESTTEMPSETTING` `TRAY_FEED` `TRAY_MAP` `YIELD_FAIL` —— **其中沒有 `HOME`**。改列 §7.2。
   - 三項宣告差異:`ONE_CYCLE` 據實回 HCACK(9045 一律 0);`ENERGY_SAVING` 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);`PP_SIGNALTOWER`/`PP_MUSIC` 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。
-- **SVID 共同段**:3 / 1001 / 1002 / 1003 / 1006 / 1009 / 1011 / 1021 / 1027 / 1101 / 1102 / 1103 / 1104 / 1105 / 1501 / 1517 / 1518 / 2758–2763 / 37010(號碼、型別與線上格式皆對齊 HT-90XX)。
+- **SVID 共同段**:3 / 4 / 9 / 1001 / 1002 / 1003 / 1006 / 1009 / 1011 / 1021 / 1027 / 1101 / 1102 / 1103 / 1104 / 1105 / 1501 / 1517 / 1518 / 2758–2763 / 37010(號碼、型別與線上格式皆對齊 HT-90XX)。
 - **ECID**:1501,2758–2763(Type1 tray 幾何)。
 - **CEID**:AMR 272 / 273 / 274 / 275;Auto-Full 35 / 36 / 37 / **148 / 149 / 150**;Auto-Unloadtray **136 / 137 / 138 / 145 / 146 / 147**。
   - 上列 Auto-Full 六號與 Auto-Unloadtray 六號**皆與 HT-90XX 同號同義**(依 HT-90XX 韌體 CEID 目錄 `EventReport_CEID.def`:148/149/150 = `Auto 4/5/6 Full`,136–138/145–147 = `Auto 1–6 Unloading tray`)。

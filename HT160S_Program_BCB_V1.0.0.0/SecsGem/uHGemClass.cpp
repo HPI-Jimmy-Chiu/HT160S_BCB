@@ -168,6 +168,7 @@ void HTGem::RefreshSVData(){ }
 void HTGem::RefreshSecsBadge(){ }
 //AI(ht160s-agv) 20260615 : base no-op; HT160Gem overrides to drive the AGV coordinator.
 void HTGem::ServiceAgv(){ }
+void HTGem::PollGemControlState(){ }   //AI(secs-controlstate) 20260803
 //AI(secs-kyec-rcmd4-fix) 20260728 : base no-op; HT160Gem overrides to release latched host state.
 void HTGem::OnCommunicationLost(){ }
 //AI(secs-lotstarttime) 20260730 : base no-op; HT160Gem overrides to latch SVID 66033.

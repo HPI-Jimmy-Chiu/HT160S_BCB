@@ -89,9 +89,9 @@ CEID,事件名稱 (HT9045 原文),本機發射,Report,備註
 88,Map Has Device Arm Error Skip,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
 89,Pre Alarm Message,—,,HT9045 為特定客戶碼 + 8 unloader 的良率監控掛勾，HT-160S 無此機制
 90,Get TestResult And Barcode,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
-91,SECS/GEM Offline,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
-92,SECS/GEM Online,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
-93,SECS/GEM Online Remote,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+91,SECS/GEM Offline,★ 會發射,Report 1,2026-08-03 新增發射點:GEM 控制狀態(Off-Line / On-Line Local / On-Line Remote)每次變更時，先送 CEID 141，緊接著依新狀態再送 91 / 92 / 93 之一，順序與 HT9045 相同。狀態值請讀 SVID 4 (1/2/3，HT9045 值域)與 SVID 9(變更前的值)。⚠ 更正前版敘述:前版備註寫「HT9045 韌體同樣只宣告不發射」是錯的 —— HT9045 的發射點在其框架層的控制狀態變更區塊，以字面值呼叫，前次盤點只掃應用層因此漏判。本機已與之對齊。
+92,SECS/GEM Online,★ 會發射,Report 1,2026-08-03 新增發射點:GEM 控制狀態(Off-Line / On-Line Local / On-Line Remote)每次變更時，先送 CEID 141，緊接著依新狀態再送 91 / 92 / 93 之一，順序與 HT9045 相同。狀態值請讀 SVID 4 (1/2/3，HT9045 值域)與 SVID 9(變更前的值)。⚠ 更正前版敘述:前版備註寫「HT9045 韌體同樣只宣告不發射」是錯的 —— HT9045 的發射點在其框架層的控制狀態變更區塊，以字面值呼叫，前次盤點只掃應用層因此漏判。本機已與之對齊。
+93,SECS/GEM Online Remote,★ 會發射,Report 1,2026-08-03 新增發射點:GEM 控制狀態(Off-Line / On-Line Local / On-Line Remote)每次變更時，先送 CEID 141，緊接著依新狀態再送 91 / 92 / 93 之一，順序與 HT9045 相同。狀態值請讀 SVID 4 (1/2/3，HT9045 值域)與 SVID 9(變更前的值)。⚠ 更正前版敘述:前版備註寫「HT9045 韌體同樣只宣告不發射」是錯的 —— HT9045 的發射點在其框架層的控制狀態變更區塊，以字面值呼叫，前次盤點只掃應用層因此漏判。本機已與之對齊。
 94,Transfer Blocked,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
 95,Cassette Load Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
 96,Cassette ID Read Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
@@ -139,7 +139,7 @@ CEID,事件名稱 (HT9045 原文),本機發射,Report,備註
 138,Auto 3 Unloading tray,★ 會發射,Report 1,Auto3 出盤
 139,Click lot start button for visual sort mode,—,,HT9045 為特定客戶視覺分選專案
 140,Prepare Load Tray,—,,HT9045 為 Tray Map Throw IC 功能前置，HT-160S 無此功能
-141,GEM Control State Change,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+141,GEM Control State Change,★ 會發射,Report 1,2026-08-03 新增發射點:GEM 控制狀態(Off-Line / On-Line Local / On-Line Remote)每次變更時，先送 CEID 141，緊接著依新狀態再送 91 / 92 / 93 之一，順序與 HT9045 相同。狀態值請讀 SVID 4 (1/2/3，HT9045 值域)與 SVID 9(變更前的值)。⚠ 更正前版敘述:前版備註寫「HT9045 韌體同樣只宣告不發射」是錯的 —— HT9045 的發射點在其框架層的控制狀態變更區塊，以字面值呼叫，前次盤點只掃應用層因此漏判。本機已與之對齊。
 142,(HT9045 未具名 / no alias),—,,HT9045 完全未指派 EventDescription(空字串)，識別字為 PickerCountWasCleared。本機逐字照抄，故 alias 為空。無發射點。
 143,(HT9045 未具名 / no alias),—,,HT9045 完全未指派 EventDescription(空字串)，識別字為 UploadPickerCount。本機逐字照抄，故 alias 為空。無發射點。
 144,(HT9045 未具名 / no alias),—,,HT9045 完全未指派 EventDescription(空字串)，識別字為 RequestPickerCount。本機逐字照抄，故 alias 為空。無發射點。

@@ -76,3 +76,5 @@ SVID,Name
 66025,Auto4 Count
 66026,Auto5 Count
 66027,Auto6 Count
+4,GemControlState
+9,PreviousGemControlState
