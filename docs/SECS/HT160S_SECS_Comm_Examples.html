@@ -738,23 +738,32 @@ sequenceDiagram
 <p>之所以分開，是因為 AGV 補料期間機台可能暫停某些動作等待交接，待 CEID 274（Finish）確認搬運完成後，host 才送 START 讓整機恢復生產。把「授權 AGV 動作」與「恢復整機生產」拆成兩個命令，host 才能精準控制兩件事的時序。</p>
 </blockquote>
 <p><strong>AGV CEID 定義</strong>：</p>
+<blockquote>
+<p>⚠ <strong>名稱更正（2026-08-03）</strong>：下表與本章各段 log 摘錄中的 <code>AGVSupplement</code> /
+<code>AGVLDUnLDStatus</code> / <code>AGVLDUnLDFinish</code> / <code>AGVLdID</code> 是<strong>舊的 CENAME</strong>。
+與京元現場 HT-9046 機台自存的 <code>EventReport_CEID.def</code> 逐筆核對後發現該機用的是
+<code>AMR Supplement</code> / <code>AMR LDUnLD Status</code> / <code>AMR LDUnLD Finish</code> /
+<code>AMR LD ID</code>，本機韌體已於 2026-08-03 改為一致。
+<strong>CEID 號碼、攜帶報表、發射時機、body 內容全部未變</strong>，只有 <code>S1F24</code> 回覆的名稱字串改了，
+因此本章所有既有的 wire 範例與 body dump 仍然完全有效。下表與 log 摘錄保留原字串，因為它們是當時實際輸出的紀錄。</p>
+</blockquote>
 <table>
 <thead>
 <tr>
 <th>CEID</th>
-<th>名稱</th>
+<th>名稱（舊 CENAME／現為 AMR *）</th>
 <th>語意</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>272</td>
-<td>AGVSupplement</td>
+<td>AGVSupplement → <strong>AMR Supplement</strong></td>
 <td>呼叫 AGV：缺料／Auto full。SVID <code>38219</code> bitmap 標記目標站</td>
 </tr>
 <tr>
 <td>273</td>
-<td>AGVLDUnLDStatus</td>
+<td>AGVLDUnLDStatus → <strong>AMR LDUnLD Status</strong></td>
 <td>Ready：機構就位</td>
 </tr>
 <tr>

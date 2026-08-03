@@ -5,12 +5,12 @@
 > **依據 Based on:** current firmware build (branch `feat/iosetview-172-refactor`)
 >
 > 本規格反映 HT-160S **目前實作**的 SECS-II / GEM 介面。命令面向 HT-90XX (HT9045) 對齊;
-> **CEID 字典自 2026-07-29 起為 HT-90XX 的逐字複本**(號碼 1–275 全數註冊,別名逐字相同,見 §3.3);
+> **CEID 字典自 2026-07-29 起為 HT-90XX 的逐字複本**(號碼 **1–292** 全數註冊,別名逐字相同,見 §3.3);
 > **SVID 字典為「共同段對齊 HT-90XX + 本機自有高位段」兩部分**(見 §3.1):凡 HT-90XX 有同概念的資料,
 > 一律沿用 HT-90XX 的號碼、型別與線上格式;sorter 特有、tester 無對應的資料放在 66xxx / 38xxx 段。
 > This document describes the SECS-II / GEM interface **as currently implemented** on HT-160S.
 > The command surface is aligned to HT-90XX. **As of 2026-07-29 the CEID dictionary is a verbatim copy of
-> HT-90XX's** (ids 1–275 all registered, aliases character-identical, §3.3). The SVID dictionary has two
+> HT-90XX's** (ids **1–292** all registered, aliases character-identical, §3.3). The SVID dictionary has two
 > parts (§3.1): a common band that reuses HT-90XX's ids, types and wire formats wherever the same concept
 > exists, and HT-160S-specific high bands (66xxx / 38xxx) for sorter data a tester has no equivalent for.
 >
@@ -18,10 +18,10 @@
 > 重新設定。最高風險為 CEID **27** 與 **28** —— 新舊字典都有這兩個號碼但意思不同,未更新會靜默誤讀。
 > A host that is not re-provisioned will silently misread CEID **27** and **28**.
 >
-> **2026-08-03 修訂(僅新增,無 breaking change)/ Revision 2026-08-03 (additive only):** 補齊 19 個
+> **2026-08-03 修訂(本段列出的號碼皆為新增;同日另有三項 breaking change,見下方 ⚠ 段落):** 補齊 16 個
 > host 已在引用、但本機先前回空 item 的 SVID —— **3**(GemClock)、**1002**(Machine ID)、**1009**
 > (Lot Start Time)、**1103–1105**(Auto1–3 Count)、**1501**(Setup File)、**2758–2763**(Type 1 Tray
-> 幾何),以及本機自有段的 **66025–66027**(Auto4–6 Count)。號碼、型別與線上格式皆比對 HT-90XX 原始碼
+> 幾何),以及 **1259–1261**(Auto4–6 Count;本版初版時為 66025–66027,同日改號,見下方 ⚠ 段落)。號碼、型別與線上格式皆比對 HT-90XX 原始碼
 > 與京元現場 log 後對齊。同時更正 §6 對 SVID 1006 的錯誤描述。詳見 §3.1。
 >
 > **同日追加(仍為僅新增):控制狀態改用 HT-90XX 編號** —— 新增 **SVID 4 GemControlState**
@@ -35,8 +35,37 @@
 > **66033**(Lot Start Time,與 **1009** 為同一個閂鎖、同一時刻,僅分隔符不同)。
 > 這四個號碼自本版起**不再註冊**,S1F3 查詢會得到「未知 SVID」而非數值,S1F11 名稱表也不再列出。
 > **若貴端已在 S2F33 報表定義中綁定這四個號碼,請改綁 1103 / 1104 / 1105 / 1009。**
-> Auto4–6 仍在本機自有段 **66025–66027**(HT-90XX 無對應號碼),號碼不變;
-> 這三個號碼與被移除的 66022–66024 **不會遞補、不會重新編號**。詳見 §3.1。
+> 詳見 §3.1。
+>
+> ⚠️ **同日追加(此項亦為 breaking change):Auto4–6 Count 改用 HT-90XX 家族編號** ——
+> **66025 / 66026 / 66027** 原本以「HT-90XX 無對應號碼」為理由留在本機自有段。該理由**已被推翻**:
+> HT-90XX 家族中的 **HT-9011UC V3.33.899** 本身就是**六站 Auto** 機台,並以
+> **1259 / 1260 / 1261** 命名 Auto4–6 Count(其後 1262 起為 Fix7–12)。依「相同功能使用同一編號」
+> 的原則,本機自本版起改用 **1259 / 1260 / 1261**,**66025–66027 不再註冊**。
+> **若貴端已在 S2F33 報表定義中綁定 66025–66027,請改綁 1259 / 1260 / 1261。**
+> 66022–66027 這六個號碼**永不遞補、永不改用他義**。詳見 §3.1。
+>
+> ⚠️ **同日追加(此項亦為 breaking change):Auto4–6 的 AMR Carrier ID 改用家族編號** ——
+> 同一條原則(**Auto1–3 遵循 HT-9046LS V3.32.810、Auto4–6 參照 HT-9011UC V3.33.899**)套用到 AMR 盤號欄位:
+> Auto1–3 維持 **38205 / 38206 / 38207**(810 定義,不變),Auto4–6 由本機自創的 38208 / 38209 / 38210
+> 改為 899 的 **38199 / 38200 / 38201**(`Output 4/5/6 Tray ID`)。**若貴端已綁定 38208–38210,請改綁
+> 38199–38201。** Auto4–6 的 tray / device / bin-setting(**38237–38245**)**維持不變**——兩棵參照樹皆無
+> 可對齊的號碼(810 的 AMR 段止於 38236、899 無 AMR SVID 家族)。詳見 §3.1 的 AMR 對照表。
+>
+> **同日追加:CEID 字典依貴端現場機台補齊至 292(僅新增)** —— 以貴端 HT-9046 現場機台自己存下的
+> `EventReport_CEID.def` 逐筆核對:**1–275 與本機 0 筆不符**;該機另有 **276–292** 共 17 個號碼,
+> 本版已全部註冊(名稱逐字照抄),`S1F23`/`S1F24` 全查由 `L,275` 變為 **`L,292`**(約 32 KB)。
+> 這 17 個**目前只註冊、無發射點**。同時更正 CEID **272–275** 在 `S1F24` 回的名稱字串,改與貴端機台一致
+> (`AMR Supplement` 等,原為 `AGVSupplement` 等)——**號碼與行為未變**。詳見 §3.3、§3.3.2.1。
+>
+> **同日追加(僅新增):SVID / ECID 1007 Operator ID** —— 本機新增操作員身分欄位(主畫面右側設定區,
+> 預設 `Operator`,存 `General.ini`,跨電源保存),並以 **SVID 1007** 公佈、同號 **ECID 1007** 註冊。
+> ⚠️ **本號接受貴端以 `S2F15` 寫入,且是唯一在運轉中也可寫的 EC**(其餘可寫 EC 限機台 idle)——
+> 貴端 2026-06-08 對 HT-90XX 的實際用法即為運轉中寫 `1007 = "AGV"`。寫入成功回 `EAC=0`、
+> 主畫面即時同步、寫入設定檔保存、並發 **CEID 48**;空字串回 `EAC=3`。
+> ⚠️ **並更正本文件先前的建議**:§6 原稱「1007 無對應,建議 host 自報表定義移除」,該建議**作廢**,
+> 請保留 1007。至此貴端 **RPTID 502 的 8 格中有 7 格有值**,僅餘 **1513 Tester On/Off** 無對應。
+> 詳見 §3.1、§3.2、§6。
 
 ---
 
@@ -106,7 +135,7 @@
 | S1F17 | Request ON-LINE | H→E | S1F18 | (header only) | |
 | S1F18 | ON-LINE Acknowledge | E→H | — | `B ONLACK` | ONLACK=0,控制狀態→5 |
 | S1F23 | Collection Event Namelist Request | H→E | S1F24 | `L,n{ CEID }`(n=0=全部) | **本次新增 (2026-07-30)** |
-| S1F24 | Collection Event Namelist Reply | E→H | — | `L,n{ L,3{ U4 CEID, A CENAME, L,m{ U4 VID } } }` | n=0 回全部 275 個 CEID;未註冊者回 `{CEID,"",L,0}` |
+| S1F24 | Collection Event Namelist Reply | E→H | — | `L,n{ L,3{ U4 CEID, A CENAME, L,m{ U4 VID } } }` | n=0 回全部 **292** 個 CEID(約 32 KB);未註冊者回 `{CEID,"",L,0}` |
 
 ### Stream 2 — 設備控制與診斷 / Equipment Control & Diagnostics
 
@@ -176,7 +205,7 @@
 
 > **本機回 `ACK=1` 的兩種情況,請勿誤判為故障**:
 > (1) 本體格式不符上表;
-> (2) 清單中含**本機未註冊的 ECID**。本機只註冊 7 個 EC(§3.2:1501、2758–2763),
+> (2) 清單中含**本機未註冊的 ECID**。本機只註冊 8 個 EC(§3.2:1007、1501、2758–2763),
 > 若對未註冊的 ECID 回 0,等於承諾「該 EC 變更會回報」——本機沒有 EC 變更事件,永遠不會發生,故據實回 1
 > (與 HT-90XX 對未註冊 ECID 回 1 的行為一致)。SECS log 會列出未註冊的 ECID 清單供雙方比對。
 
@@ -203,6 +232,7 @@
 | 1002 | Machine ID | A | 機台識別碼,取自 `General.ini [MachineIdentity] HandlerID`(維護頁的 **Handler ID** 欄)。HT-90XX 只有一個識別字串,HT-160S 有三個(機型 / Handler ID / 序號);**本號回 Handler ID,此為 2026-08-03 定案**(機型已由 1001 提供,序號另議)。⚠ **出廠預設為空字串**——這是現場輸入的欄位,未輸入前本值為空 `A[0]`,不是故障;請於機台交機時填入 |
 | 1003 | Software Version | A | 軟體版本 |
 | 1006 | Lot ID | A | 目前作用中的批號 |
+| 1007 | Operator ID | A | 本班作業人員身分。主畫面右側設定區的「Operator ID」欄位,預設 `Operator`,存於 `system\General.ini` `[MachineIdentity] OperatorID`,**跨電源保存**。**同號的 ECID 1007 指向同一份資料且可寫**——貴端可用 `S2F15` 直接設定(見 §3.2),寫入後主畫面欄位即時同步顯示。**與本機的 HMI 角色登入無關**:那是本地權限控制(Operation / Supervisor / Engineer / Honprec),會因技術員中途登入而改變,語意不同,刻意不與本號綁定 |
 | 1009 | Lot Start Time | A | 開批時刻,**HT-90XX 線上格式 `yyyy-mm-dd hh:nn:ss`(破折號)**;批與批之間為空字串。Lot Start 當下閂鎖(操作面板 Lot Start 按鈕與 SECS `LOTSTART` 兩條路徑皆寫入)、Lot End 清空,貨批進行中可隨時以 S1F3 回查,**不會隨系統時間變動**。未加入預設 Report 1;需在事件內帶出起測時間請以 S2F33 / S2F35 綁進貴端自訂報表。**跨電源保存**:工單隨機台重開並由操作員選擇「繼承」時,本值會以**原始開批時刻**還原(不是復電時刻);未繼承、工單建立於本功能之前、或中繼檔讀寫失敗則維持空字串——空字串是「批與批之間」的正式值,寧可空也不給一個看似合理但錯誤的時間。**2026-08-03 起本號為唯一的開批時刻**(原本同值的 66033 已移除) |
 | 1011 | Machine State | A | 主畫面狀態文字 |
 | 1021 | UPH | I4 | 每小時產出 |
@@ -212,6 +242,9 @@
 | 1103 | Auto1 Count | I4 | 放入 Auto1 出料盤的 IC 數(**2026-08-03 起為唯一編號**,原同值的 66022 已移除) |
 | 1104 | Auto2 Count | I4 | 放入 Auto2 出料盤的 IC 數(原同值的 66023 已移除) |
 | 1105 | Auto3 Count | I4 | 放入 Auto3 出料盤的 IC 數(原同值的 66024 已移除) |
+| 1259 | Auto4 Count | I4 | 放入 Auto4 出料盤的 IC 數。⚠ **2026-08-03 起由本機自有段 66025 改為本號**——HT-90XX 家族中的 **HT-9011UC V3.33.899** 本身就是**六站 Auto** 機台,以 1259 / 1260 / 1261 命名 Auto4–6(其後 1262 起為 Fix7–12),故本機不再自創號碼,改與家族一致 |
+| 1260 | Auto5 Count | I4 | 放入 Auto5 出料盤的 IC 數(原 66026) |
+| 1261 | Auto6 Count | I4 | 放入 Auto6 出料盤的 IC 數(原 66027) |
 | 1501 | Setup File | A | 目前 recipe / setup 檔名。**同號的 ECID 1501 指向同一份資料**(見 §3.2 說明) |
 | 1517 | Start Mode | I4 | 0=Continuous Start / 1=Initial Start(HT-90XX 編號) |
 | 1518 | Real/Dummy | I4 | 0=Dummy / 1=Tray Only / 2=Real |
@@ -223,9 +256,9 @@
 | 2763 | Type 1 Tray Division Y | I4 | 盤格 Y 數(無單位) |
 | 37010 | Enter Skip IC Count | I4 | 操作員在上一次 SKIP 時輸入的取出 IC 數 |
 
-> **關於 1103–1105 的兩點必讀 / Two notes on 1103–1105**
-> 1. **HT-160S 有六個 Auto 站**,而 HT-90XX 的 1103–1105 只到 Auto3、其後 1106–1108 叫 **Fix1–3**。要不要把 HT-160S 的 Auto4–6 對映到 Fix1–3 是**雙方商務決定**,本機**不單方面實作**,因此 host 報表中的 1106–1108 會維持空 item。Auto4–6 的產出**並未隱藏**:這三站公佈於本機自有的 **66025–66027**(HT-90XX 無對應號碼),host 以 S2F33 綁該段即可讀到。**六站完整分布 = 1103 / 1104 / 1105 + 66025 / 66026 / 66027。**(2026-08-03 前 Auto1–3 另有一組同值的 66022–66024,已因「重複資訊收斂到 HT-90XX 編號」移除。)
-> 2. **1102 與 1103–1105 的總和不保證相等。** HT-90XX 的 1102 就是該陣列的和;HT-160S 的 1102 在**掃碼/配 Bin 階段**累加,1103–1105 在**放料階段**累加,且 1102 為 RAM 值(復電歸零)而 1101/1103–1105 隨機台保存。請勿以「總和相符」作為對帳條件。
+> **關於 1103–1105 / 1259–1261 的兩點必讀 / Two notes on the six Auto counts**
+> 1. **HT-160S 有六個 Auto 站,六站全部使用 HT-90XX 家族編號**:Auto1–3 = **1103 / 1104 / 1105**(來源 HT-9046LS V3.32.810),Auto4–6 = **1259 / 1260 / 1261**(來源 HT-9011UC V3.33.899,該機同為六站 Auto 機台)。**六站完整分布 = 1103 / 1104 / 1105 + 1259 / 1260 / 1261。** 另請注意這與 **Fix1–3(1106–1108)** 是兩件不同的事:HT-9046LS 把第 4–6 個出料站叫 Fix1–3,要不要把 HT-160S 的 Auto4–6 對映到 Fix1–3 仍是**雙方商務決定**,本機**不單方面實作**,因此 host 報表中的 1106–1108 仍會維持空 item。若日後貴端確認 Fix1–3 即為第 4/5/6 輸出站,本機是**改用** 1106–1108 並同時下架 1259–1261,**不會兩組並存**(維持「一個資料一個編號」)。(2026-08-03 前 Auto1–3 另有一組同值的 66022–66024、Auto4–6 位於本機自有段 66025–66027,均已收斂到上述家族編號。)
+> 2. **1102 與六站計數(1103–1105 / 1259–1261)的總和不保證相等。** ⚠ 並更正本文件先前的敘述:HT-90XX 的 1102 **並不是** 1103–1108 的和 —— 追查 HT-9046LS V3.32.810 原始碼,1102 綁 `RunInfo.iUnloadCount`,其唯一賦值是**整個 bin 陣列**的總和(`eTrayCount`=24 格:Auto1–3、Fix1–6、bulk box、Mag1–14),所以即使在 9045 上,RPTID 501 的八格也對不回 1102。HT-160S 的 1102 在**掃碼/配 Bin 階段**累加,1103–1105 / 1259–1261 在**放料階段**累加,且 1102 為 RAM 值(復電歸零)而 1101 / 1103–1105 / 1259–1261 **隨機台保存**(六站同一個 epoch,Lot Start 一併歸零)。請勿以「總和相符」作為對帳條件。
 
 **HT-160S 自有高位段 / HT-160S-specific high band (66000+):**
 
@@ -238,9 +271,6 @@
 | 66011 | Alarm Code | I4 | 目前警報碼(0=無) |
 | 66020 | Total IC | I4 | 本批/本輪處理 IC 數 |
 | 66021 | Total Sorted | I4 | 已分選 IC 數 |
-| 66025 | Auto4 Count | I4 | 放入 Auto4 出料盤的 IC 數(**9045 無對應號碼**,9045 第 4 站叫 Fix1)。Auto1–3 請讀 **1103 / 1104 / 1105** |
-| 66026 | Auto5 Count | I4 | 放入 Auto5 出料盤的 IC 數(9045 第 5 站叫 Fix2) |
-| 66027 | Auto6 Count | I4 | 放入 Auto6 出料盤的 IC 數(9045 第 6 站叫 Fix3) |
 | 66030 | Active Lot Count | I4 | 目前載入 Lot 數 |
 | 66031 | Current Lot ID | A | 首個 Lot ID |
 | 66032 | Sort Mode | I4 | 0=Normal 1=LotBin 2=LotPassFail 3=WhiteList |
@@ -270,16 +300,27 @@
 | P4 Auto1 | 38205 | 38225 | 38231 | 38234 |
 | P5 Auto2 | 38206 | 38226 | 38232 | 38235 |
 | P6 Auto3 | 38207 | 38227 | 38233 | 38236 |
-| P7 Auto4 | 38208 | 38237 | 38240 | 38243 |
-| P8 Auto5 | 38209 | 38238 | 38241 | 38244 |
-| P9 Auto6 | 38210 | 38239 | 38242 | 38245 |
+| P7 Auto4 | **38199** | 38237 | 38240 | 38243 |
+| P8 Auto5 | **38200** | 38238 | 38241 | 38244 |
+| P9 Auto6 | **38201** | 38239 | 38242 | 38245 |
 
 Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
+
+> ⚠ **2026-08-03 變更(breaking change):Auto4–6 的 Carrier ID 由 38208 / 38209 / 38210 改為 38199 / 38200 / 38201。**
+> 依「Auto1–3 遵循 HT-9046LS V3.32.810、Auto4–6 參照 HT-9011UC V3.33.899」的原則:810 只定義三個出料口盤號
+> (38205 / 38206 / 38207,故 P4–P6 不變),而六站機台 HT-9011UC V3.33.899 把另外三個命名為
+> `Output 4/5/6 Tray ID` = **38199 / 38200 / 38201**,因此 P7–P9 改用該組家族編號,不再使用本機自創的
+> 38208–38210。**若貴端已綁定 38208–38210,請改綁 38199–38201**;這三個舊號碼即日起為空號,永不改用他義。
+> 註:HT-9011UC 把整個盤號家族(含其自身的 38205–38207)宣告在 **ECID** 命名空間;本機**維持 SVID**,
+> 因為 Auto1–3 是照 810 的 SVID 定義,六個口必須在同一個命名空間回答。
+> Tray / Device / Bin Setting 三欄的 Auto4–6(38237–38245)**維持本機延伸號**:810 的 AMR 段止於 38236、
+> HT-9011UC 整段沒有 AMR SVID 家族,兩棵樹皆無可對齊的號碼(2026-08-03 逐檔查證)。
 
 ### 3.2 設備常數 / Equipment Constants (ECID) — S2F13/F14, S2F15/F16
 
 | ECID | 名稱 Name | 型別 | 單位 | 可寫? | 說明 |
 |---|---|---|---|---|---|
+| 1007 | Operator ID | A | — | **可寫(運轉中亦可)** | 本班作業人員身分。**同號的 SVID 1007 指向同一份資料**(見 §3.1)。空字串一律拒絕(EAC=3),確保本欄永不回空 item |
 | 1501 | Recipe Name | A | — | 唯讀 | 目前配方(Setup File)名 |
 | 2758 | Tray X Pitch | FT8 | mm | 可寫(idle) | 對齊 9045 Type1 Pitch X |
 | 2759 | Tray Y Pitch | FT8 | mm | 可寫(idle) | 9045 Type1 Pitch Y |
@@ -288,7 +329,14 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 | 2762 | Tray X Division | I4 | — | 可寫(idle) | 每列格數 X |
 | 2763 | Tray Y Division | I4 | — | 可寫(idle) | 每欄格數 Y |
 
-> S2F15 寫入僅在機台 idle(非運轉、機內無 IC)時接受(EAC=2 否則);目前僅 tray-geometry 段可寫,Recipe(1501)唯讀。
+> S2F15 寫入原則上僅在機台 idle(非運轉、機內無 IC)時接受(EAC=2 否則);tray-geometry 段適用此閘,Recipe(1501)唯讀。
+
+> **2026-08-03:ECID 1007 Operator ID 為 idle 閘的唯一例外 / The one exception to the idle gate.**
+> 1007 **在運轉中也接受寫入**,不會回 EAC=2。理由:idle 閘存在的目的是防止運轉中變更 tray 幾何而位移取放
+> 座標;1007 只是識別字串,無任何機構後果,而貴端 host 正是在**運轉當下**寫它——2026-06-08 現場 log 的
+> 24 筆 S2F15 中,有 4 筆寫 `ECID 1007 = "AGV"`。若比照設閘,那 4 筆會全部被拒。
+> 寫入成功後:回 `EAC=0`、值即時顯示於主畫面欄位、寫入 `General.ini` 保存、並發 **CEID 48 Change EC**。
+> 空字串一律回 `EAC=3` 不予寫入。
 
 > **2026-08-03:同號的 SVID 已可讀 / Same ids are now readable as SVIDs too.** SECS-II 的 SVID 與 ECID
 > 是兩個獨立命名空間。本機先前只把 1501 與 2758–2763 註冊在 **EC** 命名空間,而 host 是以 **SVID**
@@ -299,14 +347,33 @@ Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。
 
 > **2026-07-29 重大變更 / Breaking change**
 >
-> HT-160S 的 CEID 字典自本版起為 **HT-90XX 字典的逐字複本**:號碼 1–275 全數註冊,別名(alias)與 HT-90XX
+> HT-160S 的 CEID 字典自本版起為 **HT-90XX 字典的逐字複本**:號碼 1–292 全數註冊,別名(alias)與 HT-90XX
 > 逐字相同。**舊版(2026-07-27 及之前)的 CEID 1–31 語意已全部作廢**,請 host 端依本節重新設定。
 > 遷移對照見本節末「§3.3.5 舊字典 → 新字典對照」。
 >
 > As of this revision the HT-160S CEID dictionary is a **verbatim copy of the HT-90XX dictionary**: ids
-> 1–275 are all registered and their aliases match HT-90XX character for character. **The CEID 1–31
+> 1–292 are all registered and their aliases match HT-90XX character for character. **The CEID 1–31
 > meanings published in the 2026-07-27 and earlier revisions are withdrawn.** Hosts must re-provision
 > per this section; see §3.3.5 for the old-to-new mapping.
+
+> **2026-08-03 補充:字典已對貴端現場機台逐筆核對過 / Dictionary verified against your own equipment**
+>
+> 本機的 CEID 字典原先移植自 HT-90XX 原始碼(HT9046LS V3.32.810),涵蓋 **1–275**。2026-08-03 取得
+> 貴端 **HT-9046 現場機台自己存下來的 `EventReport_CEID.def`**(2026-06-25)後逐筆比對,結果:
+>
+> - **1–275 與本機完全相同,0 筆別名不符** —— 證實本機的 CEID 編號與語意就是貴端 host 當初設定所依據的那一套。
+> - 貴端機台另有 **276–292 共 17 個號碼**是本機先前沒有的。本版已全部補上註冊(名稱逐字照抄該檔),
+>   使 `S1F23` / `S1F24` 的字典與貴端機台完全一致。詳見 §3.3.3。
+> - 併此更正:CEID **272 / 273 / 274 / 275** 先前在 `S1F24` 回的別名是本機自用的
+>   `AGVSupplement` / `AGVLDUnLDStatus` / `AGVLDUnLDFinish` / `AGVLdID`,與貴端機台的
+>   `AMR Supplement` / `AMR LDUnLD Status` / `AMR LDUnLD Finish` / `AMR LD ID` 不符;
+>   本版已改為與貴端機台一致。**號碼與行為完全未變,只有 `S1F24` 回覆的名稱字串改了。**
+>   若貴端是以 CEID 號碼設定(一般作法)則不受影響;以名稱比對者請以本版為準。
+>
+> ⚠ **給雙方工程人員的提醒**:HT-90XX 另有一條 **HT9011UC(V3.33.9xx)** 分支,它把
+> **CEID 217–271 整段重新編號**(該分支的 217 是 `LoadPortStatusChanged`,貴端機台與本機是 `Reserved_06`),
+> 並把上述 sorter 事件放在 275–288 而非 276–292。**貴端機台用的不是那一套**。日後任何一方要更新字典,
+> 請以貴端機台的 `.def` 或本節為準,不要從 HT9011UC 分支同步,否則 55 個號碼會靜默變義。
 
 #### 3.3.1 本機實際會發射的事件 / Events this equipment actually sends
 
@@ -373,10 +440,10 @@ The following **57** ids have a real emit site on HT-160S. Ids and names are HT-
 
 #### 3.3.2 已註冊但本機不會發射的事件 / Registered but never sent
 
-號碼 1–275 之中,上表以外的 **222** 個號碼**皆已註冊**(有別名、可被 `S2F35` 連結、可被 `S2F37` 啟用/停用),
+號碼 1–292 之中,上表以外的 **235** 個號碼**皆已註冊**(有別名、可被 `S2F35` 連結、可被 `S2F37` 啟用/停用),
 但 HT-160S **沒有對應機構,永遠不會送出**。這是為了讓 host 的字典與 HT-90XX 完全一致而刻意保留的。
 
-Every id in 1–275 not listed above — **222** of them — **is registered** (it has an alias, can be linked by
+Every id in 1–292 not listed above — **235** of them — **is registered** (it has an alias, can be linked by
 `S2F35`, can be enabled/disabled by `S2F37`) but HT-160S **has no such mechanism and will never send it**.
 They are kept registered on purpose so the host dictionary matches HT-90XX exactly.
 
@@ -390,6 +457,7 @@ They are kept registered on purpose so the host dictionary matches HT-90XX exact
 | 站別細粒度事件(Loader / Empty / Color / Auto 逐站缺盤、滿盤、剩一盤、放盤、上蓋、就緒卸盤、完成) | 154–165, 166–211 | HT-90XX 為 ASEKH_K1/K3 專案新增,**HT-90XX 韌體自身亦僅宣告未發射**;HT-160S 以粗粒度的 272 / 274 / 136–147 表達同一資訊 |
 | 節能子系統 | 212, 213 | HT-160S 無節能子系統(`ENERGY_SAVING` 遠端命令刻意回 HCACK=2) |
 | 保留位 / Reserved | 214–249, 252–271 | HT-90XX 韌體佔位,無語意 |
+| **貴端機台的延伸段(2026-08-03 新增)** | **276–292** | 見下方「§3.3.2.1 CEID 276–292」。其中數項 HT-160S 機構上做得到,但目前**尚未接上發射點**,需雙方確認酬載內容後另行排入 |
 | HT-90XX 亦未發射(僅宣告) | 43, 91, 92, 93, 114, 115, 130, 141, 209 | HT-90XX 韌體同樣只宣告不發射,無可對照的觸發時機 |
 | 觸發條件本機不存在 | 7, 11, 12, 23, 33, 49, 64, 65, 77, 78, 89, 110, 112, 113, 127, 139, 140, 142, 143, 144, 74, 75, 79 | 詳見下表 |
 
@@ -419,6 +487,41 @@ They are kept registered on purpose so the host dictionary matches HT-90XX exact
 > Linking a never-sent CEID via `S2F35` **is accepted (DRACK=0x00)** but no event will ever arrive.
 > Subscribe according to the §3.3.1 table.
 
+##### 3.3.2.1 CEID 276–292:貴端機台的延伸段 / The 276–292 block from your equipment
+
+這 17 個號碼**不是**來自 HT-90XX 原始碼,而是逐字取自貴端 **HT-9046 現場機台自己存下的
+`EventReport_CEID.def`**(2026-06-25)。同一份檔案的 1–275 與本機**逐筆相同、0 筆不符**,
+因此本機於 2026-08-03 把這 17 個一併註冊,使兩機的字典完全一致。
+
+These 17 ids do **not** come from the HT-90XX source tree. They were copied verbatim from the
+`EventReport_CEID.def` your own HT-9046 had persisted (2026-06-25); the 1–275 block of that same
+file matches HT-160S with **zero** mismatches, so the 17 were registered on 2026-08-03 to make the
+two dictionaries identical.
+
+| CEID | 名稱 / Name | HT-160S 目前狀態 / Status on HT-160S |
+|---|---|---|
+| 276 | `Loader_Buffer_NoTray` | 已註冊,未發射。機構上對應「Loader 緩衝區無盤」,本機有此感測 |
+| 277–282 | `OutputPort1BinCode` … `OutputPort6BinCode` | 已註冊,未發射。**對應本機六個 Auto 出料站的 Bin code**,機構上做得到 |
+| 283 | `MaterialModeChange` | 已註冊,未發射 |
+| 284 | `PortStateUpdated` | 已註冊,未發射 |
+| 285 | `UnloaderTrayIDReadOK` | 已註冊,未發射。本機有出料盤 2D 讀取 |
+| 286 | `UnloaderTrayIDReadFail` | 已註冊,未發射 |
+| 287 | `LoaderTrayIDReadFail` | 已註冊,未發射。本機有 Loader 側身分盤 2D 讀取 |
+| 288 | `MaximumOutputPortReport` | 已註冊,未發射 |
+| 289 | `RunCheckRequest` | 已註冊,未發射。本機無「測前查檢」流程(見 §5 功能表) |
+| 290 | `AGVLDUnLDFinish` | 已註冊,未發射。⚠ 與 **274** 在貴端機台上是同一個名稱,本機的 AMR 交握走 **272–275**(見 §3.3.4) |
+| 291 | `AGVLdID` | 已註冊,未發射。⚠ 與 **275** 同名,同上 |
+| 292 | `DoSecsGemIndexFail` | 已註冊,未發射。⚠ 與 **251** 同概念(SECS/GEM 連續失敗) |
+
+> **註**:上表中「機構上做得到」的幾項(277–282 出料站 Bin code、285/286/287 Tray ID 讀取結果、
+> 276 Loader 緩衝無盤),本機**目前只有註冊、沒有發射點**。要真的送出這些事件,需先與貴端確認
+> **每個事件要攜帶哪些 SVID**(例如 Bin code 事件要不要帶站別、盤號、Bin 值),再排入實作。
+> 若貴端需要,請提供貴端 HT-9046 上這幾個事件的實際 S6F11 範例,本機即可比照。
+>
+> The items above marked as mechanically available are **registered only** — there is no emit site yet.
+> Turning them on needs an agreed payload (which SVIDs each event carries) first. Sending us a real
+> S6F11 sample from your HT-9046 for those ids is the fastest way to settle it.
+
 #### 3.3.3 報表連結預設值 / Default report linkage
 
 **HT-160S 為每一個 CEID 預設連結 Report 1**(13 個 SVID 的機台狀態快照,見 §3.1),
@@ -442,16 +545,33 @@ behave identically. CEID 272–275 are the exception — they default to the AMR
 > As of this revision the Auto Full and Auto Unloading-tray ids carry Report 1. In earlier revisions the
 > six unloading-tray ids shipped an **empty report**; they are now registered like every other id.
 
+> **2026-08-03 佐證:上述「HT-90XX 出廠預設幾乎不帶資料」已由貴端機台的檔案證實。**
+> 貴端 HT-9046 存下的 `EventReport_ReportID.def` **整份只有一列**:`RPTID 1, Type 1, SVID 1027`;
+> 同機的 `EventReport_CEID.def` 則把 **292 個 CEID 全部 Enable、且 1:1 連到同號的 RPTID**。
+> 也就是說該機除了 CEID 1 之外,**每個事件預設都送空清單**,要有資料一律得靠 host 自己下 `S2F33` / `S2F35`。
+> 這正是貴端 2026-08-03 來信第 2 點「CEID 27 有發、但批號與機況沒資料」的同一個成因 ——
+> 差別在於 HT-160S 預設就掛 Report 1(13 個機況 SV),所以**未設定的 host 在本機仍讀得到基本資料**。
+>
+> Confirmed from your own equipment on 2026-08-03: its `EventReport_ReportID.def` contains a single line
+> (`RPTID 1, Type 1, SVID 1027`) while its `EventReport_CEID.def` enables all 292 ids linked 1:1 to a
+> same-numbered report — so on the HT-9046 every event but CEID 1 ships an empty list until the host
+> provisions. HT-160S attaches Report 1 by default instead, so an un-provisioned host still gets data.
+
 #### 3.3.4 AMR / AGV 材料交握事件 / AMR material handoff
 
 （全部 DataID=1,對齊 HT9045 / all DataID=1, aligned to HT9045)
 
 | CEID | 名稱 | 攜帶報表 | 說明 |
 |---|---|---|---|
-| 272 | AGVSupplement | Report 2(SVID 38219 bitmap)**+ Report 6** | 要料;**同時帶各站 Tray Count + Device Count** |
-| 273 | AGVLDUnLDStatus | Report 3(SVID 38220 bitmap) | 交握中(尚未計數,不帶 count) |
-| 274 | AGVLDUnLDFinish | Report 4(SVID 38221 bitmap)**+ Report 6** | 上/下料完成;**帶收尾 Tray Count + Device Count** |
-| 275 | AGVLdID | Report 7(SVID 38204) | Color 身分 Tray 2D(見下) |
+| 272 | AMR Supplement | Report 2(SVID 38219 bitmap)**+ Report 6** | 要料;**同時帶各站 Tray Count + Device Count** |
+| 273 | AMR LDUnLD Status | Report 3(SVID 38220 bitmap) | 交握中(尚未計數,不帶 count) |
+| 274 | AMR LDUnLD Finish | Report 4(SVID 38221 bitmap)**+ Report 6** | 上/下料完成;**帶收尾 Tray Count + Device Count** |
+| 275 | AMR LD ID | Report 7(SVID 38204) | Color 身分 Tray 2D(見下) |
+
+> **名稱更正(2026-08-03)**:上表四列的名稱是 `S1F24` 會回的 **CENAME**。本機先前回的是自用字串
+> `AGVSupplement` / `AGVLDUnLDStatus` / `AGVLDUnLDFinish` / `AGVLdID`,與貴端機台的
+> `AMR Supplement` / `AMR LDUnLD Status` / `AMR LDUnLD Finish` / `AMR LD ID` 不一致;本版已對齊。
+> **CEID 號碼、攜帶報表、發射時機全部未變**,只有 `S1F24` 回覆的名稱字串改了。
 
 > P-bitmap 站別對應:P1=Loader, P2=Empty, P3=Color, P4-P9=Auto1-6。
 
@@ -461,7 +581,7 @@ behave identically. CEID 272–275 are the exception — they default to the AMR
 - 下料(Auto 站)時兩值皆填真值:`TrayCount = 該車盤數 (Car->iTrayCount)`;`Device Count = 該 Auto 車的 IC 累計`(卸料時逐盤 `+= Tray.CountIC()` 累加)。
 - 上料方向(Loader/Empty/Color)僅交換盤數,Device Count 保持 0(與上下料契約一致:上料交換盤數、下料才給 IC 件數 — HT9045/HT160 皆然)。
 
-**Color 身分 Tray 2D 上傳(CEID 275 AGVLdID,對齊 HT9045)/ Color identity-tray 2D upload:**
+**Color 身分 Tray 2D 上傳(CEID 275 AMR LD ID,對齊 HT9045)/ Color identity-tray 2D upload:**
 
 - 由 Color CCD 於 Loader 回收進料點掃描身分 Tray 2D,掃描完成即以 S6F11 **CEID 275** 上傳。
 - 值寫入 **SVID 38204**(Color P3 carrier ID),經 Report 7 送出;DataID=1(對齊 HT9045)。
@@ -638,7 +758,8 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 - **命令面 / Command surface**:S1/S2/S5/S6 的基礎 GEM 訊息與 HT-90XX 對齊(見 §2)。
 - **字典面 / Dictionary**:HT-160S 為 tray sorter,無 tester 站位/測試結果/接觸次數等概念,故:
   - HT-90XX 的 tester 專屬 SVID(如 1420 32-site 測試結果、6001/6002 Arm 接觸次數、1007 Operator ID、1513 Tester On/Off、1151–1156 各站良率、16296–16299 各 site 累計)**在 HT-160S 無對應**,以容忍機制回空值或請 host 移除。
-  - **更正(2026-08-03)**:本條先前把 **1006** 一併列為「tester 專屬、無對應」並建議 host 移除,那是錯的——1006 在 HT-90XX 是 **Lot ID**(不是 Socket ID),HT-160S **自 2026-08-01 起已實作**並回目前作用中的批號(§3.1)。請**不要**從報表定義中移除 1006。同理 1007 是 **Operator ID**,不是 Socket ID;它確實無對應,但原因是 HT-160S 沒有操作員身分欄位可回。
+  - **更正(2026-08-03)**:本條先前把 **1006** 一併列為「tester 專屬、無對應」並建議 host 移除,那是錯的——1006 在 HT-90XX 是 **Lot ID**(不是 Socket ID),HT-160S **自 2026-08-01 起已實作**並回目前作用中的批號(§3.1)。請**不要**從報表定義中移除 1006。同理 1007 是 **Operator ID**,不是 Socket ID。
+  - **再更正(2026-08-03,同日稍後)**:上一句原本接著寫「1007 確實無對應,因為 HT-160S 沒有操作員身分欄位可回」——該敘述**已不再成立**。HT-160S 已於本日新增操作員身分欄位並以 **SVID / ECID 1007** 公佈(§3.1 / §3.2),且**接受貴端以 `S2F15` 寫入**(貴端 2026-06-08 對 HT-90XX 寫的 `"AGV"` 用法在本機同樣受理)。請**不要**從報表定義中移除 1007。本條剩下真正無對應的號碼是:1420、6001/6002、1513、1151–1156、16296–16299。
   - HT-160S 的機台狀態/產出/AMR 資料集中於 66xxx 與 38xxx 段(§3.1)。
 - **建議**:host 端請依本規格 §3 對應 HT-160S 實際 SVID/CEID;無法對應者(tester 專屬)由雙方確認後移除或以容忍空值處理。
 
@@ -656,7 +777,7 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
   - `LOTSTART` 於 2026-07-30 改為與 9045 逐字對齊(無參數、無條件 HCACK=0、可重複下達);`CLEAR_LOT_INFO`(host 版 Lot End)為同日新增對齊。兩者合起來構成 host 端完整的開批 / 結批一對。
   - **`HOME` 已自本節移出** —— 經逐字查證 HT9045 的 S2F42 dispatch,其命令集為 `AUTHORITY_CHECK` `AUTOSITEMAP` `AUTO_CLEAN` `AUTO_RETEST` `CLEAN_AUTO_SORT_COUNT` `CLEAN_OUT` `CLEAR_LOT_INFO` `CLOSE_ONECYCLE` `CONTINUE_*` `DEVTEMPOFFSETADJUST` `EESUG_OFFSET` `HALT` `INITIAL_START*` `LOTORDER` `LOTSTART` `ONE_CYCLE` `ONLINE_LOCAL` `ONLINE_REMOTE` `PAUSE` `PP_*` `REMOTE_*` `RESET` `RETEST_MRT` `SET_LOT_INFO` `START` `START_AGV` `START_AQL` `START_LOT` `STOP` `STOP_LOT` `SUBSTRATETYPE` `SWITCH_TO_*` `TESTTEMPSETTING` `TRAY_FEED` `TRAY_MAP` `YIELD_FAIL` —— **其中沒有 `HOME`**。改列 §7.2。
   - 三項宣告差異:`ONE_CYCLE` 據實回 HCACK(9045 一律 0);`ENERGY_SAVING` 固定回 2(本機無省電子系統,與京元 9045 現行回覆相同);`PP_SIGNALTOWER`/`PP_MUSIC` 在警報 Note 顯示期間、訊息視窗顯示期間、以及機台自身安全異常(RunState=LED_ErrJam)時暫停覆寫(9045 無此例外),以免遮蔽機台自身紅燈與警報音;值 2(閃)呈現為恆亮。
-- **SVID 共同段**:3 / 4 / 9 / 1001 / 1002 / 1003 / 1006 / 1009 / 1011 / 1021 / 1027 / 1101 / 1102 / 1103 / 1104 / 1105 / 1501 / 1517 / 1518 / 2758–2763 / 37010(號碼、型別與線上格式皆對齊 HT-90XX)。
+- **SVID 共同段**:3 / 4 / 9 / 1001 / 1002 / 1003 / 1006 / 1007 / 1009 / 1011 / 1021 / 1027 / 1101 / 1102 / 1103 / 1104 / 1105 / 1501 / 1517 / 1518 / 2758–2763 / 37010(號碼、型別與線上格式皆對齊 HT-90XX)。
 - **ECID**:1501,2758–2763(Type1 tray 幾何)。
 - **CEID**:AMR 272 / 273 / 274 / 275;Auto-Full 35 / 36 / 37 / **148 / 149 / 150**;Auto-Unloadtray **136 / 137 / 138 / 145 / 146 / 147**。
   - 上列 Auto-Full 六號與 Auto-Unloadtray 六號**皆與 HT-90XX 同號同義**(依 HT-90XX 韌體 CEID 目錄 `EventReport_CEID.def`:148/149/150 = `Auto 4/5/6 Full`,136–138/145–147 = `Auto 1–6 Unloading tray`)。
@@ -671,9 +792,9 @@ S2F37 (Bool=1, CEIDs)→ 啟用指定事件  (enable)           → S2F38 ERACK
 | `HOME` | RCMD | 遠端回原點(等同操作員 Home 鍵) | **9045 整棵 SECSGEM 樹查無 `HOME` 命令**(見 §7.1 的完整命令集)。9045 最接近的是 `RESET`,但那是測試機收料回復流程,語意不同。保留本命令:刪掉會少一個有用的遠端功能而換不到任何對齊 |
 | `ONLINE`(裸) | RCMD | = `ONLINE_REMOTE` 別名 | 便利別名;9045 僅有 `ONLINE_REMOTE` / `ONLINE_LOCAL` |
 | `CLEARCOUNT` | RCMD | host 遠端清除生產計數 | 9045 將 clear-count 僅作操作員事件(CEID 5,HT-160S 自 2026-07-29 起同號同義且會發射),無對應 RCMD(9045 另有 `CLEAN_AUTO_SORT_COUNT`,語意不同) |
-| SVID **66000–66032** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、**Auto4–6 Count(66025–66027)**、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞。66025–66027 之所以存在:9045 只給三個 Auto 編號,第 4–6 站在 9045 叫 Fix1–3,對映屬商務決定,故本機在自有段公佈第 4–6 站,不預設該對映。**2026-08-03 移除**:66022–66024(Auto1–3 Count,與 1103–1105 同值)與 66033(Lot Start Time,與 1009 同值)—— 重複資訊收斂到 HT-90XX 編號,空號不再挪用 |
-| SVID **38208–38210** ＋ **38237–38245** | SVID | Auto4/5/6 的 carrier(38208/38209/38210)＋ tray / device / bin-setting(38237–38245),共 **12 個號** | HT-160S 有 **6 個 Auto 輸出站**,9045 的目錄僅到 38236(3 站);為第 4–6 站延伸。**更正(2026-07-29)**:舊版本節誤寫成「38237–38245 = Auto4/5/6 的 carrier/tray/device/bin-setting」—— carrier 三個號實際是 **38208/38209/38210**,不在 38237–38245 之內。**待確認**:手上的 9045 傾印只有 CEID 與 ReportID 目錄,不含 382xx,故無法證實或否證 9045 是否已定義這 12 個號;需向京元索取 9045 的 SVID 目錄傾印 |
-| ~~CEID **1–31** 編號~~ | CEID | — | **本列已於 2026-07-29 作廢**:CEID 字典整份改為 HT9045 逐字複本(1–275 全數註冊、別名逐字相同),**已無「同號不同義」問題**。host 可直接沿用 HT9045 的 CEID 設定;由舊版升級者請依 **§3.3.5** 對照表重新設定。詳見 §3.3。 |
+| SVID **66000–66032** | SVID | 機台狀態/產出/Lot/分選模式:RunMode(66000)、SystemRunning(66001)、ControlState(66002)、AlarmActive(66010)、AlarmCode(66011)、TotalIC(66020)、TotalSorted(66021)、ActiveLotCount(66030)、CurrentLotID(66031)、SortMode(66032) | sorter 特有資料,9045(tester)無對應;刻意置於 **66000+ 高位段**以絕不與 9045 的 SVID 段碰撞。**2026-08-03 移除三批**:66022–66024(Auto1–3 Count,與 1103–1105 同值)、**66025–66027(Auto4–6 Count,改用 HT-9011UC V3.33.899 的 1259–1261)**、66033(Lot Start Time,與 1009 同值)—— 重複資訊收斂到 HT-90XX 編號,空號不再挪用。**本段自本版起不再含任何 per-Auto 產出計數** |
+| SVID **38237–38245** | SVID | Auto4/5/6 的 tray / device / bin-setting,共 **9 個號**(carrier 三個號已於 2026-08-03 改用家族編號 38199–38201,不再是本機延伸,見 §3.1.x 的 AMR 對照表) | HT-160S 有 **6 個 Auto 輸出站**,9045 的 AMR 目錄僅到 38236(3 站);為第 4–6 站延伸。**更正(2026-07-29)**:舊版本節誤寫成「38237–38245 = Auto4/5/6 的 carrier/tray/device/bin-setting」—— carrier 三個號當時實際是 38208/38209/38210,不在 38237–38245 之內。**2026-08-03 已用原始碼查證(不再是「待確認」)**:(a)**38237–38245 確實無 HT-90XX 對應號碼** —— HT-9046LS V3.32.810 的 AMR 段是 38222–38236(Loader/Empty/Color + Auto1–3 的 tray / device count 與 Auto1–3 bin setting)且**止於 38236**,而 HT-9011UC V3.33.899 **整段沒有 AMR SVID**,故本機這 9 個延伸號成立、保留。(b)**38208–38210 已改號(已裁定,不再是爭議)**:HT-9011UC V3.33.899 有 Auto4–6 的盤號欄位 **38199 / 38200 / 38201**(名稱 `Output 4/5/6 Tray ID`)。依「Auto1–3 遵循 810、Auto4–6 參照 899」的原則,Auto4–6 carrier 已改用 38199–38201,Auto1–3 維持 810 的 38205–38207;命名空間統一留在 **SVID**(899 把該家族宣告為 ECID,但 810 對 Auto1–3 是 SVID,六個口必須同一命名空間) |
+| ~~CEID **1–31** 編號~~ | CEID | — | **本列已於 2026-07-29 作廢**:CEID 字典整份改為 HT9045 逐字複本(1–292 全數註冊、別名逐字相同),**已無「同號不同義」問題**。host 可直接沿用 HT9045 的 CEID 設定;由舊版升級者請依 **§3.3.5** 對照表重新設定。詳見 §3.3。 |
 
 > **無 HT-160S 專屬的 SxFy 訊息,亦無專屬 ECID** —— HT-160S 未自創任何 SECS 訊息(§2 皆標準 GEM),ECID 全數對齊 9045。
 

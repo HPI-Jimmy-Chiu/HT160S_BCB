@@ -270,7 +270,24 @@ CEID,事件名稱 (HT9045 原文),本機發射,Report,備註
 269,Reserved_56,—,,HT9045 韌體保留位，無語意
 270,Reserved_57,—,,HT9045 韌體保留位，無語意
 271,Reserved_58,—,,HT9045 韌體保留位，無語意
-272,AMR Supplement,★ 會發射,Report 2(SVID 38219 bitmap)+ Report 6,AMR 要料
-273,AMR LDUnLD Status,★ 會發射,Report 3(SVID 38220 bitmap),AMR 交握中(Ready)
-274,AMR LDUnLD Finish,★ 會發射,Report 4(SVID 38221 bitmap)+ Report 6,AMR 上/下料完成
-275,AMR LD ID,★ 會發射,Report 7(SVID 38204),Color CCD 讀到身分盤 2D 後立即上傳
+272,AMR Supplement,★ 會發射,Report 2(SVID 38219 bitmap)+ Report 6,AMR 要料。〔20260803 名稱更正:S1F24 回的 CENAME 原為本機自用字串，已改為與貴端機台一致，號碼與行為不變〕
+273,AMR LDUnLD Status,★ 會發射,Report 3(SVID 38220 bitmap),AMR 交握中(Ready)。〔20260803 名稱更正:S1F24 回的 CENAME 原為本機自用字串，已改為與貴端機台一致，號碼與行為不變〕
+274,AMR LDUnLD Finish,★ 會發射,Report 4(SVID 38221 bitmap)+ Report 6,AMR 上/下料完成。〔20260803 名稱更正:S1F24 回的 CENAME 原為本機自用字串，已改為與貴端機台一致，號碼與行為不變〕
+275,AMR LD ID,★ 會發射,Report 7(SVID 38204),Color CCD 讀到身分盤 2D 後立即上傳。〔20260803 名稱更正:S1F24 回的 CENAME 原為本機自用字串，已改為與貴端機台一致，號碼與行為不變〕
+276,Loader_Buffer_NoTray,—,,Loader 緩衝區無盤。本機有此感測，尚未接發射點
+277,OutputPort1BinCode,—,,Auto1 出料站 Bin code。本機機構上做得到，尚未接發射點(酬載需雙方確認)
+278,OutputPort2BinCode,—,,Auto2 出料站 Bin code。同上
+279,OutputPort3BinCode,—,,Auto3 出料站 Bin code。同上
+280,OutputPort4BinCode,—,,Auto4 出料站 Bin code。同上
+281,OutputPort5BinCode,—,,Auto5 出料站 Bin code。同上
+282,OutputPort6BinCode,—,,Auto6 出料站 Bin code。同上
+283,MaterialModeChange,—,,貴端機台有、本機無對應流程
+284,PortStateUpdated,—,,貴端機台有、本機無對應流程
+285,UnloaderTrayIDReadOK,—,,出料盤 2D 讀取成功。本機有此機構，尚未接發射點
+286,UnloaderTrayIDReadFail,—,,出料盤 2D 讀取失敗。同上
+287,LoaderTrayIDReadFail,—,,Loader 側身分盤 2D 讀取失敗。同上
+288,MaximumOutputPortReport,—,,貴端機台有、本機無對應流程
+289,RunCheckRequest,—,,測前查檢請求。本機無「測前」概念(見功能表 Remote Control #13)
+290,AGVLDUnLDFinish,—,,⚠ 與 CEID 274 在貴端機台上同名。本機的 AMR 交握走 272-275，本號不發射
+291,AGVLdID,—,,⚠ 與 CEID 275 同名。同上
+292,DoSecsGemIndexFail,—,,⚠ 與 CEID 251 同概念(SECS/GEM 連續失敗)。本機不發射

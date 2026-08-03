@@ -404,10 +404,18 @@ W-bit=1（要求回覆）。
 
 **AGV CEID 定義**：
 
-| CEID | 名稱 | 語意 |
+> ⚠ **名稱更正（2026-08-03）**：下表與本章各段 log 摘錄中的 `AGVSupplement` / `AGVLDUnLDStatus` /
+> `AGVLDUnLDFinish` / `AGVLdID` 是**舊的 CENAME**。與京元現場 HT-9046 機台自存的
+> `EventReport_CEID.def` 逐筆核對後發現該機用的是 `AMR Supplement` / `AMR LDUnLD Status` /
+> `AMR LDUnLD Finish` / `AMR LD ID`，本機韌體已於 2026-08-03 改為一致。
+> **CEID 號碼、攜帶報表、發射時機、body 內容全部未變**，只有 `S1F24` 回覆的名稱字串改了，
+> 因此本章所有既有的 wire 範例與 body dump 仍然完全有效。下表與 log 摘錄保留原字串，
+> 因為它們是當時實際輸出的紀錄。
+
+| CEID | 名稱（舊 CENAME／現為 AMR *） | 語意 |
 |---|---|---|
-| 272 | AGVSupplement | 呼叫 AGV：缺料／Auto full。SVID `38219` bitmap 標記目標站 |
-| 273 | AGVLDUnLDStatus | Ready：機構就位 |
+| 272 | AGVSupplement → **AMR Supplement** | 呼叫 AGV：缺料／Auto full。SVID `38219` bitmap 標記目標站 |
+| 273 | AGVLDUnLDStatus → **AMR LDUnLD Status** | Ready：機構就位 |
 | 274 | AGVLDUnLDFinish | Finish：sensor 確認 load/unload 完成。除 SVID `38221` bitmap 外，自 2026-07-13 起（commit d10b9be）額外掛載 Report 6（全 9 站 TrayCount＋DeviceCount），關帳回報實際盤數／IC 數 |
 | 275 | AGVLdID | 身分盤（identity/cover tray）2D 上傳。**自 2026-07-14 起（commit c389e3f）已實作發報**：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取 2D **後立即**發 S6F11 CEID275，SVID `38204`（Color 站 P3 carrier id）帶該 2D，走**專屬 report 7＝僅 `38204`**（非 9 站全帶的 report 5）。本 run（2026-06-26）早於此實作故未出現 |
 

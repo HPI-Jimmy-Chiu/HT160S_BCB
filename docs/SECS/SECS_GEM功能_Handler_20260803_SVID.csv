@@ -6,6 +6,7 @@ SVID,Name
 1002,Machine ID
 1003,Software Version
 1006,Lot ID
+1007,Operator ID
 1009,Lot Start Time
 1011,Machine State
 1021,UPH
@@ -15,6 +16,9 @@ SVID,Name
 1103,Auto1 Count
 1104,Auto2 Count
 1105,Auto3 Count
+1259,Auto4 Count
+1260,Auto5 Count
+1261,Auto6 Count
 1501,Setup File
 1517,Start Mode
 1518,Real/Dummy
@@ -25,15 +29,15 @@ SVID,Name
 2762,Type 1 Tray Division X
 2763,Type 1 Tray Division Y
 37010,Enter Skip IC Count
+38199,AUTO4 Carrier ID
+38200,AUTO5 Carrier ID
+38201,AUTO6 Carrier ID
 38202,Loader Carrier ID
 38203,Empty Carrier ID
 38204,Color Carrier ID
 38205,AUTO1 Carrier ID
 38206,AUTO2 Carrier ID
 38207,AUTO3 Carrier ID
-38208,AUTO4 Carrier ID
-38209,AUTO5 Carrier ID
-38210,AUTO6 Carrier ID
 38219,Supplement Bin
 38220,LD UnLD Check AGV
 38221,LD UnLD Finish AGV
@@ -68,9 +72,6 @@ SVID,Name
 66011,Alarm Code
 66020,Total IC
 66021,Total Sorted
-66025,Auto4 Count
-66026,Auto5 Count
-66027,Auto6 Count
 66030,Active Lot Count
 66031,Current Lot ID
 66032,Sort Mode
