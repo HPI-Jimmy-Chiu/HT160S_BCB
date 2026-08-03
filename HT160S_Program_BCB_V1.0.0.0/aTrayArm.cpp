@@ -1115,6 +1115,14 @@ bool TTrayArmModule::TryDivertCarriedTrayToAuto(bool bAtEmptyDeposit)
     //exactly there - aTrayArm.cpp:638). The two outcomes are identical by construction; only the
     //deposit+repick round trip differs. This is the on-site 20260803 observation "TrayArm puts the
     //empty tray down at the Empty rear and immediately clamps it back up".
+    //CONSEQUENCE THE READER MUST KNOW : bUseAmrRecoveryDivert is therefore no longer an opt-OUT of
+    //"a Loader-recovered tray may end up in an AMR output stack" - with the flag off that still
+    //happens, it just happens at the deposit point instead of at pick time. The flag now only
+    //decides whether the wasted traverse to the Empty X is skipped as well. That is deliberate :
+    //with the flag off the tray reached the Auto anyway (deposit, then DecideJob picked it straight
+    //back off the Empty rear), so the flag never actually kept recovered trays out of the stacks.
+    //If a site ever needs that guarantee it has to be a NEW gate on the deposit-point path, not
+    //this flag.
     if(bAtEmptyDeposit==false &&
        GeneralSetting.bUseAMR && GeneralSetting.bUseAmrRecoveryDivert==false)
         return false;
@@ -1122,13 +1130,21 @@ bool TTrayArmModule::TryDivertCarriedTrayToAuto(bool bAtEmptyDeposit)
     int idx;
     if(bAtEmptyDeposit)
     {
-        //AI(ht160s-divert-late) 20260803 : ask EXACTLY the question DecideJob would ask one tick
-        //after the deposit - the unfiltered demand scan (aTrayArm.cpp:621) - so the Auto we pick
-        //is the one that would have got this tray anyway. Then accept only the kinds that would
-        //have been served FROM THE EMPTY REAR : cover and normal. Identity is refused because its
-        //source is Color (IsPickFromColor), so for identity the deposit is NOT wasted motion and
-        //the legacy recycle must stand.
-        idx=AutoModule->FindTrayRequestAuto(kind);
+        //AI(ht160s-divert-late) 20260803 : accept only the kinds that would have been served FROM
+        //THE EMPTY REAR - normal and cover. Identity is refused because its source is Color
+        //(IsPickFromColor), so for an identity request the deposit is NOT wasted motion and the
+        //legacy recycle must stand.
+        //Ask the kind-FILTERED question twice instead of one unfiltered scan plus a reject. The
+        //unfiltered scan returns the FIRST requester of any kind, so a lower-index Auto asking for
+        //identity would abort the whole divert even though a higher-index Auto is waiting for a
+        //normal tray we are holding - head-of-line blocking that the flag-gated early path (which
+        //passes WantKind) never had. FindTrayRequestAuto SKIPS non-matching Autos when WantKind is
+        //given, so the two calls together mean "the first Auto that wants a tray I can actually
+        //hand over". Normal is tried first : a work tray keeps SortArm placing, a cover only
+        //advances the stack.
+        idx=AutoModule->FindTrayRequestAuto(kind, eTrayKindNormal);
+        if(idx<0)
+            idx=AutoModule->FindTrayRequestAuto(kind, eTrayKindCover);
         if(idx<0)
             return false;
         if(kind!=eTrayKindNormal && kind!=eTrayKindCover)
