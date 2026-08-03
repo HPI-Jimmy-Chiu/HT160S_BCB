@@ -1,0 +1,79 @@
+SECS/GEM 功能對照表 — 修訂說明,
+,
+修訂日期 Revision date,2026-07-29 (第 1 版) / 2026-07-30 (第 2 版) / 2026-08-02 (第 3 版) / 2026-08-03 (第 4 版，本次)
+來源檔 Source,"SECS_GEM功能_Handler.xlsx (客戶提供, 2026-07-23 資料夾)"
+本檔 This file,SECS_GEM功能_Handler_20260803.xlsx
+依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit bd1d785)"
+,
+本次修訂內容 What changed,
+1. 功能表,27 項狀態依實際韌體更新，Memo 欄補上判定依據。變更的格子以淡黃底標示。
+2. CEID 表,整份改為 HT9045 字典的逐字複本(1-275 全數註冊，別名與 HT9045 逐字相同)。新增「本機發射」欄：52 個號碼本機真的會送(綠底並標 ★)，其餘 223 個已註冊但無發射點、永不送出。
+3. SVID 表,補上 1518 Real/Dummy(本機已註冊，原表漏列)。本機共註冊 51 個 SVID。
+,
+⚠ 重大變更 Breaking change,
+CEID 1-31 語意全部改變,原表的 CEID 1-31(Handler change status / Recipe Change / …)為 HT-160S 舊有自訂語意，已於 2026-07-29 全部作廢，改用 HT9045 字典。host 端設定必須同步更新。
+最高風險：CEID 27 與 28,這兩個號碼在新舊字典中都存在但意思不同。舊：27=One Cycle Finish、28=Clean Out Finish；新：27=Change Machine State、28=Retry Pressed。未更新設定會被靜默誤讀(訊息格式合法、語意錯誤)。One Cycle Finish 已移到 41，Clean Out Finish 已移到 42。
+完整新舊對照,見規格書 HT160S_SECS_Interface_Spec_20260727.md/.html 的 §3.3.5。
+,
+尚待貴端提供 / 確認 Open items,
+1,"(2026-08-02 已解除)不再需要 HT9045 的 SVID 目錄傾印。2026-07-31 現場 log 已提供貴端 host 自己的完整需求清單(33 張 S2F33 報表定義、31 條 S2F35 連結、389 個相異 SVID)，比 9045 的目錄更權威。其中 AMR 相關報表為 RPTID 2000 = {38202, 38205, 38206, 38207, 38219, 38220, 38221} 與 RPTID 2001 = {38222-38236}，另 RPTID 524 = {38237, 38238, 38239}；38208-38210 / 38240-38245 這 9 個 Auto4-6 延伸號貴端完全未引用，本機仍照常註冊並可以 S1F3 回覆。⚠ 但 38237/38238/38239 這 3 個貴端已引用的號碼有語意疑慮：貴端把 RPTID 524 綁在 CEID 67 Tray Test Finish 上，而本機對這三個號碼的定義是「AMR AUTO4/5/6 Tray Count」，與 Tray Test Finish 不相稱；且 CEID 67 為測試機事件，HT-160S 不會發射，故該報表目前永遠不會送出。請貴端確認 9045 對這三個號碼的定義是否與本機一致，若不一致則需另行編號。此為本項唯一尚未關閉的部分。"
+2,"(2026-08-02 已縮小範圍)僅剩 SET_LOT_INFO 的參數本體 SML 待確認。2026-06-08 現場 log 顯示貴端 host 從不送 SET_LOT_INFO，而是送無參數的 LOTSTART，並以 S10F5 終端訊息把批號推給操作員；本機已於 2026-07-30 據此對齊 HT9045(LOTSTART 無參數開批且可重複送、SET_LOT_INFO 疊加不清空、新增 CLEAR_LOT_INFO 結批)，lot 模型不再是待決事項。本機 SET_LOT_INFO 每筆 L[2]{客戶批號, 京元批號} 的形狀仍屬本方提案；貴端日後若要啟用此命令，請確認或指定實際 SML。"
+3,(2026-08-02 已回答，結論與原假設相反)2026-07-31 現場 log 證實貴端 host 確實會對 HT-160S 送 S2F33 / S2F35。且貴端的 S2F35 是「取代」而非「疊加」—— provision 完成後韌體預設的 Report 1 會從事件酬載中消失(當日 CEID 27 由 13 格有值退化為 1 格)，因此原本寫的「保留本機預設」不會發生。AMR 事件(CEID 272-275)在貴端自己的 RPTID 2000(7/7)與 2001(15/15)下覆蓋完整；需留意的是同時綁在這些事件上的 RPTID 502 本機目前只填得出 4 格(見下一列)。
+4,"(2026-08-02 更新)RPTID 502 = {1006, 1007, 1011, 3, 1501, 1517, 1518, 1513}，貴端將它綁在 23 個 CEID 上(1、9、10、13、14、15、19、26、27、34、42、44、45、48、49、50、73、76、80、272、273、274、275)，含當日流量最高的 CEID 27、CEID 1 Start Pressed，以及 272/273/274/275 四個 AMR 事件。本機可填的格數已由 1/8(僅 1518)提升為 4/8：1006 Lot ID、1011 Machine State、1517 Start Mode、1518 Real/Dummy。此事不需要 9045 的 SVID 目錄即可完成 —— 1517 是靠 9045 自身的 EC 宣告解出來的。仍為空值的 4 格請貴端確認取值方式：1007 Operator ID(本機有登入者身分，待確認要送哪一個欄位)、3 GemClock(本機有 SVID 1027，但格式與 9045 GemClock 不同，不能直接別名)、1501 Setup File(本機有 recipe 名稱，待確認刷新時機)、1513 Tester On/Off(HT-160S 為 Tray Sorter，機構上無測試機構，建議自此報表移除或接受空值)。另 RPTID 501 目前為 2/12(1101 Loader Count、1102 Output Total Count)、RPTID 508 為 1/6(1021 UPH)、RPTID 517 為 1/1(37010)。"
+5,「SECS/GEM 斷線停機」與「測前停機查檢」若確定需要，請提供判定條件後排入。
+,
+圖例 Legend,
+O,已實作
+X,未實作
+△,部分實作 / 有替代做法(詳見 Memo)
+N/A,機構上不適用(HT-160S 為 Tray Sorter，非測試機)
+淡黃底,本次修訂變更的儲存格
+綠底 ★,CEID 表中本機真的會發射的號碼
+,
+2026-07-30 第 2 版修訂 Revision 2,
+依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit 0ea94b7)"
+1. S1F23 / S1F24 Collection Event Namelist,"由「未實作」改為「已實作」。回 L,n{L,3{CEID, CENAME, L,m{VID}}}；<L[0]> 全查回全部 275 個 CEID(與 HT9045 字典一致)，未註冊的 CEID 回 {CEID, '', L,0}。此訊息為字典查詢，不影響訂閱 — 事件訂閱仍由 S2F33 / S2F35 / S2F37 決定。"
+2. S2F29 / S2F30 Equipment Constant Namelist,"由「未實作」改為「已實作」。回 L,n{L,6{ECID, ECNAME, ECMIN, ECMAX, ECDEF, ECUNITS}}；全查回 7 個 EC。三個界限以該 EC 自身型別編碼，未宣告者回該型別的零長度項目。EC 寫入仍走 S2F15，可寫範圍未放寬。"
+3. 貨批起測時間,由「△ 無專屬 SVID」改為「O」。新增 SVID 66033 Lot Start Time (yyyy/mm/dd hh:nn:ss)，Lot Start 閂鎖、Lot End 清空，面板按鈕與 SECS LOTSTART 兩條路徑皆寫入。未加入預設 Report 1(不變動既有事件酬載)。
+4. SVID 表,新增 66033 Lot Start Time。本機共註冊 52 個 SVID。
+,
+本次未變動 Unchanged,CEID 表(1-275 與 52 個本機發射點皆不變)、其餘功能列狀態、預設 Report 1 的 13 個 SV 內容。
+驗證 Verification,"模擬版與真機版(關閉 SOFT_SIMULATE)建置皆 exit 0；並以 headless SECS host 對實際韌體做完整 HSMS round-trip 驗證：S1F24 全查回 L,275(30189 bytes)、CEID 6 回 13 個 VID、CEID 272 回 19 個 VID、未知 CEID 回空；S2F30 全查回 L,7 且 FT_8 界限型別正確、未知 ECID 回全零長度；SVID 66033 於 LOTSTART 前為空、之後為 2026/07/30 09:59:18，同時 SVID 1027 為 09:59:20，證明 66033 為閂鎖值而非跟著時鐘走。上機驗證待執行。"
+黃底 △,CEID 表中「條件發射」的號碼 —— 需在 General.ini 開啟指定設定後才會送出，預設不送
+,
+2026-08-02 第 3 版修訂 Revision 3,
+依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit 8082f0f)"
+1. SVID 表,新增 6 個 HT9045 對齊號碼：1006 Lot ID(目前作用中的批號)、1011 Machine State(主畫面狀態字串，值域 HALT / INIT / HOMING / Clean Out / Tray Feed / One Cycle / RUNNING / LOCK / EMG / MOTOR OFF / SAFE DOOR / AIR / PAUSE)、1101 Loader Count、1102 Output Total Count(與 66021 Total Sorted 同值的別名)、1517 Start Mode、37010 Enter Skip IC Count。本機共註冊 58 個 SVID(第 2 版為 52 個)。⚠ 1517 的值採 HT9045 編號(0 = Continuous Start、1 = Initial Start)。本機內部旗標的 0/1 與 9045 相反，已在序列化前翻譯，原始旗標不對外發佈，故貴端可直接沿用 9045 的對照表。此六個號碼補上後，貴端 RPTID 502 由 1/8 提升為 4/8，RPTID 501 的前兩格(1101、1102)與 RPTID 517(37010)亦可回答；貴端訂閱的 389 個相異 SVID 中，本機可回答者由 27 個提升為 33 個。另更正 SVID 38222 的名稱：原表誤植為 MR Loader Tray Count，正確為 AMR Loader Tray Count(S1F12 回覆的是韌體註冊的名稱，故此拼字對貴端可見)。
+2. CEID 表,CEID 78 Jam Skip IC Count 由「—(永不發射)」改為「△ 條件發射(預設關閉)」，並補上 Report 與備註欄。此為貴端 2026-07-31 已訂閱(RPTID 517 = {37010})但機台從未發射的號碼。⚠ 條件：需在 General.ini 的 [SECS] 段加入 AskSkipICCount=1 才會啟用，出廠預設關閉，未開啟時機台行為與第 2 版完全相同。開啟後，操作員以 SKIP 解除警報時需輸入自 tray 取出的 IC 數，韌體先寫入 SVID 37010 再送出 CEID 78(順序與 HT9045 相同，避免帶到上一次的數字)；操作員取消輸入則不送事件。需要此事件請通知，由我方於現場開啟。不受設定影響的發射點仍為 52 個，加上 CEID 78 後共 53 個號碼具備發射點，其餘 222 個已註冊但永不送出。CEID 1-275 的編號與語意不變。
+3. S2F41 貨批生命週期,"對齊 HT9045，三項變更(此段內容第 2 版未涵蓋)：(1) LOTSTART 改為無參數即可開批、且可重複送 —— 批未開時做完整的每批初始化與 2D/Bin 交換，批已開時只做交換不重新初始化(以免清掉機內在製品的 (Lot,Bin)→Auto 綁定與每批計數)。HCACK：NORMAL 分選模式下，9045 形狀的封包一律回 0；非零回覆只來自 HT-160S 專屬的 SORTMODE / WhiteList 擴充(HT9045 無此擴充) —— 貨批開著時封包另帶 SORTMODE 變更，或機台正處於 WhiteList 分選模式且貨批開著(此時即使封包不帶 SORTMODE 也一樣)，兩者皆回 HCACK=4 —— 後者的交換動作會清空整張工單路由表，不能在有料時執行。(2) SET_LOT_INFO 改為「疊加」：不再清空既有批號與綁定，可對進行中的工單追加批號；容量改以合併後的批數檢查，被機台丟棄的批不會再誤回 HCACK=0。(3) 新增 CLEAR_LOT_INFO(host 端結批，走與面板 Lot End 相同的流程)；HCACK 1 = 生產中拒絕、2 = 機內尚有 IC 拒絕。SET_LOT_INFO 既然不再清空，此命令是唯一的結批途徑。"
+4. SVID 數值更正(1021 / 1101),SVID 1021 UPH：原本以「跨電源循環累計的總數」除以「本次開機時間」，2026-07-31 現場實測高估約 20 倍(16:29 Lot End 報 2026，該區間真值 99)，且會隨開機時間單調遞減(13 顆的期間由 5131 掉到 2305)。已改以本次計算視窗的基準值計算。貴端將 1021 綁在 RPTID 508 與 RPTID 516，而 RPTID 516 連結的 CEID 54 UPH Record End 是本機確實會發射的事件 —— 也就是說錯誤的 UPH 已經隨真實事件送到貴端，故此為對外數值的實質更正，請勿沿用 07-31 之前的數據做基準。SVID 66020 Total IC 維持「累計、跨電源循環保留」語意不變(與 HT9045 相同)。SVID 1101 Loader Count：其來源計數器先前宣告、清除、持久化俱全，卻在全樹沒有任何累加，導致 1101 與主畫面 Load 欄位恆為 0；已在 SortArm 自 Loader 取料處補上累加，1101 自本版起為真實值。
+5. SVID 66033 Lot Start Time 斷電行為變更,第 2 版註明「本欄位不做斷電保存」。該敘述自 2026-07-30 稍後的版本起已不適用：工單開啟中重新開機、且操作員選擇「沿用上一筆工單」時，SVID 66033 會以原字串回填原始起測時間(不由復電時刻或 Now() 推算)；選擇「重新開始」或工單已 Lot End 則為空。理由是「沿用的工單仍是開著的批」，回空值等於說謊。
+6. 通訊層紀錄,passive 監聽模式下，原本每個重連間隔就寫一行的重連紀錄實際上是空轉(該路徑不可達，只印字不動作)，2026-07-31 當天產生 883 行 / 62 KB，使當日 17 個 SECS 小時檔中有 14 個完全是這類雜訊、無有效內容。已移除，改為每個行程每個日曆日一行的存在性標記(用以區分「當天無 host 連線」與「SECS 紀錄故障」)。連線／斷線的邊緣紀錄維持不變。此項純屬機台端紀錄檔，不改變任何 SECS 訊息的內容、時序或格式。
+本次未變動 Unchanged,CEID 1-275 的編號與語意(含第 1 版的 breaking change 對照，27 / 28 / 41 / 42 均維持該版定義)、預設 Report 1 的 13 個 SV 內容與順序、S1F23/S1F24 與 S2F29/S2F30 的回覆形狀、EC 可寫範圍、Soter 輸出檔的檔名與欄位契約。本版新增的 6 個 SVID 一律未加入預設 Report 1(該報表是每個 CEID 的預設酬載，加欄位會改變線上每一筆事件的長度)；需要納入事件酬載請以 S2F33 + S2F35 自行綁定。
+驗證 Verification,本版所有變更之模擬版與真機版(註銷 SOFT_SIMULATE)建置皆 exit 0，原始碼編碼檢查 166 檔通過。SVID 1021 UPH 與 1101 Loader Count 的缺陷判定、以及 RPTID 501/502/508/517/524 的覆蓋率核算，依據為 2026-07-31 京元現場 SECS log 的實際封包與報表定義。⚠ 本版未進行第 2 版所做的 headless HSMS round-trip 實測，上機驗證亦待執行。
+,
+2026-08-03 第 4 版修訂 Revision 4,
+依據韌體 Firmware,"HT-160S 1.0.0.0, branch feat/iosetview-172-refactor (commit 21d86f2)"
+1. SVID 表,"新增 19 個號碼，本機共註冊 77 個 SVID(前版 58)。全部都是貴端 host 已在 S2F33 報表定義中引用、但本機先前只能回空 item 的號碼。號碼、型別與線上格式皆先比對 HT9045 原始碼與貴端 2026-06-08 / 2026-07-31 現場 log 後才實作，不是自行命名：
+• 3 GemClock — 設備時鐘，SEMI E5 16 字元 'YYYYMMDDhhmmsscc'。與 1027 是同一時刻的兩種格式，不可互換。
+• 1002 Machine ID — 取自 General.ini [MachineIdentity] HandlerID(維護畫面的 Handler ID 欄)。⚠ 出廠預設為空字串，需現場輸入後才有值。
+• 1009 Lot Start Time — 'yyyy-mm-dd hh:nn:ss'(HT9045 線上格式)。與 66033 同一閂鎖、同一時刻，66033 維持原斜線格式不變。
+• 1103 / 1104 / 1105 Auto1-3 Count — 各 Auto 出料盤的放料數。
+• 1501 Setup File — 目前 recipe 名。註：同號的 ECID 1501 一直存在，但 SECS-II 的 SVID 與 ECID 是兩個獨立命名空間，而貴端是以 SVID 路徑讀它，故先前回空。本版在 SV 側補註冊同號、同型別、指向同一份資料。
+• 2758-2763 Type 1 Tray 幾何(Pitch X/Y、Start X/Y、Division X/Y) — 同 1501 的情況(原僅存在於 EC 側)。單位為 mm，與 HT9045 一致。
+• 66022-66027 Auto1-6 Count — 本機自有段，六個 Auto 站全數公佈(見第 4 項)。"
+2. 功能表,「機台編號」「貨批起測時間」「系統時間」「機台狀態變化回報」四列補上新的資料來源與注意事項；狀態欄不變(原本即為 O)。變更的格子以淡黃底標示。
+3. 回應貴端 2026-08-03 來信第 2 點(CEID 27 有發、但批號與機況無資料),"已解決。貴端截圖中的 RPTID 502 = {1006, 1007, 1011, 3, 1501, 1517, 1518, 1513}，2026-07-31 當天本機只答得出第 7 格(1518 Real/Dummy = I4 2)，其餘 7 格皆為空 item —— 與截圖完全一致。
+本版起 502 的 8 格中有 6 格有值：1006 批號、1011 機況文字、3 設備時鐘、1501 recipe 名、1517 Start Mode、1518 Real/Dummy。已以 headless SECS host 對實際韌體實測確認。
+剩下 2 格是機構上給不出來的，建議貴端自報表定義中移除：1007 Operator ID(本機無 host 端操作員身分欄位，只有本地 HMI 角色登入，語意不同不宜混用)、1513 Tester On/Off(本機為 Tray Sorter，無測試機)。
+同一封信的另一張截圖 RPTID 501 = {1101, 1102, 1103-1108, 16296-16299} 全空，本版起 12 格中有 5 格有值(1101 Loader Count、1102 Output Total、1103-1105 Auto1-3)；其餘見第 4、5 項。"
+4. 回應貴端 2026-08-03 來信第 3 點(相同功能用同一編號、不同功能加在沒用到的編號上),"本版完全依此原則：凡 HT9045 已有同概念的資料，一律沿用 HT9045 的號碼、型別與線上格式(上列 13 個號碼即是)；只有 HT9045 沒有的功能才放在本機自有、HT9045 未使用的高位段。
+唯一需要貴端裁定的是輸出站計數：HT9045 只給三個 Auto 編號(1103-1105)，第 4/5/6 站在 HT9045 叫 Fix1-3(1106-1108)，而 HT-160S 是六個 Auto、沒有 Fix 站。把 Auto4-6 對映到 1106-1108 屬雙方商務決定，本機不單方面認定，因此 RPTID 501 的第 6-8 格維持空 item。
+但 Auto4-6 的產出並未隱藏：六站全數公佈於 66022-66027，貴端以 S2F33 綁該段即可讀到完整分布。若貴端確認 Fix1-3 即為第 4/5/6 輸出站，本機可改以 1106-1108 回報(一行設定，不需改機構)。"
+5. RPTID 501 對帳注意事項(重要),HT9045 的 1102 就是 1103-1108 陣列的總和，兩者建構上恆等。HT-160S 不是：1102 在「掃碼/配 Bin」階段累加，1103-1105 在「放料」階段累加，且 1102 為 RAM 值(復電歸零)而 1101/1103-1105 隨機台保存。請勿以「1102 等於各站總和」作為對帳條件。三者在每次 Lot Start 會一起歸零。
+尚待貴端裁定 / 確認 Open items (2026-08-03 新增),
+6,來信第 1 點「Offline 情況下仍能下 Command」—— 已確認現況：本機的 S2F41 遠端命令處理不以 GEM 控制狀態(Off-Line / On-Line Local / On-Line Remote)為閘，任一狀態皆會受理並執行。附帶說明，作為對齊基準的 HT9045 同樣不設此閘(其原始碼中該閘僅對另一家客戶代碼生效)。若貴端要求依 GEM 規範在 Off-Line 拒絕命令，請確認：(a) Off-Line 時要拒絕哪些命令(全部，或保留 ONLINE 類命令)，(b) 拒絕時回哪個 HCACK，(c) On-Line Local 是否也要拒絕。確認後本機即可加閘。
+7,與第 1 點同源的三個編號對齊項，本版尚未實作，待貴端確認是否需要：HT9045 以 SVID 4 GemControlState(1=Off-Line / 2=On-Line Local / 3=On-Line Remote)與 SVID 9 PreviousGemControlState 公佈控制狀態，並在狀態變更時送 CEID 141(GEM Control State Change)與CEID 91/92/93(Offline / Online Local / Online Remote)。本機目前把同一資訊放在自有的 SVID 66002(採 GEM 標準值域 1/4/5)，且 CEID 141 與 91/92/93 已註冊但無發射點。依來信第 3 點的原則，這四個號碼應改為與 HT9045 同號同值域。
+8,1106-1108 Fix1-3 是否即 HT-160S 的 Auto4-6(見第 4 項)。同批待裁定的還有：1151-1156 各出料站佔比(HT9045 回 'xx.xx%' 字串，分母為其 1102；本機分母語意不同，見第 5 項)、16296-16299 各 site 累計(本機無測試座 site 概念)、3616/3617 Bin-Tray Select(本機區域編碼 3-8 = Auto1-6，HT9045 為 1-3 Auto / 4-9 Fix，直接回值會被誤讀)、1023/1024/1025 index 與測試時間(本機無週期時間量測)、1026/1028 MTBF 與平均 UPH、22505-22524 節能、2701/2734/2775-2789 tray 型別與 Type2/3 幾何、38800/3454/35916 CCD 與 barcode 旗標、38821/38825/38826 2D 處理策略旗標、37006/37007、20001-20003 EC 變更稽核、10698。
+本次未變動 Unchanged,CEID 1-275 的編號與語意(含第 1 版的 breaking change 對照)、預設 Report 1 的 13 個 SV 內容與順序、S1F23/S1F24 與 S2F29/S2F30 的回覆形狀、EC 可寫範圍、S5 警報目錄、Soter 輸出檔契約。本版純為新增 SVID，任何既有事件的線上形狀都不變。
+驗證 Verification,模擬版與真機版(註銷 SOFT_SIMULATE)建置皆 exit 0，還原後再建置亦 exit 0，原始碼編碼檢查 166 檔通過。另以 headless SECS host 對實際韌體(EXE\ht160s.exe)做 HSMS round-trip 實測：S1F3 查 19 個新號碼全部回真值且型別正確；以貴端 2026-07-31 的真實報表定義重建 RPTID 501/502/513/800 後用 S6F19 拉取，得 501 = 5/12、502 = 6/8、513 = 0/6、tray 幾何 6/6;SET_LOT_INFO + LOTSTART 後 1009 回 '2026-08-03 00:58:00'、66033 回 '2026/08/03 00:58:00'(同一時刻兩種格式)。

@@ -1,0 +1,178 @@
+No,項目,,,Memo
+基本,,,,
+1,S1F1,Are You There Request?,O,"Are You There?:'S1F1' W
+."
+2,S1F3,Selected Equipment Status Request,O,"GetSoftwareVersion:'S1F3' W
+<L[1]
+ <U4 [1] 1003>
+>
+."
+3,S1F11,Status Variable Name List Request,O,"S1F11:'S1F11' W
+  <L [0] 
+  >
+."
+4,S1F13,Establish Communications Request,O,"ECR(FT):'S1F13' W
+< L[2]
+ <A[6] 'CJ_EAP'>
+ <A[6] '1.0.00'>
+>
+."
+5,S1F15,Request OFF-LINE,O,"S1F15(Off-Line):'S1F15' W
+.
+[20260729] 已實作。S1F15 -> S1F16 OFLACK=0，控制狀態轉 Off-Line(1)。"
+6,S1F17,Request ON-LINE,O,"S1F17(On-Line):'S1F17' W
+."
+7,S1F23,Collection Event Namelist Request,O,"S1F23:'S1F23' W
+  <L [0] 
+  >
+.
+[20260730] 已實作(2026-07-30 新增)。S1F23 -> S1F24 回 L,n{L,3{U4 CEID, A CENAME, L,m{U4 VID}}}。<L[0]> 全查回全部 275 個 CEID(與 HT9045 字典逐字相同，含本機已註冊但不發射的 223 個)；指定 CEID 只回該幾筆；未註冊的 CEID 回 {CEID, '', L,0}(與 HT9045 同)。VID 清單由該 CEID 所連結的報表依序展開，順序與該事件 S6F11 內的排列一致，重複的 VID 不去除(一個 CEID 連兩張含相同 SVID 的報表時，S6F11 本來就會送兩次)。註：本訊息只是字典查詢，不等於訂閱 — 實際要收哪些事件仍由 S2F33 / S2F35 / S2F37 決定。"
+8,S2F13,Equipment Constant Request,O,"GetEAPEquipmentType:'S2F13' W
+  <L [1] 
+    <U4 [1] 1501>
+  >
+."
+9,S2F15,New Equipment Constant Send,O,"NewEquipmentConstantSend(SetLotInfo):'S2F15' W
+  <L [1] 
+    <L [2] 
+      <U4 [1] 2763>
+      <A [1] '5'>
+    >
+  >
+."
+10,S2F29,Equipment Constant Namelist Request,O,"S2F29:'S2F29' W
+  <L [0] 
+  >
+.
+[20260730] 已實作(2026-07-30 新增)。S2F29 -> S2F30 回 L,n{L,6{U4 ECID, A ECNAME, ECMIN, ECMAX, ECDEF, A ECUNITS}}。<L[0]> 全查回全部 7 個 EC：1501 Recipe Name、2758/2759 Tray Pitch X/Y、2760/2761 Tray Start X/Y、2762/2763 Tray Division X/Y。ECMIN / ECMAX / ECDEF 以該 EC 自身宣告的型別編碼(例如 FT_8 的 Tray X Start 回 FT_8，不是 ASCII)；未宣告上下限者回該型別的零長度項目(E5「未宣告」的表示法，與 HT9045 相同)。未註冊的 ECID 回 L,6 內名稱 / 三個界限 / 單位皆為零長度。註：本訊息為唯讀查詢；EC 寫入仍走 S2F15，維持「機台閒置才受理」與「只開放 tray 幾何」兩道限制，S2F30 不會放寬可寫範圍。"
+11,S2F33,Define Report,O,"Define AMR related Report:'S2F33' W
+  <L [2] 
+    <U4 [1] 1>
+    <L [1] 
+      <L [2] 
+        <U4 [1] 2000>
+        <L [7] 
+          <U4 [1] 38202> #Load port carrier ID
+          <U4 [1] 38205> #Auto1 carrier ID
+          <U4 [1] 38206> #Auto2 carrier ID
+          <U4 [1] 38207> #Auto3 carrier ID
+          <U4 [1] 38219> #Supplement_Bin
+          <U4 [1] 38220> #LD_UnLD_Check_AGV
+          <U4 [1] 38221> #LD_UnLD_Finish_AGV
+        >
+      >
+    >
+  >
+."
+12,S2F35,Link Event Report,O,"AGVSupplement_Link_Report:'S2F35' W
+  <L [2] 
+    <U4 [1] 272>
+    <L [1] 
+      <L [2] 
+        <U4 [1] 272>
+        <L [1] 
+          <U4 [1] 2000>
+        >
+      >
+    >
+  >
+."
+13,S2F37,Enable/Disable Event Report,O,"EnableEvent:'S2F37' W
+  <L [2] 
+    <Boolean [1] True>
+    <L [0]
+ >
+  >
+."
+14,S5F1,Alarm Report Send,O,[20260729] 已實作。警報發生/解除各送一次；ALCD bit7 0x80=set / 0x00=clear，ALID 由警報碼雜湊產生(與 S5F6/S5F8 目錄同一來源)。
+15,S5F3,Enable/Disable Alarm Send,△,"EnableAlarmSend:'S5F3' W
+  <L [2] 
+    <B [1] 80>
+    <L [0]
+ >
+  >
+.
+[20260802] 更正為部分實作。訊息層已實作(回 S5F4 ACKC5=0，不會 T3 逾時)，但內容不生效：本機沒有 per-ALID 啟用表，請求中的 ALED 與 ALID 清單會被忽略，所有警報恆為啟用，故停用之後 S5F1 仍會照常上報、S5F8 仍等於全目錄。若貴端需要真正的 per-ALID 警報啟用/停用，需另行排入。"
+16,S5F5,List Alarms Request,O,"EnhancedRCMD(ALARM):'S5F5' W
+  <L [0]
+  >
+.
+[20260802] 已實作，但不支援 ALID 過濾：不論請求帶不帶 ALID 清單，S5F6 一律回完整警報目錄，建議直接送 <L[0]> 全查。目錄由本機警報碼 SSOT 即時產生，目前 481 筆(2026-07-20 移除 16 支機構上未安裝的汽缸，對應 96 個 4xxxx 汽缸碼；筆數會隨機構配置增減，請以當下 S5F6 的回覆為準)。S5F7/S5F8 行為相同 —— 本機無 per-ALID 啟用表，「已啟用清單」恆等於全目錄。"
+17,S6F11,Event Report Send,O,"Event Report Send:'S6F11' W
+  <L [3] 
+    <U4 [1] 1>
+    <U4 [1] 6>
+    <L [1] 
+      <L [2] 
+        <U4 [1] 1>
+        <L [13] 
+          <A [6] 'HT160S'>
+          <A [7] '1.0.0.0'>
+          <I4 [1] 886>
+          <A [19] '2026/07/23 16:44:31'>
+          <I4 [1] 0>
+          <I4 [1] 1>
+          <I4 [1] 0>
+          <I4 [1] 0>
+          <I4 [1] 0>
+          <I4 [1] 189>
+          <I4 [1] 9>
+          <I4 [1] 5>
+          <A [10] 'SIMU_LOT_A'>
+        >
+      >
+    >
+  >
+."
+18,S6F15,Event Report Request,O,":'S6F15' W
+<L [2] 
+  <U4 [1] 0>
+  <U4 [1] 1>
+>
+.
+[20260729] 已實作(2026-07-28 新增)。裸 <U4 CEID> 與 L,1 包裝皆接受；未註冊的 CEID 回 L,3{DATAID,CEID,L,0}；解析失敗回 CEID=0，不會不回覆。"
+19,S6F19,Individual Report Request,O,"GetTestTimeReport:'S6F19' W
+  <U4 [1] 1>
+.
+[20260729] 已實作(2026-07-28 新增)。回 L,n{SV 值} 扁平清單(不含 RPTID)；由即時登錄表取值，host 以 S2F33 重定義該 RPTID 後長度會跟著變。"
+20,S2F31,校時,O,[20260729] 已實作。收下並回 TIACK=0，但刻意不寫入設備時鐘(避免 host 校時與現場工單時間打架)。另有 S2F17 -> S2F18 供 host 讀取本機時間。
+資料收集,,,,
+1,機台狀態變化回報,,O,"[20260729] 已實作(2026-07-29 新增)。CEID 27 Change Machine State：機台狀態文字每次變更即送 S6F11(RUNNING / PAUSE / EMG / LOCK / SAFE DOOR / AIR / MOTOR OFF / Clean Out / One Cycle …)。另 SVID 66000 RunMode、66001 SystemRunning 可主動查詢。
+[20260802] 另新增 SVID 1011 Machine State，內容與上述狀態文字完全相同(HT9045 對應號)，可用 S1F3 主動查詢。值域：HALT / INIT / HOMING / Clean Out / Tray Feed / One Cycle / RUNNING / LOCK / EMG / MOTOR OFF / SAFE DOOR / AIR / PAUSE。
+[20260803] 補充資料來源：此事件的「機況」值即 SVID 1011 Machine State(2026-08-01 新增)。貴端若以自訂報表(S2F33/S2F35)接收此事件，請將 1011 納入該報表，否則事件本身雖會送出、對應欄位仍為空 item —— 這正是貴端 2026-08-03 來信第 2 點的成因，詳見「2026-08-03 第 4 版修訂」。"
+2,機台編號,,O,"SVID:1001
+[20260802] SVID:1001。註：1001 於 HT9045 字典為 Machine Model，本機回 <A[6] 'HT160S'>(無連字號)。⚠ 請注意 S1F2 / S1F14 的 MDLN 另回 <A[7] 'HT-160S'>(有連字號)，兩者並非同一字串；host 端若以字串比對機種，請以 SVID 1001 的 'HT160S' 為準，或兩式皆接受。(本表 基本 #17 的 S6F11 範例第一格 <A [6] 'HT160S'> 即為 SVID 1001 的實際回覆。)若貴端需要「機台序號」，本機以 stbMain 的 HandlerID / SerialNo 管理，目前未掛 SVID，可再議。
+[20260803] 新增 SVID 1002 Machine ID,取自 General.ini [MachineIdentity] 的 HandlerID(即維護畫面的 Handler ID 欄)。⚠ 出廠預設為空字串，需由現場輸入後才有值；1001 仍為機型名。"
+3,機台型號,,O,[20260802] SVID:1001 Machine Model(與上一列同一個 SVID)，回 <A[6] 'HT160S'>。⚠ 更正第 1 版敘述：S1F2 / S1F14 的 MDLN 回的是 <A[7] 'HT-160S'>，與 SVID 1001 的字串並不相同(一個有連字號、一個沒有)。
+4,廠商軟體版本,,O,SVID:1003
+5,貨批起測時間,,O,"[20260730] 已實作(2026-07-30 新增)。新增 SVID 66033 Lot Start Time，格式 'yyyy/mm/dd hh:nn:ss'(與 SVID 1027 System Time 同格式，可直接比對)。於 Lot Start 當下閂鎖 — 操作面板 Lot Start 按鈕與 SECS S2F41 LOTSTART 兩條路徑都會寫入 — Lot End 清空，貨批進行中可隨時以 S1F3 回查(不會隨系統時間變動)。CEID 6 Lot Start 事件照舊發送，可作為即時通知。註1：66033 未加入預設 Report 1。該報表是每個 CEID 的預設酬載，其 13 個 SV 的內容已對貴端公布，加欄位會改變線上每一筆事件的長度；若需在事件內帶出起測時間，請以 S2F33 / S2F35 將 66033 綁進貴端自訂報表即可。註2：[20260802 更正] 本欄位會隨工單一起持久化，第 2 版所述「不做斷電保存」已不適用。Lot Start 當下除了閂鎖 66033，也會把同一個時間戳寫入工單中繼檔；機台中途重開後，若操作員選擇「沿用上一張工單」，66033 會以原始時間戳回填(不是復電時刻，也不是本次開機時間)，該貨批仍視為進行中。若操作員選擇「重新開始」、或該工單建立於本功能之前、或中繼檔讀寫失敗，則 66033 為空。Lot End 一律清空 66033 並刪除中繼檔。
+[20260803] 另新增 SVID 1009 Lot Start Time,與 66033 同一個閂鎖、同一時刻，但採 HT9045 的線上格式 'yyyy-mm-dd hh:nn:ss'(破折號)；66033 維持原斜線格式不變。"
+6,系統時間,,O,"SVID:1027
+[20260803] 另新增 SVID 3 GemClock(GEM 標準號),同一時刻但採 SEMI E5 16 字元格式'YYYYMMDDhhmmsscc'(與本機 S2F18 回覆同格式)；1027 維持 'yyyy/mm/dd hh:nn:ss'。"
+7,機台Event回傳,,O,
+8,機台Alarm回傳,,O,[20260802] 已實作。S5F1 主動上報；S5F5/S5F6 全警報目錄、S5F7/S5F8 已啟用清單皆支援。目錄由本機警報碼 SSOT 即時產生，目前 481 筆(第 1 版寫的 576 筆為 2026-07-20 移除 16 支未安裝汽缸之前的數字)。⚠ 更正第 1 版敘述：S5F3/S5F4 並非「支援啟用停用」—— 該訊息只回 ACKC5=0，本機沒有 per-ALID 啟用表，請求內容不生效，所有警報恆為啟用(見 基本 #15)。另 S5F5/S5F7 的 ALID 過濾亦未實作，一律回全目錄。
+9,測試結果,,N/A,[20260729] HT-160S 為 Tray Sorter，無測試機構，故無測試結果。分選結果以 SVID 66021 Total Sorted、各 Bin 分選數與 Production log / Soter CSV 提供。
+Remote Control,,,,
+1,S2F41,Start,O,[20260729] RCMD START。走與操作員 Start 相同的 MachineStart() 閘(Lot/2D 資料齊備才受理)。
+2,S2F41,Pause,O,[20260729] RCMD PAUSE(減速暫停)。另有 STOP(硬停，立即停馬達)與 HALT(2026-07-29 新增，對齊 HT9045 的軟停，與 PAUSE 同一路徑)。
+3,S2F41,One Cycle,O,[20260729] RCMD ONE_CYCLE。完成時送 CEID 41 One Cycle Finish。HCACK 據實回報：0=已啟動 / 2=機台未運轉或資料不符 / 4=已在 OneCycle 中(與 HT9045 一律回 0 不同，見規格書 §3.4)。
+4,S2F41,Clean Out,O,[20260729] RCMD CLEAN_OUT(2026-07-29 新增，對齊 HT9045)。僅能自 Normal 運轉模式進入，非 Normal 回 HCACK=2；排空後送 CEID 42 Clean Out Finish 再自動 Lot End。
+5,S2F41,Auto Clean,X,[20260729] 測試機專屬(清針/socket 清潔)，HT-160S 無此機構。本機認得 AUTO_CLEAN 但回 HCACK=2「認得命令、本機不執行」，不回 1、不回 4。
+6,S2F41,Download Setup File,X,[20260729] 未實作。S7F1/F3/F5 已在 dispatch 表中，但目前為 log-only skeleton，不會回覆，host 會等到 T3 逾時。若貴端需要遠端下載工作檔，需另行排入(建議同時定義檔案格式與存放位置)。
+7,S2F41,蜂鳴器控制,O,[20260729] RCMD PP_MUSIC。單一 pair、CP 名稱可為空字串，值 1..4 對應音效類別；空 list = 解除。為閂鎖式覆寫，可由面板 ALARM RESET / OFF BUZZER / 維修畫面按鈕解除，斷線亦自動解除。
+8,S2F41,三色燈控制,O,[20260729] RCMD PP_SIGNALTOWER。RED/GREEN/YELLOW = 0關/1亮/2閃；空 list = 解除。請每次同時指定三色。註：值 2(閃)本機依既有慣例呈現為恆亮(HT-160S 塔燈全機不閃)。警報/訊息顯示中或機台自身安全異常時暫停覆寫，避免遮蔽機台紅燈。
+9,S10F3,訊息顯示(單行),O,[20260729] 已實作(2026-07-28 新增)。回 ACKC10=0。顯示行為：寫入 SECS log 與 EventLog，不彈出強制視窗(本機訊息視窗為 ShowModal 且會停止所有馬達，於 HSMS 接收執行緒彈窗會使通訊本身停擺)。
+10,S10F5,訊息顯示(多行),O,[20260729] 已實作(2026-07-28 新增)。多段文字，回 ACKC10=0；顯示行為同 S10F3。
+11,權限控管,,X,[20260729] 未實作。HT9045 的 AUTHORITY_CHECK 尚未移植。本機權限為本地管理(system\login.txt，ID/密碼/層級)，切換時送 CEID 16 Switch UserLevel。
+12,密碼變更,,X,[20260729] 未實作。HT9045 的 PP_PASSWORD 尚未移植。本機密碼於維修畫面本地變更。
+13,測前停機查檢,,X,[20260729] 未實作。相關旗標(bN04_RunCheck)在本機唯一站點已註解，無 live 路徑。HT-160S 為 sorter，無「測前」概念；若貴端需要開工前自檢，需另定義查檢項目。
+其他,,,,
+1,SECS/GEM斷線停機,,△,[20260729] 部分。HSMS 斷線時本機會解除 host 的塔燈/蜂鳴器閂鎖覆寫(避免無人可解)，但不會自動停機——生產繼續。若貴端要求斷線即停機，需明確定義(斷線多久算斷、是暫停或收尾停機、是否需操作員確認)後排入。
+2,軟體自動佈署,,X,[20260729] 不走 SECS。本機以 NSIS updater 佈署(D:\HT160S_Updater_NSIS)，非 SECS/GEM 範圍。
+我方補充 —— 本表原未列出、但機台已實作的訊息與命令 (2026-08-02 新增),,,,
+1,S2F41,Lot Start (LOTSTART),O,"[20260802] RCMD LOTSTART，2026-07-30 對齊 HT9045。無參數、可重複送。貨批關閉時做完整的每批初始化 + 2D/Bin 交換並發 CEID 6 Lot Start；貨批已開著時只做 2D/Bin 交換，不重置計數器與 (Lot,Bin)→Auto 綁定(以免清掉機內在製品的綁定；「開著」= 已 Lot Start 尚未 Lot End，或機內仍有 IC)。本命令不設定批號 —— 封包內的 ASCII 批號會被讀取記錄但不註冊，請改用 SET_LOT_INFO。⚠ HCACK：NORMAL 分選模式下，9045 形狀的封包一律回 0；非 0 只有兩種情形，皆來自 HT-160S 自有的 WhiteList / SORTMODE 擴充(HT9045 無此擴充)：(a) 貨批開著時封包另帶 SORTMODE 變更 → HCACK=4；(b) 機台目前處於 WhiteList 分選模式且貨批開著 → HCACK=4，**即使封包不含 SORTMODE 也會如此**(WhiteList 的交換會清空整張工單路由表，不能在有料時執行)。"
+2,S2F41,Set Lot Info (SET_LOT_INFO),O,"[20260802] RCMD SET_LOT_INFO，本機唯一的批號設定者，2026-07-30 起改為疊加(不再清空既有工單與綁定，可對進行中的工單追加批號)。容量以合併後的批數檢查，被機台丟棄的批不會再誤回 HCACK=0。註：每筆 L[2]{客戶批號, 京元批號} 的形狀仍屬本方提案，待貴端確認實際 SML。"
+3,S2F41,Clear Lot Info / 結批 (CLEAR_LOT_INFO),O,[20260802] RCMD CLEAR_LOT_INFO，host 端 Lot End，走與操作面板 Lot End 按鈕同一條流程(UPH 紀錄、CEID 8、LotStory 歸檔、清 LotRegistry / LotBinBinding、還原 WhiteList 覆蓋、取消在途 WebAPI 查詢)。運轉中回 HCACK=1、機內仍有 IC 回 HCACK=2。SET_LOT_INFO 改為疊加之後，這是唯一能結批退批的命令。
+4,S2F41,其他已實作 RCMD,O,[20260802] 下列 RCMD 亦已實作並會回 S2F42：START_AGV(AMR 交接 prep。CP 名稱為 LOADERTRAYCOUNT / LOADERICCOUNT 與站名 Loader / Empty / Color / AUTO1~6；動作 CP 的值為 'Action'(該站要動)或 'NA'(僅列入向量、不動作)。⚠ 若機台 AMR 功能關閉(bUseAMR=0)，本命令一律回 HCACK=2 並且完全不做 prep)、HOME(0=已啟動 / 4=運轉中或正在 Home / 2=UI 尚未就緒)、STOP(硬停，立即停馬達)、ONLINE 與 ONLINE_REMOTE(控制狀態轉 Online-Remote)、ONLINE_LOCAL(轉 Online-Local)、CLEARCOUNT(清本次生產計數，運轉中回 HCACK=4)、CLEAN_AUTO_SORT_COUNT(清各 Auto 分選計數，機內仍有 IC 回 HCACK=2)、ENERGY_SAVING(認得命令但本機不執行，回 HCACK=2)。未列出的 HT9045 測試機專屬命令(AUTO_RETEST / INITIAL_START_ART / START_AQL / AUTOSITEMAP / AUTO_CLEAN 等 16 個)一律回 HCACK=2「認得命令、本機無此機構」，不回 1、不回 4。
+5,S2F25,Loopback Diagnostic Request,O,[20260802] 已實作(2026-07-27 新增)。S2F25 → S2F26 原樣回送收到的 <B> 內容(標準 HSMS 連線診斷)。格式錯誤(非 BINARY)只寫 log、不回覆。
+6,S125F1,Enable/Disable EC Data Send (貴端私有串流),O,[20260802] 已實作(2026-07-28 新增；移植前此訊息會落到 S9F3，使貴端 T3 逾時)。每個請求恰回一個 S125F2 <B ACK>(HT9045 是每個 ECID 各回一次 ack 且共用同一 transaction id，該行為視為缺陷，未移植)。ACK=0 僅在清單中所有 ECID 本機皆有登錄時給出；本機只登錄 7 個 EC(1501、2758~2763)，貴端 45 個 ECID 的清單正常會得到 ACK=1，並在 log 中列出未登錄的 ECID。本機不保存啟用表 —— 內容僅作探索記錄。

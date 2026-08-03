@@ -374,12 +374,13 @@ void HT160Gem::AddSV()
     //                         S2F18 reply); length and character set stay legal E5 TIME.
     //   1002 Machine ID     - RPTID 518/519 + S1F3. 9045 binds ONE identity string
     //                         (IniConfig.sGPIBMachineID) into which KYEC typed "HT-1295".
-    //                         HT160S has three (model / handler id / serial no) and the
-    //                         handler id is the operator-set machine identity, so 1002 gets
-    //                         that one; 1001 already carries the model. NOTE FOR COMMISSIONING:
-    //                         General.ini [MachineIdentity] HandlerID ships EMPTY, so until an
-    //                         FAE types it on the maintenance page the host reads A[0] "".
-    //                         Registering it is what makes typing it have any effect.
+    //                         HT160S has three (model / handler id / serial no); 1001 already
+    //                         carries the model. DECIDED 20260803 (user ruling, recorded in the
+    //                         customer workbook Rev 4): 1002 publishes the HANDLER ID. Do not
+    //                         re-point it at sSerialNo or sMachineModel without a new ruling.
+    //                         NOTE FOR COMMISSIONING: General.ini [MachineIdentity] HandlerID
+    //                         ships EMPTY, so until an FAE types it on the maintenance page the
+    //                         host reads A[0] "". Registering it is what makes typing it count.
     //   1009 Lot Start Time - RPTID 508 slot 3. Wire = A[19] "2026-06-07 12:57:32" (dashes).
     //                         Same latch as HT160S's own 66033, reformatted in RefreshSVData.
     HGemPtr->SetSVDataPointer(3,    HType.ASCII_TYPE, "GemClock", "", &sGemClock, "equipment clock, SEMI 16-char TIME YYYYMMDDhhmmsscc (GEM-standard SVID 3; 1027 is the same instant in yyyy/mm/dd hh:nn:ss)");

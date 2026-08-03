@@ -168,7 +168,7 @@
 |---|---|---|---|
 | 3 | GemClock | A | 設備當前時間,**SEMI E5 16 字元 `YYYYMMDDhhmmsscc`**(與 HT-90XX 的 `iTimeFormat=1` 同格式,也與本機 S2F18 回覆同格式)。與 1027 是**同一時刻的兩種格式**,不可互換;百分秒欄固定 `00` |
 | 1001 | Machine Model | A | 機型名 = HT-160S |
-| 1002 | Machine ID | A | 機台識別碼,取自 `General.ini [MachineIdentity] HandlerID`。**出廠預設為空字串**——這是操作員在維護頁輸入的欄位,未輸入前本值為空(不是故障)。HT-90XX 只有一個識別字串,HT-160S 有三個(機型 / Handler ID / 序號),本號回的是 **Handler ID** |
+| 1002 | Machine ID | A | 機台識別碼,取自 `General.ini [MachineIdentity] HandlerID`(維護頁的 **Handler ID** 欄)。HT-90XX 只有一個識別字串,HT-160S 有三個(機型 / Handler ID / 序號);**本號回 Handler ID,此為 2026-08-03 定案**(機型已由 1001 提供,序號另議)。⚠ **出廠預設為空字串**——這是現場輸入的欄位,未輸入前本值為空 `A[0]`,不是故障;請於機台交機時填入 |
 | 1003 | Software Version | A | 軟體版本 |
 | 1006 | Lot ID | A | 目前作用中的批號 |
 | 1009 | Lot Start Time | A | 開批時刻,**HT-90XX 線上格式 `yyyy-mm-dd hh:nn:ss`(破折號)**。與 66033 同一個閂鎖、同一時刻,只是分隔符不同(66033 維持既有斜線格式不變);批與批之間為空字串 |
