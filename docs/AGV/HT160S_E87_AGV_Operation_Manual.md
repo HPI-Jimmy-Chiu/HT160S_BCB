@@ -182,7 +182,7 @@ sequenceDiagram
 | 272 | AGVSupplement | 38219 | 叫車：缺料(P1–P3) 或 Auto 滿盤(P4–P9)，bitmap 標目標站 |
 | 273 | AGVLDUnLDStatus | 38220 | Ready：機構到位 / Auto 已排空，AGV 可動作 |
 | 274 | AGVLDUnLDFinish | 38221 | Finish：上/下料完成（模擬自動；真機待 IO 點）|
-| 275 | AGVLdID | 38202–38210 | Carrier ID（目前不自動上報；host 可用 S1F3 讀對應 SVID）|
+| 275 | AGVLdID | 38202–38207 + 38199–38201 | Carrier ID（目前不自動上報；host 可用 S1F3 讀對應 SVID）|
 
 ### 6.2 站點 P mapping（`PIndex = AutoNo + 3`）
 
@@ -224,7 +224,7 @@ bitmap payload（ASCII）：`P1:0,P2:0,...,Px:1,...,P9:0`（單站 P=1）。
 1. **真機 Finish 需 IO 點**：模擬 `IsAmrTaken=true` 自動完成；真機目前回 false，握手會停在 **Ready**，直到「車輛取走」IO 點配上（`aAuto1To6.cpp::IsAmrTaken`）。
 2. **Device Count SVID = 0**（38231 等）：目前不報真實顆數（備用欄位）。
 3. **P1–P3 實體前置機構**：目前只做缺料通知 + 命令受理；實體補料前置動作（若有）待硬體定義。
-4. **CEID275 AGVLdID** 不自動上報；host 以 S1F3 讀 carrier id SVID（38202–38210）。
+4. **CEID275 AGVLdID** 不自動上報；host 以 S1F3 讀 carrier id SVID（38202–38207 + Auto4–6 的 38199–38201）。
 5. **AGV 接管條件 = SECS 連線**：`bUseAMR` 且 HSMS **SELECTED** 時，滿車交由 AGV 握手（不彈操作員 modal）；**斷線即 fallback** 回原本 modal + 手動換車。
 
 ---

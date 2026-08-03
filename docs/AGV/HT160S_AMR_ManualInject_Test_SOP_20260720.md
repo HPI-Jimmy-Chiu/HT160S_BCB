@@ -313,7 +313,7 @@ Empty / Color：把 Loader 換成 Empty / Color 三顆鈕。
 | 272 | AGVSupplement | 38219 | 叫車：缺料(P1-P3) 或 Auto 滿盤(P4-P9)，bitmap 標目標站 |
 | 273 | AGVLDUnLDStatus | 38220 | Ready：機構到位 / Auto 已排空 |
 | 274 | AGVLDUnLDFinish | 38221 | Finish：上/下料完成 |
-| 275 | AGVLdID | 38202-38210 | Carrier ID（不自動上報；host 以 S1F3 讀） |
+| 275 | AGVLdID | 38202-38207 + 38199-38201 | Carrier ID（不自動上報；host 以 S1F3 讀） |
 | 35/36/37、148/149/150 | Auto Full 離散預告 | — | 下料 Full 附帶（Auto1-6） |
 
 ### 11.3 程式位置（維護參考）

@@ -333,7 +333,7 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 
 每站綁定的 SVID (號碼非連續，Auto4–6 跳過保留區，故用顯式表)：
 
-- CarrierID：38202–38210
+- CarrierID：38202–38207 + 38199–38201（2026-08-03 改號：Auto4–6 由 38208–38210 改為 **38199–38201**，舊號碼永不改用他義）
 - TrayCount / DeviceCount
 - BinSet：Auto 才有 (ASCII bin setting)
 - 位元圖：38219=Supplement、38220=Status、38221=Finish
@@ -365,7 +365,7 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 | 38203 | ASCII | EmptyTray Carrier ID | P2（待客戶確認） |
 | 38204 | ASCII | ColorTray Carrier ID | P3；現為 CEID275 身分盤 2D 上傳欄 |
 | 38205–38207 | ASCII | Auto1–3 Carrier ID | P4–P6 |
-| 38208–38210 | ASCII | Auto4–6 Carrier ID | P7–P9 |
+| 38199–38201 | ASCII | Auto4–6 Carrier ID | P7–P9（2026-08-03 由 38208–38210 改號，對齊 HT-9011UC V3.33.899）|
 | 38211–38218 | — | （未配置間隙） | |
 | 38219 / 38220 / 38221 | ASCII | Supplement / LD-UnLD-Check / LD-UnLD-Finish bitmap | CEID272/273/274 各自的 `P1:0,...,Px:1,...,P9:0` 位元圖 |
 | 38222 | INT4 | AMR Loader Tray Count | host `START_AGV` CP 灌入；**work-only**（表頭 cover/identity 盤由韌體依 `General.ini [AMR]` 另加） |

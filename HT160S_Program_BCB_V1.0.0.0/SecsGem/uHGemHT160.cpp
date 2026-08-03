@@ -439,14 +439,19 @@ void HT160Gem::AddSV()
     //  (a) EPOCH. HT9045's 1103-1108 come from the disk-persisted LastSet.BinCT and survive lot
     //      changes and power cycles. On HT160S every count in this band is zeroed together by
     //      ResetPerLotProductionCounters() at each Lot Start, but they do NOT agree across a
-    //      POWER CYCLE : 1101 and 1103-1105 live in tRunData, which WriteLastDataFile persists
-    //      to lastdata.dat, while 1102 reads MachineRun.iTotalSorted, which is RAM-only and
-    //      comes back as 0. Verified on the wire 20260803 (S1F3 after a fresh app start
-    //      answered 1101=0 1102=0 but 1103..1105=1). So 1103-1105 are actually CLOSER to
-    //      9045's semantics than the already-shipped 1102 is; do not "fix" it by making
-    //      1103-1105 volatile.
-    //  (b) PARTITION. On HT9045 1102 == sum(1103..1108) by construction (its 1102 IS the sum
-    //      of that array). HT160S has SIX Auto stations : 1103-1105 carry Auto1-3 and Auto4-6
+    //      POWER CYCLE : 1101, 1103-1105 AND 1259-1261 live in tRunData, which WriteLastDataFile
+    //      persists to lastdata.dat, while 1102 reads MachineRun.iTotalSorted, which is RAM-only
+    //      and comes back as 0. Verified on the wire 20260803 (S1F3 after a fresh app start
+    //      answered 1101=0 1102=0 but 1103..1105=1). So 1103-1105 / 1259-1261 are actually CLOSER
+    //      to 9045's semantics than the already-shipped 1102 is; do not "fix" it by making them
+    //      volatile. All six per-Auto counts share one epoch : ResetPerLotProductionCounters()
+    //      zeroes the whole tRunData.TrayICCnt array at each Lot Start.
+    //  (b) PARTITION. On HT9045 1102 is NOT sum(1103..1108). Traced in the 810 tree : 1102 binds
+    //      &RunInfo.iUnloadCount (uHGemHT9045_SV.cpp:154) and its ONLY assignment is
+    //      RunInfo.iUnloadCount=Sum at cSortCT.cpp:275, where Sum accumulates LastSet.BinCT[0][i]
+    //      over i<eTrayCount and eTrayCount is 24 (Auto1-3, Fix1-6, bulk box, Mag1-14). So even on
+    //      9045 the eight RPTID-501 slots do not reconcile to 1102 - the whole bin array does.
+    //      HT160S has SIX Auto stations : 1103-1105 carry Auto1-3 and Auto4-6
     //      carry the HT90XX family's own Auto4-6 numbers 1259-1261 (registered right below),
     //      so the six-station picture is 1103/1104/1105 + 1259/1260/1261. Slots 6-8 of the
     //      host's RPTID 501 STILL stay empty : those slots ask for 1106-1108, which on HT9045
@@ -523,7 +528,11 @@ void HT160Gem::AddSV()
     // serialize, so the bound address stays valid while the reported value tracks
     // live data. Sub-grouped with gaps (66000 state / 66010 alarm / 66020 output /
     // 66030 lot) so each group can grow without renumbering. These are HT160-only
-    // semantics; 9045 has no equivalent SVID here.
+    // semantics; 9045 has no equivalent SVID here - WITH TWO DELIBERATE EXCEPTIONS that survived
+    // the 20260803 dedupe and must not be "cleaned up" by the same rule: 66021 Total Sorted is the
+    // same value as 1102, and 66002 Control State is the same state as SVID 4/9. Both are KEPT
+    // because they sit inside the frozen default Report 1 (removing them would change the wire
+    // shape of every event), not because 9045 lacks a number for them.
     // -- Machine state (66000-66009) --
     HGemPtr->SetSVDataPointer(66000, HType.INT_4_TYPE, "Run Mode", "", &svRunMode, "0=Normal 1=Home 2=OneCycle 3=CleanOut 4=TrayFeed");
     HGemPtr->SetSVDataPointer(66001, HType.INT_4_TYPE, "System Running", "", &svSystemRunning, "1=machine started/running, 0=stopped");
