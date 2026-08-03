@@ -88,7 +88,13 @@ SVID 66002 保留不變(GEM 標準值域 1/4/5)。詳見 §1、§3.1、§3.3.1�
 <h2 id="1-connection-transport">1. 連線與傳輸 / Connection &amp; Transport</h2>
 <ul>
 <li><strong>HSMS-SS</strong>,設備端為 <strong>passive</strong>(host 主動撥入 / equipment is passive, host connects in)。</li>
-<li>Port / Device(Session) ID:見 <code>system\ComPort.ini</code>(現場觀察 on-site observed: <strong>port 6000, Device ID = 1</strong>)。</li>
+<li>連線參數設定於 <code>system\General.ini</code> 的 <strong><code>[SECS]</code></strong> 段(<strong>不在 <code>ComPort.ini</code></strong>;該檔無 SECS 設定)。
+  現場實機值(取自 2026-07-31 京元竹南 State Record 的 <code>MachineConfig\system\General.ini</code>,以現場資料為準):
+  <code>Address=192.168.8.3</code>、<strong><code>Port=6000</code></strong>、<strong><code>DeviceID=0</code></strong>、<strong><code>ActiveMode=0</code></strong>(= passive,設備監聽)、
+  <code>ReconnectInterval=60</code>、<code>LinktestInterval=10</code>、<code>T6Timeout=6</code>。<blockquote>
+<p>2026-08-03 更正:本節前版寫「見 <code>ComPort.ini</code>」與「Device ID = 1」,兩者皆與現場設定不符,已依 State Record 更正。</p>
+</blockquote>
+</li>
 <li>型號 / 版本 由 S1F2 與 S1F14 回報:<code>MDLN = HT-160S</code>,<code>SOFTREV = 1.0.0.0</code>。</li>
 <li><strong>GEM 控制狀態 Control State</strong> —— 同一個狀態以<strong>兩種編號</strong>公佈:<strong>SVID 4 / 9</strong>(HT-90XX 值域,建議 host 使用)與既有的 <strong>SVID 66002</strong>(GEM 標準值域,不變更)。變更時送 <strong>CEID 141</strong>,緊接著送 <strong>91 / 92 / 93</strong> 中對應新狀態的一個(與 HT-90XX 同順序)。</li>
 <li>⚠ <strong>控制狀態目前不作為命令閘門</strong>:本機在 Off-Line / On-Line Local 狀態下仍會受理並執行 S2F41 遠端命令。這與 HT-90XX 現行行為一致(其控制狀態閘僅對另一家客戶代碼生效)。若需依 GEM 規範在 Off-Line 拒絕命令,請告知三件事:要拒絕哪些命令(全部,或保留 <code>ONLINE_*</code> 以免無法上線)、拒絕時回哪個 HCACK、On-Line Local 是否也拒絕。</li>

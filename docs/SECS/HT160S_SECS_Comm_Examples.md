@@ -46,7 +46,7 @@ HT160S 採用半導體業界標準的三層 SECS/GEM 堆疊。由下而上分別
 
 | 角色 | 裝置 | 連線模式 | 說明 |
 |---|---|---|---|
-| EQUIPMENT | HT160S | **PASSIVE**（`ActiveMode=0`） | 監聽，等待 Host 連入；DeviceID=0 |
+| EQUIPMENT | HT160S | **PASSIVE**（`ActiveMode=0`） | 監聽，等待 Host 連入；DeviceID=0。**已由現場實機確認**：2026-07-31 京元竹南 State Record 的 `system\General.ini [SECS]` 為 `ActiveMode=0`、`Port=6000`、`DeviceID=0` |
 | HOST / EAP | SECS Host Simulator | **ACTIVE** | 主動送出 `Select.req` |
 
 - **Port**：`5098`
@@ -849,7 +849,8 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 
 1. **啟動模擬器（PASSIVE listen）**：模擬器於 `127.0.0.1:5098` 監聽（device=1），等待設備連入。
    > 提醒：本重現環境刻意讓模擬器當監聽方、設備撥入（與正式產線方向相反，見 1.2）；訊息層角色不變。
-2. **設備撥入**：HT160S（EQUIPMENT，`ActiveMode=0`，DeviceID=0）連入 port 5098，完成 `Select.req → Select.rsp`（SELECTED）；之後約每 10s Linktest 維持鏈路。
+2. **設備撥入**：HT160S（EQUIPMENT，**本重現環境設 `ActiveMode=1`**，DeviceID=0）連入 port 5098，完成 `Select.req → Select.rsp`（SELECTED）；之後約每 10s Linktest 維持鏈路。
+   > 2026-08-03 更正：此步原註明 `ActiveMode=0`，與「設備主動撥入」矛盾 —— `ActiveMode=0` 是設備**監聽**（正式產線用，現場實機即為 0，見 1.2），要讓設備撥入必須設 `ActiveMode=1`。§1.2 表格描述的是**正式產線**方向，本章是刻意反向的實驗室環境。
 3. **送 Lot 設定 trio**：依序送（順序不可顛倒，理由見 3.2）
    - `S2F41 SET_LOT_INFO`（預設 `SIMU_LOT_A..E`）→ 期望 `S2F42 HCACK=0`
    - `S2F41 LOTSTART` → 觸發 Lot WebAPI pull（`GET http://127.0.0.1:8160/lot/<LOTID>`，期望 HTTP=200、ok=1）→ `HCACK=0`

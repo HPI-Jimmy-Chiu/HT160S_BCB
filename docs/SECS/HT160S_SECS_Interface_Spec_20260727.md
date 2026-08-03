@@ -47,7 +47,11 @@
 ## 1. 連線與傳輸 / Connection & Transport
 
 - **HSMS-SS**,設備端為 **passive**(host 主動撥入 / equipment is passive, host connects in)。
-- Port / Device(Session) ID:見 `system\ComPort.ini`(現場觀察 on-site observed: **port 6000, Device ID = 1**)。
+- 連線參數設定於 `system\General.ini` 的 **`[SECS]`** 段(**不在 `ComPort.ini`**;該檔無 SECS 設定)。
+  現場實機值(取自 2026-07-31 京元竹南 State Record 的 `MachineConfig\system\General.ini`,以現場資料為準):
+  `Address=192.168.8.3`、**`Port=6000`**、**`DeviceID=0`**、**`ActiveMode=0`**(= passive,設備監聽)、
+  `ReconnectInterval=60`、`LinktestInterval=10`、`T6Timeout=6`。
+  > 2026-08-03 更正:本節前版寫「見 `ComPort.ini`」與「Device ID = 1」,兩者皆與現場設定不符,已依 State Record 更正。
 - 型號 / 版本 由 S1F2 與 S1F14 回報:`MDLN = HT-160S`,`SOFTREV = 1.0.0.0`。
 - **GEM 控制狀態 Control State** —— 同一個狀態以**兩種編號**公佈:**SVID 4 / 9**(HT-90XX 值域,建議 host 使用)與既有的 **SVID 66002**(GEM 標準值域,不變更)。變更時送 **CEID 141**,緊接著送 **91 / 92 / 93** 中對應新狀態的一個(與 HT-90XX 同順序)。
 - ⚠ **控制狀態目前不作為命令閘門**:本機在 Off-Line / On-Line Local 狀態下仍會受理並執行 S2F41 遠端命令。這與 HT-90XX 現行行為一致(其控制狀態閘僅對另一家客戶代碼生效)。若需依 GEM 規範在 Off-Line 拒絕命令,請告知三件事:要拒絕哪些命令(全部,或保留 `ONLINE_*` 以免無法上線)、拒絕時回哪個 HCACK、On-Line Local 是否也拒絕。

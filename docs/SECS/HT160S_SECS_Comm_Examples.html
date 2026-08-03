@@ -119,7 +119,7 @@
 <td>EQUIPMENT</td>
 <td>HT160S</td>
 <td><strong>PASSIVE</strong>（<code>ActiveMode=0</code>）</td>
-<td>監聽，等待 Host 連入；DeviceID=0</td>
+<td>監聽，等待 Host 連入；DeviceID=0。<strong>已由現場實機確認</strong>：2026-07-31 京元竹南 State Record 的 <code>system\General.ini [SECS]</code> 為 <code>ActiveMode=0</code>、<code>Port=6000</code>、<code>DeviceID=0</code></td>
 </tr>
 <tr>
 <td>HOST / EAP</td>
@@ -1727,7 +1727,7 @@ sequenceDiagram
 <p>提醒：本重現環境刻意讓模擬器當監聽方、設備撥入（與正式產線方向相反，見 1.2）；訊息層角色不變。</p>
 </blockquote>
 </li>
-<li><strong>設備撥入</strong>：HT160S（EQUIPMENT，<code>ActiveMode=0</code>，DeviceID=0）連入 port 5098，完成 <code>Select.req → Select.rsp</code>（SELECTED）；之後約每 10s Linktest 維持鏈路。</li>
+<li><strong>設備撥入</strong>：HT160S（EQUIPMENT，<strong>本重現環境設 <code>ActiveMode=1</code></strong>，DeviceID=0）連入 port 5098，完成 <code>Select.req → Select.rsp</code>（SELECTED）；之後約每 10s Linktest 維持鏈路。<blockquote><p>2026-08-03 更正：此步原註明 <code>ActiveMode=0</code>，與「設備主動撥入」矛盾 —— <code>ActiveMode=0</code> 是設備<strong>監聽</strong>（正式產線用，現場實機即為 0，見 1.2），要讓設備撥入必須設 <code>ActiveMode=1</code>。§1.2 表格描述的是<strong>正式產線</strong>方向，本章是刻意反向的實驗室環境。</p></blockquote></li>
 <li><strong>送 Lot 設定 trio</strong>：依序送（順序不可顛倒，理由見 3.2）
    - <code>S2F41 SET_LOT_INFO</code>（預設 <code>SIMU_LOT_A..E</code>）→ 期望 <code>S2F42 HCACK=0</code>
    - <code>S2F41 LOTSTART</code> → 觸發 Lot WebAPI pull（<code>GET http://127.0.0.1:8160/lot/&lt;LOTID&gt;</code>，期望 HTTP=200、ok=1）→ <code>HCACK=0</code>
