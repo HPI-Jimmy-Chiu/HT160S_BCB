@@ -37,7 +37,7 @@ struct TAgvStationDesc
     int         PIndex;        // 1..9
     int         Kind;          // eAgvStationKind
     int         AutoIndex;     // 0..5 for ASK_AUTO, else -1
-    unsigned    SvidCarrierID; // 38202..38210
+    unsigned    SvidCarrierID; // 38202/38203/38204 + Auto1-3 38205-38207 (810) + Auto4-6 38199-38201 (899)
     unsigned    SvidTrayCount; // draft section 6 (non-contiguous past Auto3)
     unsigned    SvidDeviceCnt; // ditto
     unsigned    SvidBinSet;    // ASCII bin setting (Auto only; 0 if none)
@@ -51,7 +51,7 @@ public:
     AnsiString SupplementBitmap;                 // 38219  set at CEID272 fire time
     AnsiString StatusBitmap;                     // 38220  set at CEID273 fire time
     AnsiString FinishBitmap;                     // 38221  set at CEID274 fire time
-    AnsiString CarrierID[AGV_STATION_COUNT];     // 38202..38210 (index P-1)
+    AnsiString CarrierID[AGV_STATION_COUNT];     // 38202-38207 + 38199-38201 (index P-1; see AgvStation[])
     // AI(ht160s-agv-binsetting) 20260713 : TrayCount[0]=Loader is host-supplied
     // (START_AGV LoaderTrayCount CP) because only the Loader consumes it (tray-kind
     // boundary tagging). [1]/[2] (Empty/Color, SVID 38223/38224) stay RESERVED 0 :

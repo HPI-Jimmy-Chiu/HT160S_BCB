@@ -107,9 +107,24 @@ const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
     /*P4*/ { 4, ASK_AUTO,    0, 38205, 38225, 38231, 38234, "AUTO1"  },
     /*P5*/ { 5, ASK_AUTO,    1, 38206, 38226, 38232, 38235, "AUTO2"  },
     /*P6*/ { 6, ASK_AUTO,    2, 38207, 38227, 38233, 38236, "AUTO3"  },
-    /*P7*/ { 7, ASK_AUTO,    3, 38208, 38237, 38240, 38243, "AUTO4"  },
-    /*P8*/ { 8, ASK_AUTO,    4, 38209, 38238, 38241, 38244, "AUTO5"  },
-    /*P9*/ { 9, ASK_AUTO,    5, 38210, 38239, 38242, 38245, "AUTO6"  }
+    //AI(secs-auto-align-899) 20260803 : the Auto4-6 CARRIER ID column is no longer invented.
+    // Rule from the customer : Auto1-3 follow HT9046LS V3.32.810, Auto4-6 follow HT9011UC
+    // V3.33.899. 810 numbers only three output-port tray ids (38205/38206/38207, and it declares
+    // them as SVs - uHGemHT9045_SV.cpp:797-799), so P4-P6 above are untouched. 899 - the six-Auto
+    // machine - names the other three "Output 4/5/6 Tray ID" = 38199/38200/38201
+    // (uHGemHT9045_EC.cpp:1664-1666), so P7-P9 adopt those numbers instead of the former
+    // HT160S-invented 38208/38209/38210. Note 899 declares that whole family (its own 38205-38207
+    // included) in the EC namespace; HT160S keeps the SV namespace because that is what 810 does
+    // for Auto1-3 and the six ports must answer through ONE namespace.
+    // Checked before renumbering : 810 uses nothing in 38195-38201 (its band is 38202, 38205-38207,
+    // 38219+) and HT160S had no other use of 38199-38201. 38208/38209/38210 are now RETIRED - do
+    // not reuse them, a host provisioned before 20260803 still has them bound to AUTO4-6 Carrier ID.
+    // The tray / device / bin-setting columns for Auto4-6 (38237-38245) stay HT160S extensions :
+    // 810's AMR band ends at 38236 and 899 has no AMR SVID family at all, so no family number
+    // exists to adopt (verified in both trees 20260803).
+    /*P7*/ { 7, ASK_AUTO,    3, 38199, 38237, 38240, 38243, "AUTO4"  },
+    /*P8*/ { 8, ASK_AUTO,    4, 38200, 38238, 38241, 38244, "AUTO5"  },
+    /*P9*/ { 9, ASK_AUTO,    5, 38201, 38239, 38242, 38245, "AUTO6"  }
 };
 //---------------------------------------------------------------------------
 TAgvCoordinator::TAgvCoordinator()

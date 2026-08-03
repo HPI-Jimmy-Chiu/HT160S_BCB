@@ -446,19 +446,33 @@ void HT160Gem::AddSV()
     //      9045's semantics than the already-shipped 1102 is; do not "fix" it by making
     //      1103-1105 volatile.
     //  (b) PARTITION. On HT9045 1102 == sum(1103..1108) by construction (its 1102 IS the sum
-    //      of that array). HT160S has SIX Auto stations and only Auto1-3 have a 9045 number
-    //      that is not a business decision - 1106-1108 are 9045's "Fix1-3" and mapping them
-    //      onto HT160S Auto4-6 is KYEC's call, not ours. So slots 6-8 of RPTID 501 stay empty
-    //      and the eight slots do NOT add up to 1102 on a lot that uses Auto4-6. Auto4-6
-    //      output is NOT hidden: those three stations are published on HT160S's own band as
-    //      66025-66027 (see below), so the full six-station picture is 1103/1104/1105 +
-    //      66025/66026/66027.
+    //      of that array). HT160S has SIX Auto stations : 1103-1105 carry Auto1-3 and Auto4-6
+    //      carry the HT90XX family's own Auto4-6 numbers 1259-1261 (registered right below),
+    //      so the six-station picture is 1103/1104/1105 + 1259/1260/1261. Slots 6-8 of the
+    //      host's RPTID 501 STILL stay empty : those slots ask for 1106-1108, which on HT9045
+    //      are "Fix1-3", and mapping the Fix slots onto HT160S Auto4-6 remains KYEC's business
+    //      decision. That is a DIFFERENT question from numbering Auto4-6 - answering the
+    //      latter (1259-1261) does not answer the former - so the eight slots of RPTID 501
+    //      still do not add up to 1102 on a lot that uses Auto4-6.
     //AI(secs-svid-dedupe) 20260803 : these three ARE the Auto1-3 counts now - the parallel
     // 66022/66023/66024 registrations that pointed at the same three cells were removed on the
     // customer's ruling "same information -> one number, and that number is HT9045's".
     HGemPtr->SetSVDataPointer(1103, HType.INT_4_TYPE, "Auto1 Count", "pcs", &tRunData.TrayICCnt[eAuto1], "ICs placed into the Auto1 output tray (9045 SVID 1103)");
     HGemPtr->SetSVDataPointer(1104, HType.INT_4_TYPE, "Auto2 Count", "pcs", &tRunData.TrayICCnt[eAuto2], "ICs placed into the Auto2 output tray (9045 SVID 1104)");
     HGemPtr->SetSVDataPointer(1105, HType.INT_4_TYPE, "Auto3 Count", "pcs", &tRunData.TrayICCnt[eAuto3], "ICs placed into the Auto3 output tray (9045 SVID 1105)");
+    //AI(secs-auto-align-899) 20260803 : Auto4-6 output counts, on the HT90XX family's OWN
+    // Auto4-6 numbers. HT9046LS V3.32.810 (the build KYEC runs) stops at Auto3, which is why
+    // these three used to sit on HT160S's private 66025-66027 band under the comment "9045 has
+    // no number for slots 4-6". That premise was WRONG : HT9011UC V3.33.899 - the same HT90XX
+    // SECS layer on a SIX-Auto machine - registers "Auto 4/5/6 Count" as 1259/1260/1261
+    // (HT9011UC_Code_V3.33.899.0_20260323_Jimmy_20260422\SECSGEM\uHGemHT9045_SV.cpp:262-264,
+    // tagged "For HT-9011UC"), then continues with Fix 7-12 at 1262+. So the family DOES number
+    // a six-Auto machine and HT160S adopts those numbers instead of inventing its own. Checked
+    // for clashes before renumbering : neither reference tree binds 1259-1261 to anything else
+    // (810 does not define 1256-1262 at all) and HT160S had no other use of them.
+    HGemPtr->SetSVDataPointer(1259, HType.INT_4_TYPE, "Auto4 Count", "pcs", &tRunData.TrayICCnt[eAuto4], "ICs placed into the Auto4 output tray (9045-family SVID 1259, from HT9011UC V3.33.899)");
+    HGemPtr->SetSVDataPointer(1260, HType.INT_4_TYPE, "Auto5 Count", "pcs", &tRunData.TrayICCnt[eAuto5], "ICs placed into the Auto5 output tray (9045-family SVID 1260, from HT9011UC V3.33.899)");
+    HGemPtr->SetSVDataPointer(1261, HType.INT_4_TYPE, "Auto6 Count", "pcs", &tRunData.TrayICCnt[eAuto6], "ICs placed into the Auto6 output tray (9045-family SVID 1261, from HT9011UC V3.33.899)");
     //AI(secs-startmode) 20260802 : slot 6 of the host's RPTID 502. Value is 9045-numbered
     // (see RefreshSVData) : 0=Continuous Start, 1=Initial Start. HT9045 declares this one as
     // an EC with min 0 / max 8 and carries the whole legend in its EC description, so a host
@@ -520,19 +534,16 @@ void HT160Gem::AddSV()
     // -- Output / production (66020-66029) --
     HGemPtr->SetSVDataPointer(66020, HType.INT_4_TYPE, "Total IC", "pcs", &svTotalIC, "total IC processed this lot/run");
     HGemPtr->SetSVDataPointer(66021, HType.INT_4_TYPE, "Total Sorted", "pcs", &svTotalSorted, "total IC sorted into a bin");
-    //AI(secs-bclass-0803) 20260803 : per-Auto output counts for the three HT160S stations that
-    // HT9045 has NO number for. 9045 numbers only three Autos (1103-1105, registered above) and
-    // calls the next three "Fix1-3" (1106-1108); mapping those onto HT160S Auto4-6 is a business
-    // decision for KYEC, so until that ruling lands Auto4/5/6 live here, on HT160S's own band.
-    //AI(secs-svid-dedupe) 20260803 : this band used to START at 66022 and republish Auto1-3
-    // through the SAME tRunData.TrayICCnt cells as 1103-1105. The customer ruled that duplicated
-    // information must collapse onto the HT9045 number, so 66022/66023/66024 were removed and
-    // this band now begins at 66025. The gap at 66022-66024 is DELIBERATE: do not reuse those
-    // three numbers for anything else - a host configured before 20260803 may still have them
-    // bound to "Auto1-3 Count" and would silently misread whatever took their place.
-    HGemPtr->SetSVDataPointer(66025, HType.INT_4_TYPE, "Auto4 Count", "pcs", &tRunData.TrayICCnt[eAuto4], "ICs placed into the Auto4 output tray (no 9045 number - 9045 calls slot 4 Fix1)");
-    HGemPtr->SetSVDataPointer(66026, HType.INT_4_TYPE, "Auto5 Count", "pcs", &tRunData.TrayICCnt[eAuto5], "ICs placed into the Auto5 output tray (no 9045 number - 9045 calls slot 5 Fix2)");
-    HGemPtr->SetSVDataPointer(66027, HType.INT_4_TYPE, "Auto6 Count", "pcs", &tRunData.TrayICCnt[eAuto6], "ICs placed into the Auto6 output tray (no 9045 number - 9045 calls slot 6 Fix3)");
+    //AI(secs-svid-dedupe) 20260803 : 66022/66023/66024 "Auto1-3 Count" USED TO SIT HERE and
+    // republished the SAME tRunData.TrayICCnt cells as 1103-1105; the customer ruled that
+    // duplicated information must collapse onto the HT9045 number, so they were removed.
+    //AI(secs-auto-align-899) 20260803 : 66025/66026/66027 "Auto4-6 Count" ALSO used to sit here,
+    // on the premise that the HT90XX family has no Auto4-6 number. HT9011UC V3.33.899 disproves
+    // that (1259/1260/1261), so those three moved up next to 1103-1105 and this band no longer
+    // publishes any per-Auto output count at all.
+    // The whole 66022-66027 gap is DELIBERATE : do NOT reuse any of those six numbers for
+    // anything else - a host configured before 20260803 may still have them bound to
+    // "Auto1-6 Count" and would silently misread whatever took their place.
     // -- Current Lot (66030-66039) --
     HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
     HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
