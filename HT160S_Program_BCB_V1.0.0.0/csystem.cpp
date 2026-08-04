@@ -1816,7 +1816,9 @@ void ProcessMotion()
 			if(fMain!=NULL) fMain->EmitCleanOutOK();
 			if(GeneralSetting.bUseAMR)
 			{
-				//AMR mode : run the FULL Lot End automatically (no operator modal) -- CEID12 +
+				//AI(secs-comment-truth) 20260805 : was "CEID12" - wrong since the CEID dictionary was
+				//realigned to HT9045 (ab1b99e). Lot End is CEID 8; 12 is Switch Engineer Mode.
+				//AMR mode : run the FULL Lot End automatically (no operator modal) -- CEID 8 +
 				//UPH/Soter/lastdata + WhiteList revert + ArchiveWorkOrder + LotRegistry.Clear +
 				//LotBinBinding.Clear, all inside DoLotEndProcess (reads live lot data, so call it
 				//BEFORE InitialAllTask). Investigation confirmed CleanOut-finish is reachable
@@ -1857,12 +1859,16 @@ void ProcessMotion()
 	{
 		if(CheckOneCycleFinish())
 		{
-			//AI(secs-kyec-rcmd4) 20260728 : emit S6F11 CEID27 "One Cycle Finish" FIRST, mirroring
-			//the CleanOut-finish path above (EmitCleanOutOK). CEID 27 was declared and registered
+			//AI(secs-kyec-rcmd4) 20260728 : emit S6F11 "One Cycle Finish" FIRST, mirroring the
+			//CleanOut-finish path above (EmitCleanOutOK). The event was declared and registered
 			//but sent from NOWHERE, so a host that drove S2F41 ONE_CYCLE and got HCACK=0 had no
-			//way to learn the cycle actually finished. KYEC's HT9045 emits its equivalent (CEID 41)
-			//and did so 3x on 2026-06-08 - HCACK was 0 in all eleven ONE_CYCLE cases, so the host
-			//can distinguish a real cycle ONLY by this finish event.
+			//way to learn the cycle actually finished. KYEC's HT9045 emits its equivalent and did
+			//so 3x on 2026-06-08 - HCACK was 0 in all eleven ONE_CYCLE cases, so the host can
+			//distinguish a real cycle ONLY by this finish event.
+			//AI(secs-comment-truth) 20260805 : this comment said CEID 27 throughout. That was true
+			//only before ab1b99e made HT160's CEID dictionary a verbatim copy of HT9045's: One Cycle
+			//Finish is now CEID 41 (SECS_EVENT.OneCycleFinish), the SAME number 9045 uses, and 27 is
+			//Change Machine State in BOTH dictionaries. See the caveat note below.
 			//AI(secs-msggap-fix) 20260729 : recount of that correlation - the 11 host commands split
 			//3 ACCEPTED / 8 SWALLOWED (not 2/9), and the three CEID 41s do NOT map 1:1 onto the
 			//accepted commands : one (18:51:58) follows a LOCAL OneCycle press with the nearest host
@@ -1870,11 +1876,13 @@ void ProcessMotion()
 			//stranded by a HALT 0.85 s later, so it never produced a 41 at all. That stranded arm is
 			//the field evidence behind the SECS stale-arm guard in TfMain::OneCycleCore and the
 			//discard in MachineStop.
-			//TWO HOST-SIDE CAVEATS on our CEID 27 : (1) 27 means "Change Machine State" in KYEC's
-			//9045 dictionary and is its busiest event of the day (~406 sends), so a host provisioned
-			//from that dictionary MISREADS this event; (2) 9045 also emits an S5F1 (ALID 316001640
+			//AI(secs-comment-truth) 20260805 : caveat (1) is RESOLVED and has been deleted - it said
+			//"27 means Change Machine State in KYEC's 9045 dictionary, so a host provisioned from
+			//that dictionary MISREADS this event". Since ab1b99e we emit 41, the number 9045 itself
+			//uses, so there is nothing to misread. ONE HOST-SIDE CAVEAT remains on CEID 41:
+			//9045 also emits an S5F1 (ALID 316001640
 			//"One cycle finish") alongside CEID 41 and HT160 does not, so a host keying off that
-			//ALID sees nothing. Both are declared in
+			//ALID sees nothing. It is declared in
 			//docs/SECS/HT160S_SECS_Interface_Spec_20260727.md as customer-confirmation items.
 			//EventReport self-gates on USE_SECS_GEM + HSMS SELECTED.
 			if(fMain!=NULL) fMain->EmitOneCycleOK();

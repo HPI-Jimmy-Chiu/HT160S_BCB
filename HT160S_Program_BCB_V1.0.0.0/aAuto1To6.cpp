@@ -877,8 +877,11 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
     //AI(secs-ceid-align) 20260728 : Auto4-6 Unloadtray CEIDs realigned to HT9045
     // (145/146/147). The old 140/141/142 collided with 9045 CEID 140 Prepare Load
     // Tray and 141 GEM Control State Change, so a 9045-dictionary host misread them.
-    // Unregistered on purpose: EventReport sends S6F11 with an empty report list,
-    // which is exactly what 9045 does for these CEIDs (KYEC log 2026-06-08 CEID 136).
+    // AI(secs-comment-truth) 20260805 : was "Unregistered on purpose: EventReport sends
+    // S6F11 with an empty report list". No longer true - ab1b99e's 1-292 loop registers all
+    // six of these ids like every other 9045 number, so they now ship the default Report 1
+    // (which since the 20260804 alignment holds exactly one SV, 1027 System Time), not an
+    // empty L[0]. 136/137/138 and 145/146/147 are HT9045's own Unloadtray numbers.
     int AutoCeid[6]={136, 137, 138, 145, 146, 147};
     int &Task = DischargeTask[Index];
     if(Flag==0)

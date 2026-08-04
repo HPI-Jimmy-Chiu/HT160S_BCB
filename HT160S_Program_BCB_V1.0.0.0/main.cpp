@@ -3097,7 +3097,11 @@ void __fastcall TfMain::DoLotEndProcess()
 //---------------------------------------------------------------------------
 //AI(ht160s-overcount-tripqueue D3) 20260721 : emit S6F11 CEID42 "Clean Out Finish"
 //(was defined but never sent). Called from csystem's CleanOut-finish BEFORE the Lot End
-//so the host sees CleanOutOK(28) then PressLotEnd(12). EventReport self-gates on
+//AI(secs-comment-truth) 20260805 : was "CleanOutOK(28) then PressLotEnd(12)". Both numbers
+//were from the pre-alignment dictionary. It is Clean Out Finish = CEID 42 then Lot End =
+//CEID 8; in the HT9045-aligned dictionary we now use, 28 is Retry Pressed and 12 is Switch
+//Engineer Mode.
+//so the host sees Clean Out Finish (42) then Lot End (8). EventReport self-gates on
 //USE_SECS_GEM + HSMS SELECTED, so this is a no-op when SECS is off / link is down.
 void __fastcall TfMain::EmitCleanOutOK()
 {

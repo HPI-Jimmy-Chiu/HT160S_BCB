@@ -1402,7 +1402,16 @@ void THGem::SetCEIDContent(unsigned iCeid, AnsiString CeidAlias, unsigned iRepor
         p->Mode = Mode;      //AI(secs-reportdef) 20260724 : 0=host, 1=firmware
         CEIDList->Add(p);
     }
-    p->Alias = CeidAlias;
+    //AI(secs-ceid-alias-keep) 20260805 : only ADOPT a non-empty alias. The 4-arg overload above
+    //  passes "" (it only wants to change the link), and S2F35 goes through that overload - so an
+    //  unconditional assign here wiped the firmware CENAME of every CEID the host linked. S1F24 then
+    //  answered a zero-length CENAME, breaking the published "292 entries byte-identical to your
+    //  EventReport_CEID.def" promise; KYEC's provisioning links 31 CEIDs including 272-275, i.e. the
+    //  four AMR names that were only just corrected. A freshly created node's Alias is already "",
+    //  so the empty case needs no assignment and the firmware's own AddCEID (always non-empty for
+    //  named events) is unaffected.
+    if(CeidAlias!="")
+        p->Alias = CeidAlias;
     int n = (int)iReportCount;
     if(n<0) n=0;
     if(n>32) n=32;

@@ -55,6 +55,13 @@ public:
     // AI(ht160s-agv-binsetting) 20260713 : TrayCount[0]=Loader is host-supplied
     // (START_AGV LoaderTrayCount CP) because only the Loader consumes it (tray-kind
     // boundary tagging). [1]/[2] (Empty/Color, SVID 38223/38224) stay RESERVED 0 :
+    // AI(secs-comment-truth) 20260805 : the reserved-0 set is WIDER than the two SVIDs named
+    // below - DeviceCount[1]/[2] (SVID 38229/38230) are reserved for the same reason, and
+    // CarrierID[1] (SVID 38203 Empty Carrier ID) is never written either. So the full list of
+    // registered-but-never-maintained AMR SVIDs is 38203 / 38223 / 38224 / 38229 / 38230.
+    // Separately, CarrierID[0] (38202 Loader Carrier ID) is also never written - the identity
+    // tray's 2D goes to CarrierID[AMR_IDENTITY_CARRIER_INDEX] = index 2 = SVID 38204. That one
+    // is a customer-facing surprise (their RPTID 2000 binds 38202), not a reservation.
     // HT9045/KYEC drive Empty/Color purely by sensor+TrayArm with zero SECS, and
     // HT160 has no stack-depth counting hardware (only a present/empty InputEnd
     // sensor). [3..8]=Auto are refreshed live from TMyCar. See uHGemHT160 START_AGV.

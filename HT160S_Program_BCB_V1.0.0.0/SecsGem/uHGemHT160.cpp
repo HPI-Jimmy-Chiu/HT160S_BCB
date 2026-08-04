@@ -44,8 +44,10 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     // [SECS] InitialControlState (default On-Line Remote) and clears this. See bControlStateSeeded.
     iControlSubstate     = 1;
     bControlStateSeeded  = false;
-    sSystemTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
-    sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
+    //AI(secs-oneinstant) 20260805 : ONE Now() for both, same reason as RefreshSVData below.
+    TDateTime tBoot = Now();
+    sSystemTime = tBoot.FormatString("yyyy/mm/dd hh:nn:ss");
+    sGemClock   = tBoot.FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
 
     //AI(ht160s-secsgem) 20260611 : init SV snapshot members (refreshed on demand)
     //AI(secs-66xxx-retire) 20260804 : the whole HT160-only 66000+ band was retired on the customer's
@@ -54,6 +56,11 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     // is what SVID 1102 Output Total Count is bound to, not because 66021 wanted it.
     svTotalSorted   = 0;
     svUPH           = 0;
+    //AI(secs-skipiccount-init) 20260805 : SVID 37010. This was the ONE sv* member the ctor missed,
+    // and RefreshSVData deliberately does not touch it (it must latch the last SKIP input), so before
+    // the first SKIP a host S1F3 read back uninitialised heap - HT160Gem is a heap object and the base
+    // ctor does no memset. Zero it here, NOT in RefreshSVData, or the latch semantics are lost.
+    svSkipICCount   = 0;
     //AI(secs-66xxx-retire) 20260804 : SVID 1008 Run Mode replaces 66000. HT-160S is a sorter with no
     // RT and no EQC pass, so the family's "0:Normal; 1:RT; 2:EQC" enumeration is answered as a
     // CONSTANT "0" - set once here and never touched by RefreshSVData.
@@ -677,11 +684,16 @@ void HT160Gem::AddSV()
 // Kept NULL-safe (fNote may not exist yet) and type-safe (no bool/enum binding).
 void HT160Gem::RefreshSVData()
 {
-    sSystemTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
+    //AI(secs-oneinstant) 20260805 : ONE Now() for both SVs. Two separate Now() calls straddle the
+    // second boundary often enough to matter, and a host cross-checking 3 against 1027 inside the
+    // SAME S1F4 / S6F11 would see them 1 second apart - which contradicts both this function's own
+    // "Same instant as 1027" comment and the published "same instant, SEMI 16-char format" wording.
+    TDateTime tNow = Now();
+    sSystemTime = tNow.FormatString("yyyy/mm/dd hh:nn:ss");
     //AI(secs-bclass-0803) 20260803 : SVID 3 GemClock. Same instant as 1027 above, in the
     // 16-char SEMI E5 TIME the host parses (identical recipe to the shipping S2F18 reply).
     // Must NOT alias sSystemTime - see the sGemClock comment in uHGemHT160.h.
-    sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";
+    sGemClock   = tNow.FormatString("yyyymmddhhnnss") + "00";
     //AI(secs-bclass-0803) 20260803 : SVID 1501 Setup File. MANDATORY - ecRecipeName was only
     // assigned in S2F14_EquipmentConstanData, and the KYEC host never sends S2F13, so without
     // this the SV would answer an empty string. Pure string getter, no VCL, no file IO.
@@ -1042,7 +1054,13 @@ void HT160Gem::AddCEID()
     unsigned rptSup[2]; rptSup[0] = 2; rptSup[1] = 6;
     unsigned rptSta[1]; rptSta[0] = 3;
     unsigned rptFin[2]; rptFin[0] = 4; rptFin[1] = 6;
-    unsigned rptCid[1]; rptCid[0] = 7;   //AI(ht160s-agv-identity2d) 20260713 : CEID275 -> dedicated report 7 ([38202] only), NOT the 9-wide report 5 (AGVLdID must not ship 8 stale carrier ids)
+    //AI(secs-comment-truth) 20260805 : report 7 is [38204], NOT [38202]. The literal here said
+    // 38202 while AddReprot 40 lines down builds report 7 out of
+    // AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID = index 2 = 38204 (the Color CCD is the
+    // station that actually reads the identity tray's 2D). Two audit passes were misled by this
+    // line. Nobody writes CarrierID[0] at all, so "fixing" report 7 back to 38202 to match this
+    // comment would have shipped a permanently empty 2D field.
+    unsigned rptCid[1]; rptCid[0] = 7;   //AI(ht160s-agv-identity2d) 20260713 : CEID275 -> dedicated report 7 ([38204] only), NOT the 9-wide report 5 (AGVLdID must not ship 8 stale carrier ids)
     //AI(secs-ceid-alias-fix) 20260803 : the alias MUST come from EventDescription, not from a
     // literal. These four calls re-register 272-275 to swap their report link, and
     // SetCEIDContent overwrites Alias unconditionally - so the four literals that used to sit
@@ -1052,6 +1070,11 @@ void HT160Gem::AddCEID()
     // machine's own EventReport_CEID.def : it answers "AMR Supplement" / "AMR LDUnLD Status" /
     // "AMR LDUnLD Finish" / "AMR LD ID", we answered the AGV* literals. Every other id in
     // 1-292 already matched. Do not reintroduce a literal here.
+    //AI(secs-ceid-alias-keep) 20260805 : "SetCEIDContent overwrites Alias unconditionally" above is
+    // no longer true - it now only adopts a NON-EMPTY alias, because the 4-arg overload (which is
+    // what host S2F35 goes through) passes "" and was wiping the CENAME of every CEID the host
+    // linked. These four calls still pass EventDescription and are still correct as written; the
+    // guard is belt-and-braces for them, and the real fix for S2F35. Do not pass "" here.
     HGemPtr->SetCEIDContent(272, EventDescription[SECS_EVENT.AGVSupplement  ], 2, rptSup, EquDefault);
     HGemPtr->SetCEIDContent(273, EventDescription[SECS_EVENT.AGVLDUnLDStatus], 1, rptSta, EquDefault);
     HGemPtr->SetCEIDContent(274, EventDescription[SECS_EVENT.AGVLDUnLDFinish], 2, rptFin, EquDefault);
@@ -1342,15 +1365,19 @@ void HT160Gem::S1F12_StatusVariableNamelistReply()
 //  Unknown CEID -> { CEID, "", L,0 } so the top-level shape stays constant (HT9045
 //  answers the same way; see its S1F24 "no such CEID" branch).
 //
-//  FULL DUMP is deliberate. AddCEID registers all 292 HT9045 ids, and only 57 of them
+//  FULL DUMP is deliberate. AddCEID registers all 292 HT9045 ids, and only 56 of them
 //  have an emit site on HT160S - this reply lists all 292 anyway:
+//AI(secs-comment-truth) 20260805 : this block said 57 in one sentence and 52 in the next.
+//  The audited count is 56 = 45 unconditional + 10 that need [HardwareInstall] UseAMR=1
+//  (35/36/37/148/149/150 Auto Full and 272/273/274/275 AMR) + 1 that needs [SECS]
+//  AskSkipICCount=1 (CEID 78). That matches the V column of the customer workbook's CEID sheet.
 //    - HT9045 dumps its whole dictionary too, so a host that diffs the two machines'
 //      namelists sees one dictionary, which is the entire point of the 20260729 align.
 //    - The namelist is NOT a subscription. The host binds what it wants with S2F33 +
 //      S2F35 and arms it with S2F37, so a wider namelist cannot make an unemitted CEID
-//      start arriving. Trimming to the 52 would instead hide ids the host may legitimately
+//      start arriving. Trimming to the 56 would instead hide ids the host may legitimately
 //      pre-define reports against (e.g. for a later firmware that does emit them).
-//  Size: 292 x (name + report 1's 13 VIDs) is ~38 KB against the 1 MB encode buffer, and
+//  Size: 292 x (name + report 1's 1 VID) is ~38 KB against the 1 MB encode buffer, and
 //  DataItemOut's overflow backstop poisons the message rather than truncating it.
 //---------------------------------------------------------------------------
 void HT160Gem::S1F24_CollectionEventNamelist()
@@ -1785,11 +1812,19 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
     HGemPtr->StringOut(sLog);
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-secsgem) 20260612 : local GUI EC editor write path. Enforces the
-//  exact same policy as the host S2F16: only the tray-form geometry ECs
-//  (9045 Type1 band 2758-2763) are settable, only while the machine is idle, and
-//  a successful write is persisted to the active recipe's setup.ini. Returns 0=ok,
-//  1=not settable / unknown, 2=busy, 3=convert/range error.
+//AI(ht160s-secsgem) 20260612 : local GUI EC editor write path for the tray-form geometry ECs
+//  (9045 Type1 band 2758-2763), settable only while the machine is idle; a successful write is
+//  persisted to the active recipe's setup.ini. Returns 0=ok, 1=not settable / unknown, 2=busy,
+//  3=convert error.
+//AI(secs-guiec-numguard) 20260805 : this is NOT "the exact same policy as the host S2F16" - the
+//  old comment claimed that and it was wrong twice over: the GUI cannot write ECID 1007 (the host
+//  can, and deliberately without the idle gate), and until today the GUI had no numeric guard at
+//  all. WriteECValueByString uses StrToFloatDef / StrToIntDef, so 'abc' / '7O.5' / a blank turned
+//  into 0, returned success, and TrayForm.Save persisted that 0 into the live recipe while the UI
+//  said "Write OK". An XPitch or XDivision of 0 collapses every Loader / SortArm slot onto one
+//  position. The 20260804 "no more silent zero" work only ever covered the host S2F15 path; the
+//  guards it added are reused here so both paths reject the same values. This also makes the
+//  caller's case 3 reachable - it was dead code before.
 int HT160Gem::GuiWriteTrayEC(unsigned ECID, AnsiString sValue)
 {
     if(HGemPtr==NULL)
@@ -1801,6 +1836,12 @@ int HT160Gem::GuiWriteTrayEC(unsigned ECID, AnsiString sValue)
 
     if(ECID<2758 || ECID>2763)
         return 1;        // not a host/GUI-settable constant
+
+    //AI(secs-guiec-numguard) 20260805 : 2762 / 2763 are the INT_4 Division counts, 2758-2761 the
+    //  FT_8 pitches / starts - same split the host S2F15 pass 1 uses.
+    bool bNumOk = (ECID>=2762) ? S2F15IsInt(sValue) : S2F15IsFloat(sValue);
+    if(!bNumOk)
+        return 3;        // not a number - refuse instead of writing 0
 
     if(HGemPtr->WriteECValueByString(ECID, sValue)!=0)
         return 3;        // unconvertible value
@@ -1861,11 +1902,22 @@ static bool IsTesterOnlyRcmd(AnsiString S)
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260610 : S2F41 SET_LOT_INFO variable-length multi-Lot.
-//  Reads outer L[2]{ A "SET_LOT_INFO", L[n]{ A lotID ... } }, refills
-//  LotRegistry (overwrite, D1), backfills first lot to edLotNo (D2), rejects
-//  while producing / IC under machine (D3, HCACK=4). HCACK: 0=ok,1=format,
-//  2=param,4=busy (D4); cap HT160_MAX_LOT=64, over -> HCACK=2 (D5).
+//  Reads outer L[2]{ A "SET_LOT_INFO", L[n]{ item ... } }. Each item may be either
+//  A lotID (flat list - this is the SHIPPED path and what the simulator sends) or
+//  L[1|2]{ A custLot [, A kyecLot] }; the two may be mixed in one packet.
+//  Backfills first lot to edLotNo (D2). HCACK: 0=ok, 1=format, 2=param,
+//  4=re-tagging an existing lot's KYEC id while IC are under the machine;
+//  cap HT160_MAX_LOT=64, over -> HCACK=2 (D5).
 //  S2F42 reply: L[2]{ B HCACK, L[0] }.
+//AI(secs-comment-truth) 20260805 : two claims in this header were inverted by the 20260730
+//  lot-lifecycle rework (0ba540a) and stayed here for five weeks:
+//   - "refills LotRegistry (overwrite, D1)" -> it is ADDITIVE. Nothing is cleared; LotRegistry
+//     and LotBinBinding survive, so a lot can be appended to an in-progress work order.
+//     Capacity is checked against the MERGED count.
+//   - "rejects while producing / IC under machine (D3, HCACK=4)" -> that whole-packet busy gate
+//     was REMOVED. Producing is fine. The only surviving 4 is the narrow re-tag case above.
+//  CLEAR_LOT_INFO is now the only way to end/withdraw a lot. Do not restore the old wording
+//  from this file's git history.
 //---------------------------------------------------------------------------
 int HT160Gem::S2F42_Host_Command_Acknowledge()
 {
@@ -1900,7 +1952,11 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
         {
             S = "";
         }
-        S = S.UpperCase();
+        //AI(secs-rcmd-trim) 20260805 : Trim BEFORE UpperCase. Without it a leading space defeated
+        //  every AnsiPos(...)==1 prefix branch as well as the eight exact-match branches, so
+        //  " PAUSE" fell through to the catch-all HCACK=1 - while IsTesterOnlyRcmd (which Trims
+        //  itself) answered " AUTO_CLEAN" with 2. Same handler, two different tolerances.
+        S = S.Trim().UpperCase();
 
         if(S.AnsiPos("SET_LOT_INFO")==1)
         {
@@ -1983,6 +2039,22 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                                 break;
                             }
                             custLot = AnsiString(str);
+                            //AI(secs-setlotinfo-blank) 20260805 : same Trim gate the L[2] branch
+                            //  above already has. SECS ASCII is routinely space-padded, and a
+                            //  blank-filled lot id used to pass this len>0 test, get counted as a
+                            //  new lot by the capacity check (FindLotIndex Trims, so it answers -1),
+                            //  then be refused by AddLot inside the COMMIT loop -> HCACK=2 + break
+                            //  with the earlier lots of the same packet already in LotRegistry, and
+                            //  RefreshLotListFromRegistry / SaveWorkOrder skipped because HCACK!=0.
+                            //  That left RAM holding lots the host believes were all rejected, and
+                            //  RAM out of step with WorkOrder.json - breaking this branch's own
+                            //  "commit atomically" contract. Catching it here in the PARSE stage
+                            //  keeps the commit loop unable to reach AddLot<0 again.
+                            if(custLot.Trim()=="")
+                            {
+                                HCACK = 2;                       // blank ASCII lot id -> param error
+                                break;
+                            }
                         }
                         else
                         {
@@ -3423,7 +3495,11 @@ void HT160Gem::S125F2_EnableDisableECDataAcknowledge()
     //  L,45. ALED is a BIT-7 flag on this host, not a boolean - HT9045 tests `T & 0x80`, which
     //  is why 0x01 means DISABLE despite looking like a true.
     //  Nothing is stored. The only thing the EC-enable list gates on HT9045 is whether an EC
-    //  change fires CEID 48, and HT160 registers no such CEID and has no EC-enable table, so
+    //AI(secs-comment-truth) 20260805 : the rest of this sentence used to read "and HT160 registers
+    //  no such CEID and has no EC-enable table". Half of that is now false - CEID 48 Change EC IS
+    //  registered (AddCEID) and IS emitted from the S2F15 write path once the whole packet commits.
+    //  What remains true is that HT160 has no per-ECID enable table, so CEID 48 is deliberately NOT
+    //  gated by this S125F1 list - which is still why
     //  an enable table here would be dead weight. The referenced ECIDs are logged instead,
     //  the same referenced-set discovery logging S2F33 does for unknown SVIDs.
     //  ACK 0=Acknowledge, 1=Denied. Exactly ONE reply per request - see the Dispatch comment
@@ -3470,7 +3546,10 @@ void HT160Gem::S125F2_EnableDisableECDataAcknowledge()
             }
             //AI(secs-msggap-fix) 20260729 : do not ACK=0 an ECID this machine does not have.
             //A 0 tells the host "EC-change reporting is now enabled for that ECID" - it is not,
-            //and with no EC-enable table and no EC-change event on HT160 it never will be.
+            //AI(secs-comment-truth) 20260805 : was "and with no EC-enable table and no EC-change
+            //event on HT160 it never will be". HT160 does emit CEID 48 Change EC now; what it has
+            //no per-ECID enable table for is deciding WHICH ECs report, so this list still cannot
+            //be honoured and a 0 would still be a lie.
             //HT9045 answers 1 per unregistered ECID (uHGemClass.cpp:2650-2653), wire-proven at
             //KYEC by the four 0x01 acks at list positions 7/8/10/45 = ECIDs 2101/2102/2004/8506,
             //the exact four missing from the whole 9045 tree. HT160 sends ONE ack per request, so
@@ -3478,7 +3557,9 @@ void HT160Gem::S125F2_EnableDisableECDataAcknowledge()
             //the offenders in the log. KYEC's list is 45 ECIDs of which HT160 owns exactly one
             //(1501), so this normally answers 1 - which is the truth, where 0 was a lie.
             //GetECName() is used instead of the private FindECItem(): it returns "" for an
-            //unregistered ECID, and all seven ECs this machine registers have a non-empty name.
+            //unregistered ECID, and all eight ECs this machine registers have a non-empty name.
+            //AI(secs-comment-truth) 20260805 : "seven" was the count before ECID 1007 Operator ID
+            //was added on 2026-08-03. It is eight: 1501, 1007, 2758-2763.
             if(HGemPtr->GetECName((unsigned)strtoul(sTmp.c_str(), NULL, 10))=="")
             {
                 nUnknownEc++;
