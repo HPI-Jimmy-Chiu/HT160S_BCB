@@ -138,7 +138,6 @@ __published:	// IDE-managed Components
     TSpeedButton *sbMaintance;
     TSpeedButton *sbOffset;
     TSpeedButton *sbSpeed;
-    TSpeedButton *sbTool;
     TSpeedButton *sbMessage;
     TSpeedButton *sbExit;
     TSpeedButton *sbMonitor;
@@ -401,7 +400,6 @@ __published:	// IDE-managed Components
     void __fastcall sbMaintanceClick(TObject *Sender);
     void __fastcall sbOffsetClick(TObject *Sender);
     void __fastcall sbSpeedClick(TObject *Sender);
-    void __fastcall sbToolClick(TObject *Sender);
     void __fastcall sbMessageClick(TObject *Sender);
     void __fastcall sbExitClick(TObject *Sender);
     void __fastcall sbMonitorClick(TObject *Sender);

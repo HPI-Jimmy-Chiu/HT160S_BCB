@@ -25,8 +25,7 @@
 | Maintance | 按鈕 | 開啟維護畫面 |
 | Offset | 按鈕 | 開啟 Offset 偏移補正畫面 |
 | Speed | 按鈕 | 開啟速度設定畫面 |
-| Tools | 按鈕 | 開啟系統工具畫面 |
-| Message | 按鈕 | 開啟訊息/警報視窗 |
+| Message | 按鈕 | 開啟訊息畫面（保留頁，目前無內容）。警報視窗改由警報發生時自動彈出 |
 | Monitor | 按鈕 | 切換至 MonitorView 監看分頁 |
 | Exit | 按鈕 | 關閉主視窗、離開程式 |
 
@@ -40,7 +39,7 @@
 | Motion View | 按鈕 | 切換至 Motion View 動作模擬分頁 |
 | Other | 按鈕 | 切換至 Other 分頁，含 Lock/IO/Suck 狀態 |
 
-> 註：頂部功能列實際螢幕文字已由截圖（`screenshots/main-overview.png`）與 DFM Caption 確認：**Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit**（圖示＋文字；「Maintance」為機上實際拼字）。DFM Hint「Change Language」為複製貼上遺留，非按鈕功能。
+> 註：頂部功能列實際螢幕文字已由截圖（`screenshots/main-overview.png`）與 DFM Caption 確認：**Language / Product / Maintance / Offset / Speed / Message / Monitor / Exit**（圖示＋文字；「Maintance」為機上實際拼字）。DFM Hint「Change Language」為複製貼上遺留，非按鈕功能。原本位於 Speed 與 Message 之間的 Tools 鍵只會開出一片空白視窗，已於 2026-08-04 移除。
 
 ---
 

@@ -114,13 +114,14 @@ foreach($t in $mainTabs){
 }
 
 # ----- toolbar sub-screens from main (open modal -> capture -> close) -----
-# client-relative centers (rootForm 309,54): Product=214, Offset=492, Speed=631, Tools=770, Message=909 ; all y=27
+# client-relative centers (rootForm 309,54): Product=214, Offset=492, Speed=631, Message=770 ; all y=27
+# 20260804 : the Tools button was removed (it only ever opened an empty form) and the
+# buttons to its right shifted one pitch (139) left, so Message moved 909 -> 770.
 $toolbar = @(
   @{n="screen-product"; f="screen-product.png"; x=214; y=27},
   @{n="screen-offset";  f="screen-offset.png";  x=492; y=27},
   @{n="screen-speed";   f="screen-speed.png";   x=631; y=27},
-  @{n="screen-tools";   f="screen-tools.png";   x=770; y=27},
-  @{n="screen-message"; f="screen-message.png"; x=909; y=27}
+  @{n="screen-message"; f="screen-message.png"; x=770; y=27}
 )
 foreach($t in $toolbar){
   try{

@@ -689,20 +689,18 @@ void __fastcall TfMain::sbSpeedClick(TObject *Sender)
     ShowTopForm(fSpeed, sbSpeed);
 }
 //---------------------------------------------------------------------------
-void __fastcall TfMain::sbToolClick(TObject *Sender)
-{
-    EventReport(SECS_EVENT.EnterTool);          //17 Enter Tool Page (HT160S FormSysTools)
-    ShowTopForm(FormSysTools, sbTool);
-}
-//---------------------------------------------------------------------------
 void __fastcall TfMain::sbMessageClick(TObject *Sender)
 {
     //AI(secs-ceid-align9045) 20260729 : CEID 22 "Enter Message Page" (HT9045 has the same
-    //button). HT160S's Message button browses fNote (the alarm/note form) as a page, which is
-    //the same operator action HT9045 reports - so this id is NOT one of the "HT160S has no such
-    //page" cases. Reported from the button handler like the other four page-entry ids.
+    //button). Reported from the button handler like the other page-entry ids.
+    //AI(ht160s-toolbar) 20260804 : re-pointed from fNote to fData. fNote is the ALARM /
+    //recovery form, not a page : showing it modally with no alarm pending sounded the buzzer
+    //(note.cpp FormShow PlayAlarmBuzzer), handed the physical operator panel to
+    //TfNote::ScanKey (main.cpp ScanPanelKeys early-returns while fNote->fShow) and let the
+    //panel PAUSE key run DecStopAllMotor() from what the operator thinks is an info page.
+    //fData is HT172's Message page (main.cpp:948 fData->ShowModal), still an empty stub here.
     EventReport(SECS_EVENT.EnterMessage);
-    ShowTopForm(fNote, sbMessage);
+    ShowTopForm(fData, sbMessage);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbExitClick(TObject *Sender)
@@ -1862,19 +1860,21 @@ bool __fastcall TfMain::SmokeProbeTopForms(AnsiString &OpenedForms, AnsiString &
         SmokeShowTopForm(fSpeed);
         OpenedForms += ",Speed";
 
-        ProbeStage = "Tools:create";
-        if(FormSysTools == NULL)
-            FormSysTools = new TFormSysTools(this);
-        ProbeStage = "Tools:show";
-        SmokeShowTopForm(FormSysTools);
-        OpenedForms += ",Tools";
-
         ProbeStage = "Message:create";
+        if(fData == NULL)
+            fData = new TfData(this);
+        ProbeStage = "Message:show";
+        SmokeShowTopForm(fData);
+        OpenedForms += ",Message";
+
+        //AI(ht160s-toolbar) 20260804 : fNote has no toolbar button (it is the alarm form),
+        //but keep it in the smoke probe - it is the most safety-critical screen we own.
+        ProbeStage = "Note:create";
         if(fNote == NULL)
             fNote = new TfNote(this);
-        ProbeStage = "Message:show";
+        ProbeStage = "Note:show";
         SmokeShowTopForm(fNote);
-        OpenedForms += ",Message";
+        OpenedForms += ",Note";
         return true;
     }
     catch(Exception &E)

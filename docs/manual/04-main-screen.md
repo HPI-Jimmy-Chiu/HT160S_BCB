@@ -24,12 +24,11 @@ Main 分頁是 HT160S 的主操作頁面，集中了頂部功能列、生產計�
 | Maintance | 按鈕 | 開啟維護畫面。 |
 | Offset | 按鈕 | 開啟 Offset 偏移補正畫面。 |
 | Speed | 按鈕 | 開啟速度設定畫面。 |
-| Tools | 按鈕 | 開啟系統工具畫面。 |
-| Message | 按鈕 | 開啟訊息／警報視窗。 |
+| Message | 按鈕 | 開啟訊息畫面（保留頁，目前無內容）。警報視窗改由警報發生時自動彈出。 |
 | Monitor | 按鈕 | 切換至 MonitorView 監看分頁。 |
 | Exit | 按鈕 | 關閉主視窗、離開程式。 |
 
-> 註：頂部功能列實際螢幕文字已由截圖（`screenshots/main-overview.png`，模擬程式擷取、與實機 UI 相同）確認，由左至右為：**Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit**（各鈕為圖示＋文字；「Maintance」為機上實際拼字）。
+> 註：頂部功能列實際螢幕文字已由截圖（`screenshots/main-overview.png`，模擬程式擷取、與實機 UI 相同）確認，由左至右為：**Language / Product / Maintance / Offset / Speed / Message / Monitor / Exit**（各鈕為圖示＋文字；「Maintance」為機上實際拼字）。原本位於 Speed 與 Message 之間的 Tools 鍵只會開出一片空白視窗，已於 2026-08-04 移除，其右側各鍵一併左移。
 
 ### 4.1.2 Recipe Name 與 User 欄位
 

@@ -145,6 +145,6 @@ Loader 內部運作序列：待命 → 進料 → CCD 掃描 → 可供分類 �
 
 - **盤面顯示對應**：生產中盤面＝Tray Status 分頁的「Loader 2D Left / Loader 2D Right」盤面（鏡射 Loader 車道內容盤）；移動盤面＝Motion View 的左/右 Loader 移動盤面（位置取實體馬達、內容取虛擬馬達）。
 - **Loader 左右對應**：Loader1 → 畫面左側「Loader 2D Left」；Loader2 → 右側「Loader 2D Right」。
-- **頂部功能列文字**：Language / Product / Maintance / Offset / Speed / Tools / Message / Monitor / Exit（螢幕實際拼字即「Maintance」）。
+- **頂部功能列文字**：Language / Product / Maintance / Offset / Speed / Message / Monitor / Exit（螢幕實際拼字即「Maintance」）。
 - **盤種與滿車上限**：盤種分 Normal（工作盤，載 IC）／Identity（帶 2D TrayID 身分盤，不載 IC）／Cover（頂蓋空盤，不得載 IC）；車內慣例第一片為 identity、第二片為 cover、其餘為 normal；每車最多 100 片盤。
 - **IO 點位對照**：各模組氣缸/感測器位址見附錄 B。畫面顯示名稱即該 IO 點位的別名；最終位址以機台實際設定為準。
