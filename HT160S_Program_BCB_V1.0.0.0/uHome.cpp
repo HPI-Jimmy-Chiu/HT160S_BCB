@@ -303,8 +303,10 @@ static void SimHomeTrace(AnsiString line, bool bReset)
 //drop Z and crash into the tray below). Non-blocking: returns false while busy.
 //AI(ht160s-home-resume-w3b) 20260711 : carriage table for PARK & RE-ACQUIRE.
 //idx 0/1 = Loader1/2, idx 2..7 = Auto1..6. Same clamp semantics on every carriage :
-//PushTray = front stopper, LeanOnTray = rear hook (owner order : release rear then
-//front, engage front then rear). idx 8=Empty, 9=Color (W3b-2) : their carry gate is
+//PushTray = front stopper, LeanOnTray = rear hook. RELEASE order (case 50/60 and the
+//case-300 haul release) : Pop PushTray FIRST, Pop LeanOnTray only after PushTray has
+//confirmed OFF. Engage order at the case-300 re-acquire : Push PushTray then LeanOnTray.
+//idx 8=Empty, 9=Color (W3b-2) : their carry gate is
 //the clamp out-bits (their VMot fHasTray means a tray at the REAR SEAT, not on the
 //car) and a mid-haul park must finish the interrupted transfer to the module-owned
 //haul target (GetHomeHaulTargetY) before releasing there.
@@ -734,39 +736,23 @@ bool TfHome::ProcessMotorHome()
 			//cars (L=Loader1, R=Loader2) share one Loader-Y rail; homing while a car still
 			//clamps a tray would drag that tray into the other car (cars colliding/jamming).
 			//So release BOTH cars' tray clamps BEFORE any Loader-Y motion (case 200 homes
-			//MLoaderY_1/_2). Release ORDER per machine spec : rear hook (LeanOnTray) FIRST,
-			//then front stopper (PushTray). Pop() opens the clamp and returns true once the
-			//Off sensor confirms (returns true immediately under SOFT_SIMULATE).
+			//MLoaderY_1/_2). Release ORDER per machine spec (user 2026-07-31) : PushTray
+			//FIRST, LeanOnTray only after EVERY PushTray has confirmed OFF (case 60).
+			//Popping LeanOnTray while PushTray still presses lets the tray spring out of
+			//the pocket and settle off-position -- the next pick then grabs a shifted tray
+			//and the IC map is scrambled. Same order as every production release ladder
+			//(Loader discharge 2000->3000, Empty feed 5000->6000, Color retreat 420->430).
+			//Pop() opens the clamp and returns true once the Off sensor confirms (returns
+			//true immediately under SOFT_SIMULATE).
 			{
 #ifdef SOFT_SIMULATE
 				if(bSimNewStep)
-					SimHomeTrace("case50: release Loader rear hooks (Loader1/2 LeanOnTray) -> case60 when both off", false);
+					SimHomeTrace("case50: release front stoppers (PushTray, every carriage) -> case60 when all off", false);
 #endif
 				//AI(ht160s-home-resume-w3b) 20260711 : release EVERY park-capable carriage's
-				//rear hook (Loader1/2 + Auto1-6). A1 : with both clamps Off the Y home motion
-				//does not drag a tray; an empty carriage's clamp cycling is harmless (the feed
-				//ladders re-engage on the next grab).
-				bool bAllRear=true;
-				for(int pk=0; pk<HOME_PARK_N; pk++)
-				{
-					TTrayMotor *PMot; TTrayMotor *PV; TMyCylinder *PF; TMyCylinder *PR; AnsiString PName;
-					HomeParkCarriage(pk, &PMot, &PV, &PF, &PR, &PName);
-					if(PR==NULL)
-						continue;
-					if(PR->Pop()==false)
-						bAllRear=false;
-				}
-				if(bAllRear)
-					iMotorHomeTask=60;
-			}
-			return false;
-		case 60:
-			//Front stopper (PushTray) released only after the rear hook is fully open.
-			{
-#ifdef SOFT_SIMULATE
-				if(bSimNewStep)
-					SimHomeTrace("case60: release Loader front stoppers (Loader1/2 PushTray) -> case100 when both off", false);
-#endif
+				//clamp (Loader1/2 + Auto1-6 + Empty + Color). A1 : with both clamps Off the Y
+				//home motion does not drag a tray; an empty carriage's clamp cycling is
+				//harmless (the feed ladders re-engage on the next grab).
 				bool bAllFront=true;
 				for(int pk=0; pk<HOME_PARK_N; pk++)
 				{
@@ -778,6 +764,29 @@ bool TfHome::ProcessMotorHome()
 						bAllFront=false;
 				}
 				if(bAllFront)
+					iMotorHomeTask=60;
+			}
+			return false;
+		case 60:
+			//Rear hook (LeanOnTray) released only after EVERY carriage's PushTray is
+			//confirmed fully open (case 50). Releasing the hook while the stopper is still
+			//pressing is what flips/shifts the tray, so this stage is gated, not parallel.
+			{
+#ifdef SOFT_SIMULATE
+				if(bSimNewStep)
+					SimHomeTrace("case60: release rear hooks (LeanOnTray, every carriage) -> case100 when all off", false);
+#endif
+				bool bAllRear=true;
+				for(int pk=0; pk<HOME_PARK_N; pk++)
+				{
+					TTrayMotor *PMot; TTrayMotor *PV; TMyCylinder *PF; TMyCylinder *PR; AnsiString PName;
+					HomeParkCarriage(pk, &PMot, &PV, &PF, &PR, &PName);
+					if(PR==NULL)
+						continue;
+					if(PR->Pop()==false)
+						bAllRear=false;
+				}
+				if(bAllRear)
 					iMotorHomeTask=100;
 			}
 			return false;
