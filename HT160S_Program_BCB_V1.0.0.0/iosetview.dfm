@@ -1533,9 +1533,9 @@ object fiosetview: Tfiosetview
     Top = 40
     Width = 849
     Height = 729
-    ActivePage = ts_IOLoader
+    ActivePage = ts_IOTapeLoadUnload
     Style = tsButtons
-    TabIndex = 0
+    TabIndex = 1
     TabOrder = 2
     object ts_IOLoader: TTabSheet
       Caption = 'Loader'
@@ -1796,7 +1796,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 10
+              TabOrder = 7
               OnClick = BtnPanelClick
               TrueColor = 16744448
               FalseColor = 8404992
@@ -1821,7 +1821,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 11
+              TabOrder = 8
               OnClick = BtnPanelClick
               TrueColor = 16744448
               FalseColor = 8404992
@@ -2116,7 +2116,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 6
+              TabOrder = 5
             end
             object GroupBox1: TGroupBox
               Left = 184
@@ -2130,7 +2130,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 7
+              TabOrder = 6
               object mlC_Loader1_PushTray_Off: TMyLed
                 Left = 20
                 Top = 42
@@ -2226,7 +2226,7 @@ object fiosetview: Tfiosetview
               Font.Name = 'MS Sans Serif'
               Font.Style = []
               ParentFont = False
-              TabOrder = 8
+              TabOrder = 7
               object mlC_Loader2_PushTray_Off: TMyLed
                 Left = 20
                 Top = 42
@@ -2350,7 +2350,7 @@ object fiosetview: Tfiosetview
               ParentFont = False
               ParentShowHint = False
               ShowHint = True
-              TabOrder = 10
+              TabOrder = 8
               OnClick = BtnPanelClick
               TrueColor = 16744448
               FalseColor = 8404992
@@ -2584,9 +2584,9 @@ object fiosetview: Tfiosetview
         Top = 0
         Width = 841
         Height = 698
-        ActivePage = TabSheet2
+        ActivePage = TabSheet3
         Align = alClient
-        TabIndex = 1
+        TabIndex = 0
         TabOrder = 0
         object TabSheet3: TTabSheet
           Caption = 'Auto 1~3'
@@ -2786,22 +2786,6 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto1_OutputBottomHasTray'
             end
-            object mlSnAuto1_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto1_TrayPos1'
-            end
-            object mlSnAuto1_TrayPos2: TMyLed
-              Left = 447
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto1_TrayPos2'
-            end
             object bpC_Auto1_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
@@ -2932,7 +2916,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 8
+              TabOrder = 7
             end
           end
           object Panel42: TPanel
@@ -3040,22 +3024,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto2_OutputBottomHasTray'
-            end
-            object mlSnAuto2_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto2_TrayPos1'
-            end
-            object mlSnAuto2_TrayPos2: TMyLed
-              Left = 447
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto2_TrayPos2'
             end
             object bpC_Auto2_LeanOnTray: TBtnPanel
               Left = 277
@@ -3187,7 +3155,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 8
+              TabOrder = 7
             end
           end
           object Panel72: TPanel
@@ -3295,22 +3263,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto3_OutputBottomHasTray'
-            end
-            object mlSnAuto3_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto3_TrayPos1'
-            end
-            object mlSnAuto3_TrayPos2: TMyLed
-              Left = 447
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto3_TrayPos2'
             end
             object bpC_Auto3_LeanOnTray: TBtnPanel
               Left = 277
@@ -3442,7 +3394,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 8
+              TabOrder = 7
             end
           end
         end
@@ -3644,22 +3596,6 @@ object fiosetview: Tfiosetview
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto4_OutputBottomHasTray'
             end
-            object mlSnAuto4_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto4_TrayPos1'
-            end
-            object mlSnAuto4_TrayPos2: TMyLed
-              Left = 447
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto4_TrayPos2'
-            end
             object bpC_Auto4_LeanOnTray: TBtnPanel
               Left = 277
               Top = 80
@@ -3790,7 +3726,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 8
+              TabOrder = 7
             end
           end
           object Panel121: TPanel
@@ -3898,22 +3834,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto5_OutputBottomHasTray'
-            end
-            object mlSnAuto5_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto5_TrayPos1'
-            end
-            object mlSnAuto5_TrayPos2: TMyLed
-              Left = 447
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto5_TrayPos2'
             end
             object bpC_Auto5_LeanOnTray: TBtnPanel
               Left = 277
@@ -4045,7 +3965,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 8
+              TabOrder = 7
             end
           end
           object Panel128: TPanel
@@ -4153,22 +4073,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'SnAuto6_OutputBottomHasTray'
-            end
-            object mlSnAuto6_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto6_TrayPos1'
-            end
-            object mlSnAuto6_TrayPos2: TMyLed
-              Left = 447
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnAuto6_TrayPos2'
             end
             object bpC_Auto6_LeanOnTray: TBtnPanel
               Left = 277
@@ -4300,7 +4204,7 @@ object fiosetview: Tfiosetview
               Height = 49
               BevelInner = bvLowered
               Color = 9534289
-              TabOrder = 8
+              TabOrder = 7
             end
           end
           object Panel146: TPanel

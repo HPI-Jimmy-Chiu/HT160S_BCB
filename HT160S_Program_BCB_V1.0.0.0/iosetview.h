@@ -141,8 +141,6 @@ __published:
     TMyLed *mlSnAuto1_InputHasTray;
     TMyLed *mlSnAuto1_InputFullTray;
     TMyLed *mlSnAuto1_OutputBottomHasTray;
-    TMyLed *mlSnAuto1_TrayPos1;
-    TMyLed *mlSnAuto1_TrayPos2;
     TBtnPanel *bpC_Auto1_LeanOnTray;
     TBtnPanel *bpC_Auto1_FrontRiseTray;
     TBtnPanel *bpC_Auto1_PushTray;
@@ -155,8 +153,6 @@ __published:
     TMyLed *mlSnAuto2_InputHasTray;
     TMyLed *mlSnAuto2_InputFullTray;
     TMyLed *mlSnAuto2_OutputBottomHasTray;
-    TMyLed *mlSnAuto2_TrayPos1;
-    TMyLed *mlSnAuto2_TrayPos2;
     TBtnPanel *bpC_Auto2_LeanOnTray;
     TBtnPanel *bpC_Auto2_FrontRiseTray;
     TBtnPanel *bpC_Auto2_PushTray;
@@ -169,8 +165,6 @@ __published:
     TMyLed *mlSnAuto3_InputHasTray;
     TMyLed *mlSnAuto3_InputFullTray;
     TMyLed *mlSnAuto3_OutputBottomHasTray;
-    TMyLed *mlSnAuto3_TrayPos1;
-    TMyLed *mlSnAuto3_TrayPos2;
     TBtnPanel *bpC_Auto3_LeanOnTray;
     TBtnPanel *bpC_Auto3_FrontRiseTray;
     TBtnPanel *bpC_Auto3_PushTray;
@@ -183,8 +177,6 @@ __published:
     TMyLed *mlSnAuto4_InputHasTray;
     TMyLed *mlSnAuto4_InputFullTray;
     TMyLed *mlSnAuto4_OutputBottomHasTray;
-    TMyLed *mlSnAuto4_TrayPos1;
-    TMyLed *mlSnAuto4_TrayPos2;
     TBtnPanel *bpC_Auto4_LeanOnTray;
     TBtnPanel *bpC_Auto4_FrontRiseTray;
     TBtnPanel *bpC_Auto4_PushTray;
@@ -197,8 +189,6 @@ __published:
     TMyLed *mlSnAuto5_InputHasTray;
     TMyLed *mlSnAuto5_InputFullTray;
     TMyLed *mlSnAuto5_OutputBottomHasTray;
-    TMyLed *mlSnAuto5_TrayPos1;
-    TMyLed *mlSnAuto5_TrayPos2;
     TBtnPanel *bpC_Auto5_LeanOnTray;
     TBtnPanel *bpC_Auto5_FrontRiseTray;
     TBtnPanel *bpC_Auto5_PushTray;
@@ -211,8 +201,6 @@ __published:
     TMyLed *mlSnAuto6_InputHasTray;
     TMyLed *mlSnAuto6_InputFullTray;
     TMyLed *mlSnAuto6_OutputBottomHasTray;
-    TMyLed *mlSnAuto6_TrayPos1;
-    TMyLed *mlSnAuto6_TrayPos2;
     TBtnPanel *bpC_Auto6_LeanOnTray;
     TBtnPanel *bpC_Auto6_FrontRiseTray;
     TBtnPanel *bpC_Auto6_PushTray;
