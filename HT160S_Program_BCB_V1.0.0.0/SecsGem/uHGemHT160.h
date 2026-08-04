@@ -7,11 +7,13 @@
 //AI(secs-ceid-align9045) 20260729 : CEID dictionary is now a VERBATIM copy of HT9045.
 //  Source of truth : D:/HT9045/HT9046LS_Code_V3.32.810_B01_20260527KeyPro_01_AutoUP/SECSGEM/
 //                    uHGemHT9045.h (enum) + uHGemHT9045.cpp (EventDescription).
-//  All 275 ids are registered so the host dictionary matches HT9045 one-for-one; ids whose
+//  All 292 ids are registered so the host dictionary matches HT9045 one-for-one; ids whose
 //  mechanism does not exist on HT160S (tester / ART / site / temperature / E87 cassette /
 //  OHT / Fix station / energy saving / Reserved) are registered but never emitted.
 //  142/143/144 carry no alias in HT9045 either - kept unnamed on purpose.
 //  Numbering is FIXED by HT9045. Do not renumber, do not insert, do not reuse a slot.
+//AI(secs-ceid-276-292) 20260803 : 1-275 come from the source tree above; 276-292 come from the
+//  KYEC machine's own persisted dictionary (see the block just above TotalEvent). 292 total.
 struct ETypeStruct
 {
     enum
@@ -291,6 +293,42 @@ struct ETypeStruct
         AGVLDUnLDStatus             ,   // 273 AMR LDUnLD Status
         AGVLDUnLDFinish             ,   // 274 AMR LDUnLD Finish
         AGVLdID                     ,   // 275 AMR LD ID
+        //AI(secs-ceid-276-292) 20260803 : 276-292 come from the KYEC MACHINE ITSELF, not from a
+        //  source tree : D:/backup_version/HT9046/KYEC/20260626/EventReport_CEID.def, the CEID
+        //  dictionary the KYEC 9046 had persisted on 2026-06-25. That file lists 292 ids, and its
+        //  1-275 block matches our porting source (HT9046LS V3.32.810) VERBATIM - 0 alias
+        //  mismatches - which is what proves our numbering is the one KYEC's host was configured
+        //  against. These 17 close the remaining gap so S1F23/S1F24 answers the SAME dictionary
+        //  the customer's own machine does.
+        //  ALL 17 ARE REGISTER-ONLY : no emit site anywhere in HT160S, exactly like the other
+        //  ~220 inert ids. Several DO describe mechanisms HT160S has (per-output-port bin code,
+        //  tray-id read ok/fail, loader buffer empty) - wiring those is a separate decision with
+        //  its own payload design, not something to bolt on here.
+        //  WARNING TRAP, recorded so nobody "upgrades" the dictionary from the wrong tree : the
+        //  HT9011UC branch (V3.33.9xx) is NOT the same dictionary. It renumbers 217-271 wholesale
+        //  (its 217 is LoadPortStatusChanged, ours/KYEC's is Reserved_06) and puts these sorter
+        //  events at 275-288 instead of 276-292. Porting from HT9011UC would silently change the
+        //  meaning of 55 ids the KYEC host already has bound. Only the .def above is authoritative.
+        //  Three names collide with ids we already have (274/275/251 carry the same 9045 names),
+        //  so those three enum tags carry their CEID number as a suffix. The wire ALIAS is still
+        //  byte-identical to the .def - only the C++ identifier differs.
+        Loader_Buffer_NoTray        ,   // 276 Loader_Buffer_NoTray
+        OutputPort1BinCode          ,   // 277 OutputPort1BinCode
+        OutputPort2BinCode          ,   // 278 OutputPort2BinCode
+        OutputPort3BinCode          ,   // 279 OutputPort3BinCode
+        OutputPort4BinCode          ,   // 280 OutputPort4BinCode
+        OutputPort5BinCode          ,   // 281 OutputPort5BinCode
+        OutputPort6BinCode          ,   // 282 OutputPort6BinCode
+        MaterialModeChange          ,   // 283 MaterialModeChange
+        PortStateUpdated            ,   // 284 PortStateUpdated
+        UnloaderTrayIDReadOK        ,   // 285 UnloaderTrayIDReadOK
+        UnloaderTrayIDReadFail      ,   // 286 UnloaderTrayIDReadFail
+        LoaderTrayIDReadFail        ,   // 287 LoaderTrayIDReadFail
+        MaximumOutputPortReport     ,   // 288 MaximumOutputPortReport
+        RunCheckRequest             ,   // 289 RunCheckRequest
+        AGVLDUnLDFinish_290         ,   // 290 AGVLDUnLDFinish   (same name as 274 on the KYEC machine)
+        AGVLdID_291                 ,   // 291 AGVLdID           (same name as 275 on the KYEC machine)
+        DoSecsGemIndexFail_292      ,   // 292 DoSecsGemIndexFail(251 carries the same concept)
         TotalEvent
     };
 };
@@ -316,6 +354,15 @@ private:
     // that number is already in the customer spec, so it is not re-encoded here.
     unsigned char svGemControlState;      // SVID 4 GemControlState
     unsigned char svGemControlPreState;   // SVID 9 PreviousGemControlState
+    //AI(secs-e30-gate) 20260803 : SEMI E30 splits OFF-LINE into three substates. HT160S needs the
+    // distinction for ONE rule : the host may be taken ON-LINE by its own S1F17 only from HOST
+    // OFF-LINE, so an operator who took the tool off-line locally cannot be overridden remotely.
+    // Kept in its OWN member, never folded into iControlState, because 66002 is bound directly to
+    // iControlState and 66002 is slot 7 of the customer-frozen 13-SV report 1 - widening its value
+    // domain would change bytes in every event report. Consequence to accept knowingly: a move
+    // between two OFF-LINE substates fires no CEID, because 141/91/92/93 key off the folded value.
+    int iControlSubstate;                 // 1=EQUIPMENT OFF-LINE 2=ATTEMPT ON-LINE 3=HOST OFF-LINE 0=n/a (on-line)
+    bool bControlStateSeeded;             // false until the first tick applies [SECS] InitialControlState
     //AI(ht160s-secsgem) 20260611 : SV snapshot members refreshed just before each
     // S6F11 / S1F4 serialize, so SetSVDataPointer can bind a stable address while
     // the value still tracks live machine data (avoids binding bool/enum/form ptr).
@@ -375,6 +422,17 @@ public:
     virtual void RefreshSecsBadge();   //AI(ht160s-secsgem) 20260612 : 1s tick -> sync main-screen SECS badge to HSMS state
     virtual void ServiceAgv();         //AI(ht160s-agv) 20260615 : 1s tick -> drive E87/AGV coordinator (Phase B/D)
     virtual void PollGemControlState();//AI(secs-controlstate) 20260803 : 1s tick -> SVID 4/9 + CEID 141/91/92/93 on a control-state edge
+    //AI(secs-e30-gate) 20260803 : the ONLY writer of iControlState / iControlSubstate. Every path
+    // that changes control state (host S1F15/S1F17, host ONLINE_* commands, the operator buttons on
+    // the maintenance SECS tab, the boot seed) goes through here so the substate can never drift
+    // out of step with the state, and so one place owns the log line. Does NOT fire events - the
+    // 1 s PollGemControlState edge-detector does that, deliberately (see its comment).
+    void SetControlState(int iGemStdState, int iSubstate, AnsiString sWhy);
+    bool IsHostOnlineRequestAllowed();  // E30 : host S1F17 may go on-line only from HOST OFF-LINE
+    int  GetControlSubstate();          // 1/2/3, 0 when on-line
+    virtual void OperatorSetControlState(int iGemStdState);//AI(secs-e30-gate) 20260803 : maintenance SECS tab buttons
+    virtual int  GetControlState();     // GEM-standard domain 1/4/5, for the maintenance UI
+    virtual AnsiString DescribeControlState();  // one-line operator text for the maintenance SECS tab
     virtual void OnCommunicationLost();//AI(secs-kyec-rcmd4-fix) 20260728 : HSMS link lost -> drop the latched PP_SIGNALTOWER/PP_MUSIC panel override
     virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");//AI(secs-lotstarttime) 20260730 : latch/clear the Lot Start Time behind SVID 1009 (sWhen = restored stamp, "" = now)
     //AI(secs-skipiccount) 20260802 : latch SVID 37010 then fire CEID 78, in that order -

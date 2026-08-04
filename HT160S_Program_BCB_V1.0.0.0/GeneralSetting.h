@@ -191,6 +191,18 @@ public:
 	//  false (default) = no prompt, no CEID 78. Behaviour bit-identical to today.
 	//  true            = prompt on SKIP, then report the number.
 	bool bAskSkipICCount;
+	//AI(secs-e30-gate) 20260803 : GEM control-state commissioning settings, [SECS] section.
+	//  iInitialControlState = the GEM control state the machine boots into, in SVID 66002's own
+	//  domain (1 = Off-Line / 4 = On-Line Local / 5 = On-Line Remote). Default 5.
+	//  MUST NOT default to Off-Line: E30 lets the host go on-line only from HOST OFF-LINE, and on
+	//  2026-07-31 the host's S1F17 was the only thing that ever brought this machine on-line, so a
+	//  machine that boots EQUIPMENT OFF-LINE with no operator at the panel is a production stop.
+	//  This is a COMMISSIONING key, not an operator toggle - the operator uses the SECS tab.
+	int iInitialControlState;
+	//  bAcceptHostOnlineRequest = may the host's S1F17 / RCMD ONLINE_* take the tool on-line at
+	//  all. HT9045's GemCheckBoxAcceptHostOnlineRequest ported ([GEM] AcceptHostOnlineRequest
+	//  there, default true). false => ONLACK=1 / HCACK=2 refusal. Default true.
+	bool bAcceptHostOnlineRequest;
 	int iHomeReacquireOffsetCnt;
 	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
 	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)
@@ -227,6 +239,15 @@ public:
 	AnsiString sMachineModel;
 	AnsiString sHandlerID;
 	AnsiString sSerialNo;
+	//AI(secs-operatorid) 20260803 : SVID/ECID 1007 Operator ID, slot 2 of the KYEC
+	// host's RPTID 502. CANONICAL store - the main-screen edtSysOperatorID edit and
+	// the host S2F15 write both land here, and SVID 1007 is bound DIRECTLY to this
+	// member (no RefreshSVData snapshot), exactly like sHandlerID / SVID 1002.
+	// HT9045 keeps the same value in a TEdit on fLotInfo (uHGemHT9045_EC.cpp:59);
+	// HT160S cannot bind a VCL control because its THGem dereferences raw typed
+	// pointers only, so the AnsiString is the binding point and the edit mirrors it.
+	// Defaults to "Operator" so the host never reads A[0] "" on an uncommissioned set.
+	AnsiString sOperatorID;
 	// Serial baud rate for the bin display COM line. Old-160 ran the LED board
 	// through an external MCU.exe TCP bridge, so the handler kept no baud; the
 	// HT9046 hardware standard (matching HT172) is 9600-8-N-1. Settable here so

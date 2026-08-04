@@ -2613,6 +2613,77 @@ object fMaintenance: TfMaintenance
             OnClick = btnSecsOverrideReleaseClick
           end
         end
+        object pnlSecsControlState: TPanel
+          Left = 20
+          Top = 152
+          Width = 780
+          Height = 150
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblSecsCtlTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 520
+            Height = 20
+            AutoSize = False
+            Caption = 'GEM Control State (SEMI E30)'
+          end
+          object lblSecsCtlState: TLabel
+            Left = 16
+            Top = 44
+            Width = 740
+            Height = 20
+            AutoSize = False
+            Caption = 'State: -'
+          end
+          object lblSecsCtlHint: TLabel
+            Left = 16
+            Top = 118
+            Width = 740
+            Height = 20
+            AutoSize = False
+            Caption =
+              'Off-Line selected here is Equipment Off-Line: the host cannot lif' +
+              't it with S1F17.'
+          end
+          object btnSecsCtlOffline: TButton
+            Left = 16
+            Top = 74
+            Width = 170
+            Height = 34
+            Caption = 'Off-Line'
+            TabOrder = 0
+            OnClick = btnSecsCtlOfflineClick
+          end
+          object btnSecsCtlLocal: TButton
+            Left = 200
+            Top = 74
+            Width = 170
+            Height = 34
+            Caption = 'On-Line Local'
+            TabOrder = 1
+            OnClick = btnSecsCtlLocalClick
+          end
+          object btnSecsCtlRemote: TButton
+            Left = 384
+            Top = 74
+            Width = 170
+            Height = 34
+            Caption = 'On-Line Remote'
+            TabOrder = 2
+            OnClick = btnSecsCtlRemoteClick
+          end
+          object chkSecsAcceptHostOnline: TCheckBox
+            Left = 574
+            Top = 80
+            Width = 190
+            Height = 21
+            Caption = 'Accept host S1F17'
+            TabOrder = 3
+            OnClick = chkSecsAcceptHostOnlineClick
+          end
+        end
       end
       object tsMaintCOM: TTabSheet
         Caption = 'COM Port'

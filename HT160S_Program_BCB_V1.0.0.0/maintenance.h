@@ -188,6 +188,14 @@ __published:
     TLabel *lblSecsOverrideTitle;
     TLabel *lblSecsOverrideState;
     TButton *btnSecsOverrideRelease;
+    TPanel *pnlSecsControlState;
+    TLabel *lblSecsCtlTitle;
+    TLabel *lblSecsCtlState;
+    TLabel *lblSecsCtlHint;
+    TButton *btnSecsCtlOffline;
+    TButton *btnSecsCtlLocal;
+    TButton *btnSecsCtlRemote;
+    TCheckBox *chkSecsAcceptHostOnline;
     TSpeedButton *spbMaintMCUDisplay;
     TTabSheet *tsMaintMCUDisplay;
     TPanel *pnlMCUSetup;
@@ -443,6 +451,10 @@ __published:
     void __fastcall PwDeleteClick(TObject *Sender);
     void __fastcall PwSaveClick(TObject *Sender);
     void __fastcall PwReloadClick(TObject *Sender);
+    void __fastcall btnSecsCtlOfflineClick(TObject *Sender);
+    void __fastcall btnSecsCtlLocalClick(TObject *Sender);
+    void __fastcall btnSecsCtlRemoteClick(TObject *Sender);
+    void __fastcall chkSecsAcceptHostOnlineClick(TObject *Sender);
 private:
     int iMaintenanceMenuCount;
     TSpeedButton *MenuButtons[MAX_MAINTENANCE_MENU_COUNT];
@@ -500,6 +512,7 @@ private:
     void __fastcall AddFtpLog(AnsiString Text);
     void __fastcall RefreshAmrStatus();
     void __fastcall RefreshSecsOverrideStatus();
+    void __fastcall RefreshSecsControlState();   //AI(secs-e30-gate) 20260803 : SECS tab control-state label + button enables
     void __fastcall BuildAmrInjectPanel();
     void __fastcall BuildAgvTimeoutField();
     void __fastcall ShowPasswordPage();

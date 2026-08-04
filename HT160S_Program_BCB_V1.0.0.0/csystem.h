@@ -35,6 +35,12 @@ void SetSecsMusicOverride(int MusicClass);
 void ClearSecsMusicOverride();
 void ClearSecsPanelOverride();
 bool IsSecsPanelOverrideActive();
+//AI(secs-e30-gate) 20260803 : GEM control-state bridge for the maintenance SECS tab. Same shape as
+//the panel-override helpers above : the UI must not include the SECS headers, so these forward to
+//HSys.MyGem. Inert (0 / "" / no-op) on a build without the GEM object.
+void SecsOperatorSetControlState(int iGemStdState);
+int  SecsGetControlState();
+AnsiString SecsDescribeControlState();
 void ProcessRunStatus(bool bProgramStart=false);
 void ProcessMotion();
 bool DoInitialProgramStart();

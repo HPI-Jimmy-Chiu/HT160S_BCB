@@ -1622,6 +1622,7 @@ void __fastcall TfMaintenance::tmrTowerLightBlinkTimer(TObject *Sender)
     RefreshFtpStatus();
     RefreshAmrStatus();
     RefreshSecsOverrideStatus();
+    RefreshSecsControlState();   //AI(secs-e30-gate) 20260803
 }
 //---------------------------------------------------------------------------
 //AI(secs-kyec-rcmd4-fix) 20260728 : host PP_SIGNALTOWER / PP_MUSIC override status + the
@@ -1650,6 +1651,71 @@ void __fastcall TfMaintenance::btnSecsOverrideReleaseClick(TObject *Sender)
     ClearSecsPanelOverride();
     RecordProcess("SECS: host panel override released from Maintenance screen");
     RefreshSecsOverrideStatus();
+}
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : the operator's GEM control-state surface. Before this the machine had
+//  NO way at all to take itself off-line or on-line - the only thing that ever moved the control
+//  state was the host (S1F15 / S1F17 / RCMD ONLINE_*). That made SEMI E30's central rule
+//  unimplementable: the host may go on-line only from HOST OFF-LINE, precisely so an operator
+//  standing at the machine cannot be overridden remotely. Ported in shape from HT9045, which has
+//  the same four controls (three states + "accept host on-line request").
+//  Driven off the existing 300 ms tmrTowerLightBlink refresh, like RefreshSecsOverrideStatus.
+void __fastcall TfMaintenance::RefreshSecsControlState()
+{
+    if(lblSecsCtlState==NULL)
+        return;
+    int iState=SecsGetControlState();
+    AnsiString sText=SecsDescribeControlState();
+    if(iState==0)
+        lblSecsCtlState->Caption="State: (SECS/GEM not enabled on this machine)";
+    else
+        lblSecsCtlState->Caption="State: "+sText;
+    //Grey out the state we are already in, so the panel doubles as the indicator.
+    if(btnSecsCtlOffline!=NULL) btnSecsCtlOffline->Enabled=(iState!=0 && iState!=1);
+    if(btnSecsCtlLocal  !=NULL) btnSecsCtlLocal  ->Enabled=(iState!=0 && iState!=4);
+    if(btnSecsCtlRemote !=NULL) btnSecsCtlRemote ->Enabled=(iState!=0 && iState!=5);
+    if(chkSecsAcceptHostOnline!=NULL &&
+       chkSecsAcceptHostOnline->Checked!=GeneralSetting.bAcceptHostOnlineRequest)
+        chkSecsAcceptHostOnline->Checked=GeneralSetting.bAcceptHostOnlineRequest;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsCtlOfflineClick(TObject *Sender)
+{
+    (void)Sender;
+    SecsOperatorSetControlState(1);
+    RefreshSecsControlState();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsCtlLocalClick(TObject *Sender)
+{
+    (void)Sender;
+    SecsOperatorSetControlState(4);
+    RefreshSecsControlState();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsCtlRemoteClick(TObject *Sender)
+{
+    (void)Sender;
+    SecsOperatorSetControlState(5);
+    RefreshSecsControlState();
+}
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : the commissioning switch, HT9045's GemCheckBoxAcceptHostOnlineRequest.
+//  Unchecked = the host's S1F17 is answered ONLACK=1 and RCMD ONLINE_* HCACK=2. Persisted, because
+//  a machine that forgets this across a power cycle is not a safety statement.
+//  Note VCL: assigning Checked fires OnClick, so RefreshSecsControlState must be idempotent - it is
+//  (it only assigns when the value differs).
+void __fastcall TfMaintenance::chkSecsAcceptHostOnlineClick(TObject *Sender)
+{
+    (void)Sender;
+    if(chkSecsAcceptHostOnline==NULL)
+        return;
+    if(GeneralSetting.bAcceptHostOnlineRequest==chkSecsAcceptHostOnline->Checked)
+        return;
+    GeneralSetting.bAcceptHostOnlineRequest=chkSecsAcceptHostOnline->Checked;
+    GeneralSetting.Save();
+    RecordProcess(AnsiString("SECS: AcceptHostOnlineRequest -> ")+
+                  (GeneralSetting.bAcceptHostOnlineRequest?"ON":"OFF")+" (Maintenance screen)");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenWorkFile()

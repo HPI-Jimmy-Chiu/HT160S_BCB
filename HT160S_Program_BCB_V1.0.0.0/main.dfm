@@ -2728,6 +2728,38 @@ object fMain: TfMain
                 TabOrder = 1
                 OnClick = pnRealDummyClick
               end
+              object lblSysOperatorID: TLabel
+                Left = 14
+                Top = 165
+                Width = 107
+                Height = 20
+                AutoSize = False
+                Caption = 'Operator ID'
+                Font.Charset = ANSI_CHARSET
+                Font.Color = clNavy
+                Font.Height = -16
+                Font.Name = 'Arial'
+                Font.Style = [fsBold]
+                ParentFont = False
+              end
+              object edtSysOperatorID: TEdit
+                Left = 17
+                Top = 187
+                Width = 200
+                Height = 27
+                AutoSize = False
+                Font.Charset = ANSI_CHARSET
+                Font.Color = clBlack
+                Font.Height = -16
+                Font.Name = 'Arial'
+                Font.Style = [fsBold]
+                MaxLength = 20
+                ParentFont = False
+                TabOrder = 3
+                Text = 'Operator'
+                OnExit = edtSysOperatorIDExit
+                OnMouseUp = edtSysOperatorIDMouseUp
+              end
             end
             object cb_WorkFile: TComboBox
               Left = 116

@@ -218,6 +218,10 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     LoadStartModePicture();
     ReadPassword();   //AI(ht160s-password) 20260624 : load system\login.txt user book (seed default if missing)
     UserRoleManager.InitializeByBuildMode();
+    //AI(secs-operatorid) 20260803 : SVID/ECID 1007. GeneralSetting is already loaded here
+    //(HSys.Initial -> InitialCosFunction -> GeneralSetting.Load, well before CreateForm), so
+    //the field shows the persisted value from the first paint instead of the DFM placeholder.
+    LoadOperatorIDToDisplay();
 
     bUpdatingMainSelections = true;
     UpdateWorkFileComboBox();
@@ -2493,6 +2497,69 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
 //label. Prefers the value latched at Lot Start; falls back to edLotNo so paths that run
 //before any Lot Start (a bare machine Start, a boot restore whose latch is empty) keep the
 //old behaviour instead of suddenly labelling with "".
+//---------------------------------------------------------------------------
+//AI(secs-operatorid) 20260803 : SVID/ECID 1007 Operator ID - slot 2 of the KYEC host's
+//RPTID 502. GeneralSetting.sOperatorID is the CANONICAL store and SVID/ECID 1007 bind
+//straight to it (uHGemHT160.cpp), the same no-snapshot shape as sHandlerID / SVID 1002.
+//Nothing in the SECS layer reads this TEdit; these two helpers only keep the visible
+//field and the store agreed in both directions.
+//  LoadOperatorIDToDisplay() : store -> edit. Boot, and after a host S2F15 write, so the
+//                              operator SEES what CJ_EAP pushed (KYEC writes "AGV").
+//  CommitOperatorID()        : edit -> store + General.ini. A blank field collapses back
+//                              to "Operator" so the host never reads A[0] "".
+void __fastcall TfMain::LoadOperatorIDToDisplay()
+{
+    if(GeneralSetting.sOperatorID.Trim()==AnsiString(""))
+        GeneralSetting.sOperatorID="Operator";
+    if(edtSysOperatorID==NULL)
+        return;
+    if(edtSysOperatorID->Text!=GeneralSetting.sOperatorID)
+        edtSysOperatorID->Text=GeneralSetting.sOperatorID;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::CommitOperatorID()
+{
+    AnsiString sNew;
+
+    if(edtSysOperatorID==NULL)
+        return;
+    sNew=edtSysOperatorID->Text.Trim();
+    if(sNew==AnsiString(""))
+        sNew="Operator";
+    if(edtSysOperatorID->Text!=sNew)
+        edtSysOperatorID->Text=sNew;
+    if(GeneralSetting.sOperatorID==sNew)
+        return;                     // unchanged -> no disk write, no log line
+    GeneralSetting.sOperatorID=sNew;
+    GeneralSetting.Save();
+    RecordProcess(AnsiString("Operator ID set to ")+sNew);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::edtSysOperatorIDExit(TObject *Sender)
+{
+    (void)Sender;
+    CommitOperatorID();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::edtSysOperatorIDMouseUp(TObject *Sender, TMouseButton Button,
+      TShiftState Shift, int X, int Y)
+{
+    (void)Sender;
+    (void)Button;
+    (void)Shift;
+    (void)X;
+    (void)Y;
+    //The panel has no physical keyboard, so the field is filled through the same
+    //on-screen QWERTY the account page uses (maintenance.cpp edPwId). HT9045 hooks
+    //its own edtSysOperatorID on OnMouseUp the same way (uLotInfo.dfm).
+    if(fQwertyKey==NULL || edtSysOperatorID==NULL)
+        return;
+    if(fQwertyKey->ShowQwertyKey(edtSysOperatorID, N_NO_SPACE, 0, false, 0, 0,
+           LangT("Operator ID"))==false)
+        return;
+    CommitOperatorID();
+}
+//---------------------------------------------------------------------------
 AnsiString __fastcall TfMain::ActiveLotID()
 {
     if(m_sActiveLot.Trim()!=AnsiString(""))

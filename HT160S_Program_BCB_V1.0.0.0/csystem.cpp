@@ -21,6 +21,7 @@
 #include "cSoterOutput.h"
 #include "GeneralSetting.h"   //AI(ht160s-overcount-tripqueue D6) 20260721 : GeneralSetting.bUseAMR gates the CleanOut auto-Lot-End
 #include "SecsGem/uAgvStation.h"   //AI(amr-unmanned W4) 20260721 : AgvCoord.TimeoutPending -> WAR0962 in the main loop
+#include "SecsGem/uHGemClass.h"   //AI(secs-e30-gate) 20260803 : HTGem control-state hooks for the SecsGetControlState bridge
 #include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject test mode on machine start
 #include "uHome.h"
 #include "uspeed.h"                     //AI(HT160S-Maintainer) 20260602 : SetMotorSpeed / LoadMotorSpeedFromIni (Speed module port)
@@ -1012,6 +1013,26 @@ void ClearSecsPanelOverride()
 bool IsSecsPanelOverrideActive()
 {
 	return (s_bSecsTowerOverride || s_bSecsMusicOverride);
+}
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : GEM control-state bridge for the maintenance SECS tab. Calls through
+//the HTGem* base (HSys.MyGem) exactly as note.cpp does for ReportSkipICCount, so no UI unit has to
+//include the SECS headers. NULL-safe : on a build with SECS disabled MyGem does not exist and the
+//tab simply shows nothing selectable.
+void SecsOperatorSetControlState(int iGemStdState)
+{
+	if(HSys.MyGem!=NULL)
+		HSys.MyGem->OperatorSetControlState(iGemStdState);
+}
+//---------------------------------------------------------------------------
+int SecsGetControlState()
+{
+	return (HSys.MyGem!=NULL) ? HSys.MyGem->GetControlState() : 0;
+}
+//---------------------------------------------------------------------------
+AnsiString SecsDescribeControlState()
+{
+	return (HSys.MyGem!=NULL) ? HSys.MyGem->DescribeControlState() : AnsiString("");
 }
 //---------------------------------------------------------------------------
 void DoSystemMessage()

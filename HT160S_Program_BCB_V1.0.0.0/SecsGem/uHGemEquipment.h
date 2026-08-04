@@ -364,6 +364,11 @@ public:
     void DataItemOut(int Len, unsigned char Type, void *Value);
     void DataItemOut(unsigned char Type, AnsiString Text);   // ASCII convenience overload
     void SendLocalData();
+    //AI(secs-e30-gate) 20260803 : SxF0 Abort Transaction, the E30 refusal for a host primary the
+    // equipment must not act on in its current control state. Header-only reply; reuses the
+    // refused transaction's SystemByte because Function 0 is even. Must live on THGem : Remote
+    // (which holds that SystemByte) is private here.
+    void SendAbort(int Stream);
     int DataItemIn(int Len, unsigned char Type, void *Value);
     int DataItemIn(int Len, unsigned char Type, AnsiString &Str);   // ASCII/numeric read overload
     int GetDataItemLenAndType(int &Len, unsigned char &Type);

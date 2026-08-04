@@ -146,6 +146,8 @@ __published:	// IDE-managed Components
     TPanel *pnlMain1;
     TPanel *pnlMain2;
     TPanel *pnlSetting;
+    TLabel *lblSysOperatorID;
+    TEdit *edtSysOperatorID;
     TPanel *palMainStatus;
     TPanel *pnlFeatureStatus;
     TPanel *pnlFeatureBadge1;
@@ -443,6 +445,8 @@ __published:	// IDE-managed Components
     void __fastcall btn2DImportClick(TObject *Sender);
     void __fastcall pgcWorkOrderChange(TObject *Sender);
     void __fastcall stbMainDrawPanel(TStatusBar *StatusBar, TStatusPanel *Panel, const TRect &Rect);
+    void __fastcall edtSysOperatorIDExit(TObject *Sender);
+    void __fastcall edtSysOperatorIDMouseUp(TObject *Sender, TMouseButton Button, TShiftState Shift, int X, int Y);
 private:	// User declarations
     TPanel *FeatureStatusPanels[MAIN_FEATURE_STATUS_COUNT];
     TLabel *FeatureStatusNameLabels[MAIN_FEATURE_STATUS_COUNT];
@@ -510,6 +514,12 @@ public:		// User declarations
     void __fastcall FreezeProductInfoAtLotEnd();
     void __fastcall LotStartCore(AnsiString FirstLot, AnsiString Origin);   //AI(secs-lot-additive) 20260730 : shared modal-free Lot-Start body (btnLotStart + SECS LOTSTART); caller registers the lots
     AnsiString __fastcall ActiveLotID();   //AI(secs-lot-multilot) 20260730 : latched active lot (m_sActiveLot), falling back to edLotNo when no lot has been opened yet
+    //AI(secs-operatorid) 20260803 : SVID/ECID 1007. GeneralSetting.sOperatorID is the
+    // canonical store; these two keep the main-screen edit and the store agreed.
+    // LoadOperatorIDToDisplay() pushes store -> edit (boot, and after a host S2F15 write);
+    // CommitOperatorID() pushes edit -> store and persists General.ini.
+    void __fastcall LoadOperatorIDToDisplay();
+    void __fastcall CommitOperatorID();
     //AI(secs-lotstarttime-persist) 20260730 : work-order-scoped metadata beside WorkOrder.json
     //(currently only the Lot Start time behind SVID 1009). Same lifecycle as WorkOrder.json.
     void __fastcall SaveWorkOrderLotStartTime(AnsiString sWhen);

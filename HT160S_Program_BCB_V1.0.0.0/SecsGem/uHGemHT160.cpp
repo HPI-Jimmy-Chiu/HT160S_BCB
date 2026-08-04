@@ -35,6 +35,13 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     // MapGemControlState9045() folds it into Off-Line for SVID 4 rather than re-encoding 66002.
     svGemControlState    = 1;
     svGemControlPreState = 1;
+    //AI(secs-e30-gate) 20260803 : boot substate. EQUIPMENT OFF-LINE is the E30-shaped default, but
+    // it is NOT what ships : with EQUIPMENT OFF-LINE the host's S1F17 must be refused, and on
+    // 2026-07-31 that S1F17 was the ONLY thing that ever brought this machine on-line, so booting
+    // there would lock the tool out permanently. The first PollGemControlState tick applies
+    // [SECS] InitialControlState (default On-Line Remote) and clears this. See bControlStateSeeded.
+    iControlSubstate     = 1;
+    bControlStateSeeded  = false;
     sSystemTime = Now().FormatString("yyyy/mm/dd hh:nn:ss");
     sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
 
@@ -61,6 +68,10 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     //  uHGemHT9045.cpp HT9045Gem::HT9045Gem (272 assignments, CEID 1-275). 142/143/144 are
     //  left unassigned exactly as HT9045 leaves them, so AddCEID registers them with an
     //  empty alias and the .def dump matches the HT9045 firmware dump column-for-column.
+    //AI(secs-ceid-276-292) 20260803 : PROVEN against the customer's own machine. The KYEC 9046's
+    //  persisted EventReport_CEID.def (D:/backup_version/HT9046/KYEC/20260626/) was diffed
+    //  alias-by-alias against this table : 1-275 match with ZERO mismatches, and the machine
+    //  carries 17 further ids 276-292 which are now appended below.
     //  Strings are HT9045's, including its own typos - do NOT "improve" them, the host
     //  matches on them. See uHGemHT160.h ETypeStruct for the numbering contract.
     EventDescription[SECS_EVENT.DoStart                 ] = "1 Start Pressed";
@@ -335,6 +346,28 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     EventDescription[SECS_EVENT.AGVLDUnLDStatus         ] = "273 AMR LDUnLD Status";
     EventDescription[SECS_EVENT.AGVLDUnLDFinish         ] = "274 AMR LDUnLD Finish";
     EventDescription[SECS_EVENT.AGVLdID                 ] = "275 AMR LD ID";
+    //AI(secs-ceid-276-292) 20260803 : aliases copied BYTE-FOR-BYTE out of the KYEC machine's own
+    // D:/backup_version/HT9046/KYEC/20260626/EventReport_CEID.def (its Alias column already
+    // carries the leading number, same convention as every line above). Register-only : none of
+    // these has an emit site in HT160S. Do not "tidy" the underscores or the CamelCase - the
+    // host matches these strings.
+    EventDescription[SECS_EVENT.Loader_Buffer_NoTray    ] = "276 Loader_Buffer_NoTray";
+    EventDescription[SECS_EVENT.OutputPort1BinCode      ] = "277 OutputPort1BinCode";
+    EventDescription[SECS_EVENT.OutputPort2BinCode      ] = "278 OutputPort2BinCode";
+    EventDescription[SECS_EVENT.OutputPort3BinCode      ] = "279 OutputPort3BinCode";
+    EventDescription[SECS_EVENT.OutputPort4BinCode      ] = "280 OutputPort4BinCode";
+    EventDescription[SECS_EVENT.OutputPort5BinCode      ] = "281 OutputPort5BinCode";
+    EventDescription[SECS_EVENT.OutputPort6BinCode      ] = "282 OutputPort6BinCode";
+    EventDescription[SECS_EVENT.MaterialModeChange      ] = "283 MaterialModeChange";
+    EventDescription[SECS_EVENT.PortStateUpdated        ] = "284 PortStateUpdated";
+    EventDescription[SECS_EVENT.UnloaderTrayIDReadOK    ] = "285 UnloaderTrayIDReadOK";
+    EventDescription[SECS_EVENT.UnloaderTrayIDReadFail  ] = "286 UnloaderTrayIDReadFail";
+    EventDescription[SECS_EVENT.LoaderTrayIDReadFail    ] = "287 LoaderTrayIDReadFail";
+    EventDescription[SECS_EVENT.MaximumOutputPortReport ] = "288 MaximumOutputPortReport";
+    EventDescription[SECS_EVENT.RunCheckRequest         ] = "289 RunCheckRequest";
+    EventDescription[SECS_EVENT.AGVLDUnLDFinish_290     ] = "290 AGVLDUnLDFinish";
+    EventDescription[SECS_EVENT.AGVLdID_291             ] = "291 AGVLdID";
+    EventDescription[SECS_EVENT.DoSecsGemIndexFail_292  ] = "292 DoSecsGemIndexFail";
 }
 //---------------------------------------------------------------------------
 HT160Gem::~HT160Gem()
@@ -419,11 +452,28 @@ void HT160Gem::AddSV()
     //                       panel wants; see aSortArm.cpp TransferPickDataFromLoader)
     //   1102 Output Total - MachineRun.iTotalSorted, already published as 66021; 1102 is a
     //                       pure alias so the host's own report resolves without renumbering
-    // Still missing from 502 and tracked in docs/plan/onsite-0731-kyec-triage-20260801.md:
-    // 1007 Operator ID, 1501 Setup File, 3 GemClock (format differs from 1027), 1517 Start
-    // Mode (9045 value domain is 12-valued - needs a KYEC mapping). 1513 Tester On/Off is a
-    // legitimate "no": HT160S is a sorter and has no tester mechanism.
+    // Still missing from 502 : 1517 Start Mode closed 20260802, then 1501 Setup File and
+    // 3 GemClock on 20260803, and 1007 Operator ID just below - which leaves only 1513
+    // Tester On/Off, a legitimate "no" (HT160S is a sorter and has no tester mechanism).
     HGemPtr->SetSVDataPointer(1006, HType.ASCII_TYPE, "Lot ID", "", &svActiveLot, "active lot id (9045 ECID/SVID 1006 Lot ID)");
+    //AI(secs-operatorid) 20260803 : slot 2 of the host's RPTID 502. Three facts fixed the shape:
+    //  (a) On HT9045 1007 is an EC, NOT an SV (uHGemHT9045_EC.cpp:59 -> fLotInfo->edtSysOperatorID).
+    //      It still answers SV reads over there only because 9045's SetECDataPointer ends with a
+    //      SetSVDataPointer on the same pointer (its uHGemEquipment.cpp:5838). HT160S's does NOT -
+    //      the same asymmetry that left 1501 answering empty until 20260803 - so 1007 is registered
+    //      TWICE here, once per namespace, both onto this one AnsiString.
+    //  (b) The KYEC host WRITES this one. The 2026-06-08 session carried 24 S2F15 transactions and
+    //      four of them set ECID 1007 to "AGV" (= this shift is run by the AMR, no human). So it
+    //      has to be host-settable, not merely readable; S2F16 below allow-lists 1007 for that.
+    //  (c) Bound DIRECTLY to the canonical GeneralSetting.sOperatorID, with NO RefreshSVData
+    //      snapshot. A snapshot would be rewritten every tick and would silently undo the host's
+    //      write. Same no-snapshot shape as SVID 1002 / sHandlerID above. The main-screen
+    //      edtSysOperatorID edit mirrors this store both ways (main.cpp CommitOperatorID /
+    //      LoadOperatorIDToDisplay); the SECS layer never touches the VCL control.
+    //  Deliberately NOT bound to UserRoleManager.GetUserID(): that is a LOCAL login identity
+    //  ("Operation" / "Engineer" / an account name) and it moves the moment a technician logs in
+    //  mid-lot, whereas 1007 is the host's field for who owns the shift.
+    HGemPtr->SetSVDataPointer(1007, HType.ASCII_TYPE, "Operator ID", "", &GeneralSetting.sOperatorID, "operator id shown on the main screen; host-settable through S2F15 ECID 1007 (9045 ECID 1007 Operator ID)");
     HGemPtr->SetSVDataPointer(1011, HType.ASCII_TYPE, "Machine State", "", &svMachineState, "main-screen status text (9045 SVID 1011)");
     HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "Loader Count", "pcs", &svLoaderIC, "ICs picked off Loader trays (9045 SVID 1101)");
     HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin (9045 SVID 1102; same value as 66021)");
@@ -755,6 +805,22 @@ void HT160Gem::PollGemControlState()
     if(HGemPtr==NULL)
         return;
 
+    //AI(secs-e30-gate) 20260803 : one-shot boot seed. Done here, on the first tick, and NOT in the
+    //  constructor : GeneralSetting is loaded from General.ini during boot and the GEM object is
+    //  built in the same start-up sequence, so reading the setting in the ctor would couple this to
+    //  an initialisation order nobody guarantees. By the first 1 s tick the ini is always loaded.
+    //  This also kills a shipped defect : iControlState was 0 until the host's first S1F17, and 0
+    //  is not a legal value of SVID 66002's own published domain (1/4/5) - the 2026-07-31 log shows
+    //  the host actually receiving <I4[1] 0> inside report 1 at 14:44:02.
+    if(bControlStateSeeded==false)
+    {
+        bControlStateSeeded = true;
+        int iSeed = GeneralSetting.iInitialControlState;
+        if(iSeed!=1 && iSeed!=4 && iSeed!=5)
+            iSeed = 5;                       // never boot into an illegal value
+        SetControlState(iSeed, (iSeed==1) ? 3 : 0, "boot seed from [SECS] InitialControlState");
+    }
+
     unsigned char uNew = MapGemControlState9045(iControlState);
     if(uNew==svGemControlState)
         return;
@@ -777,6 +843,70 @@ void HT160Gem::PollGemControlState()
         HGemPtr->EventReport(1, SECS_EVENT.SECSOnlineRemote);    // 93
 }
 //---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : the single writer of control state + substate. See the header.
+void HT160Gem::SetControlState(int iGemStdState, int iSubstate, AnsiString sWhy)
+{
+    if(iGemStdState!=1 && iGemStdState!=4 && iGemStdState!=5)
+        return;                              // refuse to store a value outside 66002's domain
+    if(iGemStdState!=1)
+        iSubstate = 0;                       // substates exist only under OFF-LINE
+    else if(iSubstate!=1 && iSubstate!=2 && iSubstate!=3)
+        iSubstate = 3;                       // default to HOST OFF-LINE : recoverable by the host
+
+    if(iControlState==iGemStdState && iControlSubstate==iSubstate)
+        return;
+
+    iControlState    = iGemStdState;
+    iControlSubstate = iSubstate;
+
+    if(HGemPtr!=NULL)
+    {
+        AnsiString S;
+        S.sprintf("[SECS] control state -> %d (substate %d) : %s",
+                  iControlState, iControlSubstate, sWhy.c_str());
+        HGemPtr->StringOut(S);
+    }
+    RecordProcess("SECS control state -> " + DescribeControlState() + " (" + sWhy + ")");
+}
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : E30 - the host's S1F17 may bring the tool on-line only from HOST
+//  OFF-LINE. EQUIPMENT OFF-LINE means the OPERATOR owns the tool and the host must be refused
+//  (ONLACK=1). Also honours the commissioning switch [SECS] AcceptHostOnlineRequest, which is
+//  HT9045's GemCheckBoxAcceptHostOnlineRequest ported (uHGemClass.cpp:419-441 there).
+bool HT160Gem::IsHostOnlineRequestAllowed()
+{
+    if(GeneralSetting.bAcceptHostOnlineRequest==false)
+        return false;
+    return (iControlSubstate!=1);            // refuse only from EQUIPMENT OFF-LINE
+}
+//---------------------------------------------------------------------------
+int HT160Gem::GetControlState()    { return iControlState; }
+int HT160Gem::GetControlSubstate() { return iControlSubstate; }
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : the operator's own control, from the maintenance SECS tab. Choosing
+//  Off-Line here lands in EQUIPMENT OFF-LINE - the substate the host may NOT lift with S1F17 -
+//  which is the whole point : it is the only way the machine can answer the audit question "show
+//  me the operator taking the tool off-line and the host being refused". A host-requested
+//  off-line (S1F15) lands in HOST OFF-LINE instead and stays host-recoverable.
+void HT160Gem::OperatorSetControlState(int iGemStdState)
+{
+    if(iGemStdState==1)
+        SetControlState(1, 1, "operator selected Off-Line at the machine");
+    else if(iGemStdState==4)
+        SetControlState(4, 0, "operator selected On-Line Local at the machine");
+    else if(iGemStdState==5)
+        SetControlState(5, 0, "operator selected On-Line Remote at the machine");
+}
+//---------------------------------------------------------------------------
+AnsiString HT160Gem::DescribeControlState()
+{
+    if(iControlState==5) return "On-Line Remote";
+    if(iControlState==4) return "On-Line Local";
+    if(iControlSubstate==1) return "Off-Line (Equipment)";
+    if(iControlSubstate==2) return "Off-Line (Attempt On-Line)";
+    return "Off-Line (Host)";
+}
+//---------------------------------------------------------------------------
 void HT160Gem::AddEC()
 {
     if(HGemPtr==NULL)
@@ -793,19 +923,33 @@ void HT160Gem::AddEC()
     //    RecipeManager's getter/normalizer), so it is reported from the
     //    ecRecipeName snapshot refreshed in S2F14_EquipmentConstanData().
     // -- Recipe selection --
-    HGemPtr->SetECDataPointer(1501, HType.ASCII_TYPE, "Recipe Name",     "",   &ecRecipeName,      "", "", "Default", "current recipe (Setup File) name");
+    //AI(secs-ecname-align9045) 20260804 : name string aligned to HT9045 ("Setup File", declared at
+    // HT9046LS V3.32.810 uHGemHT9045_EC.cpp:79 and HT9011UC V3.33.899 :80) and to this machine's own
+    // SV side (AddSV above), which already used the 9045 wording. Same number, same type, same
+    // pointer - only the string S2F30 / S1F12 report changes. It was "Recipe Name" until 20260804,
+    // which made S2F30 and S1F12 answer two different names for one datum.
+    HGemPtr->SetECDataPointer(1501, HType.ASCII_TYPE, "Setup File",      "",   &ecRecipeName,      "", "", "Default", "current recipe (Setup File) name");
+    // -- Operator identity --
+    //AI(secs-operatorid) 20260803 : the EC half of 1007 (the SV half is registered above on the
+    // SAME AnsiString). This is the namespace HT9045 actually publishes it in and the one the KYEC
+    // host writes: four S2F15 "1007 = AGV" transactions on 2026-06-08. Default "Operator" matches
+    // GeneralSetting's own default so S2F30/S2F13 and the main-screen field always agree.
+    HGemPtr->SetECDataPointer(1007, HType.ASCII_TYPE, "Operator ID",     "",   &GeneralSetting.sOperatorID, "", "", "Operator", "operator id for the running shift (9045 ECID 1007); host-settable, mirrored by the main-screen field");
     //AI(ht160s-secsgem) 20260612 : Tray Form geometry aligned to HT9045 "Type 1
     //  Tray" band (9045 ECID 2758-2763) instead of the old 2011-2016 (which collided
     //  with 9045's 2011 X-Dimension / 2012 Y-Dimension / 2013 Kit Diameter contact-
     //  force band). HT160 currently exposes a single tray geometry, bound directly to
     //  the live THT160TrayForm struct (persistent + type-matched).
     //  data\<recipe>\setup.ini [TrayForm]
-    HGemPtr->SetECDataPointer(2760, HType.FT_8_TYPE,  "Tray X Start",    "mm", &TrayForm.XStart,   "", "", "0", "tray X start pos (9045 ECID 2760 Type1 Start Position X)");
-    HGemPtr->SetECDataPointer(2758, HType.FT_8_TYPE,  "Tray X Pitch",    "mm", &TrayForm.XPitch,   "", "", "0", "tray X pitch (9045 ECID 2758 Type1 Pitch X)");
-    HGemPtr->SetECDataPointer(2761, HType.FT_8_TYPE,  "Tray Y Start",    "mm", &TrayForm.YStart,   "", "", "0", "tray Y start pos (9045 ECID 2761 Type1 Start Position Y)");
-    HGemPtr->SetECDataPointer(2759, HType.FT_8_TYPE,  "Tray Y Pitch",    "mm", &TrayForm.YPitch,   "", "", "0", "tray Y pitch (9045 ECID 2759 Type1 Pitch Y)");
-    HGemPtr->SetECDataPointer(2762, HType.INT_4_TYPE, "Tray X Division", "",   &TrayForm.XDivision,"", "", "0", "tray columns / X count (9045 ECID 2762 Type1 Division X)");
-    HGemPtr->SetECDataPointer(2763, HType.INT_4_TYPE, "Tray Y Division", "",   &TrayForm.YDivision,"", "", "0", "tray rows / Y count (9045 ECID 2763 Type1 Division Y)");
+    //AI(secs-ecname-align9045) 20260804 : names aligned to HT9045 / to this machine's SV side, same
+    // reasoning as 1501 above. 9045 declares these six at uHGemHT9045_EC.cpp:219-222 (810) with
+    // exactly these strings and the same "mm" / no-unit split.
+    HGemPtr->SetECDataPointer(2760, HType.FT_8_TYPE,  "Type 1 Tray Start Position X", "mm", &TrayForm.XStart,   "", "", "0", "tray X start pos (9045 ECID 2760 Type1 Start Position X)");
+    HGemPtr->SetECDataPointer(2758, HType.FT_8_TYPE,  "Type 1 Tray Pitch X",          "mm", &TrayForm.XPitch,   "", "", "0", "tray X pitch (9045 ECID 2758 Type1 Pitch X)");
+    HGemPtr->SetECDataPointer(2761, HType.FT_8_TYPE,  "Type 1 Tray Start Position Y", "mm", &TrayForm.YStart,   "", "", "0", "tray Y start pos (9045 ECID 2761 Type1 Start Position Y)");
+    HGemPtr->SetECDataPointer(2759, HType.FT_8_TYPE,  "Type 1 Tray Pitch Y",          "mm", &TrayForm.YPitch,   "", "", "0", "tray Y pitch (9045 ECID 2759 Type1 Pitch Y)");
+    HGemPtr->SetECDataPointer(2762, HType.INT_4_TYPE, "Type 1 Tray Division X",       "",   &TrayForm.XDivision,"", "", "0", "tray columns / X count (9045 ECID 2762 Type1 Division X)");
+    HGemPtr->SetECDataPointer(2763, HType.INT_4_TYPE, "Type 1 Tray Division Y",       "",   &TrayForm.YDivision,"", "", "0", "tray rows / Y count (9045 ECID 2763 Type1 Division Y)");
     //AI(ht160s-secsgem) 20260612 : RESERVED tray-type slots aligned to HT9045 for
     //  future HT160 multi-tray support. NOT registered yet (HT160 has no Type2/3
     //  data source / values today). When HT160 gains Type 2/3 tray geometries,
@@ -831,11 +975,16 @@ void HT160Gem::AddCEID()
     if(HGemPtr==NULL)
         return;
 
-    //AI(secs-ceid-align9045) 20260729 : register the FULL HT9045 dictionary (CEID 1-275),
-    // mirroring HT9045Gem::AddCEID. Two deliberate departures from HT9045, both at the
-    // REPORT-LINK layer only (the CEID numbers and aliases are byte-identical):
+    //AI(secs-ceid-align9045) 20260729 : register the FULL HT9045 dictionary (CEID 1-292 since
+    // 20260803), mirroring HT9045Gem::AddCEID. Two deliberate departures from HT9045, both at
+    // the REPORT-LINK layer only (the CEID numbers and aliases are byte-identical):
     //   1) HT9045 links CEID i -> RPTID i and only ever defines RPTID 1 = {1027}, so every
-    //      id except 1 ships an empty L[0] until the host provisions S2F33/S2F35. HT160S
+    //      id except 1 ships an empty L[0] until the host provisions S2F33/S2F35. CONFIRMED on
+    //      the customer's own machine 20260803 : KYEC's EventReport_ReportID.def holds exactly
+    //      one line (RPTID 1, Type 1, SVID 1027) and its EventReport_CEID.def links all 292 ids
+    //      1:1 to a same-numbered report - so on the 9046 every event but CEID 1 really does
+    //      carry nothing until the host provisions. That is the same shape as KYEC's
+    //      "CEID 27 fires but has no data" report against HT160S. HT160S
     //      keeps its own report 1 (13 machine-context SVs, see AddReprot) on every id, so a
     //      host that has NOT provisioned still gets usable data. A host that does provision
     //      overwrites the link anyway, so this cannot diverge once S2F35 has run.
@@ -861,13 +1010,22 @@ void HT160Gem::AddCEID()
     unsigned rptSta[1]; rptSta[0] = 3;
     unsigned rptFin[2]; rptFin[0] = 4; rptFin[1] = 6;
     unsigned rptCid[1]; rptCid[0] = 7;   //AI(ht160s-agv-identity2d) 20260713 : CEID275 -> dedicated report 7 ([38202] only), NOT the 9-wide report 5 (AGVLdID must not ship 8 stale carrier ids)
-    HGemPtr->SetCEIDContent(272, "AGVSupplement",   2, rptSup, EquDefault);
-    HGemPtr->SetCEIDContent(273, "AGVLDUnLDStatus", 1, rptSta, EquDefault);
-    HGemPtr->SetCEIDContent(274, "AGVLDUnLDFinish", 2, rptFin, EquDefault);
-    HGemPtr->SetCEIDContent(275, "AGVLdID",         1, rptCid, EquDefault);
+    //AI(secs-ceid-alias-fix) 20260803 : the alias MUST come from EventDescription, not from a
+    // literal. These four calls re-register 272-275 to swap their report link, and
+    // SetCEIDContent overwrites Alias unconditionally - so the four literals that used to sit
+    // here ("AGVSupplement" / "AGVLDUnLDStatus" / "AGVLDUnLDFinish" / "AGVLdID") silently
+    // clobbered the 9045-aligned aliases the loop above had just set, on the ONLY four events
+    // KYEC actually consumes. Caught 20260803 by diffing a live S1F24 against the KYEC
+    // machine's own EventReport_CEID.def : it answers "AMR Supplement" / "AMR LDUnLD Status" /
+    // "AMR LDUnLD Finish" / "AMR LD ID", we answered the AGV* literals. Every other id in
+    // 1-292 already matched. Do not reintroduce a literal here.
+    HGemPtr->SetCEIDContent(272, EventDescription[SECS_EVENT.AGVSupplement  ], 2, rptSup, EquDefault);
+    HGemPtr->SetCEIDContent(273, EventDescription[SECS_EVENT.AGVLDUnLDStatus], 1, rptSta, EquDefault);
+    HGemPtr->SetCEIDContent(274, EventDescription[SECS_EVENT.AGVLDUnLDFinish], 2, rptFin, EquDefault);
+    HGemPtr->SetCEIDContent(275, EventDescription[SECS_EVENT.AGVLdID        ], 1, rptCid, EquDefault);
 
     //AI(secs-ceid-align9045) 20260729 : the explicit Auto-Full block that used to live here
-    // (35/36/37/148/149/150) is gone - the 1-275 loop above now registers those ids straight
+    // (35/36/37/148/149/150) is gone - the 1-292 loop above now registers those ids straight
     // from the HT9045 dictionary, with HT9045's own aliases ("35 Auto1 Full" ...) instead of
     // the locally sprintf'd ones. Same for the Unloadtray ids 136-138/145-147, which used to
     // be left unregistered on purpose : they are now registered like every other id, so they
@@ -1144,15 +1302,15 @@ void HT160Gem::S1F12_StatusVariableNamelistReply()
 //  Unknown CEID -> { CEID, "", L,0 } so the top-level shape stays constant (HT9045
 //  answers the same way; see its S1F24 "no such CEID" branch).
 //
-//  FULL DUMP is deliberate. AddCEID registers all 275 HT9045 ids, and only 52 of them
-//  have an emit site on HT160S - this reply lists all 275 anyway:
+//  FULL DUMP is deliberate. AddCEID registers all 292 HT9045 ids, and only 57 of them
+//  have an emit site on HT160S - this reply lists all 292 anyway:
 //    - HT9045 dumps its whole dictionary too, so a host that diffs the two machines'
 //      namelists sees one dictionary, which is the entire point of the 20260729 align.
 //    - The namelist is NOT a subscription. The host binds what it wants with S2F33 +
 //      S2F35 and arms it with S2F37, so a wider namelist cannot make an unemitted CEID
 //      start arriving. Trimming to the 52 would instead hide ids the host may legitimately
 //      pre-define reports against (e.g. for a later firmware that does emit them).
-//  Size: 275 x (name + report 1's 13 VIDs) is ~35 KB against the 1 MB encode buffer, and
+//  Size: 292 x (name + report 1's 13 VIDs) is ~38 KB against the 1 MB encode buffer, and
 //  DataItemOut's overflow backstop poisons the message rather than truncating it.
 //---------------------------------------------------------------------------
 void HT160Gem::S1F24_CollectionEventNamelist()
@@ -1362,15 +1520,72 @@ void HT160Gem::NoteLotStartTime(bool bStarted, AnsiString sWhen)
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : S2F15 New Equipment Constant Send -> S2F16.
 //  Request  L,n { L,2 { ECID, ECV } }.   Reply  S2F16  B EAC.
-//  EAC: 0=ok, 1=one+ ECID unknown / not host-settable, 2=busy, 3=range.
-//  SAFETY: only the tray-form geometry ECs (2011-2016) are host-settable, and
-//  only while the machine is idle (SystemStart==false && no IC under machine).
-//  Writing tray geometry while running could shift sort/place coordinates, so a
-//  busy machine rejects the whole request (EAC=2, nothing written). Recipe-name
-//  (1501) and any other ECID are rejected (EAC=1) to keep host EC-set out of
-//  recipe switching. A successful tray write is persisted via TrayForm.Save().
-//  NOTE: writes are applied incrementally; on a mixed batch the accepted items
-//  are already written when a later item fails. Host should send tray ECs alone.
+//  EAC: 0=ok, 1=one+ ECID unknown / not host-settable / malformed, 2=busy,
+//       3=value rejected (blank 1007, or a tray value that is not a number).
+//  SAFETY: only the 9045 Type1 tray geometry band (2758-2763) is host-settable,
+//  and only while the machine is idle (SystemStart==false && no IC under
+//  machine): writing tray geometry while running would shift sort/place
+//  coordinates. ECID 1007 Operator ID is the one exception to the idle gate (a
+//  label, no mechanical consequence). Recipe name (1501) and every other number
+//  are rejected to keep host EC-set out of recipe switching. A successful tray
+//  write is persisted via TrayForm.Save(), an Operator ID write via
+//  GeneralSetting.Save(); either one reports CEID 48 Change EC.
+//
+//AI(secs-s2f15-atomic) 20260804 : TWO PASSES, all-or-nothing. Until today the loop
+//  applied each item as it read it while EAC was a single scalar for the whole
+//  message, so a mixed packet WROTE the writable items and still answered
+//  non-zero - and CEID 48, which requires EAC==0, was suppressed. Measured on the
+//  wire with KYEC's own packet L,2{ L,2{1006,lot}, L,2{1007,"AGV"} }: Operator ID
+//  stored and persisted to General.ini, reply EAC=1, no event. "Changed, reported
+//  failed, and silent" is the worst possible answer, and their host sends exactly
+//  that shape (also {1007,37007}); every one of the 24 S2F15 they sent on
+//  2026-06-08 carries at least one ECID this machine does not register.
+//  So: pass 1 parses and validates EVERY item and writes nothing; pass 2 runs only
+//  when the whole packet is acceptable. HT9045 has the same property by a different
+//  route (its busy check rejects the whole message before its check/update passes,
+//  uHGemClass.cpp:744-784).
+//  Pass 1 also rejects what used to be written as a silent zero:
+//   - an ECV whose item type this framework cannot read (F8 was one until the
+//     20260804 fix in DataItemIn - see uHGemEquipment.cpp) -> EAC=1, never 0.
+//   - a tray value that is not a number ("abc", or an empty item) -> EAC=3.
+//     StrToFloatDef/StrToIntDef would have turned both into 0.0 and TrayForm.Save()
+//     would have persisted that into the recipe while answering EAC=0.
+//  EAC precedence when several items fail: 1 (never acceptable) > 3 (bad value) >
+//  2 (busy), so the host is told the most actionable thing - a 2 means "retry when
+//  idle", and it must not be reported for a number that can never be written.
+//---------------------------------------------------------------------------
+#define HT160_S2F15_MAX_ITEMS 32
+//---------------------------------------------------------------------------
+static unsigned char S2F15EacRank(unsigned char eac)
+{
+    if(eac==1) return 3;
+    if(eac==3) return 2;
+    if(eac==2) return 1;
+    return 0;
+}
+//---------------------------------------------------------------------------
+static void S2F15RaiseEac(unsigned char &EAC, unsigned char eac)
+{
+    if(S2F15EacRank(eac) > S2F15EacRank(EAC))
+        EAC = eac;
+}
+//---------------------------------------------------------------------------
+//Numeric guards for the tray band. StrToFloat / StrToInt throw EConvertError on a
+//value the machine cannot use, which is exactly the case that used to become 0.
+//---------------------------------------------------------------------------
+static bool S2F15IsFloat(AnsiString s)
+{
+    if(s.Trim()=="") return false;
+    try { StrToFloat(s.Trim()); } catch(...) { return false; }
+    return true;
+}
+//---------------------------------------------------------------------------
+static bool S2F15IsInt(AnsiString s)
+{
+    if(s.Trim()=="") return false;
+    try { StrToInt(s.Trim()); } catch(...) { return false; }
+    return true;
+}
 //---------------------------------------------------------------------------
 void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
 {
@@ -1380,6 +1595,11 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
     AnsiString sECID, sVal, sLog;
     unsigned ECID;
     bool bWroteTrayForm = false;
+    bool bWroteOperatorID = false;   //AI(secs-operatorid) 20260803 : ECID 1007 committed this pass
+
+    unsigned  ItemECID[HT160_S2F15_MAX_ITEMS];
+    AnsiString ItemVal[HT160_S2F15_MAX_ITEMS];
+    int iItems = 0;
 
     if(HGemPtr==NULL)
         return;
@@ -1394,50 +1614,125 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
         n = 0;
     }
 
+    // ---- pass 1 : parse + validate every item, write nothing ----
     for(i=0; i<n; i++)
     {
         // inner L,2 { ECID, ECV }
         if(HGemPtr->GetDataItemLenAndTypeAndDelete(inner, HType.LIST_TYPE)!=1)
         {
-            EAC = 1;
+            S2F15RaiseEac(EAC, 1);
             break;
         }
         sECID = "";
+        bool bIdOk = false;
         if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
-            HGemPtr->DataItemIn(len, Type, sECID);
+            bIdOk = (HGemPtr->DataItemIn(len, Type, sECID)==1);
         sVal = "";
+        bool bValOk = false;
         if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
-            HGemPtr->DataItemIn(len, Type, sVal);
+            bValOk = (HGemPtr->DataItemIn(len, Type, sVal)==1);
 
         ECID = (unsigned)StrToIntDef(sECID, 0);
 
-        if(bBusy)
+        if(bIdOk==false || bValOk==false)
         {
-            EAC = 2;                 // busy -> reject, write nothing
+            //An item type this framework cannot read. Report it instead of writing
+            //whatever the empty string converts to.
+            sLog.sprintf("[SECS] S2F15 ECID %u : unreadable item (idOk=%d valOk=%d type=%u) -> EAC=1",
+                         ECID, (int)bIdOk, (int)bValOk, (unsigned)Type);
+            HGemPtr->StringOut(sLog);
+            S2F15RaiseEac(EAC, 1);
             continue;
         }
-        if(ECID>=2758 && ECID<=2763)  //AI(ht160s-secsgem) 20260612 : 9045 Type1 tray band
+
+        if(iItems >= HT160_S2F15_MAX_ITEMS)
         {
-            if(HGemPtr->WriteECValueByString(ECID, sVal)==0)
-                bWroteTrayForm = true;
-            else
-                EAC = 3;             // unconvertible / out of range
+            HGemPtr->StringOut("[SECS] S2F15 too many items in one message -> EAC=1");
+            S2F15RaiseEac(EAC, 1);
+            continue;
+        }
+
+        if(ECID==1007)
+        {
+            //AI(secs-operatorid) 20260803 : ECID 1007 Operator ID is exempt from the busy gate on
+            //purpose - it is a label with no mechanical consequence, and the KYEC host writes it
+            //precisely WHILE the tool runs (four S2F15 "1007 = AGV" on 2026-06-08). A blank value is
+            //refused rather than stored, so the SV can never regress to A[0] "".
+            if(sVal.Trim()==AnsiString(""))
+            {
+                S2F15RaiseEac(EAC, 3);
+                continue;
+            }
+            ItemECID[iItems] = ECID;
+            ItemVal[iItems]  = sVal.Trim();
+            iItems++;
+        }
+        else if(ECID>=2758 && ECID<=2763)  //AI(ht160s-secsgem) 20260612 : 9045 Type1 tray band
+        {
+            if(bBusy)
+            {
+                S2F15RaiseEac(EAC, 2);   // busy -> reject the whole message, write nothing
+                continue;
+            }
+            bool bNumOk = (ECID>=2762) ? S2F15IsInt(sVal) : S2F15IsFloat(sVal);
+            if(bNumOk==false)
+            {
+                sLog.sprintf("[SECS] S2F15 ECID %u : value '%s' is not a number -> EAC=3",
+                             ECID, sVal.c_str());
+                HGemPtr->StringOut(sLog);
+                S2F15RaiseEac(EAC, 3);
+                continue;
+            }
+            ItemECID[iItems] = ECID;
+            ItemVal[iItems]  = sVal.Trim();
+            iItems++;
         }
         else
         {
-            EAC = 1;                 // not a host-settable constant
+            S2F15RaiseEac(EAC, 1);       // not a host-settable constant
+        }
+    }
+
+    // ---- pass 2 : commit, only when the whole message passed ----
+    if(EAC==0)
+    {
+        for(i=0; i<iItems; i++)
+        {
+            if(HGemPtr->WriteECValueByString(ItemECID[i], ItemVal[i])!=0)
+            {
+                S2F15RaiseEac(EAC, 3);   // registry rejected it (should not happen after pass 1)
+                continue;
+            }
+            if(ItemECID[i]==1007)
+                bWroteOperatorID = true;
+            else
+                bWroteTrayForm = true;
         }
     }
 
     if(bWroteTrayForm && !bBusy)
         TrayForm.Save(RecipeManager.GetCurrentRecipeName());
 
+    //AI(secs-operatorid) 20260803 : persist + show what the host just set. General.ini keeps it
+    //across a restart exactly like an operator-typed value, and LoadOperatorIDToDisplay() pushes
+    //it into the main-screen field so the floor can SEE that the host took the shift over (KYEC
+    //sends "AGV"). Safe to touch the VCL from here: the HSMS sockets are ctNonBlocking /
+    //stNonBlocking, so every message handler already runs on the main thread.
+    if(bWroteOperatorID)
+    {
+        GeneralSetting.Save();
+        if(fMain!=NULL)
+            fMain->LoadOperatorIDToDisplay();
+    }
+
     //AI(secs-ceid-align9045) 20260729 : CEID 48 "Change EC". HT9045 reports this from its own
     //S2F15 commit loop (uHGemEquipment.cpp:4021), once the new value has actually been taken.
     //HT160S only ever commits the tray-form geometry band, so bWroteTrayForm is the exact
     //"an EC really changed" condition. EAC!=0 (rejected / busy / out of range) writes nothing
     //and therefore reports nothing.
-    if(bWroteTrayForm && !bBusy && EAC == 0)
+    //AI(secs-operatorid) 20260803 : an Operator ID commit is an EC change too, so it reports the
+    //same CEID. It carries no !bBusy term because 1007 is deliberately writable while running.
+    if(((bWroteTrayForm && !bBusy) || bWroteOperatorID) && EAC == 0)
         HGemPtr->EventReport(1, SECS_EVENT.ChangeEC);
 
     // S2F16 reply : B EAC
@@ -1445,8 +1740,8 @@ void HT160Gem::S2F16_NewEquipmentConstantSendAcknowledge()
     HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &EAC);
     HGemPtr->SendLocalData();
 
-    sLog.sprintf("[SECS] S2F16 EAC=%u busy=%d trayWritten=%d",
-                 (unsigned)EAC, (int)bBusy, (int)bWroteTrayForm);
+    sLog.sprintf("[SECS] S2F16 EAC=%u busy=%d trayWritten=%d opIdWritten=%d",
+                 (unsigned)EAC, (int)bBusy, (int)bWroteTrayForm, (int)bWroteOperatorID);
     HGemPtr->StringOut(sLog);
 }
 //---------------------------------------------------------------------------
@@ -1915,17 +2210,36 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
         {
             //AI(ht160s-secsgem) 20260611 : ONLINE (remote) host command. Consume the
             // parameter list and move the local control-state mirror to Online Remote(5).
+            //AI(secs-e30-gate) 20260803 : routed through the single writer, and honours the same
+            // E30 rule as S1F17 - the host cannot take the tool back from an operator who put it
+            // in EQUIPMENT OFF-LINE. HCACK=2 "cannot perform now" is the E5-correct refusal.
             HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
-            iControlState = 5;
-            HCACK = 0;
+            if(IsHostOnlineRequestAllowed()==false)
+            {
+                HCACK = 2;
+                RecordProcess("SECS ONLINE_REMOTE refused : " + DescribeControlState());
+            }
+            else
+            {
+                SetControlState(5, 0, "host RCMD ONLINE_REMOTE");
+                HCACK = 0;
+            }
         }
         else if(S.AnsiPos("ONLINE_LOCAL")==1)
         {
             //AI(ht160s-secsgem) 20260611 : ONLINE_LOCAL host command. Consume the
             // parameter list and move the control-state mirror to Online Local(4).
             HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE);
-            iControlState = 4;
-            HCACK = 0;
+            if(IsHostOnlineRequestAllowed()==false)
+            {
+                HCACK = 2;
+                RecordProcess("SECS ONLINE_LOCAL refused : " + DescribeControlState());
+            }
+            else
+            {
+                SetControlState(4, 0, "host RCMD ONLINE_LOCAL");
+                HCACK = 0;
+            }
         }
         else if(S.AnsiPos("LOTSTART")==1)
         {
@@ -2603,14 +2917,31 @@ void HT160Gem::S1F18_ONLINEAcknowledge()
     //  existing "ONLINE" host command (S2F41) semantics at S2F42 dispatch. Previously unhandled
     //  -> the S1 dispatch fell through to S9F3 (Unrecognized), so a GEM host could never bring
     //  the tool online via S1F17/F18. Send idiom mirrors S1F14_ConnectRequestAcknowledge.
+    //AI(secs-e30-gate) 20260803 : ONLACK is no longer a hard-coded 0. Ported from HT9045's own
+    //  discipline (its HTGem::S1F18_ONLINEAcknowledge, uHGemClass.cpp:419-441) :
+    //     2 = already on-line          (nothing to do)
+    //     0 = accepted, going on-line  (operator permits it)
+    //     1 = refused                  (operator owns the tool, or the commissioning switch is off)
+    //  The refusal is the whole point of E30's substates : an operator who put the machine in
+    //  EQUIPMENT OFF-LINE must not be overridden from the host. Note the field consequence,
+    //  measured on the 2026-07-31 log : CJ_EAP does NOT re-send S1F17 after a reconnect, so a
+    //  refusal is not retried - the tool stays off-line until someone walks to the machine. That
+    //  is why [SECS] AcceptHostOnlineRequest defaults to 1 and why the state is on the SECS tab.
     if(HGemPtr==NULL)
         return;
     unsigned char ONLACK = 0;
+    if(iControlState==4 || iControlState==5)
+        ONLACK = 2;                                  // already on-line
+    else if(IsHostOnlineRequestAllowed()==false)
+        ONLACK = 1;                                  // operator / commissioning refusal
     HGemPtr->InitLocalHead(1, 18, 0);
     HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &ONLACK);
     HGemPtr->SendLocalData();
-    iControlState = 5;   //Online-Remote (same target as the ONLINE host command)
-    HGemPtr->StringOut("[SECS] S1F18 ONLINE acknowledged (ONLACK=0, control state -> Online-Remote 5)");
+    if(ONLACK==0)
+        SetControlState(5, 0, "host S1F17 Request ON-LINE");
+    AnsiString sOn;
+    sOn.sprintf("[SECS] S1F18 ONLACK=%u (%s)", (unsigned)ONLACK, DescribeControlState().c_str());
+    HGemPtr->StringOut(sOn);
 }
 //---------------------------------------------------------------------------
 void HT160Gem::S1F16_OFFLINEAcknowledge()
@@ -2626,7 +2957,11 @@ void HT160Gem::S1F16_OFFLINEAcknowledge()
     HGemPtr->InitLocalHead(1, 16, 0);
     HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &OFLACK);
     HGemPtr->SendLocalData();
-    iControlState = 1;   //Equipment Off-Line (GEM control state)
+    //AI(secs-e30-gate) 20260803 : lands in HOST OFF-LINE, not EQUIPMENT OFF-LINE. E30 keys the
+    //  S1F17 permission on exactly this distinction : the host asked to go off-line, so the host
+    //  must be able to take itself back on-line. The old comment called this "Equipment Off-Line",
+    //  which is the substate that would have locked CJ_EAP out permanently.
+    SetControlState(1, 3, "host S1F15 Request OFF-LINE");
     //AI(secs-kyec-rcmd4-fix) 20260728 : going OFF-LINE means the host has handed the machine back
     //  to the operator, so it must not leave the tower/buzzer driven by a stale host override.
     if(IsSecsPanelOverrideActive())

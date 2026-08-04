@@ -115,6 +115,10 @@ void THT160GeneralSetting::SetDefault()
 	iAutoPushConfirmSettleMs=500;
 	iAutoConcurrency=0;   //AI(auto-per-station) 20260802 : 0 = legacy single ladder (see header)
 	bAskSkipICCount=false;   //AI(secs-skipiccount) 20260802 : no extra operator dialog by default
+	//AI(secs-e30-gate) 20260803 : boot ON-LINE REMOTE. Off-Line by default would lock the host out
+	//(E30 accepts S1F17 only from HOST OFF-LINE) - see the header for the field evidence.
+	iInitialControlState=5;
+	bAcceptHostOnlineRequest=true;
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
 	iHomeDrainTimeoutSec=15;
@@ -135,6 +139,7 @@ void THT160GeneralSetting::SetDefault()
 	sMachineModel="HT160S";
 	sHandlerID="";
 	sSerialNo="";
+	sOperatorID="Operator";   //AI(secs-operatorid) 20260803 : SVID/ECID 1007 default, never blank
 	iBinDispBaud=9600;
 	iBinDispPanelType=0;
 	bBinDispLogVerbose=false;
@@ -237,6 +242,10 @@ void THT160GeneralSetting::Load()
 	//does not exist. 0 keeps the legacy ladder, which is the on-site rollback value.
 	iAutoConcurrency=Ini->ReadInteger("Auto", "Concurrency", 0);
 	bAskSkipICCount=Ini->ReadBool("SECS", "AskSkipICCount", false);
+	iInitialControlState=Ini->ReadInteger("SECS", "InitialControlState", 5);
+	if(iInitialControlState!=1 && iInitialControlState!=4 && iInitialControlState!=5)
+		iInitialControlState=5;
+	bAcceptHostOnlineRequest=Ini->ReadBool("SECS", "AcceptHostOnlineRequest", true);
 	if(iAutoConcurrency<0) iAutoConcurrency=0;
 	if(iAutoConcurrency>6) iAutoConcurrency=6;
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
@@ -259,6 +268,7 @@ void THT160GeneralSetting::Load()
 	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
 	sHandlerID=Ini->ReadString("MachineIdentity", "HandlerID", "");
 	sSerialNo=Ini->ReadString("MachineIdentity", "SerialNo", "");
+	sOperatorID=Ini->ReadString("MachineIdentity", "OperatorID", "Operator");   //AI(secs-operatorid) 20260803 : SVID/ECID 1007
 	iBinDispBaud=Ini->ReadInteger("BinDisplay", "Baud", 9600);
 	iBinDispPanelType=Ini->ReadInteger("BinDisplay", "PanelType", 0);
 	bBinDispLogVerbose=Ini->ReadBool("BinDisplay", "LogVerbose", false);
@@ -326,6 +336,8 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "AutoPushConfirmSettleMs", iAutoPushConfirmSettleMs);
 	Ini->WriteInteger("Auto", "Concurrency", iAutoConcurrency);
 	Ini->WriteBool("SECS", "AskSkipICCount", bAskSkipICCount);
+	Ini->WriteInteger("SECS", "InitialControlState", iInitialControlState);
+	Ini->WriteBool("SECS", "AcceptHostOnlineRequest", bAcceptHostOnlineRequest);
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
 	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);
@@ -346,6 +358,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteString("MachineIdentity", "Model", sMachineModel);
 	Ini->WriteString("MachineIdentity", "HandlerID", sHandlerID);
 	Ini->WriteString("MachineIdentity", "SerialNo", sSerialNo);
+	Ini->WriteString("MachineIdentity", "OperatorID", sOperatorID);   //AI(secs-operatorid) 20260803 : SVID/ECID 1007
 	Ini->WriteInteger("BinDisplay", "Baud", iBinDispBaud);
 	Ini->WriteInteger("BinDisplay", "PanelType", iBinDispPanelType);
 	Ini->WriteBool("BinDisplay", "LogVerbose", bBinDispLogVerbose);

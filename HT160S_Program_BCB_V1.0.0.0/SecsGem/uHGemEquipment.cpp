@@ -1545,6 +1545,25 @@ void THGem::InitLocalHead(int Stream, int Function, int WaitBit)
     CreateLocalHead();
 }
 //---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : SxF0 Abort Transaction - the SEMI E30 refusal for a host primary
+//  the equipment must not act on in its current control state ("the equipment responds with SxF0
+//  to any primary other than S1F13 or S1F17 while OFF-LINE").
+//  Mechanics, all free from the existing codec : Function 0 is EVEN, so InitLocalHead reuses
+//  Remote.SystemByte and the abort therefore closes the very transaction being refused;
+//  CreateLocalHead emits the 10-byte header and stamps 10 into the 4-byte length prefix, so this
+//  is a legal 14-byte header-only frame with no body; SendLocalData still gates on
+//  ActiveSocket != NULL && SELECTED. W_Bit is 0 - an abort is a reply and never expects one.
+//  MUST be preferred over "log and send nothing" : silence is what made the host T3-timeout on
+//  2026-07-23, and a T3 is indistinguishable from a dead machine.
+void THGem::SendAbort(int Stream)
+{
+    InitLocalHead(Stream, 0, 0);
+    SendLocalData();
+    AnsiString S;
+    S.sprintf("[SECS][TX] S%dF0 abort (refused in this control state)", Stream);
+    StringOut(S);
+}
+//---------------------------------------------------------------------------
 void THGem::DataItemOut(int len, unsigned char Type, void *P)
 {
     int i, k;
@@ -2562,6 +2581,13 @@ void THGem::LogSmlBody(const char *Dir, unsigned char *Ptr, int Len, int S, int 
     if(!bLogSmlBody || Ptr==NULL || Len<14)
         return;
 
+    //AI(secs-e30-gate) 20260803 : Function 0 (Abort Transaction) is header-only BY DEFINITION, so
+    //  there is no body to render and RenderSmlItem would report a parse error on every abort -
+    //  proven on this wire already, the host's own header-only S1F17 logs exactly that. Skip the
+    //  dump instead of teaching the field to ignore a recurring "[SML parse error rc=-1]".
+    if(F==0)
+        return;
+
     AnsiString Block, Tree;
     Block.sprintf("[SECS][%s] S%dF%d W=%d body:", Dir, S, F, W);
     int RunLength = 14;
@@ -3176,6 +3202,34 @@ int THGem::DataItemIn(int Len, unsigned char t, AnsiString &Str)
         int P;
         ret = DataItemInSub(Len, t, &P);
         if(ret==1) { Str = P; iReturnCode = ret; }
+        return ret;
+    }
+    //AI(secs-ecv-types) 20260804 : FT_8 / FT_4 / BOOLEAN were missing, so every caller that reads a
+    //  host value through this overload silently got an EMPTY string for a perfectly legal float or
+    //  boolean item (the else below returns -1 AND leaves the item unconsumed). The S2F15 EC-write
+    //  path ignored that -1 and fed "" to StrToFloatDef, i.e. a host <F8 102.5> wrote 0.0 into the
+    //  tray geometry and still answered EAC=0. The value is already decoded to text by ProcessSML,
+    //  so all this needs is the branch. FloatToStrF (not sprintf) because the consumer parses it
+    //  back with StrToFloatDef - both honour the same locale decimal separator.
+    else if(t==HType.FT_8_TYPE)
+    {
+        double P;
+        ret = DataItemInSub(Len, t, &P);
+        if(ret==1) { Str = FloatToStrF(P, ffGeneral, 15, 0); iReturnCode = ret; }
+        return ret;
+    }
+    else if(t==HType.FT_4_TYPE)
+    {
+        float P;
+        ret = DataItemInSub(Len, t, &P);
+        if(ret==1) { Str = FloatToStrF((double)P, ffGeneral, 7, 0); iReturnCode = ret; }
+        return ret;
+    }
+    else if(t==HType.BOOLEAN_TYPE)
+    {
+        bool P;
+        ret = DataItemInSub(Len, t, &P);
+        if(ret==1) { Str = (P ? "1" : "0"); iReturnCode = ret; }
         return ret;
     }
     else

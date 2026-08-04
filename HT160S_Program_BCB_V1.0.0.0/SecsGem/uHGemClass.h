@@ -49,6 +49,15 @@ public:
     // ahead of the HCACK reply it is still building. Base is a no-op.
     virtual void PollGemControlState();
 
+    //AI(secs-e30-gate) 20260803 : operator-side control-state surface, reached from the machine UI
+    // through HSys.MyGem (an HTGem*), same convention as NoteLotStartTime / ReportSkipICCount.
+    // WITHOUT an operator control there is no way into or out of EQUIPMENT OFF-LINE, E30's
+    // "accept S1F17 only from HOST OFF-LINE" rule can never be exercised, and a machine that
+    // boots off-line can never be brought on-line at all. Base implementations are inert.
+    virtual void OperatorSetControlState(int iGemStdState);   // 1 = Off-Line(Equipment) / 4 = Local / 5 = Remote
+    virtual int  GetControlState();                           // GEM domain 1/4/5, 0 = not a GEM build
+    virtual AnsiString DescribeControlState();                // operator-facing text
+
     //AI(secs-kyec-rcmd4-fix) 20260728 : transport -> logic notification that the HSMS link is
     // gone (peer disconnect, socket error, Separate.req, or our own DropConnection). Lets the
     // logic layer drop any latched host state that would otherwise outlive the host. Base is a
