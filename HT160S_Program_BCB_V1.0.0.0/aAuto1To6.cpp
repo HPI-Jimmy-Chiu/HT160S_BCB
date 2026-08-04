@@ -1976,6 +1976,31 @@ void TAutoModule::DoAuto(int &Task)
 //Extracted from DoDischargeTray case 6000-7000 so the Teach Advanced TestGoUpOnce drives
 //the IDENTICAL cylinder action as the production discharge (no drift). Caller owns the
 //SubTask + settle Delay. Returns true when the rise+lower has completed.
+//AI(ht160s-frontrise-pushpop) 20260804 : the RISE now goes through TMyCylinder::Push() instead
+//of a raw On() plus an IsCylinderOnReady() poll. Root cause this fixes (on-site 20260803): the
+//old case 1 drove Rise->On() every scan and then only read the on-reed - IsCylinderOnReady is a
+//bare OnSensor.IsOn() (mycylin.cpp), no timer and no alarm - so a reed that never made froze
+//this sub-task forever, silently. With [Auto] Concurrency=0 the six stations share ONE ladder
+//whose case 4000 blocks on DoDischargeTray, so one stuck riser starves every station
+//rear->working-car pull: on 20260803 Auto4 (named by SECS CEID=145 at 15:25:35.634, 1.5 s after
+//the module entered Task 4000) held the shared rung for ~8 minutes and the only trace was the
+//300 s StuckWatchdog. Push() carries the confirm + timeout + SetCylinderAlarm the class already
+//provides (C_Auto*_FrontRiseTray _On reeds are Enable=1 with OnAlarmTime=5000 in the in-force
+//IO_Table), so a dead reed now alarms in 5 s naming the cylinder instead of hanging the machine.
+//case 1 is a one-shot Rise->Reset() arm state, the idiom every feeder module already uses in
+//front of a confirmed stroke (aEmpty.cpp:1192/1255). It is REQUIRED, not decoration: Task is
+//shared by Push/Pop and the 20260731 iLastDir re-arm only covers a direction CHANGE, so a stroke
+//abandoned mid-flight would leave Task=50 with a live wall-clock Delay and the next SAME-direction
+//entry would raise the timeout alarm on its first scan, zero grace. One-shot only - calling
+//Reset() every scan would re-arm the budget every poll and the alarm could never fire at all.
+//The LOWER half is deliberately left as the original fire-and-forget Rise->Off(). Routing it
+//through Pop() would newly make six _Off reeds load-bearing on every discharged tray when the
+//only code that has ever read them is the HOME drain (line 199) - and this machine failed that
+//very confirm twice on 20260803 ("40040 Cylinder=C_Empty_FrontRiseTray_1 Func=Pop"). Add the Pop
+//confirm only after all twelve C_Auto*_FrontRiseTray reeds have been exercised on the machine.
+//KNOWN GAP, deliberately not fixed here: DoAllAutoCleanOut case 4000/5000 still drives the same
+//six risers with raw On()/Off() + IsCylinderOnReady and waits for ALL SIX, so the identical
+//silent hang survives on the end-of-lot path.
 bool TAutoModule::DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay)
 {
     TMyCylinder *Rise=GetFrontRise(Index);
@@ -1989,16 +2014,20 @@ bool TAutoModule::DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay)
     switch(SubTask)
     {
         case 1:
-            Rise->On();
-            if(IsCylinderOnReady(Rise, IsSoftSimulate()))
-            {
-                Delay.SetMS(GeneralSetting.iAutoFrontRiseDwellMs);
-                Delay.On();
-                SubTask=2;
-            }
+            Rise->Reset();
+            SubTask=2;
             break;
 
         case 2:
+            if(Rise->Push() || IsSoftSimulate())
+            {
+                Delay.SetMS(GeneralSetting.iAutoFrontRiseDwellMs);
+                Delay.On();
+                SubTask=3;
+            }
+            break;
+
+        case 3:
             if(Delay.Off())
             {
                 Rise->Off();
