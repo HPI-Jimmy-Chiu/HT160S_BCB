@@ -3109,15 +3109,15 @@ object fMaintenance: TfMaintenance
           object lblTopCcdTestTitle: TLabel
             Left = 16
             Top = 14
-            Width = 200
+            Width = 240
             Height = 20
             AutoSize = False
-            Caption = 'Manual Shot (LON)'
+            Caption = 'Manual Shot (LON / LOFF)'
           end
           object lblTopCcdResultCap: TLabel
-            Left = 190
+            Left = 296
             Top = 52
-            Width = 80
+            Width = 60
             Height = 20
             AutoSize = False
             Caption = 'Result'
@@ -3125,19 +3125,28 @@ object fMaintenance: TfMaintenance
           object btnTopCcdShot: TButton
             Left = 16
             Top = 48
-            Width = 150
+            Width = 130
             Height = 28
             Caption = 'Trigger Shot'
             TabOrder = 0
             OnClick = btnTopCcdShotClick
           end
+          object btnTopCcdEndShot: TButton
+            Left = 154
+            Top = 48
+            Width = 130
+            Height = 28
+            Caption = 'End Shot (LOFF)'
+            TabOrder = 1
+            OnClick = btnTopCcdEndShotClick
+          end
           object edTopCcdResult: TEdit
-            Left = 280
+            Left = 360
             Top = 48
             Width = 400
-            Height = 24
+            Height = 21
             ReadOnly = True
-            TabOrder = 1
+            TabOrder = 2
           end
         end
         object memTopCcdLog: TMemo
@@ -3281,15 +3290,15 @@ object fMaintenance: TfMaintenance
           object lblColorCcdTestTitle: TLabel
             Left = 16
             Top = 14
-            Width = 200
+            Width = 240
             Height = 20
             AutoSize = False
-            Caption = 'Manual Shot (LON)'
+            Caption = 'Manual Shot (LON / LOFF)'
           end
           object lblColorCcdResultCap: TLabel
-            Left = 190
+            Left = 296
             Top = 52
-            Width = 80
+            Width = 60
             Height = 20
             AutoSize = False
             Caption = 'Result'
@@ -3297,19 +3306,28 @@ object fMaintenance: TfMaintenance
           object btnColorCcdShot: TButton
             Left = 16
             Top = 48
-            Width = 150
+            Width = 130
             Height = 28
             Caption = 'Trigger Shot'
             TabOrder = 0
             OnClick = btnColorCcdShotClick
           end
+          object btnColorCcdEndShot: TButton
+            Left = 154
+            Top = 48
+            Width = 130
+            Height = 28
+            Caption = 'End Shot (LOFF)'
+            TabOrder = 1
+            OnClick = btnColorCcdEndShotClick
+          end
           object edColorCcdResult: TEdit
-            Left = 280
+            Left = 360
             Top = 48
             Width = 400
             Height = 24
             ReadOnly = True
-            TabOrder = 1
+            TabOrder = 2
           end
         end
         object memColorCcdLog: TMemo

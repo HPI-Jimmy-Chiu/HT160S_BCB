@@ -250,6 +250,7 @@ __published:
     TLabel *lblTopCcdStatusError;
     TLabel *lblTopCcdTestTitle;
     TButton *btnTopCcdShot;
+    TButton *btnTopCcdEndShot;
     TLabel *lblTopCcdResultCap;
     TEdit *edTopCcdResult;
     TMemo *memTopCcdLog;
@@ -272,6 +273,7 @@ __published:
     TLabel *lblColorCcdStatusError;
     TLabel *lblColorCcdTestTitle;
     TButton *btnColorCcdShot;
+    TButton *btnColorCcdEndShot;
     TLabel *lblColorCcdResultCap;
     TEdit *edColorCcdResult;
     TMemo *memColorCcdLog;
@@ -406,11 +408,13 @@ __published:
     void __fastcall btnTopCcdSaveClick(TObject *Sender);
     void __fastcall btnTopCcdReloadClick(TObject *Sender);
     void __fastcall btnTopCcdShotClick(TObject *Sender);
+    void __fastcall btnTopCcdEndShotClick(TObject *Sender);
     void __fastcall btnColorCcdConnectClick(TObject *Sender);
     void __fastcall btnColorCcdDisconnectClick(TObject *Sender);
     void __fastcall btnColorCcdSaveClick(TObject *Sender);
     void __fastcall btnColorCcdReloadClick(TObject *Sender);
     void __fastcall btnColorCcdShotClick(TObject *Sender);
+    void __fastcall btnColorCcdEndShotClick(TObject *Sender);
     void __fastcall chkTopCcdEnableClick(TObject *Sender);
     void __fastcall chkColorCcdEnableClick(TObject *Sender);
     void __fastcall btnLotApiSaveClick(TObject *Sender);
@@ -466,6 +470,12 @@ private:
     bool bTowerLightBlinkPhase;
     bool bLoadingHardwareSettings;   // guard: suppress save-on-click handlers during programmatic LoadHardwareSettings
     TEdit *edAgvTimeoutSec;   //AI(amr-unmanned W5) 20260722 : dynamically-built AGV handshake timeout (s) editor on the AMR page (NULL until BuildAgvTimeoutField)
+    //AI(ht160s-maintainer) 20260804 : latch "a manual shot is open" (LON sent from the
+    //maintenance page, LOFF not sent yet) so the auto-close in Refresh*CcdStatus fires
+    //exactly once per shot. Manual-page only : the aLoader / aColor production paths
+    //open and close their own shots.
+    bool bTopCcdShotOpen;
+    bool bColorCcdShotOpen;
 
     void __fastcall RegisterMaintenancePages();
     void __fastcall LayoutMaintenanceButtons();

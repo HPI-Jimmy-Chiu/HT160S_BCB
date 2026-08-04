@@ -307,6 +307,8 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     iMaintenanceMenuCount=0;
     LastClickButton=NULL;
     bTowerLightBlinkPhase=false;
+    bTopCcdShotOpen=false;     //AI(ht160s-maintainer) 20260804 : no manual shot open at power-on
+    bColorCcdShotOpen=false;
     edAgvTimeoutSec=NULL;   //AI(amr-unmanned W5) 20260722 : dynamically built on the AMR page (BuildAgvTimeoutField)
     //AI(ht160s-maintainer) 20260613 : Bin Display (MCU) / Top CCD / Color CCD / Lot
     //WebAPI page controls now stream from the DFM, so they are already assigned by the
@@ -446,6 +448,17 @@ void __fastcall TfMaintenance::RefreshTopCcdStatus()
                 edTopCcdResult->Text=Code;
                 AddTopCcdLog(AnsiString("Recv 2D = ")+Code);
             }
+            //AI(ht160s-maintainer) 20260804 : mirror the production read->LOFF pairing
+            //(aLoader / aColor). Gate on the shot latch, NOT on the "code changed"
+            //branch above : TopCcdGetResult() never clears bTopCcdReadDone so it keeps
+            //returning true, and re-reading the SAME code would otherwise skip the
+            //close and leave the reader lamp on.
+            if(bTopCcdShotOpen && bConnected)
+            {
+                TopCcdSocket->TopCcdEndShot();
+                bTopCcdShotOpen=false;
+                AddTopCcdLog("Auto end shot after read (send LOFF)");
+            }
         }
     }
     else
@@ -505,6 +518,16 @@ void __fastcall TfMaintenance::btnTopCcdDisconnectClick(TObject *Sender)
     (void)Sender;
     if(TopCcdSocket!=NULL)
     {
+        //AI(ht160s-maintainer) 20260804 : close an open shot BEFORE dropping the link.
+        //LOFF is an application command, so a bare TCP close would leave the reader
+        //lamp on with no channel left to turn it off. closesocket() keeps the default
+        //linger (SO_LINGER off), so the queued LOFF still goes out.
+        if(TopCcdSocket->IsTopCcdConnected() && bTopCcdShotOpen)
+        {
+            TopCcdSocket->TopCcdEndShot();
+            AddTopCcdLog("End shot before disconnect (send LOFF)");
+        }
+        bTopCcdShotOpen=false;
         TopCcdSocket->TopCcdDisconnect();
         AddTopCcdLog("Disconnect");
     }
@@ -524,7 +547,35 @@ void __fastcall TfMaintenance::btnTopCcdShotClick(TObject *Sender)
         else
         {
             TopCcdSocket->TopCcdTriggerShot();
+            bTopCcdShotOpen=true;
             AddTopCcdLog("Trigger shot (send LON)");
+        }
+    }
+    RefreshTopCcdStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260804 : the manual test page could only OPEN a shot (LON)
+//and never close it, so after a manual trigger the reader kept its lamp on and kept
+//reading until some production cycle happened to send LOFF. Pair the trigger with an
+//explicit end-shot, the same way the aLoader / aColor read paths do.
+//No auto-timeout on purpose : during teach / alignment the operator legitimately wants
+//to keep the light on while positioning a part, so closing the shot stays their call.
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnTopCcdEndShotClick(TObject *Sender)
+{
+    (void)Sender;
+    EnsureTopCcdSocketCreated();
+    if(TopCcdSocket!=NULL)
+    {
+        if(!TopCcdSocket->IsTopCcdConnected())
+        {
+            AddTopCcdLog("Not connected, please Connect first");
+        }
+        else
+        {
+            TopCcdSocket->TopCcdEndShot();
+            bTopCcdShotOpen=false;
+            AddTopCcdLog("End shot (send LOFF)");
         }
     }
     RefreshTopCcdStatus();
@@ -620,6 +671,15 @@ void __fastcall TfMaintenance::RefreshColorCcdStatus()
                 edColorCcdResult->Text=Code;
                 AddColorCcdLog(AnsiString("Recv 2D = ")+Code);
             }
+            //AI(ht160s-maintainer) 20260804 : see RefreshTopCcdStatus - close on the
+            //shot latch, not on the "code changed" branch, or a repeated code leaves
+            //the reader lamp on.
+            if(bColorCcdShotOpen && bConnected)
+            {
+                ColorCcdSocket->ColorCcdEndShot();
+                bColorCcdShotOpen=false;
+                AddColorCcdLog("Auto end shot after read (send LOFF)");
+            }
         }
     }
     else
@@ -679,6 +739,14 @@ void __fastcall TfMaintenance::btnColorCcdDisconnectClick(TObject *Sender)
     (void)Sender;
     if(ColorCcdSocket!=NULL)
     {
+        //AI(ht160s-maintainer) 20260804 : see btnTopCcdDisconnectClick - LOFF first,
+        //otherwise the bare TCP close strands the reader with its lamp on.
+        if(ColorCcdSocket->IsColorCcdConnected() && bColorCcdShotOpen)
+        {
+            ColorCcdSocket->ColorCcdEndShot();
+            AddColorCcdLog("End shot before disconnect (send LOFF)");
+        }
+        bColorCcdShotOpen=false;
         ColorCcdSocket->ColorCcdDisconnect();
         AddColorCcdLog("Disconnect");
     }
@@ -698,7 +766,31 @@ void __fastcall TfMaintenance::btnColorCcdShotClick(TObject *Sender)
         else
         {
             ColorCcdSocket->ColorCcdTriggerShot();
+            bColorCcdShotOpen=true;
             AddColorCcdLog("Trigger shot (send LON)");
+        }
+    }
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260804 : LOFF counterpart of btnColorCcdShotClick - see the
+//note above btnTopCcdEndShotClick.
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdEndShotClick(TObject *Sender)
+{
+    (void)Sender;
+    EnsureColorCcdSocketCreated();
+    if(ColorCcdSocket!=NULL)
+    {
+        if(!ColorCcdSocket->IsColorCcdConnected())
+        {
+            AddColorCcdLog("Not connected, please Connect first");
+        }
+        else
+        {
+            ColorCcdSocket->ColorCcdEndShot();
+            bColorCcdShotOpen=false;
+            AddColorCcdLog("End shot (send LOFF)");
         }
     }
     RefreshColorCcdStatus();
@@ -721,7 +813,17 @@ void __fastcall TfMaintenance::chkTopCcdEnableClick(TObject *Sender)
     else
     {
         if(TopCcdSocket!=NULL)
+        {
+            //AI(ht160s-maintainer) 20260804 : disabling also drops the link, so close
+            //an open manual shot first (same reason as btnTopCcdDisconnectClick).
+            if(TopCcdSocket->IsTopCcdConnected() && bTopCcdShotOpen)
+            {
+                TopCcdSocket->TopCcdEndShot();
+                AddTopCcdLog("End shot before disconnect (send LOFF)");
+            }
+            bTopCcdShotOpen=false;
             TopCcdSocket->TopCcdDisconnect();
+        }
         AddTopCcdLog("Disable Top CCD -> use simulated 2D");
     }
     RefreshTopCcdStatus();
@@ -743,7 +845,16 @@ void __fastcall TfMaintenance::chkColorCcdEnableClick(TObject *Sender)
     else
     {
         if(ColorCcdSocket!=NULL)
+        {
+            //AI(ht160s-maintainer) 20260804 : see chkTopCcdEnableClick - LOFF first.
+            if(ColorCcdSocket->IsColorCcdConnected() && bColorCcdShotOpen)
+            {
+                ColorCcdSocket->ColorCcdEndShot();
+                AddColorCcdLog("End shot before disconnect (send LOFF)");
+            }
+            bColorCcdShotOpen=false;
             ColorCcdSocket->ColorCcdDisconnect();
+        }
         AddColorCcdLog("Disable Color CCD -> disconnect");
     }
     RefreshColorCcdStatus();

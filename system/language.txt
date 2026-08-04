@@ -464,9 +464,10 @@ fMaintenance	btnTopCcdSave	Save	儲存
 fMaintenance	btnTopCcdReload	Reload	重新載入
 fMaintenance	btnTopCcdConnect	Connect	連線
 fMaintenance	btnTopCcdDisconnect	Disconnect	中斷連線
-fMaintenance	lblTopCcdTestTitle	Manual Shot (LON)	手動拍攝(LON)
+fMaintenance	lblTopCcdTestTitle	Manual Shot (LON / LOFF)	手動拍攝(LON / LOFF)
 fMaintenance	lblTopCcdResultCap	Result	結果
 fMaintenance	btnTopCcdShot	Trigger Shot	觸發拍攝
+fMaintenance	btnTopCcdEndShot	End Shot (LOFF)	結束拍攝(LOFF)
 fMaintenance	tsMaintColorCcd	Color CCD	顏色CCD
 fMaintenance	lblColorCcdSetupTitle	Color CCD TCP Setup	顏色CCD TCP設定
 fMaintenance	lblColorCcdIPCap	IP	IP
@@ -476,9 +477,10 @@ fMaintenance	btnColorCcdSave	Save	儲存
 fMaintenance	btnColorCcdReload	Reload	重新載入
 fMaintenance	btnColorCcdConnect	Connect	連線
 fMaintenance	btnColorCcdDisconnect	Disconnect	中斷連線
-fMaintenance	lblColorCcdTestTitle	Manual Shot (LON)	手動拍攝(LON)
+fMaintenance	lblColorCcdTestTitle	Manual Shot (LON / LOFF)	手動拍攝(LON / LOFF)
 fMaintenance	lblColorCcdResultCap	Result	結果
 fMaintenance	btnColorCcdShot	Trigger Shot	觸發拍攝
+fMaintenance	btnColorCcdEndShot	End Shot (LOFF)	結束拍攝(LOFF)
 fMaintenance	tsMaintLotApi	Lot WebAPI	Lot WebAPI
 fMaintenance	Label1	WebAPI Path	WebAPI路徑
 fMaintenance	lblLotApiSaveHint	Save/Reload persist the URL to system\General.ini [LotWebApi] BaseUrl.	儲存/重新載入會將URL存入system\General.ini [LotWebApi] BaseUrl。
