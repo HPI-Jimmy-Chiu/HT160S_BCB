@@ -211,7 +211,7 @@ C 類**不會有任何實作動作**,因此僅列號碼與主題。責任方一�
 
 | RPTID | SV 數 | HT160S 可供應數 | 覆蓋率 | 補完 B 後 | 被 S6F11 攜帶 | 最關鍵缺項 |
 |---|---|---|---|---|---|---|
-| **502** | 8 | **1** | **12.5%** | 5 (62.5%) | **510** | **1011 Machine State**、3 GemClock、1501 Setup File(全部 B 類)。補完後只剩 1007 Operator ID(C)、1517 Start Mode(D)、1513 Tester On/Off(C) |
+| **502** | 8 | **1** → **7**(2026-08-03) | **12.5%** → **87.5%** | 5 (62.5%) | **510** | **1011 Machine State**、3 GemClock、1501 Setup File(全部 B 類)。~~補完後只剩 1007 Operator ID(C)、1517 Start Mode(D)、1513 Tester On/Off(C)~~ → 1517 已於 2026-08-02 補、**1007 已於 2026-08-03 補**(見下表,C 類判定被推翻);**僅餘 1513 Tester On/Off** 真的無對應 |
 | 507 | 4 | 0 | 0% | 0 | 52 | 1530/1531 Site 狀態、3540 Site Map(全 C3)、3450 Test Mode(C9)。**整張無解** |
 | 501 | 12 | 0 | 0% | 5 (41.7%) | 33 | 1101 Loader Count、1102 Output Total、1103-1105 Auto1-3(全 B);剩 1106-1108 Fix(D)、16296-16299 per-site 計數(C3) |
 | 508 | 6 | **1** | **16.7%** | 2 (33.3%) | 33 | 1009 Lot Start Time(B);1023/1024 Index Time(D)、1025 Test Time / 1028 Avg UPH(C) |
@@ -290,7 +290,7 @@ host 在同一天對這三張報表做了 **FT ↔ ART_FT 換頭**,而且 **槽�
 | ECID | 9045 名稱/意義 | host 寫入次數 / 值 | HT160S 現況 | 分類 | 責任方 | 說明 |
 |---|---|---|---|---|---|---|
 | **1006** | EC=`Lot ID`(`uHGemHT9045_EC.cpp:57`,綁 `fLotInfo->edtSysLotID`);同號另註冊為 SV `Site Ag Socket ID`(`SECSGEM.cpp:725`) | **3 次**,值 `"LQ50SIJAG2"` | 未註冊 EC 1006 → `S2F16` 回 **EAC=1**。批號在 HT160S 走 RCMD `SET_LOT_INFO`(`uHGemHT160.cpp:687-694`)+ `LotRegistry` | **B** | 雙方確認 | 這是 8 個裡**唯一 sorter 有實質對應**的一個。決策點:要不要讓 host 用 S2F15 ECID 1006 設批號(現在只能用 RCMD)。註意 9045 同號雙註冊,語意須明文寫進規格書 |
-| **1007** | EC=`Operator ID`(`uHGemHT9045_EC.cpp:58`);同號 SV 為 `Site Ah Socket ID` | **4 次**,值 `"AGV"` | 未註冊 → EAC=1。HT160S **沒有操作員身分資料源**(全庫查無 operator/user id 變數) | **C** | 雙方確認 | 非測試機專屬,但 HT160S 未建置操作員身分。京元寫的值是 `"AGV"`(表示無人線),語意上等同「本班由 AMR 操作」;若京元需要,這是一個新欄位而非既有資料 |
+| **1007** | EC=`Operator ID`(`uHGemHT9045_EC.cpp:59`;本表原記 `:58`,該行實為 1006 Lot ID);同號 SV 為 `Site Ah Socket ID`(`SECSGEM.cpp:726`,屬 HT9011UC 另一份註冊表) | **4 次**,值 `"AGV"` | ~~未註冊 → EAC=1~~ **已於 2026-08-03 實作**:SV+EC 雙註冊,綁 `GeneralSetting.sOperatorID`,`S2F15` 可寫且**不受 idle 閘限制** | ~~C~~ → **B(已完成)** | 已裁定 | ⚠ 本表原判「HT160S 沒有操作員身分資料源(全庫查無 operator/user id 變數)」**已被推翻兩次**:(a) 2026-06-24 起有 `UserRoleManager`(含 `GetUserID()`);(b) 2026-08-03 另建了獨立的主畫面 Operator ID 欄位。最終採 (b) 不採 (a)——UserRoleManager 是本地權限身分、會因技術員中途登入而變動,與「本班作業人員」語意不同。京元寫的 `"AGV"`(無人線)在本機同樣受理 |
 | **16000** | Consecutive Failure Alarm by Socket | **18 次**,`Boolean 0x00` | 未註冊 → EAC=1 | **C** | 京元 host | 連續 fail 判定需測試結果 + socket,sorter 兩者皆無 |
 | **16002** | Consecutive Failure Alarm by Head | **18 次**,`Boolean 0x00` | 未註冊 → EAC=1 | **C** | 京元 host | 同上(head = 測試頭) |
 | **16023** | By Site Compare Yield Enable | **18 次**,`Boolean 0x00` | 未註冊 → EAC=1 | **C** | 京元 host | per-site 良率比較 |

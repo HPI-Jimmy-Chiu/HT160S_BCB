@@ -168,7 +168,7 @@ StringOut(S);                                          // <- 在 guard 外面
 | 槽 | SVID | 9045 語意 | HT-160S 現況 | 裁定 | 動作 |
 |---|---|---|---|---|---|
 | 1 | **1006** | **Lot ID**（ECID，`uHGemHT9045_EC.cpp:57` → `fLotInfo->edtSysLotID`） | 只有自有 66031 | **B：有資料沒曝露** | 新增 `svActiveLot` 綁 1006 |
-| 2 | **1007** | Operator ID | 2026-06-24 起有 UserRoleManager | **B** | 綁登入者 ID |
+| 2 | **1007** | Operator ID | 2026-06-24 起有 UserRoleManager | **B** | ~~綁登入者 ID~~ → **已實作 2026-08-03**，但**不是**綁登入者 ID：改為主畫面獨立輸入欄（`GeneralSetting.sOperatorID`，預設 `Operator`）＋ **ECID 1007 可由 host `S2F15` 寫入**。UserRoleManager 是本地權限身分、會因技術員中途登入而變動，與「本班作業人員」語意不同，刻意不綁 |
 | 3 | **1011** | **Machine State**（`uHGemHT9045_SV.cpp:71` → `fMain->palMainStatus`） | `palMainStatus` 完全等價 | **B** | 鏡射 `SetMainStatus()` 的字串 |
 | 4 | 3 | GemClock | 有 1027 但**格式不同**，不能直接別名 | B（需轉格式） | 依 9045 `uHGemEquipment.cpp:6359` 格式 |
 | 5 | 1501 | Setup File（recipe） | 存在於 EC namespace，但只在 host 送 S2F13 時刷新 | B | 改為 serialize 時取值 |
@@ -501,7 +501,7 @@ HT172 原版（移植來源）：`D:\HT172\HT172_Program_V1.0.25.0_20260420\main
 | 4 | **DISP-01 步驟 1** `LoaderIC++` | 筆記第 7 條的分子；同時餵螢幕與 host 的 RPTID 501；**無依賴，可先上** | 低 | 是（計數正確性） | 無 |
 | 5 | **SREC Slice 1** IO/汽缸/sensor/馬達傾印 | 讓之後每一次現場分析都變快；本身不改機台行為 | 低 | 是（實 IO 讀取，sim 走不到） | 無 |
 | 6 | **SECS-T02** `StopCommunication()` graceful Separate | 一天丟 241 筆訊息；修法收斂在 transport + 關機路徑 | 中（冪等性是關鍵，見 §3.3-3） | 是 | 無 |
-| 7 | **RPTID 502 其餘格** 1007 / 1501 / 3 | 補完 host 最高價值的那張報表 | 低 | 否 | 1517 的值域對照需京元 |
+| 7 | ~~**RPTID 502 其餘格** 1007 / 1501 / 3~~ **已完成 2026-08-03** | 補完 host 最高價值的那張報表 | 低 | 否 | 8 格中 7 格已有值（1006/1007/1011/3/1501/1517/1518）；僅餘 **1513 Tester On/Off** 無對應（sorter 無測試機），已建議京元自報表定義移除 |
 | 8 | **DISP-04** Lot End 歸零 + **DISP-01 步驟 2** 渲染 | 兩者綁在一起：先歸零才敢顯示 Total | 中 | 是 | **對京元可見的行為改變，需先告知** |
 | 9 | **DISP-05** jam rate | 定義未定，不宜先寫碼 | 中 | 是 | **需京元敲定 per-IC vs per-tray** |
 | 10 | **EMPTY-01** Empty 往返優化 | 純效率；踩的是當天早上才加固過的路徑，模擬驗不出來 | **高** | **是（必須）** | 無，但要排獨立批次 |

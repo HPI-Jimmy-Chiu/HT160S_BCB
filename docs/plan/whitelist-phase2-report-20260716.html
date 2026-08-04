@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhiteList Phase 2 實作完成報告</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1f2328; --muted:#57606a; --border:#d0d7de;
+  --card:#f6f8fa; --accent:#0969da; --accent-bg:#ddf4ff;
+  --code-bg:#f6f8fa; --code-fg:#24292f; --th:#eaeef2;
+  --ok:#1a7f37; --warn:#9a6700; --stop:#cf222e;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --border:#30363d;
+    --card:#161b22; --accent:#4493f8; --accent-bg:#12283f;
+    --code-bg:#161b22; --code-fg:#e6edf3; --th:#21262d;
+    --ok:#3fb950; --warn:#d29922; --stop:#f85149;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei","PingFang TC",
+              "Noto Sans TC",Helvetica,Arial,sans-serif;
+  line-height:1.65; font-size:16px;
+}
+.wrap{max-width:940px; margin:0 auto; padding:32px 20px 96px}
+h1{font-size:1.9rem; line-height:1.25; margin:.2em 0 .6em; padding-bottom:.3em; border-bottom:2px solid var(--border)}
+h2{font-size:1.4rem; margin:1.8em 0 .5em; padding-bottom:.25em; border-bottom:1px solid var(--border)}
+h3{font-size:1.12rem; margin:1.4em 0 .4em}
+p,li{color:var(--fg)}
+a{color:var(--accent); text-decoration:none}
+a:hover{text-decoration:underline}
+code{
+  font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  background:var(--code-bg); color:var(--code-fg);
+  padding:.15em .4em; border-radius:6px; font-size:.88em;
+  border:1px solid var(--border);
+}
+pre{
+  background:var(--code-bg); border:1px solid var(--border); border-radius:10px;
+  padding:14px 16px; overflow-x:auto; line-height:1.5;
+}
+pre code{background:none; border:none; padding:0; font-size:.85em}
+table{
+  border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto;
+}
+th,td{border:1px solid var(--border); padding:8px 12px; text-align:left; vertical-align:top}
+th{background:var(--th); font-weight:600; white-space:nowrap}
+tr:nth-child(even) td{background:var(--card)}
+blockquote{
+  margin:1em 0; padding:.6em 1em; border-left:4px solid var(--accent);
+  background:var(--accent-bg); border-radius:0 8px 8px 0; color:var(--fg);
+}
+blockquote p{margin:.3em 0}
+ul,ol{padding-left:1.5em}
+li{margin:.25em 0}
+hr{border:none; border-top:1px solid var(--border); margin:2.2em 0}
+input[type=checkbox]{margin-right:.5em; transform:translateY(1px)}
+.badge{
+  display:inline-block; font-size:.75rem; font-weight:600; padding:.1em .55em;
+  border-radius:999px; border:1px solid var(--border); background:var(--card);
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1 id="whitelist-phase-2">WhiteList 分選模式 — Phase 2 實作完成報告</h1>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>日期</td>
+<td>2026-07-16</td>
+</tr>
+<tr>
+<td>分支</td>
+<td><code>feat/iosetview-172-refactor</code></td>
+</tr>
+<tr>
+<td>Commit</td>
+<td><code>4466cac</code> — <code>feat(secs): WhiteList Phase 2 - host SORTMODE switch + trace-1005 + SVID 66032</code></td>
+</tr>
+<tr>
+<td>前置</td>
+<td>Phase 1 核心 <code>a46b7e9</code>（2026-07-15，WebAPI-substitution 模型）</td>
+</tr>
+<tr>
+<td>計畫 SSOT</td>
+<td><code>docs/plan/whitelist-sortmode-plan-20260714.md</code> §6 / §7</td>
+</tr>
+<tr>
+<td>建置</td>
+<td>sim <code>-Full</code> EXIT 0；真機 <code>SOFT_SIMULATE</code> off <code>-Full</code> EXIT 0（define 已還原）；編碼檢查 163 檔通過</td>
+</tr>
+<tr>
+<td>審查</td>
+<td>5 視角對抗式複驗 + 獨立 skeptic 驗證：<strong>0 confirmed 缺陷</strong>（2 NIT 皆 refuted）</td>
+</tr>
+<tr>
+<td>狀態</td>
+<td>Code-complete、compile-clean；<strong>上機 host round-trip 驗證 pending</strong></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="0">0. 一句話總結</h2>
+<p>Phase 2 讓 <strong>SECS 主機可在 <code>S2F41 LOTSTART</code> 電文尾端夾帶一個可選的 <code>SORTMODE</code> 選項對來切換分選模式</strong>（NORMAL / WHITELIST），並補齊 Production_Log 的 <code>NotWhitelisted</code>（trace 1005）可追溯性、以及 host 回讀模式的 SVID 66032。全部改動為 shared core（無 <code>#ifdef SOFT_SIMULATE</code>），sim 與真機組態皆建置乾淨。</p>
+<hr>
+<h2 id="1">1. 本次交付範圍</h2>
+<h3 id="_1">✅ 已完成（本次核准範圍）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>項目</th>
+<th>檔案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>SECS <code>LOTSTART</code> 可選 <code>SORTMODE</code> pair 解析（Phase 2 主體）+ 4 個審查修正</td>
+<td><code>SecsGem/uHGemHT160.cpp</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>SVID 66032 host 回讀目前 SortMode（Q6）</td>
+<td><code>SecsGem/uHGemHT160.cpp</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Production_Log trace 1005 <code>NotWhitelisted</code>（<strong>兩處</strong> trace 站點）</td>
+<td><code>aSortArm.cpp</code> + <code>deviceinfo.cpp</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>maintenance UI 選擇器同步（避免 stale 頁存檔覆寫 host 切換）</td>
+<td><code>maintenance.h</code> + <code>maintenance.cpp</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_2">⏳ 刻意延後（非本次核准範圍）</h3>
+<ul>
+<li><strong>StateRecord JSON 具名 SortMode 4-way</strong>：<code>cStateRecordHT160.cpp</code> 的 3-way 三元就緊鄰<strong>目前未提交的 <code>SR_Trace</code> AV-hunt 除錯碼</strong>（標記 "REMOVE after fix"）。為避免把該暫時除錯碼一起 commit，本次不動此檔。</li>
+<li><strong>無功能缺口</strong>：host 已可用新 SVID 66032 讀模式；快照也已 dump 數值 <code>iSortMode</code>（可交叉核對）。僅 JSON 字串標籤在 WhiteList 模式仍顯示 <code>Normal</code>。</li>
+<li><strong>1 行 follow-up</strong>：待除錯碼清掉/提交後，把三元改成 4-way 即可。</li>
+</ul>
+<hr>
+<h2 id="2-secs-kyec-eap">2. SECS 協定規格（給 KYEC EAP）</h2>
+<h3 id="21">2.1 電文格式</h3>
+<p>在既有 <code>S2F41 LOTSTART</code> 內層 lot 清單中，允許夾帶<strong>至多一個</strong>巢狀 <code>L[2]{ A"SORTMODE", A值 }</code> 選項對；值域 <code>NORMAL</code> | <code>WHITELIST</code>（大小寫不敏感，內部 <code>Trim().UpperCase()</code>）。</p>
+<p><strong>切為 WhiteList 模式（同時開一個 lot）</strong></p>
+<pre><code>S2F41 W
+&lt;L [2]
+  &lt;A &quot;LOTSTART&quot;&gt;
+  &lt;L [2]
+    &lt;A &quot;LOT001&quot;&gt;
+    &lt;L [2] &lt;A &quot;SORTMODE&quot;&gt; &lt;A &quot;WHITELIST&quot;&gt;&gt;
+  &gt;
+&gt;
+</code></pre>
+<p><strong>切回一般模式</strong></p>
+<pre><code>S2F41 W
+&lt;L [2]
+  &lt;A &quot;LOTSTART&quot;&gt;
+  &lt;L [2]
+    &lt;A &quot;LOT002&quot;&gt;
+    &lt;L [2] &lt;A &quot;SORTMODE&quot;&gt; &lt;A &quot;NORMAL&quot;&gt;&gt;
+  &gt;
+&gt;
+</code></pre>
+<p><strong>不帶 pair（sticky，維持目前模式；與現行電文位元組相容）</strong></p>
+<pre><code>S2F41 W
+&lt;L [2]
+  &lt;A &quot;LOTSTART&quot;&gt;
+  &lt;L [1] &lt;A &quot;LOT003&quot;&gt;&gt;
+&gt;
+</code></pre>
+<h3 id="22-hcack">2.2 HCACK 回覆對照</h3>
+<table>
+<thead>
+<tr>
+<th>HCACK</th>
+<th>意義</th>
+<th>觸發條件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>接受；模式已切、lot 已註冊</td>
+<td>清單解析成功且守衛通過</td>
+</tr>
+<tr>
+<td>1</td>
+<td>電文清單格式錯</td>
+<td>外層非預期 LIST</td>
+</tr>
+<tr>
+<td>2</td>
+<td>參數錯</td>
+<td>pair 長度非 2 / name 非 <code>SORTMODE</code> / 值域外 / <strong>pair 無 lot</strong> / 清單截斷 / lot 讀取失敗 / 超過容量(64) / 型別不符</td>
+</tr>
+<tr>
+<td>4</td>
+<td>設備忙（整包拒絕）</td>
+<td>外層守衛 <code>SystemStart \|\| HasICUnderMachine</code>，<strong>或</strong> pair 存在且 <code>MachineRun.bRunning==true</code>（lot 已開始）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-svid-66032">2.3 主機回讀（SVID 66032）</h3>
+<p>host 以 <code>S1F3</code> 查 SVID <strong>66032</strong>（INT_4）→ <code>S1F4</code> 回目前 <code>iSortMode</code>：<code>0=Normal / 1=LotBin / 2=LotPassFail / 3=WhiteList</code>。切模式後可回讀確認。</p>
+<h3 id="24">2.4 語意要點（務必寫進客戶規格）</h3>
+<ol>
+<li><strong>省略即不變（sticky）</strong>：不帶 <code>SORTMODE</code> pair 的 LOTSTART 不改模式，且跨重開機持久（<code>GeneralSetting.Save()</code>）。</li>
+<li><strong>切換與 Lot Start 綁定</strong>：<code>SORTMODE</code> pair 必須隨一個 lot 一起送；pair-only（無 lot）回 HCACK=2。模式在<strong>同一筆 LOTSTART</strong>內、於 2D 資料載入決策<strong>之前</strong>套用，故該 lot 即以新模式載入（WhiteList→本地檔、否則→WebAPI）。</li>
+<li><strong>原子性</strong>：任何解析失敗或忙碌拒絕 → <strong>不註冊任何 lot、不改模式</strong>（無 ghost lot）。</li>
+<li><strong>忙碌保護</strong>：lot 已開始（<code>bRunning</code>）時送含 pair 的 LOTSTART → 整包 HCACK=4；host 應先 Lot End 再切模式。</li>
+<li><strong>重複 pair</strong> → 取最後一個。</li>
+<li><strong>白名單檔規格</strong>（沿用 Phase 1）：<code>HT160S_WhiteList\WhiteList.json</code>，<code>"Maps"</code> schema，<code>LotNumber</code> 須對齊 host 宣告的真實 Lot ID，碼 byte-exact、不得重複。</li>
+</ol>
+<hr>
+<h2 id="3">3. 逐檔改動</h2>
+<h3 id="31-secsgemuhgemht160cpp">3.1 <code>SecsGem/uHGemHT160.cpp</code></h3>
+<p><strong>(a) LOTSTART 緩衝式解析 + SORTMODE pair</strong>（<code>S2F42_Host_Command_Acknowledge</code>，約 842–966 行）
+- 內層逐項先 <code>GetDataItemLenAndType</code>（<strong>非消耗 peek</strong>）判型別：
+  - <code>LIST_TYPE</code> → 當 <code>SORTMODE</code> pair：<code>GetDataItemLenAndTypeAndDelete(pairLen, LIST_TYPE)</code>（消耗 header），<code>pairLen!=2</code> → HCACK=2 break；讀 name/value，非 <code>SORTMODE</code> 或值域外 → HCACK=2 break。
+  - <code>ASCII_TYPE</code> → lot id，緩衝進 <code>bufLots[HT160_MAX_LOT]</code>（=64）。
+- lot <strong>先緩衝不 commit</strong>；迴圈結束後才在 <code>if(HCACK==0)</code> 區塊 <code>LotRegistry.AddLot()</code>，再套模式 → <strong>在既有 2D 載入決策之前</strong>。
+- 樣式對齊已驗證的 <code>START_AGV</code>（同檔 ~920–969）peek/consume 慣例。</p>
+<p><strong>(b) SVID 66032</strong>（<code>AddSV</code>，約 124 行）</p>
+<pre><code class="language-cpp">HGemPtr-&gt;SetSVDataPointer(66032, HType.INT_4_TYPE, &quot;Sort Mode&quot;, &quot;&quot;,
+    &amp;GeneralSetting.iSortMode, &quot;0=Normal 1=LotBin 2=LotPassFail 3=WhiteList&quot;);
+</code></pre>
+<p>綁 live config int（全域穩定位址、serialize 時讀），免 <code>RefreshSVData</code> mirror。</p>
+<p><strong>(c) include</strong>：新增 <code>#include "maintenance.h"</code>（取用 <code>fMaintenance</code> + 新方法）。</p>
+<h3 id="32-maintenanceh-maintenancecpp">3.2 <code>maintenance.h</code> / <code>maintenance.cpp</code></h3>
+<p>新增 public 方法 <code>SyncSortModeSelectorFromSetting()</code>：在 <code>bLoadingHardwareSettings=true</code> 括號內把 <code>rgSortMode-&gt;ItemIndex</code> 設為 <code>iSortMode</code>，<strong>抑制 <code>rgSortModeClick</code> 的 re-entrant OnClick 與其 modal</strong>（否則會在 HSMS 接收路徑彈窗卡 T3），避免 stale 硬體頁 <code>SaveHardwareSettings</code> 靜默把 host 切換改回。</p>
+<h3 id="33-asortarmcppbig5-latin1-byte-splice">3.3 <code>aSortArm.cpp</code>（Big5 檔，以 latin1 byte-splice 修改）</h3>
+<p><strong>兩處</strong> <code>iTrace2D</code> 推導站點（<code>TransferPickDataFromLoader</code> ~1491、<code>RecordAutoSkippedCells</code> ~1262）：</p>
+<pre><code class="language-cpp">else if(Slot[...].LotIndex&lt;0)
+    iTrace2D = GeneralSetting.IsWhiteListSortMode() ? 1005 : 1000;
+</code></pre>
+<p>即「碼讀得到但無 owning lot」→ WhiteList 模式=名單外拒收(1005)，其餘=一般 NoMap(1000)。</p>
+<h3 id="34-deviceinfocpp">3.4 <code>deviceinfo.cpp</code></h3>
+<p><code>AddTraceInfo</code> 加 <code>case 1005: sLabel = "NotWhitelisted";</code>。與 <code>SaveRejectRecord</code> 寫的 <code>eErrorCode</code>（如 "AutoSkip"）為不同欄位，三欄（eTraceCode/eErrorType/eErrorCode）並存不衝突。</p>
+<hr>
+<h2 id="4">4. 關鍵正確性決策</h2>
+<table>
+<thead>
+<tr>
+<th>決策</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>緩衝式原子提交</strong></td>
+<td>lot 先進 <code>bufLots[]</code>，僅在全清單解析成功且守衛通過後才 <code>AddLot</code>。任何拒絕路徑不留 ghost lot、不改模式。</td>
+</tr>
+<tr>
+<td><strong><code>bRunning</code> busy 守衛</strong></td>
+<td>既有 832 行守衛只擋 <code>SystemStart\|\|HasICUnderMachine</code>，漏掉「lot 已 Start、機台未 Start、無在製 IC」窗口。pair 存在 + <code>bRunning</code> → HCACK=4。</td>
+</tr>
+<tr>
+<td><strong>套模式在 load 決策之前</strong></td>
+<td><code>iSortMode</code> 於 <code>if(HCACK==0)</code> 區塊套用，位於 post-block 的 WhiteList-vs-WebAPI 載入判斷之前，確保該 lot 以新模式載入。</td>
+</tr>
+<tr>
+<td><strong>UI 同源守衛</strong></td>
+<td>SECS 切換後同步 <code>rgSortMode</code> 選擇器，與 UI 端 <code>rgSortModeClick</code> 的 <code>HasICUnderMachine</code> 守衛對稱；避免 stale 頁覆寫。</td>
+</tr>
+<tr>
+<td><strong>VCL 主執行緒安全</strong></td>
+<td>S2F42 跑在 VCL 主執行緒（stNonBlocking OnClientRead）；同步用 <code>bLoadingHardwareSettings</code> 抑制不彈 modal，無 T3 風險；<code>Save()</code> 為短檔寫。</td>
+</tr>
+<tr>
+<td><strong>trace 兩站點一致</strong></td>
+<td>同一拒收在正常揀料與 AutoSkip 兩路徑都記 1005，Production_Log 分析不會前後不一。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5">5. 建置與編碼閘門</h2>
+<table>
+<thead>
+<tr>
+<th>閘門</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sim <code>-Full</code>（<code>SOFT_SIMULATE</code> on，開發 active define）</td>
+<td>EXIT 0；<code>EXE/ht160s.exe</code> 新產出</td>
+</tr>
+<tr>
+<td>真機 <code>-Full</code>（<code>SOFT_SIMULATE</code> off）</td>
+<td>EXIT 0（驗證 shared core 於真機組態亦編譯乾淨）</td>
+</tr>
+<tr>
+<td>還原 define + sim 重編</td>
+<td>EXIT 0；<code>MachineType.h</code> 無 diff（define 已還原）</td>
+</tr>
+<tr>
+<td>編碼檢查 <code>check-ht160s-source-encoding.ps1</code></td>
+<td>163 檔通過（無 <code>EF BF BD</code>、無 UTF-8 BOM）</td>
+</tr>
+<tr>
+<td>Big5 檔改法</td>
+<td><code>aSortArm.cpp</code> 以 latin1 byte-splice；git diff 恰 2 行、Big5 bytes(7) 保留、無行尾 churn</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6">6. 對抗式審查結果</h2>
+<p>5 視角（SECS 解析 / HCACK 原子性 / 回歸相容 / 併發-T3 / 領域-trace-SVID）獨立審查，每個發現再由獨立 skeptic 讀實際碼嘗試反駁。</p>
+<ul>
+<li><strong>Confirmed 缺陷：0</strong></li>
+<li><strong>提出並 REFUTED 的 NIT：2</strong>（皆屬「相對舊碼的刻意行為改變」，非缺陷；見 §7）</li>
+</ul>
+<blockquote>
+<p>這代表本次改動通過對抗式複驗，未發現真實邏輯/協定/回歸缺陷。（compile-clean ≠ works：仍需上機驗證，見 §8。）</p>
+</blockquote>
+<hr>
+<h2 id="7">7. 與舊行為的差異（透明列出，皆為改善）</h2>
+<ol>
+<li><strong>超過 64 個 lot id 的單筆 LOTSTART</strong>：舊碼靜默截斷到 64 並回 HCACK=0；新碼回 HCACK=2（整包拒絕）。新行為對 host 誠實，且 <code>bufLots[64]</code> 固定陣列需此上限保記憶體安全。實務上 LOTSTART 通常僅 1 個 lot。</li>
+<li><strong>中途解析失敗的 partial-commit</strong>：舊碼會把失敗點前的 lot 永久留在 registry（HCACK=2 但殘留 ghost lot）；新碼原子化（拒絕即不留）。無合規 host 會依賴舊的殘留行為。</li>
+</ol>
+<hr>
+<h2 id="8-host-round-trip">8. 上機驗證清單（host round-trip）</h2>
+<p>建議用 <code>HT160S_SECS_Simulator</code> 實跑（勿偽造 log）：</p>
+<ul>
+<li>[ ] LOTSTART + <code>SORTMODE WHITELIST</code> → HCACK=0；SVID 66032 回讀=3；maintenance 頁 radio 顯示 By WhiteList。</li>
+<li>[ ] LOTSTART + <code>SORTMODE NORMAL</code> → HCACK=0；SVID 66032 回讀=0。</li>
+<li>[ ] 純 lot（無 pair）→ 模式不變（sticky）。</li>
+<li>[ ] pair-only（無 lot）→ HCACK=2。</li>
+<li>[ ] <code>SORTMODE FOO</code>（值域外）/ pairLen≠2 → HCACK=2。</li>
+<li>[ ] lot 已 Start（<code>bRunning</code>）時送含 pair → HCACK=4；模式未變、lot 未動。</li>
+<li>[ ] WhiteList 模式跑一輪：名單外 IC → Production_Log <code>eTraceCode=1005 / eErrorType=NotWhitelisted</code>。</li>
+<li>[ ] AutoSkip 開啟時，名單外且揀料失敗 IC → 1005/NotWhitelisted + eErrorCode=AutoSkip 並存。</li>
+<li>[ ] host 切 WHITELIST 後，開 maintenance 硬體頁再存檔 → 模式不被改回。</li>
+</ul>
+<hr>
+<h2 id="9">9. 仍待辦</h2>
+<ul>
+<li><strong>StateRecord 4-way 具名標籤</strong>（§1 延後）：待 <code>cStateRecordHT160.cpp</code> 的 SR_Trace 除錯碼清除/提交後，1 行三元擴充。</li>
+<li><strong>客戶規格書</strong>（計畫 §6.6）：HCACK 表 / 值域大小寫 / 省略語意 / 白名單檔 schema / 範例交易 log（SECS_Simulator 實跑）。</li>
+<li><strong>上機 host round-trip 驗證</strong>（§8）。</li>
+</ul>
+</div>
+</body>
+</html>
