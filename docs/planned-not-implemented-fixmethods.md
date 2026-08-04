@@ -326,6 +326,12 @@
 
 ### F1-systools-emptyform
 
+> **✅ 已結案 2026-08-04 (commit `1f17067`)**：走 Option 2 的「移除按鈕」部分，但**刻意不刪 unit**。
+> 下方 Option 2 寫的「刪 `systools.cpp/.h/.dfm`」**是錯的、已過期**：systools 自 20260624 起承載狀態列時鐘
+> （`systools.cpp:21/51` 的 `AddMyTimeStringShow`/`RefreshMyTimeString`、`main.cpp:2415` 註冊、
+> `database.cpp:170` 每秒推動），刪掉會讓主畫面時間停住。`ht160s.cpp` 的 USEFORM/CreateForm 與 BPR 條目一併保留，
+> 因此本次不需要動 BPR。實際落地行數與下方記錄的行號不同（該行號早已 drift）。
+
 **位置**：`HT160S_Program_BCB_V1.0.0.0/systools.cpp:9-14`（空 ctor）；`systools.h:10-16` 空 class。接線：`main.dfm:766-908`（`sbTool: TSpeedButton`，Caption 'Tools'，`OnClick=sbToolClick`）、`main.h:106/371`、`main.cpp:554-557`（`ShowTopForm(FormSysTools, sbTool)` → 顯示空白頁）、`main.cpp:27` include、`main.cpp:1302-1307` SmokeShow probe、`ht160s.cpp:17/88/136`、`ht160s.bpr:9/29/91`。
 
 **現況**：確認空殼。HT172 `FormSysTools` 3411 行內部多已移至 `SYSTEM_MODULAR/database.cpp`；無 HT160 呼叫者需要它。其餘只剩 comment-only 參考（`uspeed.cpp:15`、`uspeed.h:16`、`cEventLog.h:4`，無編譯相依）。

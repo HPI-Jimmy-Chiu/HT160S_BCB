@@ -273,6 +273,11 @@
 
 #### B-20. FormSysTools (System Tools 頁) 為空殼接到主畫面 'Tools' 鈕 (`F1-systools-emptyform`)
 
+> **✅ 已結案 2026-08-04 (commit `1f17067`)**：採「移除按鈕、保留 unit」。sbTool 按鈕 + handler + smoke probe 全刪，
+> 其右側按鈕左移一個 pitch(139)。**systools.cpp/.h/.dfm 保留未刪** —— 本節與 fixmethods 的 Option 2「連 unit 一起刪」
+> 已過期：systools 自 20260624 起是狀態列時鐘的宿主（`AddMyTimeStringShow`/`RefreshMyTimeString`，
+> `main.cpp` 註冊、`database.cpp` Timer1 每秒推動），刪掉會打掉時鐘。
+
 - 位置: `HT160S_Program_BCB_V1.0.0.0/systools.cpp:11`
 - 規劃來源: form 完整註冊接線非缺席: `ht160s.cpp:17` USEFORM、`:136` CreateForm; `main.h:106` sbTool + `:371` sbToolClick; `main.cpp:517` `ShowTopForm(FormSysTools, sbTool)`; `:1264-1267` lazy create+SmokeShow. 故真實 toolbar 按鈕開一個空白視窗.
 - 現況/證據: 整個 systools.cpp 15 行 (僅空 ctor `:11`); systools.dfm 為空 640x480 'Tools' form 無子元件. HT172 systools.cpp 3411 行 (含 TAlarmManager/JAM alarm table/LevelSetup/NoNeedHomeCheckList). 三軸反駁失敗: (a) caller live — `sbToolClick` 呼叫 `ShowTopForm` (無條件 ShowModal); sbTool 是 main.dfm:766 真實可見按鈕. (b) 無 Visible/Enabled guard, 永遠可點. (c) 部分 by-design — 註解稱其為空 stub, HT172 內部 alarm-code-generation 已遷至 SYSTEM_MODULAR (database.cpp:748/755), 但 toolbar 按鈕未重用/隱藏/移除.
