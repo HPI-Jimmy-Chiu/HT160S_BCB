@@ -947,8 +947,8 @@ void __fastcall TfMain::FreezeProductInfoAtLotEnd()
 //LOTSTART / the Clear All button - NOT by Lot End. So they read "since the last lot start
 //or clear", and on a machine driven with START + LOT END only they carry across lots and
 //across power cycles (tRunData is restored from lastdata.dat at boot, by explicit design).
-//That is the same epoch SVID 66020 / 1101 / 1102 already report to the host, so the screen
-//and the host now agree. Whether Lot End should also zero them is a separate, customer-
+//That is the same epoch SVID 1101 / 1102 already report to the host, so the screen
+//and the host now agree. (66020 carried it too until the 66xxx band was retired 20260804.) Whether Lot End should also zero them is a separate, customer-
 //visible decision recorded in docs/plan/onsite-0731-kyec-triage-20260801.md.
 //
 //Write-only-on-change, matching ShowUnloadAutoInfo, so the panels do not flicker. Explicit

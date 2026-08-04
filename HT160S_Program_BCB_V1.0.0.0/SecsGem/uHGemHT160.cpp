@@ -31,8 +31,10 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     iControlState = 0;
     //AI(secs-controlstate) 20260803 : HT9045 starts its GemControlState at 1 (Off-Line) and only
     // fires the change events on an edge, so seed both to 1. iControlState's own 0 is left alone :
-    // it is a legacy "no host transition yet" value on the already-published SVID 66002, and
-    // MapGemControlState9045() folds it into Off-Line for SVID 4 rather than re-encoding 66002.
+    // it is a legacy "no host transition yet" value, and MapGemControlState9045() folds it into
+    // Off-Line for SVID 4 rather than re-encoding it.
+    //AI(secs-66xxx-retire) 20260804 : iControlState no longer has an SVID of its own (66002 retired);
+    // it stays as the internal store SVID 4 is derived from.
     svGemControlState    = 1;
     svGemControlPreState = 1;
     //AI(secs-e30-gate) 20260803 : boot substate. EQUIPMENT OFF-LINE is the E30-shaped default, but
@@ -46,15 +48,16 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     sGemClock   = Now().FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
 
     //AI(ht160s-secsgem) 20260611 : init SV snapshot members (refreshed on demand)
-    svRunMode       = 0;
-    svSystemRunning = 0;
-    svAlarmActive   = 0;
-    svAlarmCode     = 0;
-    svTotalIC       = 0;
+    //AI(secs-66xxx-retire) 20260804 : the whole HT160-only 66000+ band was retired on the customer's
+    // ruling, so svRunMode / svSystemRunning / svAlarmActive / svAlarmCode / svTotalIC / svLotCount /
+    // svCurrentLot are GONE with it (see the tombstone in AddSV). svTotalSorted survives because it
+    // is what SVID 1102 Output Total Count is bound to, not because 66021 wanted it.
     svTotalSorted   = 0;
     svUPH           = 0;
-    svLotCount      = 0;
-    svCurrentLot    = "";
+    //AI(secs-66xxx-retire) 20260804 : SVID 1008 Run Mode replaces 66000. HT-160S is a sorter with no
+    // RT and no EQC pass, so the family's "0:Normal; 1:RT; 2:EQC" enumeration is answered as a
+    // CONSTANT "0" - set once here and never touched by RefreshSVData.
+    svRunMode9045   = "0";
     svLotStartTime  = "";            //AI(secs-lotstarttime) 20260730 : internal latch (slash format), set by NoteLotStartTime, not by RefreshSVData ; no SVID of its own since 20260803
     svLotStartTime9045 = "";         //AI(secs-bclass-0803) : SVID 1009, the latch above reformatted to 9045's dashes in RefreshSVData
     svSoftwareVersion = "1.0.0.0";   // keep in step with ht160s.cpp GemInitial("HT160S","1.0.0.0")
@@ -390,9 +393,14 @@ void HT160Gem::AddSV()
     //AI(ht160s-secsgem) 20260612 : SVID numbering follows HT9045 AddSV for the
     // common identity/time/throughput band (1001 Machine Model, 1003 Software
     // Version, 1021 UPH, 1027 System Time) so a shared host SVID table works across
-    // machines. HT160-specific run/alarm/output/lot SVs are relocated to a high
-    // 66000+ band (9045 max SVID 65095 + 1000, rounded) so they can never collide
-    // with the 9045 1010-1190 band or any future 9045 SVID growth.
+    // machines.
+    //AI(secs-66xxx-retire) 20260804 : HT160-specific run/alarm/output/lot SVs USED TO live in a
+    // private 66000+ band (9045 max SVID 65095 + 1000, rounded, chosen so it could never collide
+    // with 9045's own ranges). The customer retired that whole band on 20260804: HT-160S now
+    // publishes family numbers only. The band's tombstone, with the per-number replacement, sits
+    // where the registrations were - below the tray-form ECs. Nothing HT160-only is published on
+    // an SV any more; the only non-family numbers left are the AMR / AGV 38xxx block, which is
+    // itself an HT9045 family range.
     //AI(secs-onsite0731) 20260801 : the comment here used to call 1010-1190 a "count region",
     // which is wrong and is exactly what made 1011 look deliberately skipped. 9045 uses
     // 1010 "Machine Pre State" and 1011 "Machine State" (uHGemHT9045_SV.cpp:70-71); the
@@ -406,10 +414,12 @@ void HT160Gem::AddSV()
     //AI(secs-controlstate) 20260803 : GEM control state on HT9045's OWN numbers, per the customer's
     // 2026-08-03 instruction "same function must use the same id". HT9045 publishes 4 = current and
     // 9 = previous, both U1, both in the 1=Off-Line / 2=On-Line Local / 3=On-Line Remote domain
-    // (its uHGemEquipment.cpp SV block). HT160S keeps 66002 as well : that id is already in the
-    // customer spec book with the GEM-standard 1/4/5 domain, so it is NOT re-encoded - the two ids
-    // report the same state in two numberings, and SVID 4 is the one a 9045-numbered host reads.
-    HGemPtr->SetSVDataPointer(4, HType.UINT_1_TYPE, "GemControlState",         "", &svGemControlState,    "1=Off-Line 2=On-Line Local 3=On-Line Remote (9045 SVID 4; same state as 66002 in 9045 numbering)");
+    // (its uHGemEquipment.cpp SV block).
+    //AI(secs-66xxx-retire) 20260804 : SVID 4 / 9 are now the ONLY published control state. HT160S used
+    // to publish the same state twice, also as SVID 66002 in the GEM-standard 1/4/5 domain; 66002 went
+    // with the rest of the band on the customer's ruling. The internal store keeps its own domain -
+    // see iControlState in uHGemHT160.h - and MapGemControlState9045() converts it here.
+    HGemPtr->SetSVDataPointer(4, HType.UINT_1_TYPE, "GemControlState",         "", &svGemControlState,    "1=Off-Line 2=On-Line Local 3=On-Line Remote (9045 SVID 4)");
     HGemPtr->SetSVDataPointer(9, HType.UINT_1_TYPE, "PreviousGemControlState", "", &svGemControlPreState, "control state before the last change, same domain as SVID 4 (9045 SVID 9)");
 
     //AI(secs-bclass-0803) 20260803 : three more slots of the KYEC host's own reports, all
@@ -450,12 +460,19 @@ void HT160Gem::AddSV()
     //   1011 Machine State- 9045 SVID 1011 -> fMain->palMainStatus (uHGemHT9045_SV.cpp:71)
     //   1101 Loader Count - tRunData.LoaderIC (the same counter the dead main-screen "Load"
     //                       panel wants; see aSortArm.cpp TransferPickDataFromLoader)
-    //   1102 Output Total - MachineRun.iTotalSorted, already published as 66021; 1102 is a
-    //                       pure alias so the host's own report resolves without renumbering
+    //   1102 Output Total - MachineRun.iTotalSorted, the machine's only sorted-out total
     // Still missing from 502 : 1517 Start Mode closed 20260802, then 1501 Setup File and
     // 3 GemClock on 20260803, and 1007 Operator ID just below - which leaves only 1513
     // Tester On/Off, a legitimate "no" (HT160S is a sorter and has no tester mechanism).
-    HGemPtr->SetSVDataPointer(1006, HType.ASCII_TYPE, "Lot ID", "", &svActiveLot, "active lot id (9045 ECID/SVID 1006 Lot ID)");
+    //AI(secs-66xxx-retire) 20260804 : 1006 now carries EVERY lot on the machine, comma-separated, so
+    // that retiring 66030 Active Lot Count and 66031 Current Lot ID loses no information (customer
+    // ruling, 20260804). One lot -> byte-identical to what this SV answered before, which is what
+    // keeps the KYEC host's RPTID 502 slot 1 working unchanged; three lots -> "LOTA,LOTB,LOTC", from
+    // which the host recovers the count (commas+1) and the first lot (text before the first comma).
+    // Between lots the registry is empty and the answer falls back to ActiveLotID() exactly as
+    // before, so the published "no lot open -> the main-screen lot field" contract still holds.
+    // Built in RefreshSVData; see there for the blank-slot rule.
+    HGemPtr->SetSVDataPointer(1006, HType.ASCII_TYPE, "Lot ID", "", &svActiveLot, "every lot on the machine, comma-separated (one lot = just that lot id); 9045 ECID/SVID 1006 Lot ID");
     //AI(secs-operatorid) 20260803 : slot 2 of the host's RPTID 502. Three facts fixed the shape:
     //  (a) On HT9045 1007 is an EC, NOT an SV (uHGemHT9045_EC.cpp:59 -> fLotInfo->edtSysOperatorID).
     //      It still answers SV reads over there only because 9045's SetECDataPointer ends with a
@@ -474,9 +491,21 @@ void HT160Gem::AddSV()
     //  ("Operation" / "Engineer" / an account name) and it moves the moment a technician logs in
     //  mid-lot, whereas 1007 is the host's field for who owns the shift.
     HGemPtr->SetSVDataPointer(1007, HType.ASCII_TYPE, "Operator ID", "", &GeneralSetting.sOperatorID, "operator id shown on the main screen; host-settable through S2F15 ECID 1007 (9045 ECID 1007 Operator ID)");
+    //AI(secs-66xxx-retire) 20260804 : SVID 1008 Run Mode, the family number that REPLACES the retired
+    //  66000. The family declares it ASCII with the enumeration "0:Normal; 1:RT; 2:EQC" (family SV&EC
+    //  master row for 1008; marked on HT-9040S / HT-704X / HT-2036 / HT-2000M). Neither HT9046LS
+    //  V3.32.810 nor HT9011UC V3.33.899 registers it, so there is no 9045 binding to copy - but the
+    //  customer ruled on 20260804 that HT-160S publishes it anyway, permanently "0" (Normal), because
+    //  a sorter has neither a retest (RT) nor an EQC pass. It is a CONSTANT, not a snapshot:
+    //  svRunMode9045 is set in the constructor and RefreshSVData never writes it, so the bound
+    //  address is stable for the process lifetime.
+    //  What was LOST with 66000 and is NOT re-published anywhere: the machine's task mode
+    //  (Home / OneCycle / CleanOut / TrayFeed). A host that needs it reads SVID 1011 Machine State
+    //  or follows the task CEIDs (3/4 pressed, 41/42 finished) - exactly as it must on an HT9045.
+    HGemPtr->SetSVDataPointer(1008, HType.ASCII_TYPE, "Run Mode", "", &svRunMode9045, "always \"0\" = Normal; HT-160S is a sorter with no RT / EQC mode (9045 family SVID 1008)");
     HGemPtr->SetSVDataPointer(1011, HType.ASCII_TYPE, "Machine State", "", &svMachineState, "main-screen status text (9045 SVID 1011)");
     HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "Loader Count", "pcs", &svLoaderIC, "ICs picked off Loader trays (9045 SVID 1101)");
-    HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin (9045 SVID 1102; same value as 66021)");
+    HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin; the total-processed count retired with 66020 is read here or on 1101 (9045 SVID 1102)");
     //AI(secs-bclass-0803) 20260803 : slots 3-5 of the host's RPTID 501, 9045 names "Auto1/2/3
     // Count". Bound to tRunData.TrayICCnt, NOT to MachineRun.iAreaCount which is what
     // docs/plan/secs-9045-porting-20260729/svid-ownership.md:110-112 recommended:
@@ -573,60 +602,48 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(2762, HType.INT_4_TYPE, "Type 1 Tray Division X",       "",   &TrayForm.XDivision, "tray columns / X cell count (9045 SVID/ECID 2762)");
     HGemPtr->SetSVDataPointer(2763, HType.INT_4_TYPE, "Type 1 Tray Division Y",       "",   &TrayForm.YDivision, "tray rows / Y cell count (9045 SVID/ECID 2763)");
 
-    //AI(ht160s-secsgem) 20260612 : HT160 custom high band (66000+). Values are
-    // snapshotted into the sv* members by RefreshSVData() right before each
-    // serialize, so the bound address stays valid while the reported value tracks
-    // live data. Sub-grouped with gaps (66000 state / 66010 alarm / 66020 output /
-    // 66030 lot) so each group can grow without renumbering. These are HT160-only
-    // semantics; 9045 has no equivalent SVID here - WITH TWO DELIBERATE EXCEPTIONS that survived
-    // the 20260803 dedupe and must not be "cleaned up" by the same rule: 66021 Total Sorted is the
-    // same value as 1102, and 66002 Control State is the same state as SVID 4/9. Both are KEPT
-    // because they sit inside the frozen default Report 1 (removing them would change the wire
-    // shape of every event), not because 9045 lacks a number for them.
-    // -- Machine state (66000-66009) --
-    HGemPtr->SetSVDataPointer(66000, HType.INT_4_TYPE, "Run Mode", "", &svRunMode, "0=Normal 1=Home 2=OneCycle 3=CleanOut 4=TrayFeed");
-    HGemPtr->SetSVDataPointer(66001, HType.INT_4_TYPE, "System Running", "", &svSystemRunning, "1=machine started/running, 0=stopped");
-    HGemPtr->SetSVDataPointer(66002, HType.INT_4_TYPE, "Control State", "", &iControlState, "GEM control state mirror (4=Local 5=Remote)");
-    // -- Alarm state (66010-66019) --
-    HGemPtr->SetSVDataPointer(66010, HType.INT_4_TYPE, "Alarm Active", "", &svAlarmActive, "1=alarm dialog showing, 0=no alarm");
-    HGemPtr->SetSVDataPointer(66011, HType.INT_4_TYPE, "Alarm Code", "", &svAlarmCode, "current active alarm code (0=none)");
-    // -- Output / production (66020-66029) --
-    HGemPtr->SetSVDataPointer(66020, HType.INT_4_TYPE, "Total IC", "pcs", &svTotalIC, "total IC processed this lot/run");
-    HGemPtr->SetSVDataPointer(66021, HType.INT_4_TYPE, "Total Sorted", "pcs", &svTotalSorted, "total IC sorted into a bin");
-    //AI(secs-svid-dedupe) 20260803 : 66022/66023/66024 "Auto1-3 Count" USED TO SIT HERE and
-    // republished the SAME tRunData.TrayICCnt cells as 1103-1105; the customer ruled that
-    // duplicated information must collapse onto the HT9045 number, so they were removed.
-    //AI(secs-auto-align-899) 20260803 : 66025/66026/66027 "Auto4-6 Count" ALSO used to sit here,
-    // on the premise that the HT90XX family has no Auto4-6 number. HT9011UC V3.33.899 disproves
-    // that (1259/1260/1261), so those three moved up next to 1103-1105 and this band no longer
-    // publishes any per-Auto output count at all.
-    // The whole 66022-66027 gap is DELIBERATE : do NOT reuse any of those six numbers for
-    // anything else - a host configured before 20260803 may still have them bound to
-    // "Auto1-6 Count" and would silently misread whatever took their place.
-    // -- Current Lot (66030-66039) --
-    HGemPtr->SetSVDataPointer(66030, HType.INT_4_TYPE, "Active Lot Count", "", &svLotCount, "lots currently loaded on the machine");
-    HGemPtr->SetSVDataPointer(66031, HType.ASCII_TYPE, "Current Lot ID", "", &svCurrentLot, "first registered lot id (empty if none)");
-    //AI(secs-svid-dedupe) 20260803 : 66033 "Lot Start Time" USED TO SIT HERE. It carried the
-    // same NoteLotStartTime latch as SVID 1009, differing only in separator (66033 slashes,
-    // 1009 HT9045's dashes), so it was removed on the customer's "one concept -> one HT9045
-    // number" ruling; 1009 is now the only published lot start time. Do NOT reuse 66033.
-    // The LATCH is untouched : svLotStartTime still holds the slash-format stamp, still rides
-    // the WorkOrder meta file across a power cycle, and RefreshSVData still reformats it into
-    // svLotStartTime9045 for 1009. Only the registration went away.
-    // Neither number was ever in firmware report 1 (its 13-SV shape is published to the
-    // customer), so no event payload changes shape - a host that wants the start time inside an
-    // event binds 1009 with S2F33 + S2F35; otherwise S1F3 reads it back during the lot.
-    //AI(ht160s-whitelist) 20260716 : Q6 host read-back of the active sort mode. Bound to the
-    // live config int (stable global address, read at serialize time) so a SORTMODE switch via
-    // S2F41 LOTSTART is confirmable by S1F3. No RefreshSVData mirror : not a per-cycle snapshot.
-    //AI(ht160s-whitelist-override) 20260717 : report the EFFECTIVE mode (base + WhiteList overlay),
-    // not the raw base, so the host reads WHITELIST during a WhiteList lot and the base between lots.
-    //AI(ht160s-whitelist) 20260727 : WhiteList is NOT a 4th entry of the maintenance Sort Mode
-    // selector (rgSortMode stays 3-way : 0/1/2). Value 3 means "the per-lot WhiteList overlay is
-    // armed", whatever the base is; between lots the base value comes back. Matching semantic on
-    // the command side : SORTMODE=NORMAL means "no overlay, keep the operator's base selector",
-    // NOT "set base to 0", so a NORMAL lot can legitimately read back 1 or 2 here.
-    HGemPtr->SetSVDataPointer(66032, HType.INT_4_TYPE, "Sort Mode", "", &GeneralSetting.iEffectiveSortMode, "effective: 0/1/2=base Normal/LotBin/LotPassFail, 3=WhiteList overlay armed");
+    //AI(secs-66xxx-retire) 20260804 : THE WHOLE HT160-ONLY 66000+ BAND IS RETIRED. TOMBSTONE - READ
+    // BEFORE ADDING ANY SVID IN 66000-66039.
+    // The band used to publish ten SVIDs that existed only on HT-160S. On 20260804 the customer
+    // ruled that HT-160S must publish family (HT-90XX) numbers only, and went through the band
+    // number by number. All ten registrations are gone; the numbers themselves are PERMANENTLY
+    // RETIRED and must never be reused for anything else, exactly like 66022-66027 and 66033 before
+    // them - a host configured before 20260804 may still have them bound, and DataItemOutSVItem
+    // answers an unregistered SVID with an empty L[0] item (uHGemEquipment.cpp), so today a stale
+    // binding is a DETECTABLE blank. Reusing a number would turn that blank into an undetectable
+    // wrong value.
+    //   66000 Run Mode        -> SVID 1008, constant "0" (see the 1008 registration above). The task
+    //                            mode (Home / OneCycle / CleanOut / TrayFeed) is no longer published
+    //                            on any SV; SVID 1011 Machine State and the task CEIDs carry it.
+    //   66001 System Running  -> nothing. Running-vs-stopped comes from SVID 1011's status text and
+    //                            from CEID 1/2 (Start/Pause pressed). HT9045 publishes no such flag
+    //                            either (neither 810 nor 899 registers one).
+    //   66002 Control State   -> SVID 4 GemControlState (with 9 PreviousGemControlState). Same state,
+    //                            9045's value domain. iControlState itself SURVIVES as internal
+    //                            machine state - it is still the GEM-standard 1/4/5 store that
+    //                            MapGemControlState9045() folds into SVID 4 - it is only no longer
+    //                            published under its own number.
+    //   66010 Alarm Active    -> nothing. Alarms are an S5F1 stream, as on HT9045: neither 810 nor
+    //   66011 Alarm Code      -> nothing.  899 registers any "current alarm" SV. S5F6 lists the
+    //                            catalogue; S5F1 carries the live one.
+    //   66020 Total IC        -> SVID 1101 Loader Count (ICs picked off Loader trays) and SVID 1102
+    //                            Output Total Count (ICs placed into a bin). Those two are what the
+    //                            family publishes; the third "processed" counter was ours alone.
+    //   66021 Total Sorted    -> SVID 1102, which was already bound to the very same
+    //                            MachineRun.iTotalSorted. Pure de-duplication.
+    //   66030 Active Lot Count-> SVID 1006, which now answers every lot comma-separated; the count is
+    //   66031 Current Lot ID  -> SVID 1006 as well: the text before the first comma. See the 1006
+    //                            registration above and the join in RefreshSVData.
+    //   66032 Sort Mode       -> nothing. The sorter's mode has no family number at all (the family's
+    //                            only candidate, 35530 "[I27] Manual sort mode", is an HT9045/46
+    //                            BOOLEAN machine option, not a 3-state + overlay selector). The cost
+    //                            is knowingly accepted: a host can still SET the mode through
+    //                            S2F41 LOTSTART SORTMODE, but can no longer read it back with S1F3.
+    //                            GeneralSetting.iEffectiveSortMode stays live for the machine itself
+    //                            (RecomputeEffectiveSortMode / the maintenance badge).
+    // Earlier retirements in the same band, still binding : 66022/66023/66024 (Auto1-3 Count, ->
+    // 1103-1105), 66025/66026/66027 (Auto4-6 Count, -> 1259-1261), 66033 (Lot Start Time, -> 1009).
+    // The svLotStartTime latch behind 66033 is untouched and still feeds 1009.
 
     //AI(ht160s-agv) 20260615 : E87/AGV SVIDs (draft 38202-38245), bound to the
     // AgvCoord snapshot block (stable addresses). Bitmaps 38219-38221 are written
@@ -670,13 +687,10 @@ void HT160Gem::RefreshSVData()
     // this the SV would answer an empty string. Pure string getter, no VCL, no file IO.
     ecRecipeName = RecipeManager.GetCurrentRecipeName();
 
-    svRunMode       = (int)HSys.Sys.RunMode;
-    svSystemRunning = HSys.Sys.SystemStart ? 1 : 0;
-
-    svAlarmActive   = (fNote!=NULL && fNote->fShow) ? 1 : 0;
-    svAlarmCode     = (fNote!=NULL) ? fNote->Code : 0;
-
-    svTotalIC       = tRunData.TotalIC;
+    //AI(secs-66xxx-retire) 20260804 : the snapshots for the retired 66000 / 66001 / 66010 / 66011 /
+    // 66020 used to be taken here (HSys.Sys.RunMode, HSys.Sys.SystemStart, fNote->fShow, fNote->Code,
+    // tRunData.TotalIC). They are gone with their SVIDs - nothing else read those members. The three
+    // below survive because they back 1102 / 1021 / 1101.
     svTotalSorted   = MachineRun.iTotalSorted;
     svUPH           = tRunData.UPH;
     svLoaderIC      = tRunData.LoaderIC;
@@ -687,6 +701,9 @@ void HT160Gem::RefreshSVData()
     // empty item in slot 3 every time. g_sMachineStateText is mirrored at SetMainStatus()
     // (csystem.cpp), so no VCL property is read on this path.
     svMachineState  = g_sMachineStateText;
+    //AI(secs-66xxx-retire) 20260804 : SVID 1006 starts as the single latched active lot - the answer
+    // this SV has always given, and the fallback for a machine with nothing registered - and is
+    // REPLACED by the comma-joined registry list further down whenever at least one lot is registered.
     svActiveLot     = (fMain!=NULL) ? fMain->ActiveLotID() : AnsiString("");
 
     //AI(secs-startmode) 20260802 : SVID 1517 Start Mode, translated into HT9045's numbering.
@@ -702,26 +719,40 @@ void HT160Gem::RefreshSVData()
     else
         svStartMode = 0;   // HT160S Continue -> 9045 rsmContinuStart
 
-    svLotCount      = LotRegistry.GetLotCount();
-    //AI(secs-lot-multilot) 20260730 : walk to the first NON-BLANK slot. This read raw slot 0,
-    // the only slot walker in the tree that did not skip freed slots (RemoveLot deliberately
-    // leaves a blank slot in place so the packed indices other modules hold stay valid). After
-    // the first lot was removed, 66031 answered "" while 66030 still answered >0 - and 66031
-    // rides report 1, the default payload of EVERY CEID, so the host saw a blank current lot
-    // on every event. Semantics are unchanged and still as published: "first registered lot".
-    svCurrentLot = "";
-    if(svLotCount>0)
+    //AI(secs-66xxx-retire) 20260804 : SVID 1006 Lot ID = EVERY registered lot, comma-separated. This
+    // is what replaces the retired 66030 Active Lot Count and 66031 Current Lot ID: the host recovers
+    // the lot count as (commas + 1) and the first lot as the text before the first comma, so nothing
+    // those two numbers carried is lost. Four properties this loop must keep:
+    //  - BLANK SLOTS ARE SKIPPED. RemoveLot deliberately leaves a freed slot in place so that the
+    //    packed indices tray cells and SortArm slots hold as raw integers stay valid, so the slot span
+    //    (GetLotSlotCount) is >= the lot count. A naive walk would emit empty entries and a leading
+    //    or doubled comma. This is the same walker the 20260730 fix introduced, joining now instead
+    //    of breaking at the first hit.
+    //  - ONE lot answers byte-identically to what this SV answered before this change: no separator,
+    //    no trailing comma. That is what keeps the KYEC host's RPTID 502 slot 1 working untouched.
+    //    AddLot stores the id already trimmed (CosFunction.cpp AddLot: Key=LotID.Trim()), so the
+    //    Trim() below is a no-op safety net and cannot alter a single-lot answer.
+    //  - AN EMPTY REGISTRY leaves the ActiveLotID() fallback assigned above in place, so the
+    //    published "no lot open -> the main-screen lot field" contract is unchanged.
+    //  - Separator is a plain comma with NO space (customer's choice, 20260804). Worst case is
+    //    HT160_MAX_LOT (64) ids, on the order of 1 KB - three orders of magnitude under the 1 MB
+    //    encode buffer, which is itself guarded (uHGemEquipment.cpp encode-overflow backstop).
+    if(LotRegistry.GetLotCount()>0)
     {
+        AnsiString sLotList = "";
         int SlotCount = LotRegistry.GetLotSlotCount();
         for(int LotSlot=0; LotSlot<SlotCount; LotSlot++)
         {
             TLotRunInfo *Lot = LotRegistry.GetLot(LotSlot);
             if(Lot!=NULL && Lot->sLotID.Trim()!="")
             {
-                svCurrentLot = Lot->sLotID;
-                break;
+                if(sLotList!="")
+                    sLotList += ",";
+                sLotList += Lot->sLotID.Trim();
             }
         }
+        if(sLotList!="")
+            svActiveLot = sLotList;
     }
 
     //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time in HT9045's wire format. Derived
@@ -733,9 +764,9 @@ void HT160Gem::RefreshSVData()
     // locale DateSeparator / TimeSeparator PLACEHOLDERS, so a StringReplace("/","-") would be a
     // silent no-op on a machine whose regional separators differ. The 19-char field layout is
     // fixed by the format string, so the positions are locale-invariant even when the two
-    // separator characters are not. Deliberately OUTSIDE the if(svLotCount>0) block above :
-    // Lot End empties the registry, and freezing this inside the guard would leave 1009
-    // reporting the closed lot's timestamp forever.
+    // separator characters are not. Deliberately OUTSIDE the registry guard above (the block that
+    // builds 1006's lot list) : Lot End empties the registry, and freezing this inside that guard
+    // would leave 1009 reporting the closed lot's timestamp forever.
     svLotStartTime9045 = "";
     if(svLotStartTime.Length()==19)
     {
@@ -1036,28 +1067,35 @@ void HT160Gem::AddCEID()
 void HT160Gem::AddReprot()
 {
     int EquDefault = 1;
-    //AI(ht160s-secsgem) 20260612 : report 1 carries the real machine-data SVs on
-    // every event, using the 9045-aligned numbering (1001/1003/1021/1027) plus the
-    // HT160 custom high band (66000+).
-    unsigned ReportIDContent[16];
+    //AI(secs-66xxx-retire) 20260804 : DEFAULT REPORT 1 IS NOW EXACTLY {1027 System Time}, byte-for-byte
+    // what HT9045 defines (uHGemHT9045.cpp AddReprot: ReportIDContent[]={1027}) and what the customer's
+    // own HT9046 persists (its EventReport_ReportID.def holds one line: RPTID 1, Type 1, SVID 1027).
+    // It used to carry 13 SVs - 1001/1003/1021/1027 plus nine of the HT160-only 66xxx band. Nine of
+    // those thirteen ceased to exist when the customer retired the band on 20260804 (see the tombstone
+    // in AddSV), and a four-SV remnant would have been neither the old shape nor the family's, so the
+    // report was aligned instead of patched.
+    // CONSEQUENCE TO KNOW: AddCEID links 288 of the 292 CEIDs to report 1 (all but 272-275, which are
+    // re-linked to reports 2/6, 3, 4/6 and 7 for the AMR handshake), so this changes the payload of
+    // almost every event this machine emits - each S6F11 now carries one item, the timestamp. S1F24
+    // Event Namelist walks the same CEID->report->SVID chain, so those 288 namelist rows shrink from
+    // 13 VIDs to 1 as well. A host that has provisioned its own reports through S2F33 + S2F35 is
+    // unaffected, because its links replace report 1 entirely - this machine's own
+    // system/EventReportDef.ini shows the KYEC host doing exactly that (Report=501/502/513/800, none
+    // of which ever referenced a 66xxx number). A host that has NOT provisioned now gets what an
+    // HT9045 would give it: the event id and the time.
+    // THE ONE REAL REGRESSION, STATE IT TO THE CUSTOMER: S2F35 event->report LINKS are session-only,
+    // never persisted (uHGemEquipment.cpp saves Report= rows only), so after every power cycle all 288
+    // ids fall back to report 1 until the host re-runs S2F33 + S2F35. Before this change that fallback
+    // window still carried 13 machine-context SVs; now it carries just the timestamp.
+    // Reports 2-7 (the AMR / AGV bitmaps, per-station tray + device counts, identity-tray 2D) are
+    // deliberately untouched below - the 272-275 handshake depends on their shape.
+    unsigned ReportIDContent[1];
 
     if(HGemPtr==NULL)
         return;
 
-    ReportIDContent[ 0] = 1001;  // Machine Model     (9045-aligned)
-    ReportIDContent[ 1] = 1003;  // Software Version  (9045-aligned)
-    ReportIDContent[ 2] = 1021;  // UPH               (9045-aligned)
-    ReportIDContent[ 3] = 1027;  // System Time       (9045-aligned)
-    ReportIDContent[ 4] = 66000; // Run Mode          (HT160 custom band)
-    ReportIDContent[ 5] = 66001; // System Running
-    ReportIDContent[ 6] = 66002; // Control State
-    ReportIDContent[ 7] = 66010; // Alarm Active
-    ReportIDContent[ 8] = 66011; // Alarm Code
-    ReportIDContent[ 9] = 66020; // Total IC
-    ReportIDContent[10] = 66021; // Total Sorted
-    ReportIDContent[11] = 66030; // Active Lot Count
-    ReportIDContent[12] = 66031; // Current Lot ID
-    HGemPtr->SetReportIDContent(1, 13, ReportIDContent, EquDefault);
+    ReportIDContent[0] = 1027;   // System Time - the whole default report, as on HT9045
+    HGemPtr->SetReportIDContent(1, 1, ReportIDContent, EquDefault);
 
     //AI(ht160s-agv) 20260615 : dedicated AGV reports. 2/3/4 each carry a single
     // P1-P9 bitmap SV (supplement/status/finish); 5 carries all nine carrier IDs.

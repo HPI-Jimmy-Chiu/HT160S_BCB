@@ -350,37 +350,45 @@ private:
     // as SVID 4 / 9. unsigned char + U1 on the wire because that is exactly what HT9045 does
     // (uHGemEquipment.cpp SetSVDataPointer(4, UINT_1_TYPE, ...) over an unsigned char member),
     // and the VALUE DOMAIN is 9045's, not GEM's : 1=Off-Line, 2=On-Line Local, 3=On-Line Remote.
-    // iControlState above keeps the GEM-standard 1/4/5 domain it has always published on 66002 -
-    // that number is already in the customer spec, so it is not re-encoded here.
+    // iControlState above keeps the GEM-standard 1/4/5 domain it used to publish on SVID 66002.
+    //AI(secs-66xxx-retire) 20260804 : 66002 is retired, so iControlState is now INTERNAL ONLY - it
+    // remains the store every control-state path writes and the value MapGemControlState9045() folds
+    // into SVID 4, but it has no SVID of its own any more. Its 1/4/5 domain is deliberately left
+    // as-is: re-encoding it would touch every reader for no wire-visible gain.
     unsigned char svGemControlState;      // SVID 4 GemControlState
     unsigned char svGemControlPreState;   // SVID 9 PreviousGemControlState
     //AI(secs-e30-gate) 20260803 : SEMI E30 splits OFF-LINE into three substates. HT160S needs the
     // distinction for ONE rule : the host may be taken ON-LINE by its own S1F17 only from HOST
     // OFF-LINE, so an operator who took the tool off-line locally cannot be overridden remotely.
-    // Kept in its OWN member, never folded into iControlState, because 66002 is bound directly to
-    // iControlState and 66002 is slot 7 of the customer-frozen 13-SV report 1 - widening its value
-    // domain would change bytes in every event report. Consequence to accept knowingly: a move
-    // between two OFF-LINE substates fires no CEID, because 141/91/92/93 key off the folded value.
+    // Kept in its OWN member, never folded into iControlState : SVID 4's published domain is 9045's
+    // three values, and widening what iControlState holds would change what SVID 4 reports. (Until
+    // 20260804 the reason was stronger still - iControlState was itself published as SVID 66002,
+    // slot 7 of the then-frozen 13-SV report 1 - but the conclusion is unchanged.) Consequence to
+    // accept knowingly: a move between two OFF-LINE substates fires no CEID, because 141/91/92/93
+    // key off the folded value.
     int iControlSubstate;                 // 1=EQUIPMENT OFF-LINE 2=ATTEMPT ON-LINE 3=HOST OFF-LINE 0=n/a (on-line)
     bool bControlStateSeeded;             // false until the first tick applies [SECS] InitialControlState
     //AI(ht160s-secsgem) 20260611 : SV snapshot members refreshed just before each
     // S6F11 / S1F4 serialize, so SetSVDataPointer can bind a stable address while
     // the value still tracks live machine data (avoids binding bool/enum/form ptr).
-    int        svRunMode;        // (int)HSys.Sys.RunMode 0Normal/1Home/2OneCycle/3CleanOut/4TrayFeed
-    int        svSystemRunning;  // HSys.Sys.SystemStart 0/1
-    int        svAlarmActive;    // fNote->fShow 0/1
-    int        svAlarmCode;      // fNote->Code
-    int        svTotalIC;        // tRunData.TotalIC
-    int        svTotalSorted;    // MachineRun.iTotalSorted
-    int        svUPH;            // tRunData.UPH
-    int        svLotCount;       // LotRegistry.GetLotCount()
-    AnsiString svCurrentLot;     // first registered Lot ID ("" if none)
-    //AI(secs-onsite0731) 20260801 : the seven-of-eight empty slots of the KYEC host's
-    // RPTID 502 were the operator's on-site notes 3 and 4. These three close the ones whose
-    // data HT160S already owns. svActiveLot is SEPARATE from svCurrentLot on purpose:
-    // svCurrentLot rides firmware report 1, whose 13-SV shape is published in the customer
-    // interface spec and means "first registered lot"; 1006 must be the ACTIVE lot.
-    AnsiString svActiveLot;      // TfMain::ActiveLotID()      -> SVID 1006 Lot ID
+    //AI(secs-66xxx-retire) 20260804 : svRunMode / svSystemRunning / svAlarmActive / svAlarmCode /
+    // svTotalIC / svLotCount / svCurrentLot USED TO BE DECLARED HERE, one per retired 66xxx SVID.
+    // Every one of them was written only by RefreshSVData and read only by its own registration, so
+    // they went with the band. Do not resurrect a member here to "keep the data around" - the whole
+    // point of the retirement is that the family numbers (1008 / 1011 / 1101 / 1102 / 1006 / SVID 4)
+    // are the only published surface. See the tombstone in HT160Gem::AddSV.
+    int        svTotalSorted;    // MachineRun.iTotalSorted    -> SVID 1102 Output Total Count
+    int        svUPH;            // tRunData.UPH               -> SVID 1021 UPH
+    //AI(secs-66xxx-retire) 20260804 : SVID 1008 Run Mode. A CONSTANT "0" (= Normal in the family's
+    // "0:Normal; 1:RT; 2:EQC" enumeration), set in the constructor and never touched again - a sorter
+    // has no retest and no EQC pass. Held in a member only because SetSVDataPointer binds an address.
+    AnsiString svRunMode9045;    // constant "0"               -> SVID 1008 Run Mode
+    //AI(secs-onsite0731) 20260801 : one of the seven-of-eight empty slots of the KYEC host's RPTID 502.
+    //AI(secs-66xxx-retire) 20260804 : this is now the ONLY published lot identity. RefreshSVData seeds
+    // it from TfMain::ActiveLotID() and then, if the registry holds anything, overwrites it with every
+    // registered lot id joined by commas - which is what replaced 66030 Active Lot Count and 66031
+    // Current Lot ID. One lot still answers exactly the single id, so the host's slot 1 is unchanged.
+    AnsiString svActiveLot;      // comma-joined lot list      -> SVID 1006 Lot ID
     AnsiString svMachineState;   // g_sMachineStateText mirror -> SVID 1011 Machine State
     int        svLoaderIC;       // tRunData.LoaderIC          -> SVID 1101 Loader Count
     //AI(secs-startmode) 20260802 : SVID 1517 Start Mode, in HT9045's NUMBERING, not ours.

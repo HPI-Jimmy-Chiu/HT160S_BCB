@@ -204,7 +204,7 @@ void THT160GeneralSetting::Load()
 		if(iSortMode<smNormal || iSortMode>smLotPassFail)
 			iSortMode=smNormal;
 	}
-	RecomputeEffectiveSortMode();   // keep the SVID-66032 mirror in step with the reloaded base
+	RecomputeEffectiveSortMode();   // keep the effective-mode mirror in step with the reloaded base
 
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
 	bUseAmrRecoveryDivert=Ini->ReadBool("SortMode", "UseAmrRecoveryDivert", false);

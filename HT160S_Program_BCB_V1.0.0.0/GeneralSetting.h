@@ -67,8 +67,15 @@ public:
 	// core reads the EFFECTIVE mode below, so while armed it behaves like smWhiteList (static
 	// Bin->Auto table like Normal, but the 2D->Bin source is a local WhiteList.json loaded at Lot
 	// Start; codes not in the list -> Error) and falls back to the base mode when disarmed.
-	// iEffectiveSortMode is a live mirror exported to the host as SVID 66032 (needs a real int to
-	// point at). Use the Is*SortMode() helpers - they all read the effective mode.
+	//AI(secs-66xxx-retire) 20260804 : iEffectiveSortMode USED TO be exported to the host as SVID
+	// 66032; that number went with the whole 66xxx band on the customer's ruling, and the family
+	// has no sort-mode SVID to move it to. It is now machine-internal only - the host can still
+	// SET the mode with S2F41 LOTSTART SORTMODE but can no longer read it back.
+	// NOTE: IT IS NOW A DEAD STORE and is kept only to avoid a pointless blast radius: 66032 was its
+	// ONLY reader. RecomputeEffectiveSortMode() still writes it, but every machine path - the
+	// Is*SortMode() helpers below, routing, the UI, the state record - calls the FUNCTION
+	// GetEffectiveSortMode() instead. Removing the int would mean touching RecomputeEffectiveSortMode
+	// and its five callers for no functional gain, so it stays until something else needs the slot.
 	bool bWhiteListActive;
 	int  iEffectiveSortMode;
 	int  GetEffectiveSortMode()       { return bWhiteListActive ? smWhiteList : iSortMode; }
@@ -192,8 +199,10 @@ public:
 	//  true            = prompt on SKIP, then report the number.
 	bool bAskSkipICCount;
 	//AI(secs-e30-gate) 20260803 : GEM control-state commissioning settings, [SECS] section.
-	//  iInitialControlState = the GEM control state the machine boots into, in SVID 66002's own
-	//  domain (1 = Off-Line / 4 = On-Line Local / 5 = On-Line Remote). Default 5.
+	//  iInitialControlState = the GEM control state the machine boots into, in the GEM-standard
+	//  domain (1 = Off-Line / 4 = On-Line Local / 5 = On-Line Remote). Default 5. That domain is
+	//  HT160Gem::iControlState's, which SVID 66002 used to publish verbatim; 66002 was retired on
+	//  20260804 and the host now reads the same state on SVID 4 in 9045's 1/2/3 domain.
 	//  MUST NOT default to Off-Line: E30 lets the host go on-line only from HOST OFF-LINE, and on
 	//  2026-07-31 the host's S1F17 was the only thing that ever brought this machine on-line, so a
 	//  machine that boots EQUIPMENT OFF-LINE with no operator at the panel is a production stop.

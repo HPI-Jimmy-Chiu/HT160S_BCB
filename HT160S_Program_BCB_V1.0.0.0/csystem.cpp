@@ -2016,8 +2016,10 @@ int GetCalculateUPH(TDateTime tEndTime)
 		return 0;
 	//AI(secs-onsite0731) 20260801 : count only the units placed since the epoch that
 	//tRunData.StartTime marks (see the bFirstRun block in ProcessMotion). TotalIC itself
-	//stays cumulative - it is published as SVID 66020 and the customer's HT9045 is
-	//cumulative too - so the baseline is subtracted here rather than zeroing the counter.
+	//stays cumulative - the customer's HT9045 is cumulative too - so the baseline is
+	//subtracted here rather than zeroing the counter.
+	//AI(secs-66xxx-retire) 20260804 : TotalIC no longer has an SVID of its own (66020 retired);
+	//it now feeds only the screen and the UPH derived here. The host reads 1101 / 1102.
 	int iWindowIC=tRunData.TotalIC-g_iUphBaseIC;
 	if(iWindowIC<0)
 		iWindowIC=0;
