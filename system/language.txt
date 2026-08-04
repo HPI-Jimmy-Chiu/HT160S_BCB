@@ -43,6 +43,7 @@ fMain	lblFeatureName2	SAFE	安全
 fMain	lblFeatureName3	AMR	AMR
 fMain	lblRunMode	Real/Dummy	實機/模擬
 fMain	lbStartMode	Start Mode	啟動模式
+fMain	lblSysOperatorID	Operator ID	操作員 ID
 fMain	spbTrayStatus	Tray Status	料盤狀態
 fMain	sbTimeData	Time Data	時間數據
 fMain	apbLogs	Logs	日誌

@@ -314,3 +314,4 @@ Zone	區域
 \n\nSave motor parameter changes?	\n\n儲存馬達參數變更？
 apply	套用
 guard	防護
+Operator ID	操作員 ID

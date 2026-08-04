@@ -55,3 +55,9 @@ docs/panasonicA6/panasonicA6_document.pdf
 
 # KYEC CONFIDENTIAL training material (not version-controlled)
 docs/kyec-training/
+
+# Office lock files (per-open-session, never useful in-repo)
+~$*
+
+# Workbook peek dumps from doc sessions
+.wbpeek.txt
