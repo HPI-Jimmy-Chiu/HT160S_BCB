@@ -571,6 +571,6 @@ ColorY 軸幾何：Y＝前／後（相對操作者）、X＝左／右、Z＝上�
 | `Auto%d output car full (%d trays) - change car then confirm` | 邏輯堆疊車盤數達每車上限 | 操作員換車後確認；清車資料並重建堆疊角色 |
 | `Auto enable changed. Please restart the software ...` | 操作員變更 per-Auto 啟用後的提示 | 重啟軟體讓 Lot+Bin 路由生效 |
 
-> 註（定案）：卸盤事件的 CEID 陣列 `{136,137,138,140,141,142}` 跳過 139，係因 **139 在 HT9045 CEID 空間已被占用**，HT160 為避免撞號刻意跳過（詳見第 12 章）。AMR 模式卸盤時另累計車上 IC 數供 SVID 38231-33/38240-42。維護畫面各 Auto 啟用勾選的螢幕文字為「**Auto1**」~「**Auto6**」（英文）。
+> 註（定案）：卸盤事件的 CEID 陣列 **`{136,137,138,145,146,147}`** 跳過 139，係因 **139 在 HT9045 CEID 空間已被占用**，HT160 為避免撞號刻意跳過（詳見第 12 章）。⚠ **2026-08-04 更正**：原文寫的 Auto4–6 號碼 140/141/142 是 2026-07 前的舊編號，已改為 **145/146/147**（140 與 9045 的 Prepare Load 撞號；141 自 2026-08-03 起改為 GEM Control State Change，與卸盤無關）。AMR 模式卸盤時另累計車上 IC 數供 SVID 38231-33/38240-42。維護畫面各 Auto 啟用勾選的螢幕文字為「**Auto1**」~「**Auto6**」（英文）。
 >
 > 【待補（現場）：實機「車已被取走」感測（`IsAmrTaken` 重用 `SnAutoX_InputEnd`，Lane0/IP2/Port1/Bit0~5）是否已最終接線——未接線（Enable==false）時 AMR 握手會停在 Ready。】

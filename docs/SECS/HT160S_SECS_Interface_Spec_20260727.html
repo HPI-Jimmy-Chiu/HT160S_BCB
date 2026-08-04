@@ -325,7 +325,7 @@ published control state.</p>
 <td>E→H</td>
 <td>—</td>
 <td><code>B ONLACK</code></td>
-<td>ONLACK=0,控制狀態→5</td>
+<td>ONLACK=0,控制狀態轉 On-Line Remote(<strong>SVID 4 = 3</strong>;2026-08-04 前本欄寫「→5」,那是已退役 66002 的 GEM 標準值域,機內部仍存 5 但不再對外公佈)</td>
 </tr>
 <tr>
 <td>S1F23</td>
@@ -804,7 +804,7 @@ host 可直接沿用 HT-90XX 的 SVID 設定;HT-90XX 有而本機無對應的號
 <td>1006</td>
 <td>Lot ID</td>
 <td>A</td>
-<td><strong>全部已登錄批號,以半角逗號 <code>,</code> 串接(不含空白)</strong>。⚠ <strong>2026-08-04 語意擴充</strong>:本號原本只回單一作用中批號,現改為回登錄表中的<strong>所有</strong>批號,順序 = 登錄順序。單批時位元與舊版<strong>完全相同</strong>(例:<code>PROBE_LOT_A</code>),故只掛一批時把本值當單一 token 解析的 host 不受影響;三批時為 <code>PROBE_LOT_A,PROBE_LOT_B,PROBE_LOT_C</code>。<code>RemoveLot</code> 釋放出的空槽會被跳過,<strong>不會出現開頭逗號或連續逗號</strong>。登錄表為空時回主畫面批號欄的文字(既有 fallback,不變),結批(<code>CLEAR_LOT_INFO</code>)後回空字串。<strong>已退役的 66030 / 66031 由本號導出</strong>:批數 = 逗號數 + 1;首批 = 第一個逗號之前的字串。⚠ <strong>本號是貴端已保存的 <code>RPTID 502</code> 第 1 格</strong>,故此值會直接出現在該既有事件報表內(item 數與 A 型別皆未變);若貴端把第 1 格當單一批號 token 解析,多批生產時請改為可處理多批的解析</td>
+<td><strong>全部已登錄批號,以半角逗號 <code>,</code> 串接(不含空白)</strong>。⚠ <strong>2026-08-04 語意擴充</strong>:本號原本只回單一作用中批號,現改為回登錄表中的<strong>所有</strong>批號,順序 = 登錄順序。單批時位元與舊版<strong>完全相同</strong>(例:<code>PROBE_LOT_A</code>),故只掛一批時把本值當單一 token 解析的 host 不受影響;三批時為 <code>PROBE_LOT_A,PROBE_LOT_B,PROBE_LOT_C</code>。<code>RemoveLot</code> 釋放出的空槽會被跳過,<strong>不會出現開頭逗號或連續逗號</strong>。登錄表為空時回主畫面批號欄的文字(既有 fallback,不變),結批(<code>CLEAR_LOT_INFO</code>)後回空字串。<strong>已退役的 66030 / 66031 由本號導出</strong>:首批 = 第一個逗號之前的字串;批數 = <strong>1006 為空字串則 0,否則逗號數 + 1</strong>(⚠ 必須先判空 —— 登錄表為空時本號回主畫面批號欄的文字,那是 <strong>0 批</strong>,直接算「逗號數 + 1」會誤報成 1 批)。⚠ <strong>本號是貴端已保存的 <code>RPTID 502</code> 第 1 格</strong>,故此值會直接出現在該既有事件報表內(item 數與 A 型別皆未變);若貴端把第 1 格當單一批號 token 解析,多批生產時請改為可處理多批的解析</td>
 </tr>
 <tr>
 <td>1007</td>
@@ -987,7 +987,7 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 <tr>
 <td>66001</td>
 <td>System Running</td>
-<td><strong>無替代</strong>。運轉 / 停止請由 <strong>1011 Machine State</strong> 的狀態文字判讀,或訂閱 <strong>CEID 1</strong>(Start 按下)與 <strong>CEID 2</strong>(Pause 按下)。HT-90XX 亦無此類 SV</td>
+<td><strong>無替代</strong>。運轉 / 停止請由 <strong>1011 Machine State</strong> 的狀態文字判讀,或訂閱 Start / Pause 事件。⚠ <strong>Start 有兩個號碼,兩個都要訂</strong>:<strong>CEID 1</strong> Start Pressed 只在<strong>機內無 IC</strong> 時發;<strong>CEID 76</strong> Start Pressed HasIC 才是<strong>機內有 IC</strong> 時的 Start(暫停後續跑、警報解除後續跑都走 76 —— 產線上這才是常態)。停止側為 <strong>CEID 2</strong> Pause Pressed。只訂 CEID 1 會漏掉絕大多數的重新起動。HT-90XX 亦無此類 SV</td>
 </tr>
 <tr>
 <td>66002</td>
@@ -1017,7 +1017,7 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 <tr>
 <td>66030</td>
 <td>Active Lot Count</td>
-<td>由新語意的 <strong>1006 Lot ID</strong> 導出:<strong>批數 = 逗號數 + 1</strong></td>
+<td>由新語意的 <strong>1006 Lot ID</strong> 導出,但<strong>必須先判空</strong>:<strong>1006 為空字串 → 批數 0;否則批數 = 逗號數 + 1</strong>。⚠ 登錄表為空時 1006 回主畫面批號欄的文字(通常是空字串),機上其實是 <strong>0 批</strong> —— 直接套「逗號數 + 1」會把 0 批誤報成 1 批(已退役的 66030 在該狀態回 0)。⚠ 另請注意:批號欄若有操作員打的字但尚未開批,1006 會回那串文字,這同樣是 <strong>0 批</strong>,不能只靠 1006 判定機上有批 —— 需要嚴格的批數請以<code>LOTSTART</code> / <code>CLEAR_LOT_INFO</code> 的事件流追蹤</td>
 </tr>
 <tr>
 <td>66031</td>
@@ -1282,12 +1282,16 @@ per this section; see §3.3.5 for the old-to-new mapping.</p>
 請以貴端機台的 <code>.def</code> 或本節為準,不要從 HT9011UC 分支同步,否則 55 個號碼會靜默變義。</p>
 </blockquote>
 <h4 id="331-events-this-equipment-actually-sends">3.3.1 本機實際會發射的事件 / Events this equipment actually sends</h4>
-<p>以下 <strong>57</strong> 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
-其中 <strong>CEID 78 為條件發射</strong>，出廠預設關閉，其餘 56 個不受設定影響。
-(2026-08-03 由 53 增為 57:新增控制狀態變更事件 <strong>141</strong> 與 <strong>91 / 92 / 93</strong>,見表末。)</p>
-<p>The following <strong>57</strong> ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
-<strong>CEID 78 is conditional</strong> (off by default); the other 56 are not gated by any setting.
-(53 -&gt; 57 on 2026-08-03: control-state change events <strong>141</strong> and <strong>91 / 92 / 93</strong> were added.)</p>
+<p>以下 <strong>56</strong> 個號碼是 HT-160S 有發射點的事件。號碼與名稱皆為 HT-90XX 原文。
+其中 <strong>CEID 78 為條件發射</strong>，出廠預設關閉，其餘 55 個不受設定影響。
+(2026-08-03 由 53 增為 57:新增控制狀態變更事件 <strong>141</strong> 與 <strong>91 / 92 / 93</strong>,見表末。
+2026-08-04 由 57 減為 56:<strong>CEID 17 Enter Tool Page</strong> 的發射點是主畫面工具列的 Tools 鍵,
+該鍵只會開出一片空白視窗,已連同按鈕一併移除,17 改列 §3.3.2。)</p>
+<p>The following <strong>56</strong> ids have a real emit site on HT-160S. Ids and names are HT-90XX's own.
+<strong>CEID 78 is conditional</strong> (off by default); the other 55 are not gated by any setting.
+(53 -&gt; 57 on 2026-08-03: control-state change events <strong>141</strong> and <strong>91 / 92 / 93</strong> were added.
+57 -&gt; 56 on 2026-08-04: the only emit site for <strong>CEID 17 Enter Tool Page</strong> was the main-screen
+Tools button, which opened an empty form and has been removed with it; 17 moved to §3.3.2.)</p>
 <table>
 <thead>
 <tr>
@@ -1351,11 +1355,6 @@ per this section; see §3.3.5 for the old-to-new mapping.</p>
 <td>16</td>
 <td>Switch UserLevel</td>
 <td>使用者權限層級切換</td>
-</tr>
-<tr>
-<td>17</td>
-<td>Enter Tool Page</td>
-<td>進入 Tool 頁</td>
 </tr>
 <tr>
 <td>18</td>
@@ -1526,9 +1525,9 @@ per this section; see §3.3.5 for the old-to-new mapping.</p>
 <li><strong>CEID 73</strong> 於<strong>每一次</strong>訊息框關閉皆送(HT-90XX 僅對 SECS 來源的警報框送)。</li>
 </ul>
 <h4 id="332-registered-but-never-sent">3.3.2 已註冊但本機不會發射的事件 / Registered but never sent</h4>
-<p>號碼 1–292 之中,上表以外的 <strong>235</strong> 個號碼<strong>皆已註冊</strong>(有別名、可被 <code>S2F35</code> 連結、可被 <code>S2F37</code> 啟用/停用),
+<p>號碼 1–292 之中,上表以外的 <strong>236</strong> 個號碼<strong>皆已註冊</strong>(有別名、可被 <code>S2F35</code> 連結、可被 <code>S2F37</code> 啟用/停用),
 但 HT-160S <strong>沒有對應機構,永遠不會送出</strong>。這是為了讓 host 的字典與 HT-90XX 完全一致而刻意保留的。</p>
-<p>Every id in 1–292 not listed above — <strong>235</strong> of them — <strong>is registered</strong> (it has an alias, can be linked by
+<p>Every id in 1–292 not listed above — <strong>236</strong> of them — <strong>is registered</strong> (it has an alias, can be linked by
 <code>S2F35</code>, can be enabled/disabled by <code>S2F37</code>) but HT-160S <strong>has no such mechanism and will never send it</strong>.
 They are kept registered on purpose so the host dictionary matches HT-90XX exactly.</p>
 <p>主要類別 / Main categories:</p>
@@ -1583,7 +1582,7 @@ They are kept registered on purpose so the host dictionary matches HT-90XX exact
 </tr>
 <tr>
 <td>觸發條件本機不存在</td>
-<td>7, 11, 12, 23, 33, 49, 64, 65, 77, 78, 89, 110, 112, 113, 127, 139, 140, 142, 143, 144, 74, 75, 79</td>
+<td>7, 11, 12, 17, 23, 33, 49, 64, 65, 77, 78, 89, 110, 112, 113, 127, 139, 140, 142, 143, 144, 74, 75, 79</td>
 <td>詳見下表</td>
 </tr>
 </tbody>
@@ -1607,6 +1606,11 @@ They are kept registered on purpose so the host dictionary matches HT-90XX exact
 <td>11 / 12</td>
 <td>Switch Production Mode / Switch Engineer Mode</td>
 <td>HT-160S 無「生產/調機」與「一般/工程」模式切換(僅有 User Level = CEID 16)</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Enter Tool Page</td>
+<td>HT-160S 無 Tool 頁。工具列原有一顆 Tools 鍵,但它開出的是一片空白視窗(HT-90XX 該頁的權限設定與警報碼產生功能在本機分屬他處),已於 2026-08-04 連同按鈕移除</td>
 </tr>
 <tr>
 <td>23</td>
@@ -2363,7 +2367,7 @@ HT-160S 只發 S6F11 事件,不發此告警。若 host 是以該 ALID 判斷循�
 <li><strong>再更正(2026-08-03,同日稍後)</strong>:上一句原本接著寫「1007 確實無對應,因為 HT-160S 沒有操作員身分欄位可回」——該敘述<strong>已不再成立</strong>。HT-160S 已於本日新增操作員身分欄位並以 <strong>SVID / ECID 1007</strong> 公佈(§3.1 / §3.2),且<strong>接受貴端以 <code>S2F15</code> 寫入</strong>(貴端 2026-06-08 對 HT-90XX 寫的 <code>"AGV"</code> 用法在本機同樣受理)。請<strong>不要</strong>從報表定義中移除 1007。本條剩下真正無對應的號碼是:1420、6001/6002、1513、1151–1156、16296–16299。</li>
 <li><strong>更正(2026-08-04)</strong>:本條先前寫「HT-160S 的機台狀態/產出/AMR 資料集中於 <strong>66xxx</strong> 與 38xxx 段」——<strong>66xxx 段已於 2026-08-04 依貴端裁定全數退役</strong>(最後留存的十個號碼 66000 / 66001 / 66002 / 66010 / 66011 / 66020 / 66021 / 66030 / 66031 / 66032 不再註冊,逐號替代方案見 §3.1 的退役墓碑表;新增家族編號 <strong>1008 Run Mode</strong> 取代 66000)。機台狀態與產出資料現在<strong>一律使用 HT-90XX 家族的共同段編號</strong>(1008 Run Mode、1011 Machine State、1006 Lot ID、1101 / 1102 / 1103–1105 / 1259–1261 各項計數);<strong>只有 AMR / AGV 資料仍在 38xxx 段</strong>。註冊 SVID 總數 <strong>76 → 67</strong>。</li>
 <li><strong>已知並接受的代價(2026-08-04)</strong>:分選模式(原 <strong>66032 Sort Mode</strong>)在 HT-90XX 家族中沒有可用編號(唯一近似的 35530「[I27] Manual sort mode」是 HT-9045/46 的 BOOLEAN 選項),host 仍可用 <code>S2F41 LOTSTART</code> 的 <code>SORTMODE</code> pair <strong>設定</strong>,但<strong>無法再以 <code>S1F3</code> 回讀</strong>。</li>
-<li><strong>1006 語意擴充(2026-08-04)</strong>:SVID 1006 改回「全部已登錄批號、以半角逗號串接」。⚠ <strong>1006 是貴端已保存的 <code>RPTID 502</code> 第 1 格</strong>,故該既有事件報表第 1 格的值會在多批生產時變成 <code>LOT_A,LOT_B</code> 形式(item 數與 A 型別不變);把該格當單一批號 token 解析的 host 需更新。單批時位元與舊版完全相同。詳見 §3.1、§3.3.3。</li>
+<li><strong>1006 語意擴充(2026-08-04)</strong>:SVID 1006 改為「全部已登錄批號、以半角逗號串接」。⚠ <strong>1006 是貴端已保存的 <code>RPTID 502</code> 第 1 格</strong>,故該既有事件報表第 1 格的值會在多批生產時變成 <code>LOT_A,LOT_B</code> 形式(item 數與 A 型別不變);把該格當單一批號 token 解析的 host 需更新。單批時位元與舊版完全相同。詳見 §3.1、§3.3.3。</li>
 <li><strong>建議</strong>:host 端請依本規格 §3 對應 HT-160S 實際 SVID/CEID;無法對應者(tester 專屬)由雙方確認後移除或以容忍空值處理。</li>
 </ul>
 <hr />

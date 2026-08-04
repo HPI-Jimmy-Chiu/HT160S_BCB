@@ -84,7 +84,7 @@
 </table>
 <blockquote>
 <p><strong>修訂說明（2026-07-13）</strong>：本手冊原始 case log 仍逐字保留 <strong>2026-06-26 來源 run</strong> 的實況（timestamp／sys／len 皆未更動）。但該 run 之後韌體有數項通訊層變更，為使本手冊繼續作為<strong>現況介面合約</strong>可用，凡「格式／行為描述」與現行程式碼不符處已就地修正，並以 <strong>「自 2026-07 起…／本 run 為舊版故未涵蓋」</strong> 之字樣標示；讀到此類字樣時，代表該項為 run 之後新增、歷史 log 不會出現，請以現行韌體行為為對接依據。主要變更集中在 <strong>§3.4 AGV 握手</strong>（CEID 272／274 加掛 Report 6 的 Tray/Device Count、LoaderTrayCount 改為 work-only）。</p>
-<p><strong>修訂說明（2026-08-04）</strong>：依京元裁定「HT-160S 只發布 HT-90XX 家族 SVID 編號」，10 個 HT160 專屬 <code>66xxx</code> SVID 已下架，<strong>預設 Report 1 縮編為只有 <code>1027 System Time</code> 一個 SV</strong>（註冊 SVID 76 → 67）。因 288 個 CEID 連結 Report 1，現行幾乎每一則 S6F11 都只帶 1 個 item；本手冊凡「Report 1＝13 個 SV／<code>len=144</code>」之敘述皆已就地標註為 <strong>2026-08-04 前的歷史值</strong>，逐字 log 節錄一律不動。<strong>新增 §3.3.1</strong> 給出實測的現行 S6F11 標準範例，並載明兩項客戶端後果（電力循環後退回 Report 1；<code>SVID 1006</code> 於 <code>RPTID 502</code> slot 1 改為逗號串接的多 lot 值）。</p>
+<p><strong>修訂說明（2026-08-04）</strong>：依京元裁定「HT-160S 只發布 HT-90XX 家族 SVID 編號」，10 個 HT160 專屬 <code>66xxx</code> SVID 已下架，<strong>預設 Report 1 縮編為只有 <code>1027 System Time</code> 一個 SV</strong>（註冊 SVID <strong>76 → 67</strong>：下架 10 個、同時新增家族號 <code>1008</code>，故 76 − 10 + 1 = 67）。因 288 個 CEID 連結 Report 1，現行幾乎每一則 S6F11 都只帶 1 個 item；本手冊凡「Report 1＝13 個 SV／<code>len=144</code>」之敘述皆已就地標註為 <strong>2026-08-04 前的歷史值</strong>，逐字 log 節錄一律不動。<strong>新增 §3.3.1</strong> 給出實測的現行 S6F11 標準範例，並載明兩項客戶端後果（電力循環後退回 Report 1；<code>SVID 1006</code> 於 <code>RPTID 502</code> slot 1 改為逗號串接的多 lot 值）。</p>
 <p><strong>如何閱讀本手冊</strong>：
 - 想快速掌握全貌 → 先看 <strong>第 2 章</strong> 的 Mermaid 序列圖（一張圖看完整個 lot run 的訊息往返）。
 - 想對接某一類訊息 → 直接跳到 <strong>第 3 章</strong> 對應小節（每節都有「用途 / 格式 / 實際 log / 欄位 FIELD TABLE」四段式結構）。
@@ -681,7 +681,7 @@ sequenceDiagram
 <td>3</td>
 <td>Auto 卸盤（unload-tray / discharge）</td>
 <td>EMPTY（<code>len=30</code>）</td>
-<td>同上。<strong>⚠ 此號已作廢</strong>：Auto5 卸盤自 commit <code>bf9d048</code> 起改為 <strong>146</strong></td>
+<td>同上。<strong>⚠ 此號的 Auto5 卸盤語意已作廢</strong>：Auto5 卸盤自 commit <code>bf9d048</code> 起改為 <strong>146</strong>。<strong>⚠⚠ 但 <code>141</code> 本身不是空號 —— 2026-08-03 起被重新指派為 <code>GEM Control State Change</code></strong>(控制狀態每次變更即發,2026-08-04 實測收到),請勿把現行的 141 當作卸盤事件解析</td>
 </tr>
 <tr>
 <td>142</td>
@@ -724,7 +724,7 @@ sequenceDiagram
 <p><strong>為什麼本 run 中 136–142 的 report body 是空的（len=30）？</strong> 這 6 個 CEID 是 <strong>Auto 卸盤（unload-tray / discharge）事件</strong>。當時它們在設計上 <strong>刻意不註冊任何 report SV</strong>（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位——這是 by design，不是漏帶資料。</p>
 <p><strong>⚠ 自 2026-07-29 起兩項都已改變（本 run 為舊版故未涵蓋）</strong>：</p>
 <ol>
-<li><strong>號碼改了</strong>：Auto4/5/6 卸盤由 <code>140/141/142</code> 更正為 <strong><code>145/146/147</code></strong>（commit <code>bf9d048</code>），以符合 HT9045 <code>EventReport_CEID.def</code> 的實際編號。現行陣列為 <code>aAuto1To6.cpp</code> 的 <code>AutoCeid[6]={136,137,138,145,146,147}</code>。<strong>本 run 出現的 140/141/142 為舊編號，現行韌體不會再送這三個號碼。</strong></li>
+<li><strong>號碼改了</strong>：Auto4/5/6 卸盤由 <code>140/141/142</code> 更正為 <strong><code>145/146/147</code></strong>（commit <code>bf9d048</code>），以符合 HT9045 <code>EventReport_CEID.def</code> 的實際編號。現行陣列為 <code>aAuto1To6.cpp</code> 的 <code>AutoCeid[6]={136,137,138,145,146,147}</code>。<strong>本 run 出現的 140/141/142 為舊編號。</strong><strong>⚠ 但 <code>141</code> 這個號碼現在有新語意、且是活躍事件</strong>：2026-08-03 起 <code>141</code> 被<strong>重新指派</strong>為 <strong>GEM Control State Change</strong>（控制狀態每次變更即發），2026-08-04 實測連線當下就收到 <code>CEID=141</code>。所以「不會再看到」只適用於 <strong>140 與 142</strong>；<code>141</code> 會看到，但它不再是 Auto5 卸盤。</li>
 <li><strong>body 不再是空的</strong>：CEID 字典整份改為 HT9045 逐字複本後（commit <code>ab1b99e</code>），這 6 個號碼與其他事件一樣註冊在 <strong>Report 1</strong>（13 個 SV），body 長度與 CEID 35 同級（<code>len=144</code>），不再是 <code>len=30</code> 的空報表。若 host 端已針對空 body 撰寫解析，請一併更新。
    <strong>⚠ 再更新（2026-08-04）</strong>：Report 1 已依京元裁定縮編為 <strong>只有 <code>1027 System Time</code></strong>，故這 6 個號碼現行僅帶 <strong>1 個 SV</strong>（body 遠小於 144），但仍<strong>不是</strong>空 body。詳見 3.3.1。</li>
 </ol>
@@ -767,7 +767,7 @@ sequenceDiagram
 <tr>
 <td><code>66001</code></td>
 <td>System Running</td>
-<td>無替代。運轉／停止請看 <strong><code>1011</code></strong> 的狀態文字與 <strong>CEID 1／2</strong>（Start／Pause 被按下）；HT9045 同樣沒有這支 SV</td>
+<td>無替代。運轉／停止請看 <strong><code>1011</code></strong> 的狀態文字與 Start／Pause 事件。⚠ <strong>Start 有兩個號碼，兩個都要訂</strong>：<strong>CEID 1</strong> 只在機內<strong>無</strong> IC 時發，機內<strong>有</strong> IC 時的 Start 是 <strong>CEID 76</strong>（暫停後續跑、警報解除後續跑都走 76 —— 產線上這才是常態）；停止側為 <strong>CEID 2</strong>。只訂 CEID 1 會漏掉絕大多數的重新起動。HT9045 同樣沒有這支 SV</td>
 </tr>
 <tr>
 <td><code>66002</code></td>
@@ -797,7 +797,7 @@ sequenceDiagram
 <tr>
 <td><code>66030</code></td>
 <td>Active Lot Count</td>
-<td>由新的 <code>1006</code> 推導：lot 數 =（逗號數 + 1）</td>
+<td>由新的 <code>1006</code> 推導，但<strong>必須先判空</strong>：<code>1006</code> 為空字串 → <strong>0 批</strong>；否則 lot 數 =（逗號數 + 1）。⚠ 未開批時 <code>1006</code> 回主畫面 lot 欄位的文字（通常為空），此時機上其實是 0 批，直接算「逗號數 + 1」會把 0 批誤報成 1 批（已退役的 <code>66030</code> 在該狀態回 0）</td>
 </tr>
 <tr>
 <td><code>66031</code></td>
@@ -1835,7 +1835,7 @@ sequenceDiagram
    - 收 <code>273</code> → 僅 log
    - 收 <code>274</code> → 自動 <code>START</code> resume（期望 <code>HCACK=4</code>，因機台已在運行——這是正常的，見 3.4）</li>
 <li><strong>觀察並核對</strong>：
-   - S6F11 生產事件（Auto 卸盤）→ 自動 S6F12 ACKC6=0。⚠ <strong>現行韌體要看的號碼是 <code>136 / 137 / 138 / 145 / 146 / 147</code></strong> —— 本章其他各處出現的 <code>136–142</code> 是 2026-06-26 來源 run 的舊編號，Auto4/5/6 已於 commit <code>bf9d048</code> 由 <code>140/141/142</code> 改為 <code>145/146/147</code>（見 3.3 的說明），重現時不會再看到 140–142。
+   - S6F11 生產事件（Auto 卸盤）→ 自動 S6F12 ACKC6=0。⚠ <strong>現行韌體要看的號碼是 <code>136 / 137 / 138 / 145 / 146 / 147</code></strong> —— 本章其他各處出現的 <code>136–142</code> 是 2026-06-26 來源 run 的舊編號，Auto4/5/6 已於 commit <code>bf9d048</code> 由 <code>140/141/142</code> 改為 <code>145/146/147</code>（見 3.3 的說明），重現時不會再看到 <strong>140 與 142</strong>。⚠ <strong><code>141</code> 仍會出現，但語意不同</strong> —— 2026-08-03 起 <code>141</code> 被重新指派為 <code>GEM Control State Change</code>（控制狀態每次變更即發），2026-08-04 實測連線當下即收到，詳見 3.3 的號碼說明。
    - 完整 AGV cycle（272→START_AGV→273→274→resume START）
    - CEID 35（Auto1 car full）與 272 同時刻雙發（<strong>本 run 為 len=144 + len=86</strong>；現行韌體 35 因 Report 1 只剩 1 個 SV 而遠小於 144、272 因加掛 report 6 而大於 86，故請以「兩者同時刻雙發」為驗收點，勿以位元組長度比對，見 3.3.1）
    - 警報 S5F1 SET/CLEAR（ALID hash、ALTX）→ 自動 S5F2 ACKC5=0</li>
