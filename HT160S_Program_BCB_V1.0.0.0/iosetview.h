@@ -286,15 +286,6 @@ __published:
     TBtnPanel *bpSwRKAlarmReset;
     TBtnPanel *bpSwRKManualStep;
     TBtnPanel *bpSwRKManualTStart;
-    TSpeedButton *sbIORingLoad;
-    TSpeedButton *sbIOTool;
-    TSpeedButton *sbIODatabase;
-    TSpeedButton *spbTerminalProgram;
-    TSpeedButton *sbIOMap;
-    TSpeedButton *sbIOTapeShuttle;
-    TSpeedButton *sbIOTapeLoadUnload;
-    TSpeedButton *sbIOSystem;
-    TSpeedButton *sbIOPanel;
     TPageControl *PageControl1;
     TTabSheet *TabSheet1;
     TPanel *Panel11;
@@ -548,7 +539,6 @@ __published:
     void __fastcall sbIORefreshClick(TObject *Sender);
     void __fastcall sbOutputClick(TObject *Sender);
     void __fastcall sbVacuumClick(TObject *Sender);
-    void __fastcall spbTerminalProgramClick(TObject *Sender);
     void __fastcall Timer1Timer(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall btnAddIOClick(TObject *Sender);
@@ -639,7 +629,6 @@ private:
     bool ResolveLegacyLedState(AnsiString AliasName, bool *State);
     bool ResolveLegacyButtonState(AnsiString AliasName, bool *State);
     TPageControl *GetLegacyPageIO();
-    void SelectLegacyIOPageByButton(TSpeedButton *Button);
     void UpdateLegacyPageTabsVisible();
     void ClearGridRows(TStringGrid *Grid);
     void SetGridRowCount(TStringGrid *Grid, int RowCount);

@@ -35,7 +35,8 @@
 
 ## F. SECS/AMR 對接（與客戶/整合者確認）
 
-- [ ] **SVID/ECID/CEID 對外名稱比對**：以 `docs/SECS/HT160S_SECS_Comm_Examples.md` 為介面合約，與客戶主機整合者文件逐號比對（含 HT160-only 延伸段 38237-38245、66032）。
+- [ ] **SVID/ECID/CEID 對外名稱比對**：以 `docs/SECS/HT160S_SECS_Comm_Examples.md` 為介面合約，與客戶主機整合者文件逐號比對（含 HT160-only 延伸段 38237-38245）。註：2026-08-04 起 66000 段 10 個 SVID 全部下架，只公佈 HT-90XX 家族號（第 12 章）。
+- [ ] **主機端報告定義重建**：確認主機開機後會重下 S2F33 + S2F35——連結不持久化，退回的 Report 1 只帶時戳 `{1027}`；並確認主機可處理 SVID 1006 多批逗號串接值（第 12 章）。
 - [ ] **S7Fx recipe 傳輸支援範圍**：與客戶確認是否使用；程式僅確認分派函式存在。
 - [ ] **SECS/GEM 選配啟用**：各客戶現場確認 `bUseSecsGem`／`[SECS] Enable` 是否開啟（付費選配）。
 - [ ] **AMR 端到端演練**：CEID272 叫車 → START_AGV → 273 Ready → 交車 → 274 Finish（含 Report 6 計數核對）、CEID275 身分盤 2D 上傳，實機 host round-trip 驗證一輪。

@@ -49,7 +49,7 @@ h1 + table th, h1 + table td{border-color:var(--line);}
 </tr>
 <tr>
 <td>版本</td>
-<td>v1.2（2026-07-27）</td>
+<td>v1.3（2026-08-04）—— 僅一項變更：§2.4 的 SECS 模式回讀（SVID 66032）已取消，設定端（§2.2 / §2.3 的 LOTSTART + SORTMODE）與白名單檔案格式（§3）完全未變</td>
 </tr>
 </tbody>
 </table>
@@ -152,8 +152,15 @@ h1 + table th, h1 + table td{border-color:var(--line);}
 </tbody>
 </table>
 <p>任何錯誤或忙碌拒絕時，不建立任何 Lot、不改變模式。</p>
-<h3 id="24-svid-66032">2.4 模式回讀（SVID 66032）</h3>
-<p>主機以 <code>S1F3</code> 查詢 SVID <code>66032</code>（INT4），回覆目前<strong>有效</strong>分選模式（基礎模式 + 白名單覆蓋合併後的結果）：</p>
+<h3 id="24-svid-66032">2.4 模式回讀（⚠ 2026-08-04 起已取消）</h3>
+<blockquote>
+<p>⚠️ <strong>本節的 SECS 回讀能力已於 2026-08-04 移除。</strong></p>
+<p>原本主機可用 <code>S1F3</code> 查詢 SVID <code>66032</code> 讀回有效分選模式。依客戶「HT-160S 只公佈 HT-90XX 家族編號」的裁定，本機自訂的 66xxx 段（含 66032）已<strong>全數下架</strong>，而 HT-90XX 家族<strong>沒有</strong>分選模式的對應編號（家族中唯一近似的 35530「[I27] Manual sort mode」是 HT9045/46 的 BOOLEAN 機台選項，型別與語意皆不合），因此<strong>沒有替代的 SVID</strong>。</p>
+<p><strong>設定端完全未變</strong>：主機仍以 <code>LOTSTART</code> 的 <code>SORTMODE</code> 選項對切換白名單模式（§2.2、§2.3 全部有效，<code>HCACK=0</code> 即代表模式切換成功）。改變的只是「回讀」——主機無法再用 <code>S1F3</code> 確認目前模式。若查詢已下架的 66032，<code>S1F4</code> 該格會回<strong>空清單</strong> <code>&lt;L[0]&gt;</code>（清單長度不變，可與「已註冊但無值」的 <code>&lt;A[0]&gt;</code> 區分），不是錯誤碼。</p>
+<p><strong>替代確認方式</strong>：看機台端 —— 維護畫面的 Sort Mode 選擇器與白名單面板的啟用狀態，或 Process 記錄中的 <code>WhiteList: ...</code> 行。若貴端的流程必須有 SECS 回讀，請配發一個 HT-90XX 家族編號給本方實作。</p>
+<p>以下原有的值域說明保留供理解機台行為之用（機台的模式判定邏輯完全未變，只是不再對外公佈編號）：</p>
+</blockquote>
+<p>原先主機以 <code>S1F3</code> 查詢 SVID <code>66032</code>（INT4），回覆目前<strong>有效</strong>分選模式（基礎模式 + 白名單覆蓋合併後的結果）：</p>
 <table>
 <thead>
 <tr>
@@ -187,7 +194,7 @@ h1 + table th, h1 + table td{border-color:var(--line);}
 </table>
 <ul>
 <li><code>0 / 1 / 2</code> 是機台三選一的<strong>基礎模式</strong>；<code>3</code> 不是選擇器的第四個選項，而是「白名單覆蓋已生效」這件事，此時基礎模式仍在背後保留著。</li>
-<li>白名單 Lot 進行中回報 <code>3</code>；Lot End 自動還原後，回報值回到該機台的基礎模式（<code>0</code>、<code>1</code> 或 <code>2</code>）。</li>
+<li>白名單 Lot 進行中為 <code>3</code>；Lot End 自動還原後，回到該機台的基礎模式（<code>0</code>、<code>1</code> 或 <code>2</code>）。⚠ 這仍是機台內部的行為，只是自 2026-08-04 起無法由 SECS 讀出。</li>
 <li><strong><code>SORTMODE = NORMAL</code> 的 Lot 不保證回報 <code>0</code>。</strong> <code>NORMAL</code> 只代表不套白名單，回讀值取決於現場 Sort Mode 選擇器的原設定，可能是 <code>0</code>、<code>1</code> 或 <code>2</code>。主機若要確認「白名單有沒有生效」，判斷準則是 <code>= 3</code> 或 <code>≠ 3</code>，不要用 <code>= 0</code> 當作 NORMAL 的檢查條件。</li>
 </ul>
 <hr />
@@ -416,14 +423,15 @@ h1 + table th, h1 + table td{border-color:var(--line);}
 <li>依 §3.2 格式製作 <code>WhiteList.json</code>（每個 Lot 都要有 <code>KYECLotID</code>）。</li>
 <li>將檔案放入機台 <code>D:\HT160S_BCB\HT160S_WhiteList\</code> 資料夾（完整路徑 <code>D:\HT160S_BCB\HT160S_WhiteList\WhiteList.json</code>）。</li>
 <li>主機以 <code>LOTSTART</code>（批號＝京元批，須與檔案 <code>KYECLotID</code> 一致）+ <code>SORTMODE = WHITELIST</code> 開 Lot。</li>
-<li>（選用）以 <code>S1F3</code> 查詢 SVID 66032，確認回報 <code>3</code>。</li>
-<li>Lot End 後，機台自動還原為基礎分選模式（回讀值變回 <code>0</code>／<code>1</code>／<code>2</code>，視現場 Sort Mode 設定）。</li>
+<li>（選用）確認模式已切換：<code>LOTSTART</code> 回 <code>HCACK=0</code> 即代表切換成功。⚠ 2026-08-04 起<strong>不再能</strong>以 <code>S1F3</code> 查詢 SVID 66032 回讀（見 §2.4）；需要目視確認時請看機台維護畫面的白名單面板。</li>
+<li>Lot End 後，機台自動還原為基礎分選模式（<code>0</code>／<code>1</code>／<code>2</code>，視現場 Sort Mode 設定）。</li>
 </ol>
 <blockquote>
-<p><strong>66032 = 3 只證明「白名單模式已切換成功」，不代表白名單檔案已被接受。</strong> 兩者是分開的：
-模式由 <code>LOTSTART</code> 的 <code>SORTMODE</code> 決定（HCACK=0 即成功），檔案則在 Lot Start 當下才讀取與檢查。
-檔案若不合格，66032 仍回 <code>3</code>，但機台名單為空、生產 Start 會被擋下。檔案是否被接受，
-請看機台端的提示訊息或 Process 記錄中的 <code>WhiteList: ...</code> 行。</p>
+<p><strong>「白名單模式已切換成功」不代表白名單檔案已被接受。</strong> 兩者是分開的：
+模式由 <code>LOTSTART</code> 的 <code>SORTMODE</code> 決定（<code>HCACK=0</code> 即成功），檔案則在 Lot Start 當下才讀取與檢查。
+檔案若不合格，模式仍是白名單，但機台名單為空、生產 Start 會被擋下。檔案是否被接受，
+請看機台端的提示訊息或 Process 記錄中的 <code>WhiteList: ...</code> 行。
+⚠ 這一點在 2026-08-04 移除 66032 回讀後更重要：模式切換成功與檔案有效<strong>都不能</strong>靠 SECS 回讀確認。</p>
 </blockquote>
 <p>操作員亦可於機台維護畫面的白名單面板勾選啟用，效果與 SECS 相同：於下一次 Lot Start 生效、Lot End 自動還原；機台內有在製 IC 時不可切換。</p>
 </body>

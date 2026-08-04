@@ -1016,9 +1016,11 @@ void HT160Gem::AddCEID()
     //      1:1 to a same-numbered report - so on the 9046 every event but CEID 1 really does
     //      carry nothing until the host provisions. That is the same shape as KYEC's
     //      "CEID 27 fires but has no data" report against HT160S. HT160S
-    //      keeps its own report 1 (13 machine-context SVs, see AddReprot) on every id, so a
-    //      host that has NOT provisioned still gets usable data. A host that does provision
-    //      overwrites the link anyway, so this cannot diverge once S2F35 has run.
+    //      used to keep its own report 1 (13 machine-context SVs) on every id, so a host that had
+    //      NOT provisioned still got usable data.
+    //      AI(secs-66xxx-retire) 20260804 : THAT DEPARTURE IS GONE. Report 1 is now {1027} exactly
+    //      as on HT9045, so an unprovisioned host gets the event id and the time - the same as the
+    //      customer's own 9046 gives it. Only departure 2) below still stands.
     //   2) CEID i -> RPTID i would collide head-on with HT160S reports 2-7, which carry the
     //      AMR P1-P9 bitmaps / tray+device counts / identity-tray 2D. CEID 2 (Pause) would
     //      start shipping the AMR supplement bitmap and the 272-275 handshake would break.
@@ -1030,8 +1032,8 @@ void HT160Gem::AddCEID()
     }
 
     //AI(ht160s-agv) 20260615 : E87/AGV events mapped to DEDICATED reports (2/3/4/5)
-    // NOT report 1, so the host receives the P-bitmap / carrier id, not the 13
-    // machine-status SVs that every other CEID carries. Report content is defined
+    // NOT report 1, so the host receives the P-bitmap / carrier id instead of report 1's payload
+    // (13 machine-status SVs until 20260804, just the 1027 timestamp since). Report content is defined
     // in AddReprot() (runs after AddCEID; EventReport resolves report->SV at send).
     //AI(ht160s-agv-devicecount) 20260713 : 272 (call) and 274 (finish) additionally
     // carry report 6 (all-station Tray/Device Count, see AddReprot) so the host gets

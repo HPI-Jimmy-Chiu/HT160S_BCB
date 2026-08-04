@@ -1898,30 +1898,6 @@ TPageControl *Tfiosetview::GetLegacyPageIO()
     return dynamic_cast<TPageControl *>(FindComponent("PageIO"));
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::SelectLegacyIOPageByButton(TSpeedButton *Button)
-{
-    TPageControl *LegacyPage;
-    TPanel *TitlePanel;
-    int PageIndex;
-
-    if(Button==NULL)
-        return;
-
-    LegacyPage=GetLegacyPageIO();
-    if(LegacyPage==NULL)
-        return;
-
-    PageIndex=Button->Tag-1;
-    if(PageIndex<0 || PageIndex>=LegacyPage->PageCount)
-        return;
-
-    LegacyPage->ActivePageIndex=PageIndex;
-    TitlePanel=dynamic_cast<TPanel *>(FindComponent("plIOForm"));
-    if(TitlePanel!=NULL)
-        TitlePanel->Caption=Button->Caption;
-    UpdateLegacyPageTabsVisible();
-}
-//---------------------------------------------------------------------------
 void Tfiosetview::UpdateLegacyPageTabsVisible()
 {
     TPageControl *LegacyPage;
@@ -2213,11 +2189,6 @@ void __fastcall Tfiosetview::strngrdIoTableSelectCell(TObject *Sender, int ACol,
     iSelectRow=ARow;
     iSelectCol=ACol;
     CanSelect=true;
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::spbTerminalProgramClick(TObject *Sender)
-{
-    (void)Sender;
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)

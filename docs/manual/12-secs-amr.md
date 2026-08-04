@@ -155,7 +155,7 @@ Settings 分頁可編輯 SECS 主機連線設定並回寫到機台設定檔 `sys
 | EC 2758 / 2759 | mm；FT_8；預設 0 | Tray X / Y Pitch (料盤 X/Y 間距)；存回 `setup.ini [TrayForm]` |
 | EC 2760 / 2761 | mm；FT_8；預設 0 | Tray X / Y Start (料盤 X/Y 起始位置) |
 | EC 2762 / 2763 | INT_4；預設 0 | Tray X / Y Division (料盤 X 行數 / Y 列數) |
-| EC 1501 | ASCII；唯讀 | Recipe Name (目前 Setup File 名稱)；唯讀回報，不在可寫範圍 |
+| EC 1501 | ASCII；唯讀 | Setup File (目前配方名稱)；唯讀回報，不在可寫範圍 |
 
 ### 12.2.9　GEM 訊息分派與運作流程
 
@@ -181,7 +181,7 @@ Settings 分頁可編輯 SECS 主機連線設定並回寫到機台設定檔 `sys
    | S14F1 | S14F2 | 物件屬性查詢 |
 
 8. **事件回報**：事件觸發時先把即時機台資料快照，再以 S6F11 送出 (僅 SELECTED 狀態)。
-9. **控制狀態 (SV 66002)**：主機 `ONLINE_REMOTE`/`ONLINE` 設為 5 (Remote)、`ONLINE_LOCAL` 設為 4 (Local)。此為鏡像值，非真正 GEM 狀態機。
+9. **控制狀態 (SVID 4 GemControlState；前一狀態 SVID 9 PreviousGemControlState)**：主機下 `ONLINE_REMOTE`/`ONLINE`/`ONLINE_LOCAL` 後，設備以 **1=Off-Line / 2=On-Line Local / 3=On-Line Remote** 回報，與 HT9045 同號同值域。此為唯一對主機公佈的控制狀態；本程式未實作完整 E30 GEM 狀態機物件，內部另存的 GEM 標準值 (1/4/5) 不對外公佈。
 
 #### S2F41 主機指令 (Host Command)
 
@@ -216,22 +216,30 @@ Settings 分頁可編輯 SECS 主機連線設定並回寫到機台設定檔 `sys
 | 274 | AGVLDUnLDFinish | AGV 取/放料完成 (Finish，見 12.3) |
 | 275 | AGVLdID | AGV carrier ID 回報 (見 12.3) |
 
-### SVID/ECID band 對照（9045 對齊段 vs HT160 自訂段）
+### SVID/ECID band 對照（全數為 HT-90XX 家族號，另加 AGV 38xxx 段）
 
 | 段 | ID | 語意 | 備註 |
 | --- | --- | --- | --- |
 | 9045 對齊（SVID） | 1001 / 1003 / 1021 / 1027 | Machine Model / Software Version / UPH / System Time | 與 HT9045 同號 |
-| 9045 對齊（ECID） | 1501 | Recipe Name | HT160 為唯讀 |
+| 9045 對齊（SVID） | 4 / 9 | GemControlState / PreviousGemControlState | 唯一對外控制狀態：1=Off-Line / 2=On-Line Local / 3=On-Line Remote |
+| 9045 對齊（SVID） | 1006 | Lot ID | 回報**目前已登錄的全部 Lot 編號**，以半角逗號串接、不加空白；只有一批時＝該批編號本身（與舊版單批回覆完全相同）；未登錄任何 Lot 時回主畫面 Lot 編號欄位的文字 |
+| 9045 對齊（SVID） | 1008 | Run Mode | ASCII，固定回 `0`（家族值域 0:Normal / 1:RT / 2:EQC）。機台的動作模式（Home／One Cycle／Clean Out／Tray Feed）不由任何 SV 公佈，請讀 1011 或依動作 CEID 判斷（Home=25、One Cycle=3、Clean Out=4、Tray Feed=32；完成事件 One Cycle Finish=41、Clean Out Finish=42） |
+| 9045 對齊（SVID） | 1011 | Machine State | 機台狀態文字（例：`HALT`）。「有沒有在生產」由此欄與 CEID 1 / 2（按下 Start／Pause）判斷 |
+| 9045 對齊（SVID） | 1101 / 1102 | Loader Count / Output Total Count | 自 Loader 料盤取走的 IC 數 / 已放入料倉的 IC 累計總數 |
+| 9045 對齊（SVID） | — | 警報狀態、警報碼 | **不以 SV 公佈**：警報一律走 S5F1 事發即報，目錄查 S5F5/S5F6（與 HT9045 相同做法） |
+| 9045 對齊（ECID） | 1501 | Setup File | HT160 為唯讀。名稱已於 2026-08-04 由 Recipe Name 對齊為 Setup File（與 SVID 側及 HT-90XX 逐字相同） |
 | 9045 對齊（ECID） | 2758–2763 | Type1 Tray Pitch/Start/Division X&Y | S2F16 可寫（限停機）；Type2/3 預留 2771-2776 / 2784-2789 未註冊 |
-| HT160 自訂（66000+） | 66000 / 66001 / 66002 | Run Mode / System Running / Control State | 66002 鏡像 4=Local / 5=Remote |
-| HT160 自訂 | 66010 / 66011 | Alarm Active / Alarm Code | |
-| HT160 自訂 | 66020 / 66021 | Total IC / Total Sorted | |
-| HT160 自訂 | 66030 / 66031 / 66032 | Active Lot Count / Current Lot ID / Sort Mode | 66032 回「有效模式」（S1F3 查詢）：0/1/2 = 維護畫面 Sort Mode 選擇器的基礎模式（Normal／LotBin／LotPassFail），3 = By WhiteList 臨時覆蓋生效中（非選擇器第四項；Lot End 後回到基礎值） |
 | AGV band（38xxx） | 38202–38245 | E87/AGV 站台資料 | 逐一定義見 12.3.9-2 |
 
-> 註：Report 1 的 13 個 SV 即「4 個 9045 對齊 + 9 個 66000 band」混編（66032 不在 Report 1 內，僅供 S1F3）。與 KYEC 主機對接的最大架構差異：9045 的報告為 host-dynamic（S2F33/35/37 動態定義），HT160 為 equipment-static 固定 7 個 report。完整對照見 `docs/AGV/HT9045_vs_HT160_SECS_Diff_20260625.md`、現況介面合約見 `docs/SECS/HT160S_SECS_Comm_Examples.md`。
+> 註（2026-08-04 起，SVID 對齊 HT-90XX 家族）：依客戶裁定，本機僅公佈 HT-90XX 家族號，原 HT160 自訂的 66000／66001／66002／66010／66011／66020／66021／66030／66031／66032 共 10 個 SVID **全部下架**（註冊數 76→67）。查詢已下架的號碼時，S1F4 該格回**空清單** `<L[0]>`（可與「已註冊但目前無值」的空字串 `<A[0]>` 區分），清單長度不變。替代讀法：動作模式→1011（或動作 CEID）；有無在跑→1011 與 CEID 1/2；控制狀態→SVID 4（前一狀態 9）；IC 計數→1101 / 1102（1102 原本就與舊 66021 綁同一顆計數器）；Lot 批數→1006 的逗號數 +1；第一批 Lot 編號→1006 第一個逗號前的字串；警報→S5F1 / S5F6。**已知且經客戶接受的代價：分選模式（Sort Mode）家族無對應 SVID，主機仍可用 S2F41 `LOTSTART` 的 `SORTMODE` 設定，但無法再以 S1F3 讀回。**
 
-> 註：本程式未實作完整 E30 GEM 狀態機物件；控制狀態以 SV 66002 鏡像值（4=Local / 5=Remote）表示。警報介面：S5F1 事發即報、S5F5/S5F6 與 S5F7/S5F8 提供由警報登錄表（`mapAlarmCodeList`，SSOT）即時產生的完整警報目錄。
+> 註（預設事件報告 Report 1 = 單一項目）：Report 1 的內容為 **`{1027 System Time}` 一個 SV**，與 HT9045 及客戶 HT9046 的持久化定義逐位元相同。292 個 CEID 中有 288 個連到 Report 1，故絕大多數 S6F11 只帶一個時戳值（形如 `L[3]{DATAID, CEID, L[1]{L[2]{RPTID 1, L[1]{<A 19 碼時戳>}}}}`）；S1F24 事件名單同鏈，該 288 筆各只列 1 個 VID。Report 2–7（AMR 位元圖、各站盤數／IC 數、身分盤 2D）完全不變。與 KYEC 主機對接的最大架構差異：9045 的報告為 host-dynamic（S2F33/35/37 動態定義），HT160 為 equipment-static 固定 7 個 report。完整對照見 `docs/AGV/HT9045_vs_HT160_SECS_Diff_20260625.md`、現況介面合約見 `docs/SECS/HT160S_SECS_Comm_Examples.md`。
+
+> ⚠️ 注意（**須向主機端明確告知的兩件事**）：
+> 1. **S2F35 的事件→報告連結只存在本次連線，不寫入磁碟。** 每次機台重新開機後，全部 288 個 CEID 都退回 Report 1，直到主機重新下 S2F33 + S2F35。此退回期間的事件內容**只有時戳**（此改動前退回期間還帶 13 個機台狀態 SV），主機若倚賴退回期間的內容取得機台資訊，開機後務必先重建報告定義。
+> 2. **SVID 1006 是主機端已持久化的 RPTID 502 的第 1 格**，因此多批生產時該格會出現逗號串接的多批字串。項目數與 A 型別不變，但把第 1 格當「單一 Lot 編號」解析的主機程式須改為可處理多批。
+
+> 註：本程式未實作完整 E30 GEM 狀態機物件；控制狀態以 SVID 4（1=Off-Line / 2=On-Line Local / 3=On-Line Remote）對外公佈，內部另存的 GEM 標準值 (1/4/5) 不公佈。警報介面：S5F1 事發即報、S5F5/S5F6 與 S5F7/S5F8 提供由警報登錄表（`mapAlarmCodeList`，SSOT）即時產生的完整警報目錄——警報**沒有**對應的 SVID。
 
 > 【待補：S7Fx recipe 傳輸的完整支援範圍，原始碼僅確認分派函式存在，未逐一展開；與客戶主機對接前需雙方確認。】
 
@@ -398,3 +406,6 @@ AMR/AGV 協調器每秒推進一次「偵測叫車」與「握手服務」兩個
 - SECS/GEM 為付費選配；各客戶現場是否啟用需現場確認。
 - Settings 分頁編輯後 **必須重啟 `ht160s.exe`** 才生效，無熱套用。
 - SECS 相關畫面的所有標籤均為英文（唯一中文僅出現在 IO 監看頁的圖例）。
+- **機台重新開機後，主機須重新下 S2F33 + S2F35 建立報告定義**（連結不寫入磁碟）。未重建前所有事件都只帶時戳（Report 1 = `{1027}`），主機端會看不到機台狀態欄位——這不是機台故障。
+- 多批生產時 **SVID 1006 會回逗號串接的多個 Lot 編號**；若主機端把它當單一批號解析，須先請整合者更新主機程式。
+- 需要向主機取「已停機／在生產／IC 計數／Lot 編號」時，請整合者改讀 SVID 1011 / 1101 / 1102 / 1006；原 66000 段自訂號已不再公佈（第 12.2.10 節註）。
