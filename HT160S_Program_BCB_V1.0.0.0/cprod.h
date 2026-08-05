@@ -209,7 +209,10 @@ typedef struct
     int  iSystemStatus;        // HALT / PAUSE / HOMING / RUNNING ...
     int  iUPH;                 // units per hour
     int  iTotalScanned;        // ICs whose 2D code was read
-    int  iTotalSorted;         // ICs placed into a Bin (reverse-lookup hit)
+    //AI(secs-1102-placepoint) 20260805 : was "ICs placed into a Bin (reverse-lookup hit)" - it was
+    // bumped in aLoader at CCD-scan time, so it counted IDENTIFIED ICs, not output. Moved to the
+    // SortArm place point on the customer's ruling (align to HT9045 / HT172). SVID 1102 reads it.
+    int  iTotalSorted;         // ICs the nozzle has actually PLACED into an Auto output tray
     int  iUnknown2D;           // reverse-lookup miss -> Error Bin
     int  iActiveLotCount;      // Lots still being sorted
     int  iAreaCount[eTrayCount]; // sorted count per output area

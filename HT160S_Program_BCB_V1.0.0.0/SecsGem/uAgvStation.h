@@ -26,11 +26,18 @@ enum eAgvStationKind { ASK_LOADER = 0, ASK_EMPTY = 1, ASK_COLOR = 2, ASK_AUTO = 
 enum eAgvHandshake { AGV_IDLE = 0, AGV_CALLED = 1, AGV_PREP = 2, AGV_READY = 3, AGV_FINISH = 4 };
 
 // AI(ht160s-agv-identity2d) 20260714 : SINGLE change-point for the identity-tray carrier SVID/station.
-// 2 = Color (P3, SVID 38204, the actual 2D reading station; customer-chosen). The identity 2D is
-// uploaded via CEID275 with AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID. To revert to the
-// 9045 Loader load-port id (SVID 38202) change ONLY this to 0 (both the stamped CarrierID[] index and
-// report 7's SVID derive from it, so one edit keeps them locked together).
-#define AMR_IDENTITY_CARRIER_INDEX 2
+// The identity 2D is uploaded via CEID275 with AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID -
+// both the stamped CarrierID[] index and report 7's SVID derive from this one constant, so a single
+// edit keeps them locked together. 0 = Loader (P1, SVID 38202), 2 = Color (P3, SVID 38204).
+//AI(secs-identity2d-38202) 20260805 : moved 2 -> 0 on the customer's ruling. It was 2 because Color
+// is the station that PHYSICALLY reads the 2D, but KYEC wants the value on HT9045's number: their
+// EAP's RPTID 2000 binds 38202 "Load port carrier ID" as its first field, so with the value on 38204
+// that field had always come back <A[0]>. Alignment with the 9045 dictionary outranks matching our
+// own mechanical layout here; the mechanical fact (Color CCD does the reading) is documented in the
+// customer workbook's SVID sheet instead. aColor still calls ReportLoaderIdentity with this constant,
+// so the reading station is unchanged - only the SVID the value is published on moves.
+// NOTE the consequence: SVID 38204 Color Carrier ID now has no writer at all. That is intended.
+#define AMR_IDENTITY_CARRIER_INDEX 0
 
 struct TAgvStationDesc
 {
@@ -57,11 +64,11 @@ public:
     // boundary tagging). [1]/[2] (Empty/Color, SVID 38223/38224) stay RESERVED 0 :
     // AI(secs-comment-truth) 20260805 : the reserved-0 set is WIDER than the two SVIDs named
     // below - DeviceCount[1]/[2] (SVID 38229/38230) are reserved for the same reason, and
-    // CarrierID[1] (SVID 38203 Empty Carrier ID) is never written either. So the full list of
-    // registered-but-never-maintained AMR SVIDs is 38203 / 38223 / 38224 / 38229 / 38230.
-    // Separately, CarrierID[0] (38202 Loader Carrier ID) is also never written - the identity
-    // tray's 2D goes to CarrierID[AMR_IDENTITY_CARRIER_INDEX] = index 2 = SVID 38204. That one
-    // is a customer-facing surprise (their RPTID 2000 binds 38202), not a reservation.
+    // CarrierID[1] (SVID 38203 Empty Carrier ID) is never written either.
+    //AI(secs-identity2d-38202) 20260805 : CarrierID[2] (SVID 38204 Color Carrier ID) joined that
+    // list today - the identity tray's 2D moved to CarrierID[0] / SVID 38202 to match HT9045, so
+    // nothing writes index 2 any more. Full list of registered-but-never-maintained AMR SVIDs:
+    // 38203 / 38204 / 38223 / 38224 / 38229 / 38230.
     // HT9045/KYEC drive Empty/Color purely by sensor+TrayArm with zero SECS, and
     // HT160 has no stack-depth counting hardware (only a present/empty InputEnd
     // sensor). [3..8]=Auto are refreshed live from TMyCar. See uHGemHT160 START_AGV.

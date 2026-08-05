@@ -1604,6 +1604,16 @@ void TSortArmModule::TransferPlaceDataToAuto()
             //unit so tRunData.TotalIC (no SVID since 66020 was retired 20260804) and the derived UPH are
             //non-zero (previously TotalIC had NO increment site anywhere -> read 0).
             tRunData.TotalIC++;
+            //AI(secs-1102-placepoint) 20260805 : SVID 1102 Output Total Count. Customer ruling -
+            // align to HT9045 / HT172: the total only increments once the nozzle has actually
+            // PLACED the IC into the Auto area. It used to be bumped in aLoader at CCD-scan time
+            // inside the 2D reverse-lookup HIT branch, which meant (a) an IC whose 2D could not be
+            // read, or was not in any lot, was still physically sorted into the Error Auto but never
+            // counted, and (b) a lot with no 2D table at all (LotRegistry empty) left 1102 pinned at
+            // 0 while the machine was visibly producing. Counting here also makes 1102 exactly the
+            // sum of 1103-1105 / 1259-1261, because TrayICCnt[] is bumped on the next line from the
+            // same event.
+            MachineRun.iTotalSorted++;
             //AI(ht160s-motion-view) 20260618 : per-Auto output IC count for the Unload
             //palAutoXXCnt display (HT172 ShowBinCount used tRunData.TrayICCnt). eAuto1=index 1.
             if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)

@@ -1784,7 +1784,10 @@ AnsiString TColorModule::GetTrayID()
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv-identity2d) 20260713 : is the last identity 2D a GENUINE value that may be
-// uploaded to the host as the identity-carrier SVID (AgvStation[AMR_IDENTITY_CARRIER_INDEX], 38204)
+// uploaded to the host as the identity-carrier SVID (AgvStation[AMR_IDENTITY_CARRIER_INDEX])
+//AI(secs-identity2d-38202) 20260805 : that SVID is 38202 Loader Carrier ID now, not 38204.
+// The Color CCD is still what reads the code - this function and its caller are unchanged -
+// only the number the value is published on moved, to match HT9045 / the customer RPTID 2000.
 // on CEID275 AGVLdID? True for a real Color-reader read, a
 // manual operator entry, OR any simulation context (laptop SOFT_SIMULATE / runtime
 // bRunSimulation) where the seeded "COLOR2D_" IS the intended test id and SHOULD reach the

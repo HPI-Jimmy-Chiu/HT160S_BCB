@@ -2130,10 +2130,18 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         LotRegistry.OnSorted(HitLotIndex, Bin);
                         //AI(ht160s-lot-reset) 20260706 : global per-Bin production count
                         //(HT172 parity: aSortArm/aMagArm bump BinICCnt[Bin] on sort). HT160
-                        //resolves Bin here at scan (like iTotalSorted), so count it here.
+                        //resolves Bin here at scan, so count it here.
                         if(Bin>=0 && Bin<TEST_MAX_BIN)
                             tRunData.BinICCnt[Bin]++;
-                        MachineRun.iTotalSorted++;
+                        //AI(secs-1102-placepoint) 20260805 : MachineRun.iTotalSorted++ REMOVED from
+                        // here. SVID 1102 Output Total Count now increments at the SortArm place
+                        // point (aSortArm.cpp TransferPlaceDataToAuto), per the customer's ruling to
+                        // match HT9045 / HT172 - "only +1 after the nozzle has put the IC into the
+                        // Auto area". Counting on the 2D reverse-lookup hit made 1102 an
+                        // IDENTIFICATION count, not an output count: an unreadable or unknown 2D was
+                        // still sorted into the Error Auto without being counted, and a lot with no
+                        // 2D table left 1102 at 0 while the machine was producing. BinICCnt stays
+                        // here - it is a per-Bin routing statistic and Bin is only known here.
                         if(TopCcdSocket!=NULL)
                             TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                         State->CcdTask=1;
@@ -2245,7 +2253,9 @@ void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
             //AI(ht160s-lot-reset) 20260706 : per-Bin count on manual-2D sort too.
             if(Bin>=0 && Bin<TEST_MAX_BIN)
                 tRunData.BinICCnt[Bin]++;
-            MachineRun.iTotalSorted++;
+            //AI(secs-1102-placepoint) 20260805 : MachineRun.iTotalSorted++ REMOVED here too - same
+            // ruling as the scan-path site above. The manual-2D entry still resolves the Bin and
+            // still routes the IC; SVID 1102 counts it when SortArm actually places it.
             if(TopCcdSocket!=NULL)
                 TopCcdSocket->TopCcdEndShot();
             State->CcdTask=1;

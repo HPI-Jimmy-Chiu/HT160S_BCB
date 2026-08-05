@@ -468,6 +468,7 @@ void HT160Gem::AddSV()
     //   1101 Loader Count - tRunData.LoaderIC (the same counter the dead main-screen "Load"
     //                       panel wants; see aSortArm.cpp TransferPickDataFromLoader)
     //   1102 Output Total - MachineRun.iTotalSorted, the machine's only sorted-out total
+    //                       (20260805: now counted at the SortArm place point, see SetSVDataPointer)
     // Still missing from 502 : 1517 Start Mode closed 20260802, then 1501 Setup File and
     // 3 GemClock on 20260803, and 1007 Operator ID just below - which leaves only 1513
     // Tester On/Off, a legitimate "no" (HT160S is a sorter and has no tester mechanism).
@@ -512,7 +513,11 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1008, HType.ASCII_TYPE, "Run Mode", "", &svRunMode9045, "always \"0\" = Normal; HT-160S is a sorter with no RT / EQC mode (9045 family SVID 1008)");
     HGemPtr->SetSVDataPointer(1011, HType.ASCII_TYPE, "Machine State", "", &svMachineState, "main-screen status text (9045 SVID 1011)");
     HGemPtr->SetSVDataPointer(1101, HType.INT_4_TYPE, "Loader Count", "pcs", &svLoaderIC, "ICs picked off Loader trays (9045 SVID 1101)");
-    HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs sorted into a bin; the total-processed count retired with 66020 is read here or on 1101 (9045 SVID 1102)");
+    //AI(secs-1102-placepoint) 20260805 : semantics changed on the customer's ruling - 1102 now counts
+    // at the SortArm PLACE point (aSortArm.cpp TransferPlaceDataToAuto), matching HT9045 / HT172, not
+    // at the aLoader 2D reverse-lookup hit. Consequence: 1102 is now exactly the sum of
+    // 1103-1105 + 1259-1261 within a lot, because TrayICCnt[] is bumped from the same event.
+    HGemPtr->SetSVDataPointer(1102, HType.INT_4_TYPE, "Output Total Count", "pcs", &svTotalSorted, "ICs the nozzle has placed into an Auto output tray; equals the sum of 1103-1105 + 1259-1261 (9045 SVID 1102)");
     //AI(secs-bclass-0803) 20260803 : slots 3-5 of the host's RPTID 501, 9045 names "Auto1/2/3
     // Count". Bound to tRunData.TrayICCnt, NOT to MachineRun.iAreaCount which is what
     // docs/plan/secs-9045-porting-20260729/svid-ownership.md:110-112 recommended:
@@ -528,8 +533,15 @@ void HT160Gem::AddSV()
     //      POWER CYCLE : 1101, 1103-1105 AND 1259-1261 live in tRunData, which WriteLastDataFile
     //      persists to lastdata.dat, while 1102 reads MachineRun.iTotalSorted, which is RAM-only
     //      and comes back as 0. Verified on the wire 20260803 (S1F3 after a fresh app start
-    //      answered 1101=0 1102=0 but 1103..1105=1). So 1103-1105 / 1259-1261 are actually CLOSER
-    //      to 9045's semantics than the already-shipped 1102 is; do not "fix" it by making them
+    //      answered 1101=0 1102=0 but 1103..1105=1).
+    //AI(secs-1102-placepoint) 20260805 : the paragraph above is still true about PERSISTENCE (1102 is
+    //      RAM-only and comes back 0 after a power cycle, the others are restored from lastdata.dat),
+    //      but the "1103-1105 are closer to 9045's semantics than 1102" part no longer holds - 1102
+    //      now counts at the same place point as TrayICCnt[], so within a lot it is exactly their sum.
+    //      The remaining divergence is the power-cycle one, and CLEAN_AUTO_SORT_COUNT clearing the
+    //      per-station counters without clearing 1102.
+    //      So 1103-1105 / 1259-1261 used to be CLOSER
+    //      to 9045's semantics than the already-shipped 1102 was; do not "fix" it by making them
     //      volatile. All six per-Auto counts share one epoch : ResetPerLotProductionCounters()
     //      zeroes the whole tRunData.TrayICCnt array at each Lot Start.
     //  (b) PARTITION. On HT9045 1102 is NOT sum(1103..1108). Traced in the 810 tree : 1102 binds
@@ -1054,13 +1066,12 @@ void HT160Gem::AddCEID()
     unsigned rptSup[2]; rptSup[0] = 2; rptSup[1] = 6;
     unsigned rptSta[1]; rptSta[0] = 3;
     unsigned rptFin[2]; rptFin[0] = 4; rptFin[1] = 6;
-    //AI(secs-comment-truth) 20260805 : report 7 is [38204], NOT [38202]. The literal here said
-    // 38202 while AddReprot 40 lines down builds report 7 out of
-    // AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID = index 2 = 38204 (the Color CCD is the
-    // station that actually reads the identity tray's 2D). Two audit passes were misled by this
-    // line. Nobody writes CarrierID[0] at all, so "fixing" report 7 back to 38202 to match this
-    // comment would have shipped a permanently empty 2D field.
-    unsigned rptCid[1]; rptCid[0] = 7;   //AI(ht160s-agv-identity2d) 20260713 : CEID275 -> dedicated report 7 ([38204] only), NOT the 9-wide report 5 (AGVLdID must not ship 8 stale carrier ids)
+    //AI(secs-comment-truth) 20260805 : this literal said 38202 while report 7 actually carried
+    // 38204, and two audit passes were misled by it. Resolved the other way in the end: the
+    // customer ruled that the value must sit on HT9045's number, so AMR_IDENTITY_CARRIER_INDEX
+    // moved 2 -> 0 and report 7 now really is 38202. Do not hard-code either number here - the
+    // report is built from the constant (see AddReprot below).
+    unsigned rptCid[1]; rptCid[0] = 7;   //AI(ht160s-agv-identity2d) 20260713 : CEID275 -> dedicated report 7 (identity carrier SVID only), NOT the 9-wide report 5 (AGVLdID must not ship 8 stale carrier ids)
     //AI(secs-ceid-alias-fix) 20260803 : the alias MUST come from EventDescription, not from a
     // literal. These four calls re-register 272-275 to swap their report link, and
     // SetCEIDContent overwrites Alias unconditionally - so the four literals that used to sit
@@ -1144,7 +1155,7 @@ void HT160Gem::AddReprot()
     HGemPtr->SetReportIDContent(6, AGV_STATION_COUNT * 2, rCnt, EquDefault);
 
     //AI(ht160s-agv-identity2d) 20260714 : report 7 = ONLY the identity carrier SVID
-    // (AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID = Color P3 / SVID 38204). CEID275
+    // (AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID; 20260805: Loader P1 / SVID 38202). CEID275
     // (AGVLdID) links to THIS (AddCEID rptCid[0]=7), so the AGVLdID event carries just the
     // freshly-scanned identity-tray 2D and does NOT ship the 8 other per-station carrier ids
     // (which may be stale). The Auto-stack carrier ids stay host-pollable via S1F3; if the host

@@ -213,7 +213,10 @@ int TAgvCoordinator::LookupByName(AnsiString cpName)
 //AI(ht160s-agv-identity2d) 20260714 : HT9045 AGVLdID port. The identity tray's 2D is read by the
 // Color CCD (DoReadColor2D) at the Loader-recovery intake; when the scan completes, upload it as
 // S6F11 CEID275. The value rides SVID AgvStation[stationIndex].SvidCarrierID via the dedicated
-// single-SVID report 7 (stationIndex = AMR_IDENTITY_CARRIER_INDEX = Color P3 / SVID 38204). Stamp
+// single-SVID report 7 (stationIndex = AMR_IDENTITY_CARRIER_INDEX). Stamp
+//AI(secs-identity2d-38202) 20260805 : that constant is now 0 = Loader P1 / SVID 38202, NOT Color P3
+// / 38204. The Color CCD is still what reads the code - only the SVID it is published on changed,
+// so this function is untouched. See the constant's comment in uAgvStation.h for why.
 // CarrierID[stationIndex] then fire. EventReport self-gates on HSMS SELECTED, so this is a no-op
 // when no host is connected (incl. laptop SOFT_SIMULATE without the SECS simulator attached).
 // DataID=1 aligns to HT9045 (all equipment-initiated S6F11 use DataID=1) AND to HT160S's own
