@@ -11,7 +11,7 @@ int CUSTOMER_CODE=HT160S_DEFAULT_CUSTOMER_CODE;
 //identity globals (status-bar panels 1-3). asModel seeded HT160S; asHandlerID/
 //asSerialNo default empty and are overwritten by UpdateMachineIdentity() from
 //GeneralSetting once it is loaded.
-AnsiString MainVersion="HT160S 1.0.0.0";
+AnsiString MainVersion="HT160S " HT160S_VERSION;   //AI(ht160s-version-ssot) 20260805 : adjacent string literals concatenate at compile time - no runtime init order
 AnsiString asModel="HT160S";
 AnsiString asHandlerID="";
 AnsiString asSerialNo="";

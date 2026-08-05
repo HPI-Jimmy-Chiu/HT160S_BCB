@@ -190,6 +190,11 @@ private:
     int  RenderSmlItem(unsigned char *Ptr, int Len, int &RunLength, int Depth, AnsiString &Out);
     void LogSmlBody(const char *Dir, unsigned char *Ptr, int Len, int S, int F, int W);
     int  DataItemInSub(int len, unsigned char Type, void *P);
+    //AI(secs-skip-item) 20260805 : drop ONE whole item (type + length + value tokens, and for a
+    //  LIST its children too) from SReceiveData without decoding it. Used by the two reject
+    //  exits of the DataItemIn AnsiString overload, which used to return WITHOUT consuming the
+    //  item they refused - so the caller's next read met the very same bad item again.
+    int  SkipOneItem();
     int  GetDataItemLenAndTypeSub(int &len, unsigned char &Type);
     int  GetDataItemLenAndTypeAndDeleteSub(int &len, unsigned char Type);
     void ProcessRemoteHead(unsigned char *Ptr);

@@ -25,6 +25,23 @@
 struct ETypeStruct SECS_EVENT;
 char GEM_MachineName[16] = "HT160S";
 //---------------------------------------------------------------------------
+//AI(secs-1027-locale) 20260805 : SVID 1027 System Time, built without going through the locale.
+// FormatString's '/' and ':' are the DateSeparator / TimeSeparator PLACEHOLDERS, not literals, so
+// on a machine whose Windows regional settings use '-' the published literal 'yyyy/mm/dd hh:nn:ss'
+// silently became '2026-08-04 15:49:53'. Build the field from the separator-free "yyyymmddhhnnss"
+// - exactly the recipe SVID 3 GemClock and the S2F18 reply already use, which is why those two
+// never had this problem - and insert the '/' and ':' ourselves. Length stays 19.
+// SVID 1009 is NOT affected: it is cut by POSITION out of svLotStartTime, a different latch that
+// this helper does not touch (see the 1009 block in RefreshSVData).
+static AnsiString FormatSystemTime1027(TDateTime tWhen)
+{
+    AnsiString s = tWhen.FormatString("yyyymmddhhnnss");   // 14 chars, locale-invariant
+    if(s.Length()!=14)
+        return s;                                          // never fabricate a shape we did not get
+    return s.SubString(1,4) + "/" + s.SubString(5,2) + "/" + s.SubString(7,2) + " "
+         + s.SubString(9,2) + ":" + s.SubString(11,2) + ":" + s.SubString(13,2);
+}
+//---------------------------------------------------------------------------
 HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     : HTGem(Path, HGemTmp)
 {
@@ -46,7 +63,7 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     bControlStateSeeded  = false;
     //AI(secs-oneinstant) 20260805 : ONE Now() for both, same reason as RefreshSVData below.
     TDateTime tBoot = Now();
-    sSystemTime = tBoot.FormatString("yyyy/mm/dd hh:nn:ss");
+    sSystemTime = FormatSystemTime1027(tBoot);   //AI(secs-1027-locale) 20260805 : literal '/' and ':', not locale separators
     sGemClock   = tBoot.FormatString("yyyymmddhhnnss") + "00";   //AI(secs-bclass-0803) : SVID 3, SEMI 16-char TIME
 
     //AI(ht160s-secsgem) 20260611 : init SV snapshot members (refreshed on demand)
@@ -67,7 +84,10 @@ HT160Gem::HT160Gem(AnsiString Path, THGem *HGemTmp)
     svRunMode9045   = "0";
     svLotStartTime  = "";            //AI(secs-lotstarttime) 20260730 : internal latch (slash format), set by NoteLotStartTime, not by RefreshSVData ; no SVID of its own since 20260803
     svLotStartTime9045 = "";         //AI(secs-bclass-0803) : SVID 1009, the latch above reformatted to 9045's dashes in RefreshSVData
-    svSoftwareVersion = "1.0.0.0";   // keep in step with ht160s.cpp GemInitial("HT160S","1.0.0.0")
+    //AI(ht160s-version-ssot) 20260805 : SVID 1003 now reads the ONE version constant in cmydef.h.
+    // The old hand-sync comment is gone with the duplicate literal - there is nothing left to keep
+    // in step, and a bump that missed this line used to leave SVID 1003 / SOFTREV behind the status bar.
+    svSoftwareVersion = HT160S_VERSION;
     ecRecipeName    = "";
 
     //AI(ht160s-secsgem) 20260610 : wire transport->logic dispatch back-pointer
@@ -701,7 +721,7 @@ void HT160Gem::RefreshSVData()
     // SAME S1F4 / S6F11 would see them 1 second apart - which contradicts both this function's own
     // "Same instant as 1027" comment and the published "same instant, SEMI 16-char format" wording.
     TDateTime tNow = Now();
-    sSystemTime = tNow.FormatString("yyyy/mm/dd hh:nn:ss");
+    sSystemTime = FormatSystemTime1027(tNow);   //AI(secs-1027-locale) 20260805 : literal '/' and ':', not locale separators
     //AI(secs-bclass-0803) 20260803 : SVID 3 GemClock. Same instant as 1027 above, in the
     // 16-char SEMI E5 TIME the host parses (identical recipe to the shipping S2F18 reply).
     // Must NOT alias sSystemTime - see the sGemClock comment in uHGemHT160.h.
@@ -839,6 +859,28 @@ static unsigned char MapGemControlState9045(int iGemStdState)
     return 1;                       // 1 = Off-Line; 0 = no host transition yet -> Off-Line
 }
 //---------------------------------------------------------------------------
+//AI(secs-bootseed-share) 20260805 : the boot seed, lifted out of PollGemControlState so the S1F18
+// handler can run it too. RE-ENTRANT BY DESIGN : bControlStateSeeded makes it a one-shot, so a
+// second caller can never re-seed a state the host or the operator has since changed.
+// WHY S1F18 needs it : the ctor parks iControlSubstate at 1 (EQUIPMENT OFF-LINE) and GemInitial
+// enables Timer1 and then calls StartCommunication immediately, so an S1F17 that arrives before the
+// first WM_TIMER tick was judged against EQUIPMENT OFF-LINE and refused with ONLACK=1 - and CJ_EAP
+// does not re-send S1F17, so the tool stayed off-line for the whole shift. WM_TIMER is a
+// low-priority message and socket notifications are pulled first, so that window is "until the
+// message pump first idles", not a guaranteed 1 second.
+// Still NOT done in the constructor : GeneralSetting is loaded from General.ini in the same start-up
+// sequence that builds the GEM object, and nobody guarantees that order.
+void HT160Gem::ApplyBootControlStateSeed()
+{
+    if(bControlStateSeeded)
+        return;
+    bControlStateSeeded = true;
+    int iSeed = GeneralSetting.iInitialControlState;
+    if(iSeed!=1 && iSeed!=4 && iSeed!=5)
+        iSeed = 5;                       // never boot into an illegal value
+    SetControlState(iSeed, (iSeed==1) ? 3 : 0, "boot seed from [SECS] InitialControlState");
+}
+//---------------------------------------------------------------------------
 //AI(secs-controlstate) 20260803 : 1s tick from THGem::Timer1Timer. Publish the control state on
 // HT9045's numbers and fire its change events, per the customer's 2026-08-03 instruction to use
 // the same id for the same function. HT9045 does exactly this in its own periodic pass : on any
@@ -867,14 +909,9 @@ void HT160Gem::PollGemControlState()
     //  This also kills a shipped defect : iControlState was 0 until the host's first S1F17, and 0
     //  is not a legal value of SVID 66002's own published domain (1/4/5) - the 2026-07-31 log shows
     //  the host actually receiving <I4[1] 0> inside report 1 at 14:44:02.
-    if(bControlStateSeeded==false)
-    {
-        bControlStateSeeded = true;
-        int iSeed = GeneralSetting.iInitialControlState;
-        if(iSeed!=1 && iSeed!=4 && iSeed!=5)
-            iSeed = 5;                       // never boot into an illegal value
-        SetControlState(iSeed, (iSeed==1) ? 3 : 0, "boot seed from [SECS] InitialControlState");
-    }
+    //AI(secs-bootseed-share) 20260805 : body moved to ApplyBootControlStateSeed() so S1F18 can seed
+    //  before it judges ONLACK. Behaviour on this path is unchanged - still a one-shot on the first tick.
+    ApplyBootControlStateSeed();
 
     unsigned char uNew = MapGemControlState9045(iControlState);
     if(uNew==svGemControlState)
@@ -3009,7 +3046,7 @@ void HT160Gem::S1F2_OnLineData()
     HGemPtr->InitLocalHead(1, 2, 0);
     HGemPtr->DataItemOut(2, HType.LIST_TYPE, NULL);
     HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("HT-160S"));
-    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("1.0.0.0"));
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString(HT160S_VERSION));   //AI(ht160s-version-ssot) 20260805 : SOFTREV from cmydef.h
     HGemPtr->SendLocalData();
     HGemPtr->StringOut("[SECS] S1F2 on-line data sent (MDLN=HT-160S)");
 }
@@ -3028,7 +3065,7 @@ void HT160Gem::S1F14_ConnectRequestAcknowledge()
     HGemPtr->DataItemOut(1, HType.BINARY_TYPE, &COMMACK);
     HGemPtr->DataItemOut(2, HType.LIST_TYPE, NULL);
     HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("HT-160S"));
-    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString("1.0.0.0"));
+    HGemPtr->DataItemOut(HType.ASCII_TYPE, AnsiString(HT160S_VERSION));   //AI(ht160s-version-ssot) 20260805 : SOFTREV from cmydef.h
     HGemPtr->SendLocalData();
     HGemPtr->StringOut("[SECS] S1F14 establish-comm acknowledged (COMMACK=0)");
 }
@@ -3052,6 +3089,11 @@ void HT160Gem::S1F18_ONLINEAcknowledge()
     //  is why [SECS] AcceptHostOnlineRequest defaults to 1 and why the state is on the SECS tab.
     if(HGemPtr==NULL)
         return;
+    //AI(secs-bootseed-share) 20260805 : seed BEFORE judging ONLACK. Without this an S1F17 that beats
+    //  the first 1 s tick is judged against the ctor's EQUIPMENT OFF-LINE (substate 1) and refused
+    //  with ONLACK=1 - which CJ_EAP never retries, so the tool is off-line for the whole shift.
+    //  One-shot: if the seed already ran, this is a no-op and the operator's / host's later choice stands.
+    ApplyBootControlStateSeed();
     unsigned char ONLACK = 0;
     if(iControlState==4 || iControlState==5)
         ONLACK = 2;                                  // already on-line

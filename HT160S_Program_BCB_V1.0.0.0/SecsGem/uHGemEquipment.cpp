@@ -1212,7 +1212,12 @@ void THGem::ProcessDefineReport_S2F33()
         if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)         { ReportAcknowledge(0x02); return; }
         if(GetDataItemLenAndType(len, Type)!=1)             { ReportAcknowledge(0x02); return; }
         if(DataItemIn(len, Type, sTmp)!=1)                  { ReportAcknowledge(0x02); return; }
-        unsigned rr = (unsigned)atoi(sTmp.c_str());
+        //AI(secs-idparse-unify) 20260805 : strtoul, not atoi. RPTID / SVID / CEID are U4 on the
+        //  wire; atoi returns a signed int and wraps anything >= 2^31 to a negative value, which the
+        //  (unsigned) cast then turns into a completely different id. Same reason S6F16 / S6F20
+        //  already use strtoul (see their inline notes). KYEC's numbers top out at 38245 so nothing
+        //  is fixed today - this is the consistency half of the pair.
+        unsigned rr = (unsigned)strtoul(sTmp.c_str(), NULL, 10);
         TGemReportItem *ex = FindReportItem(rr);
         if(ex!=NULL && ex->Mode==1)                         { ReportAcknowledge(0x03); return; }
         if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ ReportAcknowledge(0x02); return; }
@@ -1222,7 +1227,7 @@ void THGem::ProcessDefineReport_S2F33()
         {
             if(GetDataItemLenAndType(len, Type)!=1)         { ReportAcknowledge(0x02); return; }
             if(DataItemIn(len, Type, sTmp)!=1)              { ReportAcknowledge(0x02); return; }
-            unsigned sv = (unsigned)atoi(sTmp.c_str());
+            unsigned sv = (unsigned)strtoul(sTmp.c_str(), NULL, 10);   //AI(secs-idparse-unify) 20260805 : U4 id, see S2F33 RPTID above
             //AI(secs-pathA) 20260727 : Path A tolerance - accept host-referenced SVIDs the
             //firmware does not define (was DRACK=0x04 hard reject, which blocked the on-site
             //CJ_EAP report def, e.g. RPTID 504={20001,20002,20003}). S6F11 emits an empty item
@@ -1273,7 +1278,7 @@ void THGem::ProcessLinkEventReport_S2F35()
         if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)         { LinkReportAcknowledge(0x02); return; }
         if(GetDataItemLenAndType(len, Type)!=1)             { LinkReportAcknowledge(0x02); return; }
         if(DataItemIn(len, Type, sTmp)!=1)                  { LinkReportAcknowledge(0x02); return; }
-        unsigned cc = (unsigned)atoi(sTmp.c_str());
+        unsigned cc = (unsigned)strtoul(sTmp.c_str(), NULL, 10);   //AI(secs-idparse-unify) 20260805 : U4 id, see S2F33 RPTID above
         //AI(secs-pathA) 20260727 : Path A discovery-probe tolerance. Do NOT LRACK=0x04-reject a link
         //to a CEID the firmware lacks - the on-site CJ_EAP host is numbered for the HT9045 CEID
         //dictionary, and a hard reject blocks its link phase (and our capture of the referenced set).
@@ -1293,7 +1298,7 @@ void THGem::ProcessLinkEventReport_S2F35()
         {
             if(GetDataItemLenAndType(len, Type)!=1)         { LinkReportAcknowledge(0x02); return; }
             if(DataItemIn(len, Type, sTmp)!=1)              { LinkReportAcknowledge(0x02); return; }
-            unsigned rr = (unsigned)atoi(sTmp.c_str());
+            unsigned rr = (unsigned)strtoul(sTmp.c_str(), NULL, 10);   //AI(secs-idparse-unify) 20260805 : U4 id, see S2F33 RPTID above
             //AI(secs-pathA) 20260727 : skip (do not store) a link to an undefined RPTID rather than
             //LRACK=0x05-rejecting, so no dangling ref reaches S6F11 serialize. With S2F33 tolerance
             //the host RPTIDs normally exist; this is a safety net.
@@ -1362,7 +1367,7 @@ void THGem::ProcessEnableDisableEventReport_S2F37()
     {
         if(GetDataItemLenAndType(len, Type)!=1)            { EnableDisableEventReportAcknowledge(0x02); return; }
         if(DataItemIn(len, Type, sTmp)!=1)                 { EnableDisableEventReportAcknowledge(0x02); return; }
-        unsigned cc = (unsigned)atoi(sTmp.c_str());
+        unsigned cc = (unsigned)strtoul(sTmp.c_str(), NULL, 10);   //AI(secs-idparse-unify) 20260805 : U4 id, see S2F33 RPTID above
         if(FindCEIDItem(cc)==NULL)                         { EnableDisableEventReportAcknowledge(0x01); return; }
         cid[nCe++]=cc;
     }
@@ -3139,6 +3144,71 @@ int THGem::GetDataItemLenAndTypeAndDeleteSub(int &len, unsigned char Type)
     return 1;
 }
 //---------------------------------------------------------------------------
+//AI(secs-skip-item) 20260805 : consume exactly ONE item from SReceiveData and throw it away.
+//  Same token arithmetic as DataItemInSub, but with no destination buffer. It exists for the two
+//  early `return -1` exits of DataItemIn(int, unsigned char, AnsiString&) below, which returned
+//  WITHOUT consuming anything: every token of the refused item stayed at the head of the buffer,
+//  so the caller's next read hit the SAME bad item forever. In the five request loops that share
+//  that idiom (S1F4 / S1F12 / S1F24 / S2F14 / S2F30) the effect was "one unreadable id turns every
+//  id AFTER it into 0"; in S2F15 it turned an EAC=3 into an EAC=1.
+//  Token layout produced by ProcessSML, per item:
+//      LIST : [type][child count]              - children are pushed INLINE next, no value tokens
+//      ASCII: [type][byte length][the string]  - ALWAYS exactly one value token, even for A[0]
+//      other: [type][element count][v]..[v]    - element-count value tokens (none for a [0] item)
+//  A LIST is skipped WITH ITS CHILDREN. That is the one place this deliberately differs from
+//  DataItemInSub, which unwraps a list by design (every caller uses it to strip an L wrapper).
+//  Here the contract is "drop the i-th item of the caller's L,n", and in SECS-II a nested list IS
+//  one item - unwrapping would leave its children to be read as siblings and shift every field
+//  after it, trading the leak for a misalignment. Iterative (pending counter), not recursive, so a
+//  deeply nested body cannot blow the stack; pending can only be fed by tokens that exist, and a
+//  truncated frame simply runs the buffer dry and returns -1.
+//  Returns 1 when one whole item was dropped, -1 when the buffer ran out first.
+//---------------------------------------------------------------------------
+int THGem::SkipOneItem()
+{
+    unsigned char t;
+    int l, i;
+    int pending = 1;                 // items still to drop; a LIST adds its children
+    AnsiString sSkip;
+
+    if(SReceiveData==NULL || SReceiveData->Count<2)
+        return -1;
+
+    //One line per refused item. This path is never taken by a well-formed request the machine
+    //can answer, so it cannot flood the log - and it is the only trace a silently dropped host
+    //item leaves behind.
+    sSkip.sprintf("[SECS] unreadable item dropped (type=%u len=%d) - receive stream stays aligned",
+                  (unsigned)(unsigned char)atoi(SReceiveData->Strings[0].c_str()),
+                  atoi(SReceiveData->Strings[1].c_str()));
+    StringOut(sSkip);
+
+    while(pending>0)
+    {
+        if(SReceiveData->Count<2)
+            return -1;               // truncated : nothing left to stay in step with
+        t = (unsigned char)atoi(SReceiveData->Strings[0].c_str());
+        l = atoi(SReceiveData->Strings[1].c_str());
+        SReceiveData->Delete(0);     // type token
+        SReceiveData->Delete(0);     // length / element-count token
+        pending--;
+        if(t==HType.LIST_TYPE)
+        {
+            if(l>0)
+                pending += l;        // children were pushed inline right after this header
+            continue;
+        }
+        if(t==HType.ASCII_TYPE)
+        {
+            if(SReceiveData->Count!=0)
+                SReceiveData->Delete(0);   // one value token whatever the byte length
+            continue;
+        }
+        for(i=0; i<l && SReceiveData->Count!=0; i++)
+            SReceiveData->Delete(0);
+    }
+    return 1;
+}
+//---------------------------------------------------------------------------
 int THGem::DataItemIn(int Len, unsigned char Type, void *Value)
 {
     int ret;
@@ -3168,8 +3238,15 @@ int THGem::DataItemIn(int Len, unsigned char t, AnsiString &Str)
         temp = NULL;
         return ret;
     }
+    //AI(secs-skip-item) 20260805 : a non-ASCII item whose ELEMENT COUNT is not 1 - a <U4[2]> id
+    //  vector, or a zero-length <F8[0]> value - cannot be delivered through this overload. Drop the
+    //  whole item BEFORE answering -1. This exit used to leave its tokens at the head of the buffer,
+    //  so the caller's next read met the same item again and every field after it decoded as 0.
     if(Len!=1)
+    {
+        SkipOneItem();
         return -1;
+    }
 
     if(t==HType.UINT_1_TYPE)
     {
@@ -3243,6 +3320,10 @@ int THGem::DataItemIn(int Len, unsigned char t, AnsiString &Str)
     }
     else
     {
+        //AI(secs-skip-item) 20260805 : a type this overload cannot render as text - BINARY, U8, I8,
+        //  a LIST the caller peeked as one item, or an unknown format code. Consume it first, then
+        //  report the failure, for exactly the reason spelled out at the Len!=1 exit above.
+        SkipOneItem();
         return -1;
     }
 }

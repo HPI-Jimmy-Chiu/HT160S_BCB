@@ -268,7 +268,7 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          HGem = new THGem(Application);
          FSECS = new TFSECS(Application);
          HSys.MyGem = new HT160Gem("HT160S", HGem);
-         FSECS->GemInitial("HT160S", "1.0.0.0");
+         FSECS->GemInitial("HT160S", HT160S_VERSION);   //AI(ht160s-version-ssot) 20260805 : version from cmydef.h (IncludeAllHeader.h pulls it in)
          UpdateInitProgress(94);
          InitializeHT160Automation(fMain);
          UpdateInitProgress(96);

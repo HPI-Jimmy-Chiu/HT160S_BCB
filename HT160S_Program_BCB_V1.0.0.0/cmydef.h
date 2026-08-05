@@ -7,6 +7,16 @@
 //---------------------------------------------------------------------------
 #define SERVER_MOTOR_POWER_ON_DELAY 10
 #define TEST_MAX_BIN 999
+//AI(ht160s-version-ssot) 20260805 : THE application version number - single source of truth.
+// Bump it HERE and nowhere else. Consumers: cmydef.cpp MainVersion (status-bar panel 0),
+// ht160s.cpp GemInitial, SecsGem/uHGemHT160.cpp svSoftwareVersion (SVID 1003 Software Version)
+// and the S1F2 / S1F14 SOFTREV items. Before this constant the number lived as four separate
+// literals kept in step by a comment, so a bump that missed one left SVID 1003 and SOFTREV
+// silently behind the status bar.
+// A #define of a string LITERAL on purpose: it needs no header ordering, introduces no
+// static-initialisation-order dependency, and lets "HT160S " HT160S_VERSION concatenate at
+// compile time. Do NOT turn it into a global AnsiString.
+#define HT160S_VERSION "1.0.0.0"
 //---------------------------------------------------------------------------
 extern int CUSTOMER_CODE;
 //AI(ht160s-statusbar) 20260624 : version + machine-identity globals (HT172 parity).

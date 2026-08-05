@@ -436,6 +436,11 @@ public:
     // out of step with the state, and so one place owns the log line. Does NOT fire events - the
     // 1 s PollGemControlState edge-detector does that, deliberately (see its comment).
     void SetControlState(int iGemStdState, int iSubstate, AnsiString sWhy);
+    //AI(secs-bootseed-share) 20260805 : one-shot [SECS] InitialControlState seed, shared by the 1 s
+    // PollGemControlState tick and by S1F18_ONLINEAcknowledge (which must seed before it judges
+    // ONLACK, or an S1F17 inside the boot window is refused and never retried). Guarded by
+    // bControlStateSeeded, so calling it from either place is safe and idempotent.
+    void ApplyBootControlStateSeed();
     bool IsHostOnlineRequestAllowed();  // E30 : host S1F17 may go on-line only from HOST OFF-LINE
     int  GetControlSubstate();          // 1/2/3, 0 when on-line
     virtual void OperatorSetControlState(int iGemStdState);//AI(secs-e30-gate) 20260803 : maintenance SECS tab buttons
