@@ -112,8 +112,11 @@ void TDataModule1::DoAllProcess()
     //AI(general) 20260608 : State Record task-history sampling (no FSM).
     //Cheap: only records a module's Task when it changes. Used by the manual
     //"Store Hangup" snapshot button to export TaskHistory.csv for analysis.
-    if(gStateRecord!=NULL)
-        gStateRecord->SampleTasks();
+    //AI(ht160s-stuckwatchdog) 20260805 : the SampleTasks() call MOVED to csystem.cpp
+    //MainProc, just after ProcessMotion(). It must run on every main cycle including
+    //while PAUSED, and this function is SystemStart-gated by its caller - which silently
+    //defeated the stuck watchdog's pause rebase and made it fire on every resume. Do NOT
+    //re-add the call here.
 }
 //---------------------------------------------------------------------------
 void __fastcall TDataModule1::InitialMotorNameExecute(TObject *Sender)

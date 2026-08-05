@@ -306,6 +306,22 @@ void MainProc()
 		//branch was dead code (DataModule1 is never NULL after startup), which
 		//left RunMode stuck at Run_Home and the module dispatch never ran.
 		ProcessMotion();
+		//AI(ht160s-stuckwatchdog) 20260805 : State Record task sampling + the stuck
+		//watchdog moved HERE, out of DoAllProcess, so they really do run "once per main
+		//cycle" as cStateRecordHT160.h promises.
+		//Why: the watchdog rebases every module's WatchBase on the false->true edge of its
+		//production gate, precisely so an operator pause cannot inflate the stuck clock
+		//(cStateRecordHT160.cpp 20260724 note). But CheckStuckWatchdog only ran from
+		//DoAllProcess, and DoAllProcess is SystemStart-gated below (20260624). While paused
+		//the function was therefore never called, bPrevRunGate never went false, the
+		//false->true edge was never observed on resume, and dMs counted the WHOLE paused
+		//span -> the watchdog fired on the resume edge every time. Both 2026-08-05
+		//"StuckWatchdog" snapshots did exactly that: 16:14:26.726 fired 9 ms after MACHINE
+		//START, 17:30:34.343 fired 14 ms after it, each following a >5 min door-open pause.
+		//Two false hang reports, and they cost real triage time. Sampling while paused is
+		//safe and cheap: PushSample only records on a Task CHANGE, and nothing changes.
+		if(gStateRecord!=NULL)
+			gStateRecord->SampleTasks();
 		//AI(HT160S-Maintainer) 20260602 : while a SortArm single Z-home is in
 		//progress, hold the module engine so it cannot fight the re-home.
 		//AI(HT160S-Maintainer) 20260624 : ONLY run the production action engine while the
