@@ -434,6 +434,8 @@ __published:	// IDE-managed Components
     void __fastcall btnAddLotClick(TObject *Sender);
     void __fastcall btnEditLotClick(TObject *Sender);
     void __fastcall btnRemoveLotClick(TObject *Sender);
+    void __fastcall edLotNoClick(TObject *Sender);
+    void __fastcall edLotNoKeyPress(TObject *Sender, char &Key);
     void __fastcall sgLotListClick(TObject *Sender);
     void __fastcall btn2DAddRowClick(TObject *Sender);
     void __fastcall btn2DDelRowClick(TObject *Sender);

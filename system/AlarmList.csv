@@ -457,6 +457,7 @@ MES1424,1,"Color front supply tray is missing","Color front supply tray is missi
 MES1425,1,"Auto4 : Auto output car full","Auto4 : Auto output car full","",""
 MES1426,1,"Color rear has a leftover tray","Color rear has a leftover tray","",""
 MES1427,1,"Color supply stack full (sensor)","Color supply stack full (sensor)","",""
+MES1428,1,"Color carriage still holds a tray after clean-out - remove it","Color carriage still holds a tray after clean-out - remove it","",""
 MES1520,1,"Auto5 : Auto output stack full (sensor)","Auto5 : Auto output stack full (sensor)","",""
 MES1523,1,"Auto5 : Auto clean-out residual tray after drain","Auto5 : Auto clean-out residual tray after drain","",""
 MES1525,1,"Auto5 : Auto output car full","Auto5 : Auto output car full","",""

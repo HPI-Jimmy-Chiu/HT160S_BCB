@@ -1659,6 +1659,8 @@ object fMain: TfMain
                       Width = 161
                       Height = 21
                       TabOrder = 0
+                      OnClick = edLotNoClick
+                      OnKeyPress = edLotNoKeyPress
                     end
                     object btnAddLot: TButton
                       Left = 8

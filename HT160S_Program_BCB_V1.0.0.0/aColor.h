@@ -74,6 +74,21 @@ private:
     bool bReadIdentityPending;  //TrayArm reserved a Loader identity intake -> Color dedicates to receive
     HTimer ReadIdentityDelay;   //identity intake clamp settle
 
+    //AI(ht160s-phantom-tray) 20260805 : "diaper" state for the has-tray latches. On-site notes
+    //2/6/9 (KYEC 2026-08-05) : a CleanOut hung with the Color lane PHYSICALLY EMPTY while the
+    //software still believed the carriage held a tray - the operator named the exact gate,
+    //IsCleanOutFinish's "if(HSys.VMot.MMColorY->fHasTray) return false".
+    //MMColorY->fHasTray and bTrayReady are pure SOFTWARE latches : no sensor stands behind
+    //either, the only normal clearer is NotifyTrayPicked (TrayArm actually picking), and a
+    //keep-material HOME deliberately preserves them (uHome.cpp ~897/919). So once they desync
+    //true they stay true for ever. These fields carry the debounce window, the breadcrumb rate
+    //limit and the fire count - if the breadcrumb ever shows up in the EventLog it means an
+    //UPSTREAM owner minted a tray that was not there, and THAT owner is the real bug.
+    unsigned int dwPhantomTrayStart;     //GetTickCount of the first contradicting read (0=disarmed)
+    unsigned int dwPhantomTrayLogTick;   //GetTickCount of the last breadcrumb (log rate limit)
+    int          iPhantomTrayFireCount;  //diaper fires since InitialFlag (0 = never, the healthy value)
+    bool         bCleanOutCarriageAlarmed;  //one-shot : the CleanOut carriage-tray alarm has been shown
+
     bool IsSoftSimulate();
     bool IsInstalled();
     void RefreshStateFromSensors();
@@ -90,6 +105,11 @@ private:
     bool DoReadColor2D(int Flag);  //AI(HT160S-Maintainer) 20260608 : move CCD X, LON shot, read 2D, LOFF
     void BirthFrontTray();           //AI(ht160s-color-align-empty) 20260627 : identity tray born at GoDown front-confirm into FrontSourceTray (mirror Empty)
     void StampReadIdentity2D();      //AI(ht160s-color-align-empty) 20260627 : CCD read UPDATES the carried tray 2D TrayID (not a birth)
+    //AI(ht160s-phantom-tray) 20260805 : the three halves of the diaper (see the member note).
+    bool IsCarriageTrayPhysicallyAbsent();   //PHYSICAL verdict : clamps confirmed retracted AND every enabled rear-seat sensor dark; false whenever the evidence is untrustworthy
+    AnsiString DescribePhysicalTrayEvidence();   //everything the verdict looked at, for the breadcrumb
+    void ForceReleaseCarriageTrayLatch(AnsiString Why);   //clear the software latches + log (the heal)
+    bool GuardPhantomCarriageTray();         //idle-gated, debounced detector -> logs + heals; true when it fired
 
 public:
     TColorModule();

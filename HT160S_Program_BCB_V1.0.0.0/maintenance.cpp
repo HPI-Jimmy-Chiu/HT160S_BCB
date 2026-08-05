@@ -2300,6 +2300,15 @@ void __fastcall TfMaintenance::FormClose(TObject *Sender, TCloseAction &Action)
     (void)Sender;
     (void)Action;
     SaveWorkFile(GetTowerLightIniFileName());
+    //AI(ht160s-ftp) 20260805 : on-site note 5 "FTP parameter is not saved in general.ini".
+    //The btnFtpSave path DID persist, but it was the ONLY path: every other maintenance
+    //page commits on change / on close, so an operator who edited edFtpHost / chkFtpEnable
+    //and simply left the screen lost the edit with no warning, and FormShow's
+    //LoadFtpConfigToUi then repainted the OLD worker values - indistinguishable from
+    //"the save is broken". Commit on close as the backstop (Save button unchanged).
+    //Safe to call unconditionally : SaveFtpConfigFromUi no-ops when the worker is NULL and
+    //starts from the LIVE config, so untouched fields round-trip to the same values.
+    SaveFtpConfigFromUi();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::FormShow(TObject *Sender)

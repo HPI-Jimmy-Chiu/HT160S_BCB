@@ -1899,16 +1899,20 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             {
                 if(HasPickSuckError())
                 {
-                    //AI(ht160s-pick-retry) 20260702 : count the failed stroke and lift Z to
-                    //safe FIRST - both the silent auto-retry and the operator alarm happen
-                    //with the nozzle parked up, never pressed on the IC (HT172 case 500/350).
-                    //AI(jamrate) 20260801 : jam source 1 of 2 - "Loader pick up error".
-                    //Counted per FAILED PICK STROKE, i.e. here rather than at case 54
-                    //(retries exhausted), because a stroke that only succeeds on the
-                    //second attempt is still a pick failure the machine suffered - and
-                    //catching those is the whole point of a rate used as an early warning.
-                    //Move this to case 54 if the customer wants only operator-visible jams.
-                    AddJamCount("SortArm pick suck fail at Loader"+IntToStr(iActiveLoaderNo));
+                    //AI(ht160s-pick-retry) 20260702 : lift Z to safe FIRST - both the silent
+                    //auto-retry and the operator alarm happen with the nozzle parked up,
+                    //never pressed on the IC (HT172 case 500/350).
+                    //AI(jamrate) 20260805 : the AddJamCount that used to sit HERE is REMOVED
+                    //(on-site note 3 "suck or read no ic is not jam type", user ruling: a jam
+                    //is ONLY a vacuum that was ESTABLISHED and then LOST, and it always raises
+                    //a Note alarm). This branch is a failed suck STROKE - the vacuum never
+                    //built at all, which most often just means the cell had no IC in it - and
+                    //it is followed by a SILENT auto-retry (case 52) with no operator-visible
+                    //alarm at all. On the 2026-08-05 shift it inflated the figure from 4 real
+                    //jams to 15 : EventLog JAM #2,3,4,6,7,8,9,10,11,13 were all this one line
+                    //and not one of them carried an alarm row. The count now lives at its ONE
+                    //remaining source, CheckHeldICFallDown, which raises SUC0013 before it
+                    //counts. iPickRetryCount / the case-54 recovery modal are unchanged.
                     iPickRetryCount++;
                     PickTask=52;
                 }

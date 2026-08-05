@@ -1009,6 +1009,19 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(ht160s-phantom-tray) 20260805 : MES1428 = the Color CARRIAGE still claims a tray when
+        //the CleanOut drain has nothing left it can drain (aColor.cpp DoColor case 100). The drain
+        //only handles the front stack and the rear seat, so a tray held by the carriage used to
+        //block IsCleanOutFinish for ever with no alarm at all - that was the 2026-08-05 KYEC hang.
+        //Registered standalone (same idiom as MES0925 / WAR0962) to avoid resizing the 19-wide
+        //parallel seed arrays above. Slot choice : the Color family owns MES1421/1422/1424/1426/
+        //1427 while 1420/1423/1425 belong to the GENERATED Auto4 family (MES%d20/%d23/%d25 with
+        //11+ai), so 1428 is the first genuinely free Color code.
+        {
+            AnsiString cd="MES1428", mg="Color carriage still holds a tray after clean-out - remove it";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(cleanout) 20260706 : 6th family member MES%d23 = per-Auto clean-out residual
         //watchdog (EventLog-only). Suffix 23 chosen because 27 (the first pick) collides with
         //the Color seed MES1427 "Color supply stack full"; 23 is free across MES1123..MES1623.

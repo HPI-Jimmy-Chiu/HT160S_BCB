@@ -2100,11 +2100,16 @@ static AnsiString gWhiteListLoadError="";
 //  not interrupt a running machine.
 bool TfMain::CheckLotDataReady(AnsiString &Reason)
 {
-    if(edLotNo->Text=="")                                                       //Steven 20240625 : block start without lot ID
-    {
-        Reason="Please Enter LotID !";
-        return false;
-    }
+    //AI(ht160s-lot-barcode) 20260805 : on-site note 2 "uncheck edLotNo null when start, but
+    //need check lot list". The Steven-20240625 "block Start on an empty edLotNo" gate is
+    //REMOVED. edLotNo is now the barcode SCAN field : it is cleared on click and cleared again
+    //after each scan commits, so an operator who has scanned every lot in correctly is left
+    //with an empty field and used to be refused Start. It was also redundant and weaker than
+    //what follows - GetLotCount()<=0 below already refuses a run with no lot, GetItemCount()
+    //and CountLotsWithoutItems refuse a lot with no 2D map, and the RUNNING lot identity comes
+    //from m_sActiveLot / the per-IC 2D reverse lookup, never from this TEdit. The lot LIST is
+    //the contract; this field is not.
+
     //AI(ht160s-whitelist) 20260715 : WhiteList mode loads its 2D->Bin list from the local
     // file at Lot Start (LoadWhiteListFile). Give a mode-specific reason before the generic
     // 2D-data gates below so a missing/empty whitelist file is obvious.
@@ -4184,6 +4189,54 @@ void __fastcall TfMain::btnAddLotClick(TObject *Sender)
     SaveWorkOrder();
     if(sgLotList!=NULL && (LotIndex+1)<sgLotList->RowCount)
         sgLotList->Row=LotIndex+1;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-barcode) 20260805 : on-site note 1 "barcode reader to lot number". edLotNo
+//becomes the scan target, so a CLICK clears it. Without this a keyboard-wedge reader just
+//types into whatever the field already held (a previous scan, or the value sgLotListClick
+//copied out of the list) and the committed LotID silently becomes "LOT_ALOT_B".
+//Deliberately does NOT touch the 2D editor grid : Reload2DBinGridFromRegistry is driven by
+//the Lot-list click, and repainting it empty on every click into the scan field would wipe
+//the operator's 2D view. m_sActiveLot already owns the RUNNING lot (see ActiveLotID), so
+//clearing this field mid-run cannot retarget production.
+void __fastcall TfMain::edLotNoClick(TObject *Sender)
+{
+    (void)Sender;
+    if(edLotNo==NULL)
+        return;
+    if(edLotNo->Text!="")
+        edLotNo->Text="";
+    edLotNo->SelStart=0;
+    edLotNo->SelLength=0;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-barcode) 20260805 : a keyboard-wedge barcode reader ends its frame with CR
+//(some models LF), so that keystroke IS the "scan complete" event -> commit the scanned
+//LotID into the Lot list. Reuses btnAddLotClick verbatim (LotRegistry.AddLot is the single
+//source of truth, idempotent on a re-scan, and SaveWorkOrder persists it) rather than
+//duplicating the add rules. Key=0 swallows the CR so the TEdit does not beep.
+//The field is CLEARED after a successful commit so a second scan with no mouse click in
+//between starts clean - that concatenation is the exact failure edLotNoClick guards against
+//for the mouse path. An empty field on CR is a silent no-op, NOT btnAddLotClick's
+//"Please Enter LotID !" modal : a stray Enter must never pop a dialog at the machine.
+void __fastcall TfMain::edLotNoKeyPress(TObject *Sender, char &Key)
+{
+    AnsiString Scanned;
+
+    (void)Sender;
+    if(Key!=13 && Key!=10)
+        return;
+    Key=0;
+    if(edLotNo==NULL)
+        return;
+    Scanned=edLotNo->Text.Trim();
+    if(Scanned=="")
+        return;
+    edLotNo->Text=Scanned;   //commit the trimmed form so AddLot and the log agree
+    btnAddLotClick(NULL);
+    RecordProcess("Lot barcode scanned -> Lot list : "+Scanned);
+    if(edLotNo!=NULL)
+        edLotNo->Text="";
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnEditLotClick(TObject *Sender)
