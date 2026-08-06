@@ -167,6 +167,19 @@ public:
 	// carries on) instead of raising the operator pick-error alarm. Read live each pick
 	// cycle, so no restart needed. Default OFF. Stored in General.ini [SortArm] AutoSkipOnPickFail.
 	bool bSortArmAutoSkipOnPickFail;
+	// AI(ht160s-prepick) 20260806 : on-site note 7 "need check auto has tray, then sortarm pick
+	// up ic". SortArm refuses to Z-down and suck until the Auto that IC is routed to already
+	// holds a tray that can receive it, so it can never end up holding an IC with nowhere to put
+	// it (SelectPlaceAuto has no timeout, no alarm and no fallback for a fixed-route IC).
+	// This is the BOUNDED-WAIT budget in seconds : once the gate has held the pick this long
+	// continuously, MES1921 names the Auto being waited for. The clock is re-armed on every
+	// machine pause / resume and after each alarm, so a paused machine can never accumulate
+	// wait time and cry wolf on resume (the same defect the stuck watchdog had).
+	//   >0  = gate on, alarm after this many seconds (default 300 = 5 min, user's ruling)
+	//    0  = gate on, silent hold, never alarms
+	//   -1  = gate OFF entirely (pre-20260806 behaviour: pick first, then wait to place)
+	// Stored in General.ini [SortArm] PrePickAutoWaitSec; edited on the maintenance Option page.
+	int iSortArmPrePickAutoWaitSec;
 
 	// Safety : minimum encoder gap (motor counts) the two Loader-Y cars must keep
 	// from each other before either car is allowed to move, used only when the

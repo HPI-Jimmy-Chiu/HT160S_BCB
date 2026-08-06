@@ -1,6 +1,6 @@
 object fMaintenance: TfMaintenance
-  Left = 375
-  Top = 187
+  Left = 327
+  Top = 106
   BorderStyle = bsSingle
   Caption = 'Maintance'
   ClientHeight = 987
@@ -312,9 +312,9 @@ object fMaintenance: TfMaintenance
       Top = 44
       Width = 949
       Height = 943
-      ActivePage = tsMaintHardware
+      ActivePage = tsMaintTopCcd
       Align = alClient
-      TabIndex = 4
+      TabIndex = 11
       TabOrder = 1
       TabWidth = 90
       object tsMaintTowerLight: TTabSheet
@@ -1182,14 +1182,14 @@ object fMaintenance: TfMaintenance
                 Height = 40
                 Align = alTop
                 BevelInner = bvLowered
-                TabOrder = 2
+                TabOrder = 3
                 object lblSkip2DHint: TLabel
                   Left = 320
                   Top = 12
                   Width = 600
                   Height = 16
                   AutoSize = False
-                  Caption =
+                  Caption = 
                     'When ON, a 2D not found in any lot goes silently to Error (no WA' +
                     'R0475 stop). Default OFF. A misread good IC also goes to Error.'
                   Font.Charset = DEFAULT_CHARSET
@@ -2203,6 +2203,49 @@ object fMaintenance: TfMaintenance
                   OnClick = chkSuck2QuadVacuumClick
                 end
               end
+              object pnlPrePickWaitBox: TPanel
+                Left = 0
+                Top = 104
+                Width = 929
+                Height = 64
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 2
+                object lblPrePickWaitHint: TLabel
+                  Left = 16
+                  Top = 8
+                  Width = 897
+                  Height = 16
+                  AutoSize = False
+                  Caption =
+                    'SortArm will not pick an IC until the Auto it is routed to alrea' +
+                    'dy holds a tray. Alarm MES1921 after this wait.  -1 = gate off.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblPrePickWait: TLabel
+                  Left = 16
+                  Top = 36
+                  Width = 200
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Pre-pick Auto wait (sec)'
+                end
+                object edPrePickWaitSec: TEdit
+                  Left = 220
+                  Top = 33
+                  Width = 80
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '300'
+                  OnClick = edPrePickWaitSecClick
+                end
+              end
             end
             object tsLotInfo: TTabSheet
               Caption = 'Lot Info'
@@ -2643,9 +2686,9 @@ object fMaintenance: TfMaintenance
             Width = 740
             Height = 20
             AutoSize = False
-            Caption =
-              'Off-Line selected here is Equipment Off-Line: the host cannot lif' +
-              't it with S1F17.'
+            Caption = 
+              'Off-Line selected here is Equipment Off-Line: the host cannot li' +
+              'ft it with S1F17.'
           end
           object btnSecsCtlOffline: TButton
             Left = 16
@@ -3007,7 +3050,7 @@ object fMaintenance: TfMaintenance
             Left = 108
             Top = 46
             Width = 160
-            Height = 24
+            Height = 21
             TabOrder = 0
             Text = '172.16.8.89'
           end
@@ -3015,7 +3058,7 @@ object fMaintenance: TfMaintenance
             Left = 108
             Top = 82
             Width = 80
-            Height = 24
+            Height = 21
             TabOrder = 1
             Text = '5001'
           end
@@ -3516,36 +3559,36 @@ object fMaintenance: TfMaintenance
           object lblFtpHost: TLabel
             Left = 16
             Top = 18
-            Width = 80
-            Height = 16
+            Width = 43
+            Height = 13
             Caption = 'Host / IP'
           end
           object lblFtpPort: TLabel
             Left = 380
             Top = 18
-            Width = 40
-            Height = 16
+            Width = 19
+            Height = 13
             Caption = 'Port'
           end
           object lblFtpUser: TLabel
             Left = 16
             Top = 50
-            Width = 80
-            Height = 16
+            Width = 22
+            Height = 13
             Caption = 'User'
           end
           object lblFtpPwd: TLabel
             Left = 380
             Top = 50
-            Width = 80
-            Height = 16
+            Width = 46
+            Height = 13
             Caption = 'Password'
           end
           object lblFtpRemoteDir: TLabel
             Left = 16
             Top = 82
-            Width = 90
-            Height = 16
+            Width = 53
+            Height = 13
             Caption = 'Remote Dir'
           end
           object lblFtpSaveHint: TLabel
@@ -3597,7 +3640,9 @@ object fMaintenance: TfMaintenance
             Top = 110
             Width = 620
             Height = 20
-            Caption = 'Enable production upload (Lot End). Off = local report only, no upload.'
+            Caption = 
+              'Enable production upload (Lot End). Off = local report only, no ' +
+              'upload.'
             TabOrder = 5
           end
           object chkFtpUploadReport: TCheckBox

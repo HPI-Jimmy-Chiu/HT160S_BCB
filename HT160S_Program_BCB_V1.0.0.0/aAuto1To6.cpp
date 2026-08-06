@@ -1418,10 +1418,21 @@ int TAutoModule::FindTrayRequestAuto(int &OutKind, int WantKind)
     //intact. Iteration order = SortArm sucker 0..3 = its own place order (SelectPlaceAuto).
     //Falls through to the unchanged lowest-index scan when off or when SortArm holds nothing
     //that maps to a requesting Auto.
-    if(GeneralSetting.bUsePredictiveAutoSupply && SortArmModule!=NULL)
+    if(SortArmModule!=NULL)
     {
-        int Targets[4];   //max SortArm suckers (SORT_ARM_SUCKER_COUNT)
-        int nTargets=SortArmModule->GetHeldTargetAutos(Targets, 4);
+        int Targets[5];   //1 pre-pick wanted + up to SORT_ARM_SUCKER_COUNT held
+        int nTargets=0;
+        //AI(ht160s-prepick) 20260806 : the Auto the SortArm PRE-PICK GATE is blocked on goes
+        //first, and is deliberately NOT gated on bUsePredictiveAutoSupply. That flag is an
+        //optimisation ("feed the Auto a HELD IC needs next, so place does not stall"); this is
+        //the gate's own hard dependency - if nobody ever feeds the Auto SortArm is waiting for,
+        //the gate never opens and the whole line livelocks. A default-off tuning flag must not
+        //be able to cause that, so the wanted target is always honoured.
+        int Wanted=SortArmModule->GetPrePickWantedAuto();
+        if(Wanted>=0)
+            Targets[nTargets++]=Wanted;
+        if(GeneralSetting.bUsePredictiveAutoSupply)
+            nTargets+=SortArmModule->GetHeldTargetAutos(Targets+nTargets, 5-nTargets);
         for(int t=0; t<nTargets; t++)
         {
             int Req=GetTrayRequest(Targets[t]);

@@ -28,9 +28,37 @@ TEmptyModule::TEmptyModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260806 : "diaper" for the Empty has-tray latches - the sibling of
+//the Color one shipped 20260805. See the note on the members in aEmpty.h for why Empty is
+//structurally safer but has the SAME dead end: IsCleanOutFinish gates on MMEmptyY->fHasTray
+//while DoEmpty case 100 only ever drains (bFrontHasTray || bRearHasTray), so a tray the
+//CARRIAGE claims with front and rear clear can never be drained and CleanOut hangs for ever.
+//Same windows, same debounce, same rate limit as Color so the two stay obviously siblings.
+static const int EMPTY_PHANTOM_TRAY_CONFIRM_MS=1500;
+static const int EMPTY_PHANTOM_TRAY_LOG_GAP_MS=60000;
+static const char *EmptyStatusName(int St);   //defined at the bottom, beside DescribeState
+//AI(ht160s-phantom-tray) 20260806 : tri-state IO read for the breadcrumb : 1=on, 0=off,
+//-1=point disabled (the '-' convention IoDetail.txt uses). A helper rather than a nested ?:
+//expression - nested conditionals building an AnsiString are a known BCB6 hazard here.
+static int EmptyTriReadSensor(TMySensor &Sen)
+{
+    if(Sen.Enable==false)
+        return -1;
+    if(Sen.IsOn())
+        return 1;
+    return 0;
+}
+//---------------------------------------------------------------------------
 void TEmptyModule::InitialFlag(bool bKeepMaterial)
 {
     bAmrLocked=false;
+    //AI(ht160s-phantom-tray) 20260806 : diaper state. The FIRE COUNT is a per-run health figure
+    //("how many times did the software lie about a tray this run") and 0 is the only healthy
+    //value; the debounce window and the log rate limit are per-episode.
+    dwPhantomTrayStart=0;
+    dwPhantomTrayLogTick=0;
+    iPhantomTrayFireCount=0;
+    bCleanOutCarriageAlarmed=false;
     bWaitingAmrFeed=false;       //AI(ht160s-agv) Empty source-dry AMR wait latch
     AmrFeedWaitTimer.Clear();   //AI(ht160s-agv) Empty source-dry AMR wait timer
     RefillSimInfeed();
@@ -341,6 +369,12 @@ void TEmptyModule::DoEmpty(int &Task)
             //to keep moving an already-staged front tray to the rear so downstream is
             //not starved. Mirrors Loader's narrow lock (aLoader.cpp case 100).
             RefreshStateFromSensors();
+            //AI(ht160s-phantom-tray) 20260806 : cross-check the has-tray latches against the
+            //clamps + rear sensor BEFORE any branch below reads them (mirror of Color). Placed
+            //here because case 100 is both the production idle heartbeat and where the CleanOut
+            //drain decision is taken. Self-gated to a fully idle module + a 1500 ms debounce, so
+            //it is a no-op on a healthy machine.
+            GuardPhantomCarriageTray();
             //AI(cleanout) 20260701 : CleanOut drain phase. Once TrayArm has finished (Loader +
             //Auto drained, nothing more to recover/supply), stop feeding and GoUp every tray back
             //to the car via the existing bLotFinish drain path (it also gates off GoDown/feed
@@ -455,6 +489,27 @@ void TEmptyModule::DoEmpty(int &Task)
                 Status=ES_RETURNING;   //AI(ht160s-status) 20260703 : CleanOut drain GoUp
                 DoGoUpTray(0);
                 Task=3000;
+                break;
+            }
+            //AI(ht160s-phantom-tray) 20260806 : the Color hang shape, at Empty. The drain above
+            //only looks at the FRONT stack and the REAR seat, but IsCleanOutFinish ALSO gates on
+            //MMEmptyY->fHasTray - so a tray the CARRIAGE claims, with front and rear both clear,
+            //is invisible to the drain and blocks CleanOut for ever: nothing to drain, no
+            //timeout, no alarm, no operator hint. GuardPhantomCarriageTray at the top of this
+            //case heals the PHANTOM form. Reaching here means the physical evidence does NOT
+            //prove the carriage empty (clamps still gripping, wrong tier, or no rear sensor), so
+            //tell the operator ONCE and release the latch anyway - the drain has no path for a
+            //carriage tray, and holding it would only re-enter the same dead wait.
+            if(bLotFinish && (HSys.VMot.MMEmptyY!=NULL && HSys.VMot.MMEmptyY->fHasTray))
+            {
+                if(bCleanOutCarriageAlarmed==false)
+                {
+                    bCleanOutCarriageAlarmed=true;
+                    RecordProcess("CLEANOUT Empty blocked by a carriage tray the drain cannot see : "+
+                                  DescribePhysicalTrayEvidence());
+                    ShowMyError("MES1025", LangT("Empty carriage still holds a tray after clean-out - remove it"), K_RETRY);
+                }
+                ForceReleaseCarriageTrayLatch("cleanout-drain-blind");
             }
             break;
 
@@ -1280,6 +1335,145 @@ bool TEmptyModule::IsRearHasTray()
     return bRearHasTray;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260806 : does PHYSICAL evidence PROVE the Empty carriage is empty ?
+//Identical shape to TColorModule::IsCarriageTrayPhysicallyAbsent - see the long note there for
+//the reasoning. Two independent pieces, both required : (1) BOTH clamps confirmed retracted
+//(out-bit low AND the Off reed lit) - nothing can ride the carriage unclamped; (2) the rear
+//seat sensor dark - the one window where the clamps are legitimately open with a tray still
+//present is DoFeedTray case 5000/6000, where the tray rests on the rear seat and
+//SnEmpty_OutputBottomHasTray sees exactly that.
+//Conservative by construction : returns false (no verdict, no heal) in sim, on a non-REALLY
+//tier, with a disabled clamp / Off reed, with the TrayArm head lowered over the rear beam (the
+//documented false-light), or with no rear sensor at all. A missing point is never evidence.
+bool TEmptyModule::IsCarriageTrayPhysicallyAbsent()
+{
+    if(IsSoftSimulate())
+        return false;
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return false;
+
+    if(HSys.Cyn.C_Empty_PushTray.Enable==false || HSys.Cyn.C_Empty_LeanOnTray.Enable==false)
+        return false;
+    if(HSys.Cyn.C_Empty_PushTray.GetOutBit() || HSys.Cyn.C_Empty_LeanOnTray.GetOutBit())
+        return false;
+    if(HSys.Cyn.C_Empty_PushTray.OffSensor.Enable==false ||
+       HSys.Cyn.C_Empty_LeanOnTray.OffSensor.Enable==false)
+        return false;
+    if(HSys.Cyn.C_Empty_PushTray.OffSensor.IsOn()==false ||
+       HSys.Cyn.C_Empty_LeanOnTray.OffSensor.IsOn()==false)
+        return false;
+
+    if(HSys.Cyn.C_TrayArmZ_Up.OnSensor.Enable && HSys.Cyn.C_TrayArmZ_Up.OnSensor.IsOn()==false)
+        return false;
+    if(HSys.Sen.SnEmpty_OutputBottomHasTray.Enable==false)
+        return false;                       //no rear sensor -> never claim "absent"
+    if(HSys.Sen.SnEmpty_OutputBottomHasTray.IsOn())
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260806 : everything the verdict looked at, on one line, so the
+//breadcrumb stands alone. Tri-state IO values : 1=on 0=off -1=point disabled.
+AnsiString TEmptyModule::DescribePhysicalTrayEvidence()
+{
+    AnsiString s;
+    int iSwHasTray=0;
+
+    if(HSys.VMot.MMEmptyY!=NULL && HSys.VMot.MMEmptyY->fHasTray)
+        iSwHasTray=1;
+    s  = "sw[fHasTray=" + IntToStr(iSwHasTray);
+    s += " bRearHasTray="  + IntToStr(bRearHasTray ? 1 : 0);
+    s += " bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0);
+    s += " bReturnTray="   + IntToStr(bReturnTray ? 1 : 0);
+    s += " status="        + AnsiString(EmptyStatusName(Status)) + "]";
+    s += " cyn[PushTray out=" + IntToStr(HSys.Cyn.C_Empty_PushTray.GetOutBit() ? 1 : 0)
+       + " off="              + IntToStr(EmptyTriReadSensor(HSys.Cyn.C_Empty_PushTray.OffSensor))
+       + " LeanOn out="       + IntToStr(HSys.Cyn.C_Empty_LeanOnTray.GetOutBit() ? 1 : 0)
+       + " off="              + IntToStr(EmptyTriReadSensor(HSys.Cyn.C_Empty_LeanOnTray.OffSensor)) + "]";
+    s += " sen[OutputBottomHasTray=" + IntToStr(EmptyTriReadSensor(HSys.Sen.SnEmpty_OutputBottomHasTray))
+       + " InputHasTray="            + IntToStr(EmptyTriReadSensor(HSys.Sen.SnEmpty_InputHasTray))
+       + " TrayArmZup="              + IntToStr(EmptyTriReadSensor(HSys.Cyn.C_TrayArmZ_Up.OnSensor)) + "]";
+    s += " tier[softSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)
+       + " realDummy="    + IntToStr(HSys.LastSet.iRealDummy)
+       + " runMode="      + IntToStr(HSys.Sys.RunMode) + "]";
+    return s;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260806 : the heal. Drops ONLY the occupancy latches and logs.
+//As with Color it deliberately does NOT wipe MMEmptyY->Tray : the TrayArm pick copies the grid
+//(GetSourceTray) and clears the rear in the SAME tick, but a pick frozen by an alarm or pause
+//right after the lift would leave the tray in the arm's jaws with the rear seat already dark,
+//and wiping the grid there would lose it. Every consumer gates on fHasTray, and the next real
+//tray overwrites the grid via MoveFrom / InitNewTray.
+void TEmptyModule::ForceReleaseCarriageTrayLatch(AnsiString Why)
+{
+    AnsiString Evidence;
+    unsigned int dwNow=GetTickCount();
+    bool bLog;
+
+    Evidence=DescribePhysicalTrayEvidence();   //BEFORE the clear
+    iPhantomTrayFireCount++;
+    bLog=true;
+    if(dwPhantomTrayLogTick!=0 && (int)(dwNow-dwPhantomTrayLogTick)<EMPTY_PHANTOM_TRAY_LOG_GAP_MS)
+        bLog=false;
+    if(bLog)
+    {
+        dwPhantomTrayLogTick=dwNow;
+        RecordProcess("DIAPER Empty phantom tray latch cleared ("+Why+") #"+
+                      IntToStr(iPhantomTrayFireCount)+" : "+Evidence+
+                      " -- UPSTREAM DEFECT : a has-tray latch was set with no tray on the rail");
+    }
+
+    bRearHasTray=false;
+    if(HSys.VMot.MMEmptyY!=NULL)
+    {
+        HSys.VMot.MMEmptyY->fHasTray=false;   //occupancy only; Tray data kept on purpose
+        HSys.VMot.MMEmptyY->Refresh();
+    }
+    if(Status==ES_REAR_READY)
+        Status=ES_IDLE;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260806 : the detector, called from DoEmpty case 100 (the idle
+//heartbeat, and also where the CleanOut drain decision is taken). Every gate exists to make a
+//FALSE heal impossible : all three sub-ladders idle, status not busy, no return reserved, and
+//EMPTY_PHANTOM_TRAY_CONFIRM_MS of CONTINUOUS contradiction. Returns true only when it fired.
+bool TEmptyModule::GuardPhantomCarriageTray()
+{
+    bool bClaimsTray;
+
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1 ||
+       Status==ES_FEEDING || Status==ES_DESTACK || Status==ES_RETURNING ||
+       bReturnTray || bRearReturnInProgress || bTrayXToEmptyFinish)
+    {
+        dwPhantomTrayStart=0;
+        return false;
+    }
+
+    bClaimsTray=false;
+    if(bRearHasTray)
+        bClaimsTray=true;
+    if(HSys.VMot.MMEmptyY!=NULL && HSys.VMot.MMEmptyY->fHasTray)
+        bClaimsTray=true;
+    if(bClaimsTray==false || IsCarriageTrayPhysicallyAbsent()==false)
+    {
+        dwPhantomTrayStart=0;
+        return false;
+    }
+
+    if(dwPhantomTrayStart==0)
+    {
+        dwPhantomTrayStart=GetTickCount();
+        return false;
+    }
+    if((int)(GetTickCount()-dwPhantomTrayStart)<EMPTY_PHANTOM_TRAY_CONFIRM_MS)
+        return false;
+    dwPhantomTrayStart=0;
+
+    ForceReleaseCarriageTrayLatch("idle-crosscheck");
+    return true;
+}
+//---------------------------------------------------------------------------
 bool TEmptyModule::IsCleanOutFinish()
 {
     //AI(cleanout) 20260701 : Empty participates in CleanOut (was: no participation). It finishes
@@ -1475,7 +1669,12 @@ AnsiString TEmptyModule::DescribeState()
     s  = "[Empty]\r\n";
     s += "  Status=" + AnsiString(EmptyStatusName(Status)) + "\r\n";
     s += "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0)
-       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0) + "\r\n";
+       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
+       //AI(ht160s-phantom-tray) 20260806 : print the motor occupancy latch and the diaper
+       //counters. The 2026-08-05 Color hang could not be read straight off the dump because the
+       //equivalent Color line never printed fHasTray - the very flag it was blocked on.
+       + "  MotYHasTray=" + IntToStr((HSys.VMot.MMEmptyY!=NULL && HSys.VMot.MMEmptyY->fHasTray) ? 1 : 0)
+       + "  PhantomFires=" + IntToStr(iPhantomTrayFireCount) + "\r\n";
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
        + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
        + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)

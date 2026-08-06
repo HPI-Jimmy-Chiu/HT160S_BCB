@@ -1025,6 +1025,25 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(ht160s-prepick) 20260806 : MES1921 opens the SORTARM 19xx family. xx21 = the
+        //"blocked / not ready" slot, matching MES1021 (Empty), MES1421 (Color) and MES1721
+        //(TrayArm). 19xx and not 18xx on purpose : the MES1721 note above earmarks 18xx as the
+        //TrayArm family's escape hatch if AUTO_STATION_COUNT ever grows to 7 and the generated
+        //Auto family claims 17xx. Raised by the SortArm pre-pick Auto-ready gate once the wait
+        //exceeds [SortArm] PrePickAutoWaitSec (default 300 s).
+        {
+            AnsiString cd="MES1921", mg="SortArm blocked - waiting for the destination Auto to receive a tray";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(ht160s-phantom-tray) 20260806 : MES1025 = the Empty CARRIAGE still claims a tray when
+        //the CleanOut drain has nothing left it can drain. Exact sibling of the Color MES1428
+        //added 20260805; the Empty family owns 10xx and 1021..1024 were taken, so 1025 is next.
+        {
+            AnsiString cd="MES1025", mg="Empty carriage still holds a tray after clean-out - remove it";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(cleanout) 20260706 : 6th family member MES%d23 = per-Auto clean-out residual
         //watchdog (EventLog-only). Suffix 23 chosen because 27 (the first pick) collides with
         //the Color seed MES1427 "Color supply stack full"; 23 is free across MES1123..MES1623.

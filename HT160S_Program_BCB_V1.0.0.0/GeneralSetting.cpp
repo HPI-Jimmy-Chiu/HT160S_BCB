@@ -108,6 +108,7 @@ void THT160GeneralSetting::SetDefault()
 	iSortArmPickRetryCount=3;
 	iSortArmZMoveGuardMs=8000;   //AI(bcb6-172align) 20260723 : conservative default (ms)
 	bSortArmAutoSkipOnPickFail=false;
+	iSortArmPrePickAutoWaitSec=300;   //AI(ht160s-prepick) 20260806 : 5 min (user default) before MES1921
 	iLoaderYSafeDistance=10000;
 	iEmptyDestackSettleMs=500;
 	iColorDestackSettleMs=500;
@@ -229,6 +230,13 @@ void THT160GeneralSetting::Load()
 	iSortArmPickRetryCount=Ini->ReadInteger("SortArm", "PickRetryCount", 3);
 	iSortArmZMoveGuardMs=Ini->ReadInteger("SortArm", "ZMoveGuardMs", 8000);
 	bSortArmAutoSkipOnPickFail=Ini->ReadBool("SortArm", "AutoSkipOnPickFail", false);
+	iSortArmPrePickAutoWaitSec=Ini->ReadInteger("SortArm", "PrePickAutoWaitSec", 300);
+	//AI(ht160s-prepick) 20260806 : <0 disables the gate entirely (pick first, then wait to
+	//place - the pre-20260806 behaviour); 0 = gate on with NO alarm, only the silent hold.
+	if(iSortArmPrePickAutoWaitSec<-1)
+		iSortArmPrePickAutoWaitSec=-1;
+	if(iSortArmPrePickAutoWaitSec>36000)
+		iSortArmPrePickAutoWaitSec=36000;
 	if(iSortArmPickRetryCount<0)
 		iSortArmPickRetryCount=0;
 	if(iSortArmZMoveGuardMs<1000)
@@ -329,6 +337,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SortArm", "PickRetryCount", iSortArmPickRetryCount);
 	Ini->WriteInteger("SortArm", "ZMoveGuardMs", iSortArmZMoveGuardMs);
 	Ini->WriteBool("SortArm", "AutoSkipOnPickFail", bSortArmAutoSkipOnPickFail);
+	Ini->WriteInteger("SortArm", "PrePickAutoWaitSec", iSortArmPrePickAutoWaitSec);
 	Ini->WriteInteger("Safety", "LoaderYSafeDistance", iLoaderYSafeDistance);
 	Ini->WriteInteger("SettleDelay", "EmptyDestackSettleMs", iEmptyDestackSettleMs);
 	Ini->WriteInteger("SettleDelay", "ColorDestackSettleMs", iColorDestackSettleMs);

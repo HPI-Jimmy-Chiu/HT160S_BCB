@@ -282,6 +282,8 @@ void MainProc()
 		fMain->ShowBinCntInfo();       //AI(loadtotal) 20260801 : Load / Total panels above the Bin column
 	if(fMain!=NULL)
 		fMain->ShowTrayUphHistory();   //AI(ht160s-uph) 20260707 : rolling per-tray UPH history grid
+	if(fMain!=NULL)
+		fMain->ShowTaskRecord();       //AI(ht160s-taskview) 20260806 : live per-module Task + dwell (self-throttled to 4 Hz, skipped unless its tab is on top)
 
 	//AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive any in-flight Lot WebAPI pull.
 	// MainProc runs on the VCL main thread (TRunControl::Synchronize), so this is a

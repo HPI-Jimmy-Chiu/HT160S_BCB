@@ -510,6 +510,7 @@ public:		// User declarations
     void __fastcall ShowProductInfo();       //AI(ht160s-uph) 20260707 : live Lot/UPH product-info grid (HT172 sgProductInfo parity)
     void __fastcall ShowBinCntInfo();        //AI(loadtotal) 20260801 : the Load / Total panels above the Bin column (HT172 ShowBinCount tail)
     void __fastcall ShowTrayUphHistory();    //AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172 UPH_StringGrid parity)
+    void __fastcall ShowTaskRecord();        //AI(ht160s-taskview) 20260806 : live per-module Task + dwell + sub-task view in lbTaskRecord (was a dead ListBox)
     void __fastcall ClearProductInfoAtLotStart();
     void __fastcall FreezeProductInfoAtLotEnd();
     void __fastcall LotStartCore(AnsiString FirstLot, AnsiString Origin);   //AI(secs-lot-additive) 20260730 : shared modal-free Lot-Start body (btnLotStart + SECS LOTSTART); caller registers the lots

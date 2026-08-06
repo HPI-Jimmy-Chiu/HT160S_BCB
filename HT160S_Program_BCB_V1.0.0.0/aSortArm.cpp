@@ -131,12 +131,21 @@ void TSortArmModule::PauseTimeoutTimers()
 {
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
         ResidueDelay[s].Pause();
+    //AI(ht160s-prepick) 20260806 : re-arm the pre-pick wait on the pause edge. User ruling:
+    //"machine paused or alarmed -> the count must restart, so it cannot cry wolf". csystem
+    //calls this on the SystemStart FALLING edge, and every Note alarm drops SystemStart, so
+    //this single hook covers both pause and alarm. This is the same defect the State Record
+    //stuck watchdog had - it measured wall clock across a pause and fired on resume.
+    dwPrePickWaitStart=0;
 }
 //---------------------------------------------------------------------------
 void TSortArmModule::ReStartTimeoutTimers()
 {
     for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
         ResidueDelay[s].ReStart();
+    //AI(ht160s-prepick) 20260806 : and again on the resume edge, so the operator always gets a
+    //FULL fresh window of actual running before MES1921 can fire.
+    dwPrePickWaitStart=0;
 }
 //---------------------------------------------------------------------------
 void TSortArmModule::InitialFlag(bool bKeepMaterial)
@@ -155,6 +164,11 @@ void TSortArmModule::InitialFlag(bool bKeepMaterial)
     dwZDownGuardStart=0;   //AI(bcb6-172align) 20260723 : fresh SuckZ down-move guard on home/init
     bMoveAborted=false;   //AI(ht160s-sortarm) 20260703 : no pending in-flight move abort on home/init
     iPickRetryCount=0;   //AI(ht160s-pick-retry) 20260702 : fresh pick-retry budget on home/init
+    //AI(ht160s-prepick) 20260806 : fresh pre-pick wait budget + no stale published target on
+    //home/init. bPrePickBypassOnce is a one-shot operator escape and must never survive a HOME.
+    dwPrePickWaitStart=0;
+    iPrePickWantedAuto=-1;
+    bPrePickBypassOnce=false;
     //AI(ht160s-home-resume-w4) 20260711 : keep-material HOME preserves an UNFINISHED
     //place-residue verify (SR-2). The Auto-side bResidueClear=false gate now also
     //survives a keep-material HOME (aAuto1To6 InitialFlag), so wiping the pending list
@@ -1113,6 +1127,110 @@ int TSortArmModule::GetHeldTargetAutos(int *OutAutoList, int MaxCount)
     return Count;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-prepick) 20260806 : "can this Auto physically accept one more IC RIGHT NOW ?"
+//This is the user's "Auto ?€?‰ç›¤" test, and it is deliberately NOT FindPlaceCells : that one
+//has side effects (ClearPlaceSelection, iPlaceBaseX/iPlaceY) and gates every slot on
+//bHasIC - which is false before the suck, so it would always answer "no" at pick time.
+//Three conditions, all required :
+//  1. IsReadyForSortArmPlace  - in AMR mode an identity/cover working tray takes no IC
+//  2. TrayMotor->fHasTray     - the working car really has a tray  <- the note-7 rule
+//  3. at least one EMPTY_IC cell left in that tray
+bool TSortArmModule::IsAutoReadyToReceive(int AutoIndex)
+{
+    TTrayMotor *TrayMotor;
+    int XCount, YCount;
+
+    if(AutoIndex<0 || AutoIndex>=SORT_ARM_AUTO_COUNT)
+        return false;
+    if(AutoModule!=NULL && AutoModule->IsReadyForSortArmPlace(AutoIndex)==false)
+        return false;
+    TrayMotor=GetAutoVMotor(AutoIndex);
+    if(TrayMotor==NULL || TrayMotor->fHasTray==false)
+        return false;
+    XCount=GetTrayXCount();
+    YCount=GetTrayYCount();
+    for(int Y=0; Y<YCount; Y++)
+    {
+        for(int X=0; X<XCount; X++)
+        {
+            if(TrayMotor->Tray.Data[X][Y]==EMPTY_IC)
+                return true;
+        }
+    }
+    return false;   //tray full
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-prepick) 20260806 : where will the cell FindPickCells just selected go ?
+//The destination is fully knowable BEFORE the suck : FindPickCells already stamps BinValue /
+//LotIndex / PassClass / TrayData into the slot, which is everything GetMappedAutoIndex needs,
+//and the (Lot,Bin) binding was made back at Top-CCD scan time. Reads bCanPick (the pre-suck
+//selection flag), NOT bHasIC.
+//Returns the Auto index, or -1 = free routing (any Auto with room), or -2 = nothing SortArm
+//can place (routed to Color, or no cell selected).
+int TSortArmModule::GetSelectedPickTargetAuto()
+{
+    for(int s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        bool bFixedArea=false;
+        int AutoIndex;
+
+        if(Slot[s].bCanPick==false)
+            continue;
+        AutoIndex=GetMappedAutoIndex(GetSlotRoutingBin(s), Slot[s].LotIndex, Slot[s].PassClass, bFixedArea);
+        if(AutoIndex>=0)
+            return AutoIndex;
+        if(bFixedArea)
+            return -2;   //fixed route that is not an Auto (Color / unmapped) - not ours to gate
+        return -1;       //free routing
+    }
+    return -2;           //nothing selected
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-prepick) 20260806 : must the pick be HELD ? Also latches iPrePickWantedAuto so the
+//Auto feeder can serve the blocking station first (without that the gate never opens and the
+//line livelocks - see FindTrayRequestAuto).
+//Run-mode policy is load-bearing : in CleanOut / OneCycle the machine must DRAIN. Holding the
+//pick there would leave pickable ICs in the Loader for ever, IsAllCleanOutFinish would never go
+//true and CleanOut would hang - exactly the shape of the 2026-08-05 Color hang. So the gate is
+//Normal-production only; CleanOut keeps the old pick-then-wait behaviour.
+bool TSortArmModule::IsPrePickBlocked()
+{
+    int Target;
+
+    iPrePickWantedAuto=-1;
+    if(GeneralSetting.iSortArmPrePickAutoWaitSec<0)
+        return false;                       //gate disabled by config
+    if(HSys.Sys.RunMode!=Run_Normal)
+        return false;                       //CleanOut / OneCycle must drain
+    if(bPrePickBypassOnce)
+    {
+        bPrePickBypassOnce=false;           //operator SKIPped at MES1921 : let this one through
+        return false;
+    }
+    Target=GetSelectedPickTargetAuto();
+    if(Target==-2)
+        return false;                       //not an Auto-routed IC; leave the old path alone
+    if(Target==-1)
+    {
+        //free routing (no BinAreaMap fixed area) : any Auto with room will do
+        for(int i=0; i<SORT_ARM_AUTO_COUNT; i++)
+        {
+            if(IsAutoReadyToReceive(i))
+                return false;
+        }
+        return true;
+    }
+    if(IsAutoReadyToReceive(Target))
+        return false;
+    iPrePickWantedAuto=Target;
+    return true;
+}
+//---------------------------------------------------------------------------
+int TSortArmModule::GetPrePickWantedAuto()
+{
+    return iPrePickWantedAuto;
+}
+//---------------------------------------------------------------------------
 bool TSortArmModule::FindPlaceCells(int AutoIndex)
 {
     //AI(HT160S-Maintainer) 20260605 : AMR gate. In AMR mode the first two trays of each
@@ -1844,9 +1962,57 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             }
             if(FindPickCells(iActiveLoaderNo)==false)
             {
+                dwPrePickWaitStart=0;   //AI(ht160s-prepick) 20260806 : nothing to pick -> not waiting
+                iPrePickWantedAuto=-1;
                 PickTask=1;
                 return true;
             }
+            //AI(ht160s-prepick) 20260806 : THE PRE-PICK GATE (on-site note 7 : "need check auto
+            //has tray, then sortarm pick up ic"). Never suck an IC we cannot immediately place.
+            //Before this, SortArm committed to the IC and only THEN called SelectPlaceAuto - and
+            //that has no timeout, no alarm and no fallback for a fixed-route IC (its second loop
+            //re-tests every Auto, but CanPlaceSlotToAuto answers false for all of them once the
+            //route is fixed). A destination Auto with no tray therefore left the arm holding the
+            //IC at PlaceTask=1 for ever, with the Loader tray pinned behind it.
+            //POSITION IS LOAD-BEARING : this sits AFTER FindPickCells (the target is only
+            //knowable once a cell is selected) and BEFORE AcquireSortOwner. Gating after the
+            //acquire would make SortArm wait while HOLDING the shared Loader-Y rail, blocking the
+            //Loader and TrayArm - i.e. trading one stall for a worse one.
+            if(IsPrePickBlocked())
+            {
+                if(dwPrePickWaitStart==0)
+                {
+                    dwPrePickWaitStart=GetTickCount();
+                }
+                else if(GeneralSetting.iSortArmPrePickAutoWaitSec>0 &&
+                        (int)(GetTickCount()-dwPrePickWaitStart) >
+                            GeneralSetting.iSortArmPrePickAutoWaitSec*1000)
+                {
+                    AnsiString WaitMsg;
+                    int RetWait;
+
+                    if(iPrePickWantedAuto>=0)
+                        WaitMsg.sprintf("SortArm is waiting for Auto%d to receive a tray before it may pick", iPrePickWantedAuto+1);
+                    else
+                        WaitMsg="SortArm is waiting : no Auto can receive an IC before it may pick";
+                    RecordProcess("PREPICK "+WaitMsg+" (held >"+
+                        IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec)+"s)");
+                    dwPrePickWaitStart=0;   //re-arm a FULL window before this can alarm again
+                    RetWait=ShowMyError("MES1921", WaitMsg, K_RETRY|K_SKIP);
+                    if(RetWait==K_SKIP)
+                    {
+                        //escape hatch : pick anyway this once (pre-20260806 behaviour). The IC
+                        //will be held until a home appears - which is the operator's call.
+                        bPrePickBypassOnce=true;
+                        RecordProcess("PREPICK operator SKIP : one pick allowed through the gate");
+                    }
+                }
+                ClearPickSelection();
+                PickTask=1;
+                return true;   //back to idle WITHOUT taking the rail : Loader/TrayArm stay free
+            }
+            dwPrePickWaitStart=0;
+            iPrePickWantedAuto=-1;
             // Take exclusive ownership of the Loader-Y axis before approaching.
             if(LoaderModule->AcquireSortOwner(iActiveLoaderNo)==false)
             {
@@ -2363,6 +2529,19 @@ AnsiString TSortArmModule::DescribeHolding()
         s += "PickRetry=" + IntToStr(iPickRetryCount)
            + " / " + IntToStr(GeneralSetting.iSortArmPickRetryCount)
            + "  PickSuckErrSlots=" + (errSlots.IsEmpty() ? AnsiString("none") : errSlots) + "\r\n";
+    }
+
+    //AI(ht160s-prepick) 20260806 : pre-pick gate visibility. Without this a machine that is
+    //quietly refusing to pick (because the destination Auto has no tray) looks identical to an
+    //idle one in the dump - PickTask=1, no held IC, nothing obviously wrong.
+    {
+        int WaitMs=0;
+        if(dwPrePickWaitStart!=0)
+            WaitMs=(int)(GetTickCount()-dwPrePickWaitStart);
+        s += "PrePickWantedAuto=" + IntToStr(iPrePickWantedAuto)
+           + "  PrePickWaitMs=" + IntToStr(WaitMs)
+           + "  PrePickBudgetSec=" + IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec)
+           + "  PrePickBypassOnce=" + IntToStr(bPrePickBypassOnce ? 1 : 0) + "\r\n";
     }
 
     //AI(ht160s-obsv-p0) 20260720 : residue-verify chain visibility. The Auto discharge gate

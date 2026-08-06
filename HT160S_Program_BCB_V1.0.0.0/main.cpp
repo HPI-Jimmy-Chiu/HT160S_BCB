@@ -1026,6 +1026,115 @@ void __fastcall TfMain::ShowProductInfo()
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-taskview) 20260806 : LIVE per-module state in lbTaskRecord (the "Task Record" tab).
+//That ListBox was declared in main.h and laid out in main.dfm but referenced NOWHERE - a dead
+//control since the form was built. It now shows, on screen and without taking a State Record,
+//the one thing that actually diagnoses a hang: which module is parked on which Task and for
+//HOW LONG, plus the two sub-ladders that are usually the culprit (SortArm / TrayArm) and the
+//pre-pick gate's wanted Auto.
+//Cheap and flicker-free by construction : the line count is fixed, each line is only assigned
+//when its text actually changed (a blind Clear()+Add() every cycle would flicker and throw the
+//scroll position away), and the repaint is skipped entirely unless the tab is on top.
+//Dwell is measured from a LOCAL last-seen table, never from cStateRecord - a display must not
+//perturb the stuck watchdog's own clock.
+void __fastcall TfMain::ShowTaskRecord()
+{
+    static int          LastTag[8];
+    static unsigned int SinceTick[8];
+    static bool         bSeeded=false;
+    static unsigned int dwLastPaint=0;
+    unsigned int dwNow=GetTickCount();
+    int Count;
+    int i;
+
+    if(lbTaskRecord==NULL || DataModule1==NULL || DataModule1->UserMotion==NULL)
+        return;
+    if(bSeeded==false)
+    {
+        for(i=0; i<8; i++)
+        {
+            LastTag[i]=-1;
+            SinceTick[i]=dwNow;
+        }
+        bSeeded=true;
+    }
+
+    Count=DataModule1->UserMotion->ActionCount;
+    if(Count>7)
+        Count=7;
+
+    //dwell bookkeeping runs EVERY cycle (cheap, and it must not miss a transition)...
+    for(i=0; i<Count; i++)
+    {
+        int Tag=DataModule1->UserMotion->Actions[i]->Tag;
+        if(LastTag[i]!=Tag)
+        {
+            LastTag[i]=Tag;
+            SinceTick[i]=dwNow;
+        }
+    }
+    //...the repaint does not : 4 Hz is plenty for a human and keeps the main loop clean.
+    if((int)(dwNow-dwLastPaint)<250)
+        return;
+    dwLastPaint=dwNow;
+    if(PageControlTaskView==NULL || tsTaskRecord==NULL ||
+       PageControlTaskView->ActivePage!=tsTaskRecord)
+        return;
+
+    //fixed line set : 1 header + one per module + 2 summary lines
+    while(lbTaskRecord->Items->Count < Count+3)
+        lbTaskRecord->Items->Add("");
+    while(lbTaskRecord->Items->Count > Count+3)
+        lbTaskRecord->Items->Delete(lbTaskRecord->Items->Count-1);
+
+    {
+        AnsiString Head="Module        Task    In-Task   Detail";
+        if(lbTaskRecord->Items->Strings[0]!=Head)
+            lbTaskRecord->Items->Strings[0]=Head;
+    }
+
+    for(i=0; i<Count; i++)
+    {
+        AnsiString Name=DataModule1->UserMotion->Actions[i]->Name;
+        AnsiString Line;
+        AnsiString Detail="";
+        double dSec=(double)((int)(dwNow-SinceTick[i]))/1000.0;
+
+        //the two sub-laddered modules carry their own cursors; everything else is one Task
+        if(Name.Pos("SortArm")>0 && SortArmModule!=NULL)
+        {
+            Detail.sprintf("pick=%d place=%d hold=%d wantAuto=%d",
+                SortArmModule->GetPickTask(), SortArmModule->GetPlaceTask(),
+                SortArmModule->HasHoldingIC()?1:0, SortArmModule->GetPrePickWantedAuto());
+        }
+        else if(Name.Pos("TrayArm")>0 && TrayArmModule!=NULL)
+        {
+            Detail.sprintf("pick=%d place=%d job=%d hasTray=%d",
+                TrayArmModule->GetPickTask(), TrayArmModule->GetPlaceTask(),
+                TrayArmModule->GetJob(), TrayArmModule->HasTray()?1:0);
+        }
+
+        Line.sprintf("%-13s %-7d %7.1fs  %s", Name.c_str(), LastTag[i], dSec, Detail.c_str());
+        if(lbTaskRecord->Items->Strings[i+1]!=Line)
+            lbTaskRecord->Items->Strings[i+1]=Line;
+    }
+
+    {
+        AnsiString Sum;
+        Sum.sprintf("RunMode=%d  SystemStart=%d", HSys.Sys.RunMode, HSys.Sys.SystemStart?1:0);
+        if(lbTaskRecord->Items->Strings[Count+1]!=Sum)
+            lbTaskRecord->Items->Strings[Count+1]=Sum;
+    }
+    {
+        //AI(ht160s-phantom-tray) 20260806 : surface the counters on screen too. A DIAPER line in
+        //the EventLog means the software claimed a tray that was not there - an upstream defect.
+        AnsiString Tail;
+        Tail.sprintf("Jam=%d  AutoSkip=%d", tRunData.JamCount, tRunData.iAutoSkipCount);
+        if(lbTaskRecord->Items->Strings[Count+2]!=Tail)
+            lbTaskRecord->Items->Strings[Count+2]=Tail;
+    }
+}
+//---------------------------------------------------------------------------
 // AI(ht160s-uph) 20260707 : rolling per-tray UPH history + Avg (HT172
 // MySortArmParameter::CalculateUPH / UPH_StringGrid parity). Renders the cprod ring
 // (newest at row 1) only when a tray completed (g_UphRowsDirty), so it is cheap.

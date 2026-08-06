@@ -72,8 +72,20 @@ private:
     bool   bBlowSlot[4];           //placed slots that hold blow ON until the lift clears
     HTimer BlowDwell;              //pre-lift blow dwell timer (vacuum must break before lifting the IC)
     HTimer PnpSettle;              //pick/place Z-down settle dwell timer
+    //AI(ht160s-prepick) 20260806 : on-site note 7 "need check auto has tray, then sortarm pick
+    //up ic". SortArm used to commit to an IC and only THEN look for a home, and SelectPlaceAuto
+    //has no timeout, no alarm and no fallback for a fixed-route IC - so a destination Auto with
+    //no tray left the arm holding the IC at PlaceTask=1 for ever, with the Loader tray pinned
+    //behind it. These three fields are the gate's state.
+    unsigned int dwPrePickWaitStart;   //GetTickCount when the gate first held the pick (0=not waiting)
+    int  iPrePickWantedAuto;           //Auto the gate is waiting on (-1 none); published to the feeder so it is fed FIRST
+    bool bPrePickBypassOnce;           //operator chose SKIP at MES1921 : let exactly one pick through
 
     void ClearSlot(int SlotIndex);
+    //AI(ht160s-prepick) 20260806 : the three halves of the pre-pick gate (see the member note).
+    bool IsAutoReadyToReceive(int AutoIndex);   //side-effect-free "can this Auto take one more IC right now"; NOT FindPlaceCells (that one has side effects and needs bHasIC)
+    int  GetSelectedPickTargetAuto();           //Auto the cell FindPickCells just selected routes to; -1 = free routing, -2 = not SortArm-placeable
+    bool IsPrePickBlocked();                    //true when the pick must be HELD; also latches iPrePickWantedAuto
     void ClearPickSelection();
     void ClearPlaceSelection();
     void UpdateKitSuckState();
@@ -164,6 +176,7 @@ public:
     int  GetPlaceTask();       //AI(ht160s-state-record-analysis) 20260612 : sub-task readout for Store Hangup snapshot
     AnsiString DescribeHolding();   //AI(ht160s-state-record-analysis) 20260616 : read-only held-IC + routing dump for SortArmDecision.txt
     int GetHeldTargetAutos(int *OutAutoList, int MaxCount);   //AI(ht160s-predictive-supply) 20260707 : held fixed-route target Autos in place-priority order (Sucker1..4); read-only, no AutoModule callback
+    int GetPrePickWantedAuto();   //AI(ht160s-prepick) 20260806 : Auto the pre-pick gate is blocked on (-1 none). The feeder MUST serve this first or the gate never opens
     bool MoveSuckerToCell(int SlotIndex, int Target, int Col, int Row, bool bZDown, int &Task);   //AI(ht160s-sortarm-flow) 20260617 : Teach Advanced single-nozzle point test (Target 1=Loader1,2=Loader2,11..16=Auto1..6; Col/Row 0-based)
     bool CanMoveSuckerToCell(int SlotIndex, int Target, int Col, int Row, AnsiString &Err);        //AI(ht160s-sortarm-flow) 20260617 : pre-move validation for the point test
 };

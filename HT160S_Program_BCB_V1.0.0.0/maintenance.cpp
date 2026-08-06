@@ -1439,6 +1439,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     if(edSettle8!=NULL) edSettle8->Text=IntToStr(GeneralSetting.iEmptyFeedClampSettleMs);
     if(edSettle9!=NULL) edSettle9->Text=IntToStr(GeneralSetting.iColorFeedClampSettleMs);
     if(edUphMinSampleIC!=NULL) edUphMinSampleIC->Text=IntToStr(GeneralSetting.iUphMinSampleIC);
+    //AI(ht160s-prepick) 20260806 : SortArm pre-pick Auto-ready wait budget (Option page).
+    if(edPrePickWaitSec!=NULL) edPrePickWaitSec->Text=IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec);
     bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
@@ -2670,6 +2672,37 @@ void __fastcall TfMaintenance::edSettleDelayClick(TObject *Sender)
 //AI(ht160s-uph) 20260709 : UPH min-sample warm-up threshold (hide the early
 //tiny-elapsed UPH spike). 0 = auto (one full tray). Same touch-numpad idiom as
 //edSettleDelayClick; value lives in GeneralSetting.iUphMinSampleIC / General.ini.
+//AI(ht160s-prepick) 20260806 : SortArm pre-pick Auto-ready wait budget, in seconds. The gate
+//itself (aSortArm DoPickFromLoader case 1) refuses to Z-down until the Auto the IC is routed to
+//already holds a receivable tray; this is how long it may hold quietly before MES1921 names the
+//Auto. Default 300 (5 min, user's ruling). -1 turns the gate off entirely, 0 = hold silently
+//and never alarm. Same touch-numpad idiom as edUphMinSampleICClick.
+void __fastcall TfMaintenance::edPrePickWaitSecClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    TEdit *ed=(TEdit*)Sender;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, -1.0, 36000.0,
+        LangT("SortArm pre-pick Auto wait (sec); -1=off, 0=silent"))==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save SortArm pre-pick wait?"))!=1)
+    {
+        ed->Text=IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec);
+        return;
+    }
+    int v=ed->Text.ToIntDef(GeneralSetting.iSortArmPrePickAutoWaitSec);
+    if(v<-1)
+        v=-1;
+    if(v>36000)
+        v=36000;
+    GeneralSetting.iSortArmPrePickAutoWaitSec=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMaintenance::edUphMinSampleICClick(TObject *Sender)
 {
     if(bLoadingHardwareSettings)

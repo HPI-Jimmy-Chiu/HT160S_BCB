@@ -48,9 +48,26 @@ private:
     HTimer FeedDelay;
     HTimer GoDownDelay;
     HTimer GoUpDelay;
+    //AI(ht160s-phantom-tray) 20260806 : "diaper" state, the sibling of the Color one added on
+    //20260805. Empty is structurally SAFER than Color - its fHasTray is only minted after
+    //SnEmpty_OutputBottomHasTray confirms the tray (DoFeedTray case 7000), where Color's
+    //StampReadIdentity2D minted unconditionally - but the escape route is identical: once the
+    //latch is set, an operator lifting the tray off the rear seat by hand drops bRearHasTray
+    //(sensor-driven) while MMEmptyY->fHasTray stays true for ever. IsCleanOutFinish then blocks
+    //on fHasTray while DoEmpty case 100 only ever drains (bFrontHasTray || bRearHasTray), so
+    //there is nothing to drain and CleanOut can never finish. Same permanent hang as Color.
+    unsigned int dwPhantomTrayStart;     //GetTickCount of the first contradicting read (0=disarmed)
+    unsigned int dwPhantomTrayLogTick;   //GetTickCount of the last breadcrumb (log rate limit)
+    int          iPhantomTrayFireCount;  //diaper fires since InitialFlag (0 = the healthy value)
+    bool         bCleanOutCarriageAlarmed;  //one-shot : the CleanOut carriage-tray alarm has been shown
 
     bool IsSoftSimulate();
     void RefreshStateFromSensors();
+    //AI(ht160s-phantom-tray) 20260806 : the diaper (mirrors TColorModule; see aColor.cpp).
+    bool IsCarriageTrayPhysicallyAbsent();
+    AnsiString DescribePhysicalTrayEvidence();
+    void ForceReleaseCarriageTrayLatch(AnsiString Why);
+    bool GuardPhantomCarriageTray();
     void BirthFrontTray();    //AI(ht160s-tray-source) : born at DoGoDownTray front confirm (rule #1)
     void BirthRearTray();     //AI(ht160s-tray-source) : direct rear birth for REALLY-mode startup/recovery re-latch
     bool MoveEmptyY(int Position);
