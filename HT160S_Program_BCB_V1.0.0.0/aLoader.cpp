@@ -988,6 +988,38 @@ bool TLoaderModule::IsSortOwnerHeld(int LoaderNo)
     return (State->Status==LS_SORTING);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : PHYSICAL grip verdict for this side's Y carriage, for the
+//SortArm boundary confirm just before its irreversible pick Z-down.
+//On-site 2026-08-05 (user report) : a tray suddenly jumped out of a Loader-Y carriage clamp.
+//The software kept fHasTray=1 / HasOK=1, so SortArm would have driven the nozzle down onto an
+//empty carriage. The user's rule is the fix : the PushTray cylinder must be ON (its On reed
+//lit) for "has tray" to mean anything. Public so SortArm can ask without reaching into
+//HSys.Cyn; the per-side cylinder lookup stays here.
+//Tri-state : 1=gripping, 0=tray gone, -1=no verdict (see mycylin.h).
+int TLoaderModule::GetCarriageGripVerdict(int LoaderNo)
+{
+    TMyCylinder *Push=NULL;
+
+    if(IsValidLoaderNo(LoaderNo)==false)
+        return -1;
+    if(LoaderNo==1)
+        Push=&HSys.Cyn.C_Loader1_PushTray;
+    else
+        Push=&HSys.Cyn.C_Loader2_PushTray;
+    return GetClampGripVerdict(Push, IsSoftSimulate());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : the On reed SortArm hands to ShowMyError so the alarm screen
+//names the real IO point (same idiom as the MES1422 / JAM0913 call sites).
+TMySensor *TLoaderModule::GetCarriagePushOnSensor(int LoaderNo)
+{
+    if(IsValidLoaderNo(LoaderNo)==false)
+        return NULL;
+    if(LoaderNo==1)
+        return &HSys.Cyn.C_Loader1_PushTray.OnSensor;
+    return &HSys.Cyn.C_Loader2_PushTray.OnSensor;
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::IsAllCleanOutFinish()
 {
     //AI(HT160S-Maintainer) 20260605 : both Loader sides have drained in CleanOut.

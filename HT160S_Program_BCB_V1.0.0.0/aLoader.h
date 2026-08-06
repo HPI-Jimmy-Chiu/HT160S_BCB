@@ -7,6 +7,8 @@
 #include "MotorAndIO/MyMotor.h"   //AI(ht160s-tray-source) 20260625 : eTrayKind/TMyTray for rear-tray hold (Phase 6 A.1)
 #include "cCsvDailyLog.h"         //AI(ht160s-overcount-tripqueue) 20260721 : dedicated per-tray OverTrayRecycle CSV
 //---------------------------------------------------------------------------
+class TMySensor;   //AI(ht160s-clampgrip) 20260806 : fwd-decl for GetCarriagePushOnSensor (pointer return only)
+//---------------------------------------------------------------------------
 // Loader per-side handshake status for the shared Loader-Y axis. SortArm uses
 // this to know when a side has finished CCD scanning and the Y axis may be
 // handed over for picking. See AcquireSortOwner/ReleaseSortOwner/IsSortOwnerHeld.
@@ -168,6 +170,8 @@ public:
     bool AcquireSortOwner(int LoaderNo);
     void ReleaseSortOwner(int LoaderNo);
     bool IsSortOwnerHeld(int LoaderNo);
+    int  GetCarriageGripVerdict(int LoaderNo);        //AI(ht160s-clampgrip) 20260806 : physical PushTray grip verdict for the Y carriage (1=gripping 0=tray gone -1=no verdict); SortArm pick-Z boundary confirm
+    TMySensor *GetCarriagePushOnSensor(int LoaderNo); //AI(ht160s-clampgrip) 20260806 : the grip reed, so the alarm screen can name the real IO point
     void NotifyTrayArmPickRearTray();
 
     //AI(ht160s-agv) 20260623 : AMR handoff interface (mirrors TAutoModule).

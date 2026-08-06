@@ -1489,6 +1489,32 @@ bool TAutoModule::IsReadyForSortArmPlace(int Index)
     return (WorkingKind[Index]==eTrayKindNormal);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : PHYSICAL grip verdict for this station's working car, for the
+//SortArm boundary confirm just before its irreversible place Z-down (on-site notes 7/9 : the
+//working tray can jump out of the clamp while the software still shows CarHasTray). Public so
+//SortArm can ask without reaching into HSys.Cyn itself - the cylinder lookup stays here, where
+//GetPush already lives. Tri-state passthrough : 1=gripping, 0=tray gone, -1=no verdict.
+//NOTE the deliberate asymmetry with the Color diaper : this only REPORTS. An Auto working tray
+//holds placed ICs, so auto-clearing its grid would destroy the placed-IC record; the operator
+//decides.
+int TAutoModule::GetCarTrayGripVerdict(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return -1;
+    return GetClampGripVerdict(GetPush(Index), IsSoftSimulate());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : the grip reed, so SortArm's alarm screen can name the real IO
+//point (same idiom as the JAM%d02 call site in DoFeedTray case 5200).
+TMySensor *TAutoModule::GetCarTrayPushOnSensor(int Index)
+{
+    TMyCylinder *Push=GetPush(Index);
+
+    if(Push==NULL)
+        return NULL;
+    return &Push->OnSensor;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260615 : output-car-full test used by the SECS AGV coordinator to
 //  raise AGVSupplement (CEID272). Simulation has no sensor, so it uses a logical tray
 //  threshold; the real machine reads the per-Auto InputFullTray sensor (same source

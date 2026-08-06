@@ -36,6 +36,28 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
     return Cylinder->OnSensor.IsOn();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : tri-state "is this clamp gripping a tray" verdict; see the
+//mechanism note on the declaration in mycylin.h. Deliberately NOT folded into
+//IsCylinderOnReady : that one answers "may I proceed" and returns TRUE for a disabled point,
+//which is exactly the wrong default for a fault detector. Here a point we cannot read returns
+//-1 (no verdict) so callers can tell "no tray" apart from "no evidence".
+//The GetOutBit gate matters : with the clamp retracted the On reed is legitimately dark, and
+//reporting that as "tray missing" would fire on every released carriage on the machine.
+int GetClampGripVerdict(TMyCylinder *Push, bool bSoftSimulate)
+{
+    if(bSoftSimulate)
+        return -1;                       //no IO card; every read is meaningless
+    if(Push==NULL || Push->Enable==false)
+        return -1;
+    if(Push->OnSensor.Enable==false)
+        return -1;                       //cannot read the grip reed -> no verdict
+    if(Push->GetOutBit()==false)
+        return -1;                       //not clamped at all -> says nothing about a tray
+    if(Push->OnSensor.IsOn())
+        return 1;                        //hook stopped against a tray edge : gripping
+    return 0;                            //commanded out but over-travelled : tray gone
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260623 : standardized dual-cylinder tray clamp shared
 //  by all cart modules. Motion fixed: lean-stop (Lean) first, then push (Push).
 //  The per-cylinder guard mirrors Color's PushCylinder: skip the stroke when

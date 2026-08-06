@@ -1752,11 +1752,10 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
     if(iFirstDrop<0)
         return false;   //every OFF nozzle recovered within the window : rejected glitch
 
-    //AI(jamrate) 20260801 : jam source 2 of 2 - "SortArm suck dropped an IC". Placed after
-    //the iFirstDrop<0 early-return above, so a single noisy vacuum read that recovered
-    //inside FALLDOWN_LOST_MS is NOT counted - only a confirmed drop is.
-    AddJamCount(bAtPick?AnsiString("SortArm IC dropped at pick"):AnsiString("SortArm IC dropped in transit"));
-
+    //AI(jamrate) 20260805 : the AddJamCount used to sit HERE, before the alarm. It has moved
+    //BELOW the ShowSuckError call - user ruling: a jam is counted ONLY when SUC0013 is really
+    //raised, no other situation. Counting here also counted the DropSucker==NULL path, where
+    //no alarm is shown at all.
     HSys.StopAllMotor();   //MC88X1 : real decel-stop ALL (DecStopAllMotor is a no-op here)
 
     //breadcrumb : dropped cell tray Row/Col (+2D) into the alarm region so it is shown + logged
@@ -1775,7 +1774,16 @@ bool TSortArmModule::CheckHoldFallDown(bool bAtPick)
     int iKey=K_SKIP;
     TMySucker *DropSucker=GetSucker(iFirstDrop);
     if(DropSucker!=NULL)
+    {
+        //AI(jamrate) 20260805 : ShowSuckError CodeType 3 is what raises SUC0013 "Suck2 Sucker
+        //Error | SortArm IC Dropped ...". Count the jam HERE and nowhere else : the customer's
+        //definition is "the vacuum was established, Z rose, the vacuum was gone, a Note alarm
+        //fired -> that is jam+1, nothing else counts". Placed BEFORE the modal blocks so the
+        //figure is already committed if the operator walks away from the dialog, and inside the
+        //DropSucker!=NULL branch so a nozzle we cannot alarm on is not counted either.
+        AddJamCount(bAtPick?AnsiString("SortArm IC dropped at pick"):AnsiString("SortArm IC dropped in transit"));
         iKey=ShowSuckError(*DropSucker, 3, bAtPick?(K_RETRY|K_SKIP):K_SKIP, Part);   //CodeType 3 = drop (pick=1, place/residue=2)
+    }
 
     //dispose every still-OFF held nozzle per the choice, then write the SortArm slot off
     TTrayMotor *LoaderTray=(bAtPick?GetLoaderVMotor(iActiveLoaderNo):NULL);
@@ -1873,6 +1881,37 @@ bool TSortArmModule::DoPickFromLoader(int Flag)
             }
             if(MoveToLoaderPick()==false)
                 break;
+            //AI(ht160s-clampgrip) 20260806 : BOUNDARY CONFIRM before the irreversible pick
+            //Z-down (on-site notes 1/9, 2026-08-05 : a tray suddenly jumped out of a Loader-Y
+            //carriage clamp). The user's rule : the PushTray cylinder must be ON for "has tray"
+            //to mean anything. Without this the software still read fHasTray=1 / HasOK=1 and the
+            //nozzle would have driven down onto an empty carriage.
+            //Placed HERE rather than as a continuous poll across the Y move : between clamp and
+            //release there are legitimate windows where the reed changes (the feed ladder runs
+            //its own clamp confirm), and a naive poll would false-fire in them. This is the one
+            //moment where "is a tray really under me" must hold, and the answer is cheap.
+            //Verdict -1 (sim / point disabled / clamp retracted) proceeds unchanged : a point we
+            //cannot read is never evidence that a tray is missing.
+            if(LoaderModule->GetCarriageGripVerdict(iActiveLoaderNo)==0)
+            {
+                int RetGrip;
+                RecordProcess("SortArm pick BLOCKED : Loader"+IntToStr(iActiveLoaderNo)+
+                    " carriage PushTray grip reed dark with tray data present - tray lost off the carriage");
+                RetGrip=ShowMyError("JAM0913", LangT("Loader Tray Lost On Carriage"),
+                                    LoaderModule->GetCarriagePushOnSensor(iActiveLoaderNo), true,
+                                    K_RETRY|K_TRAY_END);
+                if(RetGrip==K_TRAY_END)
+                {
+                    //operator confirms the tray is gone : wipe this side's remaining tray data so
+                    //HasPickableIC goes false and the Loader discharges instead of offering the
+                    //side again (the same wipe the pick-fail K_TRAY_END uses at case 54).
+                    LoaderModule->ChangeActiveTrayData(iActiveLoaderNo, HAS_OK_IC, EMPTY_IC);
+                    LoaderModule->ChangeActiveTrayData(iActiveLoaderNo, UNCHECK_IC, EMPTY_IC);
+                    ClearPickSelection();
+                    PickTask=70;
+                }
+                break;   //K_RETRY : hold at case 40 and re-check; never Z-down on this verdict
+            }
             PickTask=45;
             break;
 
@@ -2115,8 +2154,26 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
             break;
 
         case 30:
-            if(MoveToAutoPlace())
-                PlaceTask=35;
+            if(MoveToAutoPlace()==false)
+                break;
+            //AI(ht160s-clampgrip) 20260806 : BOUNDARY CONFIRM before the irreversible place
+            //Z-down - the Auto half of the same on-site note ("need check auto has tray, then
+            //sortarm pick up ic"). Proof that the destination car really still grips its working
+            //tray, taken at the last moment before the IC is released.
+            //HELD, not dropped : the nozzle still carries the IC, so the only safe action is to
+            //stay here and re-check. Deliberately does NOT clear the Auto software state the way
+            //the Color diaper does - an Auto working tray holds already-placed ICs, so wiping its
+            //grid would destroy the placed-IC record. The operator decides.
+            if(AutoModule!=NULL && AutoModule->GetCarTrayGripVerdict(iActiveAutoIndex)==0)
+            {
+                AnsiString ErrGrip;
+                ErrGrip.sprintf("Auto%d Push Tray Miss - working tray lost from the car before place", iActiveAutoIndex+1);
+                RecordProcess("SortArm place BLOCKED : "+ErrGrip);
+                ShowMyError(AnsiString().sprintf("JAM%d02", 11+iActiveAutoIndex), ErrGrip,
+                            AutoModule->GetCarTrayPushOnSensor(iActiveAutoIndex), true, K_RETRY);
+                break;   //hold at case 30 : never release an IC into a car with no tray
+            }
+            PlaceTask=35;
             break;
 
         case 35:
