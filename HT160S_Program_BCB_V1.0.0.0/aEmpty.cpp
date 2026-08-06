@@ -6,6 +6,7 @@
 #include "language.h"
 
 #include "aEmpty.h"
+#include "cStateRecordHT160.h"   //AI(ht160s-phantom-tray) 20260806 : gStateRecord forensic snapshot on the diaper's first fire
 #include "database.h"
 #include "GeneralSetting.h"   //AI(ht160s-agv) 20260623 : iSimAmrMaxTray
 #include "cmydef.h"
@@ -1413,6 +1414,10 @@ void TEmptyModule::ForceReleaseCarriageTrayLatch(AnsiString Why)
 
     Evidence=DescribePhysicalTrayEvidence();   //BEFORE the clear
     iPhantomTrayFireCount++;
+    //AI(ht160s-obsv-p2) 20260806 : first fire per run -> full forensic snapshot BEFORE the
+    //clear (mirror of Color; see the note there).
+    if(iPhantomTrayFireCount==1 && gStateRecord!=NULL)
+        gStateRecord->TriggerSnapshot("PhantomTrayEmpty");
     bLog=true;
     if(dwPhantomTrayLogTick!=0 && (int)(dwNow-dwPhantomTrayLogTick)<EMPTY_PHANTOM_TRAY_LOG_GAP_MS)
         bLog=false;
@@ -1674,7 +1679,8 @@ AnsiString TEmptyModule::DescribeState()
        //counters. The 2026-08-05 Color hang could not be read straight off the dump because the
        //equivalent Color line never printed fHasTray - the very flag it was blocked on.
        + "  MotYHasTray=" + IntToStr((HSys.VMot.MMEmptyY!=NULL && HSys.VMot.MMEmptyY->fHasTray) ? 1 : 0)
-       + "  PhantomFires=" + IntToStr(iPhantomTrayFireCount) + "\r\n";
+       + "  PhantomFires=" + IntToStr(iPhantomTrayFireCount)
+       + "  Grip=" + IntToStr(GetClampGripVerdict(&HSys.Cyn.C_Empty_PushTray, IsSoftSimulate())) + "\r\n";
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
        + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
        + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)

@@ -108,6 +108,17 @@ __fastcall THGem::THGem(TComponent *Owner)
 //---------------------------------------------------------------------------
 __fastcall THGem::~THGem()
 {
+    //AI(secs-shutdown-uaf) 20260806 : null the GLOBAL back-pointer the moment this object
+    //dies. THGem belongs to Application while HT160Gem is HSys.MyGem, freed by the global
+    //SYSTEM_MODULAR dtor AFTER Application's teardown - so ~HT160Gem used to reach a live
+    //check "HGemPtr!=NULL" on a pointer to THIS, already-freed, object and write through it
+    //(SetGemLogic(NULL) = a store into freed memory). Latent since 20260729; it surfaced as a
+    //100%-reproducible 0xC0000005 at selftest exit once an unrelated heap-size change let the
+    //freed page be decommitted (Windows fault offset 0x12f2a1 -> THGem::SetGemLogic, mapped
+    //via a -m linker map). With the global nulled here, ~HT160Gem's "HGem==HGemPtr" liveness
+    //test (its side of this fix) skips the dead call in either destruction order.
+    if(HGem==this)
+        HGem = NULL;
     //AI(secs-audit-fix) 20260729 : drop the machine-logic back-pointer FIRST. Below we set
     //ClientSocket1/ServerSocket1->Active=false, and ScktComp's TCustomWinSocket::Disconnect
     //fires seDisconnect SYNCHRONOUSLY on a live socket -> ClientDisconnect ->

@@ -1706,8 +1706,12 @@ AnsiString TAutoModule::DescribeStation(int Index)
     //eight-gate reconstruction by elimination. CarTrays (Car[].iTrayCount) was dumped
     //NOWHERE in the tree, yet it is what selects identity vs cover vs normal for the next
     //tray, so it also decides whether an AMR-recovery divert could ever match this station.
+    //AI(ht160s-clampgrip) 20260806 : physical grip verdict beside the software CarHasTray -
+    //"working tray jumped out of the clamp" is then a one-line read (CarHasTray=1 Grip=0)
+    //instead of an IoDetail.txt cross-reference. 1=gripping 0=tray gone -1=no verdict.
     s += "  TrayReq="   + IntToStr(GetTrayRequest(Index))
-       + "  CarTrays="  + IntToStr(Car[Index].iTrayCount) + "\r\n";
+       + "  CarTrays="  + IntToStr(Car[Index].iTrayCount)
+       + "  Grip="      + IntToStr(GetCarTrayGripVerdict(Index)) + "\r\n";
     s += "  ResidueClear=" + IntToStr(State[Index].bResidueClear ? 1 : 0)
        + "  DischTail="    + IntToStr(bDischargeTailPending[Index] ? 1 : 0)
        + "  RearKind="     + IntToStr(RearKind[Index])

@@ -2735,7 +2735,12 @@ AnsiString TLoaderModule::DescribeState()
            + "  Ccd=" + IntToStr(St->CcdTask)
            + "  Disc=" + IntToStr(St->DischargeTask)
            + "  Destack=" + IntToStr(St->DestackTask) + "\r\n";
+        //AI(ht160s-clampgrip) 20260806 : print the PHYSICAL grip verdict beside the software
+        //flag. On 2026-08-05 a tray jumped out of a Loader-Y clamp while fHasTray stayed 1 -
+        //diagnosing that from a snapshot needed a manual IoDetail.txt cross-reference. Now the
+        //contradiction (fHasTray=1 Grip=0) is one line. 1=gripping 0=tray gone -1=no verdict.
         s += "         fHasTray=" + IntToStr(bHas ? 1 : 0)
+           + "  Grip=" + IntToStr(GetCarriageGripVerdict(n))
            + "  TrayEmptyFlag=" + IntToStr(St->bTrayEmpty ? 1 : 0)
            + "  CleanOutFin=" + IntToStr(St->bCleanOutFinish ? 1 : 0)
            + "  AllEmpty=" + IntToStr(ActiveTrayAllData(n, EMPTY_IC) ? 1 : 0)

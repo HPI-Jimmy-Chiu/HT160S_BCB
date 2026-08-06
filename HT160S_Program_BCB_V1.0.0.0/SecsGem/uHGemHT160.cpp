@@ -407,7 +407,13 @@ HT160Gem::~HT160Gem()
     //whenever the global HSys (which owns HSys.MyGem == this) is destroyed before Application
     //(which owns HGem). Static-dtor order is not guaranteed here, so both ends clear the link :
     //~THGem nulls GemLogic before it stops its sockets, and we null it from this side too.
-    if(HGemPtr!=NULL)
+    //AI(secs-shutdown-uaf) 20260806 : ... and the 20260729 assumption was wrong in the OTHER
+    //direction too - in practice Application dies FIRST, so HGemPtr here was a pointer to an
+    //ALREADY-FREED THGem and "HGemPtr!=NULL" happily passed (nothing ever nulled it). The
+    //store inside SetGemLogic then hit freed memory - a 100%-reproducible AV at selftest exit
+    //once heap layout shifted. ~THGem now nulls the GLOBAL HGem, so "HGem==HGemPtr" is a real
+    //liveness test : it only passes while the THGem this object was wired to is still alive.
+    if(HGemPtr!=NULL && HGem==HGemPtr)
         HGemPtr->SetGemLogic(NULL);
 }
 //---------------------------------------------------------------------------

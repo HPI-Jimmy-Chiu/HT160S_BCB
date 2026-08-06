@@ -27,6 +27,15 @@
 //---------------------------------------------------------------------------
 #define SR_MAX_MODULE   16   // upper bound on UserMotion actions tracked
 #define SR_MAX_HISTORY  30   // Task transitions kept per module (newest first)
+//AI(ht160s-obsv-p2) 20260806 : SLOW-ring dwell threshold. The plain history ring floods in an
+//idle spin - on 2026-08-05 17:30 the Auto1/Color rings held ~100 ms of 1->100->1000->3000
+//cycling and the module's last REAL action was gone. A second ring records only tasks that
+//were actually DWELT IN (>= this many ms when left), so it survives minutes of idle spin.
+//200 ms sits well between the spin period (one main cycle, ~10-20 ms) and the shortest real
+//action (a motor move / settle delay, hundreds of ms). The pre-pick wait gate idles in
+//exactly this spin shape by design, so the flood is now the NORMAL waiting posture -
+//without the slow ring every gated wait would wipe the forensic history.
+#define SR_SLOW_DWELL_MS 200
 //---------------------------------------------------------------------------
 class cStateRecordHT160
 {
@@ -46,12 +55,26 @@ private:
         int         HistCount;              // filled entries (<= SR_MAX_HISTORY)
         bool        bStuckFired;            //AI(ht160s-obsv-p1) : one auto-snapshot per stuck episode
         TDateTime   WatchBase;              //AI(ht160s-obsv) 20260724 : stuck-clock base (last task change OR last production resume) - immune to Pause/Stop wall-clock inflation
+        //AI(ht160s-obsv-p2) 20260806 : SLOW ring - only tasks dwelt in >= SR_SLOW_DWELL_MS
+        //(entry = the task + the time it was ENTERED, pushed when it is LEFT). Survives the
+        //idle-spin flood that wipes Hist[] within ~100 ms; see the define's note.
+        TTaskSample Slow[SR_MAX_HISTORY];
+        int         SlowHead;
+        int         SlowCount;
     };
 
     TModuleState Modules[SR_MAX_MODULE];
     int          ModuleCount;
     bool         bInited;
     bool         bPrevRunGate;              //AI(ht160s-obsv) 20260724 : prev state of the production gate; rebase WatchBase on its false->true edge
+    //AI(ht160s-obsv-p2) 20260806 : run-gate edge journal, dumped into CurrentTasks.txt +
+    //MachineState.ini so a snapshot SELF-DESCRIBES whether the machine was running and for
+    //how long. Both misread 2026-08-05 snapshots (16:14 / 17:30) needed an EventLog
+    //cross-read to discover they were taken 9/14 ms after a resume that followed a >5 min
+    //pause - with these fields that fact is on the first line of the dump.
+    bool         bRunGateNow;
+    TDateTime    tRunGateRise;              // 0 = never rose this run
+    TDateTime    tRunGateFall;              // 0 = never fell this run
     AnsiString   SaveRoot;                  // e.g. "D:\\HT160S_StateRecord\\"
 
     void       EnsureInited();

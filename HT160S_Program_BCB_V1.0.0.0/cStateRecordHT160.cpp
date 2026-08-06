@@ -71,6 +71,9 @@ cStateRecordHT160::cStateRecordHT160()
     ModuleCount = 0;
     bInited     = false;
     bPrevRunGate = false;                 //AI(ht160s-obsv) 20260724
+    bRunGateNow  = false;                 //AI(ht160s-obsv-p2) 20260806 : run-gate edge journal
+    tRunGateRise = 0;
+    tRunGateFall = 0;
     SaveRoot    = "D:\\HT160S_StateRecord\\";
 
     for(int i=0; i<SR_MAX_MODULE; i++)
@@ -82,6 +85,8 @@ cStateRecordHT160::cStateRecordHT160()
         Modules[i].WatchBase = Now();     //AI(ht160s-obsv) 20260724 : real base set at EnsureInited seed
         Modules[i].HistHead  = 0;
         Modules[i].HistCount = 0;
+        Modules[i].SlowHead  = 0;         //AI(ht160s-obsv-p2) 20260806 : slow ring
+        Modules[i].SlowCount = 0;
     }
 }
 //---------------------------------------------------------------------------
@@ -148,6 +153,27 @@ void cStateRecordHT160::PushSample(int ModuleIndex, int Task)
 
     TModuleState *M = &Modules[ModuleIndex];
     TDateTime tNow = Now();
+
+    //AI(ht160s-obsv-p2) 20260806 : SLOW ring - the task being LEFT is recorded (with the time
+    //it was entered) only if it was dwelt in >= SR_SLOW_DWELL_MS. Idle-spin transitions
+    //(1->10->100 within one or two main cycles) fall under the threshold and never enter this
+    //ring, so it holds the module's last ~30 REAL states while Hist[] holds the fine detail.
+    //Must run BEFORE the Hist push below : the newest Hist entry IS the departing task's
+    //entry time, and the push overwrites it.
+    if(M->bHasLast && M->HistCount > 0)
+    {
+        int PrevIdx = (M->HistHead - 1 + SR_MAX_HISTORY) % SR_MAX_HISTORY;
+        double dDwellMs = (double)(tNow - M->Hist[PrevIdx].Time) * 86400000.0;
+        if(dDwellMs >= (double)SR_SLOW_DWELL_MS)
+        {
+            M->Slow[M->SlowHead].Time = M->Hist[PrevIdx].Time;
+            M->Slow[M->SlowHead].Task = M->LastTask;
+            M->SlowHead = (M->SlowHead + 1) % SR_MAX_HISTORY;
+            if(M->SlowCount < SR_MAX_HISTORY)
+                M->SlowCount++;
+        }
+    }
+
     M->Hist[M->HistHead].Time = tNow;
     M->Hist[M->HistHead].Task = Task;
     M->HistHead = (M->HistHead + 1) % SR_MAX_HISTORY;
@@ -186,6 +212,8 @@ void cStateRecordHT160::EnsureInited()
         Modules[i].Name      = Name;
         Modules[i].HistHead  = 0;
         Modules[i].HistCount = 0;
+        Modules[i].SlowHead  = 0;   //AI(ht160s-obsv-p2) 20260806 : slow ring
+        Modules[i].SlowCount = 0;
         Modules[i].bHasLast  = false;
         Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1)
         // Seed an initial sample so every module has at least one entry.
@@ -236,21 +264,30 @@ void cStateRecordHT160::SampleTasks()
 //also rebase and cannot inflate the clock.
 void cStateRecordHT160::CheckStuckWatchdog()
 {
-    if(GeneralSetting.iStuckSnapshotSec<=0)
-        return;
-
     bool bRunGate = (HSys.Sys.SystemStart!=false) &&
                     (HSys.Sys.RunMode==Run_Normal || HSys.Sys.RunMode==Run_CleanOut);
     TDateTime tNow = Now();
+    //AI(ht160s-obsv-p2) 20260806 : run-gate edge JOURNAL, kept even when the watchdog itself
+    //is configured off (it used to sit below the iStuckSnapshotSec guard, which would have
+    //silently disabled the dump context too). Both edges are recorded so every snapshot can
+    //say "running since / stopped since" on its first line - the missing fact that let the
+    //two 2026-08-05 resume-edge snapshots be misread as genuine hangs.
     if(bRunGate && bPrevRunGate==false)
     {
+        tRunGateRise = tNow;
         for(int i=0; i<ModuleCount; i++)
         {
             Modules[i].WatchBase   = tNow;
             Modules[i].bStuckFired = false;
         }
     }
+    else if(bRunGate==false && bPrevRunGate)
+        tRunGateFall = tNow;
+    bRunGateNow  = bRunGate;
     bPrevRunGate = bRunGate;
+
+    if(GeneralSetting.iStuckSnapshotSec<=0)
+        return;
     if(bRunGate==false)
         return;
 
@@ -421,6 +458,33 @@ void cStateRecordHT160::WriteTaskHistoryCsv(AnsiString Path)
         fwrite(Row.c_str(), 1, Row.Length(), f);
     }
 
+    //AI(ht160s-obsv-p2) 20260806 : SLOW-ring rows ("<Module>_slow"). Same column pairs, but an
+    //entry's Time_k is when the task was ENTERED and only tasks dwelt in >= SR_SLOW_DWELL_MS
+    //appear, so these rows survive the idle-spin flood that wipes the plain rows within
+    //~100 ms (2026-08-05 17:30 : Auto1's whole 30-slot ring held one tick of 1/100/1000/3000
+    //spin and its last real action was unrecoverable). The pre-pick wait gate spins the
+    //SortArm idle loop BY DESIGN, so without these rows every gated wait erases the history.
+    for(int m=0; m<ModuleCount; m++)
+    {
+        TModuleState *M = &Modules[m];
+        AnsiString Row = M->Name + "_slow";
+        for(int k=0; k<SR_MAX_HISTORY; k++)
+        {
+            if(k < M->SlowCount)
+            {
+                int Idx = (M->SlowHead - 1 - k + 2*SR_MAX_HISTORY) % SR_MAX_HISTORY;
+                AnsiString T = FormatDateTime("hh:nn:ss.zzz", M->Slow[Idx].Time);
+                Row += "," + T + "," + IntToStr(M->Slow[Idx].Task);
+            }
+            else
+            {
+                Row += ",,";
+            }
+        }
+        Row += "\r\n";
+        fwrite(Row.c_str(), 1, Row.Length(), f);
+    }
+
     fflush(f);
     fclose(f);
 }
@@ -436,12 +500,47 @@ void cStateRecordHT160::WriteCurrentTasksTxt(AnsiString Path)
     //while the last change is fixed - StuckMs is then inflated by the operator's
     //notice->stop->snapshot delay (same caveat as the timestamps). It is exact when a
     //watchdog auto-triggers the snapshot while the line is still running.
+    TDateTime NowT = Now();
+    //AI(ht160s-obsv-p2) 20260806 : run-gate context FIRST, so the table below cannot be
+    //misread. RunGate=0 means the module loop is frozen (pause/stop) : every cursor is
+    //pause-frozen and StuckMs includes stopped time. A snapshot milliseconds after a rise is
+    //a resume edge, not a hang - the two 2026-08-05 misreads took an EventLog cross-read to
+    //discover exactly this.
+    {
+        AnsiString Ctx;
+        Ctx.sprintf("RunGate=%d (SystemStart && RunMode Normal/CleanOut)\r\n", bRunGateNow ? 1 : 0);
+        fwrite(Ctx.c_str(), 1, Ctx.Length(), f);
+        Ctx = "LastRunGateRise=";
+        if((double)tRunGateRise==0.0)
+            Ctx += "never";
+        else
+        {
+            double dMs=(double)(NowT-tRunGateRise)*86400000.0;
+            if(dMs<0) dMs=0;
+            Ctx += FormatDateTime("hh:nn:ss.zzz", tRunGateRise) + "  MsSinceRise=" + IntToStr((int)dMs);
+        }
+        Ctx += "\r\n";
+        fwrite(Ctx.c_str(), 1, Ctx.Length(), f);
+        Ctx = "LastRunGateFall=";
+        if((double)tRunGateFall==0.0)
+            Ctx += "never";
+        else
+        {
+            double dMs=(double)(NowT-tRunGateFall)*86400000.0;
+            if(dMs<0) dMs=0;
+            Ctx += FormatDateTime("hh:nn:ss.zzz", tRunGateFall) + "  MsSinceFall=" + IntToStr((int)dMs);
+        }
+        Ctx += "\r\n";
+        fwrite(Ctx.c_str(), 1, Ctx.Length(), f);
+        Ctx = "NOTE: RunGate=0 -> cursors are pause-frozen, StuckMs includes stopped time.\r\n\r\n";
+        fwrite(Ctx.c_str(), 1, Ctx.Length(), f);
+    }
+
     AnsiString Line = "Idx | Module        | CurTask | LastChangeTime  | StuckMs\r\n";
     fwrite(Line.c_str(), 1, Line.Length(), f);
     Line = "----+---------------+---------+-----------------+--------\r\n";
     fwrite(Line.c_str(), 1, Line.Length(), f);
 
-    TDateTime NowT = Now();
     for(int m=0; m<ModuleCount; m++)
     {
         TModuleState *M = &Modules[m];
@@ -486,6 +585,27 @@ void cStateRecordHT160::WriteMachineStateIni(AnsiString Path, AnsiString Reason,
     //SystemStart==0, so CheckMotorHome / fHome->ProcessMotorHome never step the axes. These show
     //WHY - whether the monitor is up (the ScanSystemSenser motor-power SystemStart-drops are
     //guarded ONLY while fHome is shown), the power-cycle/settle state, and if home already finished.
+    //AI(ht160s-obsv-p2) 20260806 : machine-readable run-gate context (companion to the
+    //CurrentTasks.txt header). MsSince* = -1 when that edge never happened this run.
+    {
+        TDateTime NowGate = Now();
+        int iMsRise=-1, iMsFall=-1;
+        if((double)tRunGateRise!=0.0)
+        {
+            double d=(double)(NowGate-tRunGateRise)*86400000.0;
+            if(d<0) d=0;
+            iMsRise=(int)d;
+        }
+        if((double)tRunGateFall!=0.0)
+        {
+            double d=(double)(NowGate-tRunGateFall)*86400000.0;
+            if(d<0) d=0;
+            iMsFall=(int)d;
+        }
+        Ini->WriteInteger("System", "RunGate", bRunGateNow ? 1 : 0);
+        Ini->WriteInteger("System", "MsSinceRunGateRise", iMsRise);
+        Ini->WriteInteger("System", "MsSinceRunGateFall", iMsFall);
+    }
     Ini->WriteInteger("System", "fHomeShown",        (fHome!=NULL && fHome->IsShown()) ? 1 : 0);
     Ini->WriteInteger("System", "fHomeSeenStart",    (fHome!=NULL && fHome->SeenStart()) ? 1 : 0);
     Ini->WriteInteger("System", "fAllMotorHome",     fAllMotorHome ? 1 : 0);

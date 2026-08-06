@@ -14,6 +14,7 @@
 #include "ColorCcdSocket.h"
 #include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() gates the Color CleanOut drain/finish
 #include "SecsGem\uHGemEquipment.h" //AI(ht160s-agv-identity2d) 20260714 : HGem->EventReport for CEID275
+#include "cStateRecordHT160.h"      //AI(ht160s-phantom-tray) 20260806 : gStateRecord forensic snapshot on the diaper's first fire
 #include "SecsGem\uAgvStation.h"    //AI(ht160s-agv-identity2d) 20260714 : AgvCoord.ReportLoaderIdentity + AMR_IDENTITY_CARRIER_INDEX
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -1886,6 +1887,13 @@ void TColorModule::ForceReleaseCarriageTrayLatch(AnsiString Why)
 
     Evidence=DescribePhysicalTrayEvidence();   //BEFORE the clear, so the log shows what was wrong
     iPhantomTrayFireCount++;
+    //AI(ht160s-obsv-p2) 20260806 : FIRST fire per run captures a full State Record snapshot
+    //BEFORE the latches are cleared, so the contradiction (MotYHasTray=1 Grip=0, every gate
+    //input, the upstream module cursors) is preserved as forensic evidence for finding the
+    //UPSTREAM owner that minted the phantom. Once per run only - the same StuckWatchdog-style
+    //mid-run snapshot the machine already takes, and the log rate limit stays separate.
+    if(iPhantomTrayFireCount==1 && gStateRecord!=NULL)
+        gStateRecord->TriggerSnapshot("PhantomTrayColor");
     bLog=true;
     if(dwPhantomTrayLogTick!=0 && (int)(dwNow-dwPhantomTrayLogTick)<PHANTOM_TRAY_LOG_GAP_MS)
         bLog=false;
@@ -2294,8 +2302,11 @@ AnsiString TColorModule::DescribeState()
        + "  ReadIdentityTask=" + IntToStr(ReadIdentityTask)
        + "  RaiseFrontTask=" + IntToStr(RaiseFrontTask)
        + "  bReadIdentityPending=" + IntToStr(bReadIdentityPending ? 1 : 0) + "\r\n";
+    //AI(ht160s-clampgrip) 20260806 : physical grip verdict for the carriage clamp, beside the
+    //diaper counters. 1=gripping 0=tray gone -1=no verdict (sim / disabled / not clamped).
     s += "  PhantomFires=" + IntToStr(iPhantomTrayFireCount)
-       + "  CleanOutCarriageAlarmed=" + IntToStr(bCleanOutCarriageAlarmed ? 1 : 0) + "\r\n";
+       + "  CleanOutCarriageAlarmed=" + IntToStr(bCleanOutCarriageAlarmed ? 1 : 0)
+       + "  Grip=" + IntToStr(GetClampGripVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())) + "\r\n";
     return s;
 }
 //---------------------------------------------------------------------------

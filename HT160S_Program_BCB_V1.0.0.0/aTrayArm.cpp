@@ -218,11 +218,35 @@ AnsiString TTrayArmModule::DescribeState()
        + "  Job=" + SR_TrayArmJobText(Job)
        + "  PickTask=" + IntToStr(PickTask)
        + "  PlaceTask=" + IntToStr(PlaceTask) + "\r\n";
-    s += "  bHasTray=" + IntToStr(bHasTray ? 1 : 0)
-       + "  PlaceDest=" + IntToStr(PlaceDest)
-       + "  iDeliverKind=" + IntToStr(iDeliverKind)
-       + "  iDeliverTrayID=" + iDeliverTrayID
-       + "  iAutoTarget=" + IntToStr(iAutoTarget) + "\r\n";
+    //AI(ht160s-clampgrip) 20260806 : raw clamp On-reed states beside the software latch.
+    //The clamp reeds are the arm's carried-tray ground truth (the MES1722 adoption path and
+    //the case-1432 release path both key off them), yet the dump never printed them, so
+    //"bHasTray=1 but is a tray REALLY in the jaws" needed an IoDetail.txt cross-reference.
+    //Raw tri-state prints (1/0, -1=point disabled), deliberately uninterpreted.
+    {
+        int iFrontOn=-1, iRearOn=-1;
+        if(HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.Enable)
+        {
+            if(HSys.Cyn.C_TrayArm_FrontClamp.OnSensor.IsOn())
+                iFrontOn=1;
+            else
+                iFrontOn=0;
+        }
+        if(HSys.Cyn.C_TrayArm_RearClamp.OnSensor.Enable)
+        {
+            if(HSys.Cyn.C_TrayArm_RearClamp.OnSensor.IsOn())
+                iRearOn=1;
+            else
+                iRearOn=0;
+        }
+        s += "  bHasTray=" + IntToStr(bHasTray ? 1 : 0)
+           + "  FrontClampOn=" + IntToStr(iFrontOn)
+           + "  RearClampOn=" + IntToStr(iRearOn)
+           + "  PlaceDest=" + IntToStr(PlaceDest)
+           + "  iDeliverKind=" + IntToStr(iDeliverKind)
+           + "  iDeliverTrayID=" + iDeliverTrayID
+           + "  iAutoTarget=" + IntToStr(iAutoTarget) + "\r\n";
+    }
     s += "  PickWaitArmed=" + IntToStr(bPickWaitArmed ? 1 : 0)
        + "  PlaceWaitArmed=" + IntToStr(bPlaceWaitArmed ? 1 : 0)
        + "  bCleanOutFinish=" + IntToStr(bCleanOutFinish ? 1 : 0)
