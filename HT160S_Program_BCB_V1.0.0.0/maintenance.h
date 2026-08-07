@@ -343,6 +343,10 @@ __published:
     TPanel *pnlWhiteListModeBox;
     TCheckBox *chkWhiteListActive;
     TLabel *lblWhiteListModeHint;
+    TTabSheet *tsCcd;
+    TPanel *pnlCcd2DSanitizeBox;
+    TLabel *lblCcd2DSanitizeHint;
+    TCheckBox *chkCcd2DCommaToUnderscore;
     TCheckBox *cbCommType;
     TPanel *pnlSuck2QuadBox;
     TLabel *lblSuck2QuadHint;
@@ -445,6 +449,7 @@ __published:
     void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
     void __fastcall chkUseAmrRecoveryDivertClick(TObject *Sender);
     void __fastcall chkSkipUnknown2DAlarmClick(TObject *Sender);
+    void __fastcall chkCcd2DCommaToUnderscoreClick(TObject *Sender);
     void __fastcall chkAutoEnableClick(TObject *Sender);
     void __fastcall chkSuckEnableClick(TObject *Sender);
     void __fastcall chkSuck2QuadVacuumClick(TObject *Sender);

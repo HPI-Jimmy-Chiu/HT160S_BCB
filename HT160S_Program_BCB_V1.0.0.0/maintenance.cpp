@@ -1390,6 +1390,8 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
         chkUseAmrRecoveryDivert->Checked=GeneralSetting.bUseAmrRecoveryDivert;
     if(chkSkipUnknown2DAlarm!=NULL)
         chkSkipUnknown2DAlarm->Checked=GeneralSetting.bSkipUnknown2DAlarm;   //AI(ht160s-whitelist) 20260727 : F1 load (Checked= fires OnClick; bLoadingHardwareSettings guards the write)
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        chkCcd2DCommaToUnderscore->Checked=GeneralSetting.bCcd2DCommaToUnderscore;   //AI(ht160s-ccd-2dsanitize) 20260807 : load (same OnClick guard)
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1476,6 +1478,8 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
     if(chkSkipUnknown2DAlarm!=NULL)
         GeneralSetting.bSkipUnknown2DAlarm=chkSkipUnknown2DAlarm->Checked;   //AI(ht160s-whitelist) 20260727 : F1 save
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        GeneralSetting.bCcd2DCommaToUnderscore=chkCcd2DCommaToUnderscore->Checked;   //AI(ht160s-ccd-2dsanitize) 20260807 : save
     {
         TCheckBox *AutoChk[6];
         int a;
@@ -1552,6 +1556,10 @@ void __fastcall TfMaintenance::ApplyHardwareEditLock()
     //bRunning gate - the mode cannot flip mid-lot (would corrupt in-progress routing).
     if(chkWhiteListActive!=NULL)
         chkWhiteListActive->Enabled=bEnable;
+    //AI(ht160s-ccd-2dsanitize) 20260807 : same bRunning lock - flipping the sanitize
+    //mid-lot would mix sanitized and raw code forms in one run (routing + logs).
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        chkCcd2DCommaToUnderscore->Enabled=bEnable;
 
     if(pnlHardwareHeader!=NULL)
     {
@@ -2468,6 +2476,38 @@ void __fastcall TfMaintenance::chkSkipUnknown2DAlarmClick(TObject *Sender)
     if(chkSkipUnknown2DAlarm!=NULL)
         GeneralSetting.bSkipUnknown2DAlarm=chkSkipUnknown2DAlarm->Checked;
     RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ccd-2dsanitize) 20260807 : comma -> underscore 2D sanitize toggle. Same
+//idle-only guard as chkWhiteListActiveClick : flipping it while ICs are under the
+//machine would mix raw and sanitized code forms within one run (codes captured
+//before the flip vs codes read after it - routing keys and Production_Log identity
+//would disagree). Live value, consumed at the next read; no restart needed.
+void __fastcall TfMaintenance::chkCcd2DCommaToUnderscoreClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(HasICUnderMachine())
+    {
+        if(chkCcd2DCommaToUnderscore!=NULL)
+        {
+            bLoadingHardwareSettings=true;             // suppress the re-entrant OnClick
+            chkCcd2DCommaToUnderscore->Checked=GeneralSetting.bCcd2DCommaToUnderscore;
+            bLoadingHardwareSettings=false;
+        }
+        ShowMyMessage("Cannot change 2D comma replacement while ICs are still under the machine. "
+                      "Finish or clear the current material first.");
+        return;
+    }
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        GeneralSetting.bCcd2DCommaToUnderscore=chkCcd2DCommaToUnderscore->Checked;
+    if(GeneralSetting.bCcd2DCommaToUnderscore)
+        ShowMyMessage("2D comma replacement ON : every comma in a scanned or hand-entered 2D "
+                      "code becomes an underscore. The work-order data must already use the "
+                      "underscore form.");
+    else
+        ShowMyMessage("2D comma replacement OFF : 2D codes are used exactly as read.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lotbin) 20260615 : Per-Auto enable (By Lot+Bin mode only). Disabled

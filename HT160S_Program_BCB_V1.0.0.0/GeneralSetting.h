@@ -115,6 +115,18 @@ public:
 	// Error when on, so keep it operator-armed. Stored in General.ini [SortMode] SkipUnknown2DAlarm.
 	bool bSkipUnknown2DAlarm;
 
+	//AI(ht160s-ccd-2dsanitize) 20260807 : when true, every comma in a READER-supplied
+	// 2D code (Top CCD socket reply, manual/handheld entry) is replaced with an
+	// underscore at the read source, so routing keys, Production_Log, Soter CSV and
+	// SECS all carry one consistent comma-free form. Covers half-width ',' plus the
+	// full-width comma in Big5 (A1 41) and UTF-8 (EF BC 8C) byte forms. The customer
+	// work order (WebAPI JSON) already carries the underscore form by agreement, so
+	// the loaded lot table is deliberately NOT rewritten. Idle-only toggle (flipping
+	// it mid-lot would mix both forms in one run). Edited on the maintenance
+	// hardware CCD tab. Stored in General.ini [SortMode] Ccd2DCommaToUnderscore.
+	bool bCcd2DCommaToUnderscore;
+	AnsiString SanitizeScanned2D(const AnsiString &sRaw);
+
 	// Per-Auto enable (By Lot+Bin mode only). When bAutoEnabled[i]==false, Auto(i+1)
 	// is skipped by THT160LotBinBinding::ResolveAuto so no new (LotID,Bin) pair binds
 	// to it; existing bindings still resolve. Index 0..5 = Auto1..Auto6. Default all

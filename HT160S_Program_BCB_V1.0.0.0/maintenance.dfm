@@ -2344,6 +2344,54 @@ object fMaintenance: TfMaintenance
                 end
               end
             end
+            object tsCcd: TTabSheet
+              Caption = 'CCD'
+              ImageIndex = 5
+              object pnlCcd2DSanitizeBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 89
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblCcd2DSanitizeHint: TLabel
+                  Left = 16
+                  Top = 32
+                  Width = 897
+                  Height = 49
+                  AutoSize = False
+                  Caption =
+                    'Every comma (half-width or full-width) in a 2D code read by the ' +
+                    'Top CCD or hand-entered / handheld-scanned is replaced with an u' +
+                    'nderscore before the code is used anywhere (routing, logs, CSV, ' +
+                    'SECS). The work-order data must already use the underscore form.' +
+                    ' Changeable only while idle.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkCcd2DCommaToUnderscore: TCheckBox
+                  Left = 16
+                  Top = 8
+                  Width = 470
+                  Height = 20
+                  Caption = 'Replace commas in scanned 2D codes with underscore'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkCcd2DCommaToUnderscoreClick
+                end
+              end
+            end
           end
           object Panel1: TPanel
             Left = 2

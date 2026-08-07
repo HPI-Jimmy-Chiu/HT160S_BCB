@@ -97,6 +97,7 @@ void THT160GeneralSetting::SetDefault()
 	bUsePredictiveAutoSupply=false;
 	bUseAmrRecoveryDivert=false;
 	bSkipUnknown2DAlarm=false;   //AI(ht160s-whitelist) 20260727 : F1 default OFF (legacy WAR0475 modal)
+	bCcd2DCommaToUnderscore=false;   //AI(ht160s-ccd-2dsanitize) 20260807 : default OFF (codes used as read)
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=true;
 	for(int s=0;s<4;s++)
@@ -210,6 +211,7 @@ void THT160GeneralSetting::Load()
 	bUsePredictiveAutoSupply=Ini->ReadBool("SortMode", "UsePredictiveAutoSupply", false);
 	bUseAmrRecoveryDivert=Ini->ReadBool("SortMode", "UseAmrRecoveryDivert", false);
 	bSkipUnknown2DAlarm=Ini->ReadBool("SortMode", "SkipUnknown2DAlarm", false);   //AI(ht160s-whitelist) 20260727 : F1
+	bCcd2DCommaToUnderscore=Ini->ReadBool("SortMode", "Ccd2DCommaToUnderscore", false);   //AI(ht160s-ccd-2dsanitize) 20260807
 	for(int a=0;a<6;a++)
 		bAutoEnabled[a]=Ini->ReadBool("SortMode", "AutoEnabled"+IntToStr(a), true);
 	for(int s=0;s<4;s++)
@@ -326,6 +328,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("SortMode", "UsePredictiveAutoSupply", bUsePredictiveAutoSupply);
 	Ini->WriteBool("SortMode", "UseAmrRecoveryDivert", bUseAmrRecoveryDivert);
 	Ini->WriteBool("SortMode", "SkipUnknown2DAlarm", bSkipUnknown2DAlarm);   //AI(ht160s-whitelist) 20260727 : F1
+	Ini->WriteBool("SortMode", "Ccd2DCommaToUnderscore", bCcd2DCommaToUnderscore);   //AI(ht160s-ccd-2dsanitize) 20260807
 	for(int a=0;a<6;a++)
 		Ini->WriteBool("SortMode", "AutoEnabled"+IntToStr(a), bAutoEnabled[a]);
 	for(int s=0;s<4;s++)
@@ -384,5 +387,60 @@ void THT160GeneralSetting::Save()
 		Ini->WriteInteger("BinDisplay", "Color"+IntToStr(i), iBinDispColor[i]);
 	}
 	delete Ini;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ccd-2dsanitize) 20260807 : replace every comma in a reader-supplied 2D
+//code with one underscore, gated by bCcd2DCommaToUnderscore (input returned
+//unchanged when OFF). Handles, in priority order per position :
+//  EF BC 8C  (full-width comma, UTF-8)  -> "_"
+//  A1 41     (full-width comma, Big5)   -> "_"
+//  2C        (half-width comma)         -> "_"
+//The walk is lead-byte aware : any byte >= 0x81 consumes 2 bytes as one double-byte
+//character, so a trail byte can never be misread as the start of a comma pattern.
+//Called at the read SOURCE only (Top CCD socket reply + manual/handheld entry) so
+//routing, logs, CSV and SECS all see one consistent form; the loaded work order
+//(WebAPI JSON) already carries the underscore form by customer agreement and is
+//deliberately not rewritten.
+AnsiString THT160GeneralSetting::SanitizeScanned2D(const AnsiString &sRaw)
+{
+	if(!bCcd2DCommaToUnderscore)
+		return sRaw;
+
+	int iLen=sRaw.Length();
+	AnsiString sOut="";
+	int i=1;
+	while(i<=iLen)
+	{
+		unsigned char c=(unsigned char)sRaw[i];
+		if(c==',')
+		{
+			sOut+="_";
+			i++;
+			continue;
+		}
+		if(c==0xEF && i+2<=iLen &&
+		   (unsigned char)sRaw[i+1]==0xBC && (unsigned char)sRaw[i+2]==0x8C)
+		{
+			sOut+="_";
+			i+=3;
+			continue;
+		}
+		if(c==0xA1 && i+1<=iLen && (unsigned char)sRaw[i+1]==0x41)
+		{
+			sOut+="_";
+			i+=2;
+			continue;
+		}
+		if(c>=0x81 && i+1<=iLen)
+		{
+			sOut+=(char)c;
+			sOut+=sRaw[i+1];
+			i+=2;
+			continue;
+		}
+		sOut+=(char)c;
+		i++;
+	}
+	return sOut;
 }
 //---------------------------------------------------------------------------

@@ -485,7 +485,10 @@ void __fastcall TfNote::edtManual2DKeyPress(TObject *Sender, char &Key)
         Key=0;
         if(edtManual2D->Text.Trim()=="")
             return;
-        ManualText=edtManual2D->Text.Trim();
+        //AI(ht160s-ccd-2dsanitize) 20260807 : manual/handheld entry is treated like a
+        //real read, so it gets the same comma -> underscore sanitize as the Top CCD
+        //source (no-op unless enabled). The log records the sanitized form.
+        ManualText=GeneralSetting.SanitizeScanned2D(edtManual2D->Text.Trim());
         ReturnCode=K_MANUAL_2D;
         RecordProcess(AnsiString("MANUAL 2D entered : ")+ManualText);
         Close();

@@ -11,6 +11,7 @@
 
 #include "TopCcdSocket.h"
 #include "database.h"
+#include "GeneralSetting.h"   //AI(ht160s-ccd-2dsanitize) 20260807 : SanitizeScanned2D at the read source
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -235,7 +236,10 @@ void __fastcall THT160TopCcdSocket::PollReceive()
             sRecvBuffer = sRecvBuffer.SubString(iPos + 1, sRecvBuffer.Length());
             if(sLine != "")
             {
-                sTopCcd2D       = sLine;
+                //AI(ht160s-ccd-2dsanitize) 20260807 : comma -> underscore at the read
+                //source (no-op unless GeneralSetting.bCcd2DCommaToUnderscore). The log
+                //below records the sanitized form - the form every consumer will see.
+                sTopCcd2D       = GeneralSetting.SanitizeScanned2D(sLine);
                 bTopCcdReadDone = true;
                 SaveTopCcd2DLog(sTopCcd2D);
             }
