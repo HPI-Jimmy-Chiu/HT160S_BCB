@@ -201,8 +201,8 @@ typedef struct
 	int        iPlanQty;           // expected IC count (lot-table item count)
 	int        iSortedQty;         // IC already sorted for this Lot
 	int        iBinCount[TEST_MAX_BIN]; // per-Bin sorted count for this Lot
-	TDateTime  dtFirstSeen;        // first IC of this Lot scanned
-	TDateTime  dtLastSeen;         // last IC of this Lot scanned
+	TDateTime  dtFirstSeen;        // first IC of this Lot placed (was scan-time before 20260807)
+	TDateTime  dtLastSeen;         // last IC of this Lot placed
 	bool       bActive;            // still being sorted on the machine
 
 	// Backup meta from the customer 2DIDHistory format (not used for routing,

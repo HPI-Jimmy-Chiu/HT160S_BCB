@@ -2159,7 +2159,12 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                             else if(GeneralSetting.IsLotPassFailSortMode() && PassClass>0)
                                 LotBinBinding.ResolveAuto(HitLotIndex, PassClass);
                         }
-                        LotRegistry.OnSorted(HitLotIndex, Bin);
+                        //AI(ht160s-lotqty-placepoint) 20260807 : LotRegistry.OnSorted() REMOVED from
+                        // here (and from BindManual2D below) - moved to the SortArm place point
+                        // (aSortArm.cpp TransferPlaceDataToAuto), same ruling as SVID 1102 below.
+                        // Counting per-lot SortedQty at CCD-scan time double-counted every re-scan
+                        // of a not-yet-picked cell and counted auto-skipped dies that never left
+                        // the source tray (on-site 2026-08-06 : NQ80031AA1 SortedQty=13, PlanQty=10).
                         //AI(ht160s-lot-reset) 20260706 : global per-Bin production count
                         //(HT172 parity: aSortArm/aMagArm bump BinICCnt[Bin] on sort). HT160
                         //resolves Bin here at scan, so count it here.
@@ -2281,7 +2286,8 @@ void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
                 else if(GeneralSetting.IsLotPassFailSortMode() && PassClass>0)
                     LotBinBinding.ResolveAuto(HitLotIndex, PassClass);
             }
-            LotRegistry.OnSorted(HitLotIndex, Bin);
+            //AI(ht160s-lotqty-placepoint) 20260807 : OnSorted() REMOVED here too - counted at
+            // the SortArm place point now (see the scan-path note above).
             //AI(ht160s-lot-reset) 20260706 : per-Bin count on manual-2D sort too.
             if(Bin>=0 && Bin<TEST_MAX_BIN)
                 tRunData.BinICCnt[Bin]++;

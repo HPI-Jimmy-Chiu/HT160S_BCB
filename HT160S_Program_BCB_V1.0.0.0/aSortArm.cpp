@@ -1732,6 +1732,15 @@ void TSortArmModule::TransferPlaceDataToAuto()
             // sum of 1103-1105 / 1259-1261, because TrayICCnt[] is bumped on the next line from the
             // same event.
             MachineRun.iTotalSorted++;
+            //AI(ht160s-lotqty-placepoint) 20260807 : per-lot SortedQty (UI Lot list sorted
+            // column / State Record LotData) moves here from the aLoader CCD-scan hit, from
+            // the identity frozen at pick (Slot.LotIndex / Slot.BinValue) - same place-point
+            // ruling as SVID 1102 above. Scan-time counting double-counted every re-scan of a
+            // not-yet-picked cell and counted auto-skipped dies that never left the source
+            // tray (on-site 2026-08-06 : NQ80031AA1 SortedQty=13 vs PlanQty=10). OnSorted()
+            // self-guards LotIndex<0, so unknown-2D ICs placed into the Error Auto stay
+            // uncounted per-lot exactly as before.
+            LotRegistry.OnSorted(Slot[SlotIndex].LotIndex, Slot[SlotIndex].BinValue);
             //AI(ht160s-motion-view) 20260618 : per-Auto output IC count for the Unload
             //palAutoXXCnt display (HT172 ShowBinCount used tRunData.TrayICCnt). eAuto1=index 1.
             if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)
