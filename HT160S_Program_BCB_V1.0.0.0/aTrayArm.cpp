@@ -175,12 +175,18 @@ void TTrayArmModule::PauseTimeoutTimers()
     //the production/Teach-test dwell Paused-stuck.
     PickWaitTimer.Pause();
     PlaceWaitTimer.Pause();   //AI(ht160s-home-resume-p0) 20260710 : same freeze rule as the pick watchdog
+    //AI(ht160s-tickgap) 20260807 : Z-up-lost debounce is a raw GetTickCount window (mirror of
+    //SortArm dwSuckHomeLostStart, fixed the same day for the same reason) : armed by a single
+    //bad read just before a PAUSE, it confirmed on the FIRST read after START, defeating the
+    //debounce. Clear on both edges so it only ever measures continuous running-time reads.
+    dwZUpLostStart=0;
 }
 //---------------------------------------------------------------------------
 void TTrayArmModule::ReStartTimeoutTimers()
 {
     PickWaitTimer.ReStart();
     PlaceWaitTimer.ReStart();
+    dwZUpLostStart=0;   //AI(ht160s-tickgap) 20260807 : resume twin (see PauseTimeoutTimers)
 }
 //---------------------------------------------------------------------------
 static AnsiString SR_TrayArmStatusText(int St)

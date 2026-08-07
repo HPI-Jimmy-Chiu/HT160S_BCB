@@ -137,6 +137,16 @@ void TSortArmModule::PauseTimeoutTimers()
     //this single hook covers both pause and alarm. This is the same defect the State Record
     //stuck watchdog had - it measured wall clock across a pause and fired on resume.
     dwPrePickWaitStart=0;
+    //AI(ht160s-tickgap) 20260807 : same medicine for the remaining raw-GetTickCount windows.
+    //On-site 2026-08-06 16:05:07 + 16:09:38 : PAUSE landed mid Z-down, dwZDownGuardStart kept
+    //ticking through the ~30s stop, and GuardSuckZDown fired 11-12ms after the next START -
+    //one stale window, two alarm texts (down-timeout vs Home-still-ON, depending only on
+    //whether the nozzle had already left the top). Clear all three raw-tick windows on the
+    //pause edge so resume re-arms a FULL window; the alarms then only ever measure time the
+    //ladder was actually scanning.
+    dwZDownGuardStart=0;
+    dwSuckHomeLostStart=0;
+    dwHoldLostStart=0;
 }
 //---------------------------------------------------------------------------
 void TSortArmModule::ReStartTimeoutTimers()
@@ -146,6 +156,11 @@ void TSortArmModule::ReStartTimeoutTimers()
     //AI(ht160s-prepick) 20260806 : and again on the resume edge, so the operator always gets a
     //FULL fresh window of actual running before MES1921 can fire.
     dwPrePickWaitStart=0;
+    //AI(ht160s-tickgap) 20260807 : resume twin for the three raw-tick windows (see
+    //PauseTimeoutTimers above).
+    dwZDownGuardStart=0;
+    dwSuckHomeLostStart=0;
+    dwHoldLostStart=0;
 }
 //---------------------------------------------------------------------------
 void TSortArmModule::InitialFlag(bool bKeepMaterial)
