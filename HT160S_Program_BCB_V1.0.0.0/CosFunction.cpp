@@ -869,15 +869,21 @@ void THT160LotRegistry::FreeAllIcInfo()
 	m_Code2DInfo->Clear();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-2dbin-binrange) 20260808 : invariant - Bin must be inside
+//[0, HT160_LOTREG_PACK_BIN_MOD-1] or the packed value is ambiguous (UnpackRef
+//would return a shifted LotIndex). Kept as pure arithmetic on purpose : a
+//silent clamp here would store a wrong-but-plausible Bin. The range is
+//enforced once at the single write boundary (AddItemEx) with a visible
+//failure (return false) instead.
 int THT160LotRegistry::PackRef(int LotIndex, int Bin)
 {
-	return LotIndex*1000000+Bin;
+	return LotIndex*HT160_LOTREG_PACK_BIN_MOD+Bin;
 }
 //---------------------------------------------------------------------------
 void THT160LotRegistry::UnpackRef(int Packed, int &LotIndex, int &Bin)
 {
-	LotIndex=Packed/1000000;
-	Bin=Packed%1000000;
+	LotIndex=Packed/HT160_LOTREG_PACK_BIN_MOD;
+	Bin=Packed%HT160_LOTREG_PACK_BIN_MOD;
 }
 //---------------------------------------------------------------------------
 void THT160LotRegistry::Clear()
@@ -1141,6 +1147,16 @@ bool THT160LotRegistry::AddItemEx(AnsiString LotID, AnsiString Code2D, int Bin,
 	AnsiString Code=Code2D.Trim();
 	if(Code==AnsiString(""))
 		return true;                  // nothing to add, not an error
+
+	//AI(ht160s-2dbin-binrange) 20260808 : packed 2D-ref safety. Every write of
+	//the reverse index goes through here (fresh add + upsert re-pack below), so
+	//this is the one place the PackRef invariant is enforced. A Bin outside
+	//[0, MOD-1] (bad WebAPI HBin, corrupt Maps file, editor typo) would corrupt
+	//the packed (LotIndex,Bin) - negative Bin even lands the IC in the WRONG
+	//Lot on UnpackRef. Reject visibly; import paths surface it to the operator
+	//through their existing failed-add reporting.
+	if(Bin<0 || Bin>=HT160_LOTREG_PACK_BIN_MOD)
+		return false;
 
 	int LotIndex=AddLot(LotID, HT160_LOT_SOURCE_OFFLINE, "", "");
 	if(LotIndex<0)

@@ -189,6 +189,11 @@ public:
 #define HT160_MAX_LOT 64                 // max Lots coexisting on the machine
 #define HT160_LOT_SOURCE_OFFLINE 0       // operator built the lot data by hand
 #define HT160_LOT_SOURCE_SECS    1       // remote host (SECS) pushed the lot data
+//AI(ht160s-2dbin-binrange) 20260808 : modulus of the packed 2D-ref value
+//(PackRef = LotIndex*MOD+Bin). A Bin outside [0, MOD-1] would corrupt the
+//packed reference (a negative Bin even shifts the IC into the WRONG Lot on
+//UnpackRef), so AddItemEx rejects such a Bin before any PackRef call.
+#define HT160_LOTREG_PACK_BIN_MOD 1000000
 //---------------------------------------------------------------------------
 // Layer 1 : one production Lot instance currently held on the machine.
 typedef struct

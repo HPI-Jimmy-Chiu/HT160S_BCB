@@ -3887,12 +3887,24 @@ void __fastcall TfMain::btn2DCommitClick(TObject *Sender)
     }
     int AddedCount=0;
     int DupCount=0;
+    int BadBinCount=0;
     for(int Row=1; Row<sg2DBinEdit->RowCount; Row++)
     {
         AnsiString Code=sg2DBinEdit->Cells[0][Row].Trim();
         if(Code==AnsiString(""))
             continue;
         int Bin=StrToIntDef(sg2DBinEdit->Cells[1][Row].Trim(), 0);
+        //AI(ht160s-2dbin-binrange) 20260808 : operator-typed Bin must be a normal
+        //sort bin, 1..HT160_BIN_AREA_NORMAL_MAX_BIN-1 (the BinAreaMap::IsValidBin
+        //range). 0 (= empty / unparseable cell), a negative or a huge value would
+        //otherwise corrupt the packed (LotIndex,Bin) 2D-ref or silently route the
+        //IC to the Error bin at run time. Guarding BEFORE the branch below covers
+        //all three commit paths (re-bin upsert / legacy re-add / fresh add).
+        if(Bin<=0 || Bin>=HT160_BIN_AREA_NORMAL_MAX_BIN)
+        {
+            BadBinCount++;
+            continue;
+        }
         AnsiString ExistLot;
         int ExistBin;
         int ExistIdx;
@@ -3943,7 +3955,10 @@ void __fastcall TfMain::btn2DCommitClick(TObject *Sender)
     RefreshLotListFromRegistry();
     Reload2DBinGridFromRegistry();
     SaveWorkOrder();
-    ShowMyMessage(Format(LangT("Committed: %d added, %d duplicate skipped"), ARRAYOFCONST((AddedCount, DupCount))));
+    AnsiString CommitMsg=Format(LangT("Committed: %d added, %d duplicate skipped"), ARRAYOFCONST((AddedCount, DupCount)));
+    if(BadBinCount>0)
+        CommitMsg=CommitMsg+Format(LangT(", %d invalid Bin skipped (valid 1..%d)"), ARRAYOFCONST((BadBinCount, HT160_BIN_AREA_NORMAL_MAX_BIN-1)));
+    ShowMyMessage(CommitMsg);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btn2DClearClick(TObject *Sender)
