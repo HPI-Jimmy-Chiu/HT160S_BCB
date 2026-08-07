@@ -3010,17 +3010,30 @@ void __fastcall TfMain::PollLotDataWebApi()
     {
         bDuplicate=false;
         DupCode="";
-        int iLotsBefore=LotRegistry.GetLotCount(); /*AI(ht160s-lot-webapi) 20260715: snapshot before parse*/ if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode, sLotApiPullLot)) /*AI(ht160s-kyec) 20260722: stamp KYEC lot -> ICs register under it, customer lot kept per-IC + upsert latest-wins*/
+        int iLotsBefore=LotRegistry.GetLotCount(); /*AI(ht160s-lot-webapi) 20260715: snapshot before parse*/
+        int iItemsBefore=LotRegistry.GetItemCount(); /*AI(ht160s-webapi-0lots) 20260807: snapshot ICs too*/
+        if(LotRegistry.LoadFromJsonString(Body, bDuplicate, DupCode, sLotApiPullLot)) /*AI(ht160s-kyec) 20260722: stamp KYEC lot -> ICs register under it, customer lot kept per-IC + upsert latest-wins*/
         {
             RefreshLotListFromRegistry();
             SaveWorkOrder();
-            if(LotRegistry.GetLotCount()==iLotsBefore) RecordProcess("Lot WebAPI parsed 0 lots (schema mismatch?): "+sLotApiPullLot); else RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot); /*AI(ht160s-lot-webapi) 20260715: break silent-empty parse*/
+            //AI(ht160s-webapi-0lots) 20260807 : the old criterion (lot-count unchanged ->
+            // "parsed 0 lots (schema mismatch?)") fired on EVERY pull-all sweep, because the
+            // swept lots are already registered, so a perfect 200-OK load that only added or
+            // upsert-refreshed ICs still logged "schema mismatch" (on-site 2026-08-06 15:03:53,
+            // three good KYEC pulls). Judge by the per-IC effect instead : new ICs + refreshed
+            // ICs. This also folds the old separate "refreshed N existing 2D codes" line into
+            // the loaded record (one line per pull either way).
+            {
+                int iNewLots=LotRegistry.GetLotCount()-iLotsBefore;
+                int iNewItems=LotRegistry.GetItemCount()-iItemsBefore;
+                int iRefreshed=LotRegistry.GetRefreshCount();
+                if(iNewItems==0 && iRefreshed==0)
+                    RecordProcess("Lot WebAPI parsed 0 ICs (schema mismatch or empty history): "+sLotApiPullLot);
+                else
+                    RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot+" (new lots="+IntToStr(iNewLots)+", new ICs="+IntToStr(iNewItems)+", refreshed="+IntToStr(iRefreshed)+")");
+            }
             if(bDuplicate==true)
                 RecordProcess("Lot WebAPI duplicate 2D ignored: "+DupCode);
-            //AI(ht160s-kyec) 20260722 : re-pull latest-wins : loud record of how many existing
-            //2D codes were refreshed in place to the newest WebAPI data.
-            if(LotRegistry.GetRefreshCount()>0)
-                RecordProcess("Lot WebAPI refreshed "+IntToStr(LotRegistry.GetRefreshCount())+" existing 2D codes to latest data: "+sLotApiPullLot);
             bAttemptOk=true;
         }
         else
