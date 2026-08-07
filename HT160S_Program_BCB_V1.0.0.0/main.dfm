@@ -1768,7 +1768,7 @@ object fMain: TfMain
                     Top = 32
                     Width = 548
                     Height = 168
-                    ColCount = 2
+                    ColCount = 3
                     DefaultRowHeight = 18
                     FixedCols = 0
                     RowCount = 2
@@ -1781,6 +1781,7 @@ object fMain: TfMain
                     ParentFont = False
                     ScrollBars = ssVertical
                     TabOrder = 0
+                    OnSelectCell = sg2DBinEditSelectCell
                   end
                   object btn2DAddRow: TButton
                     Left = 4

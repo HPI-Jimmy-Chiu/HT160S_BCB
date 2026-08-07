@@ -3697,16 +3697,39 @@ void __fastcall TfMain::Setup2DBinGrid()
 {
     if(sg2DBinEdit==NULL)
         return;
-    sg2DBinEdit->ColCount=2;
+    //AI(ht160s-2dbin-diepass) 20260808 : column 2 shows the customer per-IC
+    //DiePass (WebService#11, 1=pass / 0=fail) DISPLAY-ONLY - Commit never reads
+    //it (manual adds keep DiePass empty = FAIL class by customer decision).
+    sg2DBinEdit->ColCount=3;
     sg2DBinEdit->FixedCols=0;
     sg2DBinEdit->FixedRows=1;
-    sg2DBinEdit->ColWidths[0]=360;
-    sg2DBinEdit->ColWidths[1]=120;
+    sg2DBinEdit->ColWidths[0]=330;
+    sg2DBinEdit->ColWidths[1]=100;
+    sg2DBinEdit->ColWidths[2]=85;
     sg2DBinEdit->Cells[0][0]=LangT("2D Code");
     sg2DBinEdit->Cells[1][0]="Bin";
+    sg2DBinEdit->Cells[2][0]="DiePass";
     sg2DBinEdit->RowCount=2;
     sg2DBinEdit->Cells[0][1]="";
     sg2DBinEdit->Cells[1][1]="";
+    sg2DBinEdit->Cells[2][1]="";
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-diepass) 20260808 : keep the DiePass column read-only. Commit
+//ignores column 2 (AddItem always stores DiePass="") so anything typed there
+//would be silently discarded on the next reload; block the in-place editor on
+//that column instead of confusing the operator.
+void __fastcall TfMain::sg2DBinEditSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect)
+{
+    (void)Sender;
+    (void)ARow;
+    CanSelect=true;
+    if(sg2DBinEdit==NULL)
+        return;
+    if(ACol==2)
+        sg2DBinEdit->Options=sg2DBinEdit->Options >> goEditing;
+    else
+        sg2DBinEdit->Options=sg2DBinEdit->Options << goEditing;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::Refresh2DBinHeader()
@@ -3743,33 +3766,40 @@ void __fastcall TfMain::Reload2DBinGridFromRegistry()
             Rows=2;
         sg2DBinEdit->RowCount=Rows;
         // each List line : Code2D \t Bin \t HBin \t SBin \t RetestCode \t DiePass
+        //  \t CustLotID \t ProductCode \t Substage
+        //AI(ht160s-2dbin-diepass) 20260808 : split all tab fields; column 2 shows
+        //field 5 (customer DiePass). Manual/legacy records carry an empty DiePass
+        //and show blank here (= FAIL class by customer decision).
         for(int Index=0; Index<RecordCount; Index++)
         {
             AnsiString Line=List->Strings[Index];
-            AnsiString Code2D="";
-            AnsiString BinStr="";
-            int Tab1=Line.Pos("\t");
-            if(Tab1>0)
+            AnsiString Field[6];
+            int FieldIdx=0;
+            AnsiString Cur="";
+            for(int Pos=1; Pos<=Line.Length(); Pos++)
             {
-                Code2D=Line.SubString(1, Tab1-1);
-                AnsiString Rest=Line.SubString(Tab1+1, Line.Length()-Tab1);
-                int Tab2=Rest.Pos("\t");
-                if(Tab2>0)
-                    BinStr=Rest.SubString(1, Tab2-1);
+                char Ch=Line[Pos];
+                if(Ch=='\t')
+                {
+                    if(FieldIdx<6)
+                        Field[FieldIdx]=Cur;
+                    FieldIdx++;
+                    Cur="";
+                }
                 else
-                    BinStr=Rest;
+                    Cur+=Ch;
             }
-            else
-            {
-                Code2D=Line;
-            }
-            sg2DBinEdit->Cells[0][1+Index]=Code2D;
-            sg2DBinEdit->Cells[1][1+Index]=BinStr;
+            if(FieldIdx<6)
+                Field[FieldIdx]=Cur;
+            sg2DBinEdit->Cells[0][1+Index]=Field[0];
+            sg2DBinEdit->Cells[1][1+Index]=Field[1];
+            sg2DBinEdit->Cells[2][1+Index]=Field[5];
         }
         for(int Blank=1+RecordCount; Blank<sg2DBinEdit->RowCount; Blank++)
         {
             sg2DBinEdit->Cells[0][Blank]="";
             sg2DBinEdit->Cells[1][Blank]="";
+            sg2DBinEdit->Cells[2][Blank]="";
         }
     }
     __finally
@@ -3799,6 +3829,7 @@ void __fastcall TfMain::btn2DAddRowClick(TObject *Sender)
     sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
     sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]="";
     sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]="";
+    sg2DBinEdit->Cells[2][sg2DBinEdit->RowCount-1]="";
     Refresh2DBinHeader();
 }
 //---------------------------------------------------------------------------
@@ -3826,6 +3857,7 @@ void __fastcall TfMain::btn2DDelRowClick(TObject *Sender)
     {
         sg2DBinEdit->Cells[0][RowIndex]=sg2DBinEdit->Cells[0][RowIndex+1];
         sg2DBinEdit->Cells[1][RowIndex]=sg2DBinEdit->Cells[1][RowIndex+1];
+        sg2DBinEdit->Cells[2][RowIndex]=sg2DBinEdit->Cells[2][RowIndex+1];
     }
     if(sg2DBinEdit->RowCount>2)
         sg2DBinEdit->RowCount=sg2DBinEdit->RowCount-1;
@@ -3833,6 +3865,7 @@ void __fastcall TfMain::btn2DDelRowClick(TObject *Sender)
     {
         sg2DBinEdit->Cells[0][1]="";
         sg2DBinEdit->Cells[1][1]="";
+        sg2DBinEdit->Cells[2][1]="";
     }
     RefreshLotListFromRegistry();
     SaveWorkOrder();
@@ -3869,10 +3902,28 @@ void __fastcall TfMain::btn2DCommitClick(TObject *Sender)
             {
                 if(ExistBin!=Bin)
                 {
-                    LotRegistry.RemoveItem(Code);
+                    //AI(ht160s-2dbin-diepass) 20260808 : re-bin IN PLACE, preserving the
+                    //customer backup fields (HBin/SBin/RetestCode/DiePass/CustLotID/
+                    //ProductCode/Substage). The old RemoveItem+AddItem re-add stored empty
+                    //backups, so a manual Bin fix on a WebAPI-loaded IC silently flipped
+                    //its DiePass to empty (= FAIL class) and blanked the Soter columns.
+                    TLotIcInfo OldInfo;
                     AnsiString DupLot;
-                    if(LotRegistry.AddItem(TargetLot, Code, Bin, DupLot))
-                        AddedCount++;
+                    if(LotRegistry.FindIcInfo(Code, OldInfo))
+                    {
+                        if(LotRegistry.AddItemEx(TargetLot, Code, Bin,
+                            OldInfo.iHBin, OldInfo.iSBin, OldInfo.sRetestCode, OldInfo.sDiePass,
+                            OldInfo.sCustLotID, OldInfo.sProductCode, OldInfo.sSubstage,
+                            DupLot, true))
+                            AddedCount++;
+                    }
+                    else
+                    {
+                        // no backup record (should not happen) : legacy re-add
+                        LotRegistry.RemoveItem(Code);
+                        if(LotRegistry.AddItem(TargetLot, Code, Bin, DupLot))
+                            AddedCount++;
+                    }
                 }
             }
             else
@@ -4038,6 +4089,8 @@ void __fastcall TfMain::btn2DPasteClick(TObject *Sender)
             sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
             sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]=Code;
             sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]=Bin;
+            // grow-after-shrink keeps stale cell text : blank DiePass explicitly
+            sg2DBinEdit->Cells[2][sg2DBinEdit->RowCount-1]="";
         }
     }
     __finally
@@ -4121,6 +4174,8 @@ void __fastcall TfMain::btn2DImportClick(TObject *Sender)
                     sg2DBinEdit->RowCount=sg2DBinEdit->RowCount+1;
                     sg2DBinEdit->Cells[0][sg2DBinEdit->RowCount-1]=Code;
                     sg2DBinEdit->Cells[1][sg2DBinEdit->RowCount-1]=Bin;
+                    // grow-after-shrink keeps stale cell text : blank DiePass explicitly
+                    sg2DBinEdit->Cells[2][sg2DBinEdit->RowCount-1]="";
                 }
             }
         }

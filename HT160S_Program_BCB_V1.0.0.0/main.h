@@ -443,6 +443,7 @@ __published:	// IDE-managed Components
     void __fastcall btn2DClearClick(TObject *Sender);
     void __fastcall btn2DPasteClick(TObject *Sender);
     void __fastcall btn2DImportClick(TObject *Sender);
+    void __fastcall sg2DBinEditSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
     void __fastcall pgcWorkOrderChange(TObject *Sender);
     void __fastcall stbMainDrawPanel(TStatusBar *StatusBar, TStatusPanel *Panel, const TRect &Rect);
     void __fastcall edtSysOperatorIDExit(TObject *Sender);
