@@ -13,6 +13,7 @@
 //   - LotData.json     : lot registry + every 2D code with its Bin data
 //   - FeederDecision.txt / SortArmDecision.txt : per-module latched decision state
 //   - EventLog\ SecsLog\ WebApi log : the narrative that goes with the state
+//   - ProductionLog\ SoterOutput\   : recent per-IC production rows (which 2D placed)
 //   - MachineConfig\   : full copy of system\ config + current recipe folder
 // then compresses the whole folder into  D:\HT160S_StateRecord\<stamp>.zip .
 //
@@ -119,6 +120,17 @@ private:
     void       CaptureWebApiLog(AnsiString DstRootWithSlash);
     //AI(ht160s-obsv-p1) 20260720 : ship today's+yesterday's EventLog CSV inside the zip
     void       CaptureEventLog(AnsiString DstRootWithSlash);
+    //AI(ht160s-state-record) 20260807 : copy every *.csv in SrcDir whose last-write
+    //  time is >= MinWrite (shared filter for the two production captures below).
+    int        CopyCsvFilesSince(AnsiString SrcDir, AnsiString DstDirWithSlash, TDateTime MinWrite);
+    //AI(ht160s-state-record) 20260807 : ship recent Production_Log output. LotData.json
+    //  carries the LOADED work order only (per-lot sorted COUNTS, no per-IC produced
+    //  flag) - WHICH 2D codes were actually produced is only answerable from the
+    //  Production_Log rows (Code2D + Which Auto + Unload_Time), so package them.
+    void       CaptureProductionLog(AnsiString DstRootWithSlash);
+    //AI(ht160s-state-record) 20260807 : ship Soter (KYEC per-unit) CSVs flushed since
+    //  yesterday, from the month-bucketed archive folder.
+    void       CaptureSoterOutput(AnsiString DstRootWithSlash);
     //AI(ht160s-obsv-p1) 20260720 : live consumer of the StuckMs computation (auto snapshot)
     void       CheckStuckWatchdog();
 

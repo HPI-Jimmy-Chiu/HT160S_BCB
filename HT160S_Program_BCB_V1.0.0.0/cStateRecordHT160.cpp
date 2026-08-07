@@ -1458,6 +1458,97 @@ void cStateRecordHT160::CaptureEventLog(AnsiString DstRootWithSlash)
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-state-record) 20260807 : copy every *.csv in SrcDir whose last-write time
+//is >= MinWrite into DstDirWithSlash (created on first hit only, so an empty sweep
+//leaves no empty folder in the zip). A WRITE-TIME filter, not a name filter : a
+//per-lot Production_Log file is named by its Lot START stamp, which can be days old
+//while the lot is still receiving rows today.
+int cStateRecordHT160::CopyCsvFilesSince(AnsiString SrcDir, AnsiString DstDirWithSlash, TDateTime MinWrite)
+{
+    int Copied = 0;
+    TSearchRec Sr;
+
+    if(FindFirst(SrcDir + "\\*.csv", faAnyFile, Sr)==0)
+    {
+        do
+        {
+            if(Sr.Attr & faDirectory)
+                continue;
+            if(FileDateToDateTime(Sr.Time) < MinWrite)
+                continue;
+            if(Copied==0)
+                ForceDirectories(DstDirWithSlash);
+            if(CopyOneFile(SrcDir + "\\" + Sr.Name, DstDirWithSlash + Sr.Name))
+                Copied++;
+        }
+        while(FindNext(Sr)==0);
+        FindClose(Sr);
+    }
+    return Copied;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record) 20260807 : package recent Production_Log output into the
+//snapshot. LotData.json dumps the LOADED work order (every 2D code with its Bin) but
+//the registry keeps only per-lot sorted COUNTS - it cannot say WHICH 2D codes were
+//already produced. That per-IC answer lives in the Production_Log rows (Code2D +
+//Which Auto + Unload_Time), so ship them :
+//  ProductionLog\Daily\  : today's + yesterday's per-day aggregate CSV
+//                          (Production_Log\Daily\YYYY_MM\Production_YYYY_MM_DD.csv,
+//                          mirrors CaptureEventLog's two-day window)
+//  ProductionLog\PerLot\ : per-START lot CSVs (Production_Log\<yyyymm>\<Lot>_<start>.csv)
+//                          written since yesterday 00:00, from this month's folder and
+//                          (across a month boundary) yesterday's folder too.
+void cStateRecordHT160::CaptureProductionLog(AnsiString DstRootWithSlash)
+{
+    AnsiString SrcRoot  = HSys.LogRootDir + "\\Production_Log";
+    TDateTime  MinWrite = Date() - 1;   // yesterday 00:00
+
+    AnsiString DstDaily = DstRootWithSlash + "ProductionLog\\Daily\\";
+    for(int iBack=0; iBack<2; iBack++)
+    {
+        Word y,mo,d;
+        DecodeDate(Now()-iBack, y, mo, d);
+        AnsiString Mon; Mon.sprintf("%04d_%02d", (int)y,(int)mo);
+        AnsiString Fn;  Fn.sprintf("Production_%04d_%02d_%02d.csv", (int)y,(int)mo,(int)d);
+        AnsiString Src = SrcRoot + "\\Daily\\" + Mon + "\\" + Fn;
+        if(FileExists(Src)==false)
+            continue;
+        ForceDirectories(DstDaily);
+        CopyOneFile(Src, DstDaily + Fn);
+    }
+
+    AnsiString PrevMon = "";
+    for(int iBack=0; iBack<2; iBack++)
+    {
+        AnsiString Mon = FormatDateTime("yyyymm", Now()-iBack);
+        if(Mon==PrevMon)
+            continue;   // same month folder for both days -> sweep once
+        PrevMon = Mon;
+        CopyCsvFilesSince(SrcRoot + "\\" + Mon, DstRootWithSlash + "ProductionLog\\PerLot\\", MinWrite);
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record) 20260807 : package recent Soter (KYEC per-unit) output CSVs
+//from the month-bucketed archive (SoterOutput\<yyyymm>\; the flat customer pickup
+//folder is the customer's hand-off area, not ours to snapshot). Same two-day
+//write-time window as CaptureProductionLog. No feature flag : the folder only
+//exists when a Lot End ever flushed, so its absence is the gate.
+void cStateRecordHT160::CaptureSoterOutput(AnsiString DstRootWithSlash)
+{
+    AnsiString SrcRoot  = HSys.LogRootDir + "\\SoterOutput";
+    TDateTime  MinWrite = Date() - 1;   // yesterday 00:00
+
+    AnsiString PrevMon = "";
+    for(int iBack=0; iBack<2; iBack++)
+    {
+        AnsiString Mon = FormatDateTime("yyyymm", Now()-iBack);
+        if(Mon==PrevMon)
+            continue;
+        PrevMon = Mon;
+        CopyCsvFilesSince(SrcRoot + "\\" + Mon, DstRootWithSlash + "SoterOutput\\", MinWrite);
+    }
+}
+//---------------------------------------------------------------------------
 bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
 {
     if(Reason==AnsiString(""))
@@ -1504,6 +1595,8 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
     CaptureSecsLog      (TempDir);   //AI(ht160s-secsgem) 20260611 : include SECS log if feature on
     CaptureWebApiLog    (TempDir);   //AI(ht160s-lot-webapi) 20260612 : include Lot WebAPI log if any pull ran today
     CaptureEventLog     (TempDir);   //AI(ht160s-obsv-p1) 20260720 : ship the narrative with the state
+    CaptureProductionLog(TempDir);   //AI(ht160s-state-record) 20260807 : per-IC produced rows (WHICH 2D codes were placed)
+    CaptureSoterOutput  (TempDir);   //AI(ht160s-state-record) 20260807 : KYEC per-unit CSVs flushed since yesterday
 
     AnsiString ZipPath = SaveRoot + Stamp + ".zip";
     bool bZipped = CompressFolder(TempDir, ZipPath);
