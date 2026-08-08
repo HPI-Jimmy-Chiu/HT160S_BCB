@@ -318,10 +318,13 @@ bool cStateRecordHT160::CopyOneFile(AnsiString Src, AnsiString Dst)
     return CopyFile(Src.c_str(), Dst.c_str(), FALSE) ? true : false;
 }
 //---------------------------------------------------------------------------
-int cStateRecordHT160::CopyFolderFiles(AnsiString SrcDir, AnsiString DstDirWithSlash)
+int cStateRecordHT160::CopyFolderFiles(AnsiString SrcDir, AnsiString DstDirWithSlash, AnsiString SkipCsv)
 {
     int Copied = 0;
     TSearchRec Sr;
+    //AI(ht160s-snapshot-redact) 20260808 : match on ",name," so a skip entry can never
+    //partially match a longer file name (e.g. "login.txt" must not skip "mylogin.txt").
+    AnsiString SkipKey = "," + SkipCsv.LowerCase() + ",";
 
     if(FindFirst(SrcDir + "\\*.*", faAnyFile, Sr)==0)
     {
@@ -331,6 +334,9 @@ int cStateRecordHT160::CopyFolderFiles(AnsiString SrcDir, AnsiString DstDirWithS
                 continue;
             if(Sr.Attr & faDirectory)
                 continue;   // copy files only (recipe subfolders are flat here)
+            if(SkipCsv!=AnsiString("") &&
+               SkipKey.Pos("," + AnsiString(Sr.Name).LowerCase() + ",")>0)
+                continue;   //AI(ht160s-snapshot-redact) 20260808 : never packaged
             AnsiString Src = SrcDir + "\\" + Sr.Name;
             AnsiString Dst = DstDirWithSlash + Sr.Name;
             if(CopyOneFile(Src, Dst))
@@ -340,6 +346,41 @@ int cStateRecordHT160::CopyFolderFiles(AnsiString SrcDir, AnsiString DstDirWithS
         FindClose(Sr);
     }
     return Copied;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-snapshot-redact) 20260808 : every State Record zip shipped system\General.ini
+//verbatim, which carries [Ftp] Password in cleartext, and the six 2026-08-07 zips carried a
+//live write-capable credential for the customer's log server out of the fab. Host / Port /
+//User / RemoteDir are the parts with diagnostic value, so keep the file and blank only the
+//secret VALUES rather than dropping the whole section.
+bool cStateRecordHT160::CopyIniRedacted(AnsiString Src, AnsiString Dst, AnsiString KeyCsv)
+{
+    if(FileExists(Src)==false)
+        return false;
+
+    TStringList *Lines = new TStringList;
+    try
+    {
+        AnsiString KeyKey = "," + KeyCsv.LowerCase() + ",";
+        Lines->LoadFromFile(Src);
+        for(int i=0; i<Lines->Count; i++)
+        {
+            AnsiString L = Lines->Strings[i];
+            int iEq = L.Pos("=");
+            if(iEq<=1)
+                continue;   // no key, or an "=..." line with nothing before it
+            AnsiString Key = L.SubString(1, iEq-1).Trim().LowerCase();
+            if(Key==AnsiString("") || KeyKey.Pos("," + Key + ",")<=0)
+                continue;
+            Lines->Strings[i] = L.SubString(1, iEq) + "***REDACTED***";
+        }
+        Lines->SaveToFile(Dst);
+    }
+    __finally
+    {
+        delete Lines;
+    }
+    return true;
 }
 //---------------------------------------------------------------------------
 bool cStateRecordHT160::DeleteFolderRecursive(AnsiString Dir)
@@ -1366,9 +1407,17 @@ void cStateRecordHT160::CaptureConfig(AnsiString DstRootWithSlash)
     AnsiString Root = GetProjectRoot();
 
     // 1) system\ folder (General.ini, Mot_Table.csv, IO_Table.csv, etc.)
+    //AI(ht160s-snapshot-redact) 20260808 : a snapshot zip is mailed around and archived, so it
+    //must not carry credentials. login.txt is nothing BUT accounts (ID,Password,Level) and has
+    //no diagnostic value here, so it is never packaged; General.ini is packaged with its secret
+    //values blanked. Both changes act on the COPY only - the machine's own files are untouched.
     AnsiString SysDst = DstRootWithSlash + "system\\";
     ForceDirectories(SysDst);
-    int nSys = CopyFolderFiles(Root + "\\system", SysDst);
+    int nSys = CopyFolderFiles(Root + "\\system", SysDst, "login.txt,General.ini");
+    bool bRedacted = CopyIniRedacted(Root + "\\system\\General.ini",
+                                     SysDst + "General.ini", "password,passwd,secret,token");
+    if(bRedacted)
+        nSys++;
 
     // 2) current recipe folder (data\<recipe>\ setup.ini etc.)
     AnsiString RecipeName = RecipeManager.GetCurrentRecipeName();
@@ -1387,6 +1436,10 @@ void cStateRecordHT160::CaptureConfig(AnsiString DstRootWithSlash)
     Ini->WriteString ("Source", "RecipeDir",   RecipeDir);
     Ini->WriteInteger("Count",  "SystemFiles", nSys);
     Ini->WriteInteger("Count",  "RecipeFiles", nRec);
+    //AI(ht160s-snapshot-redact) 20260808 : say what was withheld, so an analyst reading a blank
+    //Password does not go looking for a machine mis-configuration that is not there.
+    Ini->WriteString ("Redaction", "SkippedFiles",  "login.txt");
+    Ini->WriteString ("Redaction", "RedactedKeys",  bRedacted ? AnsiString("General.ini: password,passwd,secret,token") : AnsiString("(General.ini missing)"));
     delete Ini;
 }
 //---------------------------------------------------------------------------

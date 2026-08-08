@@ -85,7 +85,15 @@ private:
     AnsiString GetProjectRoot();
     AnsiString Get7ZipPath();
     bool       CopyOneFile(AnsiString Src, AnsiString Dst);
-    int        CopyFolderFiles(AnsiString SrcDir, AnsiString DstDirWithSlash);
+    //AI(ht160s-snapshot-redact) 20260808 : SkipCsv = comma-separated file names (case
+    //  insensitive) that must NOT be copied at all. Default "" keeps every pre-existing
+    //  caller byte-identical; only the system\ config sweep passes a list.
+    int        CopyFolderFiles(AnsiString SrcDir, AnsiString DstDirWithSlash, AnsiString SkipCsv="");
+    //AI(ht160s-snapshot-redact) 20260808 : copy a text config while blanking the VALUE of
+    //  every "<key>=..." line whose key matches KeyCsv, so a snapshot that leaves the fab
+    //  still carries the diagnosable settings but never the secrets. Comments, blank lines,
+    //  section headers and line order are preserved. Returns false if Src does not exist.
+    bool       CopyIniRedacted(AnsiString Src, AnsiString Dst, AnsiString KeyCsv);
     bool       DeleteFolderRecursive(AnsiString Dir);
     bool       CompressFolder(AnsiString SrcDirWithSlash, AnsiString ZipPath);
     void       WriteSnapshotIni(AnsiString Path, AnsiString Reason, AnsiString Stamp);
