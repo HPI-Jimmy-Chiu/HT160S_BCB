@@ -1408,6 +1408,47 @@ void THGem::ProcessEnableDisableEventReport_S2F37()
     bHostManagesReports = true;
     EnableDisableEventReportAcknowledge(0x00);
     SaveEventReportData();
+    //AI(secs-s2f37-visibility) 20260808 : say on the wire log what the host just did to reporting.
+    //On 2026-08-07 the KYEC host opened all 8 sessions with this exact packet - CEED=FALSE with an
+    //empty CEID list, i.e. disable EVERY event - and never once sent CEED=TRUE, so the tool dropped
+    //508 S6F11 reports that shift (567 counting the pre-Select ones) and delivered no event data at
+    //all. The per-event breadcrumb at SendEventReport only says "suppressed" one report at a time,
+    //which is unreadable at 508 lines; this is the one line that states the resulting policy.
+    //The operator-facing EventLog line is raised one layer up, in
+    //HT160Gem::S2F38_EnableDisableEventReportAcknowledge, because reaching machine-layer code from
+    //here would cross the GemLogic boundary this file documents in its destructor.
+    {
+        AnsiString sEff;
+        sEff.sprintf("[SECS][S2F37] CEED=%d n=%d -> %d of %d CEIDs enabled",
+                     bCeed?1:0, n, GetEnabledCeidCount(), GetCeidCount());
+        StringOut(sEff);
+    }
+}
+//---------------------------------------------------------------------------
+//AI(secs-s2f37-visibility) 20260808 : reporting-state read-back (see the header note).
+int THGem::GetCeidCount()
+{
+    return (CEIDList!=NULL) ? CEIDList->Count : 0;
+}
+//---------------------------------------------------------------------------
+int THGem::GetEnabledCeidCount()
+{
+    int iEn = 0;
+
+    if(CEIDList==NULL)
+        return 0;
+    for(int i=0; i<CEIDList->Count; i++)
+    {
+        TGemCEIDItem *Ce = (TGemCEIDItem*)CEIDList->Items[i];
+        if(Ce!=NULL && Ce->Enabled)
+            iEn++;
+    }
+    return iEn;
+}
+//---------------------------------------------------------------------------
+bool THGem::IsHostManagingReports()
+{
+    return bHostManagesReports;
 }
 //---------------------------------------------------------------------------
 void THGem::SetCEIDContent(unsigned iCeid, unsigned iReportCount, unsigned *iReportIDData, int Mode)

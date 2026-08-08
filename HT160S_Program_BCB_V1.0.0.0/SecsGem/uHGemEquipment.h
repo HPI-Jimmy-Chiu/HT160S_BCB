@@ -301,6 +301,15 @@ public:
     void EmitEventReportBody(int Func, unsigned iDataID, unsigned iCeid);
     void EmitIndividualReport(unsigned ReportID);
     bool IsEnableEvent(unsigned iDataID, unsigned iCeid);
+    //AI(secs-s2f37-visibility) 20260808 : how many CEIDs the host currently has ENABLED, out of
+    //how many exist, and whether it has taken control of reporting at all. A host that answers
+    //its own init with "disable every CEID" and never enables anything silences the whole tool
+    //(KYEC did exactly that in all 8 sessions on 2026-08-07, dropping 567 S6F11), and until now
+    //that state was only visible by reading a wire log. Exposed so the maintenance SECS tab can
+    //show it next to the link badge.
+    int  GetCeidCount();
+    int  GetEnabledCeidCount();
+    bool IsHostManagingReports();
     void StringOut(AnsiString Text);
     //AI(ht160s-secsgem) 20260611 : move accumulated log lines into Dest and clear
     //  the internal buffer. Used by the GUI log monitor (uHGemLogForm) to pull

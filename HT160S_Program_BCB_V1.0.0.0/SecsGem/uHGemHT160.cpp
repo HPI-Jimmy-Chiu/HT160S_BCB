@@ -3175,8 +3175,35 @@ void HT160Gem::S2F36_LinkEventReportAcknowledge()
 //---------------------------------------------------------------------------
 void HT160Gem::S2F38_EnableDisableEventReportAcknowledge()
 {
-    if(HGemPtr!=NULL)
-        HGemPtr->ProcessEnableDisableEventReport_S2F37();
+    //AI(secs-s2f37-visibility) 20260808 : a host that answers its own init with "disable every
+    //CEID" silences the whole tool, and until now that left NO trace an engineer would find. On
+    //2026-08-07 KYEC's host sent exactly that in all 8 sessions and never sent CEED=TRUE, so 567
+    //S6F11 reports were dropped across the shift; the only evidence was 508 "suppressed" lines
+    //inside the SECS wire log, and the shipped EventLog said nothing at all. Raised HERE rather
+    //than in ProcessEnableDisableEventReport_S2F37 because RecordProcess is machine-layer and
+    //THGem reaches machine code only through GemLogic (see the ~THGem note in uHGemEquipment.cpp).
+    //Fires only when reporting crosses into or out of "nothing can be sent", so a host that
+    //re-sends S2F37 - or sends it once per session, as this one does - cannot flood the log.
+    static int iLastEnabledCeidLogged = -1;   //-1 = nothing reported yet this run
+
+    if(HGemPtr==NULL)
+        return;
+    HGemPtr->ProcessEnableDisableEventReport_S2F37();
+
+    int iTot = HGemPtr->GetCeidCount();
+    int iEn  = HGemPtr->GetEnabledCeidCount();
+    bool bNowSilent = (iEn==0);
+    bool bWasSilent = (iLastEnabledCeidLogged==0);
+    if(iLastEnabledCeidLogged<0 || bNowSilent!=bWasSilent)
+    {
+        if(bNowSilent)
+            RecordProcess("SECS host DISABLED every event report (S2F37, all "+IntToStr(iTot)+
+                          " CEIDs) - no S6F11 reaches the host until it enables some");
+        else
+            RecordProcess("SECS host event reporting enabled : "+IntToStr(iEn)+" of "+
+                          IntToStr(iTot)+" CEIDs");
+        iLastEnabledCeidLogged = iEn;
+    }
 }
 //---------------------------------------------------------------------------
 void HT160Gem::S2F32_DateAndTimeAcknowledge()
