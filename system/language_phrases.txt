@@ -99,6 +99,7 @@ Front Enable	前側啟用
 Front Pad	前 Pad
 HOME	復歸
 HOMING..	復歸中..
+HOME re-clamped a tray but its grip sensor went dark afterwards : %s. Please CHECK that carriage before starting production, then press OK.	HOME 已重新夾持盤，但之後夾持感測器熄滅：%s。請在開始生產前檢查該載台，然後按 OK。
 Hardware install setup	硬體安裝設定
 Hardware install setup (locked - lot running, end lot to edit)	硬體安裝設定 (鎖定 - Lot 執行中，結束 Lot 後可編輯)
 HasTray	有盤

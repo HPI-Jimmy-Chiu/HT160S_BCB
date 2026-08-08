@@ -356,6 +356,13 @@ bool TfHome::ProcessMotorHome()
 	//case-200 operator-removal fallback keys off this, not off fHasTray (Empty/Color
 	//fHasTray = rear-seat tray, must never be cleared by the fallback).
 	static bool bCarUnparkedCarry[10]={false,false,false,false,false,false,false,false,false,false};
+	//AI(ht160s-home-grip) 20260808 : carriages that finished the case-300 re-acquire still
+	//CLAMPED (Loader/Auto, step 3). Empty/Color take the haul path and deliberately end
+	//RELEASED, so they are never listed here. The case-300 summary re-confirms the grip on
+	//these before HOME may claim "all parked trays re-clamped/hauled" : on 2026-08-07 Loader1
+	//logged RE-ACQUIRE at 17:29:22.571 and the 17:29:27.358 IO sweep showed C_Loader1_PushTray
+	//commanded out with a dark On reed (grip verdict 0), yet HOME still reported success.
+	static bool bCarReclamped[10]={false,false,false,false,false,false,false,false,false,false};
 	static int  iReacqCar=0;
 	static int  iReacqStep=0;
 	//AI(ht160s-home-resume-drain) 20260711 : W2 drain stage state. Phase 0=arm, 1=pump,
@@ -470,6 +477,7 @@ bool TfHome::ProcessMotorHome()
 				iCarParkPos[pk]=0;
 				iCarHaulTarget[pk]=-1;
 				bCarUnparkedCarry[pk]=false;
+				bCarReclamped[pk]=false;   //AI(ht160s-home-grip) 20260808 : fresh round
 				if(PMot==NULL || PV==NULL || PF==NULL || PR==NULL)
 					continue;
 				bool bCarry=false;
@@ -990,7 +998,45 @@ bool TfHome::ProcessMotorHome()
 				iReacqCar++;
 			if(iReacqCar>=HOME_PARK_N)
 			{
-				RecordProcess("Home: re-acquire done, all parked trays re-clamped/hauled");
+				//AI(ht160s-home-grip) 20260808 : BOUNDARY re-confirm before HOME may claim success.
+				//The summary line below used to be printed unconditionally, which is how a lost tray
+				//left no trace at all : 2026-08-07 Loader1 logged RE-ACQUIRE at 17:29:22.571 and the
+				//17:29:27.358 IO sweep showed C_Loader1_PushTray commanded out with a dark On reed
+				//(grip verdict 0 = "tray gone"), yet HOME reported all trays re-clamped and nothing
+				//alarmed anywhere. Only Loader/Auto are testable here : Empty/Color take the haul
+				//path and end RELEASED by design, so their verdict is -1 and they are never flagged.
+				//Verdict -1 (sim / disabled point / not clamped) is NEVER evidence a tray is missing.
+				//Deliberately does NOT clear the carriage tray identity : one dark reed does not
+				//prove the tray left (a drifting reed reads identically), and wiping identity here
+				//would strand a tray that is physically still on the car. The operator decides.
+				AnsiString sLostGrip="";
+				for(int pg=0; pg<HOME_PARK_N; pg++)
+				{
+					TTrayMotor *GMot; TTrayMotor *GV; TMyCylinder *GF; TMyCylinder *GR; AnsiString GName;
+					int iGrip=-1;
+
+					if(bCarReclamped[pg]==false)
+						continue;
+					bCarReclamped[pg]=false;
+					HomeParkCarriage(pg, &GMot, &GV, &GF, &GR, &GName);
+					if(pg<=1 && LoaderModule!=NULL)
+						iGrip=LoaderModule->GetCarriageGripVerdict(pg+1);
+					else if(pg>=2 && pg<=7 && AutoModule!=NULL)
+						iGrip=AutoModule->GetCarTrayGripVerdict(pg-2);
+					if(iGrip!=0)
+						continue;
+					RecordProcess("Home: RE-ACQUIRE "+GName+" grip verdict 0 - tray lost after re-clamp");
+					if(sLostGrip!=AnsiString(""))
+						sLostGrip+=", ";
+					sLostGrip+=GName;
+				}
+				if(sLostGrip!=AnsiString(""))
+				{
+					RecordProcess("Home: re-acquire done, but grip LOST on : "+sLostGrip);
+					ShowMyMessage(Format(LangT("HOME re-clamped a tray but its grip sensor went dark afterwards : %s. Please CHECK that carriage before starting production, then press OK."), ARRAYOFCONST((sLostGrip))));
+				}
+				else
+					RecordProcess("Home: re-acquire done, all parked trays re-clamped/hauled");
 #ifdef SOFT_SIMULATE
 				SimHomeTrace("==== HOME ROUND DONE (case300 re-acquire done) ====", false);
 #endif
@@ -1026,6 +1072,7 @@ bool TfHome::ProcessMotorHome()
 						{
 							RecordProcess("Home: RE-ACQUIRE "+PName+" tray at Y="+IntToStr(iCarParkPos[iReacqCar]));
 							bCarParked[iReacqCar]=false;
+							bCarReclamped[iReacqCar]=true;   //AI(ht160s-home-grip) 20260808 : ends CLAMPED -> re-confirm at the summary
 							iReacqCar++;
 							iReacqStep=0;
 						}
