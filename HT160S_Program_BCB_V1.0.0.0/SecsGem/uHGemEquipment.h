@@ -95,6 +95,14 @@ struct TGemECItem
 //structurally short. HT9045 answered DRACK=0x00 to all 122. 192 covers the largest report
 //seen in the field with headroom; keep the reports-per-message cap at 64 (max seen: 3).
 #define GEM_MAX_SVID_PER_REPORT   192
+//AI(secs-e5-lrack) 20260805 : S2F37 CEID-list capacity. Was a bare 256 in
+//ProcessEnableDisableEventReport_S2F37 while this machine's dictionary holds 292 ids, so a host
+//that enumerated every CEID after an S1F23 full query had the whole packet rejected with
+//ERACK=0x02. 512 clears the dictionary with headroom. HT9045 has no guard at all here (a bare
+//unsigned CEID[1024] filled straight from the wire), so raising the cap moves toward it, not away.
+//The array it sizes is file-scope static inside that handler, NOT a stack frame - 512*4 = 2 KB of
+//BSS, no BCB6 stack concern. Keep the n>cap test BEFORE the fill loop.
+#define GEM_MAX_CEID_PER_S2F37    512
 struct TGemReportItem
 {
     unsigned ReportID;

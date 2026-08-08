@@ -1283,7 +1283,12 @@ void THGem::ProcessLinkEventReport_S2F35()
     if(DataItemIn(len, Type, sTmp)!=1)                      { LinkReportAcknowledge(0x02); return; }
     if(GetDataItemLenAndTypeAndDelete(a, HType.LIST_TYPE)!=1){ LinkReportAcknowledge(0x02); return; }
     if(a==0)  { LinkReportAcknowledge(0x00); return; }
-    if(a>64)  { LinkReportAcknowledge(0x02); return; }
+    //AI(secs-e5-lrack) 20260805 : capacity overflow is LRACK=0x01 "insufficient space", not 0x02
+    //"invalid format" - E5 separates the two, and the sibling ProcessDefineReport_S2F33 in this same
+    //file already answers DRACK=0x01 for the identical condition. HT9045 has NO capacity check on
+    //S2F35 at all, so there is no 9045 precedent either way; 0x01 is the E5 code and matches our own
+    //S2F33, which is the closest thing to a house rule we have.
+    if(a>64)  { LinkReportAcknowledge(0x01); return; }
     for(i=0; i<a; i++)
     {
         if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)         { LinkReportAcknowledge(0x02); return; }
@@ -1302,7 +1307,8 @@ void THGem::ProcessLinkEventReport_S2F35()
             StringOut(sUnkCe);
         }
         if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ LinkReportAcknowledge(0x02); return; }
-        if(b>32)                                            { LinkReportAcknowledge(0x02); return; }
+        //AI(secs-e5-lrack) 20260805 : per-CEID RPTID overflow is "insufficient space" (0x01) too.
+        if(b>32)                                            { LinkReportAcknowledge(0x01); return; }
         cid[nCe]=cc;
         int w=0;
         for(j=0; j<b; j++)
@@ -1353,7 +1359,7 @@ void THGem::ProcessEnableDisableEventReport_S2F37()
     unsigned char Type=0, rawb=0;
     bool bCeed=false;
     AnsiString sTmp;
-    static unsigned cid[256];
+    static unsigned cid[GEM_MAX_CEID_PER_S2F37];
     int nCe = 0;
     ResetReturnCode();
     if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)             { EnableDisableEventReportAcknowledge(0x02); return; }
@@ -1373,7 +1379,10 @@ void THGem::ProcessEnableDisableEventReport_S2F37()
         bCeed = (atoi(sTmp.c_str())!=0);
     }
     if(GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)!=1){ EnableDisableEventReportAcknowledge(0x02); return; }
-    if(n>256) { EnableDisableEventReportAcknowledge(0x02); return; }
+    //AI(secs-e5-lrack) 20260805 : cap raised 256 -> GEM_MAX_CEID_PER_S2F37 (512) so a host that
+    //enumerates the whole 292-id dictionary after an S1F23 full query is no longer rejected wholesale.
+    //This test MUST stay ahead of the fill loop below - that is what bounds cid[].
+    if(n>GEM_MAX_CEID_PER_S2F37) { EnableDisableEventReportAcknowledge(0x02); return; }
     for(i=0; i<n; i++)
     {
         if(GetDataItemLenAndType(len, Type)!=1)            { EnableDisableEventReportAcknowledge(0x02); return; }
