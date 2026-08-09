@@ -121,6 +121,7 @@ void THT160GeneralSetting::SetDefault()
 	//(E30 accepts S1F17 only from HOST OFF-LINE) - see the header for the field evidence.
 	iInitialControlState=5;
 	bAcceptHostOnlineRequest=true;
+	bSecsIgnoreHostSilenceAll=false;   //AI(secs-s2f37-silenceall) 20260808 : default OFF = strict E5
 	iAutoDischargePostYSettleMs=500;
 	iHomeReacquireOffsetCnt=100;   //AI(ht160s-home-resume-w3c) : +1mm default
 	iHomeDrainTimeoutSec=15;
@@ -256,6 +257,7 @@ void THT160GeneralSetting::Load()
 	if(iInitialControlState!=1 && iInitialControlState!=4 && iInitialControlState!=5)
 		iInitialControlState=5;
 	bAcceptHostOnlineRequest=Ini->ReadBool("SECS", "AcceptHostOnlineRequest", true);
+	bSecsIgnoreHostSilenceAll=Ini->ReadBool("SECS", "IgnoreHostSilenceAll", false);   //AI(secs-s2f37-silenceall) 20260808
 	if(iAutoConcurrency<0) iAutoConcurrency=0;
 	if(iAutoConcurrency>6) iAutoConcurrency=6;
 	iAutoDischargePostYSettleMs=Ini->ReadInteger("SettleDelay", "AutoDischargePostYSettleMs", 500);
@@ -350,6 +352,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("SECS", "AskSkipICCount", bAskSkipICCount);
 	Ini->WriteInteger("SECS", "InitialControlState", iInitialControlState);
 	Ini->WriteBool("SECS", "AcceptHostOnlineRequest", bAcceptHostOnlineRequest);
+	Ini->WriteBool("SECS", "IgnoreHostSilenceAll", bSecsIgnoreHostSilenceAll);   //AI(secs-s2f37-silenceall) 20260808
 	Ini->WriteInteger("SettleDelay", "AutoDischargePostYSettleMs", iAutoDischargePostYSettleMs);
 	Ini->WriteInteger("HomeResume", "ReacquireOffsetCnt", iHomeReacquireOffsetCnt);
 	Ini->WriteInteger("HomeResume", "DrainTimeoutSec", iHomeDrainTimeoutSec);

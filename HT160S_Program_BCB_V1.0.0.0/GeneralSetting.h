@@ -237,6 +237,19 @@ public:
 	//  all. HT9045's GemCheckBoxAcceptHostOnlineRequest ported ([GEM] AcceptHostOnlineRequest
 	//  there, default true). false => ONLACK=1 / HCACK=2 refusal. Default true.
 	bool bAcceptHostOnlineRequest;
+	//AI(secs-s2f37-silenceall) 20260808 : field escape hatch for a host that silences the tool and
+	//  never un-silences it. [SECS] IgnoreHostSilenceAll, DEFAULT FALSE = strict E5: an S2F37 that
+	//  leaves zero CEIDs enabled really does stop every S6F11, which is what the host asked for.
+	//  TRUE = the tool refuses to be left completely mute: the per-CEID flags the host wrote are
+	//  still applied, but host report management is released, so the enable gate falls back to
+	//  "send everything" until the host enables something specific. Deliberately keyed on the
+	//  RESULT (zero enabled) rather than the packet shape, and deliberately NOT a blanket
+	//  "ignore S2F37" - a host that disables named CEIDs is always obeyed, and a later targeted
+	//  S2F37 CEED=1 re-arms the gate with exactly the ids it names, so this cannot over-report.
+	//  Why it exists: on 2026-08-07 the KYEC host opened all 8 sessions with S2F37 CEED=FALSE +
+	//  empty list and never sent CEED=TRUE, so 567 S6F11 were dropped and no event data reached
+	//  the host all shift. Leave it FALSE unless a host is known to skip its own enable step.
+	bool bSecsIgnoreHostSilenceAll;
 	int iHomeReacquireOffsetCnt;
 	int iStuckSnapshotSec;   //AI(ht160s-obsv-p1) 20260720 : auto State Record when a module Task sits unchanged this many seconds while running (0=off)
 	int iRise1SettleWaitSec;       //AI(ht160s-anti-ghost-d) 20260720 : Loader case-10 rise1-not-retracted wait before the named MES0925 Note (s)

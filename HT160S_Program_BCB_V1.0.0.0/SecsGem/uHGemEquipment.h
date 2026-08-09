@@ -310,6 +310,12 @@ public:
     int  GetCeidCount();
     int  GetEnabledCeidCount();
     bool IsHostManagingReports();
+    //AI(secs-s2f37-silenceall) 20260808 : release (or re-arm) host report management. Only the
+    //HT160 layer calls this, to honour [SECS] IgnoreHostSilenceAll - the config read and the
+    //policy decision belong there, not in the protocol codec. Releasing it makes IsEnableEvent
+    //fall back to "send everything" WITHOUT rewriting the per-CEID flags the host set, so a later
+    //targeted S2F37 CEED=1 re-arms the gate with exactly the ids the host named.
+    void SetHostManagesReports(bool bOn);
     void StringOut(AnsiString Text);
     //AI(ht160s-secsgem) 20260611 : move accumulated log lines into Dest and clear
     //  the internal buffer. Used by the GUI log monitor (uHGemLogForm) to pull

@@ -3192,17 +3192,37 @@ void HT160Gem::S2F38_EnableDisableEventReportAcknowledge()
 
     int iTot = HGemPtr->GetCeidCount();
     int iEn  = HGemPtr->GetEnabledCeidCount();
-    bool bNowSilent = (iEn==0);
+    //AI(secs-s2f37-silenceall) 20260808 : [SECS] IgnoreHostSilenceAll escape hatch, default FALSE
+    //(strict E5 - a host that asks for silence gets silence). When TRUE, and the host has just
+    //left the tool with ZERO enabled CEIDs, release host report management so the enable gate in
+    //IsEnableEvent falls back to "send everything". The per-CEID flags the host wrote are left
+    //ALONE on purpose : a later targeted S2F37 CEED=1 re-arms the gate with exactly the ids the
+    //host names, and everything it did not name is already false, so this cannot over-report.
+    //Keyed on the RESULT, not the packet shape, so "disabled all 292 one by one" behaves the same.
+    bool bOverrode = false;
+    if(GeneralSetting.bSecsIgnoreHostSilenceAll && iTot>0 && iEn==0 &&
+       HGemPtr->IsHostManagingReports())
+    {
+        HGemPtr->SetHostManagesReports(false);
+        bOverrode = true;
+        HGemPtr->StringOut("[SECS][S2F37] host left 0 of "+IntToStr(iTot)+
+                           " CEIDs enabled - [SECS] IgnoreHostSilenceAll=1 releases host report "
+                           "management, S6F11 keeps flowing");
+    }
+    bool bNowSilent = (iEn==0 && !bOverrode);
     bool bWasSilent = (iLastEnabledCeidLogged==0);
     if(iLastEnabledCeidLogged<0 || bNowSilent!=bWasSilent)
     {
         if(bNowSilent)
             RecordProcess("SECS host DISABLED every event report (S2F37, all "+IntToStr(iTot)+
                           " CEIDs) - no S6F11 reaches the host until it enables some");
+        else if(bOverrode)
+            RecordProcess("SECS host disabled every event report, but [SECS] IgnoreHostSilenceAll=1 "
+                          "overrides it - S6F11 keeps flowing (tell the host to send S2F37 CEED=1)");
         else
             RecordProcess("SECS host event reporting enabled : "+IntToStr(iEn)+" of "+
                           IntToStr(iTot)+" CEIDs");
-        iLastEnabledCeidLogged = iEn;
+        iLastEnabledCeidLogged = bOverrode ? iTot : iEn;
     }
 }
 //---------------------------------------------------------------------------

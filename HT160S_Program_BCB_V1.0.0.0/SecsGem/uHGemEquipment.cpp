@@ -1451,6 +1451,11 @@ bool THGem::IsHostManagingReports()
     return bHostManagesReports;
 }
 //---------------------------------------------------------------------------
+void THGem::SetHostManagesReports(bool bOn)
+{
+    bHostManagesReports = bOn;
+}
+//---------------------------------------------------------------------------
 void THGem::SetCEIDContent(unsigned iCeid, unsigned iReportCount, unsigned *iReportIDData, int Mode)
 {
     SetCEIDContent(iCeid, "", iReportCount, iReportIDData, Mode);
