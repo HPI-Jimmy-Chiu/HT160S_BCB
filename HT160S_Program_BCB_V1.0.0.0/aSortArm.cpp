@@ -1447,6 +1447,13 @@ void TSortArmModule::RecordAutoSkippedCells()
     {
         if(bPickSuckErr[s]==false)
             continue;
+        //AI(ht160s-virtual2d) 20260808 : same bCanPick guard as the sibling SkipErroredPickCells.
+        //bPickSuckErr is only ever SET while bCanPick is true (the pick loop tests both), but a
+        //slot already ClearSlot()ed carries a WIPED-or-STALE Code2D/PickX/PickY - writing a
+        //reject record from it would fabricate a customer CSV row for a die identity that is no
+        //longer this slot's. Skipping here is safe: SkipErroredPickCells still clears the latch.
+        if(Slot[s].bCanPick==false)
+            continue;
 
         g_DeviceInfo.AddInputInfo(s, Slot[s].PickY, Slot[s].PickX, "");
 
