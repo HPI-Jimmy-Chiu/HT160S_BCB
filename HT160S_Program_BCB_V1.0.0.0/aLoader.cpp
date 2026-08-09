@@ -21,6 +21,7 @@
 #include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260610 : LoaderYSafeDistance interlock
 #include "cEventLog.h"        //AI(ht160s-overcount-tripqueue) 20260721 : g_EventLog for INF_OVERTRAY / WRN_TRIP_NOCOUNT / WRN_TRIP_UNDELIVERED
+#include "cSoterOutput.h"     //AI(ht160s-virtual2d) 20260808 : NoteVirtual2D - taint the Soter flush window when a 2D code is fabricated
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -1288,6 +1289,23 @@ AnsiString TLoaderModule::ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, b
             sCode=LotRegistry.GetCode2DByIndex(SimuCcdCycleIndex);
             SimuCcdCycleIndex=(SimuCcdCycleIndex+1)%Total;
             bOk=true;
+            //AI(ht160s-virtual2d) 20260808 : this branch just FABRICATED a die identity. On
+            //2026-08-06 it ran on the REAL machine (the Enable Simulation checkbox was ticked)
+            //and three KYEC lots' customer CSVs were published carrying registry codes in
+            //alphabetical order - indistinguishable from a genuine run, and no log anywhere
+            //recorded the 2D source. Taint the Soter flush window at the moment of fabrication,
+            //naming which arm fired; NoteVirtual2D logs once per window and gates the customer
+            //channels (FTP + pickup), archive is kept.
+            {
+                AnsiString sWhy;
+                if(tSimuData.bRunSimulation)
+                    sWhy="Enable Simulation checkbox";
+                else if(HSys.LastSet.iRealDummy!=REALLY)
+                    sWhy="RealDummy tier is not REALLY";
+                else
+                    sWhy="Top CCD disabled";
+                g_SoterOutput.NoteVirtual2D(sWhy);
+            }
         }
         return sCode;
     }

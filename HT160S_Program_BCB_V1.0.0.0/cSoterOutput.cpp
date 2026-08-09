@@ -55,6 +55,7 @@ cSoterOutput::cSoterOutput()
     : m_pCS(NULL)
     , m_bActive(false)
     , m_sArmCustLot("")
+    , m_bVirtual2DSeen(false)
     , m_pLotBuckets(NULL)
     , m_sBaseDir("")
     , m_sPickupDir("")
@@ -285,10 +286,13 @@ static AnsiString UniqueFileNameInFlush(TStringList* pSeen, const AnsiString& sN
 }
 
 //---------------------------------------------------------------------------
-// Write header (+ optional data rows) to BOTH the month-bucketed archive and the
-// flat customer pickup folder. pDataLines == NULL -> header-only (zero-die file).
+// Write header (+ optional data rows) to the month-bucketed archive and - when
+// bAlsoPickup - the flat customer pickup folder. pDataLines == NULL -> header-only
+// (zero-die file). bAlsoPickup=false is the virtual-2D window: the pickup folder is
+// a CUSTOMER channel (their fetch script pulls it after CEID 12), so a file whose 2D
+// codes were fabricated must not land there any more than it may be FTP-published.
 void cSoterOutput::WriteOneFile(const AnsiString& sArchDir, const AnsiString& sFileName,
-        TStringList* pDataLines)
+        TStringList* pDataLines, bool bAlsoPickup)
 {
     TStringList* pOut = new TStringList();
     try
@@ -302,7 +306,7 @@ void cSoterOutput::WriteOneFile(const AnsiString& sArchDir, const AnsiString& sF
         pOut->SaveToFile(sArchDir + "\\" + sFileName);
 
         // 2. customer pickup folder, flat (wiped at the next Lot Start)
-        if (m_sPickupDir != "")
+        if (bAlsoPickup && m_sPickupDir != "")
         {
             ForceDirectories(m_sPickupDir);
             pOut->SaveToFile(m_sPickupDir + "\\" + sFileName);
@@ -319,6 +323,10 @@ void cSoterOutput::DoArm(const AnsiString& sCustLot)
 {
     m_bActive     = true;
     m_sArmCustLot = sCustLot;
+    //AI(ht160s-virtual2d) 20260808 : fresh flush window -> clear the virtual-2D taint. If the
+    //reader is still fabricating, the very next scanned die re-latches it (per-die call), so a
+    //window can only stay clean if every code in it really came off a die.
+    m_bVirtual2DSeen = false;
     FreeAllBuckets();
     for (int i = 0; i < SOTER_NOZZLE_COUNT; ++i)
         m_pending[i].Clear();
@@ -399,6 +407,13 @@ void cSoterOutput::OnLotEnd()
             bool bUploadOn = (FtpUploadThd != NULL &&
                               FtpUploadThd->GetEnable() && FtpUploadThd->GetUploadReport());
             bool bNoKyecLogged = false;
+            //AI(ht160s-virtual2d) 20260808 : a window that carried ANY fabricated 2D code is
+            //archive-only. bVirtual is snapshotted here so the whole flush is judged once.
+            bool bVirtual = m_bVirtual2DSeen;
+            if (bVirtual)
+                g_EventLog.Log("FTP_SKIP",
+                    "Soter CSVs written to ARCHIVE ONLY (virtual 2D was used this run): "
+                    "no FTP publish, no pickup copy", "");
             try
             {
                 pSeen = new TStringList();
@@ -415,7 +430,7 @@ void cSoterOutput::OnLotEnd()
                     //(KYEC token). The customer-lot token (col6) is NA : no die resolved one.
                     AnsiString sFileName = BuildFileName("", "NA", m_sArmCustLot, "", 0, sStamp);
                     sFileName = UniqueFileNameInFlush(pSeen, sFileName);
-                    WriteOneFile(sArch, sFileName, NULL);
+                    WriteOneFile(sArch, sFileName, NULL, !bVirtual);
                     //AI(ht160s-kyec) 20260722 : a 0-die lot is archive/pickup only, no FTP publish
                     //(customer ruling). The KYEC lot IS known; there is simply nothing to publish.
                     if (bUploadOn && !bNoKyecLogged)
@@ -434,8 +449,12 @@ void cSoterOutput::OnLotEnd()
                         AnsiString sFileName = BuildFileName(b->sProduct, b->sCustLot, b->sKyecLot,
                                                              b->sSubstage, b->pLines->Count, sStamp);
                         sFileName = UniqueFileNameInFlush(pSeen, sFileName);
-                        WriteOneFile(sArch, sFileName, b->pLines);
+                        WriteOneFile(sArch, sFileName, b->pLines, !bVirtual);
 
+                        //AI(ht160s-virtual2d) 20260808 : a tainted bucket never enters the
+                        //publish grouping - the FTP_SKIP line above already said why, once.
+                        if (bVirtual)
+                            continue;
                         if (b->sKyecLot.Trim() != "")
                         {
                             int gi = pPub->IndexOf(b->sKyecLot);
@@ -669,6 +688,31 @@ void cSoterOutput::DiscardRow(int iNozzle)
     try
     {
         m_pending[iNozzle].Clear();
+    }
+    __finally
+    {
+        m_pCS->Release();
+    }
+}
+
+//---------------------------------------------------------------------------
+void cSoterOutput::NoteVirtual2D(const AnsiString& sWhy)
+{
+    if (!m_pCS)
+        return;
+    m_pCS->Acquire();
+    try
+    {
+        if (m_bVirtual2DSeen)
+            return;   // already latched (and logged) for this flush window
+        m_bVirtual2DSeen = true;
+        //AI(ht160s-virtual2d) 20260808 : the one line that makes a virtual run findable
+        //afterwards. On 2026-08-06 three KYEC lots' published CSVs carried registry codes in
+        //alphabetical order and no artefact anywhere recorded that the 2D source was not the
+        //CCD - it took a sort-by-StartTime analysis of the CSVs themselves to prove it.
+        g_EventLog.Log("VIRTUAL_2D",
+            "2D source is VIRTUAL (" + sWhy + ") - codes are cycled from the lot registry, "
+            "not read from dies; this run's Soter CSVs stay in the archive only", "");
     }
     __finally
     {

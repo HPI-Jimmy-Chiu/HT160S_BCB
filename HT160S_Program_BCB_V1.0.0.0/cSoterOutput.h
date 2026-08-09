@@ -77,6 +77,14 @@ private:
     bool         m_bActive;       // armed between Lot Start and the LotEnd flush
     AnsiString   m_sArmCustLot;   // armed lot id = KYEC lot (zero-die fallback col7 identity)
     TSoterRow    m_pending[SOTER_NOZZLE_COUNT];
+    //AI(ht160s-virtual2d) 20260808 : latched when any 2D code of the CURRENT flush window was
+    //FABRICATED (cycled from the lot registry) instead of read from a die. Cleared by DoArm.
+    //On 2026-08-06 the on-site "Enable Simulation" checkbox left three KYEC lots' CSVs carrying
+    //registry codes in alphabetical order, FTP-published as genuine, and NOTHING recorded that
+    //the codes were virtual - the file is bit-identical to a real run's. While latched, the
+    //flush still writes the archive (engineering record) but skips BOTH customer channels
+    //(FTP publish AND the pickup folder), and the latch event itself is EventLogged.
+    bool         m_bVirtual2DSeen;
     TStringList* m_pLotBuckets;   // keyed by CustLot (case-sensitive), insertion-order; Objects=TSoterLotBucket*
     AnsiString   m_sBaseDir;      // HSys.LogRootDir + "\\SoterOutput" (archive)
     AnsiString   m_sPickupDir;    // customer hand-off folder (cleared each Lot Start)
@@ -90,7 +98,8 @@ private:
                              const AnsiString& sKyecLot, const AnsiString& sSubstage,
                              int iQty, const AnsiString& sStamp);
     void WriteOneFile(const AnsiString& sArchDir, const AnsiString& sFileName,
-                      TStringList* pDataLines);   // header+rows -> archive + pickup
+                      TStringList* pDataLines,    // header+rows -> archive (+ pickup)
+                      bool bAlsoPickup);          //AI(ht160s-virtual2d) 20260808 : false = archive only (virtual-2D window)
     void ClearPickupDir();                            // wipe the customer pickup folder (Lot Start)
     static AnsiString CsvField(const AnsiString& s);  // quote only if needed
     static AnsiString SafeToken(const AnsiString& s); // sanitize filename token
@@ -130,6 +139,13 @@ public:
     // which is not recorded in Production_Log either). No-op when no pending row is
     // open for the nozzle. Prevents a stale row from being mis-committed by a later IC.
     void DiscardRow(int iNozzle);
+
+    //AI(ht160s-virtual2d) 20260808 : the 2D reader just FABRICATED a code (virtual fallback)
+    // instead of reading a die - taint the current flush window. sWhy names which fallback
+    // arm fired (simulation checkbox / RealDummy tier / CCD disabled) and is EventLogged once
+    // per window. See m_bVirtual2DSeen for the consequences. Called from the reader at the
+    // moment of fabrication, NOT from a config check, so it cannot fire on an idle machine.
+    void NoteVirtual2D(const AnsiString& sWhy);
 };
 
 //---------------------------------------------------------------------------

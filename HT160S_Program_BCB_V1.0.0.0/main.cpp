@@ -1540,6 +1540,13 @@ void __fastcall TfMain::cbEnableSimulationClick(TObject *Sender)
 {
     (void)Sender;
     tSimuData.bRunSimulation=cbEnableSimulation->Checked;
+    //AI(ht160s-virtual2d) 20260808 : the operator action that flips the 2D source is itself
+    //part of the evidence chain - on 2026-08-06 the ONLY way to prove this checkbox was ticked
+    //was a statistical analysis of the customer CSVs. bRunSimulation is never persisted, so a
+    //boot always starts false and this line marks every change during a session.
+    RecordProcess(AnsiString("Enable Simulation checkbox -> ")
+        +(cbEnableSimulation->Checked?AnsiString("ON (2D codes will be VIRTUAL - cycled from the lot registry)")
+                                     :AnsiString("OFF (2D codes from the real CCD)")));
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-agv) 20260623 : write the sim AMR per-zone max-tray grid back to GeneralSetting
