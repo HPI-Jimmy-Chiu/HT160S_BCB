@@ -119,12 +119,26 @@ const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
     // Checked before renumbering : 810 uses nothing in 38195-38201 (its band is 38202, 38205-38207,
     // 38219+) and HT160S had no other use of 38199-38201. 38208/38209/38210 are now RETIRED - do
     // not reuse them, a host provisioned before 20260803 still has them bound to AUTO4-6 Carrier ID.
-    // The tray / device / bin-setting columns for Auto4-6 (38237-38245) stay HT160S extensions :
-    // 810's AMR band ends at 38236 and 899 has no AMR SVID family at all, so no family number
-    // exists to adopt (verified in both trees 20260803).
-    /*P7*/ { 7, ASK_AUTO,    3, 38199, 38237, 38240, 38243, "AUTO4"  },
-    /*P8*/ { 8, ASK_AUTO,    4, 38200, 38238, 38241, 38244, "AUTO5"  },
-    /*P9*/ { 9, ASK_AUTO,    5, 38201, 38239, 38242, 38245, "AUTO6"  }
+    // The tray / device / bin-setting columns for Auto4-6 stay HT160S extensions : 810's AMR band
+    // ends at 38236 and 899 has no AMR SVID family at all, so no family number exists to adopt.
+    //AI(secs-record-traycount) 20260810 : THE TRAY COLUMN MOVED, 38237-38239 -> 38246-38248.
+    // The 20260803 note above said 38237-38245 were free to extend into, "verified in both trees".
+    // That verification has since been overtaken by the reference tree itself : HT9046LS 810_B01
+    // now defines 38237/38238/38239 as "Record Auto 1/2/3 Tray Count" (uHGemHT9045_SV.cpp:861-863,
+    // added by the vendor 20260710), which is exactly the quantity KYEC asked us to publish there.
+    // The family number wins, so AMR Auto4-6 Tray Count vacates to 38246/38247/38248 - the first
+    // ids free in BOTH trees (HT160S owns up to 38245; 810_B01's next used id above 38239 is
+    // 38511, so 38240-38510 is one unbroken gap). 38237/38238/38239 are re-registered with the
+    // family meaning in uHGemHT160 AddSV, backed by tRunData.RecordTrayCnt.
+    // 38237-38239 as AMR Auto4-6 Tray Count are RETIRED for that meaning - a host provisioned
+    // before 20260810 still has them bound that way, and it will now read the Record counter
+    // instead. This is the one renumbering in this band that changes an id's MEANING rather than
+    // just vacating it, so it must be called out to the host, not left to be discovered.
+    // LESSON, worth keeping : inventing ids inside a band the family also grows into gets
+    // overtaken. Re-run this check against every 9045 upgrade.
+    /*P7*/ { 7, ASK_AUTO,    3, 38199, 38246, 38240, 38243, "AUTO4"  },
+    /*P8*/ { 8, ASK_AUTO,    4, 38200, 38247, 38241, 38244, "AUTO5"  },
+    /*P9*/ { 9, ASK_AUTO,    5, 38201, 38248, 38242, 38245, "AUTO6"  }
 };
 //---------------------------------------------------------------------------
 TAgvCoordinator::TAgvCoordinator()

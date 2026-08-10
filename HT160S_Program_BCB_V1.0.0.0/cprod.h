@@ -15,6 +15,12 @@ struct TRunData
     TDateTime PauseTime;
     int BinICCnt[TEST_MAX_BIN];
     int TrayICCnt[eTrayCount];
+    //AI(secs-record-traycount) 20260810 : SVID 38237-38239 (Auto1-3) / 38249-38251 (Auto4-6)
+    // "Record Auto n Tray Count" - FULL TRAYS discharged from that Auto lane this work order.
+    // A different quantity from TrayICCnt[] above, which counts ICs inside the CURRENT tray.
+    // Bumped once per discharge in aAuto1To6 DoDischargeTray, alongside the lane's Unloadtray
+    // CEID; cleared with every other per-lot counter in ResetPerLotProductionCounters.
+    int RecordTrayCnt[eTrayCount];
     int LoaderIC;
     int TotalIC;
     int iPauseTime;
@@ -46,6 +52,7 @@ struct TRunData
         UPH=0;
         ZeroMemory(BinICCnt, sizeof(BinICCnt));
         ZeroMemory(TrayICCnt, sizeof(TrayICCnt));
+        ZeroMemory(RecordTrayCnt, sizeof(RecordTrayCnt));   //AI(secs-record-traycount) 20260810
         iEjectionPinCT=0;
         iAutoSkipCount=0;
         JamRate=0.0;

@@ -602,6 +602,30 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(1259, HType.INT_4_TYPE, "Auto4 Count", "pcs", &tRunData.TrayICCnt[eAuto4], "ICs placed into the Auto4 output tray (9045-family SVID 1259, from HT9011UC V3.33.899)");
     HGemPtr->SetSVDataPointer(1260, HType.INT_4_TYPE, "Auto5 Count", "pcs", &tRunData.TrayICCnt[eAuto5], "ICs placed into the Auto5 output tray (9045-family SVID 1260, from HT9011UC V3.33.899)");
     HGemPtr->SetSVDataPointer(1261, HType.INT_4_TYPE, "Auto6 Count", "pcs", &tRunData.TrayICCnt[eAuto6], "ICs placed into the Auto6 output tray (9045-family SVID 1261, from HT9011UC V3.33.899)");
+    //AI(secs-record-traycount) 20260810 : "Record Auto n Tray Count" - FULL TRAYS discharged from
+    // that Auto lane this work order. Do not confuse with the six SVs directly above : those count
+    // ICs inside the CURRENT tray, these count completed trays. KYEC asked for this quantity on
+    // 38237-38239 and the family agrees - HT9046LS 810_B01 registers exactly those three ids as
+    // "Record Auto 1/2/3 Tray Count" (uHGemHT9045_SV.cpp:861-863, vendor-added 20260710), backed
+    // by LastSet.RecodeTrayCount[]. HT160S adopts the family ids and the family's KYEC semantics.
+    //
+    // TWO PLACES 9045 AND HT160S DELIBERATELY DIFFER, both documented to the customer :
+    //  (a) 9045's counter is CUSTOMER-CODE dependent - under CC_TSI it wraps at 10 to trigger a
+    //      summary log (asendic_Auto.cpp:628-633); only its CC_KYEC_XILINX branch (:640) is the
+    //      plain cumulative count KYEC described. HT160S implements the KYEC meaning, unbranched.
+    //  (b) 9045 clears at LOT END (uLotInfo.cpp:1171-1173); HT160S clears at LOT START, with every
+    //      other per-lot counter (ResetPerLotProductionCounters). HT160S can hold 64 lots at once,
+    //      so no single Lot End identifies whose trays a LANE counter holds. Customer question Q2-e.
+    //
+    // Auto4-6 have no family number (810's AMR band stops at 38236 and 899 has no AMR family), so
+    // they extend at 38249-38251 - the ids straight after the 38246-38248 the AMR tray counts just
+    // vacated, and inside 810_B01's unbroken 38240-38510 gap. See the uAgvStation station table.
+    HGemPtr->SetSVDataPointer(38237, HType.INT_4_TYPE, "Record Auto 1 Tray Count", "trays", &tRunData.RecordTrayCnt[eAuto1], "full trays discharged from Auto1 this work order (9045 SVID 38237)");
+    HGemPtr->SetSVDataPointer(38238, HType.INT_4_TYPE, "Record Auto 2 Tray Count", "trays", &tRunData.RecordTrayCnt[eAuto2], "full trays discharged from Auto2 this work order (9045 SVID 38238)");
+    HGemPtr->SetSVDataPointer(38239, HType.INT_4_TYPE, "Record Auto 3 Tray Count", "trays", &tRunData.RecordTrayCnt[eAuto3], "full trays discharged from Auto3 this work order (9045 SVID 38239)");
+    HGemPtr->SetSVDataPointer(38249, HType.INT_4_TYPE, "Record Auto 4 Tray Count", "trays", &tRunData.RecordTrayCnt[eAuto4], "full trays discharged from Auto4 this work order (HT160S extension; family numbers only Auto1-3)");
+    HGemPtr->SetSVDataPointer(38250, HType.INT_4_TYPE, "Record Auto 5 Tray Count", "trays", &tRunData.RecordTrayCnt[eAuto5], "full trays discharged from Auto5 this work order (HT160S extension; family numbers only Auto1-3)");
+    HGemPtr->SetSVDataPointer(38251, HType.INT_4_TYPE, "Record Auto 6 Tray Count", "trays", &tRunData.RecordTrayCnt[eAuto6], "full trays discharged from Auto6 this work order (HT160S extension; family numbers only Auto1-3)");
     //AI(secs-startmode) 20260802 : slot 6 of the host's RPTID 502. Value is 9045-numbered
     // (see RefreshSVData) : 0=Continuous Start, 1=Initial Start. HT9045 declares this one as
     // an EC with min 0 / max 8 and carries the whole legend in its EC description, so a host

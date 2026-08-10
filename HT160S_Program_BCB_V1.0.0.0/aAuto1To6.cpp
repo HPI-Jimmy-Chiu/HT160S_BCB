@@ -923,6 +923,16 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
                 bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 latch clear
                 RearGrid[Index].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
                 State[Index].bFrontHasTray=true;
+                //AI(secs-record-traycount) 20260810 : SVID 38237-38239 (Auto1-3) /
+                //38249-38251 (Auto4-6) Record Auto n Tray Count. This is the ONE place a
+                //full tray leaves an Auto lane, which is why the lane's Unloadtray CEID
+                //fires on the very next line - HT9045 counts at the same event
+                //(asendic_Auto.cpp:640, its KYEC branch). Bump BEFORE the EventReport so an
+                //S6F11 carrying this SV reports the tray that just came out, not the one
+                //before it. Index 0-5 -> eAuto1..eAuto6 = 1..6, the same +1 mapping
+                //aSortArm uses for TrayICCnt.
+                if(Index>=0 && (Index+1)<eTrayCount)
+                    tRunData.RecordTrayCnt[Index+1]++;
                 if(HGem!=NULL)
                     HGem->EventReport(1, AutoCeid[Index]);
                 Task=3000;

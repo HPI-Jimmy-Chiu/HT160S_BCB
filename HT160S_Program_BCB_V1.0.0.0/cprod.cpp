@@ -174,6 +174,14 @@ void ResetPerLotProductionCounters()
         MachineRun.iAreaCount[AreaIndex]=0;
 
     ZeroMemory(tRunData.TrayICCnt, sizeof(tRunData.TrayICCnt));
+    //AI(secs-record-traycount) 20260810 : SVID 38237-38239 / 38249-38251 clear point. HT9045
+    //clears its RecodeTrayCount at LOT END (uLotInfo.cpp:1171-1173, KYEC branch); HT160S clears
+    //at LOT START instead, with every other per-lot counter. Deliberate: HT160S can hold up to
+    //64 lots at once, so "the lot that just ended" does not identify whose trays a LANE counter
+    //holds, and clearing on any Lot End would zero another lot's trays. Clearing here keeps the
+    //counter meaning "trays this work order" throughout the run and leaves the final figure
+    //readable after Lot End instead of blanking it. Open with the customer as Q2-e.
+    ZeroMemory(tRunData.RecordTrayCnt, sizeof(tRunData.RecordTrayCnt));
     ZeroMemory(tRunData.BinICCnt, sizeof(tRunData.BinICCnt));
     tRunData.TotalIC=0;
     tRunData.UPH=0;
