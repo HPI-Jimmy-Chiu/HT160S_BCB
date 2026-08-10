@@ -36,7 +36,7 @@ MAINSOURCE = ht160s.cpp
 RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm \
     uQwertyKey.dfm language.dfm setup.dfm data.dfm maintenance.dfm uOffset.dfm \
     uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm \
-    SecsGem\uHGemLogForm.dfm
+    uPadInterface.dfm SecsGem\uHGemLogForm.dfm
 LIBFILES = D:\ProgramFiles\Borland\CBuilder6\Lib\Debug\vclx.lib
 IDLFILES = 
 IDLGENFILES = 

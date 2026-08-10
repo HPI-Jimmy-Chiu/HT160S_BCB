@@ -17,10 +17,10 @@
       MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj 
       MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj 
       AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj 
-      LotWebApiClient.obj uFtpUploadThread.obj ComPort.obj MyComm.obj MyBinDisp.obj uPadInterface.obj
-      SecsGem\uHGemEquipment.obj SecsGem\UsecegemMainFrom.obj
-      SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj SecsGem\uAgvStation.obj 
-      SecsGem\uHGemLogForm.obj"/>
+      LotWebApiClient.obj uFtpUploadThread.obj ComPort.obj MyComm.obj 
+      MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj 
+      SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj 
+      SecsGem\uAgvStation.obj SecsGem\uHGemLogForm.obj"/>
     <RESFILES value="ht160s.res"/>
     <IDLFILES value=""/>
     <IDLGENFILES value=""/>
@@ -28,10 +28,12 @@
     <RESDEPEN value="$(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.dfm 
       uQwertyKey.dfm language.dfm setup.dfm data.dfm maintenance.dfm uOffset.dfm 
       uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm 
-      SecsGem\uHGemLogForm.dfm"/>
+      uPadInterface.dfm SecsGem\uHGemLogForm.dfm"/>
     <LIBFILES value="D:\ProgramFiles\Borland\CBuilder6\Lib\Debug\vclx.lib"/>
-    <LIBRARIES value="bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib wininet.lib rtl.lib vcl.lib"/>
-    <SPARELIBS value="vcl.lib rtl.lib wininet.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib bdertl.lib"/>
+    <LIBRARIES value="bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib wininet.lib rtl.lib 
+      vcl.lib"/>
+    <SPARELIBS value="vcl.lib rtl.lib wininet.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib 
+      bdertl.lib"/>
     <PACKAGES value="vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx.bpi 
       bdertl.bpi vcldbx.bpi ibxpress.bpi dsnap.bpi cds.bpi bdecds.bpi qrpt.bpi 
       teeui.bpi teedb.bpi tee.bpi dss.bpi teeqr.bpi visualclx.bpi 
