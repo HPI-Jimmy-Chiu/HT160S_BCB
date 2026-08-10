@@ -85,6 +85,10 @@ __fastcall THGem::THGem(TComponent *Owner)
     iT6Timeout         = 6;                   // seconds to wait for Linktest.rsp
     bLogLinktest       = false;               //AI(ht160s-secsgem) 20260612 : quiet heartbeat by default
     bLogSmlBody        = true;                //AI(ht160s-secsgem) 20260716 : full SML body dump on by default (gated by [SECS] LogSmlBody)
+    //AI(secs-strict-reportdef) 20260810 : DEFAULT TRUE = E5-conformant strict report validation.
+    // Overridden by General.ini [SECS] StrictReportValidation (see GemInitial). See the S2F33
+    // header comment for why the old Path A tolerance was wrong and what strict costs.
+    bStrictReportValidation = true;
     iT6Countdown       = 0;
     bAwaitLinktestRsp  = false;
     uControlSystemByte = 1;
@@ -1115,7 +1119,31 @@ void THGem::ReadEventReportData()
                     //narrow, reintroduces exactly that shift, so there is none. DataItemOutSVItem
                     //emits an empty item for an SVID the firmware does not know, so the LIST length
                     //always matches the stored SVCount.
+                    //AI(secs-strict-reportdef) 20260810 : the no-filter rule above still holds - see
+                    //the whole-report drop after this loop, which is a different thing from filtering
+                    //SVIDs out of a report. Nothing here changed.
                     sv[n++] = s;
+                }
+                //AI(secs-strict-reportdef) 20260810 : upgrade path. This overlay does NOT go through
+                //ProcessDefineReport_S2F33, so without this a machine that ran tolerant would silently
+                //REBUILD, on every boot, the very reports strict mode now refuses - EventReportDef.ini
+                //still holds whatever the host defined back then (on-site 2026-08-07: 7 reports, 54
+                //undefined SVIDs). Drop the WHOLE report, exactly as a live S2F33 would now; never a
+                //subset, which is what the 20260729 note above rightly forbids (it shifts S6F11 slots).
+                if(bStrictReportValidation)
+                {
+                    for(int k=0; k<n; k++)
+                    {
+                        if(IsValidSVID(sv[k])==false)
+                        {
+                            AnsiString sDrop;
+                            sDrop.sprintf("[SECS][boot] drop persisted RPTID=%u - SVID=%u undefined (strict; a live S2F33 would DRACK=0x04)",
+                                          rid, sv[k]);
+                            StringOut(sDrop);
+                            n = 0;
+                            break;
+                        }
+                    }
                 }
                 if(n>0) SetReportIDContent(rid, (unsigned)n, sv, 0);
             }
@@ -1202,6 +1230,19 @@ void THGem::DeleteAllHostReports()
 //---------------------------------------------------------------------------
 //AI(secs-reportdef) 20260724 : S2F33 Define Report. L,2{ DATAID, L,a{ L,2{ RPTID, L,b{ SVID.. } } } }.
 //Parse into scratch, validate ALL, then commit atomically. DRACK 0=ok 1=space 2=fmt 3=firmware-dup 4=badSVID.
+//AI(secs-strict-reportdef) 20260810 : DRACK=0x04 is LIVE again - this comment used to be stale, it
+//documented a 0x04 that had no emit site. The 20260727 Path A tolerance (accept SVIDs we do not
+//define, log them, let S6F11 emit an empty item) is now OFF by default, on customer instruction:
+//HT160S hardware genuinely differs from HT9045, so an SVID we do not have must be REFUSED, not
+//silently accepted into a report that can never carry a value. Evidence that tolerance hid a real
+//failure: 2026-08-07 on-site, KYEC's host defined 7 reports carrying 54 SVIDs, EVERY ONE undefined
+//here, and got DRACK=0x00 on all of them - the host had no way to know the data would never come.
+//Matches HT9045, which validates the same way (uHGemEquipment.cpp:7937-7940 ReportAcknowledge(0x04),
+//scan-all-then-commit loop uHGemClass.cpp:1300-1312 committing only at :1314).
+//Rejection is ATOMIC and DEFERRED: the bad SVID is recorded, the rest of the message is still parsed
+//to completion (so the receive path stays in step), and the reject is answered after the parse loop
+//but BEFORE the commit loop - so not one report is created. General.ini [SECS] StrictReportValidation=0
+//restores the old tolerance as an on-site escape hatch without a rebuild.
 void THGem::ProcessDefineReport_S2F33()
 {
     int a=0, b=0, len=0, i=0, j=0;
@@ -1211,6 +1252,9 @@ void THGem::ProcessDefineReport_S2F33()
     static int      svn[64];
     static unsigned svv[64][GEM_MAX_SVID_PER_REPORT];
     int nRpt = 0;
+    bool     bBadSvid = false;   //AI(secs-strict-reportdef) 20260810 : deferred atomic DRACK=0x04
+    unsigned uBadSvid = 0;       // first offender, for the reject log line
+    int      iBadSvidCount = 0;  // how many undefined SVIDs the whole packet named
     ResetReturnCode();
     if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)              { ReportAcknowledge(0x02); return; }
     if(GetDataItemLenAndType(len, Type)!=1)                 { ReportAcknowledge(0x02); return; }
@@ -1247,13 +1291,34 @@ void THGem::ProcessDefineReport_S2F33()
             if(IsValidSVID(sv)==false)
             {
                 AnsiString sUnkSv;
-                sUnkSv.sprintf("[SECS][S2F33] accept unknown SVID=%u (Path A tolerate; reports empty)", sv);
+                if(bStrictReportValidation)
+                {
+                    if(!bBadSvid) { bBadSvid=true; uBadSvid=sv; }
+                    iBadSvidCount++;
+                    sUnkSv.sprintf("[SECS][S2F33] REJECT unknown SVID=%u in RPTID=%u (strict; whole S2F33 -> DRACK=0x04)", sv, rr);
+                }
+                else
+                {
+                    sUnkSv.sprintf("[SECS][S2F33] accept unknown SVID=%u (Path A tolerate; reports empty)", sv);
+                }
                 StringOut(sUnkSv);
             }
             svv[nRpt][j]=sv;
         }
         nRpt++;
         //AI(secs-boundary-fix) 20260727 : removed spurious post-increment guard - rid[64] fill is already bounded by the a>64 reject above; the old nRpt>=64 check wrongly DRACK=0x01-rejected a legitimate 64-report batch and skipped the commit.
+    }
+    //AI(secs-strict-reportdef) 20260810 : atomic strict reject. Answered AFTER the whole message has
+    //been parsed (receive path stays in step) but BEFORE the commit loop below, so a packet naming
+    //even one undefined SVID creates NO reports at all - same all-or-nothing shape as HT9045.
+    if(bBadSvid)
+    {
+        AnsiString sRej;
+        sRej.sprintf("[SECS][S2F33] DRACK=0x04 - %d undefined SVID(s) in %d report(s), first=%u; nothing committed",
+                     iBadSvidCount, nRpt, uBadSvid);
+        StringOut(sRej);
+        ReportAcknowledge(0x04);
+        return;
     }
     for(i=0; i<nRpt; i++)
     {
@@ -1265,8 +1330,14 @@ void THGem::ProcessDefineReport_S2F33()
 }
 //---------------------------------------------------------------------------
 //AI(secs-reportdef) 20260724 : S2F35 Link Event Report. L,2{ DATAID, L,a{ L,2{ CEID, L,b{ RPTID.. } } } }.
-//LRACK 0=ok 2=fmt. AI(secs-pathA) 20260727 : unknown CEID/RPTID are TOLERATED (log + create/skip),
-//not LRACK=0x04/0x05-rejected, so the on-site CJ_EAP host completes its S2F35 link phase (Path A probe).
+//LRACK 0=ok 1=space 2=fmt 4=CEID-not-exist 5=RPTID-not-exist.
+//AI(secs-strict-reportdef) 20260810 : the 20260727 Path A tolerance (unknown CEID host-created and
+//linked, unknown RPTID silently skipped) is now OFF by default - same customer instruction and same
+//atomic/deferred shape as the S2F33 sibling above, and the same HT9045 precedent
+//(uHGemEquipment.cpp:7786-7813 -> LRACK 0x04 unknown CEID / 0x05 unknown RPTID).
+//Tolerance mattered here too: silently skipping an unknown RPTID let the host believe a link existed
+//that would never fire. General.ini [SECS] StrictReportValidation=0 restores the old behaviour.
+//CEID error outranks RPTID error when a packet has both - 0x04 names the outer object.
 void THGem::ProcessLinkEventReport_S2F35()
 {
     int a=0, b=0, len=0, i=0, j=0;
@@ -1277,6 +1348,10 @@ void THGem::ProcessLinkEventReport_S2F35()
     static int      rpb[64];
     static unsigned rpv[64][32];
     int nCe = 0;
+    bool     bBadCeid = false;   //AI(secs-strict-reportdef) 20260810 : deferred atomic LRACK=0x04
+    unsigned uBadCeid = 0;
+    bool     bBadRptid = false;  //AI(secs-strict-reportdef) 20260810 : deferred atomic LRACK=0x05
+    unsigned uBadRptid = 0;
     ResetReturnCode();
     if(DataItemIn(2, HType.LIST_TYPE, NULL)!=1)              { LinkReportAcknowledge(0x02); return; }
     if(GetDataItemLenAndType(len, Type)!=1)                 { LinkReportAcknowledge(0x02); return; }
@@ -1303,7 +1378,15 @@ void THGem::ProcessLinkEventReport_S2F35()
         if(FindCEIDItem(cc)==NULL)
         {
             AnsiString sUnkCe;
-            sUnkCe.sprintf("[SECS][S2F35] link to unknown CEID=%u (Path A tolerate; host-created, never fires)", cc);
+            if(bStrictReportValidation)
+            {
+                if(!bBadCeid) { bBadCeid=true; uBadCeid=cc; }
+                sUnkCe.sprintf("[SECS][S2F35] REJECT unknown CEID=%u (strict; whole S2F35 -> LRACK=0x04)", cc);
+            }
+            else
+            {
+                sUnkCe.sprintf("[SECS][S2F35] link to unknown CEID=%u (Path A tolerate; host-created, never fires)", cc);
+            }
             StringOut(sUnkCe);
         }
         if(GetDataItemLenAndTypeAndDelete(b, HType.LIST_TYPE)!=1){ LinkReportAcknowledge(0x02); return; }
@@ -1322,7 +1405,15 @@ void THGem::ProcessLinkEventReport_S2F35()
             if(FindReportItem(rr)==NULL)
             {
                 AnsiString sUnkRp;
-                sUnkRp.sprintf("[SECS][S2F35] skip unknown RPTID=%u in CEID=%u link (Path A tolerate)", rr, cc);
+                if(bStrictReportValidation)
+                {
+                    if(!bBadRptid) { bBadRptid=true; uBadRptid=rr; }
+                    sUnkRp.sprintf("[SECS][S2F35] REJECT unknown RPTID=%u in CEID=%u link (strict; whole S2F35 -> LRACK=0x05)", rr, cc);
+                }
+                else
+                {
+                    sUnkRp.sprintf("[SECS][S2F35] skip unknown RPTID=%u in CEID=%u link (Path A tolerate)", rr, cc);
+                }
                 StringOut(sUnkRp);
                 continue;
             }
@@ -1331,6 +1422,25 @@ void THGem::ProcessLinkEventReport_S2F35()
         rpn[nCe]=w; rpb[nCe]=b;
         nCe++;
         //AI(secs-boundary-fix) 20260727 : removed spurious post-increment guard - cid[64] fill is already bounded by the a>64 reject above; the old nCe>=64 check wrongly LRACK=0x02-rejected a legitimate 64-CEID batch and skipped the commit.
+    }
+    //AI(secs-strict-reportdef) 20260810 : atomic strict reject, after the full parse and before any
+    //commit, so a packet with a bad id links nothing. 0x04 (CEID) is reported ahead of 0x05 (RPTID)
+    //because the CEID is the outer object the host got wrong.
+    if(bBadCeid)
+    {
+        AnsiString sRej;
+        sRej.sprintf("[SECS][S2F35] LRACK=0x04 - CEID=%u not defined; nothing linked", uBadCeid);
+        StringOut(sRej);
+        LinkReportAcknowledge(0x04);
+        return;
+    }
+    if(bBadRptid)
+    {
+        AnsiString sRej;
+        sRej.sprintf("[SECS][S2F35] LRACK=0x05 - RPTID=%u not defined; nothing linked", uBadRptid);
+        StringOut(sRej);
+        LinkReportAcknowledge(0x05);
+        return;
     }
     for(i=0; i<nCe; i++)
     {
@@ -2011,6 +2121,15 @@ void THGem::SetLogLinktest(bool On)
 void THGem::SetLogSmlBody(bool On)
 {
     bLogSmlBody = On;
+}
+//---------------------------------------------------------------------------
+//AI(secs-strict-reportdef) 20260810 : strict (E5-conformant) vs Path A tolerant report validation.
+// ON  = S2F33 DRACK 0x04 on any undefined SVID, S2F35 LRACK 0x04/0x05 on any undefined CEID/RPTID,
+//       each rejecting the whole packet without committing anything. This is the default.
+// OFF = the 20260727 Path A behaviour, kept only as an on-site escape hatch.
+void THGem::SetStrictReportValidation(bool On)
+{
+    bStrictReportValidation = On;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260611 : SECS communication file logging. Layout aligned

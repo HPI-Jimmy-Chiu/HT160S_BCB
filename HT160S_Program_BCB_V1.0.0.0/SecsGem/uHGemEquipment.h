@@ -250,6 +250,11 @@ private:
     bool bAwaitLinktestRsp;           // a Linktest.req is outstanding
     bool bLogLinktest;                // log routine Linktest req/rsp (default off : avoid log flooding)
     bool bLogSmlBody;                 //AI(ht160s-secsgem) 20260716 : dump full SECS-II body as SML tree (RX+TX, default on)
+    //AI(secs-strict-reportdef) 20260810 : true (default) = E5-conformant strict S2F33/S2F35
+    // validation - an undefined SVID/CEID/RPTID rejects the whole packet (DRACK 0x04 / LRACK
+    // 0x04 / 0x05) and commits nothing. false = the 20260727 Path A tolerance, escape hatch
+    // only. Set from General.ini [SECS] StrictReportValidation in GemInitial.
+    bool bStrictReportValidation;
     unsigned uControlSystemByte;      // SystemBytes generator for our control msgs
     void SendLinktestReq();           // actively send Linktest.req (heartbeat)
     void DropConnection(AnsiString Reason);  // close socket + OnPeerDisconnected
@@ -429,6 +434,7 @@ public:
     void SetT6Timeout(int Seconds);            // <=0 falls back to a safe minimum
     void SetLogLinktest(bool On);              //AI(ht160s-secsgem) 20260612 : show routine Linktest in log (default off)
     void SetLogSmlBody(bool On);               //AI(ht160s-secsgem) 20260716 : dump full SECS-II body as SML tree (default on)
+    void SetStrictReportValidation(bool On);   //AI(secs-strict-reportdef) 20260810 : E5 strict S2F33/S2F35 id validation (default on)
 
     //AI(ht160s-secsgem) 20260611 : SECS communication on-disk logging control.
     void SetLogToFile(bool On);                // enable/disable disk logging

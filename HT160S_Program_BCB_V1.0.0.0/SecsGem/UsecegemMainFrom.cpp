@@ -51,6 +51,12 @@ void TFSECS::GemInitial(AnsiString HandlerType, AnsiString SoftwareVersion)
     int        iLogToFile = 1;   //AI(ht160s-secsgem) 20260611 : 1=persist SECS log to disk
     int        iLogLinktest = 0; //AI(ht160s-secsgem) 20260612 : 1=show routine Linktest in log (default quiet)
     int        iLogSmlBody = 1;  //AI(ht160s-secsgem) 20260716 : 1=dump full SECS-II body as SML tree (RX+TX)
+    //AI(secs-strict-reportdef) 20260810 : 1 (DEFAULT) = E5-conformant strict S2F33/S2F35 validation -
+    //  an SVID/CEID/RPTID we do not define rejects the whole packet (DRACK 0x04 / LRACK 0x04 / 0x05)
+    //  and commits nothing, so the host learns immediately that the data will never come. 0 = the
+    //  20260727 Path A tolerance. This is a COMMISSIONING escape hatch, not an operator toggle:
+    //  leave it at 1 unless a host is stuck and production cannot wait for a corrected report def.
+    int        iStrictReportValidation = 1;
     {
         AnsiString ConfigPath = HSys.CurrentDir + AnsiString("\\system\\General.ini");
         TIniFile *IniFile = new TIniFile(ConfigPath);
@@ -67,6 +73,7 @@ void TFSECS::GemInitial(AnsiString HandlerType, AnsiString SoftwareVersion)
             iLogToFile= IniFile->ReadInteger("SECS", "LogToFile",         iLogToFile);
             iLogLinktest= IniFile->ReadInteger("SECS", "LogLinktest",     iLogLinktest);
             iLogSmlBody = IniFile->ReadInteger("SECS", "LogSmlBody",      iLogSmlBody);
+            iStrictReportValidation = IniFile->ReadInteger("SECS", "StrictReportValidation", iStrictReportValidation);   //AI(secs-strict-reportdef) 20260810
         }
         __finally
         {
@@ -87,6 +94,9 @@ void TFSECS::GemInitial(AnsiString HandlerType, AnsiString SoftwareVersion)
     HGem->SetLogToFile(iLogToFile != 0);   //AI(ht160s-secsgem) 20260611 : disk log on/off
     HGem->SetLogLinktest(iLogLinktest != 0); //AI(ht160s-secsgem) 20260612 : quiet heartbeat by default
     HGem->SetLogSmlBody(iLogSmlBody != 0);   //AI(ht160s-secsgem) 20260716 : full SML body dump on by default
+    //AI(secs-strict-reportdef) 20260810 : push the strict/tolerant policy into the codec before
+    //StartCommunication, so the very first S2F33 of a session is already judged by it.
+    HGem->SetStrictReportValidation(iStrictReportValidation != 0);
     HGem->SetDefaultAddressAndPort(sAddress.c_str(), sPort.c_str(), sDeviceID.c_str());
     HGem->SetReceipeDirectoryAndGlobalName("..\\data\\", "*.*", 0);
     HGem->SetMachineTypeAndSoftwarseVer(HandlerType.c_str(), SoftwareVersion.c_str());
