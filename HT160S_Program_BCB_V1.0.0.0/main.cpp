@@ -2987,6 +2987,37 @@ void __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260811 : keep the operator's "Update WebAPI" button honest,
+// derived from state every cycle instead of being latched by the press. That way there
+// is no restore bookkeeping to forget : any path that ends a sweep (success, retries
+// used up, Lot End's abort) puts the caption back by itself.
+//  Enabled : only with a lot OPEN. MachineRun.bRunning is the lot-open latch (set by
+//            LotStartCore, cleared by DoLotEndProcess ; pause / alarm / stop / HOME
+//            never touch it), which is exactly the "only after Lot Start" rule.
+//  Caption : "Updating ..." while a pull-all sweep is in flight. This is the ONLY
+//            success feedback the press gives - a popup would be wrong here, because
+//            every ShowMyMessage* variant except the NoStop one calls DecStopAllMotor()
+//            + clears SystemStart, and even the NoStop box suspends MainProc until it
+//            is dismissed. A button that stalls production to say "done" is not an
+//            improvement over a button that just shows its progress.
+void __fastcall TfMain::SyncLotApiUpdateButton()
+{
+    AnsiString sWant;
+    bool bWantEnabled;
+
+    if(btnLotApiUpdate==NULL)
+        return;
+
+    bWantEnabled=(MachineRun.bRunning==true);
+    sWant=(bLotApiPullAll==true) ? LangT("Updating ...") : LangT("Update WebAPI");
+    //Compare before assigning : this runs every MainProc cycle and a blind write would
+    //repaint the button ~50 times a second.
+    if(btnLotApiUpdate->Enabled!=bWantEnabled)
+        btnLotApiUpdate->Enabled=bWantEnabled;
+    if(btnLotApiUpdate->Caption!=sWant)
+        btnLotApiUpdate->Caption=sWant;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive the in-flight pull. Called every
 // MainProc cycle (VCL main thread via Synchronize). Cheap no-op when idle. When the
 // response arrives it is parsed straight into LotRegistry and the on-screen Lot list
@@ -2998,6 +3029,10 @@ void __fastcall TfMain::PollLotDataWebApi()
     int HttpStatus;
     bool bDuplicate;
     AnsiString DupCode;
+
+    //AI(ht160s-lot-webapi) 20260811 : ABOVE the idle early-out on purpose - the button
+    //has to be re-enabled / re-captioned when the sweep is over, not only while it runs.
+    SyncLotApiUpdateButton();
 
     if(bLotApiPullActive==false)
         return;
@@ -4502,6 +4537,80 @@ void __fastcall TfMain::btnRemoveLotClick(TObject *Sender)
     LotRegistry.RemoveLot(LotText);
     RefreshLotListFromRegistry();
     SaveWorkOrder();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lot-webapi) 20260811 : operator-side "re-pull this work order's 2D/Bin data
+//from the customer WebAPI". This is the MANUAL twin of the SECS mid-lot LOTSTART open
+//branch (SecsGem\uHGemHT160.cpp, "lot already open - 2D/Bin exchange only, no re-init"),
+//and it is deliberately kept to that same contract : 2D/Bin exchange ONLY. It does NOT
+//re-initialise the lot - no LotBinBinding clear, no per-lot counter reset, no active-lot
+//re-latch, no SVID 1009 re-stamp, no CEID 6, no SaveWorkOrder (PollLotDataWebApi already
+//does RefreshLotListFromRegistry + SaveWorkOrder when a response lands) - so it can never
+//behave like a second Lot Start under live material.
+//
+//The gates mirror the SECS handler so the host and the operator cannot disagree about
+//what is legal mid-lot ; every refusal is one RecordProcess line plus a NON-STOPPING
+//dialog (ShowMyOKMessageNoStop : plain ShowMyMessage would DecStopAllMotor() and clear
+//SystemStart, i.e. this button would stop production just to explain itself) :
+//  1) no lot open -> refuse. MachineRun.bRunning is the lot-open latch. The button is
+//     also disabled in this state (SyncLotApiUpdateButton) ; this check is the authority,
+//     the greyed button is only the hint.
+//  2) WhiteList mode -> refuse, for the same reason uHGemHT160.cpp refuses the host :
+//     the "update" there is LoadWhiteListFile(), which Clear()s the WHOLE registry before
+//     it even checks the file exists (authoritative-at-lot-open, by design). With a lot
+//     open that empties the routing table under live material - permanently if the file
+//     has since gone missing or invalid.
+//  3) Auto-pull off (Maintenance chkLotApiUsePull) -> say so. StartLotWebApiPullAll()
+//     returns silently in that state, and a button that does nothing without saying why
+//     reads as broken hardware at the machine.
+//  4) empty registry -> nothing to pull. Unreachable while bRunning is true, but a silent
+//     no-op is exactly what must never happen on an operator press.
+//  5) sweep already in flight -> report and return. NEVER re-arm : StartLotWebApiPullAll
+//     folds a repeat into the running sweep on purpose (restarting the cursor was the
+//     20260730 defect where one lot finished its sweep with zero 2D items and every unit
+//     of it routed to the Error Auto).
+void __fastcall TfMain::btnLotApiUpdateClick(TObject *Sender)
+{
+    (void)Sender;
+
+    if(MachineRun.bRunning==false)
+    {
+        ShowMyOKMessageNoStop(LangT("No Lot is started : press Lot Start before updating WebAPI data !"));
+        RecordProcess("Lot WebAPI update refused : no lot open");
+        return;
+    }
+    if(GeneralSetting.IsWhiteListSortMode())
+    {
+        ShowMyOKMessageNoStop(LangT("WhiteList mode : the 2D list cannot be re-loaded while a Lot is open."));
+        RecordProcess("Lot WebAPI update refused : WhiteList mode with a lot open");
+        return;
+    }
+    if(LotRegistry.GetLotCount()<=0)
+    {
+        ShowMyOKMessageNoStop(LangT("No Lot in the work order !"));
+        RecordProcess("Lot WebAPI update refused : lot registry empty");
+        return;
+    }
+    EnsureLotWebApiClientCreated();
+    if(LotWebApiClient==NULL || LotWebApiClient->GetUsePull()==false)
+    {
+        ShowMyOKMessageNoStop(LangT("Lot WebAPI auto-pull is OFF : enable it in Maintenance -> Lot WebAPI."));
+        RecordProcess("Lot WebAPI update refused : UsePull is off");
+        return;
+    }
+    if(bLotApiPullAll==true)
+    {
+        ShowMyOKMessageNoStop(LangT("Lot WebAPI update is already running, please wait."));
+        RecordProcess("Lot WebAPI update : sweep already in flight, press ignored");
+        return;
+    }
+
+    RecordProcess("Lot WebAPI update pressed : lots="+IntToStr(LotRegistry.GetLotCount()));
+    RefreshLotListFromRegistry();
+    StartLotWebApiPullAll();
+    //Reflect "Updating ..." on this same press instead of waiting for the next MainProc
+    //cycle, so the operator sees the button react to the click.
+    SyncLotApiUpdateButton();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sgLotListClick(TObject *Sender)

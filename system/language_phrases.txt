@@ -142,6 +142,8 @@ Loader top-CCD X capture fine-tune	上料機構上視 CCD X 取像微調
 Loop	循環
 Lot "%s" has no 2D data loaded yet.\n(Work-order JSON not downloaded for this Lot.)	Lot "%s" 尚未載入 2D 資料。\n(此 Lot 的工單 JSON 尚未下載。)
 Lot No.	Lot 編號
+Lot WebAPI auto-pull is OFF : enable it in Maintenance -> Lot WebAPI.	Lot WebAPI 自動抓取未啟用：請於 維護 -> Lot WebAPI 開啟。
+Lot WebAPI update is already running, please wait.	Lot WebAPI 更新進行中，請稍候。
 Lot list is full !	Lot 清單已滿 !
 Machine is running.	機台執行中。
 Main status badges exceed the grid (max 3 cols x 2 rows = 6). The extra badges are hidden.\nIncrease MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS in main.h and widen pnlFeatureStatus to make room.	主畫面狀態標章超過格線數量 (最多 3 欄 x 2 列 = 6)。多出的標章已隱藏。\n請在 main.h 增加 MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS 並加寬 pnlFeatureStatus 以挪出空間。
@@ -174,6 +176,8 @@ NORMAL	正常
 No	否
 No 2D data : load lot 2D/Bin data before Start !	無 2D 資料：啟動前請載入 lot 2D/Bin 資料 ！
 No Lot data : add at least one Lot before Start !	無 Lot 資料：啟動前請至少新增一個 Lot ！
+No Lot in the work order !	工單內沒有 Lot !
+No Lot is started : press Lot Start before updating WebAPI data !	尚未啟動 Lot：更新 WebAPI 資料前請先按 Lot Start !
 Not Created	未建立
 Not Created 	未建立 
 Not Installed	未安裝
@@ -305,11 +309,14 @@ Tray arm Z must be up before X move.	托盤臂 Z 須先上升才能進行 X 移動。
 Tray division exceeds machine limit (X max=%d, Y max=%d). Value clamped.	盤分割超過機台極限 (X 最大=%d,Y 最大=%d)。數值已限制。
 Type	類型
 Unsaved MotorTest edits are not included in file validation. Continue?	未儲存的 MotorTest 編輯不會納入檔案驗證。是否繼續？
+Update WebAPI	更新 WebAPI 資料
+Updating ...	更新中 ...
 User ID or password is incorrect.	使用者帳號或密碼不正確。
 User accounts reloaded from system\login.txt.	已從 system\login.txt 重新載入使用者帳號。
 User accounts saved to system\login.txt.	使用者帳號已儲存至 system\login.txt。
 Value	數值
 View only. Engineer level (2) or above is required to edit.	僅供檢視。需工程師層級 (2) 以上才能編輯。
+WhiteList mode : the 2D list cannot be re-loaded while a Lot is open.	WhiteList 模式：Lot 開啟中無法重新載入 2D 清單。
 Z Phase	Z 相
 Zone	區域
 \n\nSave motor parameter changes?	\n\n儲存馬達參數變更？

@@ -1689,6 +1689,15 @@ object fMain: TfMain
                       TabOrder = 3
                       OnClick = btnRemoveLotClick
                     end
+                    object btnLotApiUpdate: TButton
+                      Left = 8
+                      Top = 128
+                      Width = 161
+                      Height = 25
+                      Caption = 'Update WebAPI'
+                      TabOrder = 4
+                      OnClick = btnLotApiUpdateClick
+                    end
                   end
                   object sgLotList: TStringGrid
                     Left = 4
@@ -2517,6 +2526,20 @@ object fMain: TfMain
                 Font.Style = [fsBold]
                 ParentFont = False
               end
+              object lblSysOperatorID: TLabel
+                Left = 14
+                Top = 165
+                Width = 107
+                Height = 20
+                AutoSize = False
+                Caption = 'Operator ID'
+                Font.Charset = ANSI_CHARSET
+                Font.Color = clNavy
+                Font.Height = -16
+                Font.Name = 'Arial'
+                Font.Style = [fsBold]
+                ParentFont = False
+              end
               object pnlLight: TPanel
                 Left = 203
                 Top = 3
@@ -2587,20 +2610,6 @@ object fMain: TfMain
                 ParentFont = False
                 TabOrder = 1
                 OnClick = pnRealDummyClick
-              end
-              object lblSysOperatorID: TLabel
-                Left = 14
-                Top = 165
-                Width = 107
-                Height = 20
-                AutoSize = False
-                Caption = 'Operator ID'
-                Font.Charset = ANSI_CHARSET
-                Font.Color = clNavy
-                Font.Height = -16
-                Font.Name = 'Arial'
-                Font.Style = [fsBold]
-                ParentFont = False
               end
               object edtSysOperatorID: TEdit
                 Left = 17

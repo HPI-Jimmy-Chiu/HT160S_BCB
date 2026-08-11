@@ -30,6 +30,7 @@ fMain	grpLotManualEdit	Lot Manual Edit	Lot 手動編輯
 fMain	btnAddLot	Add Lot	新增 Lot
 fMain	btnEditLot	Edit Lot	編輯 Lot
 fMain	btnRemoveLot	Remove Lot	移除 Lot
+fMain	btnLotApiUpdate	Update WebAPI	更新 WebAPI 資料
 fMain	btnLotStart	Lot Start	Lot 啟動
 fMain	btnLotEnd	Lot End	Lot 結束
 fMain	GroupBox1	Unload	下料

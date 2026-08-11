@@ -395,6 +395,7 @@ __published:	// IDE-managed Components
     TLabel *lbCarTrayCount_Auto6;
     TStatusBar *stbMain;
     TTabSheet *ts2DBinManual;
+    TButton *btnLotApiUpdate;
     void __fastcall sbLaguageClick(TObject *Sender);
     void __fastcall sbProductClick(TObject *Sender);
     void __fastcall sbMaintanceClick(TObject *Sender);
@@ -434,6 +435,7 @@ __published:	// IDE-managed Components
     void __fastcall btnAddLotClick(TObject *Sender);
     void __fastcall btnEditLotClick(TObject *Sender);
     void __fastcall btnRemoveLotClick(TObject *Sender);
+    void __fastcall btnLotApiUpdateClick(TObject *Sender);
     void __fastcall edLotNoClick(TObject *Sender);
     void __fastcall edLotNoKeyPress(TObject *Sender, char &Key);
     void __fastcall sgLotListClick(TObject *Sender);
@@ -500,6 +502,7 @@ public:		// User declarations
     void __fastcall PollFtpUploadResults();   //AI(ht160s-ftp) 20260721 : drain FTP upload results -> EventLog
     void __fastcall StartNextLotApiPull();
     void __fastcall StartLotWebApiPullAll();
+    void __fastcall SyncLotApiUpdateButton();   //AI(ht160s-lot-webapi) 20260811 : btnLotApiUpdate Enabled/Caption <- lot-open + sweep state
     void __fastcall UpdateSecsFeatureBadge();
     void __fastcall UpdateAmrFeatureBadge();   //AI(ht160s-agv) 20260615 : sync AMR badge to GeneralSetting.bUseAMR
     void __fastcall UpdateSortModeFeatureBadge();   //AI(ht160s-whitelist-override) 20260717 : sync sort-mode badge to effective mode
