@@ -334,6 +334,30 @@ struct ETypeStruct
 };
 extern struct ETypeStruct SECS_EVENT;
 //---------------------------------------------------------------------------
+//AI(secs-ceid-private-band) 20260813 : HT160S PRIVATE CEID BAND 9001-9099.
+//  WHY A PRIVATE BAND AND NOT "THE NEXT FREE NUMBER" : the 1-292 dictionary above is the
+//  HT9045 FAMILY's, and the family grows by APPENDING +1 (275 -> 288 -> 292 inside one year).
+//  Verified 20260813 across every readable tree under D:/HT9045 - HT9046LS 3.31.A201/A218,
+//  3.32.745/810/810_B01 and HT9011UC 874/896/899/903/905/906 plus the headless Cpp port - and
+//  against the KYEC machine's OWN persisted dictionary
+//  (D:/backup_version/HT9046/KYEC/20260626/EventReport_CEID.def) : the highest id anywhere is
+//  292, and no source hard-codes an emit above it. So 293 is precisely the slot the family
+//  takes next, and inventing there would repeat the 38237-38239 SVID mistake, where an id we
+//  invented inside a band the family also grew into was overtaken by a vendor upgrade.
+//  9001+ can never be reached by +1 growth and stays visually distinct from the host's own
+//  RPTID band (KYEC provisions 501/502/513/800 - see system/EventReportDef.ini).
+//  NOT verified : the newest reference archive (KYEC 20260810 HT9046LS 810_B04) is KeyPro-
+//  encrypted and could not be opened, so "max is 292" is proven only for the trees we can read.
+//  Re-run this check on EVERY 9045 upgrade anyway - that is the standing 38237-38239 lesson.
+//
+//  THESE IDS MUST NEVER GO INSIDE ETypeStruct. EventDescription is sized
+//  [SECS_EVENT.TotalEvent] (below) and AddCEID registers with
+//  for(i=DoStart; i<TotalEvent; i++), so an enum member valued 9001 would allocate 9002
+//  AnsiStrings AND register ~8700 empty CEIDs that S1F23/S1F24 would then answer with. Register
+//  each private id with its OWN SetCEIDContent call after that loop (same shape as the 272-275
+//  re-registration), and give it a literal alias - a private id has no EventDescription slot.
+#define HT160_CEID_LOTDATA_OK   9001   // Lot Data Exchange OK (every declared lot has 2D data)
+//---------------------------------------------------------------------------
 class HT160Gem : public HTGem
 {
 private:

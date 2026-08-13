@@ -1157,6 +1157,18 @@ void HT160Gem::AddCEID()
     HGemPtr->SetCEIDContent(273, EventDescription[SECS_EVENT.AGVLDUnLDStatus], 1, rptSta, EquDefault);
     HGemPtr->SetCEIDContent(274, EventDescription[SECS_EVENT.AGVLDUnLDFinish], 2, rptFin, EquDefault);
     HGemPtr->SetCEIDContent(275, EventDescription[SECS_EVENT.AGVLdID        ], 1, rptCid, EquDefault);
+    //AI(secs-lotdata-ok) 20260813 : HT160S PRIVATE CEID 9001 "Lot Data Exchange OK", the host's
+    // signal that the Lot WebAPI exchange succeeded and a remote START will now be accepted.
+    // Registered OUTSIDE the 1-292 loop ON PURPOSE - see the band note in uHGemHT160.h : an enum
+    // member valued 9001 would register ~8700 empty ids into the dictionary. Carries the dedicated
+    // report 8 (all lot ids + system time, built in AddReprot) so a host that has provisioned
+    // nothing still learns WHICH lots became routable. The alias is a LITERAL here because a
+    // private id has no EventDescription slot (the array is sized [TotalEvent]); the
+    // "never pass a literal" rule above is about 272-275, which DO have one. Emitted from
+    // TfMain::StartNextLotApiPull, and only when every declared lot ended up holding 2D data - a
+    // failed exchange emits NOTHING (customer rule 20260813).
+    unsigned rptLotOk[1]; rptLotOk[0] = 8;
+    HGemPtr->SetCEIDContent(HT160_CEID_LOTDATA_OK, "9001 Lot Data Exchange OK", 1, rptLotOk, EquDefault);
 
     //AI(secs-ceid-align9045) 20260729 : the explicit Auto-Full block that used to live here
     // (35/36/37/148/149/150) is gone - the 1-292 loop above now registers those ids straight
@@ -1231,6 +1243,15 @@ void HT160Gem::AddReprot()
     // CarrierID[] index and the reported SVID stay locked to one edit.
     unsigned rLdId[1]; rLdId[0] = AgvStation[AMR_IDENTITY_CARRIER_INDEX].SvidCarrierID;
     HGemPtr->SetReportIDContent(7, 1, rLdId, EquDefault);
+    //AI(secs-lotdata-ok) 20260813 : report 8 = { 1006 Lot ID, 1027 System Time }, the payload of
+    // private CEID 9001 (Lot Data Exchange OK). 1006 is EVERY registered lot comma-separated, so
+    // the host reads back exactly which lots the exchange made routable, and 1027 timestamps it.
+    // Deliberately reuses existing 9045-numbered SVIDs - NO new SVID is invented for this event
+    // (the retired 66xxx band is the cautionary tale). Report 8 is the first free firmware report
+    // id (1 = default, 2-7 = the AMR/AGV reports above); the KYEC host's own ids are 501/502/513/
+    // 800, so there is no collision on either side.
+    unsigned rLotOk[2]; rLotOk[0] = 1006; rLotOk[1] = 1027;
+    HGemPtr->SetReportIDContent(8, 2, rLotOk, EquDefault);
 
     //AI(secs-reportdef) 20260724 : premature save removed - persistence loads at boot via ReadEventReportData and saves on host S2F33/F37 only
 }

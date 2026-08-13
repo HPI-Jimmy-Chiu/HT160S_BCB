@@ -2820,6 +2820,43 @@ void __fastcall TfMain::StartNextLotApiPull()
     bLotApiPullAll=false;
     iLotApiRetryCount=0;
     RecordProcess("Lot WebAPI pull-all sweep complete");
+    //AI(secs-lotdata-ok) 20260813 : tell the host the exchange SUCCEEDED, so it knows when a
+    //remote START will be accepted (CEID 9001, HT160S private band - see uHGemHT160.h).
+    //WHY HERE and not per lot : this is the ONE point every exchange path converges on - the
+    //operator Lot Start button, the SECS LOTSTART that opens a lot, the mid-lot LOTSTART refresh
+    //and the manual Update WebAPI button all arm the sweep through StartLotWebApiPullAll - and
+    //because SET_LOT_INFO is additive one sweep can span several lots, where a single lot's
+    //200 OK does NOT mean the machine can start.
+    //THE GATE IS THE DATA, NOT THE HTTP STATUS : every registered lot must actually hold 2D
+    //items, i.e. the data half of CheckLotDataReady - the predicate MachineStart consults before
+    //it accepts a remote START. Announcing success on a 200 that parsed nothing would have the
+    //host send START and collect HCACK=2, which is worse than staying quiet.
+    //ORDER MATTERS : an armed sweep over a registry with no lots reaches this line on its first
+    //call and CountLotsWithoutItems would be 0 there, so the two count tests come FIRST. That
+    //same gate is what keeps this off the HSMS receive thread : the only way to reach here
+    //without going through PollLotDataWebApi (VCL main thread) is that empty-registry case,
+    //which GetLotCount()>0 rejects, so no S6F11 is ever sent from inside the S2F41 handler.
+    //FAILURE IS SILENT BY CUSTOMER RULE (20260813) : a lot that used up its retries leaves the
+    //registry short, this gate fails, and nothing goes out. The host must run its own timeout;
+    //machine-side recovery is another LOTSTART or the Update WebAPI button, both of which re-arm
+    //a sweep that emits on success. Every attempt is already in the WebAPI log + RecordProcess.
+    //WhiteList mode is excluded (customer ruling 20260813 "not for now"). It substitutes the
+    //local file for the WebAPI pull and never arms a sweep, so this is belt-and-braces for the
+    //one race that could still land here : a sort-mode flip in the maintenance panel while a
+    //sweep is in flight.
+    {
+        AnsiString MissingLot;
+        if(GeneralSetting.IsWhiteListSortMode()==false
+           && LotRegistry.GetLotCount()>0
+           && LotRegistry.GetItemCount()>0
+           && LotRegistry.CountLotsWithoutItems(MissingLot)==0)
+        {
+            RecordProcess("Lot WebAPI exchange OK for all "+IntToStr(LotRegistry.GetLotCount())
+                          +" lot(s), "+IntToStr(LotRegistry.GetItemCount())+" 2D code(s) - CEID "
+                          +IntToStr((int)HT160_CEID_LOTDATA_OK)+" Lot Data Exchange OK");
+            EventReport(HT160_CEID_LOTDATA_OK);
+        }
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : arm a "pull all lots" sweep over the WHOLE
