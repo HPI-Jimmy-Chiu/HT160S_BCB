@@ -183,6 +183,7 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     bLotApiPullAll = false;     //AI(ht160s-lot-webapi) 20260612 : no "pull all lots" sweep at startup
     iLotApiPullCursor = 0;
     iLotApiRetryCount = 0;
+    bLotApiAnyGiveUp = false;   //AI(ht160s-webapi-stall) 20260813 : no dropped lot yet
 
     if(ComponentState.Contains(csDesigning))
         return;
@@ -2792,6 +2793,13 @@ static const int LOT_API_MAX_RETRY = 3;
 // a pull for the lot at the cursor. The cursor only moves past a real lot once that
 // lot succeeds or its retries are used up (see PollLotDataWebApi), so a slow/failed
 // lot is retried instead of being silently dropped, and the sweep never stalls.
+//AI(ht160s-webapi-stall) 20260813 : that last claim used to be FALSE when the request could
+// not even START : RequestLotDataFromWebApi's busy-skip and start-refused paths returned
+// without arming bLotApiPullActive, and PollLotDataWebApi's early-out was the only driver,
+// so the sweep sat armed forever - button stuck at "Updating ...", CheckLotDataReady
+// refusing Start with a misleading "pull still in progress", only Lot End recovered.
+// Now Request reports whether it is in flight, the two non-start causes get distinct
+// treatment below, and the PollLotDataWebApi pump re-enters here once per MainProc cycle.
 void __fastcall TfMain::StartNextLotApiPull()
 {
     TLotRunInfo *Lot;
@@ -2812,8 +2820,30 @@ void __fastcall TfMain::StartNextLotApiPull()
         //real lot at the cursor : pull it. Do NOT advance the cursor here -
         //PollLotDataWebApi advances it on success, or re-calls us (same cursor)
         //to retry on failure, or advances it once the retries are used up.
-        RequestLotDataFromWebApi(Lot->sLotID);
-        return;                                    // one in flight ; Poll will call us again
+        if(RequestLotDataFromWebApi(Lot->sLotID))
+            return;                                // in flight ; Poll advances the sweep
+        //AI(ht160s-webapi-stall) 20260813 : request did NOT start. Two causes, two treatments :
+        //  WAIT    - another owner's request is running (maintenance Fetch). Do NOT burn
+        //            retries : the pump re-enters every MainProc cycle (~tens of ms) and a
+        //            manual fetch takes seconds, so counting here would wrongly skip a
+        //            perfectly good lot in 3 cycles.
+        //  REFUSED - StartLotRequest said no with the client idle (bad BaseUrl / winsock).
+        //            Walk the SAME retry ladder as a failed attempt so the sweep always
+        //            terminates : a permanently bad URL burns its tries, the cursor walks
+        //            off the end, the sweep closes and the button recovers. The dropped
+        //            lot withholds CEID 9001 (bLotApiAnyGiveUp), same as an HTTP give-up.
+        if(LotWebApiClient!=NULL && LotWebApiClient->IsBusy())
+            return;                                // WAIT : pump retries next cycle
+        iLotApiRetryCount++;
+        if(iLotApiRetryCount>=LOT_API_MAX_RETRY)
+        {
+            RecordProcess("Lot WebAPI giving up slot "+IntToStr(iLotApiPullCursor)+
+                          " (start refused "+IntToStr(LOT_API_MAX_RETRY)+"x)");
+            bLotApiAnyGiveUp=true;
+            iLotApiPullCursor++;
+            iLotApiRetryCount=0;
+        }
+        return;                                    // REFUSED : pump re-enters next cycle
     }
 
     //no more lots to pull : end the sweep
@@ -2844,9 +2874,17 @@ void __fastcall TfMain::StartNextLotApiPull()
     //local file for the WebAPI pull and never arms a sweep, so this is belt-and-braces for the
     //one race that could still land here : a sort-mode flip in the maintenance panel while a
     //sweep is in flight.
+    //AI(ht160s-webapi-stall) 20260813 : bLotApiAnyGiveUp closes the STALE-DATA loophole in the
+    //silence rule : on a mid-lot refresh every lot already holds items from the first pull, so
+    //a sweep in which every attempt FAILED (server down -> all give-ups) still passed the three
+    //data tests below and announced success. The flag is set at both give-up sites (the HTTP/
+    //parse ladder in PollLotDataWebApi and the start-refused ladder in StartNextLotApiPull) and
+    //cleared when a sweep is armed, so 9001 now means THIS sweep completed with zero dropped
+    //lots - not merely "the old data still looks whole".
     {
         AnsiString MissingLot;
         if(GeneralSetting.IsWhiteListSortMode()==false
+           && bLotApiAnyGiveUp==false
            && LotRegistry.GetLotCount()>0
            && LotRegistry.GetItemCount()>0
            && LotRegistry.CountLotsWithoutItems(MissingLot)==0)
@@ -2855,6 +2893,12 @@ void __fastcall TfMain::StartNextLotApiPull()
                           +" lot(s), "+IntToStr(LotRegistry.GetItemCount())+" 2D code(s) - CEID "
                           +IntToStr((int)HT160_CEID_LOTDATA_OK)+" Lot Data Exchange OK");
             EventReport(HT160_CEID_LOTDATA_OK);
+        }
+        else if(bLotApiAnyGiveUp==true)
+        {
+            //machine-log only (SECS stays silent per the customer rule) : say WHY no 9001
+            //followed this sweep, so on-site diagnosis does not need the per-attempt lines.
+            RecordProcess("Lot WebAPI sweep closed with dropped lot(s) - CEID 9001 withheld");
         }
     }
 }
@@ -2984,6 +3028,7 @@ void __fastcall TfMain::StartLotWebApiPullAll()
         bLotApiPullAll=true;
         iLotApiPullCursor=0;
         iLotApiRetryCount=0;
+        bLotApiAnyGiveUp=false;   //AI(ht160s-webapi-stall) 20260813 : fresh sweep, no dropped lot yet
         StartNextLotApiPull();
     }
 }
@@ -2992,23 +3037,26 @@ void __fastcall TfMain::StartLotWebApiPullAll()
 // Used by both the manual LotStart path and the SECS S2F42 LOTSTART handler, so it
 // must NEVER show a modal dialog (the SECS path runs on the HSMS/VCL receive thread
 // and a popup would stall factory communication). On any problem we just log.
-void __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
+//AI(ht160s-webapi-stall) 20260813 : returns TRUE only when a request is actually in flight
+// (bLotApiPullActive armed). FALSE = busy-skip or start refusal ; StartNextLotApiPull uses
+// the distinction (IsBusy = wait, otherwise retry-ladder) so the sweep can never stall armed.
+bool __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
 {
     AnsiString Lot;
 
     Lot=LotID.Trim();
     if(Lot=="")
-        return;
+        return false;
 
     EnsureLotWebApiClientCreated();
     if(LotWebApiClient==NULL)
-        return;
+        return false;
 
     if(LotWebApiClient->IsBusy())
     {
         //a pull is already running : do not stack requests (non-blocking, no modal)
         RecordProcess("Lot WebAPI pull skipped (client busy): "+Lot);
-        return;
+        return false;
     }
 
     if(LotWebApiClient->StartLotRequest(Lot))
@@ -3016,12 +3064,11 @@ void __fastcall TfMain::RequestLotDataFromWebApi(AnsiString LotID)
         bLotApiPullActive=true;
         sLotApiPullLot=Lot;
         RecordProcess("Lot WebAPI pull started: "+Lot);
+        return true;
     }
-    else
-    {
-        //start failed (bad URL etc) : log only, never block the caller
-        RecordProcess("Lot WebAPI pull start failed: "+LotWebApiClient->GetLastError());
-    }
+    //start failed (bad URL etc) : log only, never block the caller
+    RecordProcess("Lot WebAPI pull start failed: "+LotWebApiClient->GetLastError());
+    return false;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260811 : keep the operator's "Update WebAPI" button honest,
@@ -3072,7 +3119,24 @@ void __fastcall TfMain::PollLotDataWebApi()
     SyncLotApiUpdateButton();
 
     if(bLotApiPullActive==false)
+    {
+        //AI(ht160s-webapi-stall) 20260813 : self-heal an ARMED sweep with nothing in flight
+        //(RequestLotDataFromWebApi could not start : client busy with a maintenance Fetch, or
+        //StartLotRequest refused). Before this pump the early-out above was the sweep's only
+        //driver, so that state was permanent. Poll() runs UNGATED on purpose : the client's
+        //state machine only advances inside Poll/GetResult, so an ORPHANED request (maintenance
+        //form closed mid-Fetch, its timer gone) never even reaches its own timeout check and
+        //IsBusy() stays true for good - pumping it here walks it to DONE/FAILED, both of which
+        //StartLotRequest accepts as restartable. GetResult is NOT called here, so a live
+        //maintenance Fetch keeps its result (GetResult is non-destructive anyway).
+        if(bLotApiPullAll==true && LotWebApiClient!=NULL)
+        {
+            LotWebApiClient->Poll();
+            if(LotWebApiClient->IsBusy()==false)
+                StartNextLotApiPull();
+        }
         return;
+    }
     if(LotWebApiClient==NULL)
     {
         bLotApiPullActive=false;
@@ -3152,6 +3216,7 @@ void __fastcall TfMain::PollLotDataWebApi()
             {
                 RecordProcess("Lot WebAPI giving up slot "+IntToStr(iLotApiPullCursor)+
                               " after "+IntToStr(LOT_API_MAX_RETRY-1)+" retries");
+                bLotApiAnyGiveUp=true;   //AI(ht160s-webapi-stall) 20260813 : dropped lot -> withhold CEID 9001 this sweep
                 iLotApiPullCursor++;    // skip this lot and continue the sweep
                 iLotApiRetryCount=0;
                 StartNextLotApiPull();

@@ -98,6 +98,8 @@ enum TMainFeatureStatusIndex
 //     iLotApiPullCursor     - raw registry slot being pulled NOW (advances only after
 //                             a lot succeeds or its retries are used up).
 //     iLotApiRetryCount     - failed attempts on the current lot.
+//     bLotApiAnyGiveUp      - a lot was dropped this sweep (retries used up or start
+//                             refused) -> CEID 9001 is withheld at sweep close.
 //   FeatureBadgeSecsClick() - SECS badge -> open GEM log. (secsgem 20260611)
 //   sgLotListDblClick()     - double-click a Lot row to inspect the 2D/Bin data
 //                             downloaded for that Lot (operator confirms the work-order
@@ -469,6 +471,7 @@ private:	// User declarations
     bool bLotApiPullAll;
     int  iLotApiPullCursor;
     int  iLotApiRetryCount;
+    bool bLotApiAnyGiveUp;   //AI(ht160s-webapi-stall) 20260813 : any lot dropped this sweep -> no CEID 9001
     bool bFeatureBadgeOverflowWarned;   //AI(ht160s-mainui) 20260617 : one-shot guard for the badge-grid overflow warning
     void __fastcall BuildFeatureStatusBadges();
     void __fastcall LayoutFeatureBadges();   //AI(ht160s-mainui) 20260617 : arrange visible badges into the COLS x ROWS grid
@@ -497,7 +500,7 @@ public:		// User declarations
     bool __fastcall LoadWhiteListFile();   //AI(ht160s-whitelist) 20260715 : WhiteList mode 2D->Bin loader
     void __fastcall ArchiveWorkOrderToLotStory();
     bool __fastcall ArchiveDiscardedWorkOrder(AnsiString Reason);
-    void __fastcall RequestLotDataFromWebApi(AnsiString LotID);
+    bool __fastcall RequestLotDataFromWebApi(AnsiString LotID);   //AI(ht160s-webapi-stall) 20260813 : true = request actually in flight
     void __fastcall PollLotDataWebApi();
     void __fastcall PollFtpUploadResults();   //AI(ht160s-ftp) 20260721 : drain FTP upload results -> EventLog
     void __fastcall StartNextLotApiPull();
