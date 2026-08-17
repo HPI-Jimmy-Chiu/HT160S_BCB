@@ -681,7 +681,7 @@ sequenceDiagram
 <td>3</td>
 <td>Auto 卸盤（unload-tray / discharge）</td>
 <td>EMPTY（<code>len=30</code>）</td>
-<td>同上。<strong>⚠ 此號的 Auto5 卸盤語意已作廢</strong>：Auto5 卸盤自 commit <code>bf9d048</code> 起改為 <strong>146</strong>。<strong>⚠⚠ 但 <code>141</code> 本身不是空號 —— 2026-08-03 起被重新指派為 <code>GEM Control State Change</code></strong>(控制狀態每次變更即發,2026-08-04 實測收到),請勿把現行的 141 當作卸盤事件解析</td>
+<td>同上。<strong>⚠ 此號的 Auto5 卸盤語意已作廢</strong>：Auto5 卸盤自 commit <code>bf9d048</code> 起改為 <strong>146</strong>。<strong>⚠⚠ 但 <code>141</code> 本身不是空號 —— 2026-08-03 起被重新指派為 <code>GEM Control State Change</code></strong>（控制狀態每次變更即發，2026-08-04 實測收到），請勿把現行的 141 當作卸盤事件解析</td>
 </tr>
 <tr>
 <td>142</td>
@@ -724,7 +724,7 @@ sequenceDiagram
 <p><strong>為什麼本 run 中 136–142 的 report body 是空的（len=30）？</strong> 這 6 個 CEID 是 <strong>Auto 卸盤（unload-tray / discharge）事件</strong>。當時它們在設計上 <strong>刻意不註冊任何 report SV</strong>（lightweight、與 HT9045 對齊），所以 S6F11 只攜帶 CEID、不攜帶資料欄位——這是 by design，不是漏帶資料。</p>
 <p><strong>⚠ 自 2026-07-29 起兩項都已改變（本 run 為舊版故未涵蓋）</strong>：</p>
 <ol>
-<li><strong>號碼改了</strong>：Auto4/5/6 卸盤由 <code>140/141/142</code> 更正為 <strong><code>145/146/147</code></strong>（commit <code>bf9d048</code>），以符合 HT9045 <code>EventReport_CEID.def</code> 的實際編號。現行陣列為 <code>aAuto1To6.cpp</code> 的 <code>AutoCeid[6]={136,137,138,145,146,147}</code>。<strong>本 run 出現的 140/141/142 為舊編號。</strong><strong>⚠ 但 <code>141</code> 這個號碼現在有新語意、且是活躍事件</strong>：2026-08-03 起 <code>141</code> 被<strong>重新指派</strong>為 <strong>GEM Control State Change</strong>（控制狀態每次變更即發），2026-08-04 實測連線當下就收到 <code>CEID=141</code>。所以「不會再看到」只適用於 <strong>140 與 142</strong>；<code>141</code> 會看到，但它不再是 Auto5 卸盤。</li>
+<li><strong>號碼改了</strong>：Auto4/5/6 卸盤由 <code>140/141/142</code> 更正為 <strong><code>145/146/147</code></strong>（commit <code>bf9d048</code>），以符合 HT9045 <code>EventReport_CEID.def</code> 的實際編號。現行陣列為 <code>aAuto1To6.cpp</code> 的 <code>AutoCeid[6]={136,137,138,145,146,147}</code>。<strong>本 run 出現的 140/141/142 為舊編號。</strong><strong>⚠ 但 <code>141</code> 這個號碼現在有新語意、且是活躍事件</strong>：2026-08-03 起 <code>141</code> 被<strong>重新指派</strong>為 <strong>GEM Control State Change</strong>（控制狀態每次變更即發，<code>uHGemHT160.cpp</code> 的 <code>EventDescription[GemControlStateChange]="141 GEM Control State Change"</code>），2026-08-04 實測連線當下就收到 <code>CEID=141</code>。所以「不會再看到」只適用於 <strong>140 與 142</strong>；<code>141</code> 會看到，但它不再是 Auto5 卸盤。</li>
 <li><strong>body 不再是空的</strong>：CEID 字典整份改為 HT9045 逐字複本後（commit <code>ab1b99e</code>），這 6 個號碼與其他事件一樣註冊在 <strong>Report 1</strong>（13 個 SV），body 長度與 CEID 35 同級（<code>len=144</code>），不再是 <code>len=30</code> 的空報表。若 host 端已針對空 body 撰寫解析，請一併更新。
    <strong>⚠ 再更新（2026-08-04）</strong>：Report 1 已依京元裁定縮編為 <strong>只有 <code>1027 System Time</code></strong>，故這 6 個號碼現行僅帶 <strong>1 個 SV</strong>（body 遠小於 144），但仍<strong>不是</strong>空 body。詳見 3.3.1。</li>
 </ol>
@@ -824,17 +824,18 @@ sequenceDiagram
 <p><strong>為什麼 AGV 要先 START_AGV、最後又要一個 resume START？這兩個 START 不一樣嗎？</strong> 兩者是<strong>刻意分開的不同命令</strong>，職責不同：
 - <strong>START_AGV(station)</strong> = 「授權 AGV 對某一站（station）執行搬運動作」——只針對該站的 AGV 交接，不影響整機生產狀態。
 - <strong>resume START</strong> = 「在 AGV 交接完成後，恢復整機生產」——對應 3.2 的同一個 START 命令。</p>
-<p>之所以分開，是因為 AGV 補料期間機台可能暫停某些動作等待交接，待 CEID 274（Finish）確認搬運完成後，host 才送 START 讓整機恢復生產。把「授權 AGV 動作」與「恢復整機生產」拆成兩個命令，host 才能精準控制兩件事的時序。</p>
+<p>之所以分開，是因為 AGV 交接期間機台會凍結該站的機構動作（進料側的 GoDown 解疊、出料側的 GoUp 堆盤），待 CEID 274（Finish）確認搬運完成後才解凍。把「授權 AGV 動作」與「恢復整機生產」拆成兩個命令，host 才能精準控制兩件事的時序。</p>
+<p><strong>⚠ 但要理解 resume <code>START</code> 在 HT160S 實際上是「儀式性」的：設備並不等它。</strong> 韌體在發出 CEID 274 的同一個 tick 就已自行解除該站的機構鎖並恢復生產（Auto 站另含清空該車）。因此 host 沒送 resume <code>START</code> 時機台<strong>不會</strong>卡住。這也是下面 HCACK=4 的成因——送到時機台早已在跑。</p>
 </blockquote>
 <p><strong>AGV CEID 定義</strong>：</p>
 <blockquote>
-<p>⚠ <strong>名稱更正（2026-08-03）</strong>：下表與本章各段 log 摘錄中的 <code>AGVSupplement</code> /
-<code>AGVLDUnLDStatus</code> / <code>AGVLDUnLDFinish</code> / <code>AGVLdID</code> 是<strong>舊的 CENAME</strong>。
-與京元現場 HT-9046 機台自存的 <code>EventReport_CEID.def</code> 逐筆核對後發現該機用的是
-<code>AMR Supplement</code> / <code>AMR LDUnLD Status</code> / <code>AMR LDUnLD Finish</code> /
-<code>AMR LD ID</code>，本機韌體已於 2026-08-03 改為一致。
+<p>⚠ <strong>名稱更正（2026-08-03）</strong>：下表與本章各段 log 摘錄中的 <code>AGVSupplement</code> / <code>AGVLDUnLDStatus</code> /
+<code>AGVLDUnLDFinish</code> / <code>AGVLdID</code> 是<strong>舊的 CENAME</strong>。與京元現場 HT-9046 機台自存的
+<code>EventReport_CEID.def</code> 逐筆核對後發現該機用的是 <code>AMR Supplement</code> / <code>AMR LDUnLD Status</code> /
+<code>AMR LDUnLD Finish</code> / <code>AMR LD ID</code>，本機韌體已於 2026-08-03 改為一致。
 <strong>CEID 號碼、攜帶報表、發射時機、body 內容全部未變</strong>，只有 <code>S1F24</code> 回覆的名稱字串改了，
-因此本章所有既有的 wire 範例與 body dump 仍然完全有效。下表與 log 摘錄保留原字串，因為它們是當時實際輸出的紀錄。</p>
+因此本章所有既有的 wire 範例與 body dump 仍然完全有效。下表與 log 摘錄保留原字串，
+因為它們是當時實際輸出的紀錄。</p>
 </blockquote>
 <table>
 <thead>
@@ -863,17 +864,21 @@ sequenceDiagram
 <tr>
 <td>275</td>
 <td>AGVLdID</td>
-<td>身分盤（identity/cover tray）2D 上傳。<strong>自 2026-07-14 起（commit c389e3f）已實作發報</strong>：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取 2D <strong>後立即</strong>發 S6F11 CEID275，SVID <code>38204</code>（Color 站 P3 carrier id）帶該 2D，走<strong>專屬 report 7＝僅 <code>38204</code></strong>（非 9 站全帶的 report 5）。本 run（2026-06-26）早於此實作故未出現</td>
+<td>身分盤（identity/cover tray）2D 上傳。<strong>自 2026-07-14 起（commit c389e3f）已實作發報</strong>：AMR 身分盤由 Loader 退出後經 TrayArm 放到 Color 後段，由 Color 載台帶動、讀碼器移到讀取位掃描 2D，<strong>讀到後立即</strong>發 S6F11 CEID275，SVID <code>38202</code>（AMR Loader load-port Carrier ID）帶該 2D，走<strong>專屬 report 7＝僅 <code>38202</code></strong>（非 9 站全帶的 report 5）。<strong>⚠ 2026-08-05 起由 <code>38204</code> 改為 <code>38202</code></strong>，見下方說明。本 run（2026-06-26）早於此實作故未出現</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
 <p><strong>關於 CEID 275（AGVLdID）</strong>：275 是身分盤（identity/cover tray）2D 的上傳事件。<strong>本 run（2026-06-26）並未發出 275</strong>——當時韌體尚未實作發報，且本範例的 6 個 AGV cycle 只出現 272／273／274，故 275 <strong>沒有對應的 evidence row 可引用</strong>。</p>
-<p><strong>自 2026-07-14 起（commit c389e3f）275 已實作並會實際發報</strong>：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取其 2D <strong>後立即</strong>發出 S6F11 CEID275（且該 2D 為真實讀值時），SVID <code>38204</code> 帶該 2D。要點：
-- 每次身分盤進料<strong>只上報一次</strong>單一 2D——用<strong>專屬 report 7（僅 <code>38204</code>）</strong>，不夾帶其餘 8 站的 carrier id；Auto 各站的 carrier id（<code>38205</code>–<code>38210</code>）改由 host 以 <strong>S1F3 輪詢</strong>取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
-- <strong>SVID <code>38204</code> 為實際讀取站（Color 站 P3）的 carrier id</strong>（HT160S 客戶選用）；9045 原本用 Loader load-port 的 <code>38202</code>。若日後要對齊 9045 編號，韌體有單一改動點（<code>AMR_IDENTITY_CARRIER_INDEX</code>）可切回 <code>38202</code>。
+<p><strong>自 2026-07-14 起（commit c389e3f）275 已實作並會實際發報</strong>。機構流程：身分盤由 <strong>Loader</strong> 退出，<strong>TrayArm</strong> 夾取後放到 <strong>Color 後段</strong>（<code>aTrayArm.cpp</code> <code>PlaceDest=TAPLACE_COLOR</code>）；接著由 <strong>Color 載台</strong>帶動盤子、<strong>讀碼器沿 X 移到讀取位</strong>掃描 2D（<code>aColor.cpp</code> <code>DoReadColor2D</code>）。讀到真實 2D 後<strong>立即</strong>發出 S6F11 CEID275，SVID <code>38202</code> 帶該 2D。要點：
+- <strong>SVID 已於 2026-08-05 由 <code>38204</code> 改為 <code>38202</code>（韌體 <code>AMR_IDENTITY_CARRIER_INDEX</code> 由 2 改為 0）</strong>，理由是對齊 HT9045。
+  <strong><code>38204</code> 現已下架、不再註冊</strong>，host 端請移除引用（連同同批下架的 <code>38203</code>，見下方「已下架 SVID」）。
+- <strong>這不是特例，是本來就對齊。</strong>HT9045（HT9046LS V3.32.810_B01）雖然把 <code>38202</code> 命名為 <em>Load Port Carrier ID</em>，它<strong>也不是在 Loader load port 讀碼</strong>——同樣是把盤送到 buffer 站（Color 或 Empty，由 <code>TrayForm.iReaderPos</code> 決定）再用 Keyence 讀（<code>acatchtray.cpp</code> <code>InitialCoverTrayIDTask</code>）。9045 雖有 Loader 位置的讀碼器，但其資料<strong>沒有綁任何 SVID</strong>。所以「讀取裝置在 buffer 站、數值發布在 <code>38202</code>」是 9045 原本的做法，HT160S 與之一致。
+- 每次身分盤進料<strong>只上報一次</strong>單一 2D——用<strong>專屬 report 7（僅 <code>38202</code>）</strong>，不夾帶其餘各站的 carrier id；Auto 各站的 carrier id（Auto1-3＝<code>38205</code>/<code>38206</code>/<code>38207</code>，Auto4-6＝<code>38199</code>/<code>38200</code>/<code>38201</code>）改由 host 以 <strong>S1F3 輪詢</strong>取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
 - 作業員略過／讀取失敗（空 2D）者<strong>不上報</strong>（與 9045 一致，不送空碼）。
-- 真機關閉 Color CCD 時韌體產生的暫代碼（<code>COLOR2D_…</code>）<strong>不上報</strong>（避免假碼進 MES）；筆電模擬（SOFT_SIMULATE）的種子碼則會上報，供 SECS 模擬器對測。
+- 真機關閉 Color CCD 時韌體產生的暫代碼（<code>COLOR2D_…</code>）<strong>不上報</strong>（避免假碼進 MES）。閘門是韌體的 <code>IsTrayID2DGenuine()</code>，非字串前綴比對。
+  <strong>⚠ 例外：真機組建若由操作員勾選「模擬」（<code>bRunSimulation</code>），該暫代碼仍會上報。</strong> host 端若看到 <code>COLOR2D_</code> 開頭的碼，代表現場勾了模擬，應視為無效碼。
+- 報表連結：韌體自帶 report 7 → CEID275。<strong>若 host 以 S2F35 重新連結 CEID275 而未同時用 S2F33 定義所帶的 RPTID</strong>，<code>38202</code> 會從該事件掉出去。目前韌體 <code>bStrictReportValidation</code> 預設為真，會以 <code>LRACK=0x05</code> 拒絕含未知 RPTID 的 S2F35，report 7 因而存活——<strong>此保護是現行行為的前提，勿關閉</strong>。
 - <code>EventReport</code> 於 HSMS <strong>SELECTED</strong> 才送（未連線時為 no-op）。</p>
 <p>host 端仍不應假設每個 run 都必有 275——僅在該 run 有身分盤補給且連線時才出現。</p>
 </blockquote>
@@ -881,10 +886,57 @@ sequenceDiagram
 <pre><code>L[2]
   A &quot;START_AGV&quot;
   L[n]
-    L[2]{ A station, A &quot;Action&quot; }
-    [, L[2]{ A &quot;LoaderTrayCount&quot;, A n }]
+    L[2]{ A station, A verb }          verb = &quot;Action&quot; | &quot;NA&quot;
+    [, L[2]{ A &quot;LoaderTrayCount&quot;,  A n }]
+    [, L[2]{ A &quot;LoaderICCount&quot;,    A n }]
 </code></pre>
-<p><code>station</code> ∈ {Loader, Empty, Color, AUTO1..AUTO6}，由 <code>_start_agv</code> 建構。</p>
+<p><code>station</code> ∈ <code>Loader</code> / <code>Empty</code> / <code>Color</code> / <code>AUTO1</code>..<code>AUTO6</code>（<strong>大小寫不拘</strong>，韌體以大寫比對）。</p>
+<blockquote>
+<p><strong>⚠ <code>verb</code> 是啟動閘，不是說明文字。</strong> 只有字面 <strong><code>"Action"</code></strong> 會讓該站進入交接；<strong><code>"NA"</code></strong> 表示「為了向量完整而列出，不要動作」。這與 HT9045 相同（其 START_AGV 亦要求第二欄等於 <code>"Action"</code>）。京元現場 host 的實際用法是<strong>每次送完整站點向量、其中恰好一站帶 <code>"Action"</code>、其餘全帶 <code>"NA"</code></strong>。</p>
+<p>送出 <code>"Action"</code> / <code>"NA"</code> 以外的動詞（例如 <code>LOAD</code> / <code>UNLOAD</code>）：韌體<strong>記錄 log 但不動作</strong>，且 <strong><code>HCACK</code> 仍為 <code>0</code></strong>，保留給未來擴充的動詞集。</p>
+</blockquote>
+<p><strong>⚠ SVID 異動摘要（host 端必讀）</strong></p>
+<table>
+<thead>
+<tr>
+<th>SVID</th>
+<th>原意義</th>
+<th>現況</th>
+<th>host 要做什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>38204</code></td>
+<td>Color 站 carrier ID（曾用於 CEID 275 身分盤 2D）</td>
+<td><strong>已下架</strong>，不再註冊</td>
+<td>移除引用；身分盤 2D 改讀 <code>38202</code></td>
+</tr>
+<tr>
+<td><code>38203</code></td>
+<td>Empty 站 carrier ID</td>
+<td><strong>已下架</strong>，不再註冊（從未有值）</td>
+<td>移除引用</td>
+</tr>
+<tr>
+<td><code>38208</code> / <code>38209</code> / <code>38210</code></td>
+<td>Auto4-6 carrier ID（HT160S 早期自創）</td>
+<td><strong>已退役</strong>，不再註冊，S1F3 回空 <code>L[0]</code></td>
+<td>改用 <code>38199</code> / <code>38200</code> / <code>38201</code></td>
+</tr>
+<tr>
+<td><code>38237</code> / <code>38238</code> / <code>38239</code></td>
+<td>AMR Auto4-6 Tray Count</td>
+<td><strong>意義已變更</strong>：現為 <em>Record Auto 1/2/3 Tray Count</em>（本工單累計出盤數，Lot Start 重置）</td>
+<td>AMR 用途改讀 <code>38246</code> / <code>38247</code> / <code>38248</code>；否則會讀到看似合理的錯誤數字</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>上述號碼一律以 <strong>HT9046LS V3.32.810_B01</strong>（京元部署機型）為唯一對齊依據。810_B01 有的照抄（<code>38202</code> Load Port Carrier ID、<code>38205</code>-<code>38207</code> Auto1-3 Carrier ID、<code>38222</code>-<code>38236</code> AMR 段、<code>38237</code>-<code>38239</code> Record 段）；810_B01 沒有的則標示為 <strong>HT160S 擴充</strong>。</p>
+<p><strong>Auto4-6 相關的號碼全部是擴充號碼，不是家族號碼</strong>：810_B01 是三站 Auto 機台，其 AMR 資料結構本身就只有六格（Loader/Empty/Color/Auto1/Auto2/Auto3），結構上放不下 Auto4-6，因此家族中不存在可照抄的號碼。擴充號碼包含 Carrier ID <code>38199</code>-<code>38201</code>、Tray Count <code>38246</code>-<code>38248</code>、Device Count <code>38240</code>-<code>38242</code>、Bin Setting <code>38243</code>-<code>38245</code>。四組皆已確認在 810_B01 未被使用。</p>
+<p><strong><code>38223</code> / <code>38224</code> / <code>38229</code> / <code>38230</code>（Empty / Color 的 Tray Count 與 Device Count）雖然恆為 0，但刻意保留註冊</strong> —— 它們是 810_B01 的家族號碼，而 810_B01 同樣沒有寫入者（該樹所有寫入都只落在 Auto1-3）。保留才是對齊。</p>
+</blockquote>
 <p><strong>站點對照（P-Map，PIndex = AutoNo + 3）</strong>：CEID 272 的 SVID <code>38219</code> 以 bitmap 標出目標站，站號 P1–P9 對照如下：</p>
 <table>
 <thead>
@@ -900,11 +952,11 @@ sequenceDiagram
 </tr>
 <tr>
 <td>P2</td>
-<td>EmptyTray</td>
+<td>EmptyTray（<strong><code>START_AGV</code> 的 CP 名稱是 <code>Empty</code></strong>）</td>
 </tr>
 <tr>
 <td>P3</td>
-<td>ColorTray</td>
+<td>ColorTray（<strong><code>START_AGV</code> 的 CP 名稱是 <code>Color</code></strong>）</td>
 </tr>
 <tr>
 <td>P4</td>
@@ -939,7 +991,8 @@ sequenceDiagram
 <li>收到 <code>273</code>（Ready）→ 僅 log（等待機台 sensor 回報 Finish，不做動作）</li>
 <li>收到 <code>274</code>（Finish）→ 自動送 <code>START</code>（resume，恢復整機生產）</li>
 </ul>
-<p><strong>Color (P3) demand-gate（需求閘）</strong>：Color 站僅在真實需求（內部旗標 <code>bSupplyRequested</code> 成立）時才補給。</p>
+<p><strong>Color (P3) 的觸發條件</strong>：與 P1 / P2 相同，是<strong>進料源乾</strong> sensor —— <code>SnColor_InputEnd</code> 讀 OFF（韌體 <code>TColorModule::IsInputShortageForAmr</code>）。
+（<strong>更正</strong>：舊版本文件寫「僅在內部旗標 <code>bSupplyRequested</code> 成立時才補給」，那是 Color 站<strong>送盤 branch</strong> 的閘，不是叫車的閘，兩者不同層。）</p>
 <blockquote>
 <p><strong>為什麼本 run 沒有出現 P3（Color）的 AGV cycle？</strong> 因為 Color 站採「<strong>按需供給（demand-gated）</strong>」：只有在機台真正提出需求時才呼叫 AGV。本範例是一段很短的 run，期間 Color 站並未產生供給需求，所以 <strong>完全沒有 P3 cycle</strong> 出現。這是 <strong>預期行為</strong>，不是漏掉或失敗——host 端不應預期每個 run 都一定看到 P3。</p>
 </blockquote>
@@ -1003,8 +1056,8 @@ sequenceDiagram
 </tr>
 <tr>
 <td>Report 6（18 個 SVID）</td>
-<td>U4×18</td>
-<td><strong>自 2026-07-13 起（commit d10b9be）新增</strong>：全 9 站 TrayCount（<code>38222/38223/38224/38225/38226/38227/38237/38238/38239</code>）＋全 9 站 DeviceCount（<code>38228/38229/38230/38231/38232/38233/38240/38241/38242</code>），依 P1–P9 固定順序排列；目標站帶實際盤數／IC 數，其餘站為當下快照</td>
+<td>I4×18</td>
+<td><strong>自 2026-07-13 起（commit d10b9be）新增</strong>：全 9 站 TrayCount（<code>38222/38223/38224/38225/38226/38227/</code><strong><code>38246/38247/38248</code></strong>）＋全 9 站 DeviceCount（<code>38228/38229/38230/38231/38232/38233/38240/38241/38242</code>），依 P1–P9 固定順序排列。<strong>⚠ Auto4-6 TrayCount 已於 2026-08-10 由 <code>38237/38238/38239</code> 改為 <code>38246/38247/38248</code></strong>（原號在 HT9045 810_B01 被廠商定義為 <em>Record Auto 1/2/3 Tray Count</em>，語意不同，見下方「已改號 SVID」）。線上型別為 <strong>I4</strong>（非 U4）。Report 6 的 body 為位置式（依序只帶值），故照位置解析的 host 不受改號影響；以 SVID 對映／S1F3 輪詢／S2F33 佈署的 host 必須重新對映</td>
 <td>本 run 為舊版故未涵蓋</td>
 </tr>
 <tr>
@@ -1039,25 +1092,62 @@ sequenceDiagram
 <td><code>"Loader"</code> / <code>"Empty"</code> / <code>"Color"</code> / <code>"AUTO1".."AUTO6"</code></td>
 </tr>
 <tr>
-<td><code>"Action"</code></td>
+<td><code>verb</code></td>
 <td>A</td>
-<td>station 對應的動作值（CPVAL 位置）</td>
-<td><code>"Action"</code></td>
+<td>station 的動作值（CPVAL 位置）。<strong>只有 <code>"Action"</code> 會啟動交接</strong>；<code>"NA"</code>＝列出但不動作；其他動詞＝記 log 不動作</td>
+<td><code>"Action"</code> / <code>"NA"</code></td>
 </tr>
 <tr>
 <td><code>"LoaderTrayCount"</code> / <code>n</code></td>
 <td>A / A</td>
-<td>選用第二參數對：Loader 補料盤數。<strong>此為 WORK（工作盤）數，不含 cover／identity 表頭盤</strong>（9045 <code>iSECSSetTrayCount</code> 對齊，commit 111b976）；韌體再依 <code>General.ini [AMR] CoverTray0</code>＋<code>IdentityTray0</code> 補上表頭盤，得出實際 magazine 總盤數（<code>iCarTrayTotal = 工作盤數 + 表頭盤數</code>，見 <code>aLoader.cpp</code> RefillSimInfeed／SetExpectedCarTrayCount）</td>
+<td>選用參數對：Loader 補料盤數。<strong>此為 WORK（工作盤）數，不含 cover／identity 表頭盤</strong>（9045 <code>iSECSSetTrayCount</code> 對齊，commit 111b976）；韌體再依 <code>General.ini [AMR] CoverTray0</code>＋<code>IdentityTray0</code> 補上表頭盤，得出實際 magazine 總盤數（<code>iCarTrayTotal = 工作盤數 + 表頭盤數</code>）。<strong>⚠ 消耗即清（consume-once）</strong>：此值只套用到緊接著的那一台車，之後歸零。下一台車若省略本參數，<strong>不會</strong>沿用上一台的數字</td>
+<td>（選用；僅 Loader 站帶）</td>
+</tr>
+<tr>
+<td><code>"LoaderICCount"</code> / <code>n</code></td>
+<td>A / A</td>
+<td>選用參數對：host 宣告的進料 IC 數。存放於 P1 Loader 的 device-count 欄位（SVID <code>38228</code>）供回讀。<strong>latched，非 consume-once</strong>，機構不消費此值</td>
 <td>（選用；僅 Loader 站帶）</td>
 </tr>
 <tr>
 <td>回覆 <code>HCACK</code></td>
 <td>B（S2F42）</td>
-<td>接受</td>
-<td><code>0</code>（全部 6 次 START_AGV 皆 0）</td>
+<td>見下方值域表</td>
+<td><code>0</code>（本 run 全部 6 次皆 0）</td>
 </tr>
 </tbody>
 </table>
+<p><strong><code>START_AGV</code> 的 <code>HCACK</code> 值域（2026-08-17 起與 HT9045 對齊）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>HCACK</th>
+<th>何時</th>
+<th>機台狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>正常受理。<strong>也包含</strong>：CP 名稱不認得、verb 不是 <code>"Action"</code>／<code>"NA"</code> —— 這些 CP 被忽略但<strong>不影響</strong>同封包其他 CP</td>
+<td>帶 <code>"Action"</code> 的已知站已進入交接</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>body 的 LIST 結構壞掉（CP pair 不是 list）</td>
+<td>整包未套用</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td><strong>AMR 功能關閉</strong>（<code>General.ini [HardwareInstall] UseAMR=0</code>）或 <strong>CP 清單為空</strong></td>
+<td>整包未套用</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>設計說明（2026-08-17 變更）</strong>：先前韌體對「不認得的 CP 名稱」回 <code>HCACK=2</code>，但它是<strong>就地</strong>設值、迴圈繼續，因此排在該 CP <strong>之前</strong>、帶 <code>"Action"</code> 的站點<strong>已經進入交接並鎖住機構</strong>——host 卻依非 0 的回覆判定「整包被拒」而不派車，機構就被留在鎖定狀態。現已改為與 HT9045 一致：<strong>不認得的 CP 忽略、<code>HCACK</code> 維持 <code>0</code></strong>。因此 <code>START_AGV</code> 的非 0 回覆現在只代表「整包完全沒有套用」，語意不再自相矛盾。</p>
+<p>表中 <code>2</code> 的兩種情形都是<strong>在逐 CP 處理之前</strong>就整包退回，不會造成部分套用。</p>
+</blockquote>
 <p><strong>FIELD TABLE — CEID 273 / 274（S6F11 送出）</strong>：</p>
 <table>
 <thead>
@@ -1089,8 +1179,8 @@ sequenceDiagram
 </tr>
 <tr>
 <td>274 report SV</td>
-<td>A ＋ U4×18</td>
-<td>Report 4＝FinishBitmap（SVID <code>38221</code>）；<strong>自 2026-07-13 起（commit d10b9be）274 另加掛 Report 6</strong>（全 9 站 TrayCount＋DeviceCount，SVID 同 272 之 Report 6），關帳回報該站實際盤數／IC 數（本 run 為舊版故未涵蓋）</td>
+<td>A ＋ I4×18</td>
+<td>Report 4＝FinishBitmap（SVID <code>38221</code>）；<strong>自 2026-07-13 起（commit d10b9be）274 另加掛 Report 6</strong>（全 9 站 TrayCount＋DeviceCount，SVID 同 272 之 Report 6，含 2026-08-10 的 Auto4-6 TrayCount 改號 <code>38246/38247/38248</code>），關帳回報該站實際盤數／IC 數（本 run 為舊版故未涵蓋）</td>
 <td>bitmap＋counts</td>
 </tr>
 <tr>
@@ -1624,13 +1714,12 @@ sequenceDiagram
 <td>cannot perform now / param</td>
 <td>（本 run 未出現）</td>
 </tr>
-<tr>
-<td>4</td>
-<td>busy（machine already running <strong>OR</strong> ICs still inside）</td>
-<td>resume-START(×6)，by design honest interlock（見 3.4）</td>
-</tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>⚠ <code>START_AGV</code> 有專屬的值域，勿套用上表推論</strong>：自 2026-08-17 起，<code>START_AGV</code> 中<strong>不認得的 CP 名稱不再回 <code>2</code>，而是忽略該 CP 並維持 <code>HCACK=0</code></strong>（與 HT9045 一致）。其 <code>2</code> 只保留給「AMR 功能關閉」與「CP 清單為空」兩種整包退回的情形。完整值域見 3.4。
+| 4 | busy（machine already running <strong>OR</strong> ICs still inside） | resume-START(×6)，by design honest interlock（見 3.4） |</p>
+</blockquote>
 <p><strong>其他 ACK 代碼</strong>：</p>
 <table>
 <thead>
@@ -1825,7 +1914,10 @@ sequenceDiagram
 <p>提醒：本重現環境刻意讓模擬器當監聽方、設備撥入（與正式產線方向相反，見 1.2）；訊息層角色不變。</p>
 </blockquote>
 </li>
-<li><strong>設備撥入</strong>：HT160S（EQUIPMENT，<strong>本重現環境設 <code>ActiveMode=1</code></strong>，DeviceID=0）連入 port 5098，完成 <code>Select.req → Select.rsp</code>（SELECTED）；之後約每 10s Linktest 維持鏈路。<blockquote><p>2026-08-03 更正：此步原註明 <code>ActiveMode=0</code>，與「設備主動撥入」矛盾 —— <code>ActiveMode=0</code> 是設備<strong>監聽</strong>（正式產線用，現場實機即為 0，見 1.2），要讓設備撥入必須設 <code>ActiveMode=1</code>。§1.2 表格描述的是<strong>正式產線</strong>方向，本章是刻意反向的實驗室環境。</p></blockquote></li>
+<li><strong>設備撥入</strong>：HT160S（EQUIPMENT，<strong>本重現環境設 <code>ActiveMode=1</code></strong>，DeviceID=0）連入 port 5098，完成 <code>Select.req → Select.rsp</code>（SELECTED）；之後約每 10s Linktest 維持鏈路。<blockquote>
+<p>2026-08-03 更正：此步原註明 <code>ActiveMode=0</code>，與「設備主動撥入」矛盾 —— <code>ActiveMode=0</code> 是設備<strong>監聽</strong>（正式產線用，現場實機即為 0，見 1.2），要讓設備撥入必須設 <code>ActiveMode=1</code>。§1.2 表格描述的是<strong>正式產線</strong>方向，本章是刻意反向的實驗室環境。</p>
+</blockquote>
+</li>
 <li><strong>送 Lot 設定 trio</strong>：依序送（順序不可顛倒，理由見 3.2）
    - <code>S2F41 SET_LOT_INFO</code>（預設 <code>SIMU_LOT_A..E</code>）→ 期望 <code>S2F42 HCACK=0</code>
    - <code>S2F41 LOTSTART</code> → 觸發 Lot WebAPI pull（<code>GET http://127.0.0.1:8160/lot/&lt;LOTID&gt;</code>，期望 HTTP=200、ok=1）→ <code>HCACK=0</code>

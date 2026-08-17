@@ -450,7 +450,9 @@ S6F11  L[3]
 > - **START_AGV(station)** = 「授權 AGV 對某一站（station）執行搬運動作」——只針對該站的 AGV 交接，不影響整機生產狀態。
 > - **resume START** = 「在 AGV 交接完成後，恢復整機生產」——對應 3.2 的同一個 START 命令。
 >
-> 之所以分開，是因為 AGV 補料期間機台可能暫停某些動作等待交接，待 CEID 274（Finish）確認搬運完成後，host 才送 START 讓整機恢復生產。把「授權 AGV 動作」與「恢復整機生產」拆成兩個命令，host 才能精準控制兩件事的時序。
+> 之所以分開，是因為 AGV 交接期間機台會凍結該站的機構動作（進料側的 GoDown 解疊、出料側的 GoUp 堆盤），待 CEID 274（Finish）確認搬運完成後才解凍。把「授權 AGV 動作」與「恢復整機生產」拆成兩個命令，host 才能精準控制兩件事的時序。
+>
+> **⚠ 但要理解 resume `START` 在 HT160S 實際上是「儀式性」的：設備並不等它。** 韌體在發出 CEID 274 的同一個 tick 就已自行解除該站的機構鎖並恢復生產（Auto 站另含清空該車）。因此 host 沒送 resume `START` 時機台**不會**卡住。這也是下面 HCACK=4 的成因——送到時機台早已在跑。
 
 **AGV CEID 定義**：
 
@@ -467,15 +469,19 @@ S6F11  L[3]
 | 272 | AGVSupplement → **AMR Supplement** | 呼叫 AGV：缺料／Auto full。SVID `38219` bitmap 標記目標站 |
 | 273 | AGVLDUnLDStatus → **AMR LDUnLD Status** | Ready：機構就位 |
 | 274 | AGVLDUnLDFinish | Finish：sensor 確認 load/unload 完成。除 SVID `38221` bitmap 外，自 2026-07-13 起（commit d10b9be）額外掛載 Report 6（全 9 站 TrayCount＋DeviceCount），關帳回報實際盤數／IC 數 |
-| 275 | AGVLdID | 身分盤（identity/cover tray）2D 上傳。**自 2026-07-14 起（commit c389e3f）已實作發報**：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取 2D **後立即**發 S6F11 CEID275，SVID `38204`（Color 站 P3 carrier id）帶該 2D，走**專屬 report 7＝僅 `38204`**（非 9 站全帶的 report 5）。本 run（2026-06-26）早於此實作故未出現 |
+| 275 | AGVLdID | 身分盤（identity/cover tray）2D 上傳。**自 2026-07-14 起（commit c389e3f）已實作發報**：AMR 身分盤由 Loader 退出後經 TrayArm 放到 Color 後段，由 Color 載台帶動、讀碼器移到讀取位掃描 2D，**讀到後立即**發 S6F11 CEID275，SVID `38202`（AMR Loader load-port Carrier ID）帶該 2D，走**專屬 report 7＝僅 `38202`**（非 9 站全帶的 report 5）。**⚠ 2026-08-05 起由 `38204` 改為 `38202`**，見下方說明。本 run（2026-06-26）早於此實作故未出現 |
 
 > **關於 CEID 275（AGVLdID）**：275 是身分盤（identity/cover tray）2D 的上傳事件。**本 run（2026-06-26）並未發出 275**——當時韌體尚未實作發報，且本範例的 6 個 AGV cycle 只出現 272／273／274，故 275 **沒有對應的 evidence row 可引用**。
 >
-> **自 2026-07-14 起（commit c389e3f）275 已實作並會實際發報**：AMR 身分盤由 Loader 經 TrayArm 送到 Color，Color 以 CCD 讀取其 2D **後立即**發出 S6F11 CEID275（且該 2D 為真實讀值時），SVID `38204` 帶該 2D。要點：
-> - 每次身分盤進料**只上報一次**單一 2D——用**專屬 report 7（僅 `38204`）**，不夾帶其餘 8 站的 carrier id；Auto 各站的 carrier id（`38205`–`38210`）改由 host 以 **S1F3 輪詢**取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
-> - **SVID `38204` 為實際讀取站（Color 站 P3）的 carrier id**（HT160S 客戶選用）；9045 原本用 Loader load-port 的 `38202`。若日後要對齊 9045 編號，韌體有單一改動點（`AMR_IDENTITY_CARRIER_INDEX`）可切回 `38202`。
+> **自 2026-07-14 起（commit c389e3f）275 已實作並會實際發報**。機構流程：身分盤由 **Loader** 退出，**TrayArm** 夾取後放到 **Color 後段**（`aTrayArm.cpp` `PlaceDest=TAPLACE_COLOR`）；接著由 **Color 載台**帶動盤子、**讀碼器沿 X 移到讀取位**掃描 2D（`aColor.cpp` `DoReadColor2D`）。讀到真實 2D 後**立即**發出 S6F11 CEID275，SVID `38202` 帶該 2D。要點：
+> - **SVID 已於 2026-08-05 由 `38204` 改為 `38202`（韌體 `AMR_IDENTITY_CARRIER_INDEX` 由 2 改為 0）**，理由是對齊 HT9045。
+>   **`38204` 現已下架、不再註冊**，host 端請移除引用（連同同批下架的 `38203`，見下方「已下架 SVID」）。
+> - **這不是特例，是本來就對齊。**HT9045（HT9046LS V3.32.810_B01）雖然把 `38202` 命名為 *Load Port Carrier ID*，它**也不是在 Loader load port 讀碼**——同樣是把盤送到 buffer 站（Color 或 Empty，由 `TrayForm.iReaderPos` 決定）再用 Keyence 讀（`acatchtray.cpp` `InitialCoverTrayIDTask`）。9045 雖有 Loader 位置的讀碼器，但其資料**沒有綁任何 SVID**。所以「讀取裝置在 buffer 站、數值發布在 `38202`」是 9045 原本的做法，HT160S 與之一致。
+> - 每次身分盤進料**只上報一次**單一 2D——用**專屬 report 7（僅 `38202`）**，不夾帶其餘各站的 carrier id；Auto 各站的 carrier id（Auto1-3＝`38205`/`38206`/`38207`，Auto4-6＝`38199`/`38200`/`38201`）改由 host 以 **S1F3 輪詢**取得（與 9045 相同：身分盤 2D 用事件、Auto carrier id 用輪詢）。
 > - 作業員略過／讀取失敗（空 2D）者**不上報**（與 9045 一致，不送空碼）。
-> - 真機關閉 Color CCD 時韌體產生的暫代碼（`COLOR2D_…`）**不上報**（避免假碼進 MES）；筆電模擬（SOFT_SIMULATE）的種子碼則會上報，供 SECS 模擬器對測。
+> - 真機關閉 Color CCD 時韌體產生的暫代碼（`COLOR2D_…`）**不上報**（避免假碼進 MES）。閘門是韌體的 `IsTrayID2DGenuine()`，非字串前綴比對。
+>   **⚠ 例外：真機組建若由操作員勾選「模擬」（`bRunSimulation`），該暫代碼仍會上報。** host 端若看到 `COLOR2D_` 開頭的碼，代表現場勾了模擬，應視為無效碼。
+> - 報表連結：韌體自帶 report 7 → CEID275。**若 host 以 S2F35 重新連結 CEID275 而未同時用 S2F33 定義所帶的 RPTID**，`38202` 會從該事件掉出去。目前韌體 `bStrictReportValidation` 預設為真，會以 `LRACK=0x05` 拒絕含未知 RPTID 的 S2F35，report 7 因而存活——**此保護是現行行為的前提，勿關閉**。
 > - `EventReport` 於 HSMS **SELECTED** 才送（未連線時為 no-op）。
 >
 > host 端仍不應假設每個 run 都必有 275——僅在該 run 有身分盤補給且連線時才出現。
@@ -485,18 +491,38 @@ S6F11  L[3]
 L[2]
   A "START_AGV"
   L[n]
-    L[2]{ A station, A "Action" }
-    [, L[2]{ A "LoaderTrayCount", A n }]
+    L[2]{ A station, A verb }          verb = "Action" | "NA"
+    [, L[2]{ A "LoaderTrayCount",  A n }]
+    [, L[2]{ A "LoaderICCount",    A n }]
 ```
-`station` ∈ {Loader, Empty, Color, AUTO1..AUTO6}，由 `_start_agv` 建構。
+`station` ∈ `Loader` / `Empty` / `Color` / `AUTO1`..`AUTO6`（**大小寫不拘**，韌體以大寫比對）。
+
+> **⚠ `verb` 是啟動閘，不是說明文字。** 只有字面 **`"Action"`** 會讓該站進入交接；**`"NA"`** 表示「為了向量完整而列出，不要動作」。這與 HT9045 相同（其 START_AGV 亦要求第二欄等於 `"Action"`）。京元現場 host 的實際用法是**每次送完整站點向量、其中恰好一站帶 `"Action"`、其餘全帶 `"NA"`**。
+>
+> 送出 `"Action"` / `"NA"` 以外的動詞（例如 `LOAD` / `UNLOAD`）：韌體**記錄 log 但不動作**，且 **`HCACK` 仍為 `0`**，保留給未來擴充的動詞集。
+
+**⚠ SVID 異動摘要（host 端必讀）**
+
+| SVID | 原意義 | 現況 | host 要做什麼 |
+|---|---|---|---|
+| `38204` | Color 站 carrier ID（曾用於 CEID 275 身分盤 2D） | **已下架**，不再註冊 | 移除引用；身分盤 2D 改讀 `38202` |
+| `38203` | Empty 站 carrier ID | **已下架**，不再註冊（從未有值） | 移除引用 |
+| `38208` / `38209` / `38210` | Auto4-6 carrier ID（HT160S 早期自創） | **已退役**，不再註冊，S1F3 回空 `L[0]` | 改用 `38199` / `38200` / `38201` |
+| `38237` / `38238` / `38239` | AMR Auto4-6 Tray Count | **意義已變更**：現為 *Record Auto 1/2/3 Tray Count*（本工單累計出盤數，Lot Start 重置） | AMR 用途改讀 `38246` / `38247` / `38248`；否則會讀到看似合理的錯誤數字 |
+
+> 上述號碼一律以 **HT9046LS V3.32.810_B01**（京元部署機型）為唯一對齊依據。810_B01 有的照抄（`38202` Load Port Carrier ID、`38205`-`38207` Auto1-3 Carrier ID、`38222`-`38236` AMR 段、`38237`-`38239` Record 段）；810_B01 沒有的則標示為 **HT160S 擴充**。
+>
+> **Auto4-6 相關的號碼全部是擴充號碼，不是家族號碼**：810_B01 是三站 Auto 機台，其 AMR 資料結構本身就只有六格（Loader/Empty/Color/Auto1/Auto2/Auto3），結構上放不下 Auto4-6，因此家族中不存在可照抄的號碼。擴充號碼包含 Carrier ID `38199`-`38201`、Tray Count `38246`-`38248`、Device Count `38240`-`38242`、Bin Setting `38243`-`38245`。四組皆已確認在 810_B01 未被使用。
+>
+> **`38223` / `38224` / `38229` / `38230`（Empty / Color 的 Tray Count 與 Device Count）雖然恆為 0，但刻意保留註冊** —— 它們是 810_B01 的家族號碼，而 810_B01 同樣沒有寫入者（該樹所有寫入都只落在 Auto1-3）。保留才是對齊。
 
 **站點對照（P-Map，PIndex = AutoNo + 3）**：CEID 272 的 SVID `38219` 以 bitmap 標出目標站，站號 P1–P9 對照如下：
 
 | P | 站點 |
 |---|---|
 | P1 | Loader |
-| P2 | EmptyTray |
-| P3 | ColorTray |
+| P2 | EmptyTray（**`START_AGV` 的 CP 名稱是 `Empty`**）|
+| P3 | ColorTray（**`START_AGV` 的 CP 名稱是 `Color`**）|
 | P4 | AUTO1 |
 | P5 | AUTO2 |
 | P6 | AUTO3 |
@@ -512,7 +538,8 @@ L[2]
 - 收到 `273`（Ready）→ 僅 log（等待機台 sensor 回報 Finish，不做動作）
 - 收到 `274`（Finish）→ 自動送 `START`（resume，恢復整機生產）
 
-**Color (P3) demand-gate（需求閘）**：Color 站僅在真實需求（內部旗標 `bSupplyRequested` 成立）時才補給。
+**Color (P3) 的觸發條件**：與 P1 / P2 相同，是**進料源乾** sensor —— `SnColor_InputEnd` 讀 OFF（韌體 `TColorModule::IsInputShortageForAmr`）。
+（**更正**：舊版本文件寫「僅在內部旗標 `bSupplyRequested` 成立時才補給」，那是 Color 站**送盤 branch** 的閘，不是叫車的閘，兩者不同層。）
 
 > **為什麼本 run 沒有出現 P3（Color）的 AGV cycle？** 因為 Color 站採「**按需供給（demand-gated）**」：只有在機台真正提出需求時才呼叫 AGV。本範例是一段很短的 run，期間 Color 站並未產生供給需求，所以 **完全沒有 P3 cycle** 出現。這是 **預期行為**，不是漏掉或失敗——host 端不應預期每個 run 都一定看到 P3。
 
@@ -557,7 +584,7 @@ L[2]
 | `DataID` | U4 | AGV 事件資料識別 | `0` |
 | `CEID` | U4 | 事件識別碼 | `272` |
 | SVID `38219`（Report 2） | A（report SV） | bitmap 標記目標站（被設為 `1` 的位置即目標站，其餘 0） | `"P1:1,P2:0,...,P9:0"`（**依格式推得；非逐字 log 值**——本 run @00:00:13 的 log 僅記錄 `target=P1 Loader`，未逐字記錄 bitmap 字串，此處依「單一站 P=1」格式推得 `P1=1`） |
-| Report 6（18 個 SVID） | U4×18 | **自 2026-07-13 起（commit d10b9be）新增**：全 9 站 TrayCount（`38222/38223/38224/38225/38226/38227/38237/38238/38239`）＋全 9 站 DeviceCount（`38228/38229/38230/38231/38232/38233/38240/38241/38242`），依 P1–P9 固定順序排列；目標站帶實際盤數／IC 數，其餘站為當下快照 | 本 run 為舊版故未涵蓋 |
+| Report 6（18 個 SVID） | I4×18 | **自 2026-07-13 起（commit d10b9be）新增**：全 9 站 TrayCount（`38222/38223/38224/38225/38226/38227/`**`38246/38247/38248`**）＋全 9 站 DeviceCount（`38228/38229/38230/38231/38232/38233/38240/38241/38242`），依 P1–P9 固定順序排列。**⚠ Auto4-6 TrayCount 已於 2026-08-10 由 `38237/38238/38239` 改為 `38246/38247/38248`**（原號在 HT9045 810_B01 被廠商定義為 *Record Auto 1/2/3 Tray Count*，語意不同，見下方「已改號 SVID」）。線上型別為 **I4**（非 U4）。Report 6 的 body 為位置式（依序只帶值），故照位置解析的 host 不受改號影響；以 SVID 對映／S1F3 輪詢／S2F33 佈署的 host 必須重新對映 | 本 run 為舊版故未涵蓋 |
 | `len` | bytes | S6F11 body 長度 | 本 run `86`（舊版僅 Report 2）；自 2026-07-13 起因加掛 Report 6 而增大 |
 
 **FIELD TABLE — START_AGV（S2F41 收到 / 由 host 送出）**：
@@ -566,9 +593,22 @@ L[2]
 |---|---|---|---|
 | `RCMD` | A | 命令名稱 | `"START_AGV"` |
 | `station` | A | 目標站（CPNAME 位置） | `"Loader"` / `"Empty"` / `"Color"` / `"AUTO1".."AUTO6"` |
-| `"Action"` | A | station 對應的動作值（CPVAL 位置） | `"Action"` |
-| `"LoaderTrayCount"` / `n` | A / A | 選用第二參數對：Loader 補料盤數。**此為 WORK（工作盤）數，不含 cover／identity 表頭盤**（9045 `iSECSSetTrayCount` 對齊，commit 111b976）；韌體再依 `General.ini [AMR] CoverTray0`＋`IdentityTray0` 補上表頭盤，得出實際 magazine 總盤數（`iCarTrayTotal = 工作盤數 + 表頭盤數`，見 `aLoader.cpp` RefillSimInfeed／SetExpectedCarTrayCount） | （選用；僅 Loader 站帶） |
-| 回覆 `HCACK` | B（S2F42） | 接受 | `0`（全部 6 次 START_AGV 皆 0） |
+| `verb` | A | station 的動作值（CPVAL 位置）。**只有 `"Action"` 會啟動交接**；`"NA"`＝列出但不動作；其他動詞＝記 log 不動作 | `"Action"` / `"NA"` |
+| `"LoaderTrayCount"` / `n` | A / A | 選用參數對：Loader 補料盤數。**此為 WORK（工作盤）數，不含 cover／identity 表頭盤**（9045 `iSECSSetTrayCount` 對齊，commit 111b976）；韌體再依 `General.ini [AMR] CoverTray0`＋`IdentityTray0` 補上表頭盤，得出實際 magazine 總盤數（`iCarTrayTotal = 工作盤數 + 表頭盤數`）。**⚠ 消耗即清（consume-once）**：此值只套用到緊接著的那一台車，之後歸零。下一台車若省略本參數，**不會**沿用上一台的數字 | （選用；僅 Loader 站帶） |
+| `"LoaderICCount"` / `n` | A / A | 選用參數對：host 宣告的進料 IC 數。存放於 P1 Loader 的 device-count 欄位（SVID `38228`）供回讀。**latched，非 consume-once**，機構不消費此值 | （選用；僅 Loader 站帶） |
+| 回覆 `HCACK` | B（S2F42） | 見下方值域表 | `0`（本 run 全部 6 次皆 0） |
+
+**`START_AGV` 的 `HCACK` 值域（2026-08-17 起與 HT9045 對齊）**：
+
+| HCACK | 何時 | 機台狀態 |
+|---|---|---|
+| `0` | 正常受理。**也包含**：CP 名稱不認得、verb 不是 `"Action"`／`"NA"` —— 這些 CP 被忽略但**不影響**同封包其他 CP | 帶 `"Action"` 的已知站已進入交接 |
+| `1` | body 的 LIST 結構壞掉（CP pair 不是 list） | 整包未套用 |
+| `2` | **AMR 功能關閉**（`General.ini [HardwareInstall] UseAMR=0`）或 **CP 清單為空** | 整包未套用 |
+
+> **設計說明（2026-08-17 變更）**：先前韌體對「不認得的 CP 名稱」回 `HCACK=2`，但它是**就地**設值、迴圈繼續，因此排在該 CP **之前**、帶 `"Action"` 的站點**已經進入交接並鎖住機構**——host 卻依非 0 的回覆判定「整包被拒」而不派車，機構就被留在鎖定狀態。現已改為與 HT9045 一致：**不認得的 CP 忽略、`HCACK` 維持 `0`**。因此 `START_AGV` 的非 0 回覆現在只代表「整包完全沒有套用」，語意不再自相矛盾。
+>
+> 表中 `2` 的兩種情形都是**在逐 CP 處理之前**就整包退回，不會造成部分套用。
 
 **FIELD TABLE — CEID 273 / 274（S6F11 送出）**：
 
@@ -577,7 +617,7 @@ L[2]
 | `DataID` | U4 | AGV 事件資料識別 | `0` |
 | `CEID` | U4 | 273=Ready（機構就位）／274=Finish（sensor 確認完成） | `273` / `274` |
 | 273 report SV | A | Report 3＝StatusBitmap（SVID `38220`），bitmap 標記目標站 | `"P1:1,...,P9:0"` |
-| 274 report SV | A ＋ U4×18 | Report 4＝FinishBitmap（SVID `38221`）；**自 2026-07-13 起（commit d10b9be）274 另加掛 Report 6**（全 9 站 TrayCount＋DeviceCount，SVID 同 272 之 Report 6），關帳回報該站實際盤數／IC 數（本 run 為舊版故未涵蓋） | bitmap＋counts |
+| 274 report SV | A ＋ I4×18 | Report 4＝FinishBitmap（SVID `38221`）；**自 2026-07-13 起（commit d10b9be）274 另加掛 Report 6**（全 9 站 TrayCount＋DeviceCount，SVID 同 272 之 Report 6，含 2026-08-10 的 Auto4-6 TrayCount 改號 `38246/38247/38248`），關帳回報該站實際盤數／IC 數（本 run 為舊版故未涵蓋） | bitmap＋counts |
 | target | （log 標註） | 對應目標站 | `P1 Loader`（本 cycle） |
 
 **本 run 的 6 個 AGV cycle（依目標站）**：
@@ -846,6 +886,8 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 | 0 | OK | SET_LOT_INFO、LOTSTART、initial START(23:59:27)、START_AGV(×6) |
 | 1 | command does not exist **或 body/list 格式錯誤**（unknown command 走此碼；亦為預設值，outer L[2] 解析失敗、內層 L[n] 格式錯誤、CP pair 非 list 皆回 1） | （本 run 未出現；舊文件誤稱 START_AGV/START 回 1，已更正） |
 | 2 | cannot perform now / param | （本 run 未出現） |
+
+> **⚠ `START_AGV` 有專屬的值域，勿套用上表推論**：自 2026-08-17 起，`START_AGV` 中**不認得的 CP 名稱不再回 `2`，而是忽略該 CP 並維持 `HCACK=0`**（與 HT9045 一致）。其 `2` 只保留給「AMR 功能關閉」與「CP 清單為空」兩種整包退回的情形。完整值域見 3.4。
 | 4 | busy（machine already running **OR** ICs still inside） | resume-START(×6)，by design honest interlock（見 3.4） |
 
 **其他 ACK 代碼**：
