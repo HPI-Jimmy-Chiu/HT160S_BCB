@@ -143,6 +143,19 @@ static void ServiceAgvTimeoutAlarm()
 	//after HOME completes (the pending flag survives; it fires on the next non-HOME tick).
 	if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
 		return;
+	//AI(amr-alarm-defer) 20260817 : DEFER the alarm, never DROP it. ShowNoteAlarm has an
+	//early return when a Note modal is already open (note.cpp, "ALARM DROPPED (modal busy)")
+	//that sits BEFORE DecStopAllMotor / SystemStart=false / ProcessErrMessage /
+	//AlarmReport(set) - so a second alarm raised behind an open modal neither stopped the
+	//machine nor emitted S5F1; it left only a RecordProcess line. This loop used to walk into
+	//exactly that: ShowMyError blocks in ShowModal, whose message pump re-enters MainProc,
+	//which re-runs this sweep, finds the NEXT pending station, gets it silently dropped -
+	//and then cleared it anyway (see the return-value fix below). Two stations timing out in
+	//the same window was enough to lose the second alarm with no SECS trace at all.
+	//Guarding the whole sweep on the modal removes the re-entrancy AND the drop: every
+	//TimeoutPending latch simply survives and fires on a later tick, once the modal closes.
+	if(fNote!=NULL && fNote->fShow)
+		return;
 	for(int si=1; si<AGV_STATION_COUNT; si++)
 	{
 		if(AgvCoord.TimeoutPending[si]==0)
@@ -151,8 +164,24 @@ static void ServiceAgvTimeoutAlarm()
 		if(si==1)      Where="Empty (P2)";
 		else if(si==2) Where="Color (P3)";
 		else           Where="Auto"+IntToStr(si-2)+" (P"+IntToStr(si+1)+")";
-		ShowMyError("WAR0962", LangT("AGV/AMR handshake timeout - AGV did not respond")+" : "+Where, K_RETRY);
-		AgvCoord.RetryStation(si);   // clears pending + station->IDLE so PollAndCall re-CALLs
+		//AI(amr-alarm-defer) 20260817 : the return value was previously DISCARDED, so the
+		//station was re-CALLed even when the operator never saw the alarm (dropped -> 0) or
+		//answered with something other than RETRY. ShowNoteAlarm returns fNote->ReturnCode
+		//(K_RETRY==0x0002) on the normal path and 0 on the drop path, so test for K_RETRY.
+		//  K_RETRY    -> RetryStation : clears the latch + station back to IDLE, PollAndCall re-CALLs.
+		//  shown, not RETRY -> consume the latch only. The operator saw it and chose otherwise;
+		//                      re-popping the same alarm every tick would trap them in a loop.
+		//  dropped (0) -> cannot happen now (the modal guard above returns first), but if it
+		//                 ever did, the latch survives and the alarm fires later. Never lost.
+		int iKey = ShowMyError("WAR0962", LangT("AGV/AMR handshake timeout - AGV did not respond")+" : "+Where, K_RETRY);
+		if(iKey==K_RETRY)
+			AgvCoord.RetryStation(si);   // clears pending + station->IDLE so PollAndCall re-CALLs
+		else
+			AgvCoord.TimeoutPending[si] = 0;   // shown but not retried : consume, do not re-CALL
+		//AI(amr-alarm-defer) 20260817 : one alarm per sweep. The modal above may have blocked for
+		//minutes and machine state (car emptied, AMR served, HOME run) can have moved on, so let
+		//the next tick re-evaluate the remaining stations instead of trusting this stale loop.
+		break;
 	}
 }
 //---------------------------------------------------------------------------
