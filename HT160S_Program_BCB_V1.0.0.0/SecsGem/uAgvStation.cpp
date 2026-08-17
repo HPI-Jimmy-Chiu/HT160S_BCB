@@ -101,9 +101,25 @@ static bool InfeedLocked(int p)
 
 const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
 {
+    //AI(secs-align-810b01) 20260817 : P2/P3 CarrierID column is now 0 = NOT REGISTERED.
+    // Authority ruling (user, 20260817) : the ONE tree HT160S aligns to is
+    // HT9046LS_Code_V3.32.810_B01_20260527KeyPro_01_AutoUP. That tree registers exactly four
+    // carrier ids - 38202 Load Port (uHGemHT9045_SV.cpp:833) and 38205/38206/38207 Auto1-3
+    // (:834-:836). It has NO 38203 and NO 38204 in either namespace (whole-tree sweep, both
+    // SetSVDataPointer and SetECDataPointer, 0 hits). HT160S had invented them for Empty/Color
+    // and then never wrote them : CarrierID[] is only ever assigned at index 0 (ReportLoaderIdentity)
+    // and 3..8 (the Auto loop), so the host received two permanently empty <A[0]> items on report 5.
+    // Worse, 38203/38204 sat inside the vendor's own carrier-id run (38202 .. 38205-38207) with
+    // exactly the meaning the vendor would give them if it ever grew there - a silent semantic
+    // collision. Deleting the registration removes both problems and loses no family compatibility.
+    // A 0 in this column means "no SVID" ; the registration loop and report 5 skip it.
+    // NOTE the Tray/Device columns 38223/38224/38229/38230 are deliberately KEPT even though they
+    // are equally unwritten : those ARE family ids (uHGemHT9045_SV.cpp:843/:844/:849/:850) and
+    // 810_B01 leaves them unwritten too (every write there is iAMRTrayCount/iAMRDeviceCount
+    // [3]/[Pos+3]/[i+3] = Auto1-3 only). Keeping them registered-but-0 IS the aligned behavior.
     /*P1*/ { 1, ASK_LOADER, -1, 38202, 38222, 38228,     0, "Loader" },
-    /*P2*/ { 2, ASK_EMPTY,  -1, 38203, 38223, 38229,     0, "Empty"  },
-    /*P3*/ { 3, ASK_COLOR,  -1, 38204, 38224, 38230,     0, "Color"  },
+    /*P2*/ { 2, ASK_EMPTY,  -1,     0, 38223, 38229,     0, "Empty"  },
+    /*P3*/ { 3, ASK_COLOR,  -1,     0, 38224, 38230,     0, "Color"  },
     /*P4*/ { 4, ASK_AUTO,    0, 38205, 38225, 38231, 38234, "AUTO1"  },
     /*P5*/ { 5, ASK_AUTO,    1, 38206, 38226, 38232, 38235, "AUTO2"  },
     /*P6*/ { 6, ASK_AUTO,    2, 38207, 38227, 38233, 38236, "AUTO3"  },

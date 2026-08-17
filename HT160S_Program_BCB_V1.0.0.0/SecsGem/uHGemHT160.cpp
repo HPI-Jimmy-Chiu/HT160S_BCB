@@ -729,7 +729,11 @@ void HT160Gem::AddSV()
         cName.sprintf("%s Carrier ID", d->Name);
         tName.sprintf("AMR %s Tray Count", d->Name);
         vName.sprintf("AMR %s Device Count", d->Name);
-        HGemPtr->SetSVDataPointer(d->SvidCarrierID, HType.ASCII_TYPE, cName, "",      &AgvCoord.CarrierID[ai],   "AGV carrier id");
+        //AI(secs-align-810b01) 20260817 : SvidCarrierID==0 means the station has no carrier-id
+        // SVID at all (P2 Empty / P3 Color - 810_B01 registers no 38203/38204). Skip it rather
+        // than registering id 0. See the AgvStation[] table comment in uAgvStation.cpp.
+        if(d->SvidCarrierID != 0)
+            HGemPtr->SetSVDataPointer(d->SvidCarrierID, HType.ASCII_TYPE, cName, "",      &AgvCoord.CarrierID[ai],   "AGV carrier id");
         HGemPtr->SetSVDataPointer(d->SvidTrayCount, HType.INT_4_TYPE,  tName, "trays", &AgvCoord.TrayCount[ai],   "AGV tray count");
         HGemPtr->SetSVDataPointer(d->SvidDeviceCnt, HType.INT_4_TYPE,  vName, "pcs",   &AgvCoord.DeviceCount[ai], "AGV device count");
         if(d->SvidBinSet != 0 && d->AutoIndex >= 0)
@@ -1217,10 +1221,19 @@ void HT160Gem::AddReprot()
     unsigned rSup[1]; rSup[0] = 38219; HGemPtr->SetReportIDContent(2, 1, rSup, EquDefault);
     unsigned rSta[1]; rSta[0] = 38220; HGemPtr->SetReportIDContent(3, 1, rSta, EquDefault);
     unsigned rFin[1]; rFin[0] = 38221; HGemPtr->SetReportIDContent(4, 1, rFin, EquDefault);
+    //AI(secs-align-810b01) 20260817 : report 5 now carries only the stations that HAVE a carrier
+    // id. P2 Empty / P3 Color were de-registered (810_B01 has no 38203/38204 and HT160S never
+    // wrote them), so report 5 goes from 9 items to 7 instead of shipping two empty <A[0]>.
+    // Report 5 is not linked to any CEID today (CEID275 uses report 7), so this changes nothing
+    // on the wire unless a host explicitly links 5 via S2F35.
     unsigned rCid[AGV_STATION_COUNT];
+    int nCid = 0;
     for(int ci = 0; ci < AGV_STATION_COUNT; ci++)
-        rCid[ci] = AgvStation[ci].SvidCarrierID;
-    HGemPtr->SetReportIDContent(5, AGV_STATION_COUNT, rCid, EquDefault);
+    {
+        if(AgvStation[ci].SvidCarrierID != 0)
+            rCid[nCid++] = AgvStation[ci].SvidCarrierID;
+    }
+    HGemPtr->SetReportIDContent(5, (unsigned)nCid, rCid, EquDefault);
 
     //AI(ht160s-agv-devicecount) 20260713 : report 6 = all nine stations' Tray Count
     // then all nine Device Count SVIDs (same fixed P1-P9 order as report 5's carrier
@@ -2701,8 +2714,38 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         // it, it is purely the host-declared incoming IC count for read-back.
                         else if(cpN=="LOADERICCOUNT")
                             AgvCoord.DeviceCount[0] = StrToIntDef(cpVal, 0);
+                        //AI(secs-align-810b01) 20260817 : an unknown CP name is now a LOGGED NO-OP that
+                        // leaves HCACK at 0 - 9045 parity, per the standing rule that HT9046LS
+                        // V3.32.810_B01 is the single alignment authority. That tree's START_AGV handler
+                        // (SECSGEM/uHGemHT9045.cpp:1723-1758) tests only the six names it knows; a name it
+                        // does not recognise falls past every else-if, nothing happens, and the loop tail
+                        // at :1758 still sets HCACK=0. It reserves HCACK=1 for a malformed list (:1762,
+                        // :1769) and never returns 2 from this command at all.
+                        // WHY THIS ALSO REMOVES A REAL DEFECT, not just a numbering difference: the old
+                        // HCACK=2 was set in-place and the loop kept going - no break, no rollback - so a
+                        // packet whose 3rd CP was misspelled still left CPs 1 and 2 in AGV_PREP with their
+                        // mechanisms locked, while the host read the non-zero reply as "nothing happened"
+                        // and never dispatched the AMR. Those locks then had no cheap release (RetryStation
+                        // keeps them; only HOME / link drop / Clean Out / the P1 watchdog clear them).
+                        // Returning 0 - exactly as the authority tree does - makes the reply honest again:
+                        // START_AGV now always reports 0 unless the LIST itself is malformed, and the host
+                        // is never told "rejected" about a packet that was in fact partially applied.
+                        // The alternative considered and rejected was buffer-then-commit (the LOTSTART /
+                        // SET_LOT_INFO idiom at :2941). It would also have been correct, but it is a
+                        // DIVERGENCE from 810_B01, and alignment wins.
+                        // NOTE the two HCACK=2 answers deliberately KEPT on this command, both outside the
+                        // per-CP loop: bUseAMR==false (no release path exists, so accepting would latch a
+                        // permanent lock) and an empty CP list. Neither is a 9045 behaviour; both are
+                        // HT160S safety refusals that reject the WHOLE packet before anything is applied,
+                        // so neither can produce the partial-apply contradiction described above.
                         else if(AgvCoord.LookupByName(cpName) < 0)
-                            HCACK = 2;                           // unknown CP name -> param error
+                        {
+                            AnsiString sUnkCp;
+                            sUnkCp.sprintf("[SECS] START_AGV unknown CP '%s' - ignored, HCACK stays 0 (9045 parity)",
+                                           cpName.Trim().c_str());
+                            HGemPtr->StringOut(sUnkCp);
+                            RecordProcess("AGV: START_AGV unknown CP '"+cpName.Trim()+"' ignored (9045 parity)");
+                        }
                         //AI(secs-kyec-startagv) 20260728 : the KYEC host sends the FULL station
                         // vector every time, exactly one station carrying "Action" and all the rest
                         // "NA" (SECSGEM_TextLog_15.txt:507-546). "NA" means "listed for vector
