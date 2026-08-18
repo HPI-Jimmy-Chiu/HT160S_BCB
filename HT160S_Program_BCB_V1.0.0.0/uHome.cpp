@@ -1053,28 +1053,53 @@ bool TfHome::ProcessMotorHome()
 				}
 				switch(iReacqStep)
 				{
-					case 0:   //approach : park position + offset (stopper clear of the tray edge)
-						//approach offset : GeneralSetting.iHomeReacquireOffsetCnt (1/100mm; sign per carriage
-						//MUST be verified on-machine -- LD-4 : the Loader-Y pair runs opposite signs)
+					//AI(home-reacquire-order) 20260817 : CLAMP ORDER FIXED + the push moved back to park.
+					//WAS : move to park+offset -> PushTray -> LeanOnTray -> creep back to park.
+					//That was wrong twice over and it struck trays on the machine (owner report 20260817).
+					//(1) ORDER. The machine has ONE defined clamp order and this was the only place that
+					//    broke it : mycylin.cpp DoClampTray(Lean, Push) - "lean-stop first", "push last".
+					//    Every production clamp obeys it : aLoader.cpp:1762->1767, aAuto1To6.cpp:945->951,
+					//    aEmpty.cpp:669 and aColor.cpp:1147/:1666 (both call DoClampTray directly).
+					//    The RELEASE path below (steps 5/6, Pop PushTray then Pop LeanOnTray) already
+					//    matched the modules - clamping in the opposite order to releasing cannot be right.
+					//(2) POSITION. Both cylinders used to fire at park+offset, so swapping the order alone
+					//    would have changed no geometry at all. PushTray must act AT park : its stroke is
+					//    bounded by the tray edge itself (mycylin.h:81-86, verified on-site 20260805 across
+					//    all nine carriages) - extend it anywhere else and it over-travels, the On reed goes
+					//    dark and GetClampGripVerdict reports "tray gone" on a tray that never moved.
+					//NOW : park+offset -> LeanOnTray -> back to park -> PushTray. The offset now serves the
+					//lean-stop ONLY, which is the one cylinder that needs clearance to swing in.
+					case 0:   //approach : park position + offset, for the LEAN-STOP only
+						//approach offset : GeneralSetting.iHomeReacquireOffsetCnt, 1/100mm.
+						//SIGN CONVENTION (owner ruling 20260817, machine-wide) : +Y moves toward the REAR,
+						//-Y moves toward the FRONT. Tune the magnitude/sign on-machine; one global value is
+						//deliberate - the ruling makes the direction mean the same thing on every carriage.
+						//(The former note here claiming "the Loader-Y pair runs opposite signs" is dropped :
+						//Mot_Table.csv gives all ten Y axes identical Direction/HomeDirectior/soft limits.)
 						if(PMot->MotorMove(iCarParkPos[iReacqCar]+GeneralSetting.iHomeReacquireOffsetCnt))
 							iReacqStep=1;
 						break;
-					case 1:   //front stopper first (never raise it AT the tray edge)
-						if(PF->Push())
+					case 1:   //lean-stop FIRST (DoClampTray order) : the tray is squeezed against it next
+						if(PR->Push())
 							iReacqStep=2;
 						break;
-					case 2:   //rear hook squeezes the tray against the stopper
-						if(PR->Push())
-							iReacqStep=(iCarHaulTarget[iReacqCar]>=0)?4:3;
-						break;
-					case 3:   //Loader/Auto : creep back to the exact park position
+					case 2:   //back to the exact park position BEFORE the push (see (2) above)
 						if(PMot->MotorMove(iCarParkPos[iReacqCar]))
+							iReacqStep=3;
+						break;
+					case 3:   //push LAST, at park, where the tray edge is its stop
+						if(PF->Push())
 						{
-							RecordProcess("Home: RE-ACQUIRE "+PName+" tray at Y="+IntToStr(iCarParkPos[iReacqCar]));
-							bCarParked[iReacqCar]=false;
-							bCarReclamped[iReacqCar]=true;   //AI(ht160s-home-grip) 20260808 : ends CLAMPED -> re-confirm at the summary
-							iReacqCar++;
-							iReacqStep=0;
+							if(iCarHaulTarget[iReacqCar]>=0)
+								iReacqStep=4;   //Empty/Color : haul on to the module target
+							else
+							{
+								RecordProcess("Home: RE-ACQUIRE "+PName+" tray at Y="+IntToStr(iCarParkPos[iReacqCar]));
+								bCarParked[iReacqCar]=false;
+								bCarReclamped[iReacqCar]=true;   //AI(ht160s-home-grip) 20260808 : ends CLAMPED -> re-confirm at the summary
+								iReacqCar++;
+								iReacqStep=0;
+							}
 						}
 						break;
 					case 4:   //Empty/Color : finish the interrupted haul to the module target
