@@ -562,6 +562,13 @@ bool TAutoModule::ServiceStations(bool bNoNewJobs)
                 //consume ONE tail per lap.
                 if(bDischargeTailPending[Index])
                 {
+                    //AI(ht160s-agv-ruleB) 20260818 : RULE B - the tail re-enters the eject at 5000,
+                    //which runs MoveAutoY then the FrontRise stroke into the output car. Do not
+                    //start it while this station is serving an AMR. The guard MUST sit before the
+                    //latch is cleared : the latch is the only way back to this tray (cold init is
+                    //the sole other place it clears), so consuming it under a lock would strand it.
+                    if(bAmrLocked[Index])
+                        break;   //AI(ht160s-agv) discharge tail suspended during AMR handoff
                     bDischargeTailPending[Index]=false;
                     RecordProcess("HOME-RESUME Auto: discharge-tail consumed (Auto"+IntToStr(Index+1)+") - re-enter eject at 5000");
                     DischargeTask[Index]=5000;
@@ -1131,6 +1138,19 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                             Car[Index].Clear();
                             InitAutoCarStack(Index);
                         }
+                        //AI(ht160s-agv-ruleB) 20260818 : RULE B - this is the Clean Out drain raise,
+                        //and it had NO lock test at all; the only hold here was the Full sensor,
+                        //which goes dark the moment an AMR starts taking the car away. Skip the
+                        //station this tick instead, matching the bUseAMR full-hold continue above.
+                        //NOTE for the operator : bCleanOutCheck is a six-station lockstep barrier,
+                        //so one AMR-locked station holds the whole drain until CEID274 releases it.
+                        //Auto locks are NOT force-released in Clean Out (only P1-P3 are), so a
+                        //non-responding AGV surfaces as WAR0962 after the handshake timeout.
+                        //The matching DOWN stroke further below is deliberately NOT guarded : it is
+                        //the only retract for these six cylinders and gating it would strand them
+                        //extended.
+                        if(bAmrLocked[Index])
+                            continue;   //AI(ht160s-agv) drain raise suspended during AMR handoff
                         Cylinder->On();
                         if(IsCylinderOnReady(Cylinder, IsSoftSimulate()))
                             bCleanOutCheck[Index]=true;
@@ -1982,6 +2002,12 @@ void TAutoModule::DoAuto(int &Task)
                     iTail=i;
                     break;
                 }
+            if(iTail>=0 && bAmrLocked[iTail])
+                iTail=-1;   //AI(ht160s-agv-ruleB) 20260818 : RULE B, same rule as the per-station
+                            //path above. iAutoConcurrency==0 is the shipped default, so this legacy
+                            //ladder is the one most machines actually run - it must not be missed.
+                            //Dropping to -1 leaves the latch set and falls through to the normal
+                            //FindDischargeAuto selection; the tail is retried once the lock clears.
             if(iTail>=0)
             {
                 bDischargeTailPending[iTail]=false;

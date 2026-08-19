@@ -1749,6 +1749,19 @@ void __fastcall TfTeach::btnCarGoClick(TObject *Sender)
         SetCarStatus(LangT("Abort: not ready"));
         return;
     }
+    //AI(ht160s-agv-ruleB) 20260818 : RULE B - the Advanced car test drives the SAME front
+    //riser/separator cylinders as the production GoUp/GoDown (TestGoUpTray / TestGoDownTray
+    //call straight into DoFrontDestackDown / the module GoUp ladders), and had no AMR gate at
+    //all. Refuse to START while that station is serving an AMR, and say why - an engineer
+    //staring at a dead button needs the reason on screen. Area : 0=Empty, 1=Loader, 2=Color.
+    if((Area==0 && EmptyModule!=NULL  && EmptyModule->IsAmrLocked())  ||
+       (Area==1 && LoaderModule!=NULL && LoaderModule->IsAmrLocked()) ||
+       (Area==2 && ColorModule!=NULL  && ColorModule->IsAmrLocked()))
+    {
+        ShowMyOKMessageNoStop(LangT("AMR handoff in progress at this station."));
+        SetCarStatus(LangT("Abort: AMR handoff"));
+        return;
+    }
 
     bCarLoop=(chkCarLoop!=NULL && chkCarLoop->Checked);
     Loop=GetEditInt(edLoopTimes, 1);
@@ -1785,6 +1798,15 @@ void __fastcall TfTeach::btnAutoGoUpClick(TObject *Sender)
     if(CheckCarTestReady()==false)
     {
         SetAutoStatus(LangT("Abort: not ready"));
+        return;
+    }
+    //AI(ht160s-agv-ruleB) 20260818 : RULE B - TestGoUpOnce calls DoFrontRiseOnce, the same
+    //stroke the production discharge uses to stack into the output car. Refuse to START it
+    //while this Auto is serving an AMR.
+    if(AutoModule!=NULL && AutoModule->IsAmrLocked(Index))
+    {
+        ShowMyOKMessageNoStop(LangT("AMR handoff in progress at this station."));
+        SetAutoStatus(LangT("Abort: AMR handoff"));
         return;
     }
 

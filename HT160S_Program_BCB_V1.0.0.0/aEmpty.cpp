@@ -530,6 +530,14 @@ void TEmptyModule::DoEmpty(int &Task)
             break;
 
         case 3000:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - do not START a front GoUp while this station
+            //is serving an AMR. GoUpTask==1 is the idle terminal, so this only blocks a NEW round;
+            //a stroke already in flight runs to completion (aborting mid-stroke drops the stack).
+            //This is what covers the DoGoUpTray(0) re-arm further down, which had no lock test at
+            //all. bRearReturnInProgress keeps its existing meaning - the arm itself is a cursor
+            //reset that drives no coil, so the TrayArm pick interlock is unaffected.
+            if(bAmrLocked && GoUpTask==1)
+                break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
             if(DoGoUpTray(1))
             {
                 //AI(ht160s-empty-return-latch) 20260731 : do NOT drop the interlock while the

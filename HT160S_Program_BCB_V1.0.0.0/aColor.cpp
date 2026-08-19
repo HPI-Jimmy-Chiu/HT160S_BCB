@@ -489,6 +489,13 @@ void TColorModule::DoColor(int &Task)
             {
                 if(bFrontHasTray || bRearHasTray)
                 {
+                    //AI(ht160s-agv-ruleB) 20260818 : RULE B, mirroring the Empty drain guard.
+                    //Empty already refuses to GoUp while AMR-locked; Color was the one drain path
+                    //without that test. Belt-and-braces : the coordinator also forces P1-P3 to IDLE
+                    //and releases their locks in Run_CleanOut, so the residual window is a single
+                    //coordinator tick at the Run_Normal -> Run_CleanOut boundary.
+                    if(bAmrLocked)
+                        break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
                     //AI(cleanout) 20260703 : Full gate (user design, mirrors Empty). Hold
                     //the drain and ask the operator to empty the stack; the modal repeats
                     //until the Full sensor goes OFF. IsInputFullForAmr is sim-false.
@@ -603,6 +610,15 @@ void TColorModule::DoColor(int &Task)
             break;
 
         case 1700:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - do not START a front GoUp while this station
+            //is serving an AMR. GoUpTask==1 is the idle terminal, so only a NEW round is blocked;
+            //a stroke in flight completes (aborting mid-stroke drops the stack). This covers the
+            //DoGoUpTray(0) re-arm below, which had no lock test. It also settles a second problem :
+            //parking HERE re-runs the whole GoUp ladder from its terminal every scan, so P3 would
+            //otherwise read as motion-in-flight for the entire park; once the lock lands in the gap
+            //between rounds the park stops re-running and the station goes genuinely idle.
+            if(bAmrLocked && GoUpTask==1)
+                break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
             //AI(phase6-loader-recycle) 20260625 : Color receive ladder (mirrors
             //TEmptyModule::DoEmpty case 3000). Hold here until the TrayArm has finished
             //depositing the returned tray onto Color's rear (NotifyTrayXToEmptyFinish
@@ -1615,6 +1631,11 @@ bool TColorModule::RaiseFrontStackClear(int Flag)
             if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
                 bFrontHasTray=false;
+                //AI(ht160s-agv-ruleB) 20260818 : return the cursor to its idle terminal on the
+                //success path. It used to stay at 600 and rely on the caller re-arming in the same
+                //scan, which made RaiseFrontTask!=1 merely coincidentally safe as an
+                //is-motion-running test. Now it means what it says.
+                RaiseFrontTask=1;
                 return true;
             }
             break;
@@ -1712,6 +1733,14 @@ bool TColorModule::DoReadIdentityRetreat(int Flag)
             break;
 
         case 400:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - RaiseFrontStackClear drives the SAME front
+            //riser/separator cylinders as DoGoUpTray (its own header says the physical order is
+            //identical), so it is a GoUp for the purposes of the AMR rule. The module entry gate
+            //alone is not enough : this case re-arms the ladder every pass, so a lock arriving
+            //after the identity read began would otherwise never be seen. RaiseFrontTask==1 is the
+            //idle terminal, so a lift already in flight still completes.
+            if(bAmrLocked && RaiseFrontTask==1)
+                break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
             //owner : before setting the tray down at the front rest, if the front already holds a
             //tray, GoUp (lift the stack clear) first to avoid a two-tray collision; then deposit.
             if(RaiseFrontStackClear(1))

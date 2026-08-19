@@ -1723,6 +1723,16 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 3500:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - do not START a front destack GoDown while
+            //this station is serving an AMR (owner ruling 20260817 : no GoUp/GoDown during an AMR
+            //handoff). 3500 is the ONLY production entry to the destacker (it is what sets
+            //FeedTask=4000 below), and it is a clean stopping point : PushTray/LeanOnTray were
+            //already popped back at case 2000/3000, the car sits at feed Y and the destacker is
+            //fully retracted. A sequence already in flight is deliberately NOT aborted - stopping
+            //a destack mid-stroke drops the stack (see the claw note at DoFrontDestackDown).
+            //Self-clears : CEID274 releases the lock, or the P1 watchdog force-releases it.
+            if(bAmrLocked)
+                break;   //AI(ht160s-agv) front GoDown suspended during AMR handoff
             //AI(ht160s-loader) 20260627 : source-dry pre-gate BEFORE the front destacker
             //fires (item 2). Test the supply-car stock sensor SnLoader_Inputend here so a
             //dry source never wastes a godown cycle. HT160 has no HT172/HT9045 SelectHasTray;
