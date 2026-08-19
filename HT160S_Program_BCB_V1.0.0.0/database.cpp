@@ -1012,6 +1012,18 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(agv-linklost-hold) 20260819 : WAR0963 = an AMR handoff still held after the HSMS link
+        //dropped. PollAndCall no longer releases locks on a link event (a TCP drop is not evidence
+        //the AMR left, and there is no AMR-presence input), so this is the operator escape for a
+        //lock that outlived the link. Sibling slot to WAR0962 on purpose - same AMR family, and
+        //0963 was free machine-wide. Distinct code, NOT a reuse of WAR0962 : that one reads "AGV
+        //did not respond", which would blame the AGV for our own comms fault. Registered
+        //standalone, same idiom as MES0925 / WAR0962.
+        {
+            AnsiString cd="WAR0963", mg="SECS link lost - AMR handoff still held; clear the station then RETRY";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(ht160s-phantom-tray) 20260805 : MES1428 = the Color CARRIAGE still claims a tray when
         //the CleanOut drain has nothing left it can drain (aColor.cpp DoColor case 100). The drain
         //only handles the front stack and the rear seat, so a tray held by the carriage used to

@@ -185,6 +185,46 @@ static void ServiceAgvTimeoutAlarm()
 	}
 }
 //---------------------------------------------------------------------------
+//AI(agv-linklost-hold) 20260819 : WAR0963 - the escape for a lock held across an HSMS drop.
+//PollAndCall no longer releases locks when the link goes down (a TCP drop is not evidence the
+//AMR left, and there is no AMR-presence input to say otherwise), so a held lock needs a way out
+//that does not itself depend on the link. This is it: it runs in the MAIN loop, is not gated on
+//IsSelected, and asks the one authority that can actually see the station - the operator.
+//Sweep starts at si=0, unlike the WAR0962 sweep: P1 is excluded there because its supply timeout
+//is the source-dry auto-CleanOut, but P1's own silent force-release lives inside ServiceHandshake
+//behind the IsSelected gate, so while disconnected P1 has no escape at all without this.
+//Only K_RETRY is offered, and it MEANS "I checked the station, the AMR is gone, release it".
+//Not answering is the "keep waiting" case - the modal simply stays up and the lock stays held,
+//which is the safe default. A new operator key was considered and rejected: the Note form drives
+//a fixed six-key array and the Pad has five, so adding one is a UI change with a known trap.
+static void ServiceAgvLinkLostAlarm()
+{
+	if(GeneralSetting.bUseAMR==false)
+		return;
+	if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+		return;
+	if(fNote!=NULL && fNote->fShow)
+		return;   //AI(amr-alarm-defer) : a modal is up - keep every latch, re-check next tick
+	for(int si=0; si<AGV_STATION_COUNT; si++)
+	{
+		if(AgvCoord.LinkLostPending[si]==0)
+			continue;
+		AnsiString Where;
+		if(si==0)      Where="Loader (P1)";
+		else if(si==1) Where="Empty (P2)";
+		else if(si==2) Where="Color (P3)";
+		else           Where="Auto"+IntToStr(si-2)+" (P"+IntToStr(si+1)+")";
+		int iKey = ShowMyError("WAR0963",
+			LangT("SECS link lost - AMR handoff still held. Check the station is clear of the AMR, then RETRY to release")+" : "+Where,
+			K_RETRY);
+		if(iKey==K_RETRY)
+			AgvCoord.ReleaseStationByOperator(si);
+		else
+			AgvCoord.LinkLostPending[si] = 0;   // shown but not confirmed : keep the lock, re-arm the age
+		break;   // one alarm per sweep, same reason as WAR0962 above
+	}
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260603 : central alarm consumer. Modules raise alarms via
 //Alarm->Set(code) (non-blocking, returns immediately); MainProc drains the queue
 //here and shows each one through the alarm-code map. mapAlarmContext carries the
@@ -371,6 +411,7 @@ void MainProc()
 	//cycle (main-loop modal context; latched by the SECS-timer coordinator). Before
 	//ProcessAlarm so it shares the same drain tick.
 	ServiceAgvTimeoutAlarm();
+	ServiceAgvLinkLostAlarm();   //AI(agv-linklost-hold) 20260819
 
 	//AI(HT160S-Maintainer) 20260603 : drain any alarms raised during this cycle's
 	//module processing and show them through the central dispatch.

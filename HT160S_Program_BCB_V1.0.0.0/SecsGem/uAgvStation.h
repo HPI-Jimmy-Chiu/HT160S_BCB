@@ -88,10 +88,30 @@ public:
     //S4 source-dry auto-CleanOut). CONSUMED by the MAIN control loop (csystem) which pops
     //WAR0962 there - never a modal on this SECS-timer path. Cleared by RetryStation/Reset.
     unsigned char TimeoutPending[AGV_STATION_COUNT];
+    //AI(agv-linklost-hold) 20260819 : per-station HSMS-link-lost hold. A dropped link used to
+    //release every in-progress lock outright; it now HOLDS them (a TCP drop is not evidence the
+    //AMR left, and the machine has no AMR-presence input). LinkLostAge counts 1s coordinator
+    //ticks while the link is down AND this station still holds its module lock; past
+    //iAgvTimeoutSec it latches LinkLostPending once. CONSUMED by the MAIN loop (csystem), which
+    //pops WAR0963 - never a modal on this SECS-timer path. This escape deliberately depends on
+    //NOTHING that stops working while disconnected, so a held lock is always bounded.
+    int           LinkLostAge[AGV_STATION_COUNT];
+    unsigned char LinkLostPending[AGV_STATION_COUNT];
 
     TAgvCoordinator();
     void Reset();
     void RetryStation(int si);   //AI(amr-unmanned W3) 20260721 : WAR0962 K_RETRY -> station back to IDLE (+unlock kept? no: keep lock semantics, see .cpp) so PollAndCall re-CALLs
+    //AI(agv-linklost-hold) 20260819 : link-lost hold helpers. ServiceLinkLostHold ages the hold
+    //(called only from the disconnected branch of PollAndCall); ClearLinkLostHold drops the
+    //counters on reconnect WITHOUT touching lock or handshake; ReleaseStationByOperator is the
+    //WAR0963 answer - the one path allowed to release a held lock without SECS evidence, and it
+    //MUST also clear Handshake or ReassertLocks would silently re-couple the lock after a HOME.
+    //IsStationLockHeld asks the module (not Handshake) so a RetryStation orphan is covered too.
+    void ServiceLinkLostHold();
+    void ClearLinkLostHold();
+    void ReleaseStationByOperator(int si);
+    bool IsStationLockHeld(int si);
+    void ReleaseInfeedForCleanOut();   //shared by the Clean Out path, reachable while disconnected
 
     AnsiString BuildBitmap(int targetPIndex);    // "P1:0,...,Px:1,...,P9:0"
     int        LookupByName(AnsiString cpName);  // -> index 0..8, -1 if unknown

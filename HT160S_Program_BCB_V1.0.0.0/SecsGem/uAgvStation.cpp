@@ -189,9 +189,117 @@ void TAgvCoordinator::Reset()
         ShortageDebounce[i] = 0;
         ReadyEntrySensor[i] = 0;
         TimeoutPending[i]   = 0;   //AI(amr-unmanned W3) 20260721
+        LinkLostAge[i]      = 0;   //AI(agv-linklost-hold) 20260819
+        LinkLostPending[i]  = 0;
     }
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
         BinSetting[a] = "";
+}
+//---------------------------------------------------------------------------
+//AI(agv-linklost-hold) 20260819 : does this station still physically hold its module lock?
+//Deliberately asks the MODULE, not Handshake[]. RetryStation leaves a station at AGV_IDLE while
+//keeping its lock, so a Handshake test would miss exactly the orphan we most need to cover.
+bool TAgvCoordinator::IsStationLockHeld(int si)
+{
+    if(si < 0 || si >= AGV_STATION_COUNT)
+        return false;
+    if(si < 3)
+        return InfeedLocked(si);
+    if(AutoModule==NULL)
+        return false;
+    return AutoModule->IsAmrLocked(si - 3);
+}
+//---------------------------------------------------------------------------
+//AI(agv-linklost-hold) 20260819 : the Clean Out P1-P3 force-release, factored out so the
+//disconnected branch of PollAndCall can still reach it (it used to sit below that branch's
+//return, and was only harmless because the old code had already released everything).
+void TAgvCoordinator::ReleaseInfeedForCleanOut()
+{
+    for(int p = 0; p < 3; p++)
+    {
+        if(Handshake[p]!=AGV_IDLE)
+        {
+            InfeedSetLock(p, false);
+            Handshake[p] = AGV_IDLE;
+        }
+        ShortageLatch[p]   = 0;
+        LinkLostAge[p]     = 0;   //AI(agv-linklost-hold) : released here, no hold to age
+        LinkLostPending[p] = 0;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(agv-linklost-hold) 20260819 : age the link-lost hold. Runs ONLY from the disconnected
+//branch of PollAndCall, which the 1s THGem tick keeps calling (its only gates are bUseAMR and
+//AutoModule). Nothing here depends on the link, on HOME, or on a sensor, so a held lock always
+//has a bounded way out.
+//ShortageDebounce is zeroed every tick on purpose : it measures "the AGV is not answering",
+//which is unknowable while WE are the ones off the wire. Leaving it running would blow straight
+//past iAgvTimeoutSec on the first tick after reconnect and raise a false WAR0962; the AGV gets a
+//full fresh timeout instead, and this function times the disconnect itself.
+void TAgvCoordinator::ServiceLinkLostHold()
+{
+    int iLimit = GeneralSetting.iAgvTimeoutSec;
+    if(iLimit < 5)
+        iLimit = 5;                      // mirror the Load()/maintenance clamp
+    for(int si = 0; si < AGV_STATION_COUNT; si++)
+    {
+        ShortageDebounce[si] = 0;
+        if(IsStationLockHeld(si)==false)
+        {
+            LinkLostAge[si]     = 0;
+            LinkLostPending[si] = 0;
+            continue;
+        }
+        if(LinkLostAge[si]==0)
+            RecordProcess("AGV: HSMS link lost while P"+IntToStr(si+1)+
+                          " holds an AMR lock - lock and handshake are HELD (hs="+
+                          IntToStr(Handshake[si])+")");
+        LinkLostAge[si]++;
+        if(LinkLostAge[si] > iLimit && LinkLostPending[si]==0)
+        {
+            RecordProcess("AGV: link-lost hold on P"+IntToStr(si+1)+" exceeded "+
+                          IntToStr(iLimit)+"s -> WAR0963 pending");
+            LinkLostPending[si] = 1;
+        }
+    }
+}
+//---------------------------------------------------------------------------
+//AI(agv-linklost-hold) 20260819 : SELECTED again. Drop the hold counters only - the lock and the
+//handshake state survive on purpose so ServiceHandshake picks the handoff up where it stopped.
+void TAgvCoordinator::ClearLinkLostHold()
+{
+    AnsiString sHeld;
+    for(int si = 0; si < AGV_STATION_COUNT; si++)
+    {
+        if(LinkLostAge[si]!=0)
+            sHeld += " P"+IntToStr(si+1)+"("+IntToStr(LinkLostAge[si])+"s)";
+        LinkLostAge[si]     = 0;
+        LinkLostPending[si] = 0;
+    }
+    if(sHeld!="")
+        RecordProcess("AGV: HSMS link restored - held locks resume their handshake:"+sHeld);
+}
+//---------------------------------------------------------------------------
+//AI(agv-linklost-hold) 20260819 : the WAR0963 answer. This is the ONLY path allowed to release a
+//lock without SECS evidence, and it exists because the operator physically checked the station.
+//Handshake MUST be forced to IDLE here : leaving it at PREP/READY would let ReassertLocks re-couple
+//the module lock at the next InitialAllTask and the station would silently freeze again.
+void TAgvCoordinator::ReleaseStationByOperator(int si)
+{
+    if(si < 0 || si >= AGV_STATION_COUNT)
+        return;
+    if(si < 3)
+        InfeedSetLock(si, false);
+    else if(AutoModule!=NULL)
+        AutoModule->SetAmrLock(si - 3, false);
+    RecordProcess("AGV: WAR0963 operator confirmed AMR left P"+IntToStr(si+1)+
+                  " - lock released after "+IntToStr(LinkLostAge[si])+"s hold");
+    Handshake[si]        = AGV_IDLE;
+    ShortageLatch[si]    = 0;
+    ShortageDebounce[si] = 0;
+    TimeoutPending[si]   = 0;
+    LinkLostAge[si]      = 0;
+    LinkLostPending[si]  = 0;
 }
 //---------------------------------------------------------------------------
 //AI(amr-unmanned W3) 20260721 : WAR0962 K_RETRY handler. Reset the station to IDLE and
@@ -283,27 +391,34 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
 
     if(bSelected==false)
     {
-        // link down : abandon any handoff so the operator fallback (ServiceCarFull) runs
-        for(int a = 0; a < AGV_AUTO_COUNT; a++)
-        {
-            int si = a + 3;
-            if(Handshake[si]!=AGV_IDLE)
-            {
-                AutoModule->SetAmrLock(a, false);
-                Handshake[si] = AGV_IDLE;
-            }
-        }
-        for(int p = 0; p < 3; p++)
-        {
-            if(Handshake[p]!=AGV_IDLE)
-            {
-                InfeedSetLock(p, false);
-                Handshake[p] = AGV_IDLE;
-            }
-            ShortageLatch[p] = 0;
-        }
+        //AI(agv-linklost-hold) 20260819 : a dropped HSMS link is NOT evidence that the AMR has
+        //left. This block used to release every lock whose handshake was not IDLE - which
+        //INCLUDES AGV_PREP and AGV_READY, i.e. exactly the states meaning "the AMR was called
+        //and has been told it may come in". The machine has no AMR-presence input at all
+        //(IO_Table.csv has no agv/amr/dock row), so nothing could contradict that guess, and
+        //the release emitted no RecordProcess, so nothing was traceable afterwards. A host EAP
+        //restart or one late linktest un-froze a station an AMR could still be docked at,
+        //within one 1s tick, and production motion resumed into it.
+        //The stated justification does not hold either : ServiceCarFull's operator fallback
+        //does NOT depend on the lock. Its only AMR gate is bUseAMR && HGem->IsSelected()
+        //(aAuto1To6.cpp), it contains no bAmrLocked test at all, and its own comment says a
+        //link-down case "still falls through to the operator modal below".
+        //Now : keep every lock and every handshake state, and age a link-lost hold instead.
+        //The escape is link-independent - see ServiceLinkLostHold and the WAR0963 consumer in
+        //csystem - so a retained lock always has a bounded way out and never becomes an orphan.
+        ServiceLinkLostHold();
+        //AI(agv-linklost-hold) 20260819 : Clean Out's P1-P3 force-release must stay reachable
+        //while disconnected. It used to sit below this branch's return and was only harmless
+        //because the release above had already cleared everything.
+        if(HSys.Sys.RunMode==Run_CleanOut)
+            ReleaseInfeedForCleanOut();
         return;
     }
+
+    //AI(agv-linklost-hold) 20260819 : SELECTED again - drop the hold counters. The lock and the
+    //handshake are deliberately NOT touched : ServiceHandshake resumes them from their real
+    //state, so a handoff interrupted by a link blip continues instead of restarting.
+    ClearLinkLostHold();
 
     //AI(ht160s-overcount-tripqueue S5) 20260721 : in Clean Out, release any pending INFEED
     //(P1-P3) handshake so a CALLED latched just before CleanOut entry does not stay stuck
@@ -312,17 +427,7 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
     //+ re-feed). Outfeed (P4-P9 Auto unload) is intentionally NOT touched -- that is the D4
     //CleanOut unload path.
     if(HSys.Sys.RunMode==Run_CleanOut)
-    {
-        for(int p = 0; p < 3; p++)
-        {
-            if(Handshake[p]!=AGV_IDLE)
-            {
-                InfeedSetLock(p, false);
-                Handshake[p] = AGV_IDLE;
-            }
-            ShortageLatch[p] = 0;
-        }
-    }
+        ReleaseInfeedForCleanOut();
 
     //AI(amr-unmanned D4-2) 20260721 : the P4-P9 full-collect CALL now also runs in
     //Run_CleanOut (a drain GoUp can fill the output car; without a CALL the finish gate
@@ -674,10 +779,19 @@ AnsiString TAgvCoordinator::DescribeAgvState()
         AnsiString sBins = "";   //AI(ht160s-agv-binsetting) 20260713 : live SVID 38234-45 value per Auto
         if(AgvStation[i].Kind==ASK_AUTO && AgvStation[i].AutoIndex>=0)
             sBins = " bins=[" + DescribeAutoBins(AgvStation[i].AutoIndex) + "]";
+        //AI(agv-linklost-hold) 20260819 : surface a lock that outlived the HSMS link so a
+        //State Record post-mortem can tell "held across a link drop" from "handoff running".
+        AnsiString sHold = "";
+        if(LinkLostAge[i]!=0)
+        {
+            sHold = " linklost=" + IntToStr(LinkLostAge[i]) + "s";
+            if(LinkLostPending[i]!=0)
+                sHold = sHold + " WAR0963-pending";
+        }
         s += "P" + IntToStr(AgvStation[i].PIndex) + " " + AnsiString(AgvStation[i].Name)
            + ": lock=" + IntToStr(iLock)
            + " hs="    + AnsiString(AgvHsName(Handshake[i]))
-           + " ready=" + IntToStr(iReady) + sBins + "\r\n";
+           + " ready=" + IntToStr(iReady) + sBins + sHold + "\r\n";
     }
     s += AmrInject.Describe();   //AI(ht160s-agv) 20260708 : test-mode + armed-latch state
     return s;
