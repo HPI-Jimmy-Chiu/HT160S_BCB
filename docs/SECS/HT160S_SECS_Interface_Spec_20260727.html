@@ -2128,8 +2128,8 @@ will <strong>silently misread</strong> them — well-formed message, wrong seman
 <tr>
 <td><code>SET_LOT_INFO</code></td>
 <td><strong>唯一</strong>的 Lot 資訊設定命令(<strong>疊加式</strong>)</td>
-<td><code>L,n{ A custLot }</code> 或 <code>L,n{ L,2{ A custLot, A kyecLot } }</code></td>
-<td><strong>20260730 起改為疊加</strong>:不再清空既有工單。同一 Lot id 只保留一筆(沿用原 slot、index 與計數)。同一 Lot 若改帶<strong>不同的 KYEC 批號</strong>,會退掉該 Lot 舊的 2D/Bin 明細(此情形機內尚有 IC 時回 <strong>4</strong>)。登錄表會超過 64 筆回 <strong>2</strong>(不再靜默丟批)。不啟動運轉</td>
+<td><strong><code>L,1{ L,2{ A "LOTID", A "lot1,lot2,..." } }</code></strong>(20260820 起,客戶正式格式);相容保留 <code>L,n{ A lotID }</code> 與 <code>L,1{ A lotID }</code></td>
+<td><strong>20260820 起改為標準 CPNAME/CPVAL 名值對</strong>(與 HT9045 <code>SET_LOT_INFO</code> 同慣例,見 §7.1):內層 <code>L,n</code> 數的是<strong>參數個數,不是批數</strong>,多個 Lot 在 <code>LOTID</code> 的值內用<strong>逗號</strong>串接(與回報方向對稱——SVID 1006 本來就是全部 Lot 的逗號串)。所有寫法都會逗號切分、trim、封包內去重。不認識的 CPNAME <strong>忽略並記 log</strong>(不整包退;9045 的 <code>LOT_INFO</code>+<code>DISPLAY</code> 就是多參數),但<strong>整包沒有任何可辨識參數時回 2</strong>(不再靜默回 0)。<strong>20260730 起疊加</strong>:不再清空既有工單,同一 Lot id 只保留一筆(沿用原 slot、index 與計數)。登錄表會超過 64 筆回 <strong>2</strong>(不再靜默丟批)。不啟動運轉。<strong>已退役</strong>:20260721 我方自提、未經客戶確認的位置式配對 <code>L,2{ A custLot, A kyecLot }</code> 與其專屬 <code>HCACK=4</code>(它與真實封包撞形狀;確認後的模型下宣告的 Lot id 就是京元/OSAT 批,客戶批號由 WebAPI 回應逐顆帶)</td>
 </tr>
 <tr>
 <td><code>LOTSTART</code></td>
@@ -2408,7 +2408,7 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <td><code>SET_LOT_INFO</code></td>
 <td>RCMD</td>
 <td><strong>疊加式</strong>登記 Lot,並且是本機<strong>唯一</strong>的 Lot 資訊設定入口(2026-07-30 起)</td>
-<td><strong>同名不同體(不是 9045 沒有)</strong>。HT9045 的 S2F42 確實有 <code>SET_LOT_INFO</code>,但兩邊的 lot 模型與參數本體不同:HT-160S 收 <code>L,n{ A custLot }</code>(或 <code>L,2{custLot,kyecLot}</code> 配對)並<strong>疊加</strong>進登錄表、同 id 留一筆;9045 的版本收 <code>L,2{("LOT_INFO", XML), ("DISPLAY", str)}</code>,走它自己的 SPIL XML lot 模型(<code>uHGemHT9045.cpp:2183</code>)。<strong>host 不可假設兩機的 <code>SET_LOT_INFO</code> 可互換</strong>,需依 §3.4 本機格式。另註:京元 2026-06-08 全日 log 中 host <strong>從未送過</strong> <code>SET_LOT_INFO</code>——該線的 Lot 身分是 host 用 <code>S10F5</code> 終端訊息告知操作員、由人輸入機台,再由機台回報給 host</td>
+<td><strong>同名、同外殼、不同參數集</strong>。<strong>20260820 更正</strong>:本欄原本寫「兩邊參數本體不同」,那是基於我方 20260721 的位置式配對提案;客戶提供正式格式後確認,<strong>外殼是同一個</strong> CPNAME/CPVAL 名值對(9045 <code>uHGemHT9045.cpp</code> 逐項讀 <code>L,2{ A CPNAME, A CPVAL }</code> 並<strong>驗證名稱</strong>,名稱不符回 2)。差別只在<strong>參數集</strong>:HT-160S 認 <code>LOTID</code>(值=逗號分隔的 Lot 清單,疊加進登錄表、同 id 留一筆);9045 認 <code>LOT_INFO</code>(SPIL XML lot 模型)+<code>DISPLAY</code>。因此 host 仍<strong>不可假設兩機參數可互換</strong>,但可沿用同一組封包建構程式,只換 CPNAME/CPVAL。另註:京元 2026-06-08 全日 log 中 host 從未送過 <code>SET_LOT_INFO</code>(該線的 Lot 身分由 host 以 <code>S10F5</code> 告知操作員、人工輸入);<strong>2026-08-19 京元現場已實際送出</strong> <code>SET_LOT_INFO</code>,即上述 <code>LOTID</code> 形狀</td>
 </tr>
 <tr>
 <td><code>HOME</code></td>

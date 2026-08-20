@@ -2014,22 +2014,44 @@ static bool IsTesterOnlyRcmd(AnsiString S)
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260610 : S2F41 SET_LOT_INFO variable-length multi-Lot.
-//  Reads outer L[2]{ A "SET_LOT_INFO", L[n]{ item ... } }. Each item may be either
-//  A lotID (flat list - this is the SHIPPED path and what the simulator sends) or
-//  L[1|2]{ A custLot [, A kyecLot] }; the two may be mixed in one packet.
-//  Backfills first lot to edLotNo (D2). HCACK: 0=ok, 1=format, 2=param,
-//  4=re-tagging an existing lot's KYEC id while IC are under the machine;
-//  cap HT160_MAX_LOT=64, over -> HCACK=2 (D5).
-//  S2F42 reply: L[2]{ B HCACK, L[0] }.
-//AI(secs-comment-truth) 20260805 : two claims in this header were inverted by the 20260730
-//  lot-lifecycle rework (0ba540a) and stayed here for five weeks:
-//   - "refills LotRegistry (overwrite, D1)" -> it is ADDITIVE. Nothing is cleared; LotRegistry
-//     and LotBinBinding survive, so a lot can be appended to an in-progress work order.
-//     Capacity is checked against the MERGED count.
-//   - "rejects while producing / IC under machine (D3, HCACK=4)" -> that whole-packet busy gate
-//     was REMOVED. Producing is fine. The only surviving 4 is the narrow re-tag case above.
-//  CLEAR_LOT_INFO is now the only way to end/withdraw a lot. Do not restore the old wording
-//  from this file's git history.
+//AI(secs-setlotinfo-cpname) 20260820 : REALIGNED to the packet the customer actually sends,
+//  which is the standard S2F41 CPNAME/CPVAL form - not a positional list :
+//    L[2]{ A "SET_LOT_INFO", L[n]{ L[2]{ A "LOTID", A "lot1,lot2,..." }, ... } }
+//  So the inner L[n] counts PARAMETERS, not lots, and ONE parameter can declare SEVERAL lots
+//  comma-separated. Authority: HT9045 V3.32.810_B01 SECSGEM/uHGemHT9045.cpp:2230 reads its own
+//  SET_LOT_INFO exactly this way (L[2]{ A CPNAME, A CPVAL }, and it VALIDATES the name), so the
+//  customer EAP is written to the 9045 habit. It is also symmetric with what we already report
+//  back: SVID 1006 (CEID 9001 report 8) is every registered lot comma-separated.
+//  Item shapes accepted :
+//    L[2]{ A CPNAME, A CPVAL } - CPNAME "LOTID" -> CPVAL is the comma-separated lot list.
+//                                Any OTHER CPNAME is IGNORED with a log line, never refused :
+//                                9045 pairs its LOT_INFO with a DISPLAY CP, so extra parameters
+//                                are expected, and one extra CP must not throw away a valid
+//                                LOTID sent in the same packet.
+//    A "lotID"                 - flat legacy item (our own simulator sends this), and
+//    L[1]{ A "lotID" }           the 1-element list spelling. Both are comma-split too, so
+//                                every spelling behaves identically.
+//  A packet where NOTHING was recognised (no LOTID CP, no flat item) answers HCACK=2 - it
+//  declared no lot, and answering 0 to it is what cost the 20260819 on-site run 40 minutes: the
+//  host sent L[2]{"LOTID","NQ100CFAA1"}, the old code read the pair POSITIONALLY as
+//  (custLot,kyecLot), registered a lot literally named "LOTID", answered HCACK=0, and neither
+//  side could see anything wrong (SecsLog 2026_08_19 15:00:25 + CEID 73 RPTID 502 = "LOTID").
+//  RETIRED here together with that positional reading : the 20260721 L[2]{ A custLot, A kyecLot }
+//  shape (OUR unconfirmed proposal, which collides byte-for-byte with the real CPNAME/CPVAL
+//  pair), its HCACK=4 "re-tagging an existing lot KYEC id" admission gate, and its ClearLotItems
+//  retire. None of them is reachable any more BY CONSTRUCTION: under the confirmed model the
+//  declared lot id IS the KYEC/OSAT batch (it is what the customer WebAPI is queried with,
+//  OSATLot=<lot>) and the CUSTOMER lot rides per-IC in the response (LoadFromJsonString ->
+//  CustLotID, Soter col6), so a different batch is a different lot id in a different registry
+//  slot - there is nothing left to re-tag. sKyecLotID keeps its other writers (WorkOrder.json
+//  round-trip, WhiteList.json), it just has no SECS writer any more.
+//  ADDITIVE (20260730, 0ba540a) : nothing is cleared here. LotRegistry and LotBinBinding
+//  survive, so a lot can be appended to an in-progress work order, and capacity is checked
+//  against the MERGED count. CLEAR_LOT_INFO is the only way to end/withdraw a lot; the old
+//  "producing / IC under machine -> HCACK=4" whole-packet gate is gone for good.
+//  HCACK: 0=ok, 1=format, 2=param (empty list / malformed item / nothing recognised / would
+//  overflow HT160_MAX_LOT=64). S2F42 reply: L[2]{ B HCACK, L[0] }.
+//  Do not restore the old wording from this file's git history.
 //---------------------------------------------------------------------------
 int HT160Gem::S2F42_Host_Command_Acknowledge()
 {
@@ -2072,28 +2094,22 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
 
         if(S.AnsiPos("SET_LOT_INFO")==1)
         {
-            // Inner L[n] : n = number of Lots (variable)
+            // Inner L[n] : n = number of CP PARAMETERS (NOT the lot count - one "LOTID"
+            // parameter carries the whole comma-separated lot list).
             if(HGemPtr->GetDataItemLenAndTypeAndDelete(n, HType.LIST_TYPE)==1)
             {
-                sRxDetail = "lots=" + IntToStr(n);
+                sRxDetail = "params=" + IntToStr(n);
                 if(n==0)
                 {
-                    HCACK = 2;                                   // empty list -> param error
+                    HCACK = 2;                                   // empty parameter list -> param error
                 }
                 else if(n>HT160_MAX_LOT)
                 {
-                    HCACK = 2;                                   // one packet cannot exceed capacity
+                    //AI(secs-setlotinfo-cpname) 20260820 : sanity bound only. The real lot
+                    // capacity test is on the PARSED tokens further down - the customer form
+                    // sends 1-2 parameters no matter how many lots they carry.
+                    HCACK = 2;
                 }
-                //AI(secs-lot-additive) 20260730 : the blanket "producing / IC inside -> HCACK=4"
-                // guard and the ArchiveDiscardedWorkOrder gate that used to sit here are BOTH gone.
-                // Both existed because SET_LOT_INFO was a destructive OVERWRITE (Clear + refill).
-                // It is now purely ADDITIVE, so it destroys nothing: appending a lot to a live
-                // multi-lot order is safe (AddLot appends or reuses a freed slot, existing slot
-                // INDICES never move, and tray cells / SortArm slots hold those indices as raw
-                // ints), and there is nothing left to archive. The one case that still destroys
-                // data - re-declaring an existing Lot under a DIFFERENT KYEC batch, which retires
-                // that Lot's 2D->Bin list - keeps a busy guard, applied below AFTER the parse so
-                // it only fires for packets that actually retire something.
                 else
                 {
                     //AI(ht160s-ftp) 20260721 : parse into local buffers FIRST, commit atomically
@@ -2103,22 +2119,16 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                     // previous code Cleared before the loop and committed incrementally, leaving a
                     // partial lot set live after a reject.
                     AnsiString bufCust[HT160_MAX_LOT];
-                    AnsiString bufKyec[HT160_MAX_LOT];
                     int nBuf = 0;
+                    int nIgnoredCp = 0;
+                    AnsiString sFirstUnknownCp = "";
                     HCACK = 0;
                     for(i=0; i<n; i++)
                     {
-                        //AI(ht160s-ftp) 20260721 : each SET_LOT_INFO item is EITHER
-                        //   A  "custLot"                     (legacy : Cust lot only, no KYEC batch)
-                        //   L[2]{ A "custLot", A "kyecLot" }  (KYEC : Cust lot + Kyec batch id, Soter col7)
-                        // Backward compatible : an old host sending bare ASCII still works unchanged; a
-                        // new host sends the pair. The L[2] READ idiom mirrors the proven LOTSTART
-                        // SORTMODE-pair reader below, so it cannot mis-consume the stream. **The pair
-                        // SHAPE is OUR PROPOSAL pending KYEC confirmation of the SET_LOT_INFO SML**
-                        // (docs/plan/ftp-kyec-upload-plan-20260721) -- if KYEC carries the KYEC lot a
-                        // different way, ONLY this L[2] branch changes; the ASCII branch is the shipped path.
-                        AnsiString custLot = "";
-                        AnsiString kyecLot = "";
+                        //AI(secs-setlotinfo-cpname) 20260820 : one parameter -> one raw value to
+                        // comma-split. sRaw stays "" for a parameter that declares no lot (an
+                        // unmodelled CP name), which adds nothing and refuses nothing.
+                        AnsiString sRaw = "";
                         if(HGemPtr->GetDataItemLenAndType(len, Type)!=1)
                         {
                             HCACK = 2;                           // truncated list -> param error
@@ -2130,17 +2140,47 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                             if(HGemPtr->GetDataItemLenAndTypeAndDelete(pairLen, HType.LIST_TYPE)!=1
                                || pairLen<1 || pairLen>2)
                             {
-                                HCACK = 2;                       // malformed (custLot[,kyecLot]) pair
+                                HCACK = 2;                       // malformed CP item
                                 break;
                             }
-                            if(HGemPtr->GetDataItemLenAndType(len, Type)==1)
-                                HGemPtr->DataItemIn(len, Type, custLot);
-                            if(pairLen>=2 && HGemPtr->GetDataItemLenAndType(len, Type)==1)
-                                HGemPtr->DataItemIn(len, Type, kyecLot);
-                            if(custLot.Trim()=="")
+                            AnsiString sCpName = "";
+                            AnsiString sCpVal  = "";
+                            if(HGemPtr->GetDataItemLenAndType(len, Type)!=1
+                               || HGemPtr->DataItemIn(len, Type, sCpName)!=1)
                             {
-                                HCACK = 2;                       // pair carried no Cust lot -> param error
+                                HCACK = 2;                       // unreadable first element
                                 break;
+                            }
+                            if(pairLen>=2)
+                            {
+                                if(HGemPtr->GetDataItemLenAndType(len, Type)!=1
+                                   || HGemPtr->DataItemIn(len, Type, sCpVal)!=1)
+                                {
+                                    HCACK = 2;                   // unreadable CP value
+                                    break;
+                                }
+                                //AI(secs-setlotinfo-cpname) 20260820 : CPNAME / CPVAL. "LOTID" is
+                                // the only modelled parameter (customer 20260820). Compared Trimmed
+                                // + UpperCased : SECS ASCII is routinely space-padded and the CP
+                                // NAME is a protocol keyword, so its case is not identity - unlike
+                                // the lot ids below, which are kept EXACTLY as sent (they are the
+                                // WebAPI query key and the Soter col7 / file-name token).
+                                if(sCpName.Trim().UpperCase()=="LOTID")
+                                {
+                                    sRaw = sCpVal;
+                                }
+                                else
+                                {
+                                    nIgnoredCp++;
+                                    if(sFirstUnknownCp=="")
+                                        sFirstUnknownCp = sCpName.Trim();
+                                    RecordProcess("SECS SET_LOT_INFO : CP '"+sCpName.Trim()
+                                                  +"' not modelled - ignored");
+                                }
+                            }
+                            else
+                            {
+                                sRaw = sCpName;                  // L[1]{ A lotID } : flat item in a list
                             }
                         }
                         else if(Type==HType.ASCII_TYPE && len>0 && len<(int)sizeof(str))
@@ -2150,23 +2190,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                                 HCACK = 2;                       // read failure -> param error
                                 break;
                             }
-                            custLot = AnsiString(str);
-                            //AI(secs-setlotinfo-blank) 20260805 : same Trim gate the L[2] branch
-                            //  above already has. SECS ASCII is routinely space-padded, and a
-                            //  blank-filled lot id used to pass this len>0 test, get counted as a
-                            //  new lot by the capacity check (FindLotIndex Trims, so it answers -1),
-                            //  then be refused by AddLot inside the COMMIT loop -> HCACK=2 + break
-                            //  with the earlier lots of the same packet already in LotRegistry, and
-                            //  RefreshLotListFromRegistry / SaveWorkOrder skipped because HCACK!=0.
-                            //  That left RAM holding lots the host believes were all rejected, and
-                            //  RAM out of step with WorkOrder.json - breaking this branch's own
-                            //  "commit atomically" contract. Catching it here in the PARSE stage
-                            //  keeps the commit loop unable to reach AddLot<0 again.
-                            if(custLot.Trim()=="")
-                            {
-                                HCACK = 2;                       // blank ASCII lot id -> param error
-                                break;
-                            }
+                            sRaw = AnsiString(str);              // flat legacy item (simulator path)
                         }
                         else
                         {
@@ -2174,45 +2198,80 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                             break;
                         }
 
-                        if(nBuf>=HT160_MAX_LOT)
+                        //AI(secs-setlotinfo-cpname) 20260820 : comma-split. The customer packs
+                        // several lots into ONE CPVAL ("NQ8002ZAA1,NQ80030AA1"), and the same
+                        // split is applied to the flat items so every spelling behaves the same.
+                        // Blank tokens are SKIPPED, not refused - a trailing comma is not worth
+                        // failing a whole work order over. In-packet duplicates are dropped here
+                        // (AddLot is keep-existing anyway, but a duplicate would over-count the
+                        // capacity check below).
+                        while(sRaw.Trim()!="")
                         {
-                            HCACK = 2;                           // more items than capacity -> param error
-                            break;
+                            AnsiString sTok;
+                            int iComma = sRaw.AnsiPos(",");
+                            if(iComma>0)
+                            {
+                                sTok = sRaw.SubString(1, iComma-1);
+                                sRaw = sRaw.SubString(iComma+1, sRaw.Length()-iComma);
+                            }
+                            else
+                            {
+                                sTok = sRaw;
+                                sRaw = "";
+                            }
+                            sTok = sTok.Trim();
+                            if(sTok=="")
+                                continue;
+                            bool bDupInPacket = false;
+                            for(int k=0; k<nBuf; k++)
+                            {
+                                if(bufCust[k]==sTok)
+                                {
+                                    bDupInPacket = true;
+                                    break;
+                                }
+                            }
+                            if(bDupInPacket==true)
+                                continue;
+                            if(nBuf>=HT160_MAX_LOT)
+                            {
+                                HCACK = 2;                       // more lots than capacity
+                                break;
+                            }
+                            bufCust[nBuf] = sTok;
+                            nBuf++;
                         }
-                        bufCust[nBuf] = custLot;
-                        bufKyec[nBuf] = kyecLot;
-                        nBuf++;
+                        if(HCACK!=0)
+                            break;
                     }
 
-                    //AI(secs-lot-additive) 20260730 : admission checks on the PARSED list, before
-                    // anything is committed. Two things the old overwrite semantics made
-                    // impossible and additive semantics make mandatory:
-                    //  1) real capacity. The per-packet n>HT160_MAX_LOT test above is not enough
-                    //     once lots accumulate; AddLot returns -1 when the registry is full and
-                    //     the old commit loop ignored that, so the host got HCACK=0 for lots the
-                    //     machine had silently dropped. Count the genuinely NEW ids and refuse the
-                    //     whole packet if they would not fit.
-                    //  2) a KYEC batch change on an EXISTING lot. That retires the lot's old
-                    //     2D->Bin list (see the commit loop), which must never happen with that
-                    //     lot's material still in the machine.
+                    //AI(secs-setlotinfo-cpname) 20260820 : a packet we did not understand must NOT
+                    // answer 0. Nothing recognised = nothing declared, so say so and name what was
+                    // skipped. This is the check the 20260819 mis-parse needed : it turns a
+                    // wrong-shape packet into an immediate, visible HCACK=2 on both sides instead
+                    // of a silently invented lot.
+                    if(HCACK==0 && nBuf==0)
+                    {
+                        AnsiString sWhy = "SECS SET_LOT_INFO refused : no lot declared";
+                        if(sFirstUnknownCp!="")
+                            sWhy = sWhy + " (unknown CP '" + sFirstUnknownCp + "')";
+                        HCACK = 2;
+                        RecordProcess(sWhy + " - expected L[2]{ A \"LOTID\", A \"lot1,lot2\" }");
+                    }
+
+                    //AI(secs-lot-additive) 20260730 : capacity admission on the PARSED list, before
+                    // anything is committed. The per-packet bound above is not enough once lots
+                    // accumulate; AddLot returns -1 when the registry is full and the old commit
+                    // loop ignored that, so the host got HCACK=0 for lots the machine had silently
+                    // dropped. Count the genuinely NEW ids and refuse the whole packet if they
+                    // would not fit.
                     if(HCACK==0)
                     {
                         int nNewLots = 0;
-                        int nRetire  = 0;
                         for(int j=0; j<nBuf; j++)
                         {
-                            int iExist = LotRegistry.FindLotIndex(bufCust[j]);
-                            if(iExist<0)
-                            {
+                            if(LotRegistry.FindLotIndex(bufCust[j])<0)
                                 nNewLots++;
-                                continue;
-                            }
-                            TLotRunInfo *pOld = LotRegistry.GetLot(iExist);
-                            if(pOld!=NULL
-                               && bufKyec[j].Trim()!=""
-                               && pOld->sKyecLotID.Trim()!=""
-                               && pOld->sKyecLotID.Trim()!=bufKyec[j].Trim())
-                                nRetire++;
                         }
                         if(LotRegistry.GetLotCount()+nNewLots > HT160_MAX_LOT)
                         {
@@ -2220,11 +2279,6 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                             RecordProcess("SECS SET_LOT_INFO refused : lot registry full ("
                                           +IntToStr(LotRegistry.GetLotCount())+"+"+IntToStr(nNewLots)
                                           +" > "+IntToStr(HT160_MAX_LOT)+")");
-                        }
-                        else if(nRetire>0 && HasICUnderMachine()==true)
-                        {
-                            HCACK = 4;                           // would retire live 2D data -> busy
-                            RecordProcess("SECS SET_LOT_INFO refused : KYEC batch change with IC still under the machine");
                         }
                     }
 
@@ -2239,47 +2293,31 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         // CLEAR_LOT_INFO host command) remains the ONLY thing that clears them.
                         // AddLot is already dedupe-keep-existing (CosFunction.cpp:978-994), so a
                         // re-sent lot id keeps its slot, its index and its per-bin counters.
+                        AnsiString sAccepted = "";
                         for(int j=0; j<nBuf; j++)
                         {
-                            //AI(secs-lot-additive) 20260730 : resolve "did this lot already exist"
-                            // BEFORE AddLot, otherwise AddLot has already created it and every lot
-                            // looks new.
-                            bool bExisted = (LotRegistry.FindLotIndex(bufCust[j])>=0);
-                            int iLotIdx = LotRegistry.AddLot(bufCust[j], HT160_LOT_SOURCE_SECS, "", "");
-                            if(iLotIdx<0)
+                            if(LotRegistry.AddLot(bufCust[j], HT160_LOT_SOURCE_SECS, "", "")<0)
                             {
                                 // Unreachable after the capacity check above; never fail silently.
                                 HCACK = 2;
                                 RecordProcess("SECS SET_LOT_INFO : AddLot rejected '"+bufCust[j]+"'");
                                 break;
                             }
-                            TLotRunInfo *pLot = LotRegistry.GetLot(iLotIdx);
-                            if(pLot==NULL)
-                                continue;
-
-                            AnsiString sNewKyec = bufKyec[j].Trim();
-                            AnsiString sOldKyec = pLot->sKyecLotID.Trim();
-                            //AI(secs-lot-additive) 20260730 : a CHANGED KYEC batch id under the same
-                            // customer lot means a different physical batch, so the previous batch's
-                            // 2D->Bin list must stop routing - additive merging would otherwise leave
-                            // codes that are absent from the new list still routable on their old bin.
-                            // Unchanged (or newly supplied) batch id = a refresh: keep the data.
-                            if(bExisted && sNewKyec!="" && sOldKyec!="" && sNewKyec!=sOldKyec)
-                            {
-                                int nDropped = LotRegistry.ClearLotItems(bufCust[j]);
-                                RecordProcess("SECS SET_LOT_INFO : lot "+bufCust[j]+" KYEC batch "
-                                              +sOldKyec+" -> "+sNewKyec+", retired "
-                                              +IntToStr(nDropped)+" 2D items");
-                            }
-                            //AI(secs-lot-additive) 20260730 : only OVERWRITE the stored KYEC batch id
-                            // when the host actually supplied one. It used to be assigned
-                            // unconditionally, so a legacy bare-ASCII re-send of an existing lot wiped
-                            // the batch identity and persisted "" into WorkOrder.json. Mirrors the JSON
-                            // parser, which also only writes the field when it is present.
-                            if(sNewKyec!="")
-                                pLot->sKyecLotID = sNewKyec;
+                            if(j>0)
+                                sAccepted = sAccepted + ",";
+                            sAccepted = sAccepted + bufCust[j];
                         }
+                        //AI(secs-setlotinfo-cpname) 20260820 : log WHAT was declared. The S2F42
+                        // one-liner only prints the resulting registry total, which read "Lots=1"
+                        // on 20260819 while the host believed it had declared two - so the packet
+                        // content has to be in the machine log in its own right.
+                        if(HCACK==0)
+                            RecordProcess("SECS SET_LOT_INFO : "+IntToStr(nBuf)+" lot(s) declared - "
+                                          +sAccepted);
                     }
+                    sRxDetail = "params=" + IntToStr(n) + " lots=" + IntToStr(nBuf);
+                    if(nIgnoredCp>0)
+                        sRxDetail = sRxDetail + " ignoredCP=" + IntToStr(nIgnoredCp);
                 }
             }
             else

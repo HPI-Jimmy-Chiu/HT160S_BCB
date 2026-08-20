@@ -370,6 +370,27 @@ sequenceDiagram
   可重複下達。<strong>批未開</strong>→執行整套開批初始化＋拉 2D/Bin；<strong>批已開</strong>→只拉 2D/Bin、不做任何初始化。
 - 新增 <strong><code>CLEAR_LOT_INFO</code></strong>（對齊 9045）＝ host 端結批，是唯一會退掉 lot 的命令。
 詳見 <code>HT160S_SECS_Interface_Spec_20260727.md</code> §3.4。</p>
+<p><strong>⚠ 2026-08-20 <code>SET_LOT_INFO</code> body 形狀變更（重要，本章下方 5 個 lot 的舊 log 是變更前的形狀）</strong>
+依客戶（京元 EAP）提供的正式格式改為 <strong>標準 CPNAME/CPVAL 名值對</strong>，與 HT9045 的
+<code>SET_LOT_INFO</code> 同一個慣例：
+<code>L[2]
+  A "SET_LOT_INFO"
+  L[1]                      &lt;- 參數個數（不是批數）
+    L[2]
+      A "LOTID"             &lt;- CPNAME
+      A "lot1,lot2"         &lt;- CPVAL：多個 lot 用「逗號」串接</code>
+- 內層 <code>L[n]</code> 數的是<strong>參數個數</strong>，<strong>不是 lot 數</strong>；一個 <code>LOTID</code> 參數即可宣告多個 lot。
+- 與回報方向對稱：<code>SVID 1006</code>（CEID 9001 report 8）本來就是「全部已登記 lot 的逗號串」。
+- <strong>退役</strong>：2026-07-21 我方自行提案、未經客戶確認的位置式配對
+  <code>L[2]{ A 客戶批, A 京元批 }</code>。它與真實封包<strong>撞形狀</strong>——2026-08-19 現場 host 送
+  <code>L[2]{"LOTID","NQ100CFAA1"}</code>，舊碼把它當 (客戶批, 京元批) 讀，於是登記出一個名字叫
+  <code>LOTID</code> 的 lot 還回 <code>HCACK=0</code>，兩邊都看不出異常。連帶退役的還有該配對專屬的
+  <code>HCACK=4</code>（換京元批號且機內有 IC）與「退掉舊 2D 明細」動作：確認後的模型下，宣告的
+  lot id 就是京元/OSAT 批（也就是打 WebAPI 用的 <code>OSATLot</code>），客戶批號改由 WebAPI 回應
+  逐顆帶（Soter col6），所以「同一 lot 換批號」在資料上已不存在。
+- <strong>整包沒有任何可辨識參數</strong>（例如只送 <code>DISPLAY</code>）→ 回 <strong><code>HCACK=2</code></strong> 並記 log，不再靜默回 0。
+- 相容保留：平鋪 <code>A "lotID"</code> 與 <code>L[1]{ A "lotID" }</code> 仍可用（我方模擬器的舊形狀），
+  兩者也一併做逗號切分，所以任何寫法行為一致。</p>
 </blockquote>
 <p><strong>格式／body 結構（SEMI E5）</strong>：</p>
 <p>S2F41 通用結構（<strong>RCMD</strong> = Remote Command，命令名稱；<strong>CPNAME/CPVAL</strong> = 參數名稱/值）：</p>
@@ -397,8 +418,8 @@ sequenceDiagram
 <tbody>
 <tr>
 <td><code>SET_LOT_INFO</code></td>
-<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code>，或 KYEC 雙批號配對 <code>L[2]{ A "SET_LOT_INFO", L[n]{ L[2]{ A custLot, A kyecLot } } }</code></td>
-<td>lot 清單。<strong>2026-07-30 起改為疊加（additive）</strong>：不再 Clear 既有 LotRegistry，同 lot id 留一筆（沿用原 slot 與計數）。同 lot 改帶不同 KYEC 批號時會退掉該 lot 舊的 2D 明細（機內有 IC 時回 <code>HCACK=4</code>）；登錄表會滿（64）時回 2</td>
+<td><strong>（2026-08-20 起，客戶正式格式）</strong> <code>L[2]{ A "SET_LOT_INFO", L[n]{ L[2]{ A "LOTID", A "lot1,lot2,..." } } }</code>；相容保留平鋪 <code>L[n]{ A lotID }</code> 與 <code>L[1]{ A lotID }</code></td>
+<td>lot 清單。內層 <code>L[n]</code> 是<strong>參數個數</strong>，多批號在 <code>LOTID</code> 的值內用逗號串接（所有寫法都會做逗號切分、trim、封包內去重）。<strong>2026-07-30 起疊加（additive）</strong>：不再 Clear 既有 LotRegistry，同 lot id 留一筆（沿用原 slot 與計數）。<code>HCACK=2</code> = 空 list／item 形狀或型別錯／<strong>整包沒有任何可辨識參數</strong>（例：只送 <code>DISPLAY</code>）／合併後超出容量 64。不認識的 CPNAME 會被<strong>忽略並記 log</strong>（不整包退，9045 的 <code>LOT_INFO</code>+<code>DISPLAY</code> 就是多參數），只要同包內有有效 <code>LOTID</code> 就照收。<strong>已退役</strong>：位置式 <code>L[2]{ A custLot, A kyecLot }</code> 與其專屬 <code>HCACK=4</code></td>
 </tr>
 <tr>
 <td><code>LOTSTART</code></td>
@@ -418,7 +439,7 @@ sequenceDiagram
 </tbody>
 </table>
 <blockquote>
-<p><code>SET_LOT_INFO</code> 由 <code>ht160s_presets._set_lot_info</code> 建構，預設 5 個 lot <code>SIMU_LOT_A..E</code>；<code>LOTSTART</code> 由 <code>_lot_start</code> 建構；<code>START</code> 由 <code>_start</code> 建構。</p>
+<p><code>SET_LOT_INFO</code> 由 <code>ht160s_presets._set_lot_info</code> 建構，預設 5 個 lot <code>SIMU_LOT_A..E</code>（2026-08-20 起送客戶形狀：5 個批號逗號串接在一個 <code>LOTID</code> 參數內；舊的平鋪形狀另存為 preset <code>S2F41 SET_LOT_INFO (flat)</code> 供回歸）；<code>LOTSTART</code> 由 <code>_lot_start</code> 建構；<code>START</code> 由 <code>_start</code> 建構。</p>
 </blockquote>
 <p><strong>實際 case log 節錄（設備端 Equipment）</strong>：</p>
 <pre><code>23:59:25.060  [SECS][RX] S2F41 decoded rc=1 items=22
@@ -454,20 +475,20 @@ sequenceDiagram
 <tr>
 <td>lot list 元素</td>
 <td>A（於 <code>L[n]</code> 內）</td>
-<td>每個 lot ID（SET_LOT_INFO / LOTSTART 攜帶；START 為 <code>L[0]</code> 不帶）</td>
+<td>本 run 的舊形狀：一個 item 一個 lot ID（仍相容）</td>
 <td><code>"SIMU_LOT_A"</code> … <code>"SIMU_LOT_E"</code>（共 5 筆）</td>
 </tr>
 <tr>
 <td><code>CPNAME</code></td>
 <td>A</td>
-<td>參數名稱（通用結構欄位；本 trio 以 lot ID 直填 <code>L[n]</code>）</td>
-<td>（SET_LOT_INFO/LOTSTART 不使用 CPNAME 形式）</td>
+<td>參數名稱。<strong>2026-08-20 起 <code>SET_LOT_INFO</code> 使用此形式</strong>，唯一有作用的名稱是 <code>LOTID</code>（比對時 trim + 不分大小寫）；其他名稱忽略並記 log</td>
+<td><code>"LOTID"</code></td>
 </tr>
 <tr>
 <td><code>CPVAL</code></td>
 <td>A</td>
-<td>參數值</td>
-<td>（同上）</td>
+<td>參數值。<code>LOTID</code> 的值 = <strong>逗號分隔的 lot 清單</strong>（單批就是一個 lot id，不需逗號）</td>
+<td><code>"NQ8002ZAA1,NQ80030AA1"</code></td>
 </tr>
 <tr>
 <td><code>W</code>-bit</td>
@@ -521,11 +542,66 @@ sequenceDiagram
 <tr>
 <td><code>Lots</code></td>
 <td>log 欄位</td>
-<td>此時 LotRegistry 內 lot 數</td>
+<td>此時 LotRegistry 內 lot 數（<strong>是登錄表總數，不是這包宣告了幾批</strong>——2026-08-19 現場就是被這個欄位誤導）</td>
 <td><code>5</code></td>
 </tr>
 </tbody>
 </table>
+<h4 id="321-2026-08-20-run">3.2.1 客戶形狀實測（2026-08-20，另一個 run）</h4>
+<p>上面的 case log 釘在 2026-06-26 的舊形狀。<strong>客戶正式格式（CPNAME/CPVAL）改完後</strong>於 2026-08-20
+以 HSMS 對真韌體實測（19 項斷言全過），逐字節錄如下——<strong>這是另一個 run，不要與上面的
+<code>SIMU_LOT_A..E</code> log 混讀</strong>：</p>
+<pre><code>11:15:04.957  [SECS][RX] S2F41 W=1 body:
+&lt;L[2]
+  &lt;A[12] &quot;SET_LOT_INFO&quot;&gt;
+  &lt;L[1]
+    &lt;L[2]
+      &lt;A[5] &quot;LOTID&quot;&gt;
+      &lt;A[5] &quot;PRB_A&quot;&gt;
+    &gt;
+  &gt;
+&gt;
+11:15:04.970  [SECS] S2F42 cmd=SET_LOT_INFO HCACK=0 Lots=1
+
+11:15:05.009  [SECS][RX] S2F41 W=1 body:
+&lt;L[2]
+  &lt;A[12] &quot;SET_LOT_INFO&quot;&gt;
+  &lt;L[1]
+    &lt;L[2]
+      &lt;A[5] &quot;LOTID&quot;&gt;
+      &lt;A[11] &quot;PRB_B,PRB_C&quot;&gt;      &lt;- 一個參數、兩個 lot
+    &gt;
+  &gt;
+&gt;
+11:15:05.014  [SECS] S2F42 cmd=SET_LOT_INFO HCACK=0 Lots=3
+
+11:15:05.087  [SECS][RX] S1F3  &lt;L[1] &lt;U4[1] 1006&gt;&gt;
+11:15:05.087  [SECS][TX] S1F4  &lt;L[1] &lt;A[17] &quot;PRB_A,PRB_B,PRB_C&quot;&gt;&gt;   &lt;- 回報方向同樣逗號串
+
+11:15:05.117  [SECS][RX] S2F41 W=1 body:
+&lt;L[2]
+  &lt;A[12] &quot;SET_LOT_INFO&quot;&gt;
+  &lt;L[1]
+    &lt;L[2]
+      &lt;A[7] &quot;DISPLAY&quot;&gt;          &lt;- 整包只有不認識的參數
+      &lt;A[9] &quot;SOMETHING&quot;&gt;
+    &gt;
+  &gt;
+&gt;
+11:15:05.123  [SECS] S2F42 cmd=SET_LOT_INFO HCACK=2 Lots=3            &lt;- 不再靜默回 0
+</code></pre>
+<p>同一時刻的機台 Process log（<code>EventLog\2026_08\HT160S_2026_08_20.csv</code>）：</p>
+<pre><code>11:15:04.957  SECS SET_LOT_INFO : 1 lot(s) declared - PRB_A
+11:15:05.009  SECS SET_LOT_INFO : 2 lot(s) declared - PRB_B,PRB_C
+11:15:05.117  SECS SET_LOT_INFO : CP 'DISPLAY' not modelled - ignored
+11:15:05.120  SECS SET_LOT_INFO refused : no lot declared (unknown CP 'DISPLAY') - expected L[2]{ A &quot;LOTID&quot;, A &quot;lot1,lot2&quot; }
+</code></pre>
+<blockquote>
+<p>同一個 run 也驗過：<code>LOTID</code> + 多餘的 <code>DISPLAY</code> 參數 → <code>HCACK=0</code> 且該 lot 照收；
+平鋪 <code>A "lotID"</code> → <code>HCACK=0</code>；平鋪值內含逗號 → 一樣切成兩批；
+空 <code>L[0]</code>、<code>LOTID</code> 值全為空白 → <code>HCACK=2</code>；封包內重複 lot id → 只登記一筆；
+重送已存在的 lot → <code>HCACK=0</code> 且不會多出 slot（疊加、keep-existing）。</p>
+</blockquote>
 <hr />
 <h3 id="33-s6f11-s6f12-ceid-dataid">3.3 生產事件上報（S6F11 / S6F12 + CEID + DataID）</h3>
 <p><strong>用途</strong>：生產過程中，設備會主動把物料移動等事件以 <strong>S6F11 Event Report</strong> 上報給 host；host 收到後以 <strong>S6F12</strong> 回 ACK。這是設備「告知 host 現在發生了什麼」的主要管道。</p>
@@ -1667,7 +1743,12 @@ sequenceDiagram
 <tr>
 <td><code>_set_lot_info</code></td>
 <td>SET_LOT_INFO</td>
-<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code></td>
+<td><code>L[2]{ A "SET_LOT_INFO", L[1]{ L[2]{ A "LOTID", A "lot1,lot2,..." } } }</code>（2026-08-20 起＝客戶正式格式）</td>
+</tr>
+<tr>
+<td><code>_set_lot_info_flat</code></td>
+<td>SET_LOT_INFO</td>
+<td><code>L[2]{ A "SET_LOT_INFO", L[n]{ A lotID } }</code>（舊平鋪形狀，preset <code>S2F41 SET_LOT_INFO (flat)</code>，回歸用）</td>
 </tr>
 <tr>
 <td><code>_lot_start</code></td>
