@@ -11,7 +11,7 @@
 #pragma hdrstop
 
 #include "uAgvStation.h"
-#include "cmydef.h"      //AI(ht160s-home-resume-w5) : fAllMotorHome for the HOME freeze gate
+#include "cmydef.h"      //AI(amr-nohang) 20260825 : was fAllMotorHome for the HOME freeze gate (that term is gone); kept for the shared globals
 #include "note.h"        //AI(ht160s-home-resume-w5) : RecordProcess
 //AI(ht160s-agv) 20260615 : Phase B sources - AMR car-full state + mode gates +
 // SECS transport to fire S6F11. All project-root headers (bare names resolve via
@@ -521,15 +521,26 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
     //to keep advancing the handshake : CEID273/274 fired off module state that
     //InitialAllTask was about to rebuild, and the PREP/READY watchdog aged through
     //the homing span (a slow HOME silently force-released a docked AMR's handshake).
-    //Freeze transitions AND aging while homing / not yet homed; nothing is cleared,
-    //and InitialAllTask's ReassertLocks() re-couples the module locks afterwards.
+    //Freeze transitions AND aging while homing; nothing is cleared, and InitialAllTask's
+    //ReassertLocks() re-couples the module locks afterwards.
+    //AI(amr-nohang) 20260825 : the fAllMotorHome==false term is REMOVED (owner ruling :
+    //the handshake must never be the thing that hangs). Run_Home is BOUNDED - a HOME ends -
+    //and is the actual window where InitialAllTask rebuilds module state on a different
+    //thread cadence, so it stays. fAllMotorHome==false is UNBOUNDED : a servo alarm
+    //(csystem.cpp:701 / :1319), EMG (:868), motor-power drop (:783 / :845) or a fresh
+    //program start (cmydef.cpp:32) clears it and ONLY a completed HOME restores it. On
+    //20260824 at KYEC that froze P1 for 27 minutes : the host re-sent START_AGV every 10s,
+    //got HCACK=0 every time, and CEID273 was never even attempted (SECSGEM_TextLog_16).
+    //Safe to drop : ServiceHandshake drives NO motor - it reads state, fires S6F11 and
+    //releases locks. A released lock only lets a production ladder run, and production is
+    //gated on SystemStart, which an un-homed machine has false anyway.
     {
         static bool s_bFreezeLogged=false;
-        if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+        if(HSys.Sys.RunMode==Run_Home)
         {
             if(s_bFreezeLogged==false)
             {
-                RecordProcess("AGV: handshake frozen for HOME (transitions + watchdog aging held)");   //AI(ht160s-obsv-p1)
+                RecordProcess("AGV: handshake frozen for Run_Home (transitions + watchdog aging held)");   //AI(ht160s-obsv-p1)
                 s_bFreezeLogged=true;
             }
             return;

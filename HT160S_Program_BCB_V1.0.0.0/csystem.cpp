@@ -141,7 +141,14 @@ static void ServiceAgvTimeoutAlarm()
 	//latched just before a HOME could pop WAR0962 (ShowNoteAlarm DecStopAllMotor +
 	//SystemStart=false) mid-homing and abort the just-armed sequence. Consume the latch only
 	//after HOME completes (the pending flag survives; it fires on the next non-HOME tick).
-	if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+	//AI(amr-nohang) 20260825 : fAllMotorHome==false REMOVED here too. It made the ESCAPE
+	//share the same unbounded freeze as the coordinator, so a station stuck behind a servo
+	//alarm / EMG / motor-power drop got no CEID273, no WAR0962 and no operator notice at
+	//all - silent, which also violates the standing 'never stop silently' rule. Run_Home is
+	//kept : that is the real hazard (WAR0962 does DecStopAllMotor + SystemStart=false and
+	//would abort a just-armed home sequence). Popping WAR0962 on an already-stopped un-homed
+	//machine is harmless - it is already stopped.
+	if(HSys.Sys.RunMode==Run_Home)
 		return;
 	//AI(amr-alarm-defer) 20260817 : DEFER the alarm, never DROP it. ShowNoteAlarm has an
 	//early return when a Note modal is already open (note.cpp, "ALARM DROPPED (modal busy)")
@@ -201,7 +208,10 @@ static void ServiceAgvLinkLostAlarm()
 {
 	if(GeneralSetting.bUseAMR==false)
 		return;
-	if(HSys.Sys.RunMode==Run_Home || fAllMotorHome==false)
+	//AI(amr-nohang) 20260825 : fAllMotorHome==false REMOVED, same reasoning as the WAR0962
+	//sweep above. This escape exists precisely for a lock held with no SECS link, so it must
+	//not depend on a flag only a completed HOME can restore.
+	if(HSys.Sys.RunMode==Run_Home)
 		return;
 	if(fNote!=NULL && fNote->fShow)
 		return;   //AI(amr-alarm-defer) : a modal is up - keep every latch, re-check next tick
