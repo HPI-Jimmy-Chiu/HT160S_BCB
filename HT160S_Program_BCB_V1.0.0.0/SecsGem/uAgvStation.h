@@ -48,6 +48,9 @@ struct TAgvStationDesc
     unsigned    SvidTrayCount; // draft section 6 (non-contiguous past Auto3)
     unsigned    SvidDeviceCnt; // ditto
     unsigned    SvidBinSet;    // ASCII bin setting (Auto only; 0 if none)
+    //AI(amr-lane-lotno) 20260831 : lot number this lane sorts FOR (Auto only; 0 = no SVID).
+    // Customer re-opened the private 66xxx band at 66040 for it - see the uHGemHT160 tombstone.
+    unsigned    SvidLotNo;     // 66040-66045 (Auto1-6); 0 on P1-P3
     const char *Name;          // "Loader"/"Empty"/"Color"/"AUTO1".."AUTO6"
 };
 
@@ -75,6 +78,11 @@ public:
     int        TrayCount[AGV_STATION_COUNT];     // (index P-1)
     int        DeviceCount[AGV_STATION_COUNT];   // (index P-1)
     AnsiString BinSetting[AGV_AUTO_COUNT];       // Auto1..6 (index AutoIndex)
+    //AI(amr-lane-lotno) 20260831 : 66040-66045, the lot number each Auto lane is sorting for.
+    // Same value the main screen shows in plLotNumberAuto1..6, read from the same source
+    // (LotBinBinding reverse lookup), NOT from the panel caption. Empty when the lane has no
+    // lot bound (smNormal routes by bin only). Refreshed every tick, ungated by bUseAMR.
+    AnsiString LotNumber[AGV_AUTO_COUNT];        // Auto1..6 (index AutoIndex)
 
     // --- per-station runtime handshake state (Phase B/C/D) ---
     unsigned char Handshake[AGV_STATION_COUNT];      // eAgvHandshake
@@ -130,6 +138,9 @@ public:
     // RefreshBinSettings() repopulates all six from the live routing config each tick.
     AnsiString DescribeAutoBins(int AutoIndex);
     void       RefreshBinSettings();
+    //AI(amr-lane-lotno) 20260831 : per-Auto lane lot number for SVID 66040-66045 (host S1F3).
+    AnsiString DescribeAutoLot(int AutoIndex);
+    void       RefreshLotNumbers();
 
     // AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state for
     // the State Record snapshot + the AMR maintenance panel (header + one line per

@@ -671,6 +671,12 @@ void HT160Gem::AddSV()
     HGemPtr->SetSVDataPointer(2762, HType.INT_4_TYPE, "Type 1 Tray Division X",       "",   &TrayForm.XDivision, "tray columns / X cell count (9045 SVID/ECID 2762)");
     HGemPtr->SetSVDataPointer(2763, HType.INT_4_TYPE, "Type 1 Tray Division Y",       "",   &TrayForm.YDivision, "tray rows / Y cell count (9045 SVID/ECID 2763)");
 
+    //AI(amr-lane-lotno) 20260831 : THE BAND IS RE-OPENED AT 66040 BY CUSTOMER INSTRUCTION.
+    // KYEC asked for the AMR unload flow to publish the lot number of each output lane in this
+    // private band, starting at 66040. So 66040-66045 are now AMR Auto1-6 Lot Number, registered
+    // in the AGV station loop below and backed by AgvCoord.LotNumber[]. This revives NOTHING in
+    // 66000-66039 : every id retired on 20260804 stays retired and must never be reused, exactly
+    // as the tombstone below says. Further private ids continue upward from 66046.
     //AI(secs-66xxx-retire) 20260804 : THE WHOLE HT160-ONLY 66000+ BAND IS RETIRED. TOMBSTONE - READ
     // BEFORE ADDING ANY SVID IN 66000-66039.
     // The band used to publish ten SVIDs that existed only on HT-160S. On 20260804 the customer
@@ -741,6 +747,17 @@ void HT160Gem::AddSV()
             AnsiString bName;
             bName.sprintf("AMR %s Bin Setting", d->Name);
             HGemPtr->SetSVDataPointer(d->SvidBinSet, HType.ASCII_TYPE, bName, "", &AgvCoord.BinSetting[d->AutoIndex], "AGV bin setting");
+        }
+        //AI(amr-lane-lotno) 20260831 : per-Auto lane lot number, SVID 66040-66045 (Auto only).
+        // QUERY-ONLY on purpose : it is bound here so host S1F3 answers it, but it is NOT added
+        // to report 6. Report 6 is already provisioned on the host for CEID 272/274, and widening
+        // its body would change what the EAP has to parse. If the customer later wants it pushed
+        // on the unload events, give it a NEW report id - do not grow report 6.
+        if(d->SvidLotNo != 0 && d->AutoIndex >= 0)
+        {
+            AnsiString lName;
+            lName.sprintf("AMR %s Lot Number", d->Name);
+            HGemPtr->SetSVDataPointer(d->SvidLotNo, HType.ASCII_TYPE, lName, "", &AgvCoord.LotNumber[d->AutoIndex], "AGV lane lot number");
         }
     }
 }
@@ -879,6 +896,10 @@ void HT160Gem::ServiceAgv()
     // for host S1F3. Config-derived + RunMode/link-independent, so it runs BEFORE the
     // RunMode-gated PollAndCall (a host reads bin setting at config time, machine idle).
     AgvCoord.RefreshBinSettings();
+    //AI(amr-lane-lotno) 20260831 : keep SVID 66040-66045 (per-Auto lane lot number) live for
+    // host S1F3. Ungated by bUseAMR on the customer ruling, so it is a separate call and NOT
+    // folded into RefreshBinSettings (that one returns early when AMR is off).
+    AgvCoord.RefreshLotNumbers();
     AgvCoord.PollAndCall(HGemPtr);
     AgvCoord.ServiceHandshake(HGemPtr);
 }

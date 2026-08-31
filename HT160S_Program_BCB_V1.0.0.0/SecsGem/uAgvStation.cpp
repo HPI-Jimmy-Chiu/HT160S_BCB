@@ -117,12 +117,12 @@ const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
     // are equally unwritten : those ARE family ids (uHGemHT9045_SV.cpp:843/:844/:849/:850) and
     // 810_B01 leaves them unwritten too (every write there is iAMRTrayCount/iAMRDeviceCount
     // [3]/[Pos+3]/[i+3] = Auto1-3 only). Keeping them registered-but-0 IS the aligned behavior.
-    /*P1*/ { 1, ASK_LOADER, -1, 38202, 38222, 38228,     0, "Loader" },
-    /*P2*/ { 2, ASK_EMPTY,  -1,     0, 38223, 38229,     0, "Empty"  },
-    /*P3*/ { 3, ASK_COLOR,  -1,     0, 38224, 38230,     0, "Color"  },
-    /*P4*/ { 4, ASK_AUTO,    0, 38205, 38225, 38231, 38234, "AUTO1"  },
-    /*P5*/ { 5, ASK_AUTO,    1, 38206, 38226, 38232, 38235, "AUTO2"  },
-    /*P6*/ { 6, ASK_AUTO,    2, 38207, 38227, 38233, 38236, "AUTO3"  },
+    /*P1*/ { 1, ASK_LOADER, -1, 38202, 38222, 38228,     0,     0, "Loader" },
+    /*P2*/ { 2, ASK_EMPTY,  -1,     0, 38223, 38229,     0,     0, "Empty"  },
+    /*P3*/ { 3, ASK_COLOR,  -1,     0, 38224, 38230,     0,     0, "Color"  },
+    /*P4*/ { 4, ASK_AUTO,    0, 38205, 38225, 38231, 38234, 66040, "AUTO1"  },
+    /*P5*/ { 5, ASK_AUTO,    1, 38206, 38226, 38232, 38235, 66041, "AUTO2"  },
+    /*P6*/ { 6, ASK_AUTO,    2, 38207, 38227, 38233, 38236, 66042, "AUTO3"  },
     //AI(secs-auto-align-899) 20260803 : the Auto4-6 CARRIER ID column is no longer invented.
     // Rule from the customer : Auto1-3 follow HT9046LS V3.32.810, Auto4-6 follow HT9011UC
     // V3.33.899. 810 numbers only three output-port tray ids (38205/38206/38207, and it declares
@@ -152,9 +152,9 @@ const TAgvStationDesc AgvStation[AGV_STATION_COUNT] =
     // just vacating it, so it must be called out to the host, not left to be discovered.
     // LESSON, worth keeping : inventing ids inside a band the family also grows into gets
     // overtaken. Re-run this check against every 9045 upgrade.
-    /*P7*/ { 7, ASK_AUTO,    3, 38199, 38246, 38240, 38243, "AUTO4"  },
-    /*P8*/ { 8, ASK_AUTO,    4, 38200, 38247, 38241, 38244, "AUTO5"  },
-    /*P9*/ { 9, ASK_AUTO,    5, 38201, 38248, 38242, 38245, "AUTO6"  }
+    /*P7*/ { 7, ASK_AUTO,    3, 38199, 38246, 38240, 38243, 66043, "AUTO4"  },
+    /*P8*/ { 8, ASK_AUTO,    4, 38200, 38247, 38241, 38244, 66044, "AUTO5"  },
+    /*P9*/ { 9, ASK_AUTO,    5, 38201, 38248, 38242, 38245, 66045, "AUTO6"  }
 };
 //---------------------------------------------------------------------------
 TAgvCoordinator::TAgvCoordinator()
@@ -193,7 +193,10 @@ void TAgvCoordinator::Reset()
         LinkLostPending[i]  = 0;
     }
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
+    {
         BinSetting[a] = "";
+        LotNumber[a]  = "";   //AI(amr-lane-lotno) 20260831
+    }
 }
 //---------------------------------------------------------------------------
 //AI(agv-linklost-hold) 20260819 : does this station still physically hold its module lock?
@@ -789,7 +792,8 @@ AnsiString TAgvCoordinator::DescribeAgvState()
         }
         AnsiString sBins = "";   //AI(ht160s-agv-binsetting) 20260713 : live SVID 38234-45 value per Auto
         if(AgvStation[i].Kind==ASK_AUTO && AgvStation[i].AutoIndex>=0)
-            sBins = " bins=[" + DescribeAutoBins(AgvStation[i].AutoIndex) + "]";
+            sBins = " bins=[" + DescribeAutoBins(AgvStation[i].AutoIndex) + "]"
+                  + " lot=[" + DescribeAutoLot(AgvStation[i].AutoIndex) + "]";   //AI(amr-lane-lotno) 20260831
         //AI(agv-linklost-hold) 20260819 : surface a lock that outlived the HSMS link so a
         //State Record post-mortem can tell "held across a link drop" from "handoff running".
         AnsiString sHold = "";
@@ -876,5 +880,46 @@ void TAgvCoordinator::RefreshBinSettings()
         return;
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
         BinSetting[a] = DescribeAutoBins(a);
+}
+//---------------------------------------------------------------------------
+// AI(amr-lane-lotno) 20260831 : the lot number THIS Auto lane is sorting for, published on
+// SVID 66040-66045 for the AMR unload flow (customer request 20260831 : "only the unload +
+// AMR flow needs it, one SVID per Auto1-6").
+// SOURCE : the SAME LotBinBinding reverse lookup the main screen uses to fill the unload-area
+// panels plLotNumberAuto1..6 (main.cpp ShowUnloadAutoInfo). Deliberately NOT the panel Caption -
+// binding SECS to a VCL control would make the host answer depend on the form being painted.
+// ONE LANE = ONE LOT (customer rule 20260831). The binding table already behaves that way : the
+// screen loop stops at the first binding pointing at this Auto, and so does this one.
+// smNormal has no per-lane lot binding at all (routing is by bin only), so it answers "" -
+// exactly what the panel shows in that mode. Read-only, no state change.
+AnsiString TAgvCoordinator::DescribeAutoLot(int AutoIndex)
+{
+    if(AutoIndex < 0 || AutoIndex >= AGV_AUTO_COUNT)
+        return "";
+    if(GeneralSetting.IsDynamicBindingMode() == false)
+        return "";
+
+    int n = LotBinBinding.GetBindingCount();
+    for(int i = 0; i < n; i++)
+    {
+        AnsiString LotID;
+        int Key;
+        int BoundAuto;
+        if(LotBinBinding.GetBindingByIndex(i, LotID, Key, BoundAuto) == false)
+            continue;
+        if(BoundAuto == AutoIndex)
+            return LotID;
+    }
+    return "";
+}
+//---------------------------------------------------------------------------
+// AI(amr-lane-lotno) 20260831 : repopulate all six lane lot numbers for host S1F3.
+// NOT gated on bUseAMR (customer ruling 20260831), unlike RefreshBinSettings just above :
+// this one must answer whether or not AMR is configured. Config-derived and read-only, so a
+// tick costs one binding-table walk per Auto and nothing else.
+void TAgvCoordinator::RefreshLotNumbers()
+{
+    for(int a = 0; a < AGV_AUTO_COUNT; a++)
+        LotNumber[a] = DescribeAutoLot(a);
 }
 //---------------------------------------------------------------------------
