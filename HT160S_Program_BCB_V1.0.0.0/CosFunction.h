@@ -393,11 +393,18 @@ private:
 	AnsiString MakeKey(AnsiString LotID, int Bin);
 	AnsiString GetIniFileName();
 	int  GetAutoStationCount();     // number of Auto stations (Auto1..Auto6)
-	int  GetErrorAutoIndex();       // 0-based Auto index of the Error Auto
 
 public:
 	__fastcall THT160LotBinBinding();
 	__fastcall ~THT160LotBinBinding();
+
+	//AI(auto-lane-label) 20260901 : moved private -> public. The Error / overflow Auto is
+	//never bound (ResolveAuto skips it) yet it physically collects scan-fail ICs and any
+	//overflow good product, so an operator-facing message about that lane has to be able to
+	//say WHICH lane it is instead of showing a blank lot. Read-only derived getter (it just
+	//maps BinAreaMap.GetErrorBinArea() to a 0-based Auto index), so publishing it adds no
+	//new state and no new way to mutate the table.
+	int  GetErrorAutoIndex();       // 0-based Auto index of the Error Auto
 
 	void Clear();
 	// Read-only lookup of an already-bound pair. Returns 0-based Auto index, or

@@ -167,6 +167,14 @@ public:
     //  a logical tray threshold (AMR_FULL_TRAY_SIM). Distinct from TMyCar::IsFull()
     //  (MAX_TRAY_PER_CAR book-keeping cap) on purpose.
     bool IsOutputCarFullForAmr(int Index);
+    //AI(cleanout-amr-collect) 20260901 : clean-out collect-call inputs. Kept as two small
+    //  accessors instead of widening IsOutputCarFullForAmr, whose GetTrayRequest caller uses
+    //  it to refuse trays (see the block comment on IsCleanOutCollectDueForAmr).
+    bool IsStationCleanOutFinish(int Index);  // THIS station's drain latch (not the module-wide one)
+    bool IsFrontHasTrayForAmr(int Index);     // SnAutoX_InputHasTray live read; false in simulation
+    //AI(auto-lane-label) 20260901 : operator-facing "which lot is this stack" label for the
+    //  Full alarm and the clean-out residual log. "" = nothing true to say, caller omits the field.
+    AnsiString DescribeLaneLotForOperator(int Index);
     void InitAutoCarStack(int Index);       // set tray[0]=identity, tray[1]=cover, rest=normal
     //AI(HT160S-Maintainer) 20260605 : AMR stack-order support.
     int GetNextTrayKindForAuto(int Index);          // eTrayKind needed next, -1 if car full

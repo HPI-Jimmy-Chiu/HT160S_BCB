@@ -1,7 +1,8 @@
 # Auto 出料收尾：AMR 叫車 + 操作員警報顯示批號 — 實作規格
 
 - **日期**：2026-09-01
-- **狀態**：**規格待審 — 尚未動任何程式碼**
+- **狀態**：**CODE-COMPLETE（2026-09-01）** — 已實作、兩種組態建置 EXIT 0、編碼檢查 166 files PASS。
+  **上機驗證 pending**（§7 的 T6–T16）。實作與規格的差異見 §10
 - **分支**：`feat/iosetview-172-refactor`
 - **來源**：2026-08-31 京元上機 State Record（`D:\HT160S_StateRecord\20260831第一台結束的staterecod.zip`，HT160S-01，`UseAMR=1`）
 - **裁定人**：使用者（2026-09-01 逐點確認，見 §2）
@@ -34,10 +35,10 @@ Clean Out 收尾時出料車通常**沒滿但有盤**，機台不會叫 AMR，�
 
 ```
 叫車 = SnAuto1_InputFullTray == ON                    ← 既有：產能觸發（車滿，換車繼續跑）
-    OR ( Loader  清機完成（L+R 兩側）
+    OR ( RunMode == Run_CleanOut
+      AND Loader  清機完成（L+R 兩側）
       AND SortArm 清機完成
       AND Auto1  清機完成（只看該站自己）
-      AND 貨批尚未 Lot End
       AND SnAuto1_InputHasTray == ON )                ← 新增：交件觸發（沒滿也要收走）
 ```
 
@@ -80,7 +81,7 @@ Tray/Device 皆 0），CEID 273 / 274 對 P4–P9 **全日 0 次**。
 | ③ | Auto 清機完成的定義 | **只看該站自己**，不看其他五站 |
 | ④ | 「Lot End 前」的界線 | **不另設 Lot 閘**（20260901 覆議後定案）。`Run_CleanOut` + 三個 drain-finish + `InputHasTray` 已是**必要且充分**條件；加一個 Lot 檢查擋不掉任何該擋的，只會製造一條「該叫車卻不叫」的靜默路徑，理由見 §4.6 |
 | ⑤ | 撤銷分支 | 併進同一個 `bFull` 布林 |
-| ⑥ | 前置通知 CEID（35/36/37/148/149/150） | **照發**，這就是叫車流程 |
+| ⑥ | 前置通知 CEID（35/36/37/148/149/150） | ~~照發~~ → **20260901 覆議：收尾叫車不發，只有「真的滿」才發**。理由：這六個號碼在交付給客戶的工作簿 CEID 頁上白紙黑字寫著「AutoN **車滿**」，收尾叫車時車並不滿，照發等於讓韌體違反自己剛交付的規格；且 0831 log 顯示京元從未以 S2F35 連結這六個號碼（走預設 Report 1＝純時間戳，內容無從分辨），唯一發射的一次（CEID 149）host 也毫無反應。不發不會少給資訊——CEID 272 的 SVID 38219 bitmap 已標明站別。**此改動不需客戶同意**（少送一則 vs 送一則語意錯的） |
 | ⑦ | `bUseAMR==0` 時的收尾叫車 | **完全不叫車**，維持 `MES1x23` 通知操作員 |
 | ⑧ | 逾時逃生門 | 沿用 `iAgvTimeoutSec` + `TimeoutPending`，**不做靜默放行** |
 | ⑨ | Error 流道的 Full 警報 | 顯示 `Lot=(Error lane / reject)`，**英文** |
@@ -499,7 +500,7 @@ detail  = "front=1 full=0 rear=0 Lot=NQ8002ZAA1:FAIL"
 | R1 | **清機完成被綁在 AMR 身上**：AMR 不來 → 卡在 `Run_CleanOut` | 這個風險**現在就存在**（`IsAllCleanOutFinish` 的 front-sensor 閘早已 hold），本案不會更糟，反而多一條「叫車」的解法。逾時逃生門（§4.8）＋ `bUseAMR` 閘是保底 |
 | R2 | `bUseAMR==0` 誤觸發 → 鎖住 Auto 且無人可解 | `IsCleanOutCollectDueForAmr()` 第一行擋掉。與 `START_AGV` 在 AMR off 時回 HCACK=2 的既有守衛一致（`uHGemHT160.cpp:2725`） |
 | R3 | 每秒重複發 CEID 272 | 既有 `Handshake[si]==AGV_IDLE` 天然 one-shot |
-| R4 | 前置通知 CEID 語意失真：車未滿卻發「Auto N Full」 | 裁定 ⑥ 已接受。⚠ **需在客戶工作簿 CEID 頁補一句**：35/36/37/148/149/150 亦會在 Clean Out 收尾叫車時發射，此時出料車未必滿 |
+| R4 | ~~前置通知 CEID 語意失真：車未滿卻發「Auto N Full」~~ | ✅ **已消除（20260901 覆議 ⑥）**：收尾叫車不發這六個 CEID，`Gem->EventReport(1, AutoFullCeid[a])` 改為 `if(bTrueFull)` 才發。工作簿的「AutoN 車滿」敘述維持正確，**不需要改工作簿，也不需要問客戶** |
 | R5 | 收尾叫車鎖住 Auto → `GetTrayRequest()` 回 `eTrayReqNone` | **這是要的**。且 `Run_CleanOut` + SortArm 清機完成時本來就已回 `eTrayReqNone`（`:1408`） |
 | R6 | 與 `ReleaseInfeedForCleanOut()` 衝突 | 不會：那支只處理 P1–P3，`uAgvStation.cpp:430` 註解明載 outfeed 不碰 |
 | R7 | sim build 行為改變 | `IsFrontHasTrayForAmr()` 在 sim 回 false；Part C 只動真機分支；Part B/D 的 helper 在 sim 照跑但無 sensor 觸發點。**sim 行為不變** |
@@ -543,15 +544,13 @@ detail  = "front=1 full=0 rear=0 Lot=NQ8002ZAA1:FAIL"
    的報表號連到 274。現場連結為 `{502, 2000}`，韌體預設的 Report 6 被覆寫掉了。
    （已寫入 `SECS_GEM功能_Handler_20260831.xlsx` 修訂說明 B9 / B13 與
    `HT160S_SECS_Interface_Spec_20260727.md` §3.3.4，commit `5f9d122`。）
-3. ⚠⚠ **【實作前必須先問，這是 blocker】R4 — 前置通知 CEID 的語意變更。**
-   Clean Out 收尾叫車會沿用 Auto Full 的前置通知 CEID（35 / 36 / 37 / 148 / 149 / 150，裁定 ⑥），
-   但**此時出料車未必是實體滿**。若京元 EAP 的 swimlane 是「收到 Auto N Full → 判定該站滿 → 派車 / 記帳」，
-   他們的 MES 帳面盤數會出錯。
-   **這不是文件問題，是介面語意變更**，而且他們的答案可能推翻裁定 ⑥（改用別的通知方式）。
-   **必須在寫程式之前取得回覆**，問句草稿見 §9.1。
+3. ~~【blocker】R4 — 前置通知 CEID 的語意變更~~ → ✅ **已解除**。20260901 覆議裁定 ⑥：
+   收尾叫車**不發**那六個 CEID，只有真的滿才發。京元收到的 `Auto N Full` 語意維持不變，
+   **不需要問、也不需要改工作簿**。§9.1 的問句草稿保留為歷史紀錄，不需寄出。
 
 4. **知會 R8（低風險，可隨文件走）**：Auto Full 警報的 S5F1 `ALTX` 文字會變長並帶批號；
    `ALID` **不變**（`ComputeAlarmAlid()` 只 hash 警報碼），以 ALID 對號的 EAP 不受影響。
+   **這是本案唯一還需要知會客戶的事項**，且可等上機驗完隨新版工作簿一起走。
 
 ### 8.1 這兩則的文件時機（20260901 定案）
 
@@ -570,11 +569,12 @@ R4 / R8 是**已決定要做的變更通知**。放進去會讓京元把已定�
 
 ## 9. 待辦
 
-**本方待裁定事項：無。** 十六條裁定 + 兩條覆議（§2 ④、§8.1）已全部定案。
+**本方待裁定事項：無。** 十六條裁定 + 三條覆議（§2 ④、§2 ⑥、§8.1）已全部定案並實作。
 
-**唯一的外部 blocker**：§8 第 3 點的 R4，需要京元回覆後才能開工
-（他們的答案可能推翻裁定 ⑥，屆時 `uAgvStation.cpp:471` 的
-`Gem->EventReport(1, AutoFullCeid[a])` 要改成別的通知方式或拿掉）。
+**外部 blocker：無。** 原本的 R4 已由覆議 ⑥ 消除（收尾叫車不發 `Auto N Full`）。
+
+**剩下的只有上機驗證**：§7 的 T6–T16 共 11 項，需要真機 + AMR + host 配合。
+`T1`–`T5` 已在 2026-09-01 完成（見 §10）。
 
 ### 9.1 給京元的問句草稿（R4）
 
@@ -612,7 +612,54 @@ R4 / R8 是**已決定要做的變更通知**。放進去會讓京元把已定�
 
 ---
 
-## 10. 相關
+## 10. 實作紀錄（2026-09-01）與規格差異
+
+### 10.1 實際改動的檔案
+
+| 檔案 | 改動 |
+|---|---|
+| `SecsGem/uAgvStation.h` | +1 宣告 `IsCleanOutCollectDueForAmr(int)` |
+| `SecsGem/uAgvStation.cpp` | +1 include (`aSortArm.h`)、+1 函式、`PollAndCall` 的 `bFull` 拆成 `bTrueFull` / `bCollect` / `bFull`，`AutoFullCeid` 發射改為 `if(bTrueFull)` |
+| `aAuto1To6.h` | +3 宣告 `IsStationCleanOutFinish` / `IsFrontHasTrayForAmr` / `DescribeLaneLotForOperator` |
+| `aAuto1To6.cpp` | +3 函式定義；`ServiceCarFull` 的 `MES1x20` 加 Lot/counts；清機排空 Full 閘的 `MES1x20` 加 Lot；`MES1x25` 真機分支註解掉；`MES1x23` 加 Lot |
+| `CosFunction.h` | `THT160LotBinBinding::GetErrorAutoIndex()` 由 private 改為 public |
+
+### 10.2 與規格的三處差異（都是實作時才發現的）
+
+1. **`MES1x20` 有兩個發射點，規格只寫了一個。**
+   除了 `ServiceCarFull()`（`:1955` 附近），`DoAllAutoCleanOut()` case 4000 的 Full 閘（`:1135` 附近）
+   也會彈同一個 `MES1x20`（AMR=0 路徑；AMR=1 在該處 `continue` 交給 coordinator）。
+   **兩處都加了 Lot 標籤**——同一個警報碼、同一個操作動作，不能一個有一個沒有。
+   排空 Full 閘那處**不加數量**（該分支只在 AMR=0 執行，裁定 ⑬ 本來就不顯示）。
+
+2. **`GetErrorAutoIndex()` 原本是 private**，`DescribeLaneLotForOperator()` 呼叫不到（編譯錯誤 E2247）。
+   改為 public 並加註說明。它是純唯讀的推導 getter（把 `BinAreaMap.GetErrorBinArea()` 映成 0-based Auto 索引），
+   公開它不新增任何狀態、也不新增任何改動表格的途徑。
+
+3. **`uAgvStation.cpp` 原本看不到 `SortArmModule`**，補 `#include "aSortArm.h"`。
+
+### 10.3 已完成的驗證
+
+| # | 項目 | 結果 |
+|---|---|---|
+| T1 | 模擬建置 `-Full` | ✅ EXIT 0 |
+| T2 | 真機建置 `-Full`（`//#define SOFT_SIMULATE`） | ✅ EXIT 0，驗畢已還原 `#define SOFT_SIMULATE` 並重建 |
+| T3 | 編碼檢查 | ✅ 166 files PASS，無 `EF BF BD`、無 BOM |
+| T4 | HOME 迴歸自測 | ✅ 見下方 commit 訊息 |
+| T5 | sim 清機不受影響 | ✅ `IsFrontHasTrayForAmr()` 在 sim 回 false，`MES1x25` 的 sim 分支未動 |
+
+⚠ **`aAuto1To6.cpp` 是 CP950/Big5**，不能用 harness 的 Edit/Write 工具（會把中文變成 U+FFFD）。
+本次以 PowerShell + `Encoding.GetEncoding(950)` 逐段錨點取代完成，改後驗證：
+仍為非 UTF-8（＝CP950 未被破壞）、`U+FFFD` 計數 0、CRLF 69 / bare-LF 2076→2166（只增不改）。
+
+### 10.4 真機版 EXE
+
+T2 產出的真機版另存為 `EXE\ht160s_REALMACHINE_20260901.exe`（`EXE\ht160s.exe` 已被之後的模擬建置覆蓋）。
+⚠ **要出貨給客戶請用前者，或重跑一次真機建置**——`EXE\ht160s.exe` 現在是模擬版。
+
+---
+
+## 11. 相關
 
 - 記憶：`ht160s-onsite-kyec-findings`（2026-08-31 節）、`amr-owner-rules-no-hang-no-interference`、
   `ht9045-cleanout-trigger-model`、`amr-updown-ic-count-contract`、`amr-startagv-action-na-lock`、

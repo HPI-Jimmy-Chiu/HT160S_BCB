@@ -22,6 +22,7 @@
 #include "aAuto1To6.h"        // AutoModule->GetAutoCar (TMyCar : iTrayCount/CarID/IsFull)
 //---------------------------------------------------------------------------
 #include "aLoader.h"          // LoaderModule (P1 infeed handoff)
+#include "aSortArm.h"         //AI(cleanout-amr-collect) 20260901 : SortArmModule->IsCleanOutFinish() in the clean-out collect gate
 #include "aEmpty.h"           // EmptyModule  (P2 infeed handoff)
 #include "aColor.h"           // ColorModule  (P3 infeed handoff)
 #include "uAmrInject.h"      // AI(ht160s-agv) 20260708 : AMR manual-inject test facility
@@ -376,6 +377,55 @@ void TAgvCoordinator::ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiStr
     Gem->EventReport(1, 275);      // CEID275 AGVLdID
 }
 //---------------------------------------------------------------------------
+//AI(cleanout-amr-collect) 20260901 : the SECOND reason to call the AMR to an Auto - the CLEAN-OUT
+// COLLECT. The first reason (IsOutputCarFullForAmr) is a THROUGHPUT trigger : the car filled up
+// mid-run, swap it and keep going. This one is a HANDOVER trigger : this lot is done, the
+// front-of-line modules are drained, and whatever is on the output car - full or not - must leave
+// before Lot End rather than cross into the next lot.
+//
+// ORDER MATTERS AND IS GUARANTEED : State[].bCleanOutFinish is latched at DoAllAutoCleanOut
+// case 7000, which runs AFTER the GoUp ladder (case 4000-6000) has stacked every working tray
+// into that Auto's output car. So by the time this returns true the trays are already ON the car;
+// we are asking for the car to be taken away, never for a mid-transfer pickup.
+//
+// WHY A SEPARATE FUNCTION AND NOT AN EXTRA TERM INSIDE IsOutputCarFullForAmr() : that predicate
+// has five callers and one of them (aAuto1To6.cpp GetTrayRequest) uses it to REFUSE new trays.
+// Widening it there would make an Auto stop asking for trays the moment it latched drain-done -
+// a different behaviour entirely, and one that would bite outside CleanOut too. Owner ruling.
+//
+// THE HOLD SIDE ALREADY EXISTED and is deliberately untouched : TAutoModule::IsAllCleanOutFinish
+// already returns false while SnAutoX_InputHasTray is ON, so CheckCleanOutFinish already parks the
+// machine in Run_CleanOut until the car leaves. What was missing was any code that ASKS for it to
+// leave : the only notice was the EventLog line from ServiceCleanOutResidualWatchdog, i.e. the
+// machine waited for an OPERATOR. On-site 2026-08-31 17:19:08 that is exactly what Auto6 did
+// (MES1623, front=1 full=0 - trays on the car, car not full, clean-out held, nobody called).
+//
+// NO "IS A LOT STILL OPEN" TEST, ON PURPOSE - DO NOT ADD ONE. It was specified and then removed
+// on review : Lot End is pressed about a minute after Clean Out starts (2026-08-31 : 17:18:16 ->
+// 17:19:16, 17:35:48 -> 17:36:39) while an AMR takes minutes to arrive, so a lot-open term would
+// go false mid-handshake, drop bFull, and let the release branch in PollAndCall hand the lock back
+// with the trays still on the car - switching the feature off in its most common case. Run_CleanOut
+// plus the three drain-finish terms plus InputHasTray are necessary and sufficient.
+//
+// NO SORT-MODE GATE either : a Normal-mode run finishes Clean Out with trays on the car just as a
+// By-Lot run does. Only the OPERATOR-FACING LOT LABEL is mode-limited, not the call.
+bool TAgvCoordinator::IsCleanOutCollectDueForAmr(int AutoIndex)
+{
+    if(GeneralSetting.bUseAMR==false)                          // AMR off -> operator handles it
+        return false;
+    if(AutoModule==NULL || LoaderModule==NULL || SortArmModule==NULL)
+        return false;
+    if(HSys.Sys.RunMode!=Run_CleanOut)                         // collect window = the CleanOut drain
+        return false;
+    if(LoaderModule->IsAllCleanOutFinish()==false)             // owner ruling : BOTH loader sides drained
+        return false;
+    if(SortArmModule->IsCleanOutFinish()==false)
+        return false;
+    if(AutoModule->IsStationCleanOutFinish(AutoIndex)==false)   // owner ruling : this station only
+        return false;
+    return AutoModule->IsFrontHasTrayForAmr(AutoIndex);
+}
+//---------------------------------------------------------------------------
 // Phase B/B-2 : raise AGVSupplement (CEID272). P4-P9 = AMR Auto output-car full
 // (IsOutputCarFullForAmr : real InputFullTray sensor / sim tray threshold); P1-P3 =
 // input shortage (SnLoader/Empty/Color_Input(e)nd, ON = needs refill, user-confirmed).
@@ -461,14 +511,30 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             CarrierID[si] = Car->CarID;
         }
 
-        bool bFull = AutoModule->IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
+        bool bTrueFull = AutoModule->IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
+        //AI(cleanout-amr-collect) 20260901 : SECOND reason to call the AMR - the CLEAN-OUT
+        // COLLECT. bTrueFull is a THROUGHPUT trigger (car filled mid-run, swap and keep going);
+        // this is a HANDOVER trigger (lot done, front-of-line drained, take whatever is on the
+        // car). ONE boolean below on purpose : the CALL branch and the release branch must read
+        // the same value, or a collect-call raised on one tick is revoked on the next.
+        bool bCollect = IsCleanOutCollectDueForAmr(a);
+        bool bFull = bTrueFull || bCollect;
         // AI(ht160s-agv) 20260627 : full car + station idle -> CALL the AGV to collect it.
         if(bFull && Handshake[si]==AGV_IDLE)
         {
             AutoModule->SetAmrLock(a, true);
             SupplementBitmap = BuildBitmap(AgvStation[si].PIndex);
             Gem->EventReport(1, 272);   // CEID272 AGVSupplement
-            Gem->EventReport(1, AutoFullCeid[a]);   // discrete Auto Full (two-stage pre-notification)
+            //AI(cleanout-amr-collect) 20260901 : the discrete "Auto N Full" pre-notification is
+            // emitted ONLY for a genuine full car. Owner ruling 20260901 : on a clean-out collect
+            // the car is NOT full, and CEID 35/36/37/148/149/150 are published to the customer as
+            // "AutoN car full" (customer workbook Handler_20260831, CEID sheet), so
+            // firing them here would make the firmware contradict its own delivered spec. The
+            // host loses nothing : CEID272 already carries the P1-P9 bitmap (SVID 38219) naming
+            // the station, and KYEC never linked these six ids with S2F35 (2026-08-31 logs) so
+            // they arrive with report 1 - a bare timestamp - and cannot be told apart by content.
+            if(bTrueFull)
+                Gem->EventReport(1, AutoFullCeid[a]);   // discrete Auto Full (two-stage pre-notification)
             Handshake[si] = AGV_CALLED;
         }
         else if(bFull==false && Handshake[si]==AGV_CALLED)

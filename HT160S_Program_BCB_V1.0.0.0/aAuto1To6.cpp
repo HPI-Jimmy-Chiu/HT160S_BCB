@@ -1129,6 +1129,12 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                             TMySensor *FullSensor=GetInputFullTray(Index);
                             AnsiString ErrorText;
                             ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
+                            //AI(auto-lane-label) 20260901 : same label as the ServiceCarFull modal - this
+                            //is the SAME alarm code (MES1x20) and the same operator action, so it must not
+                            //say less. AMR=0 only (the bUseAMR case returned above), hence no counts here.
+                            AnsiString sLotDrain=DescribeLaneLotForOperator(Index);
+                            if(sLotDrain!="")
+                                ErrorText=ErrorText+" | Lot="+sLotDrain;
                             do
                             {
                                 ShowMyError(AnsiString().sprintf("MES%d20", 11+Index), ErrorText, FullSensor, false, K_RETRY);
@@ -1312,6 +1318,12 @@ void TAutoModule::ServiceCleanOutResidualWatchdog()
             continue;
         AnsiString Where;
         Where.sprintf("front=%d full=%d rear=%d", bFrontOn?1:0, bFullOn?1:0, bRearOn?1:0);
+        //AI(auto-lane-label) 20260901 : with AMR off this line is the operator ONLY notice that a lane
+        //still holds trays after the drain, so name the lot the same way the Full alarm does. It goes
+        //in the detail column next to the sensor triple, so the message string itself stays greppable.
+        AnsiString sLotRes=DescribeLaneLotForOperator(Index);
+        if(sLotRes!="")
+            Where=Where+" Lot="+sLotRes;
         g_EventLog.Log(AnsiString().sprintf("MES%d23", 11+Index),
                        AnsiString().sprintf("Auto%d clean-out residual tray after drain - remove it", Index+1),
                        Where);
@@ -1568,6 +1580,61 @@ bool TAutoModule::IsOutputCarFullForAmr(int Index)
         return (Car[Index].iTrayCount >= GeneralSetting.iSimAmrMaxTray[3+Index]);
     TMySensor *FullSensor=GetInputFullTray(Index);
     return (FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(cleanout-amr-collect) 20260901 : per-station CleanOut drain latch, for the AMR collect-call
+//gate. Deliberately NOT IsAllCleanOutFinish() - that one is module-wide (all six stations) and
+//would make a station that finished early wait for the slowest. Owner ruling 20260901.
+//The latch is set at DoAllAutoCleanOut case 7000, i.e. AFTER the GoUp ladder has stacked every
+//working tray into this Auto output car, so "true" already means "the trays are on the car".
+bool TAutoModule::IsStationCleanOutFinish(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    return State[Index].bCleanOutFinish;
+}
+//---------------------------------------------------------------------------
+//AI(cleanout-amr-collect) 20260901 : "this Auto output stack still holds at least one tray" - the
+//SAME sensor IsAllCleanOutFinish() already blocks on, exposed so the AGV coordinator can turn that
+//block into a COLLECT CALL instead of a silent wait. Simulation returns false : a laptop run has no
+//AMR to answer the call, and the sim clean-out must still be able to complete.
+bool TAutoModule::IsFrontHasTrayForAmr(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    if(IsSoftSimulate())
+        return false;
+    TMySensor *Front=GetInputHasTray(Index);
+    return (Front!=NULL && Front->Enable==true && Front->IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(auto-lane-label) 20260901 : the operator-facing "which lot is this stack" label, shared by the
+//Full alarm (ServiceCarFull + the CleanOut drain Full gate) and the CleanOut residual log
+//(ServiceCleanOutResidualWatchdog). Returns "" when there is nothing TRUE to say - the caller then
+//omits the whole field rather than printing an empty one.
+//
+//THE MODE GATE MUST BE HERE, NOT INSIDE DescribeAutoBins(). That function does NOT return an empty
+//string in smNormal - it returns the lane STATIC BIN NUMBER ("3", "ERR", "3,ERR"). Printing that
+//behind a "Lot=" label would show a bin number as if it were a lot id, which is worse than showing
+//nothing. Owner ruling 20260901 : a lane lot is a By Lot+Bin / By Lot+PassFail concept only.
+//smNormal has no lane-level lot binding AT ALL (routing is by bin, several lots may legitimately
+//share a lane), so there is no honest answer to give there - not a missing one, an absent one.
+AnsiString TAutoModule::DescribeLaneLotForOperator(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return "";
+    if(GeneralSetting.IsDynamicBindingMode()==false)
+        return "";                                    // smNormal / WhiteList : no lane lot exists
+    AnsiString s=AgvCoord.DescribeAutoBins(Index);     // "LOT:PASS" / "LOT:FAIL" / "LOT:<bin>"
+    if(s!="")
+        return s;
+    //AI(auto-lane-label) 20260901 : the Error / overflow lane is NEVER bound - ResolveAuto skips it -
+    //yet it physically collects 2D-scan-fail ICs plus any overflow good product, so it CAN fill up
+    //and alarm. Left blank it reads as a missing value; say what it is instead. On-site 2026-08-31
+    //this lane was Auto1, and its SVID 66040 / 38234 were empty all day for exactly this reason.
+    if(Index==LotBinBinding.GetErrorAutoIndex())
+        return "(Error lane / reject)";
+    return "";                                        // bound to nothing yet : say nothing
 }
 //---------------------------------------------------------------------------
 void TAutoModule::SetPlaceResidueClear(int Index, bool bClear)
@@ -1882,6 +1949,20 @@ void TAutoModule::ServiceCarFull()
         {
             AnsiString ErrorText;
             ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
+            //AI(auto-lane-label) 20260901 : name the lot this stack belongs to, so a machine running
+            //several lots into several lanes can be cleared without guessing. Customer request via
+            //KYEC 2026-09-01. An empty label means the field is omitted entirely, never left blank.
+            AnsiString sLot=DescribeLaneLotForOperator(Index);
+            if(sLot!="")
+                ErrorText=ErrorText+" | Lot="+sLot;
+            //AI(auto-lane-label) 20260901 : the counts are AMR-mode-only ON PURPOSE. Car[].iTrayCount
+            //is only ever incremented inside the bUseAMR branch of DoDischargeTray, so in Normal mode
+            //it would print a permanent "trays=0". Owner ruling : show BOTH numbers or NEITHER - a
+            //half-true pair is worse for the operator than no numbers. (iAmrDeviceCount IS valid in
+            //both modes; it is suppressed together with the tray count for consistency, knowingly.)
+            if(GeneralSetting.bUseAMR)
+                ErrorText=ErrorText+AnsiString().sprintf("  trays=%d  ICs=%d",
+                                                        Car[Index].iTrayCount, iAmrDeviceCount[Index]);
             do
             {
                 ShowMyError(AnsiString().sprintf("MES%d20", 11+Index), ErrorText, FullSensor, false, K_RETRY);
@@ -1891,14 +1972,23 @@ void TAutoModule::ServiceCarFull()
             Car[Index].Clear();
             InitAutoCarStack(Index);
         }
-        else if(bLogicalFull)
-        {
-            AnsiString ErrorText;
-            ErrorText.sprintf("Auto%d output car full (%d trays) - change car then confirm", Index+1, MAX_TRAY_PER_CAR);
-            ShowMyError(AnsiString().sprintf("MES%d25", 11+Index), ErrorText, K_RETRY);
-            Car[Index].Clear();
-            InitAutoCarStack(Index);
-        }
+        //AI(cleanout-amr-collect) 20260901 : REAL-MACHINE LOGICAL-FULL BRANCH REMOVED.
+        // The iTrayCount >= MAX_TRAY_PER_CAR test is a SIMULATION SUBSTITUTE : a laptop run has no
+        // InputFullTray sensor, so the tray count stands in for it. That is what the IsSoftSimulate()
+        // branch above is, and it STAYS. Applying the same substitute to a real machine that HAS the
+        // sensor was never the intent - the sensor is the truth. Owner ruling 20260901 : real machine
+        // is sensor-only, and no EventLog line either.
+        // MES1125/1225/1325/1425/1525/1625 therefore no longer fire on a real machine; the catalogue
+        // rows in system\AlarmList.csv are LEFT IN PLACE (an entry that never fires is harmless,
+        // while deleting one changes the ALID set the host holds from S5F6).
+        // else if(bLogicalFull)
+        // {
+        //     AnsiString ErrorText;
+        //     ErrorText.sprintf("Auto%d output car full (%d trays) - change car then confirm", Index+1, MAX_TRAY_PER_CAR);
+        //     ShowMyError(AnsiString().sprintf("MES%d25", 11+Index), ErrorText, K_RETRY);
+        //     Car[Index].Clear();
+        //     InitAutoCarStack(Index);
+        // }
     }
 }
 //---------------------------------------------------------------------------

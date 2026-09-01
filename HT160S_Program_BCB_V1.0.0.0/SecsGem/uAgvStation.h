@@ -142,6 +142,13 @@ public:
     AnsiString DescribeAutoLot(int AutoIndex);
     void       RefreshLotNumbers();
 
+    //AI(cleanout-amr-collect) 20260901 : second AMR call reason - the CLEAN-OUT COLLECT.
+    // True when this Auto has finished its clean-out drain (every working tray already
+    // stacked into the output car) and the car still holds trays, so it must be taken away
+    // before the lot ends even though it never reached the Full sensor. OR-ed with the
+    // full-car trigger in PollAndCall; see the block comment on the definition.
+    bool IsCleanOutCollectDueForAmr(int AutoIndex);
+
     // AI(ht160s-agv) 20260625 : read-only multi-line dump of coordinator state for
     // the State Record snapshot + the AMR maintenance panel (header + one line per
     // P1..P9 : lock / handshake / live ready). No state change.
