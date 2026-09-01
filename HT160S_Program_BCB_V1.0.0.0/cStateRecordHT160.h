@@ -77,6 +77,14 @@ private:
     TDateTime    tRunGateRise;              // 0 = never rose this run
     TDateTime    tRunGateFall;              // 0 = never fell this run
     AnsiString   SaveRoot;                  // e.g. "D:\\HT160S_StateRecord\\"
+    //AI(staterecord-7zip) 20260901 : one WARNING per program run when 7-Zip is absent, so
+    //the EventLog says it on day one instead of the fact only surfacing as a folder full of
+    //uncompressed snapshots months later. Not a latch on the snapshot itself - the dump is
+    //still written, because an uncompressed snapshot is still evidence.
+    bool         bSevenZipWarned;
+    //AI(staterecord-retention) 20260901 : true once PurgeOldSnapshots has run this program
+    //start, so the boot sweep happens exactly once even if EnsureInited is re-entered.
+    bool         bPurgedThisRun;
 
     void       EnsureInited();
     void       PushSample(int ModuleIndex, int Task);
@@ -141,6 +149,17 @@ private:
     void       CaptureSoterOutput(AnsiString DstRootWithSlash);
     //AI(ht160s-obsv-p1) 20260720 : live consumer of the StuckMs computation (auto snapshot)
     void       CheckStuckWatchdog();
+    //AI(staterecord-retention) 20260901 : delete snapshots older than
+    //  GeneralSetting.iLogRetentionStateRecordDays from SaveRoot (0 = keep forever).
+    //  Removes BOTH the .zip and any leftover uncompressed folder (CompressFolder failure
+    //  keeps the folder on purpose, so those accumulate too). Runs once at init and again
+    //  after every snapshot, so a machine that never restarts still stays bounded.
+    void       PurgeOldSnapshots();
+    //AI(staterecord-retention) 20260901 : true only for a name that is EXACTLY the stamp
+    //  MakeStamp() produces ("YYYY-MM-DD HH_MM_SS"), with the date decoded from the NAME
+    //  (not the file time, which a copy or a restore rewrites). Anything an engineer
+    //  renamed or dropped into the folder by hand fails this test and is never deleted.
+    bool       ParseStampDate(AnsiString Name, TDateTime &Out);
 
 public:
     cStateRecordHT160();

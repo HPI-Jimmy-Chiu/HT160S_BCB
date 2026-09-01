@@ -74,6 +74,8 @@ cStateRecordHT160::cStateRecordHT160()
     bRunGateNow  = false;                 //AI(ht160s-obsv-p2) 20260806 : run-gate edge journal
     tRunGateRise = 0;
     tRunGateFall = 0;
+    bSevenZipWarned = false;              //AI(staterecord-7zip) 20260901
+    bPurgedThisRun  = false;              //AI(staterecord-retention) 20260901
     SaveRoot    = "D:\\HT160S_StateRecord\\";
 
     for(int i=0; i<SR_MAX_MODULE; i++)
@@ -220,6 +222,26 @@ void cStateRecordHT160::EnsureInited()
         PushSample(i, Motion->Actions[i]->Tag);
     }
     bInited = true;
+
+    //AI(staterecord-retention) 20260901 : boot sweep. Done here rather than in the ctor
+    //because the ctor runs before GeneralSetting has been loaded from General.ini, so
+    //iLogRetentionStateRecordDays would still be the compiled default at that point.
+    if(bPurgedThisRun==false)
+    {
+        bPurgedThisRun = true;
+        PurgeOldSnapshots();
+    }
+    //AI(staterecord-7zip) 20260901 : say it on day one. Without 7-Zip every snapshot fails
+    //to compress and CompressFolder deliberately KEEPS the uncompressed folder (evidence),
+    //so the folder silently fills with 3-10x larger trees and the customer only finds out
+    //when the disk is full. One line per program run, at init, not at the first failure.
+    if(bSevenZipWarned==false && Get7ZipPath()==AnsiString(""))
+    {
+        bSevenZipWarned = true;
+        RecordProcess(AnsiString("State Record WARNING: 7-Zip not found - snapshots will be left "
+                                 "UNCOMPRESSED as folders under ")+SaveRoot+
+                      " (install 7-Zip, or place 7z.exe next to the EXE)");
+    }
 }
 //---------------------------------------------------------------------------
 void cStateRecordHT160::SampleTasks()
@@ -403,6 +425,134 @@ bool cStateRecordHT160::DeleteFolderRecursive(AnsiString Dir)
         FindClose(Sr);
     }
     return RemoveDir(Dir) ? true : false;
+}
+//---------------------------------------------------------------------------
+//AI(staterecord-retention) 20260901 : decode the timestamp OUT OF THE NAME, and only for a
+//name that is EXACTLY what MakeStamp() writes : "YYYY-MM-DD HH_MM_SS" (19 chars).
+//Two reasons it is the name and not the file time : (a) copying a snapshot off the machine
+//and back, or restoring it, rewrites the file time and would make an old snapshot look
+//fresh - or a fresh one look old and get deleted; (b) matching the exact stamp shape is what
+//makes the purge SAFE. Anything else in that folder - an engineer's note, a renamed zip like
+//"20260831_first_machine.zip", a log someone dropped there - fails this test and is never
+//touched. The purge deletes only files this program itself created and still owns.
+bool cStateRecordHT160::ParseStampDate(AnsiString Name, TDateTime &Out)
+{
+    if(Name.Length()!=19)
+        return false;
+    const char *p = Name.c_str();
+    // positions of the 14 digits in "YYYY-MM-DD HH_MM_SS"
+    static const int DigitPos[14] = {0,1,2,3, 5,6, 8,9, 11,12, 14,15, 17,18};
+    for(int i=0; i<14; i++)
+    {
+        char c = p[DigitPos[i]];
+        if(c<'0' || c>'9')
+            return false;
+    }
+    if(p[4]!='-' || p[7]!='-' || p[10]!=' ' || p[13]!='_' || p[16]!='_')
+        return false;
+
+    int y  = StrToIntDef(Name.SubString( 1,4), 0);
+    int mo = StrToIntDef(Name.SubString( 6,2), 0);
+    int d  = StrToIntDef(Name.SubString( 9,2), 0);
+    int hh = StrToIntDef(Name.SubString(12,2), 0);
+    int mi = StrToIntDef(Name.SubString(15,2), 0);
+    int ss = StrToIntDef(Name.SubString(18,2), 0);
+    if(y<2000 || y>2200 || mo<1 || mo>12 || d<1 || d>31 || hh>23 || mi>59 || ss>59)
+        return false;
+
+    // EncodeDate throws on an impossible day (e.g. 02-31) - treat that as "not ours".
+    try
+    {
+        Out = EncodeDate((Word)y,(Word)mo,(Word)d) + EncodeTime((Word)hh,(Word)mi,(Word)ss,0);
+    }
+    catch(...)
+    {
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(staterecord-retention) 20260901 : SaveRoot had NO retention at all - nothing in this
+//codebase ever deleted a snapshot - and the tree only grows. On 2026-08-31 the two on-site
+//machines wrote 8 and 6 snapshots in ONE day (HomeResumeDone x5, StuckWatchdog x3 / x4 plus
+//two manual), and TriggerSnapshot re-copies the WHOLE day's SECS + Production + Soter +
+//EventLog every time, so same-day growth is quadratic in the snapshot count, not linear.
+//Add to that the leftover UNCOMPRESSED folders that CompressFolder deliberately keeps when
+//zipping fails, and a machine with no 7-Zip installed accumulates them from day one.
+//
+//Deletes BOTH forms (zip and folder) once older than GeneralSetting.iLogRetentionStateRecordDays;
+//0 = keep forever, the explicit opt-out. Names are collected FIRST and deleted afterwards :
+//deleting inside a FindFirst/FindNext walk is undefined on Win32.
+void cStateRecordHT160::PurgeOldSnapshots()
+{
+    int Days = GeneralSetting.iLogRetentionStateRecordDays;
+    if(Days<=0)
+        return;                                   // 0 = keep forever
+    if(DirectoryExists(SaveRoot)==false)
+        return;
+
+    TDateTime Cut = Now() - double(Days);
+    TStringList *DoomedZip = new TStringList();
+    TStringList *DoomedDir = new TStringList();
+    TSearchRec Sr;
+
+    try
+    {
+        if(FindFirst(SaveRoot + "*.*", faAnyFile, Sr)==0)
+        {
+            do
+            {
+                if(Sr.Name==AnsiString(".") || Sr.Name==AnsiString(".."))
+                    continue;
+                bool bDir = ((Sr.Attr & faDirectory)!=0);
+                AnsiString Base;
+                if(bDir)
+                    Base = Sr.Name;
+                else
+                {
+                    if(CompareText(ExtractFileExt(Sr.Name), AnsiString(".zip"))!=0)
+                        continue;                 // not a snapshot artifact at all
+                    Base = ChangeFileExt(Sr.Name, "");
+                }
+                TDateTime Stamped;
+                if(ParseStampDate(Base, Stamped)==false)
+                    continue;                     // hand-named -> never ours to delete
+                if(Stamped >= Cut)
+                    continue;                     // still inside the window
+                if(bDir)
+                    DoomedDir->Add(Sr.Name);
+                else
+                    DoomedZip->Add(Sr.Name);
+            }
+            while(FindNext(Sr)==0);
+            FindClose(Sr);
+        }
+
+        int nZip=0, nDir=0;
+        for(int i=0; i<DoomedZip->Count; i++)
+        {
+            if(DeleteFile(SaveRoot + DoomedZip->Strings[i]))
+                nZip++;
+        }
+        for(int i=0; i<DoomedDir->Count; i++)
+        {
+            // DeleteFolderRecursive appends "\\*.*" itself : pass WITHOUT a trailing slash.
+            if(DeleteFolderRecursive(SaveRoot + DoomedDir->Strings[i]))
+                nDir++;
+        }
+        if(nZip>0 || nDir>0)
+        {
+            RecordProcess(AnsiString("State Record retention: removed ")+IntToStr(nZip)+
+                          " zip(s) and "+IntToStr(nDir)+" leftover folder(s) older than "+
+                          IntToStr(Days)+" days from "+SaveRoot);
+        }
+    }
+    catch(...)
+    {
+        // Housekeeping must never take the machine down.
+    }
+    delete DoomedZip;
+    delete DoomedDir;
 }
 //---------------------------------------------------------------------------
 bool cStateRecordHT160::CompressFolder(AnsiString SrcDirWithSlash, AnsiString ZipPath)
@@ -1659,7 +1809,24 @@ bool cStateRecordHT160::TriggerSnapshot(AnsiString Reason)
         LastSnapshotZip = ZipPath;        //AI(general) 20260608 : remember zip path for Explorer /select
         DeleteFolderRecursive(TempDir);   // keep only the zip on success
     }
-    RecordProcess(AnsiString("SNAPSHOT ")+Reason+(bZipped?" ok ":" FAILED ")+ZipPath);   //AI(ht160s-obsv-p2) : 7z failure was swallowed
+    //AI(staterecord-7zip) 20260901 : say WHY it failed. "FAILED" alone could not distinguish
+    //"7-Zip is not installed on this PC" (every snapshot from now on will be a folder) from
+    //"this one zip failed" (disk full, >60 s timeout), and those need different actions.
+    AnsiString sWhy;
+    if(bZipped==false)
+    {
+        if(Get7ZipPath()==AnsiString(""))
+            sWhy = " (7-Zip not found - snapshot kept UNCOMPRESSED as a folder)";
+        else
+            sWhy = " (compress failed - snapshot kept UNCOMPRESSED as a folder)";
+    }
+    RecordProcess(AnsiString("SNAPSHOT ")+Reason+(bZipped?" ok ":" FAILED ")+ZipPath+sWhy);   //AI(ht160s-obsv-p2) : 7z failure was swallowed
+
+    //AI(staterecord-retention) 20260901 : purge AFTER writing, not before - a machine that
+    //runs for weeks without a restart would otherwise never sweep (the boot sweep in
+    //EnsureInited only fires once). Cheap : one directory listing of a folder that this
+    //very policy keeps small.
+    PurgeOldSnapshots();
 
     return bZipped;
 }

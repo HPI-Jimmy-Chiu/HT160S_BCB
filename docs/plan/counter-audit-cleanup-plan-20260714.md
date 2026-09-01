@@ -120,6 +120,26 @@
 - SECS_GEM text/err log：`...\SecsGem\uHGemEquipment.cpp:1211`（SECS file-log 開時）。
 - 建議：各自套 `PruneFolderTree` 或改走 `cCsvDailyLog`。
 
+**⚠ 本次稽核漏抓的一項（20260901 補登，已修）**
+- **State Record 快照本體**：`D:\HT160S_StateRecord\*.zip`。本節當時只登記了 `_ldj_trace.txt`（見 3e），
+  **沒有登記 zip 本身**，而那才是量級最大的一項：`TriggerSnapshot()` 完全沒有 retention / 去重 / 上限，
+  且每顆快照都重新複製「當天全部」的 SECS + Production + Soter + EventLog，**同一天內是二次成長**。
+  20260831 現場實測：第一台一天 8 顆、第二台 6 顆（`HomeResumeDone`×5 / `StuckWatchdog`×3 等）。
+  另有 `CompressFolder` 失敗時刻意保留的**未壓縮資料夾**——客戶機沒裝 7-Zip 就從第一天開始累積。
+- **已修（20260901）**：新增 `[LogRetention] StateRecordDays`（預設 90，0=永久保留），
+  `cStateRecordHT160::PurgeOldSnapshots()` 同時清 zip 與殘留資料夾；
+  只刪符合 `YYYY-MM-DD HH_MM_SS` 戳記的檔名（工程師手動改名的檔案永不觸碰）。
+  **刻意避開 3d 的缺陷**：開機掃一次之外，**每次快照後再掃一次**，所以永不重開機的機台也會清。
+  同時補上 7-Zip 缺失的開機警告與失敗原因（見下方 3f）。
+
+### 3f. 7-Zip 缺失沒有任何提示（20260901 補登，已修）
+- `CompressFolder` 找不到 7z.exe 就直接回 false，而 `TriggerSnapshot` **只在成功時刪暫存資料夾**，
+  所以沒裝 7-Zip 的機台每顆快照都留一個未壓縮資料夾（比 zip 大 3–10 倍），且 EventLog 只寫 `FAILED` 不說原因。
+- **已修（20260901）**：`EnsureInited` 開機檢查一次並寫一行 WARNING；
+  `SNAPSHOT ... FAILED` 現在會分辨「7-Zip 未安裝」與「這一次壓縮失敗（磁碟滿 / 逾時）」。
+- **仍未修**：`CompressFolder` 的 `WaitForSingleObject(..., 60000)` 逾時後**不會 `TerminateProcess`**，
+  會留下孤兒 7z 行程。已知，未處理。
+
 ### 3d. cCsvDailyLog 家族 prune 僅開機時跑
 - EventLog/UPHLog/PadLog/… 有 90/180/365 天保留，但 prune 在**啟動時**執行 → 永不重開機的機台不會清。
 - 建議：改成 day-rollover（或 Lot End）也觸發 prune。

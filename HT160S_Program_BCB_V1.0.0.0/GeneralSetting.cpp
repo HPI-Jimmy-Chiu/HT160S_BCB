@@ -152,6 +152,7 @@ void THT160GeneralSetting::SetDefault()
 	iLogRetentionDiscardedDays=90; // LotStory Discarded work-order backups, keep 90d
 	iLogRetentionUPHLogDays=180;   // UPHLog per-lot folders, keep ~6 months
 	iLogRetentionProdDailyDays=365; // Production_Log Daily aggregate : keep ~1 year (per-lot files permanent)
+	iLogRetentionStateRecordDays=90; // State Record snapshots : high volume (each re-copies the whole day's logs), keep 90d
 	iUphMinSampleIC=0;             // 0 = auto (one full tray); hide UPH below this IC count
 	// Defaults mirror old-160: Empty=E, Loader=L, Auto1..6=1..6, Color=C.
 	{
@@ -290,6 +291,7 @@ void THT160GeneralSetting::Load()
 	iLogRetentionDiscardedDays=Ini->ReadInteger("LogRetention", "DiscardedDays", 90);
 	iLogRetentionUPHLogDays=Ini->ReadInteger("LogRetention", "UPHLogDays", 180);
 	iLogRetentionProdDailyDays=Ini->ReadInteger("LogRetention", "ProdDailyDays", 365);
+	iLogRetentionStateRecordDays=Ini->ReadInteger("LogRetention", "StateRecordDays", 90);
 	iUphMinSampleIC=Ini->ReadInteger("UPH", "MinSampleIC", 0);
 	for(int i=0;i<9;i++)
 	{
@@ -383,6 +385,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("LogRetention", "DiscardedDays", iLogRetentionDiscardedDays);
 	Ini->WriteInteger("LogRetention", "UPHLogDays", iLogRetentionUPHLogDays);
 	Ini->WriteInteger("LogRetention", "ProdDailyDays", iLogRetentionProdDailyDays);
+	Ini->WriteInteger("LogRetention", "StateRecordDays", iLogRetentionStateRecordDays);
 	Ini->WriteInteger("UPH", "MinSampleIC", iUphMinSampleIC);
 	for(int i=0;i<9;i++)
 	{

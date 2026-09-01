@@ -322,6 +322,15 @@ public:
 	//AI(ht160s-uph) 20260706 : per-tray/lot UPH logs under UPHLog (month buckets).
 	int iLogRetentionUPHLogDays;    // UPHLog per-lot folders
 	int iLogRetentionProdDailyDays; // Production_Log Daily aggregate (per-day prod CSV)
+	//AI(staterecord-retention) 20260901 : State Record snapshots under SaveRoot
+	// (D:\HT160S_StateRecord by default). This tree had NO retention at all - nothing in
+	// the codebase ever deleted a snapshot - while 2026-08-31 on-site produced 8 and 6
+	// zips in ONE day on the two machines (HomeResumeDone x5 + StuckWatchdog x3 / x4 + 2
+	// manual), and every snapshot re-copies the WHOLE day's SECS + Production + Soter logs,
+	// so same-day growth is quadratic in the snapshot count. 0 = keep forever (opt out).
+	// Only files matching the machine's own "YYYY-MM-DD HH_MM_SS" stamp are ever removed,
+	// so anything an engineer renamed or dropped into that folder by hand is never touched.
+	int iLogRetentionStateRecordDays; // State Record snapshot zips + leftover folders
 
 	// AI(ht160s-uph) 20260709 : min-sample warm-up guard for the on-screen + SECS UPH.
 	// Early in a lot the elapsed window is tiny, so TotalIC*3600/sec spikes to a huge
