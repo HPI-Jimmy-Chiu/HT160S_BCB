@@ -78,7 +78,7 @@ Tray/Device 皆 0），CEID 273 / 274 對 P4–P9 **全日 0 次**。
 | ① | 是否寫進 `IsOutputCarFullForAmr()` | **不可**。另開新函式，`IsOutputCarFullForAmr()` 一個字不動 |
 | ② | Loader 清機完成的定義 | **L+R 兩側都排空** ＝ `LoaderModule->IsAllCleanOutFinish()` |
 | ③ | Auto 清機完成的定義 | **只看該站自己**，不看其他五站 |
-| ④ | 「Lot End 前」的界線 | 以 `CheckCleanOutFinish()` 為框；外框接受「只要 Lot 還開著就算」 |
+| ④ | 「Lot End 前」的界線 | **不另設 Lot 閘**（20260901 覆議後定案）。`Run_CleanOut` + 三個 drain-finish + `InputHasTray` 已是**必要且充分**條件；加一個 Lot 檢查擋不掉任何該擋的，只會製造一條「該叫車卻不叫」的靜默路徑，理由見 §4.6 |
 | ⑤ | 撤銷分支 | 併進同一個 `bFull` 布林 |
 | ⑥ | 前置通知 CEID（35/36/37/148/149/150） | **照發**，這就是叫車流程 |
 | ⑦ | `bUseAMR==0` 時的收尾叫車 | **完全不叫車**，維持 `MES1x23` 通知操作員 |
@@ -381,8 +381,9 @@ bool TAgvCoordinator::IsCleanOutCollectDueForAmr(int AutoIndex)
         return false;
     if(HSys.Sys.RunMode!=Run_CleanOut)                           // collect window = the CleanOut drain
         return false;
-    if(IsLotOpenForCollect()==false)                             // "before Lot End"
-        return false;
+    //AI(cleanout-amr-collect) 20260901 : THERE IS DELIBERATELY NO "is a lot still open" TEST HERE.
+    // It was specified, then removed on review, and it must not be added back - see the block
+    // comment below this function for the on-site evidence.
     if(LoaderModule->IsAllCleanOutFinish()==false)               // owner ruling : BOTH sides drained
         return false;
     if(SortArmModule->IsCleanOutFinish()==false)
@@ -393,19 +394,43 @@ bool TAgvCoordinator::IsCleanOutCollectDueForAmr(int AutoIndex)
 }
 ```
 
-檔頭 static 區新增：
+### 4.6.1 ⚠ 為什麼沒有「Lot 還開著」的檢查 —— 不要把它加回來
 
-```cpp
-//AI(cleanout-amr-collect) 20260901 : "the lot has not ended yet". CleanOut runs INSIDE an open lot
-// (Lot End is a separate operator/host action afterwards), so this is the outer boundary of the
-// collect window - owner ruling 20260901.
-static bool IsLotOpenForCollect()
-{
-    if(LotRegistry.GetLotCount() > 0)
-        return true;
-    return (fMain!=NULL && fMain->ActiveLotID().Trim()!="");
-}
+規格初稿有一個 `IsLotOpenForCollect()`（`LotRegistry.GetLotCount()>0`，退回
+`fMain->ActiveLotID()`），對應「在 Lot End 前」這句需求。**覆議後刪除**，理由三條：
+
+**(1) 兩個方向的失敗代價不對稱。**
+誤判「Lot 還開著」（其實沒開）→ 車上有盤就叫 AMR 來收 —— 清機本來就要清乾淨，這個行為是對的，無害。
+誤判「Lot 已結束」（其實開著）→ **不叫車 → 清機 hold → 等人**，正是本案要修的洞。
+一邊無害、一邊讓功能失效，那這個閘的存在就只是多開一條靜默失敗的路。
+
+**(2) 它在現場的常態操作順序下會把自己關掉。** 2026-08-31 EventLog：
+
 ```
+17:18:16.782  AUTO CleanOut: Loader source dry ...
+17:19:16.653  LOT END pressed                      ← 60 秒後
+17:35:48.872  AUTO CleanOut: Loader source dry ...
+17:36:39.782  LOT END pressed                      ← 51 秒後
+```
+
+**Lot End 是在 Clean Out 之後約 1 分鐘按下的**，而 AMR 從叫車到把車拉走要幾分鐘。所以真實序列是：
+
+```
+CleanOut → 收尾叫車(CEID 272) → 操作員按 Lot End(約 1 分鐘後) → LotRegistry 清空
+        → IsLotOpenForCollect() 變 false → bFull 變 false
+        → :474 釋放分支把 AMR 鎖放掉、Handshake 退回 IDLE
+        → 車還在、盤還在，但機台再也不叫車 → 清機永遠 hold
+```
+
+**這個閘會在最常見的操作順序下失效**，比它想防的問題嚴重得多。
+
+**(3) `fMain->ActiveLotID()` fallback 還違反本 codebase 自己的規則。**
+它會退回讀主畫面 `edLotNo`（TEdit 即時文字）。`DescribeAutoLot()` 的註解就明文禁止這種綁法：
+*"Deliberately NOT the panel Caption - binding SECS to a VCL control would make the host answer
+depend on the form being painted."* 把機構控制條件綁在操作員隨時可打字的輸入框上是雙重錯誤。
+
+**替代的語意保險**：若日後仍想要「不要跨批」的保證，用 `IsAllCleanOutFinish()` 本身即可 ——
+它已經是清機的真實邊界，而且它 hold 住的時候本來就代表這批還沒結束。**不需要另外查批號。**
 
 ### 4.7 Part A — 唯一修改的既有行（`uAgvStation.cpp:464`）
 
@@ -518,17 +543,72 @@ detail  = "front=1 full=0 rear=0 Lot=NQ8002ZAA1:FAIL"
    的報表號連到 274。現場連結為 `{502, 2000}`，韌體預設的 Report 6 被覆寫掉了。
    （已寫入 `SECS_GEM功能_Handler_20260831.xlsx` 修訂說明 B9 / B13 與
    `HT160S_SECS_Interface_Spec_20260727.md` §3.3.4，commit `5f9d122`。）
-3. **知會 R8**：Auto Full 警報的 S5F1 `ALTX` 文字會變長並帶批號；`ALID` 不變。
-4. **知會 R4**：Auto Full 的前置通知 CEID（35/36/37/148/149/150）之後也會在 Clean Out 收尾叫車時發射，
-   此時出料車未必是實體滿。
+3. ⚠⚠ **【實作前必須先問，這是 blocker】R4 — 前置通知 CEID 的語意變更。**
+   Clean Out 收尾叫車會沿用 Auto Full 的前置通知 CEID（35 / 36 / 37 / 148 / 149 / 150，裁定 ⑥），
+   但**此時出料車未必是實體滿**。若京元 EAP 的 swimlane 是「收到 Auto N Full → 判定該站滿 → 派車 / 記帳」，
+   他們的 MES 帳面盤數會出錯。
+   **這不是文件問題，是介面語意變更**，而且他們的答案可能推翻裁定 ⑥（改用別的通知方式）。
+   **必須在寫程式之前取得回覆**，問句草稿見 §9.1。
+
+4. **知會 R8（低風險，可隨文件走）**：Auto Full 警報的 S5F1 `ALTX` 文字會變長並帶批號；
+   `ALID` **不變**（`ComputeAlarmAlid()` 只 hash 警報碼），以 ALID 對號的 EAP 不受影響。
+
+### 8.1 這兩則的文件時機（20260901 定案）
+
+**現在不寫進工作簿。** `SECS_GEM功能_Handler_20260831.xlsx` 的修訂說明第一頁自己釘著
+「依據韌體 Firmware：HT-160S 1.0.0.0 ... **commit 7f7b391**」——工作簿是**釘在某個 firmware commit 上的快照**，
+寫入還沒實作的行為，就是 2026-09-01 剛花兩個 commit 修掉的那個病（文件與程式碼不同步）。
+
+**也不放「尚待貴端確認 Open items」頁。** 那一頁放的是「需要京元回答我們才能往下走」的事；
+R4 / R8 是**已決定要做的變更通知**。放進去會讓京元把已定案的行為讀成「還沒定案」，製造認知空窗。
+
+**正確時機與位置**：Part A–D 實作完成並上機驗過（T6 / T11 / T17）之後，出新版工作簿時
+寫進**「本次修訂內容 Changes」**（A7–A12 區）。在那之前，這兩則的正式落腳處就是本節，
+跟著 commit 走不會遺失。
 
 ---
 
-## 9. 待裁定（實作前需回覆）
+## 9. 待辦
 
-1. §4.6 的「Lot 還開著」是否要嚴格化為只看 `LotRegistry.GetLotCount()>0`？
-   （現行寫法有 `fMain->ActiveLotID()` fallback，會在「操作員在批號欄打了字但沒開批」時回非空。）
-2. R4 / R8 的兩則客戶知會，要不要我一併寫進工作簿的「尚待貴端確認」頁？
+**本方待裁定事項：無。** 十六條裁定 + 兩條覆議（§2 ④、§8.1）已全部定案。
+
+**唯一的外部 blocker**：§8 第 3 點的 R4，需要京元回覆後才能開工
+（他們的答案可能推翻裁定 ⑥，屆時 `uAgvStation.cpp:471` 的
+`Gem->EventReport(1, AutoFullCeid[a])` 要改成別的通知方式或拿掉）。
+
+### 9.1 給京元的問句草稿（R4）
+
+> **中文**
+> 關於 HT-160S 的 AMR 下料流程，我們即將新增一項行為，需要先確認貴端 EAP 是否可接受。
+>
+> 目前機台只在**出料車實體滿**（`SnAutoX_InputFullTray` 感測器 ON）時才發 `CEID 272 AMR Supplement` 叫車。
+> 新增後，在 **Clean Out 收尾階段**（Loader 兩側、SortArm、該 Auto 都已排空，但該 Auto 出料車上還有盤）
+> 也會叫車，**此時出料車未必是實體滿**——目的是讓成品盤在 Lot End 前被收走，不跨批留在機上。
+>
+> 這個新的叫車會沿用既有的前置通知 CEID：Auto1–3 = **35 / 36 / 37**，Auto4–6 = **148 / 149 / 150**
+> （即 `Auto N Full`）。
+>
+> **請確認**：貴端 EAP 若以這六個 CEID 判定「該站出料車已滿」或用於盤數記帳，
+> 收到「車未滿」的這一則是否會造成問題？若不可接受，我們可以改為：
+> (a) 收尾叫車不發這六個 CEID，只發 `CEID 272`；或
+> (b) 由貴端指定另一個 CEID 號碼專用於收尾叫車。
+>
+> **English**
+> We are adding one behaviour to the HT-160S AMR unload flow and need your confirmation first.
+>
+> Today the equipment raises `CEID 272 AMR Supplement` only when an output car is **physically full**
+> (`SnAutoX_InputFullTray` sensor ON). We will additionally raise it during **Clean Out**, once the
+> Loader (both sides), the SortArm and that Auto have all drained but the Auto's output car still
+> holds trays — **the car is not necessarily full at that moment**. The intent is that finished trays
+> leave the machine before Lot End instead of carrying over into the next lot.
+>
+> This new call reuses the existing pre-notification CEIDs: Auto1-3 = **35 / 36 / 37**,
+> Auto4-6 = **148 / 149 / 150** (`Auto N Full`).
+>
+> **Please confirm**: if your EAP uses those six CEIDs to decide "this output car is full", or for
+> tray accounting, would receiving one for a not-full car cause a problem? If it is not acceptable
+> we can either (a) omit those six CEIDs on the clean-out collect call and send only `CEID 272`,
+> or (b) use a different CEID that you nominate for this case.
 
 ---
 
