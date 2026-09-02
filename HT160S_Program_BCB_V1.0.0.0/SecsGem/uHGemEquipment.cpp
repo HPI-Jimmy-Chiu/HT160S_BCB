@@ -2263,6 +2263,17 @@ void THGem::DropConnection(AnsiString Reason)
 //---------------------------------------------------------------------------
 void THGem::OnPeerConnected(TCustomWinSocket *Socket)
 {
+    //AI(secs-halfopen) 20260902 : a new inbound accept can silently REPLACE a half-open
+    //  socket - the old peer died without a FIN/RST ever reaching us, so the OS never
+    //  raised OnDisconnect.  Without this tear-down the stale ActiveSocket pointer is
+    //  simply overwritten below, OnPeerDisconnected() never runs, and therefore
+    //  GemLogic->OnCommunicationLost() never releases the latched host state : the
+    //  PP_SIGNALTOWER / PP_MUSIC panel override and the AMR station lock stay orphaned
+    //  (see that hook's own note in OnPeerDisconnected below).  Until now the Linktest
+    //  T6 watchdog hid this by always dropping first - 211 drops on 2026-09-02 alone -
+    //  so raising T6 to a sane value exposes it.  Guard it here instead.
+    if(ActiveSocket != NULL && ActiveSocket != Socket)
+        OnPeerDisconnected();
     ActiveSocket = Socket;
     iHsmsState   = HSMS_STATE_CONNECTED;
     iReconnectCountdown = iReconnectInterval;   //AI(ht160s-secsgem) 20260611 : arm for next drop
