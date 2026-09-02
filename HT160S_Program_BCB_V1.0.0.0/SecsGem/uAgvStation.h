@@ -70,8 +70,14 @@ public:
     // CarrierID[1] (SVID 38203 Empty Carrier ID) is never written either.
     //AI(secs-identity2d-38202) 20260805 : CarrierID[2] (SVID 38204 Color Carrier ID) joined that
     // list today - the identity tray's 2D moved to CarrierID[0] / SVID 38202 to match HT9045, so
-    // nothing writes index 2 any more. Full list of registered-but-never-maintained AMR SVIDs:
-    // 38203 / 38204 / 38223 / 38224 / 38229 / 38230.
+    // nothing writes index 2 any more.
+    //AI(secs-align-810b01) 20260902 : DeviceCount[0] (SVID 38228 AMR Loader Device Count) joined
+    // that list. It briefly had a writer - the host's START_AGV LoaderICCount CP was parked there
+    // and latched forever, which put a permanent constant on the wire (KYEC 2026-09-02 : 38228 read
+    // 10 all day). 810_B01 never writes its own index 0 either, so the aligned behaviour is no
+    // writer at all. See the LOADERICCOUNT branch in uHGemHT160 START_AGV.
+    // Full list of registered-but-never-maintained AMR SVIDs:
+    // 38203 / 38204 / 38223 / 38224 / 38228 / 38229 / 38230.
     // HT9045/KYEC drive Empty/Color purely by sensor+TrayArm with zero SECS, and
     // HT160 has no stack-depth counting hardware (only a present/empty InputEnd
     // sensor). [3..8]=Auto are refreshed live from TMyCar. See uHGemHT160 START_AGV.

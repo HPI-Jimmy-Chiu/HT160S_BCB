@@ -2766,13 +2766,30 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
                         //AI(secs-kyec-startagv) 20260728 : LoaderICCount is a REAL KYEC CP, not an
                         // unknown one - the field host sends it on every START_AGV upload packet
                         // (KYEC log 2026-06-08 SECSGEM_TextLog_15.txt:544). It used to fall through
-                        // to BeginPrep -> HCACK=2 and the whole handoff was refused. Park it in the
-                        // P1 Loader device slot (SVID 38228 AMR Loader Device Count), which had no
-                        // writer at all and always reported 0. Latched, not consume-once: unlike
-                        // TrayCount[0] (consumed by EnqueueTrip, uAgvStation.cpp:85) nothing acts on
-                        // it, it is purely the host-declared incoming IC count for read-back.
+                        // to BeginPrep -> HCACK=2 and the whole handoff was refused. It is now
+                        // RECOGNISED AND IGNORED : named here so it never reaches the unknown-CP
+                        // branch, but it writes NO SVID.
+                        //AI(secs-align-810b01) 20260902 : IT USED TO BE PARKED IN DeviceCount[0]
+                        // (SVID 38228 AMR Loader Device Count) and LATCHED there forever - nothing
+                        // ever cleared it - so ONE host-declared value became a permanent constant
+                        // on the wire. On site 2026-09-02 that is exactly what happened : 38228 read
+                        // 10 on all 33 AMR events of the day, long after that car was gone, and the
+                        // host had no way to tell a live count from a stale one.
+                        // Owner ruling 20260902 : align with the authority instead of inventing a
+                        // writer. HT9046LS V3.32.810_B01 registers 38228 against
+                        // TestIF_File.iAMRDeviceCount[0] (SECSGEM/uHGemHT9045_SV.cpp:848) and NEVER
+                        // writes index 0 - every write in that tree is [3] / [Pos+3] / [i+3], i.e.
+                        // Auto1-6 only (aoutarm.cpp:2995, asendic_Auto.cpp:1687, csystem.cpp:7906,
+                        // :9649). That tree has no LoaderICCount CP at all. So 38228 is a
+                        // registered-but-never-maintained SVID there, and now here too - it joins
+                        // 38203 / 38204 / 38223 / 38224 / 38229 / 38230 on that list (uAgvStation.h).
+                        // NOTHING IS LOST : the declared value is still recorded in sRxDetail above,
+                        // so the S2F41 log still shows what the host sent. Only the bogus read-back
+                        // is gone. HCACK stays 0 - accepting-and-ignoring is what 810_B01 does.
                         else if(cpN=="LOADERICCOUNT")
-                            AgvCoord.DeviceCount[0] = StrToIntDef(cpVal, 0);
+                        {
+                            // accepted + logged in sRxDetail; deliberately published on no SVID
+                        }
                         //AI(secs-align-810b01) 20260817 : an unknown CP name is now a LOGGED NO-OP that
                         // leaves HCACK at 0 - 9045 parity, per the standing rule that HT9046LS
                         // V3.32.810_B01 is the single alignment authority. That tree's START_AGV handler
