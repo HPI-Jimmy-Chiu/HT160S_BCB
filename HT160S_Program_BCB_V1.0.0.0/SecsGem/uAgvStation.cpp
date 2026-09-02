@@ -557,6 +557,40 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
     for(int p = 0; p < 3; p++)
     {
         bool bShort = InfeedShortage(p) || AmrInject.InputShort(p);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
+        //AI(amr-loader-nocall) 20260902 : THE LOADER (P1) NO LONGER CALLS THE AMR by default.
+        // Owner ruling 20260902 : on this machine a dry Loader source is an END-OF-LOT signal,
+        // not a refill request. aLoader's source-dry path already enters Clean Out on its own
+        // once iAmrFeedWaitSec elapses (aLoader.cpp DoFeedTray case 9000), so asking for a car
+        // and then draining anyway just put a CEID 272 on the wire that nobody was meant to act
+        // on. On 2026-09-02 five of the seven CEID 272s of the day were this P1 call.
+        //
+        // WHAT THIS DOES NOT BREAK, all verified before the change :
+        //  - The iAmrFeedWaitSec window KEEPS its meaning. If the host pushes START_AGV("Loader")
+        //    on its own schedule inside that window, BeginPrep -> InfeedSetLock(0,true) sets
+        //    bAmrLocked, and aLoader's auto-CleanOut branch is vetoed by its bAmrLocked==false
+        //    guard, so the refill still wins over Clean Out exactly as before. aLoader is UNCHANGED.
+        //  - A host-initiated handoff still completes : BeginPrep() does NOT require AGV_CALLED,
+        //    so PREP -> 273 -> 274 -> InfeedRefill -> EnqueueTrip(TrayCount[0]) all still run and
+        //    the TripQueue accounting is untouched.
+        //  - The P1 watchdog below only ages PREP/READY, and only BeginPrep can create those.
+        //  - P2 Empty / P3 Color are deliberately NOT affected : they keep calling.
+        //
+        // CONSEQUENCE THE HOST MUST BE TOLD : the EAP will never again see CEID 272 with P1:1,
+        // so Loader refill scheduling belongs to the EAP. And once Clean Out has started,
+        // BeginPrep refuses an infeed START_AGV (see the Run_CleanOut guard there), so a refill
+        // must wait for the drain to finish and RunMode to return to Normal.
+        //
+        // [AGV] LoaderCallsAmr=1 restores the pre-20260902 behaviour without a rebuild.
+        if(p==0 && GeneralSetting.bLoaderCallsAmr==false)
+        {
+            ShortageLatch[p] = bShort ? 1 : 0;   // keep the FeederDecision snapshot truthful
+            //A CALLED left over from LoaderCallsAmr=1 (config flipped mid-run) has no answer
+            //coming. Drop it so DescribeAgvState never shows a handshake nobody was told about.
+            //PREP/READY are NOT touched : those mean a host-initiated handoff is in flight.
+            if(Handshake[p]==AGV_CALLED)
+                Handshake[p] = AGV_IDLE;
+            continue;
+        }
         if(bShort && Handshake[p]==AGV_IDLE)
         {
             SupplementBitmap = BuildBitmap(AgvStation[p].PIndex);

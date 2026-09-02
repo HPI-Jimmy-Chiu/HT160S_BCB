@@ -279,6 +279,15 @@ public:
 	int iAmrFeedWaitSec;   //AI(ht160s-agv) 20260626 : seconds to wait for AMR magazine refill before Loader-empty alarm (HT9046 600s)
 	int iAmrHandshakeWaitSec;   //AI(ht160s-agv) coordinator PREP/READY watchdog aging limit (seconds) before releasing the AMR lock
 	int iAgvTimeoutSec;   //AI(amr-unmanned W1) 20260721 : unified AGV handshake timeout (seconds) -> WAR0962; serves Normal full-collect wait, CleanOut collect wait, Empty/Color supply wait (was iCleanOutAmrWaitSec, never consumed)
+	//AI(amr-loader-nocall) 20260902 : does the LOADER (P1) proactively CALL the AMR when its
+	// source runs dry? Owner ruling 20260902 : DEFAULT FALSE. A dry Loader source is this
+	// machine's end-of-lot signal, not a refill request - the aLoader source-dry path enters
+	// Clean Out on its own once iAmrFeedWaitSec elapses. With this false the coordinator emits
+	// no CEID 272 for P1 and takes no handshake state; a HOST-INITIATED START_AGV("Loader")
+	// still works (BeginPrep does not require CALLED), so refill scheduling moves to the EAP.
+	// Set [AGV] LoaderCallsAmr=1 to restore the pre-20260902 behaviour without a rebuild.
+	// Empty (P2) / Color (P3) are NOT affected - they keep calling.
+	bool bLoaderCallsAmr;
 	// Machine identity (status-bar panels 1-3). Persisted in General.ini
 	// [MachineIdentity]. sMachineModel defaults "HT160S". These are the HT160
 	// source of truth; UpdateMachineIdentity() copies them into the cmydef
