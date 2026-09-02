@@ -2417,7 +2417,7 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             else
             {
                 RecordProcess("SECS CLEAR_LOT_INFO : lot end by host");
-                fMain->DoLotEndProcess();
+                fMain->DoLotEndProcess("by host (SECS CLEAR_LOT_INFO)");   //AI(lotend-log-source) 20260902
                 HCACK = 0;
             }
         }

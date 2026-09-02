@@ -533,7 +533,14 @@ public:		// User declarations
     void __fastcall SaveWorkOrderLotStartTime(AnsiString sWhen);
     AnsiString __fastcall LoadWorkOrderLotStartTime();
     void __fastcall ClearWorkOrderMeta();
-    void __fastcall DoLotEndProcess();   //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body (btnLotEnd + CleanOut-finish auto path)
+    //AI(ht160s-overcount-tripqueue D3) 20260721 : shared Lot-End body.
+    //AI(lotend-log-source) 20260902 : pSource NAMES THE CALLER in the EventLog. THREE paths reach
+    // this body - the operator button, the CleanOut-finish auto path (csystem), and the host's
+    // SECS CLEAR_LOT_INFO - and until today all three logged the identical "LOT END pressed",
+    // so a log reader could not tell an operator action from the machine ending the lot itself.
+    // That cost a wrong root-cause reading of the 2026-09-02 KYEC run. Default keeps the button's
+    // string byte-identical so existing log greps still match.
+    void __fastcall DoLotEndProcess(const char *pSource="pressed");
     void __fastcall EmitCleanOutOK();    //AI(ht160s-overcount-tripqueue D3) 20260721 : S6F11 CEID42 CleanOutFinish (self-gates on HSMS SELECTED); called from csystem CleanOut-finish before Lot End
     void __fastcall RefreshEventLogView();
     void __fastcall RefreshModuleStatusGrid();   //AI(ht160s-status) 20260703 : Module Status diagnostic sheet pump (throttled; called from DoSystemMessage)

@@ -3257,14 +3257,19 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     DoLotEndProcess();
 }
 //---------------------------------------------------------------------------
-void __fastcall TfMain::DoLotEndProcess()
+void __fastcall TfMain::DoLotEndProcess(const char *pSource)
 {
+    //AI(lotend-log-source) 20260902 : say WHICH of the three callers ended the lot. The line is
+    // now emitted OUTSIDE the SystemStart guard on purpose : the host path (SECS CLEAR_LOT_INFO)
+    // is only accepted while SystemStart is false, so inside the guard it produced NO line at all,
+    // and a CleanOut finish after a stop was equally silent. Log-only change; the SystemStart
+    // clear below keeps its original condition, so control flow is unchanged.
+    if(pSource==NULL)
+        pSource="pressed";
+    RecordProcess(AnsiString("LOT END ")+pSource);
     //AI(HT160S-Maintainer) 20260604 : P1 stop the sort run (HT172 LotEnd analog).
     if(HSys.Sys.SystemStart==true)
-    {
-        RecordProcess("LOT END pressed");
         HSys.Sys.SystemStart=false;
-    }
     SoftStop=true;
     MachineRun.bRunning=false;
 

@@ -1925,7 +1925,7 @@ void ProcessMotion()
 				//the output cars hold the sorted product for operator/AMR removal exactly as a manual
 				//Lot End leaves them today). Non-AMR keeps the existing modal path below (D6).
 				HSys.Sys.bCleanOut=false;
-				if(fMain!=NULL) fMain->DoLotEndProcess();
+				if(fMain!=NULL) fMain->DoLotEndProcess("auto (CleanOut finish)");   //AI(lotend-log-source) 20260902 : nobody pressed anything on this path
 				InitialAllTask();
 			}
 			else
