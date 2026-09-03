@@ -578,7 +578,15 @@ def check_prose(paths):
                 txt = io.open(p, encoding="utf-8").read()
             except (IOError, UnicodeDecodeError):
                 continue
+            infence = False
             for k, line in enumerate(txt.splitlines(), 1):
+                # verbatim log excerpts inside ``` fences are evidence, not claims :
+                # a 2026-06-26 capture legitimately shows the pre-cutover ALID values.
+                if line.lstrip().startswith("```"):
+                    infence = not infence
+                    continue
+                if infence:
+                    continue
                 for needle, what in RETIRED_PROSE:
                     if re.search(needle, line):
                         hits.append("%s:%d asserts %s"

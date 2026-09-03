@@ -778,18 +778,20 @@ W-bit=1。
 | SET | `0x80` = `128`（bit7） | 警報成立 |
 | CLEAR | `0x00` = `0` | 警報解除 |
 
-**ALID 推導**：本機的 ALID 是以 alarm-code **字串** 做 31-poly rolling hash 算出的 U4（`alid = alid*31u + (unsigned char)byte`，`UsecegemMainFrom.cpp:150-152`）。此演算法 stateless／deterministic（同一字串永遠算出同一 ALID）；真正人類可讀的代碼承載於 **ALTX** 欄位。已驗證（python 重算 byte-for-byte 相符）：
+**ALID 推導（⚠ 自 2026-09-03 韌體 `6377aff` 起改版）**：ALID 為**固定 9 碼的號段式編碼**，`ALID = 號段 Class × 100,000,000 + 號段內碼 Payload`（`UsecegemMainFrom.cpp` `ComputeAlarmAlid()`）：號段 1=JAM / 2=WAR / 3=MES（Payload = 前綴後的數字尾，例 `MES1421` → `300001421`）；4=汽缸 4xxxx / 5=馬達 5xxxx / 6=吸嘴 6xxxx / 7=7xxxx / 8=8xxxx（Payload = 完整 5 碼代碼，例 `40000` → `400040000`）；9 = 尚未登錄成警報碼的自由字串（**不在 S5F6/S5F8 目錄內**，Payload 由字串導出；host 請讀 ALTX 的 leading token）；0 永不發送。本機值域 100,000,913 ～ 999,752,848，全部小於 2,147,483,647，host 可用有號 32 位元整數存放。解碼：`Class = ALID / 1e8`、`Payload = ALID % 1e8`，class 1/2/3 補零至 4 位（Payload < 10000）或 5 位，class 4～8 補零至 5 位。完整 486 筆對照（含 Class / Payload 欄）見客戶工作簿 `SECS_GEM功能_Handler_20260903.xlsx` 的「ALID」工作表。
 
-| ALTX（alarm code 字串） | ALID（U4） |
-|---|---|
-| `"Loader Tray Empty"` | `4045923824` |
-| `"SnFKCleanOut"` | `3891410149` |
+> ⚠ **本 run（2026-06-26）為舊版韌體**：當時 ALID 是 alarm-code 字串的 hash 值（8 或 10 碼），下方 log 中的 `4045923824` / `3891410149` 即該舊值，逐字保留、不改寫。同兩支警報在現行韌體的 ALID 如下（`Loader Tray Empty` 之後已登錄為代碼 `MES0920`）：
 
-> **ALTX 的內容範圍（重要）**：實際 handler（`UsecegemMainFrom.cpp:154-156`）在 **沒有附加 Message 時** 設 `altx = Code`（即純 alarm code 字串），在 **有 Message 時** 設 `altx = Code + ' ' + Message`（即 code、一個空白、再接人類可讀訊息）。換言之，**ALTX 不保證恆等於 alarm code**——可能是 `code` 或 `code + 空白 + message`。本 run 觀察到的 ALTX 皆為純 alarm code（`"Loader Tray Empty"`／`"SnFKCleanOut"`，無附加 Message）。
+| 警報（本 run 的 ALTX） | 本 run ALID（舊版 hash） | 現行 ALID（2026-09-03 起） | 備註 |
+|---|---|---|---|
+| `"Loader Tray Empty"` | `4045923824` | `300000920` | 已登錄為 `MES0920`，號段 3；現行 ALTX = `"MES0920 Loader Tray Empty"` |
+| `"SnFKCleanOut"` | `3891410149` | `991410149` | 自由字串，號段 9，不在目錄；ALTX = `"SnFKCleanOut SnFKCleanOut"` |
+
+> **ALTX 的內容範圍（重要）**：實際 handler（`UsecegemMainFrom.cpp` `AlarmReport()`）在 **沒有附加 Message 時** 設 `altx = Code`（即純 alarm code 字串），在 **有 Message 時** 設 `altx = Code + ' ' + Message`（即 code、一個空白、再接人類可讀訊息）。換言之，**ALTX 不保證恆等於 alarm code**——可能是 `code` 或 `code + 空白 + message`。本 run 觀察到的 ALTX 皆為純 alarm code（`"Loader Tray Empty"`／`"SnFKCleanOut"`，無附加 Message）。
 >
 > **整合建議**：host 端若要以 ALTX 辨識警報，請 **以開頭的 code token（第一個空白前的字串）作為比對鍵**，而非整段 ALTX 字串，以免日後附加 Message 時比對失敗。
 
-> **為什麼 ALID 用字串 hash、而不是固定編號？host 該以什麼為準？** 因為 ALID 由字串確定性地算出，可避免維護一張人工編號表；但這也代表 **ALID 本身對 host 不直觀**。整合時建議 host 端 **以 ALTX 的 leading code token 作為警報的辨識依據**（ALID 用於去重／配對 SET↔CLEAR 即可），因為 code token 才是人類可讀、語意明確的代碼。
+> **host 該以什麼為準？（2026-09-03 更新）** 現行 ALID 可直接反解回警報碼（號段 1～8），host 端建議 **以 ALID 對工作簿「ALID」表查表、或直接依上式解碼**；只有號段 9（未登錄的自由字串警報）不在目錄內，該類請 **以 ALTX 的 leading code token 辨識**。舊版「ALID 為字串 hash、對 host 不直觀」的取捨自本版起不再適用。
 >
 > **S5F5/F6 + S5F7/F8 警報目錄查詢（2026-07-15 更新，commit `4ae0cce`）**：`AddAlarmList()`／`S5F6_ListAlarmData()` 過去為空 stub、只回空 `L,0`。現已改為從 `mapAlarmCodeList`（同一份 alarm SSOT，也餵 AlarmList.csv 與 S5F1）**即時輸出完整警報目錄**：
 >
@@ -810,6 +812,8 @@ W-bit=1。
 00:01:11.861  [SECS][TX] S5F1 Alarm ALID=3891410149 ALCD=0     (CLEAR "SnFKCleanOut")
 ```
 
+> ⚠ 上列 ALID 為 2026-06-26 舊版韌體的 hash 值。現行韌體同兩支警報分別送 `ALID=300000920`（`MES0920 Loader Tray Empty`）與 `ALID=991410149`（`SnFKCleanOut`，號段 9）。
+
 **實際 case log 節錄（Host 端 Simulator）**：
 
 ```
@@ -826,7 +830,7 @@ W-bit=1。
 | Item | 型別 | 意義 | 範例值（本 run） |
 |---|---|---|---|
 | `ALCD` | B | Alarm Code byte：bit7(0x80=128)=SET、0x00=CLEAR | `128`（SET）／`0`（CLEAR） |
-| `ALID` | U4 | Alarm ID，由 ALTX 字串 31-poly hash 而來，deterministic | `4045923824`（Loader Tray Empty）／`3891410149`（SnFKCleanOut） |
+| `ALID` | U4 | Alarm ID。**2026-09-03 起為 9 碼號段式**（`Class×1e8 + Payload`，見上方「ALID 推導」）；本 run 的值為舊版 hash | 本 run：`4045923824`（Loader Tray Empty）／`3891410149`（SnFKCleanOut）；現行：`300000920` ／ `991410149` |
 | `ALTX` | A | Alarm Text：`code`，或 `code + 空白 + message`（有附加訊息時）；本 run 皆為純 code | `"Loader Tray Empty"`／`"SnFKCleanOut"`（本 run 無附加 message；host 比對請取 leading code token） |
 | `W`-bit | header | 要求回覆 | `1`（S5F1W） |
 | `len` | bytes | S5F1 body 長度 | `62` |
@@ -1008,9 +1012,9 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 | 00:00:41 | AGV cycle + CEID 35 | P4 AUTO1；272(len=86)+35(len=144) 同時（兩個長度皆為 **2026-06-26 當時**的 body 大小；現行韌體 272 因加掛 report 6 而更大、35 因 Report 1 縮編為 1 個 SV 而更小，見 3.3.1） |
 | 00:00:46 | AGV cycle | P1 Loader |
 | 00:00:51 | AGV cycle | P2 Empty |
-| 00:01:00 | S5F1 SET | Loader Tray Empty，ALID=4045923824，ALCD=128 |
+| 00:01:00 | S5F1 SET | Loader Tray Empty，ALID=4045923824（舊版 hash；現行 `MES0920` = 300000920），ALCD=128 |
 | 00:01:04 | S5F1 CLEAR | Loader Tray Empty，ALCD=0 |
-| 00:01:05 | S5F1 SET | SnFKCleanOut，ALID=3891410149，ALCD=128 |
+| 00:01:05 | S5F1 SET | SnFKCleanOut，ALID=3891410149（舊版 hash；現行 991410149，號段 9），ALCD=128 |
 | 00:01:11 | S5F1 CLEAR | SnFKCleanOut，ALCD=0（clean out 結束） |
 
 **End-to-End 完整性（Integrity）**：以下計數可在兩端 log 交叉核對，是整合驗收的關鍵證據——序號連續、TX/RX 對等，即代表通訊無漏訊、無重送。
@@ -1072,7 +1076,7 @@ S2F41 body 由 `ht160s_presets.py` 的 builders 建構，可作為 host 端構�
 | RPTID | Report ID；report 定義識別碼 |
 | SVID / SV | Status Variable ID／Status Variable；狀態變數識別碼（如 38219）／狀態變數 |
 | DataID | Data ID（S6F11 欄位）；對 host 無語意，host 依 CEID 分派 |
-| ALID | Alarm ID；本機由 ALTX 字串 31-poly hash 而來的 U4 |
+| ALID | Alarm ID；U4。2026-09-03 起為 9 碼號段式 `Class×100,000,000 + Payload`（號段 1=JAM 2=WAR 3=MES 4～8=數字碼家族 9=未登錄自由字串），可反解回警報碼；本文 2026-06-26 run 中的值為舊版 hash |
 | ALCD | Alarm Code byte；bit7(0x80=128)=SET、0x00=CLEAR |
 | ALTX | Alarm Text；`code` 或 `code + 空白 + message`（有附加訊息時）；建議 host 以 leading code token 辨識警報 |
 | HCACK | Host Command Acknowledge（S2F42 回覆碼，0/1/2/4） |

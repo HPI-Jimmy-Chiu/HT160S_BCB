@@ -1417,29 +1417,38 @@ sequenceDiagram
 </tr>
 </tbody>
 </table>
-<p><strong>ALID 推導</strong>：本機的 ALID 是以 alarm-code <strong>字串</strong> 做 31-poly rolling hash 算出的 U4（<code>alid = alid*31u + (unsigned char)byte</code>，<code>UsecegemMainFrom.cpp:150-152</code>）。此演算法 stateless／deterministic（同一字串永遠算出同一 ALID）；真正人類可讀的代碼承載於 <strong>ALTX</strong> 欄位。已驗證（python 重算 byte-for-byte 相符）：</p>
+<p><strong>ALID 推導（⚠ 自 2026-09-03 韌體 <code>6377aff</code> 起改版）</strong>：ALID 為<strong>固定 9 碼的號段式編碼</strong>，<code>ALID = 號段 Class × 100,000,000 + 號段內碼 Payload</code>（<code>UsecegemMainFrom.cpp</code> <code>ComputeAlarmAlid()</code>）：號段 1=JAM / 2=WAR / 3=MES（Payload = 前綴後的數字尾，例 <code>MES1421</code> → <code>300001421</code>）；4=汽缸 4xxxx / 5=馬達 5xxxx / 6=吸嘴 6xxxx / 7=7xxxx / 8=8xxxx（Payload = 完整 5 碼代碼，例 <code>40000</code> → <code>400040000</code>）；9 = 尚未登錄成警報碼的自由字串（<strong>不在 S5F6/S5F8 目錄內</strong>，Payload 由字串導出；host 請讀 ALTX 的 leading token）；0 永不發送。本機值域 100,000,913 ～ 999,752,848，全部小於 2,147,483,647，host 可用有號 32 位元整數存放。解碼：<code>Class = ALID / 1e8</code>、<code>Payload = ALID % 1e8</code>，class 1/2/3 補零至 4 位（Payload &lt; 10000）或 5 位，class 4～8 補零至 5 位。完整 486 筆對照（含 Class / Payload 欄）見客戶工作簿 <code>SECS_GEM功能_Handler_20260903.xlsx</code> 的「ALID」工作表。</p>
+<blockquote>
+<p>⚠ <strong>本 run（2026-06-26）為舊版韌體</strong>：當時 ALID 是 alarm-code 字串的 hash 值（8 或 10 碼），下方 log 中的 <code>4045923824</code> / <code>3891410149</code> 即該舊值，逐字保留、不改寫。同兩支警報在現行韌體的 ALID 如下（<code>Loader Tray Empty</code> 之後已登錄為代碼 <code>MES0920</code>）：</p>
+</blockquote>
 <table>
 <thead>
 <tr>
-<th>ALTX（alarm code 字串）</th>
-<th>ALID（U4）</th>
+<th>警報（本 run 的 ALTX）</th>
+<th>本 run ALID（舊版 hash）</th>
+<th>現行 ALID（2026-09-03 起）</th>
+<th>備註</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>"Loader Tray Empty"</code></td>
 <td><code>4045923824</code></td>
+<td><code>300000920</code></td>
+<td>已登錄為 <code>MES0920</code>，號段 3；現行 ALTX = <code>"MES0920 Loader Tray Empty"</code></td>
 </tr>
 <tr>
 <td><code>"SnFKCleanOut"</code></td>
 <td><code>3891410149</code></td>
+<td><code>991410149</code></td>
+<td>自由字串，號段 9，不在目錄；ALTX = <code>"SnFKCleanOut SnFKCleanOut"</code></td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>ALTX 的內容範圍（重要）</strong>：實際 handler（<code>UsecegemMainFrom.cpp:154-156</code>）在 <strong>沒有附加 Message 時</strong> 設 <code>altx = Code</code>（即純 alarm code 字串），在 <strong>有 Message 時</strong> 設 <code>altx = Code + ' ' + Message</code>（即 code、一個空白、再接人類可讀訊息）。換言之，<strong>ALTX 不保證恆等於 alarm code</strong>——可能是 <code>code</code> 或 <code>code + 空白 + message</code>。本 run 觀察到的 ALTX 皆為純 alarm code（<code>"Loader Tray Empty"</code>／<code>"SnFKCleanOut"</code>，無附加 Message）。</p>
+<p><strong>ALTX 的內容範圍（重要）</strong>：實際 handler（<code>UsecegemMainFrom.cpp</code> <code>AlarmReport()</code>）在 <strong>沒有附加 Message 時</strong> 設 <code>altx = Code</code>（即純 alarm code 字串），在 <strong>有 Message 時</strong> 設 <code>altx = Code + ' ' + Message</code>（即 code、一個空白、再接人類可讀訊息）。換言之，<strong>ALTX 不保證恆等於 alarm code</strong>——可能是 <code>code</code> 或 <code>code + 空白 + message</code>。本 run 觀察到的 ALTX 皆為純 alarm code（<code>"Loader Tray Empty"</code>／<code>"SnFKCleanOut"</code>，無附加 Message）。</p>
 <p><strong>整合建議</strong>：host 端若要以 ALTX 辨識警報，請 <strong>以開頭的 code token（第一個空白前的字串）作為比對鍵</strong>，而非整段 ALTX 字串，以免日後附加 Message 時比對失敗。</p>
-<p><strong>為什麼 ALID 用字串 hash、而不是固定編號？host 該以什麼為準？</strong> 因為 ALID 由字串確定性地算出，可避免維護一張人工編號表；但這也代表 <strong>ALID 本身對 host 不直觀</strong>。整合時建議 host 端 <strong>以 ALTX 的 leading code token 作為警報的辨識依據</strong>（ALID 用於去重／配對 SET↔CLEAR 即可），因為 code token 才是人類可讀、語意明確的代碼。</p>
+<p><strong>host 該以什麼為準？（2026-09-03 更新）</strong> 現行 ALID 可直接反解回警報碼（號段 1～8），host 端建議 <strong>以 ALID 對工作簿「ALID」表查表、或直接依上式解碼</strong>；只有號段 9（未登錄的自由字串警報）不在目錄內，該類請 <strong>以 ALTX 的 leading code token 辨識</strong>。舊版「ALID 為字串 hash、對 host 不直觀」的取捨自本版起不再適用。</p>
 <p><strong>S5F5/F6 + S5F7/F8 警報目錄查詢（2026-07-15 更新，commit <code>4ae0cce</code>）</strong>：<code>AddAlarmList()</code>／<code>S5F6_ListAlarmData()</code> 過去為空 stub、只回空 <code>L,0</code>。現已改為從 <code>mapAlarmCodeList</code>（同一份 alarm SSOT，也餵 AlarmList.csv 與 S5F1）<strong>即時輸出完整警報目錄</strong>：</p>
 <ul>
 <li><strong>S5F5</strong>（host「List Alarm Request」）→ 設備回 <strong>S5F6</strong>「List Alarm Data」。</li>
@@ -1457,6 +1466,9 @@ sequenceDiagram
 00:01:05.056  [SECS][TX] S5F1 Alarm ALID=3891410149 ALCD=128   (SET   &quot;SnFKCleanOut&quot;)
 00:01:11.861  [SECS][TX] S5F1 Alarm ALID=3891410149 ALCD=0     (CLEAR &quot;SnFKCleanOut&quot;)
 </code></pre>
+<blockquote>
+<p>⚠ 上列 ALID 為 2026-06-26 舊版韌體的 hash 值。現行韌體同兩支警報分別送 <code>ALID=300000920</code>（<code>MES0920 Loader Tray Empty</code>）與 <code>ALID=991410149</code>（<code>SnFKCleanOut</code>，號段 9）。</p>
+</blockquote>
 <p><strong>實際 case log 節錄（Host 端 Simulator）</strong>：</p>
 <pre><code>[00:01:00] RX  S5F1W (sys=54) -&gt; auto S5F2 ACKC5=0
 [00:01:04] RX  S5F1W (sys=55) -&gt; auto S5F2 ACKC5=0
@@ -1486,8 +1498,8 @@ sequenceDiagram
 <tr>
 <td><code>ALID</code></td>
 <td>U4</td>
-<td>Alarm ID，由 ALTX 字串 31-poly hash 而來，deterministic</td>
-<td><code>4045923824</code>（Loader Tray Empty）／<code>3891410149</code>（SnFKCleanOut）</td>
+<td>Alarm ID。<strong>2026-09-03 起為 9 碼號段式</strong>（<code>Class×1e8 + Payload</code>，見上方「ALID 推導」）；本 run 的值為舊版 hash</td>
+<td>本 run：<code>4045923824</code>（Loader Tray Empty）／<code>3891410149</code>（SnFKCleanOut）；現行：<code>300000920</code> ／ <code>991410149</code></td>
 </tr>
 <tr>
 <td><code>ALTX</code></td>
@@ -1926,7 +1938,7 @@ sequenceDiagram
 <tr>
 <td>00:01:00</td>
 <td>S5F1 SET</td>
-<td>Loader Tray Empty，ALID=4045923824，ALCD=128</td>
+<td>Loader Tray Empty，ALID=4045923824（舊版 hash；現行 <code>MES0920</code> = 300000920），ALCD=128</td>
 </tr>
 <tr>
 <td>00:01:04</td>
@@ -1936,7 +1948,7 @@ sequenceDiagram
 <tr>
 <td>00:01:05</td>
 <td>S5F1 SET</td>
-<td>SnFKCleanOut，ALID=3891410149，ALCD=128</td>
+<td>SnFKCleanOut，ALID=3891410149（舊版 hash；現行 991410149，號段 9），ALCD=128</td>
 </tr>
 <tr>
 <td>00:01:11</td>
@@ -2070,7 +2082,7 @@ sequenceDiagram
 </tr>
 <tr>
 <td>ALID</td>
-<td>Alarm ID；本機由 ALTX 字串 31-poly hash 而來的 U4</td>
+<td>Alarm ID；U4。2026-09-03 起為 9 碼號段式 <code>Class×100,000,000 + Payload</code>（號段 1=JAM 2=WAR 3=MES 4～8=數字碼家族 9=未登錄自由字串），可反解回警報碼；本文 2026-06-26 run 中的值為舊版 hash</td>
 </tr>
 <tr>
 <td>ALCD</td>

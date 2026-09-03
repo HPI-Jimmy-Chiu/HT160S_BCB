@@ -148,3 +148,16 @@ S8 是 S9 的**硬前置**（B5：否則 `*_manual.xlsx` 舊雜湊說法會一�
 - S3b 對真韌體 headless round-trip（需機台或真韌體在線）。
 - S4 工作簿 0903、S5 兩本 md/html、S6 模擬器、S7 記憶/.github、S8 退役雙胞胎、S9 打包。
 - ⚠ 對照表變成 486 列後，S4 表尾註／功能頁的「485」字樣要寫 **486**，`MES0926` 要列入「本次新增」。
+
+### S4 完成（20260903，commit `eafa7f2`）
+- `docs/SECS/SECS_GEM功能_Handler_20260903.xlsx`：ALID 頁 486 列、F/G = 號段 Class / 號段內碼 Payload（使用者裁定選項 2，A–E 不動）、
+  表尾註 A489 全段改寫 / A490 三處定點改、功能頁 E16 全格改寫、E18/E31 更新 486、修訂說明 4 新項 + 0831 歷史區 + open item(D1)。
+- PNG 兩張 byte-identical；prose guard 12 處殘留全為〔20260903〕括號內刻意引用的舊文。
+- 產生器 `emit_xlsx` 改 F/G 版面 + `--prose JSON`；一次性腳本收在 `docs/plan/alid-option-d-20260902/s4-workbook-0903/`。
+
+### S5 完成（20260903）
+- `HT160S_SECS_Comm_Examples.md`：ALID 推導段改寫為號段式、2026-06-26 run 的舊 hash 值逐字保留並加「舊版／現行」對照表、
+  FIELD TABLE / 時間軸 / 詞彙表三處標註新舊；`Interface_Spec_20260727.md`：文件地位改指 0903 工作簿、S5F1/S5F6 列備註、
+  66011 錯句更正、§3.5 全段改寫（486 筆、編碼/解碼/值域/9046LS 零交集/ALTX 語言/號段 9 例外）。
+- 兩本 `.html` 以 `scripts/ops/build-secs-html.py` 重生（先對 `af32607` 自測 byte-exact 再產出；Interface_Spec.html 順帶補上 0901 那次 md 修訂漏重生的內容）。
+- prose guard 現在略過 ``` 圍欄內的逐字 log；Comm_Examples 剩 8 處殘留皆為「本 run 舊值」對照表刻意保留。

@@ -1,15 +1,16 @@
 # HT-160S SECS/GEM 介面規格書 / SECS/GEM Interface Specification
 
 > **機型 Model:** HT-160S (Tray Sorter) &nbsp;|&nbsp; **MDLN:** `HT-160S` &nbsp;|&nbsp; **SOFTREV:** `1.0.0.0`
-> **文件版本 Doc rev:** 2026-09-01
+> **文件版本 Doc rev:** 2026-09-03
 > **依據 Based on:** current firmware build (branch `feat/iosetview-172-refactor`)
 >
-> ⚠️ **文件地位 / Document status (2026-09-01)**:對客戶交付的**單一權威文件是
-> `docs/SECS/SECS_GEM功能_Handler_20260831.xlsx`**(工作簿,含 SVID / CEID / ECID / ALID 四張表與修訂說明頁)。
+> ⚠️ **文件地位 / Document status (2026-09-03)**:對客戶交付的**單一權威文件是
+> `docs/SECS/SECS_GEM功能_Handler_20260903.xlsx`**(工作簿,含 SVID / CEID / ECID / ALID 四張表與修訂說明頁)。
 > 本 `.md` 為內部參考,號碼與語意如與該工作簿不符,**一律以工作簿為準**。
 > 2026-09-01 已就下列兩次改號完成全文補正:**(1) 20260805 身分盤 2D 由 SVID 38204 改為 38202、
 > 38203/38204 於 20260817 取消註冊;(2) 20260810 AMR Auto4–6 Tray Count 由 38237–38239 改為 38246–38248**
 > (38237–38239 改為家族定義的 *Record Auto 1/2/3 Tray Count*)。補正處以「**⚠ 更正**」標示。
+> 2026-09-03 追加第三次改號的補正:**(3) S5 ALID 由警報碼字串 hash 改為固定 9 碼號段式**(韌體 `6377aff`,目錄 486 筆),見 §3.5。
 > The single customer-facing authority is the workbook `SECS_GEM功能_Handler_20260831.xlsx`; where this
 > `.md` disagrees, the workbook wins. Two renumberings were swept through this file on 2026-09-01.
 >
@@ -221,11 +222,11 @@
 
 | S/F | 名稱 Name | 方向 | 回覆 | 本體 Body (SECS-II) | 說明 Notes |
 |---|---|---|---|---|---|
-| S5F1 | Alarm Report Send | E→H | (S5F2) | `L,3{ B ALCD, U4 ALID, A ALTX }` | ALCD bit7:0x80=set/0x00=clear |
+| S5F1 | Alarm Report Send | E→H | (S5F2) | `L,3{ B ALCD, U4 ALID, A ALTX }` | ALCD bit7:0x80=set/0x00=clear;ALID = 9 碼號段式(§3.5) |
 | S5F3 | Enable/Disable Alarm Send | H→E | S5F4 | `L,2{ ALED, ALID }` | |
 | S5F4 | Enable/Disable Alarm Ack | E→H | — | `B ACKC5` | ACKC5=0 |
 | S5F5 | List Alarm Request | H→E | S5F6 | `L,n{ ALID }`(n=0=全部) | |
-| S5F6 | List Alarm Data | E→H | — | `L,n{ L,3{ B ALCD, U4 ALID, A ALTX } }` | 目錄由 AlarmList.csv/SSOT 即時產生 |
+| S5F6 | List Alarm Data | E→H | — | `L,n{ L,3{ B ALCD, U4 ALID, A ALTX } }` | 目錄由警報碼 SSOT 即時產生,486 筆(§3.5) |
 | S5F7 | List Enabled Alarm Request | H→E | S5F8 | `L,0` | |
 | S5F8 | List Enabled Alarm Data | E→H | — | `L,n{ L,3{ B ALCD, U4 ALID, A ALTX } }` | |
 
@@ -342,7 +343,7 @@
 | 66001 | System Running | **無替代**。運轉 / 停止請由 **1011 Machine State** 的狀態文字判讀,或訂閱 Start / Pause 事件。⚠ **Start 有兩個號碼,兩個都要訂**:**CEID 1** Start Pressed 只在**機內無 IC** 時發;**CEID 76** Start Pressed HasIC 才是**機內有 IC** 時的 Start(暫停後續跑、警報解除後續跑都走 76 —— 產線上這才是常態)。停止側為 **CEID 2** Pause Pressed。只訂 CEID 1 會漏掉絕大多數的重新起動。HT-90XX 亦無此類 SV |
 | 66002 | Control State | 改用 **SVID 4 GemControlState**(搭配 **9 PreviousGemControlState**),值域為 HT-90XX 的 1=Off-Line / 2=On-Line Local / 3=On-Line Remote(§1)。機內部仍以 GEM 標準值域 1/4/5 儲存,但不再對外公佈 |
 | 66010 | Alarm Active | **無替代**。警報一律走 **S5F1** 串流,目錄查 **S5F5/F6**,與 HT-90XX 完全一致(§3.5) |
-| 66011 | Alarm Code | **無替代**,同上——警報碼即 S5F1 的 **ALID** |
+| 66011 | Alarm Code | **無替代**,同上——警報碼由 S5F1 的 **ALID** 反解取得(9 碼號段式,§3.5;號段 9 者改讀 ALTX 的第一個 token) |
 | 66020 | Total IC | 改讀 **1101 Loader Count**(自 Loader 盤取出的 IC 數)與 / 或 **1102 Output Total Count**(已放入 Bin 的 IC 數);兩者語意見 §3.1 的計數說明 |
 | 66021 | Total Sorted | 改讀 **1102 Output Total Count**——兩號本來就綁**同一個**計數器(`MachineRun.iTotalSorted`),純屬去重,值不會有任何差異 |
 | 66030 | Active Lot Count | 由新語意的 **1006 Lot ID** 導出,但**必須先判空**:**1006 為空字串 → 批數 0;否則批數 = 逗號數 + 1**。⚠ 登錄表為空時 1006 回主畫面批號欄的文字(通常是空字串),機上其實是 **0 批** —— 直接套「逗號數 + 1」會把 0 批誤報成 1 批(已退役的 66030 在該狀態回 0)。⚠ 另請注意:批號欄若有操作員打的字但尚未開批,1006 會回那串文字,這同樣是 **0 批**,不能只靠 1006 判定機上有批 —— 需要嚴格的批數請以`LOTSTART` / `CLEAR_LOT_INFO` 的事件流追蹤 |
@@ -852,12 +853,18 @@ right column = this revision's id (= HT-90XX's).
 > 附帶說明:host 確實會送**各色不同值**的封包(京元 2026-06-08 六筆 SET 中有一筆為 `RED=2 GREEN=0 YELLOW=0`,
 > 其餘五筆為 `2/2/2`),故本機逐色處理而非整組同值處理。
 
-### 3.5 警報 / Alarms (ALID) — S5F1, S5F5/F6
+### 3.5 警報 / Alarms (ALID) — S5F1, S5F5/F6, S5F7/F8
 
-- ALID 目錄由機台警報 SSOT(`system\AlarmList.csv` / `mapAlarmCodeList`)**即時**產生,約 480+ 碼。
+- ALID 目錄由機台警報 SSOT(`mapAlarmCodeList`,開機時傾印為 `system\AlarmList.csv`)**即時**產生,**486 碼**;S5F5/S5F7 的 ALID 過濾清單未實作,一律回完整目錄;本機無 per-ALID 啟用表,S5F8 恆等於 S5F6。
+- **⚠ 更正(2026-09-03,韌體 `6377aff`):ALID 改為固定 9 碼的號段式編碼**,不再是警報碼字串的 hash:
+    - `ALID = 號段 Class × 100,000,000 + 號段內碼 Payload`;號段 1=JAM、2=WAR、3=MES(Payload = 前綴後的數字尾,例 `MES1421` → `300001421`、`JAM0913` → `100000913`、`WAR16120` → `200016120`);4=汽缸 4xxxx、5=馬達 5xxxx、6=吸嘴 6xxxx、7=7xxxx、8=8xxxx(Payload = 完整 5 碼代碼,例 `40000` → `400040000`);9 = 尚未登錄成警報碼的自由字串警報(**不在目錄**,Payload 由字串導出);0 永不發送。
+    - 解碼:`Class = ALID / 100,000,000`、`Payload = ALID % 100,000,000`;class 1/2/3 → 前綴 + Payload 補零至 4 位(Payload < 10000)或 5 位;class 4～8 → Payload 補零至 5 位;class 9 → 讀 ALTX 的第一個 token。
+    - 本機值域 100,000,913 ～ 999,752,848,恆 9 碼且全部小於 2,147,483,647 → host 可用有號 32 位元整數存放。與 HT-9046LS 的 9 碼 ALID 空間零交集(9046LS 首位 1/2/3 且第 2-3 位為單元編號 ≥ 01;本機號段 1/2/3 第 2-3 位恆為 00)。
+    - S5F1 與 S5F6/S5F8 由同一函式產生 ALID,同一支警報兩處恆等。全部 486 筆的數值皆與 2026-09-03 前不同,**韌體與 host 字典須在同一維護窗口整批切換**;歷史 log 的舊值請用新舊對照表換算,勿以新規則反推。
 - 欄位:`AlarmCode, AlarmType, E_ErrMessage, C_ErrMessage, E_Description, C_Description`(中英雙語)。
-- S5F1 ALTX = `<code> <English message>`;ALCD bit7 = 0x80(set)/0x00(clear)。
-- **完整警報清單請見隨附的 `system\AlarmList.csv`**(過長,不在本規格內展開)。
+- ALTX:S5F6/S5F8 目錄 = `<code> <English message>`;S5F1 事件 = `<code> <當下介面語言的訊息>`(中文介面為 Big5/CP950 原始位元組,請勿以 UTF-8 解碼);ALCD bit7 = 0x80(set)/0x00(clear),**S5F1 的 ALCD 低 7 位恆為 0(不帶類別)**,分類請以 ALID 查表或取號段。
+- 號段 9 的兩類例外:吸嘴碼族 `SUC<3 位索引><1 位錯誤別>` 12 個、以及安全門/緊急停止/馬達電源/離子風扇/氣壓/各軸 `_MotOverLimitErr`/分選臂與 TrayArm 英文長句等自由字串警報(其 ALTX 為同一字串重複兩次);host 請預留「號段 9 = 未知 ALID,顯示 ALTX」路徑。本方後續登錄這些警報成正式代碼時,其 ALID 會再變一次。
+- **完整 486 筆對照請見工作簿 `SECS_GEM功能_Handler_20260903.xlsx` 的「ALID」工作表**(A–E 欄同 0831 版順序,F/G 欄為 Class / Payload);`system\AlarmList.csv` 不含 ALID 欄。
 
 ---
 

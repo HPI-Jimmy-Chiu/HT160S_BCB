@@ -24,13 +24,23 @@ a{color:#0969da}
 <h1 id="ht-160s-secsgem-secsgem-interface-specification">HT-160S SECS/GEM 介面規格書 / SECS/GEM Interface Specification</h1>
 <blockquote>
 <p><strong>機型 Model:</strong> HT-160S (Tray Sorter) &nbsp;|&nbsp; <strong>MDLN:</strong> <code>HT-160S</code> &nbsp;|&nbsp; <strong>SOFTREV:</strong> <code>1.0.0.0</code>
-<strong>文件版本 Doc rev:</strong> 2026-08-04
+<strong>文件版本 Doc rev:</strong> 2026-09-03
 <strong>依據 Based on:</strong> current firmware build (branch <code>feat/iosetview-172-refactor</code>)</p>
+<p>⚠️ <strong>文件地位 / Document status (2026-09-03)</strong>:對客戶交付的<strong>單一權威文件是
+<code>docs/SECS/SECS_GEM功能_Handler_20260903.xlsx</code></strong>(工作簿,含 SVID / CEID / ECID / ALID 四張表與修訂說明頁)。
+本 <code>.md</code> 為內部參考,號碼與語意如與該工作簿不符,<strong>一律以工作簿為準</strong>。
+2026-09-01 已就下列兩次改號完成全文補正:<strong>(1) 20260805 身分盤 2D 由 SVID 38204 改為 38202、
+38203/38204 於 20260817 取消註冊;(2) 20260810 AMR Auto4–6 Tray Count 由 38237–38239 改為 38246–38248</strong>
+(38237–38239 改為家族定義的 <em>Record Auto 1/2/3 Tray Count</em>)。補正處以「<strong>⚠ 更正</strong>」標示。
+2026-09-03 追加第三次改號的補正:<strong>(3) S5 ALID 由警報碼字串 hash 改為固定 9 碼號段式</strong>(韌體 <code>6377aff</code>,目錄 486 筆),見 §3.5。
+The single customer-facing authority is the workbook <code>SECS_GEM功能_Handler_20260831.xlsx</code>; where this
+<code>.md</code> disagrees, the workbook wins. Two renumberings were swept through this file on 2026-09-01.</p>
 <p>本規格反映 HT-160S <strong>目前實作</strong>的 SECS-II / GEM 介面。命令面向 HT-90XX (HT9045) 對齊;
 <strong>CEID 字典自 2026-07-29 起為 HT-90XX 的逐字複本</strong>(號碼 <strong>1–292</strong> 全數註冊,別名逐字相同,見 §3.3);
 <strong>SVID 字典自 2026-08-04 起全部為 HT-90XX 家族編號</strong>(見 §3.1):凡 HT-90XX 有同概念的資料,
 一律沿用 HT-90XX 的號碼、型別與線上格式;唯一的延伸段是 AMR / AGV 用的 <strong>38xxx</strong> 段。
-原本承載 sorter 特有資料的 <strong>66xxx 自有段已整段退役</strong>(見下方 ⚠ 段落與 §3.1 的退役墓碑表)。
+原本承載 sorter 特有資料的 <strong>66000–66039 自有段已整段退役</strong>(見下方 ⚠ 段落與 §3.1 的退役墓碑表);
+⚠ 自 <strong>2026-08-31</strong> 起依貴端指示,自有段<strong>自 66040 重新啟用</strong>(66040–66045 AMR AUTO1–6 Lot Number,見 §3.1)。
 This document describes the SECS-II / GEM interface <strong>as currently implemented</strong> on HT-160S.
 The command surface is aligned to HT-90XX. <strong>As of 2026-07-29 the CEID dictionary is a verbatim copy of
 HT-90XX's</strong> (ids <strong>1–292</strong> all registered, aliases character-identical, §3.3). <strong>As of 2026-08-04 every
@@ -69,8 +79,12 @@ HT-90XX 家族中的 <strong>HT-9011UC V3.33.899</strong> 本身就是<strong>�
 同一條原則(<strong>Auto1–3 遵循 HT-9046LS V3.32.810、Auto4–6 參照 HT-9011UC V3.33.899</strong>)套用到 AMR 盤號欄位:
 Auto1–3 維持 <strong>38205 / 38206 / 38207</strong>(810 定義,不變),Auto4–6 由本機自創的 38208 / 38209 / 38210
 改為 899 的 <strong>38199 / 38200 / 38201</strong>(<code>Output 4/5/6 Tray ID</code>)。<strong>若貴端已綁定 38208–38210,請改綁
-38199–38201。</strong> Auto4–6 的 tray / device / bin-setting(<strong>38237–38245</strong>)<strong>維持不變</strong>——兩棵參照樹皆無
-可對齊的號碼(810 的 AMR 段止於 38236、899 無 AMR SVID 家族)。詳見 §3.1 的 AMR 對照表。</p>
+38199–38201。</strong> Auto4–6 的 tray / device / bin-setting <strong>維持本機延伸號</strong>——兩棵參照樹皆無
+可對齊的號碼(810 的 AMR 段止於 38236、899 無 AMR SVID 家族)。詳見 §3.1 的 AMR 對照表。
+⚠ <strong>更正(2026-09-01)</strong>:本段原寫「(<strong>38237–38245</strong>)維持不變」,該範圍已於 <strong>2026-08-10</strong> 變更 ——
+HT-9046LS V3.32.810_B01 於 2026-07-10 新增 <strong>38237 / 38238 / 38239 = Record Auto 1/2/3 Tray Count</strong>,
+家族號優先,故 <strong>AMR Auto4–6 Tray Count 讓位至 38246 / 38247 / 38248</strong>。現行的三欄延伸號為
+<strong>Device Count 38240–38242、Bin Setting 38243–38245、Tray Count 38246–38248</strong>。</p>
 <p><strong>同日追加:CEID 字典依貴端現場機台補齊至 292(僅新增)</strong> —— 以貴端 HT-9046 現場機台自己存下的
 <code>EventReport_CEID.def</code> 逐筆核對:<strong>1–275 與本機 0 筆不符</strong>;該機另有 <strong>276–292</strong> 共 17 個號碼,
 本版已全部註冊(名稱逐字照抄),<code>S1F23</code>/<code>S1F24</code> 全查由 <code>L,275</code> 變為 <strong><code>L,292</code></strong>(約 32 KB)。
@@ -539,7 +553,7 @@ published control state.</p>
 <td>E→H</td>
 <td>(S5F2)</td>
 <td><code>L,3{ B ALCD, U4 ALID, A ALTX }</code></td>
-<td>ALCD bit7:0x80=set/0x00=clear</td>
+<td>ALCD bit7:0x80=set/0x00=clear;ALID = 9 碼號段式(§3.5)</td>
 </tr>
 <tr>
 <td>S5F3</td>
@@ -571,7 +585,7 @@ published control state.</p>
 <td>E→H</td>
 <td>—</td>
 <td><code>L,n{ L,3{ B ALCD, U4 ALID, A ALTX } }</code></td>
-<td>目錄由 AlarmList.csv/SSOT 即時產生</td>
+<td>目錄由警報碼 SSOT 即時產生,486 筆(§3.5)</td>
 </tr>
 <tr>
 <td>S5F7</td>
@@ -747,8 +761,12 @@ published control state.</p>
 <blockquote>
 <p>⚠️ <strong>CEID 編號(§3.3)自 2026-07-29 起與 HT-90XX 完全相同</strong>,host 可直接沿用 HT-90XX 的 CEID 設定,
 但須注意本機只有其中 53 個號碼有發射點(§3.3.1，其中 CEID 78 為條件發射、預設關閉),其餘 222 個雖已註冊卻永遠不會送出(§3.3.2)。</p>
-<p>⚠️ <strong>SVID 編號(§3.1)自 2026-08-04 起全部為 HT-90XX 家族編號</strong> —— 本機自有的 66xxx 段已整段退役,
-剩下的是共同段(3 / 4 / 9 / 1xxx / 2758–2763 / 37010)與 AMR / AGV 的 38xxx 段,共 <strong>67 個</strong>。
+<p>⚠️ <strong>SVID 編號(§3.1)自 2026-08-04 起全部為 HT-90XX 家族編號</strong> —— 本機自有的 66000–66039 段已整段退役,
+剩下的是共同段(3 / 4 / 9 / 1xxx / 2758–2763 / 37010)與 AMR / AGV 的 38xxx 段。
+⚠ <strong>更正(2026-09-01)</strong>:(1) 本句原寫「66xxx 段已整段退役」,<strong>2026-08-31 起自有段自 66040 重新啟用</strong>
+(66040–66045 AMR AUTO1–6 Lot Number,見 §3.1);66000–66039 的下架不變。
+(2) 註冊總數原載 <strong>67</strong>,現行為 <strong>77</strong>(前段 37 + AMR 段 40)——期間增減請以工作簿
+<code>SECS_GEM功能_Handler_20260831.xlsx</code> 為準。
 host 可直接沿用 HT-90XX 的 SVID 設定;HT-90XX 有而本機無對應的號碼(tester 專屬,見 §6)以及已退役的
 66xxx,HT-160S 的 S2F33 / S2F35 會<strong>容忍</strong>(見 §4),但那些欄位會回空 item。</p>
 </blockquote>
@@ -1002,7 +1020,7 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 <tr>
 <td>66011</td>
 <td>Alarm Code</td>
-<td><strong>無替代</strong>,同上——警報碼即 S5F1 的 <strong>ALID</strong></td>
+<td><strong>無替代</strong>,同上——警報碼由 S5F1 的 <strong>ALID</strong> 反解取得(9 碼號段式,§3.5;號段 9 者改讀 ALTX 的第一個 token)</td>
 </tr>
 <tr>
 <td>66020</td>
@@ -1039,7 +1057,36 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 同日 <strong>66025 / 66026 / 66027</strong>(Auto4–6 Count)改用 HT-9011UC V3.33.899 的 <strong>1259 / 1260 / 1261</strong>。
 這些號碼<strong>保留空號、不再挪作他用</strong>——若貴端設定未更新,S1F3 會回「未知 SVID」(空 item),
 不會回到別的資料上,故不存在靜默誤讀的風險。
-【<strong>2026-08-04</strong>:加上上表的十個號碼,<strong>66xxx 段至此整段為空,HT-160S 不再公佈任何 66xxx SVID。</strong>】</p>
+【<strong>2026-08-04</strong>:加上上表的十個號碼,<strong>66000–66039 至此整段為空。</strong>】</p>
+<p>⚠️ <strong>更正(2026-09-01):本段原寫「HT-160S 不再公佈任何 66xxx SVID」,該敘述自 2026-08-31 起已不成立。</strong>
+依貴端 2026-08-31 指示,本機自有段<strong>自 66040 起重新啟用</strong>,新增六個號碼:</p>
+<table>
+<thead>
+<tr>
+<th>SVID</th>
+<th>名稱 Name</th>
+<th>型別</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>66040–66045</strong></td>
+<td>AMR AUTO1–6 Lot Number</td>
+<td>A</td>
+<td>該出料流道當前負責分選的貨批批號,供 AMR 下貨流程辨識收走的出料車屬於哪一批</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>值的來源是「批號→出料流道」的動態綁定</strong>:僅在 <strong>By Lot+Bin / By Lot+PassFail</strong> 兩種分選模式、
+  且該流道已被綁定時才有值。<strong>NORMAL 模式、尚未綁定、或該流道是 Error 流道時回零長度字串</strong>
+  —— 零長度是正式值,不是錯誤。綁定在 CCD 讀到 2D 並命中已宣告批號時建立,故 2D 讀取失敗的期間六個號碼都會是空的。</li>
+<li><strong>韌體內建報表不掛這六個號碼</strong>,CEID 272 / 274 的韌體預設報表(Report 2 / 4 / 6)內容與長度完全不變;
+  host 若要在事件中取得,請自行以 <code>S2F33</code> 定義含這六號的 RPTID 並以 <code>S2F35</code> 連結。</li>
+<li>⚠ <strong>66000–66039 的下架完全不變</strong>,每一個已下架號<strong>永不挪用</strong>;日後若要再擴充,從 <strong>66046</strong> 往上長。</li>
+<li>完整說明見工作簿 <code>SECS_GEM功能_Handler_20260831.xlsx</code> 的「SVID」頁表尾註 (f)。</li>
+</ul>
 </blockquote>
 <p><strong>AMR / AGV 段 / AMR band (38xxx):</strong></p>
 <table>
@@ -1093,14 +1140,14 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 </tr>
 <tr>
 <td>P2 Empty</td>
-<td>38203</td>
+<td><strong>未註冊</strong>(原 38203)</td>
 <td>38223</td>
 <td>38229</td>
 <td>—</td>
 </tr>
 <tr>
 <td>P3 Color</td>
-<td>38204</td>
+<td><strong>未註冊</strong>(原 38204)</td>
 <td>38224</td>
 <td>38230</td>
 <td>—</td>
@@ -1129,21 +1176,21 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 <tr>
 <td>P7 Auto4</td>
 <td><strong>38199</strong></td>
-<td>38237</td>
+<td><strong>38246</strong></td>
 <td>38240</td>
 <td>38243</td>
 </tr>
 <tr>
 <td>P8 Auto5</td>
 <td><strong>38200</strong></td>
-<td>38238</td>
+<td><strong>38247</strong></td>
 <td>38241</td>
 <td>38244</td>
 </tr>
 <tr>
 <td>P9 Auto6</td>
 <td><strong>38201</strong></td>
-<td>38239</td>
+<td><strong>38248</strong></td>
 <td>38242</td>
 <td>38245</td>
 </tr>
@@ -1151,6 +1198,14 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 </table>
 <p>Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。</p>
 <blockquote>
+<p>⚠ <strong>更正(2026-09-01),本表兩處</strong>:
+1. <strong>P2 Empty / P3 Color 的 Carrier ID 欄</strong>原列 38203 / 38204。<strong>自 2026-08-17 韌體起這兩個號碼已取消註冊</strong>
+   (對齊 HT-9046LS V3.32.810_B01:該樹只註冊 38202 與 38205–38207 四個 carrier id,並無 38203 / 38204)。
+   <code>S1F3</code> 對它們回零長度項目、<code>S1F12</code> 回 <code>{SVID, '', ''}</code>。⚠ 連帶:全查 <code>&lt;L[0]&gt;</code> 的筆數為 <strong>77</strong>,不是舊版所載的 73。
+   另請注意 <strong>38223 / 38224 / 38229 / 38230 四個仍然註冊、但本機不維護其值</strong>(恆 0),與上述兩個「未註冊」不同。
+2. <strong>P7–P9 的 Tray Count 欄</strong>原列 38237 / 38238 / 38239。<strong>自 2026-08-10 起改為 38246 / 38247 / 38248</strong>;
+   38237–38239 已被家族收回,語意改為 <strong>Record Auto 1/2/3 Tray Count</strong>(本工單累計出盤數)。
+   ⚠ 兩者型別同為 I4、數值都看似合理,<strong>線上無法分辨</strong>,舊綁定會靜默讀到錯誤數字——host 必須改綁。</p>
 <p>⚠ <strong>2026-08-03 變更(breaking change):Auto4–6 的 Carrier ID 由 38208 / 38209 / 38210 改為 38199 / 38200 / 38201。</strong>
 依「Auto1–3 遵循 HT-9046LS V3.32.810、Auto4–6 參照 HT-9011UC V3.33.899」的原則:810 只定義三個出料口盤號
 (38205 / 38206 / 38207,故 P4–P6 不變),而六站機台 HT-9011UC V3.33.899 把另外三個命名為
@@ -1158,8 +1213,11 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 38208–38210。<strong>若貴端已綁定 38208–38210,請改綁 38199–38201</strong>;這三個舊號碼即日起為空號,永不改用他義。
 註:HT-9011UC 把整個盤號家族(含其自身的 38205–38207)宣告在 <strong>ECID</strong> 命名空間;本機<strong>維持 SVID</strong>,
 因為 Auto1–3 是照 810 的 SVID 定義,六個口必須在同一個命名空間回答。
-Tray / Device / Bin Setting 三欄的 Auto4–6(38237–38245)<strong>維持本機延伸號</strong>:810 的 AMR 段止於 38236、
-HT-9011UC 整段沒有 AMR SVID 家族,兩棵樹皆無可對齊的號碼(2026-08-03 逐檔查證)。</p>
+Tray / Device / Bin Setting 三欄的 Auto4–6 <strong>維持本機延伸號</strong>:810 的 AMR 段止於 38236、
+HT-9011UC 整段沒有 AMR SVID 家族,兩棵樹皆無可對齊的號碼(2026-08-03 逐檔查證)。
+⚠ <strong>更正(2026-09-01)</strong>:本句原寫該三欄為 38237–38245。<strong>2026-08-10 起 Tray Count 已由 38237–38239
+移至 38246–38248</strong>(38237–38239 被家族收回為 <em>Record Auto 1/2/3 Tray Count</em>),故現行三欄為
+<strong>Device Count 38240–38242、Bin Setting 38243–38245、Tray Count 38246–38248</strong>。</p>
 </blockquote>
 <h3 id="32-equipment-constants-ecid-s2f13f14-s2f15f16">3.2 設備常數 / Equipment Constants (ECID) — S2F13/F14, S2F15/F16</h3>
 <table>
@@ -1874,7 +1932,7 @@ un-provisioned host gets a bare timestamp on either machine.]</strong></p>
 <tr>
 <td>275</td>
 <td>AMR LD ID</td>
-<td>Report 7(SVID 38204)</td>
+<td>Report 7(SVID <strong>38202</strong>)</td>
 <td>Color 身分 Tray 2D(見下)</td>
 </tr>
 </tbody>
@@ -1888,14 +1946,35 @@ un-provisioned host gets a bare timestamp on either machine.]</strong></p>
 </blockquote>
 <p><strong>下料 Tray/Device Count 上傳(對齊 HT9045 iAMRTrayCount / iAMRDeviceCount)/ Unload count upload:</strong></p>
 <ul>
-<li>CEID <strong>272(要車)與 274(完成)</strong> 皆附 <strong>Report 6</strong>;Report 6 = 9 站 <strong>Tray Count</strong>(SVID 38222–38227 / 38237–38239)接著 9 站 <strong>Device Count</strong>(SVID 38228–38233 / 38240–38242),與 HT9045 的 <code>iAMRTrayCount[]</code> / <code>iAMRDeviceCount[]</code> <strong>同編號同語意</strong>。</li>
-<li>下料(Auto 站)時兩值皆填真值:<code>TrayCount = 該車盤數 (Car-&gt;iTrayCount)</code>;<code>Device Count = 該 Auto 車的 IC 累計</code>(卸料時逐盤 <code>+= Tray.CountIC()</code> 累加)。</li>
-<li>上料方向(Loader/Empty/Color)僅交換盤數,Device Count 保持 0(與上下料契約一致:上料交換盤數、下料才給 IC 件數 — HT9045/HT160 皆然)。</li>
+<li>CEID <strong>272(要車)與 274(完成)</strong> 皆附 <strong>Report 6</strong>;Report 6 = 9 站 <strong>Tray Count</strong>(SVID 38222–38227 / <strong>38246–38248</strong>)接著 9 站 <strong>Device Count</strong>(SVID 38228–38233 / 38240–38242),與 HT9045 的 <code>iAMRTrayCount[]</code> / <code>iAMRDeviceCount[]</code> <strong>同編號同語意</strong>。
+  ⚠ <strong>更正(2026-09-01)</strong>:Tray Count 的 Auto4–6 三格原載 38237–38239,<strong>2026-08-10 起為 38246–38248</strong>(見 §3.1 AMR 對照表的更正說明)。</li>
 </ul>
+<blockquote>
+<p>⚠️ <strong>host 以 <code>S2F35</code> 重新連結 272 / 274 時,韌體內建的 Report 6 會整包消失</strong> ——
+<code>S2F35</code> 是<strong>取代</strong>該 CEID 的整組報表連結,不是疊加。因此當 host 送出
+<code>L,2{ CEID 274, L,n{ 自訂 RPTID… } }</code> 之後,韌體預設的 <code>{Report 4, Report 6}</code> 即被覆寫,
+<strong>各站 Tray Count / Device Count 不再隨 CEID 274 送出</strong>。
+若仍需在下料完成事件取得關帳盤數與 IC 數,請於該連結中<strong>一併帶入</strong>含
+SVID <strong>38222–38227 / 38246–38248</strong>(Tray)與 <strong>38228–38233 / 38240–38242</strong>(Device)的自訂 RPTID,
+或直接把韌體內建的 <strong><code>RPTID 6</code></strong> 加進連結(Report 6 為 firmware-owned,開機即存在,不需 <code>S2F33</code> 定義)。
+同樣的陷阱也適用於 CEID <strong>275 / Report 7</strong>(見下方 §3.3.4 對 275 的說明)。
+⚠ 另請注意:<code>S2F35</code> 的連結<strong>不跨電源保存</strong>,故每次復電後 272 / 274 會先退回韌體預設(帶 Report 6),
+直到 host 重下 <code>S2F35</code> 才又被覆寫 —— 同一台機器在復電前後可能出現「有數量 / 沒數量」兩種 body,
+這不是韌體不穩定,而是連結狀態不同。</p>
+<p>A host <code>S2F35</code> <strong>replaces</strong> a CEID's whole report list; linking 272 / 274 to custom RPTIDs drops the
+firmware's Report 6 (per-station tray / device counts). Include an RPTID carrying those SVIDs — or
+firmware-owned <code>RPTID 6</code> itself — in the same link. Links are session-only, so the payload differs
+before and after a power cycle.
+- 下料(Auto 站)時兩值皆填真值:<code>TrayCount = 該車盤數 (Car-&gt;iTrayCount)</code>;<code>Device Count = 該 Auto 車的 IC 累計</code>(卸料時逐盤 <code>+= Tray.CountIC()</code> 累加)。
+- 上料方向(Loader/Empty/Color)僅交換盤數,Device Count 保持 0(與上下料契約一致:上料交換盤數、下料才給 IC 件數 — HT9045/HT160 皆然)。</p>
+</blockquote>
 <p><strong>Color 身分 Tray 2D 上傳(CEID 275 AMR LD ID,對齊 HT9045)/ Color identity-tray 2D upload:</strong></p>
 <ul>
 <li>由 Color CCD 於 Loader 回收進料點掃描身分 Tray 2D,掃描完成即以 S6F11 <strong>CEID 275</strong> 上傳。</li>
-<li>值寫入 <strong>SVID 38204</strong>(Color P3 carrier ID),經 Report 7 送出;DataID=1(對齊 HT9045)。</li>
+<li>值寫入 <strong>SVID 38202</strong>(Loader P1 carrier ID),經 Report 7 送出;DataID=1(對齊 HT9045)。
+  ⚠ <strong>更正(2026-09-01)</strong>:本行原載 38204(Color P3 carrier ID)。<strong>2026-08-05 起依「與 HT9045 對齊優先」
+  的裁示改為 38202</strong>,Report 7 亦隨之改為僅含 38202;<strong>38204 自此不再有任何寫入者,並於 2026-08-17 取消註冊</strong>。
+  機構事實仍是 Color 站的讀碼器在讀 2D,號碼用 38202 是刻意的家族對齊決定。</li>
 <li>對齊 HT9045 AGVLdID(load id);HT9045 的 report 內容為 host 動態定義,HT-160S 現以 Report 7 單一身分 SVID 為預設,host 亦可經 S2F35 改綁自己的報表。</li>
 </ul>
 <h4 id="335-old-to-new-ceid-mapping">3.3.5 舊字典 → 新字典對照 / Old-to-new CEID mapping</h4>
@@ -2253,12 +2332,20 @@ will <strong>silently misread</strong> them — well-formed message, wrong seman
 附帶說明:host 確實會送<strong>各色不同值</strong>的封包(京元 2026-06-08 六筆 SET 中有一筆為 <code>RED=2 GREEN=0 YELLOW=0</code>,
 其餘五筆為 <code>2/2/2</code>),故本機逐色處理而非整組同值處理。</p>
 </blockquote>
-<h3 id="35-alarms-alid-s5f1-s5f5f6">3.5 警報 / Alarms (ALID) — S5F1, S5F5/F6</h3>
+<h3 id="35-alarms-alid-s5f1-s5f5f6-s5f7f8">3.5 警報 / Alarms (ALID) — S5F1, S5F5/F6, S5F7/F8</h3>
 <ul>
-<li>ALID 目錄由機台警報 SSOT(<code>system\AlarmList.csv</code> / <code>mapAlarmCodeList</code>)<strong>即時</strong>產生,約 480+ 碼。</li>
+<li>ALID 目錄由機台警報 SSOT(<code>mapAlarmCodeList</code>,開機時傾印為 <code>system\AlarmList.csv</code>)<strong>即時</strong>產生,<strong>486 碼</strong>;S5F5/S5F7 的 ALID 過濾清單未實作,一律回完整目錄;本機無 per-ALID 啟用表,S5F8 恆等於 S5F6。</li>
+<li><strong>⚠ 更正(2026-09-03,韌體 <code>6377aff</code>):ALID 改為固定 9 碼的號段式編碼</strong>,不再是警報碼字串的 hash:<ul>
+<li><code>ALID = 號段 Class × 100,000,000 + 號段內碼 Payload</code>;號段 1=JAM、2=WAR、3=MES(Payload = 前綴後的數字尾,例 <code>MES1421</code> → <code>300001421</code>、<code>JAM0913</code> → <code>100000913</code>、<code>WAR16120</code> → <code>200016120</code>);4=汽缸 4xxxx、5=馬達 5xxxx、6=吸嘴 6xxxx、7=7xxxx、8=8xxxx(Payload = 完整 5 碼代碼,例 <code>40000</code> → <code>400040000</code>);9 = 尚未登錄成警報碼的自由字串警報(<strong>不在目錄</strong>,Payload 由字串導出);0 永不發送。</li>
+<li>解碼:<code>Class = ALID / 100,000,000</code>、<code>Payload = ALID % 100,000,000</code>;class 1/2/3 → 前綴 + Payload 補零至 4 位(Payload &lt; 10000)或 5 位;class 4～8 → Payload 補零至 5 位;class 9 → 讀 ALTX 的第一個 token。</li>
+<li>本機值域 100,000,913 ～ 999,752,848,恆 9 碼且全部小於 2,147,483,647 → host 可用有號 32 位元整數存放。與 HT-9046LS 的 9 碼 ALID 空間零交集(9046LS 首位 1/2/3 且第 2-3 位為單元編號 ≥ 01;本機號段 1/2/3 第 2-3 位恆為 00)。</li>
+<li>S5F1 與 S5F6/S5F8 由同一函式產生 ALID,同一支警報兩處恆等。全部 486 筆的數值皆與 2026-09-03 前不同,<strong>韌體與 host 字典須在同一維護窗口整批切換</strong>;歷史 log 的舊值請用新舊對照表換算,勿以新規則反推。</li>
+</ul>
+</li>
 <li>欄位:<code>AlarmCode, AlarmType, E_ErrMessage, C_ErrMessage, E_Description, C_Description</code>(中英雙語)。</li>
-<li>S5F1 ALTX = <code>&lt;code&gt; &lt;English message&gt;</code>;ALCD bit7 = 0x80(set)/0x00(clear)。</li>
-<li><strong>完整警報清單請見隨附的 <code>system\AlarmList.csv</code></strong>(過長,不在本規格內展開)。</li>
+<li>ALTX:S5F6/S5F8 目錄 = <code>&lt;code&gt; &lt;English message&gt;</code>;S5F1 事件 = <code>&lt;code&gt; &lt;當下介面語言的訊息&gt;</code>(中文介面為 Big5/CP950 原始位元組,請勿以 UTF-8 解碼);ALCD bit7 = 0x80(set)/0x00(clear),<strong>S5F1 的 ALCD 低 7 位恆為 0(不帶類別)</strong>,分類請以 ALID 查表或取號段。</li>
+<li>號段 9 的兩類例外:吸嘴碼族 <code>SUC&lt;3 位索引&gt;&lt;1 位錯誤別&gt;</code> 12 個、以及安全門/緊急停止/馬達電源/離子風扇/氣壓/各軸 <code>_MotOverLimitErr</code>/分選臂與 TrayArm 英文長句等自由字串警報(其 ALTX 為同一字串重複兩次);host 請預留「號段 9 = 未知 ALID,顯示 ALTX」路徑。本方後續登錄這些警報成正式代碼時,其 ALID 會再變一次。</li>
+<li><strong>完整 486 筆對照請見工作簿 <code>SECS_GEM功能_Handler_20260903.xlsx</code> 的「ALID」工作表</strong>(A–E 欄同 0831 版順序,F/G 欄為 Class / Payload);<code>system\AlarmList.csv</code> 不含 ALID 欄。</li>
 </ul>
 <hr />
 <h2 id="4-dynamic-event-reports-tolerance">4. 動態報表定義與容忍行為 / Dynamic Event Reports &amp; Tolerance</h2>
@@ -2391,7 +2478,7 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <li><strong>CEID</strong>:AMR 272 / 273 / 274 / 275;Auto-Full 35 / 36 / 37 / <strong>148 / 149 / 150</strong>;Auto-Unloadtray <strong>136 / 137 / 138 / 145 / 146 / 147</strong>。</li>
 <li>上列 Auto-Full 六號與 Auto-Unloadtray 六號<strong>皆與 HT-90XX 同號同義</strong>(依 HT-90XX 韌體 CEID 目錄 <code>EventReport_CEID.def</code>:148/149/150 = <code>Auto 4/5/6 Full</code>,136–138/145–147 = <code>Auto 1–6 Unloading tray</code>)。</li>
 <li>註:HT-160S 有 6 個 Auto 輸出站,故六號全部會用到。京元 2026-06-08 當天的 HT-90XX log 中,本家族只觀察到 <code>136</code>(2 次)與 <code>137</code>(3 次)實際發射(兩者皆為空報表),其餘號碼當天未出現 —— 但<strong>編號與語意皆為 9045 韌體既有定義</strong>,並非 HT-160S 自創,故列為「已對齊」而非「HT-160S 專屬」。</li>
-<li><strong>AMR 資料</strong>:Tray/Device Count(SVID 38222+ / 38228+)、Color 身分 2D(CEID 275 / SVID 38204)、事件 DataID=1 —— 皆對齊 HT9045(見 §3.3)。</li>
+<li><strong>AMR 資料</strong>:Tray/Device Count(SVID 38222+ / 38228+)、身分盤 2D(CEID 275 / SVID <strong>38202</strong>)、事件 DataID=1 —— 皆對齊 HT9045(見 §3.3)。⚠ <strong>更正(2026-09-01)</strong>:原載 38204,2026-08-05 起為 38202。</li>
 </ul>
 <h3 id="72-ht-160s-9045-ht-160s-only-rationale">7.2 HT-160S 專屬(9045 無對應)+ 為何特殊 / HT-160S-only + rationale</h3>
 <table>
@@ -2432,12 +2519,12 @@ Per customer requirement, every SECS command HT-160S uses is aligned to HT9045. 
 <td>~~SVID <strong>66000–66033</strong>~~</td>
 <td>SVID</td>
 <td>—</td>
-<td><strong>本列已於 2026-08-04 作廢:66xxx 自有段整段退役,本機不再公佈任何 66xxx SVID。</strong> 依貴端裁定「HT-160S 只公佈 HT-90XX 家族編號」,最後留存的十個號碼 <strong>66000 / 66001 / 66002 / 66010 / 66011 / 66020 / 66021 / 66030 / 66031 / 66032</strong>(RunMode / SystemRunning / ControlState / AlarmActive / AlarmCode / TotalIC / TotalSorted / ActiveLotCount / CurrentLotID / SortMode)已全部不再註冊;2026-08-03 已先移除 66022–66024(與 1103–1105 同值)、66025–66027(改用 1259–1261)、66033(與 1009 同值)。<strong>逐號替代方案見 §3.1 的退役墓碑表</strong>;新增家族編號 <strong>1008 Run Mode</strong> 取代 66000。這些號碼<strong>永久退役、永不遞補、永不改用他義</strong>,故舊綁定只會得到可偵測的空 item <code>&lt;L[0]&gt;</code>。⚠ <strong>已知並接受的代價</strong>:分選模式(原 66032)無家族編號可用——host 仍可用 <code>LOTSTART</code> 的 <code>SORTMODE</code> pair 設定,但無法以 <code>S1F3</code> 回讀。本機剩下唯一的延伸號碼是下一列的 38237–38245</td>
+<td><strong>本列已於 2026-08-04 作廢:66000–66039 自有段整段退役。</strong>(⚠ <strong>更正 2026-09-01</strong>:本列原寫「本機不再公佈任何 66xxx SVID」,該敘述自 2026-08-31 起不成立 —— 自有段已自 <strong>66040</strong> 重新啟用,見 §3.1;66000–66039 的下架不變、永不挪用) 依貴端裁定「HT-160S 只公佈 HT-90XX 家族編號」,最後留存的十個號碼 <strong>66000 / 66001 / 66002 / 66010 / 66011 / 66020 / 66021 / 66030 / 66031 / 66032</strong>(RunMode / SystemRunning / ControlState / AlarmActive / AlarmCode / TotalIC / TotalSorted / ActiveLotCount / CurrentLotID / SortMode)已全部不再註冊;2026-08-03 已先移除 66022–66024(與 1103–1105 同值)、66025–66027(改用 1259–1261)、66033(與 1009 同值)。<strong>逐號替代方案見 §3.1 的退役墓碑表</strong>;新增家族編號 <strong>1008 Run Mode</strong> 取代 66000。這些號碼<strong>永久退役、永不遞補、永不改用他義</strong>,故舊綁定只會得到可偵測的空 item <code>&lt;L[0]&gt;</code>。⚠ <strong>已知並接受的代價</strong>:分選模式(原 66032)無家族編號可用——host 仍可用 <code>LOTSTART</code> 的 <code>SORTMODE</code> pair 設定,但無法以 <code>S1F3</code> 回讀。本機剩下唯一的延伸號碼是下一列的 38240–38248(⚠ <strong>更正 2026-09-01</strong>:原載 38237–38245,Tray Count 三格已於 2026-08-10 移至 38246–38248)</td>
 </tr>
 <tr>
-<td>SVID <strong>38237–38245</strong></td>
+<td>SVID <strong>38240–38248</strong></td>
 <td>SVID</td>
-<td>Auto4/5/6 的 tray / device / bin-setting,共 <strong>9 個號</strong>(carrier 三個號已於 2026-08-03 改用家族編號 38199–38201,不再是本機延伸,見 §3.1.x 的 AMR 對照表)</td>
+<td>Auto4/5/6 的 device / bin-setting / tray count,共 <strong>9 個號</strong>(Device 38240–38242、Bin Setting 38243–38245、<strong>Tray Count 38246–38248</strong>;carrier 三個號已於 2026-08-03 改用家族編號 38199–38201,不再是本機延伸,見 §3.1.x 的 AMR 對照表)。⚠ <strong>更正(2026-09-01)</strong>:本列原載 <strong>38237–38245</strong>。2026-08-10 起 <strong>38237–38239 被 HT-9046LS 810_B01 收回為 <em>Record Auto 1/2/3 Tray Count</em>(家族號優先)</strong>,本機的 AMR Auto4–6 Tray Count 讓位至 <strong>38246–38248</strong>;38237–38239 現在是<strong>家族號、不是延伸號</strong>,且語意已變(本工單累計出盤數),舊綁定會靜默讀到錯誤數字</td>
 <td>HT-160S 有 <strong>6 個 Auto 輸出站</strong>,9045 的 AMR 目錄僅到 38236(3 站);為第 4–6 站延伸。<strong>更正(2026-07-29)</strong>:舊版本節誤寫成「38237–38245 = Auto4/5/6 的 carrier/tray/device/bin-setting」—— carrier 三個號當時實際是 38208/38209/38210,不在 38237–38245 之內。<strong>2026-08-03 已用原始碼查證(不再是「待確認」)</strong>:(a)<strong>38237–38245 確實無 HT-90XX 對應號碼</strong> —— HT-9046LS V3.32.810 的 AMR 段是 38222–38236(Loader/Empty/Color + Auto1–3 的 tray / device count 與 Auto1–3 bin setting)且<strong>止於 38236</strong>,而 HT-9011UC V3.33.899 <strong>整段沒有 AMR SVID</strong>,故本機這 9 個延伸號成立、保留。(b)<strong>38208–38210 已改號(已裁定,不再是爭議)</strong>:HT-9011UC V3.33.899 有 Auto4–6 的盤號欄位 <strong>38199 / 38200 / 38201</strong>(名稱 <code>Output 4/5/6 Tray ID</code>)。依「Auto1–3 遵循 810、Auto4–6 參照 899」的原則,Auto4–6 carrier 已改用 38199–38201,Auto1–3 維持 810 的 38205–38207;命名空間統一留在 <strong>SVID</strong>(899 把該家族宣告為 ECID,但 810 對 Auto1–3 是 SVID,六個口必須同一命名空間)</td>
 </tr>
 <tr>
