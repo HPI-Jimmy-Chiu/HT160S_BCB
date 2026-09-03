@@ -2272,8 +2272,23 @@ void THGem::OnPeerConnected(TCustomWinSocket *Socket)
     //  (see that hook's own note in OnPeerDisconnected below).  Until now the Linktest
     //  T6 watchdog hid this by always dropping first - 211 drops on 2026-09-02 alone -
     //  so raising T6 to a sane value exposes it.  Guard it here instead.
+    //AI(secs-halfopen-2) 20260903 : and CLOSE the stale socket, exactly as DropConnection()
+    //  does. The 20260902 tear-down released only our state and left the old
+    //  TCustomWinSocket alive inside TServerSocket; its LATE OnClientDisconnect /
+    //  OnClientError would then have run into OnPeerDisconnected() / DropConnection() and
+    //  torn down the healthy NEW link instead - the very failure this guard exists for,
+    //  merely postponed. Close() may itself route through ServerClientDisconnect (which
+    //  already calls OnPeerDisconnected), so tear down explicitly only if that did not
+    //  happen. The identity checks in ServerClientDisconnect / ServerClientRead /
+    //  ServerClientError below are the other half of this fix.
     if(ActiveSocket != NULL && ActiveSocket != Socket)
-        OnPeerDisconnected();
+    {
+        TCustomWinSocket *pStale = ActiveSocket;
+        StringOut("[SECS] stale half-open peer replaced by a new connection - closing it");
+        try { pStale->Close(); } catch(...) {}
+        if(ActiveSocket != NULL)
+            OnPeerDisconnected();
+    }
     ActiveSocket = Socket;
     iHsmsState   = HSMS_STATE_CONNECTED;
     iReconnectCountdown = iReconnectInterval;   //AI(ht160s-secsgem) 20260611 : arm for next drop
@@ -2516,10 +2531,23 @@ void __fastcall THGem::ServerClientConnect(TObject *Sender, TCustomWinSocket *So
 }
 void __fastcall THGem::ServerClientDisconnect(TObject *Sender, TCustomWinSocket *Socket)
 {
+    //AI(secs-halfopen-2) 20260903 : only the ACTIVE peer may tear the session down. A socket
+    //  that OnPeerConnected() already replaced still delivers its own late disconnect;
+    //  acting on it would drop the healthy link. (ActiveSocket==NULL keeps the old path.)
+    if(ActiveSocket != NULL && Socket != ActiveSocket)
+    {
+        StringOut("[SECS] stale peer disconnected (ignored, live link untouched)");
+        return;
+    }
     OnPeerDisconnected();
 }
 void __fastcall THGem::ServerClientRead(TObject *Sender, TCustomWinSocket *Socket)
 {
+    //AI(secs-halfopen-2) 20260903 : bytes from a stale socket must never enter the live
+    //  HSMS frame buffer (RecvBuffer is shared and length-prefixed - one foreign byte
+    //  desynchronises every frame after it).
+    if(ActiveSocket != NULL && Socket != ActiveSocket)
+        return;
     ReadFromPeer(Socket);
 }
 void __fastcall THGem::ServerClientError(TObject *Sender, TCustomWinSocket *Socket,
@@ -2529,6 +2557,14 @@ void __fastcall THGem::ServerClientError(TObject *Sender, TCustomWinSocket *Sock
     S.sprintf("[SECS] server socket error event=%d code=%d", (int)ErrorEvent, ErrorCode);
     StringOut(S);
     ErrorCode = 0;   // suppress VCL exception
+    //AI(secs-halfopen-2) 20260903 : an error on a socket OnPeerConnected() already replaced
+    //  concerns the dead peer only. DropConnection() would Close() ActiveSocket - the
+    //  healthy new link - so log it and leave the session alone.
+    if(ActiveSocket != NULL && Socket != ActiveSocket)
+    {
+        StringOut("[SECS] stale peer error (ignored, live link untouched)");
+        return;
+    }
     //AI(ht160s-secsgem) 20260611 : same as client side - a peer RST/error gives
     //  no OnClientDisconnect, so drop the state so a new client can be accepted.
     if(iHsmsState >= HSMS_STATE_CONNECTED)
