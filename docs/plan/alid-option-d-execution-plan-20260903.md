@@ -105,3 +105,46 @@ S8 是 S9 的**硬前置**（B5：否則 `*_manual.xlsx` 舊雜湊說法會一�
 - ALTX 超過 40 字元 447/485 筆（Data Item 規格上限），規模是 ALID 問題的 7 倍，另案。
 - class 4-8 每類只有 10,000 個 payload；超過即落 class 9，由修正 2 抓。
 - `note.cpp:1005` 在 map 不一致時給碼加 `-` 前綴 → S5F1 落 class 9 而目錄不落；只在內部 map 壞掉時可達，另案。
+
+---
+
+## 6. 執行紀錄
+
+### 20260903 裁定
+- **B2 = 擴 '4'..'8' 並改走 EventLog**（= 變更檔 E6b）；**D1 = 分批**（47 自由字串另案登錄）；**D2 = 順手修**。
+
+### S1 完成（20260903）
+- `scripts/ops/gen-alid-catalog.py` 入庫；新增 B1 資料來源閘：`EXPECTED_CSV_ROWS` / `EXPECTED_CSV_MD5` 常數（可用
+  `--expect-csv-rows / --expect-csv-md5` 覆寫，`--allow-csv-drift` 降為警告），每次執行先驗。
+  負向測試：錯 md5 → exit 1；HEAD 的 484 列副本 → exit 1。`--selftest` 0 失敗、`--audit` 0 違規、
+  `--verify-table` 對昨晚 532 表 0 不符。
+- **未掛進 `build-ht160s.ps1`**：`--check` 比對的是模擬器磁碟常數，S6 之前必然 stale 會擋建置；S6 完成後再掛。
+
+### S2 完成（20260903）
+- E1-E9 照變更檔逐字套用（`UsecegemMainFrom.cpp/.h`、`database.cpp/.h`、`ht160s.cpp`）。
+- B2：`database.cpp` 守衛 `if(c0<'4' || c0>'8')`；命中時 `gAlidAuditFaults++` 並寫入 `gAlidAuditDetail`
+  （受 `K_ALID_AUDIT_MAX_LINES` 上限，溢出計入 `gAlidAuditSuppressed`）；verdict latch 的五行 reset 移到
+  `CreateSystemAlarmCode()` 開頭（`mapAlarmCodeList.clear()` 之後），守衛才能寫進同一份報告。
+- D2：`aLoader.cpp` 改用 `ShowMyError("MES0926", LangT("Loader Tray has IC,please remove"), ...)`；
+  `database.cpp` 以 MES0925 同款 standalone 區塊登錄 `MES0926`（訊息與 LangT key 逐位元相同，
+  `language_phrases.txt:138` 中譯不受影響；9046LS 字典無 MES0926，不撞）。
+  → 註冊碼 485 → **486**，ALID `300000926`；舊值 1671856712（雜湊）永不再送出。
+- 全部新註解 ASCII；六檔 CRLF 保留、非 ASCII 位元 0。
+
+### S3 完成（20260903）
+| 建置 | 模式 | 結果 |
+|---|---|---|
+| A | 真機（`//#define SOFT_SIMULATE`，工作樹既有狀態）`-Full` | exit 0（唯一警告 W8004 csystem.cpp:1951 為既有） |
+| B | 模擬（define 打開）`-Full` | exit 0 |
+| smoke | `test-ht160s-startup.ps1 -StartupSeconds 20` | **Pass**（ProcessAliveAfterStartupWindow） |
+| C | 還原真機（md5 `4fdc44ce…` byte-identical）`-Full` | exit 0 |
+- EventLog `HT160S_2026_09_03.csv` 恰一行：`INF_ALID_AUDIT,"S5 ALID self-check : 486 alarm code(s), 0 violation(s)"`。
+- `system/AlarmList.csv` 由開機重寫為 486 列（含 `MES0926`），md5 `b710227ca23356f178c7384bf2784e70`；
+  產生器常數同步 bump；`--audit` 486/486、class {1:14, 2:15, 3:37, 4:234, 5:180, 6:6}、0 違規。
+- 新交付對照表：`docs/plan/alid-option-d-20260902/HT160S_ALID_map_20260903.csv`（486 列，含 OldALID / Changed / DecodesBackTo）。
+- alarm-registry 檢查：31 literals（MES0926 已被抓到並確認登錄）。
+
+### 尚未做
+- S3b 對真韌體 headless round-trip（需機台或真韌體在線）。
+- S4 工作簿 0903、S5 兩本 md/html、S6 模擬器、S7 記憶/.github、S8 退役雙胞胎、S9 打包。
+- ⚠ 對照表變成 486 列後，S4 表尾註／功能頁的「485」字樣要寫 **486**，`MES0926` 要列入「本次新增」。

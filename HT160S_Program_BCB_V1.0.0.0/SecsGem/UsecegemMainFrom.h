@@ -33,7 +33,15 @@ void EventReport(unsigned Ceid);
 void NoteLotStartTime(bool bStarted, AnsiString sWhen="");
 //AI(ht160s-secsgem) 20260625 : S5F1 alarm report (set/clear) glue, mirrors EventReport.
 void AlarmReport(AnsiString Code, AnsiString Message, bool bSet);
-//AI(ht160s-secsgem) 20260715 : SSOT ALID hash shared by S5F1 + the S5F6/S5F8 alarm catalog.
+//AI(secs-alid-optiond) 20260902 : SSOT ALID shared by S5F1 and the S5F6/S5F8 alarm
+//  catalog - a PURE function of the alarm code string (no map, no language, no machine
+//  state), which is what makes the reported ALID equal the catalog ALID. Returns the
+//  class-banded encoding Class*100000000 + Payload : 1=JAM 2=WAR 3=MES (payload = the
+//  canonical 4- or 5-digit tail), 4=cylinder 5=motor 6=sucker 7=eRecordProcess 8=eOther
+//  (payload = the whole 5-digit code), 9=unregistered free string (host: "not in the
+//  catalog, read the code from the leading token of ALTX"). ALWAYS exactly 9 digits:
+//  never 0, never above 999999999, so even a signed 32-bit host parse is safe. Amendment
+//  2 in database.cpp CreateSystemAlarmCode() self-checks every registered code at startup.
 unsigned ComputeAlarmAlid(AnsiString Code);
 //---------------------------------------------------------------------------
 #endif

@@ -2439,7 +2439,11 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
                    HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true &&
                    HSys.Sen.SnLoader_OutputBottomHasTray.IsOn()==false)
                 {
-                    int ret=ShowMyError(LangT("Loader Tray has IC,please remove"), K_RETRY|K_SKIP);
+                    //AI(secs-alid-optiond D2) 20260903 : code-carrying overload. The 1-arg form used
+                    //the TRANSLATED text as the alarm code, so the S5F1 ALID changed with the UI
+                    //language and the alarm never appeared in the S5F6/S5F8 catalog. MES0926 is
+                    //registered in database.cpp CreateSystemAlarmCode; the LangT key is unchanged.
+                    int ret=ShowMyError("MES0926", LangT("Loader Tray has IC,please remove"), K_RETRY|K_SKIP);
                     if(ret==K_RETRY)
                     {
                         break;

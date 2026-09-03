@@ -22,6 +22,8 @@
 #include "CosFunction.h"
 #include "GeneralSetting.h"
 #include "SecsGem\uHGemClass.h"
+#include "SecsGem\UsecegemMainFrom.h"   //AI(secs-alid-optiond) 20260902 : ComputeAlarmAlid for the ALID self-check
+#include "cEventLog.h"                  //AI(secs-alid-optiond) 20260902 : g_EventLog, the ratified report channel
 #include "cStepTrace.h"
 #include "cStateRecordHT160.h"
 #include "systools.h"
@@ -31,6 +33,19 @@
 //---------------------------------------------------------------------------
 SYSTEM_MODULAR HSys;
 TDataModule1 *DataModule1;
+//AI(secs-alid-optiond) 20260902 : AMENDMENT 2 verdict latch. CreateSystemAlarmCode()
+//runs inside HSys.Initial() at init progress 46; g_EventLog.Init() only runs at
+//ht160s.cpp progress 86, and cCsvDailyLog::AppendLine returns early while m_pCS is NULL,
+//so an EventLog write at self-check time is a silent no-op at power-on. The verdict is
+//latched here and flushed by ReportAlarmAlidAudit() from ht160s.cpp once the log is open.
+//gAlidAuditDetail is a program-lifetime singleton, bounded to K_ALID_AUDIT_MAX_LINES
+//strings, deliberately never freed (the iosetview re-run of CreateSystemAlarmCode reuses
+//it). 0 faults = clean.
+static const int K_ALID_AUDIT_MAX_LINES = 40;   //bound the EventLog burst; a rollback would otherwise log every row
+int          gAlidAuditRows       = 0;
+int          gAlidAuditFaults     = 0;
+int          gAlidAuditSuppressed = 0;
+TStringList *gAlidAuditDetail     = NULL;
 //---------------------------------------------------------------------------
 __fastcall TDataModule1::TDataModule1(TComponent* Owner)
     : TDataModule(Owner)
@@ -814,6 +829,15 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
 
     mapNameToAlarm.clear();
     mapAlarmCodeList.clear();
+    //AI(secs-alid-optiond) 20260903 : reset the AMENDMENT 2 verdict latch FIRST (owner ruling
+    //B2) so the 20260626 [ALARM-COLLISION] guard further down can add its findings to the same
+    //EventLog report instead of an OutputDebugString nobody on a shipped machine can see.
+    gAlidAuditRows       = 0;
+    gAlidAuditFaults     = 0;
+    gAlidAuditSuppressed = 0;
+    if(gAlidAuditDetail==NULL)
+        gAlidAuditDetail = new TStringList();
+    gAlidAuditDetail->Clear();
 
     for(int i=0; i<iTotalCylinder; i++)
     {
@@ -1024,6 +1048,20 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(secs-alid-optiond D2) 20260903 : MES0926 = Loader discharge tray still carries IC
+        //(aLoader.cpp DoLoaderDischarge case 1000). That alarm used to be raised through the
+        //1-arg ShowMyError with LangT("Loader Tray has IC,please remove") as BOTH code and
+        //message, so the TRANSLATED string became the alarm code : the S5F1 ALID changed with
+        //the UI language (EN vs Big5 ZH) and the alarm was absent from the S5F6/S5F8 catalog.
+        //Owner ruling D2 (20260903) : give it a real code. 0926 is the next free Loader slot
+        //after MES0925 and is unused in the customer's HT9046LS dictionary (theirs stops at
+        //MES0923 / MES0922x). The English text is kept byte-identical to the LangT key so
+        //system\language_phrases.txt:138 still resolves the Chinese message.
+        {
+            AnsiString cd="MES0926", mg="Loader Tray has IC,please remove";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(ht160s-phantom-tray) 20260805 : MES1428 = the Color CARRIAGE still claims a tray when
         //the CleanOut drain has nothing left it can drain (aColor.cpp DoColor case 100). The drain
         //only handles the front stack and the rear seat, so a tray held by the carriage used to
@@ -1078,7 +1116,13 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
     //beginning 4/5/6 must be a generated structured family code (Cyn=4/Mot=5/Suck=6) of the
     //canonical 5-char "<fam><3-index><1-err>" shape; flag anything else as a hand-allocated
     //code that has shadowed the structured numeric space. WAR/JAM/MES keys start with a
-    //letter and are skipped, so 9045 reuse never trips this. Observe-only (OutputDebugString).
+    //letter and are skipped, so 9045 reuse never trips this.
+    //AI(secs-alid-optiond) 20260903 : owner ruling B2 - (1) widened from 4/5/6 to '4'..'8' :
+    //Option D made 7 (eRecordProcess) and 8 (eOther) LIVE numeric ALID classes, so a
+    //non-5-char 7xxxx / 8xxxx key would silently fall to class 9 exactly like a 4xxxx one;
+    //(2) no longer observe-only : every hit is also counted and latched into the AMENDMENT 2
+    //verdict below, so it reaches the EventLog via ReportAlarmAlidAudit() - OutputDebugString
+    //alone is invisible on a shipped machine (no debugger attached).
     {
         std::map<AnsiString, AnsiString>::iterator itGuard;
         for(itGuard=mapNameToAlarm.begin(); itGuard!=mapNameToAlarm.end(); ++itGuard)
@@ -1087,7 +1131,7 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             if(kk.Length()<1)
                 continue;
             char c0=kk[1];
-            if(c0!='4' && c0!='5' && c0!='6')
+            if(c0<'4' || c0>'8')   //AI(secs-alid-optiond) 20260903 : B2 - classes 4..8
                 continue;
             bool bAllDigit=true;
             for(int p2=1; p2<=kk.Length(); p2++)
@@ -1097,7 +1141,15 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
                     break;
                 }
             if(bAllDigit==true && kk.Length()!=5)
+            {
                 OutputDebugString((AnsiString("[ALARM-COLLISION] non-canonical structured key: ")+kk+"\r\n").c_str());
+                //AI(secs-alid-optiond) 20260903 : B2 - same finding, into the EventLog report.
+                gAlidAuditFaults++;
+                if(gAlidAuditDetail!=NULL && gAlidAuditDetail->Count<K_ALID_AUDIT_MAX_LINES)
+                    gAlidAuditDetail->Add(AnsiString("non-canonical structured key ")+kk+" (mapNameToAlarm)");
+                else
+                    gAlidAuditSuppressed++;
+            }
         }
     }
 
@@ -1117,6 +1169,116 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
     catch(...)
     {
     }
+    //AI(secs-alid-optiond) 20260902 : AMENDMENT 2 - the S5 ALID startup self-check
+    //(ratified spec section 2). Option D's "9 digits AND decodable" promise degrades
+    //SILENTLY the moment a code that does not fit the grammar is registered - a 6-digit
+    //family code, a 5-letter prefix, a non-canonical leading-zero tail ("MES01421"), a
+    //bare "30000" - each just becomes class 9 with no complaint, and the host is then
+    //told "not in the catalog" for a code that IS in the catalog. There is no ALID
+    //auditor anywhere else in the toolchain, so this is it.
+    //
+    //THE THREE RATIFIED CHECKS, per row of the FINAL mapAlarmCodeList :
+    //  NOT_9_DIGITS            ComputeAlarmAlid() is outside [100000000..999999999]
+    //  CLASS9_NOT_IN_CATALOG   a REGISTERED code encoded to class 9
+    //  DUPLICATE_OF_<code>     two codes share one ALID (the host cannot tell them apart)
+    //A host-decode round-trip check is deliberately NOT included : AMENDMENT 1b makes the
+    //round trip a THEOREM (one canonical string per payload for classes 1/2/3, payload ==
+    //the code for classes 4..8), verified exhaustively over all 350000 strings the
+    //classes 1..8 grammar accepts - 0 failures. It would be a permanently dead branch.
+    //Measured on the 20260902 map : 485 rows, 0 faults.
+    //
+    //RELATION TO THE 20260626 [ALARM-COLLISION] GUARD ~40 lines above : that guard flags
+    //an all-digit key beginning 4/5/6 whose length is not 5. Every such key now also
+    //fails CLASS9_NOT_IN_CATALOG here (a length other than 5 cannot be class 4..8), so
+    //this check STRICTLY SUBSUMES it for detection. The old guard is kept because it
+    //names the specific cause ("non-canonical structured key") and because it scans
+    //mapNameToAlarm, which this pass does not. Nothing is re-implemented.
+    //
+    //REPORT CHANNEL (ratified) : g_EventLog.Log() - one line per violation plus one
+    //summary line, into the daily EventLog CSV, which the State Record zip already
+    //carries. NEVER ShowMyMessage (it stops the machine), never a modal, and never a
+    //note.cpp alarm (ShowNoteAlarm calls DecStopAllMotor() and clears Sys.SystemStart -
+    //it would physically stop the machine at power-on over a catalog cosmetic, and it is
+    //self-defeating: the map is what feeds the alarm system being used to complain about
+    //the map). This self-check can NEVER block a production start.
+    //(the verdict latch was reset at the top of this function, before the 20260626 guard,
+    // so that guard's findings land in the same report - owner ruling B2, 20260903)
+    try
+    {
+        std::map<unsigned, AnsiString> mapAlidSeen;
+        //LOCAL iterator on purpose : the member IterAlarmCodeList is shared mutable state
+        //(note.cpp ShowSystemError assigns it too), so this pass does not touch it.
+        std::map<AnsiString, MyAlarmCodeStruct>::iterator itAudit;
+        for(itAudit=mapAlarmCodeList.begin(); itAudit!=mapAlarmCodeList.end(); ++itAudit)
+        {
+            AnsiString sCode = itAudit->second.AlarmCode;
+            unsigned   uAlid = ComputeAlarmAlid(sCode);
+            unsigned   uCls  = uAlid/100000000u;
+            AnsiString sBad  = "";
+            gAlidAuditRows++;
+
+            if(uAlid<100000000u || uAlid>999999999u)
+                sBad = "NOT_9_DIGITS";
+            else if(uCls==9u)
+                sBad = "CLASS9_NOT_IN_CATALOG";
+            else if(mapAlidSeen.find(uAlid)!=mapAlidSeen.end())
+                sBad = AnsiString("DUPLICATE_OF_")+mapAlidSeen[uAlid];
+
+            if(mapAlidSeen.find(uAlid)==mapAlidSeen.end())
+                mapAlidSeen[uAlid] = sCode;
+
+            if(sBad!="")
+            {
+                gAlidAuditFaults++;
+                if(gAlidAuditDetail->Count<K_ALID_AUDIT_MAX_LINES)
+                    gAlidAuditDetail->Add(AnsiString().sprintf("%s ALID=%u %s",
+                                          sCode.c_str(), uAlid, sBad.c_str()));
+                else
+                    gAlidAuditSuppressed++;
+            }
+        }
+    }
+    catch(...)
+    {
+    }
+    //Free second channel, and the only one that works before the EventLog opens. Same
+    //idiom and spirit as the [ALARM-COLLISION] guard above.
+    OutputDebugString(AnsiString().sprintf("[ALID-AUDIT] rows=%d faults=%d\r\n",
+                      gAlidAuditRows, gAlidAuditFaults).c_str());
+    //A no-op at power-on (the log is not open yet - see the latch note at the top of this
+    //file); this call is what covers the RUNTIME re-run from iosetview.cpp:942, where the
+    //log IS open. Power-on is covered by the single call from ht160s.cpp.
+    ReportAlarmAlidAudit();
+}
+//---------------------------------------------------------------------------
+void ReportAlarmAlidAudit()
+{
+    //AI(secs-alid-optiond) 20260902 : AMENDMENT 2's ratified report channel - one
+    //g_EventLog line per violation plus one summary line. Called from TWO places by
+    //design, and that is not a duplicate:
+    //  - from the tail of CreateSystemAlarmCode(), which is a silent no-op at power-on
+    //    (cCsvDailyLog::AppendLine early-returns while m_pCS is NULL) and is what covers
+    //    the RUNTIME re-run from iosetview.cpp:942, where the log IS open;
+    //  - once from ht160s.cpp, right after g_EventLog.Init(), which covers power-on.
+    //Exactly one set of lines lands on each path: WinMain is single-threaded and the
+    //ht160s.cpp call runs before the UI exists, so no iosetview re-run can precede it.
+    //Do NOT add a "already reported" static flag - the power-on no-op would consume it.
+    //Writes at most K_ALID_AUDIT_MAX_LINES+2 lines and returns. No modal, no machine
+    //stop, nothing that can block a production start.
+    int i;
+    if(gAlidAuditDetail!=NULL)
+        for(i=0; i<gAlidAuditDetail->Count; i++)
+            g_EventLog.Log("WRN_ALID_AUDIT", gAlidAuditDetail->Strings[i]);
+    if(gAlidAuditSuppressed>0)
+        g_EventLog.Log("WRN_ALID_AUDIT",
+                       AnsiString().sprintf("and %d further violation(s) not listed",
+                                            gAlidAuditSuppressed));
+    //The summary is written EVERY boot, clean or not. One line a day is nothing, and a
+    //report that only appears on failure cannot be diffed to prove nothing changed - a
+    //KYEC "your ALID is wrong" claim is then settled from the shipped EventLog.
+    g_EventLog.Log((gAlidAuditFaults>0) ? "WRN_ALID_AUDIT" : "INF_ALID_AUDIT",
+                   AnsiString().sprintf("S5 ALID self-check : %d alarm code(s), %d violation(s)",
+                                        gAlidAuditRows, gAlidAuditFaults));
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::InitialSensorName()

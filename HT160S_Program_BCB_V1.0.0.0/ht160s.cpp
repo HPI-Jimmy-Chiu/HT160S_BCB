@@ -217,6 +217,12 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //from the systools timer reading the version panel). Routed through the HT160
          //event-log path (RecordProcess -> g_EventLog). fNote already exists (created above).
          RecordProcess(AnsiString("Program Start with version ")+MainVersion);
+         //AI(secs-alid-optiond) 20260902 : flush the AMENDMENT 2 S5-ALID self-check
+         //verdict now that the EventLog is open. HSys.Initial() ran the check at progress
+         //46 while the log was still shut (its own call there is a no-op), so this is the
+         //loud operator-facing channel. One summary line when clean, plus one line per
+         //violation when not; it can never block the production start.
+         ReportAlarmAlidAudit();
          //AI(general) 20260617 : log retention (auto-prune old day/month folders).
          //Values from General.ini [LogRetention]; audit logs kept longer than the
          //high-volume comm/diagnostic channels. GeneralSetting is already loaded

@@ -608,4 +608,14 @@ public:
 //---------------------------------------------------------------------------
 extern SYSTEM_MODULAR HSys;
 //---------------------------------------------------------------------------
+//AI(secs-alid-optiond) 20260902 : AMENDMENT 2 S5-ALID self-check verdict, filled by
+//SYSTEM_MODULAR::CreateSystemAlarmCode() (0 faults = clean). The check runs inside
+//HSys.Initial(), long before g_EventLog.Init(), so ReportAlarmAlidAudit() flushes the
+//verdict to the EventLog from ht160s.cpp once the log is open. Detail lines are bounded;
+//gAlidAuditSuppressed counts what did not fit.
+extern int          gAlidAuditRows;
+extern int          gAlidAuditFaults;
+extern int          gAlidAuditSuppressed;
+extern TStringList *gAlidAuditDetail;
+void ReportAlarmAlidAudit();
 #endif
