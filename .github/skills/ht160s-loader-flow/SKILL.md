@@ -31,7 +31,7 @@ Maintain and extend the HT160S_BCB Loader module. The Loader feeds trays, runs t
 Sensors added for Loader:
 - `SnLoader_InputHasTray`, `SnLoader_InputFullTray`, `SnLoader_Inputend`
 - `SnLoader_TrayPos1`, `SnLoader_TrayPos2`
-- `SnLoader_OutputHasTray`, `SnLoader_OutputBottomHasTray`
+- `SnLoader_OutputBottomHasTray`
 
 > **Spatial-truth warning (user memory 雷 #2):** `Input*` = Front stacking area (operator load side); `Output*`/rear = pickup area (TrayArm takes away). `Input/Output` are logical roles, NOT physical front/rear directions. Confirm against `machine-spatial-truth.md` before wiring new sensors.
 

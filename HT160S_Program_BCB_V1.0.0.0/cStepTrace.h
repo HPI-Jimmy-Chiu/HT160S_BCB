@@ -22,4 +22,25 @@
 // Cheap no-op when tracing is disabled.
 void StepTraceTick();
 //---------------------------------------------------------------------------
+// Process breadcrumb : the live "which action + Task case is driving this
+// cycle" label. DataModule1::DoAllProcess publishes it (action Name + Tag)
+// before each action Execute; mycylin SetCylinderAlarm reads it at alarm-raise
+// time so a decoupled (queued) cylinder alarm names the FLOW, not just the
+// cylinder. Cleared between cycles so an alarm raised outside module dispatch
+// carries no stale step. ASCII-only; AnsiString flow; no C++11.
+void       SetProcStep(const AnsiString& Name, int Task);
+AnsiString GetProcStep();
+//---------------------------------------------------------------------------
+// Single-axis Home / motion task trace for Teach + Motor Test diagnosis.
+// One-shot capture written through the shared cCsvDailyLog daily-CSV channel:
+//     D:\HT160S_Log\MotorTaskLog\YYYYMMDD\MotorTask_YYYYMMDD.csv
+// Active while a Teach / Motor Test session is open (call MotorTaskLogSetActive
+// on form show/close) OR whenever the flag file D:\HT160S_Log\motortask.on
+// exists. Cheap no-op when inactive. Each call appends one row; callers log on
+// task transitions (not every tick) so the file stays a readable "step movie".
+void MotorTaskLogSetActive(bool bActive);
+bool MotorTaskLogActive();
+void MotorTaskLog(const AnsiString& sSource, const AnsiString& sMotor,
+                  const AnsiString& sEvent,  const AnsiString& sDetail);
+//---------------------------------------------------------------------------
 #endif

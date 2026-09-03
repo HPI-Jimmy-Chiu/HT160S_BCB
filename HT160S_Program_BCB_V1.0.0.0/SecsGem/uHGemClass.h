@@ -36,6 +36,50 @@ public:
     // screen SECS status badge). Base is a no-op.
     virtual void RefreshSecsBadge();
 
+    //AI(ht160s-agv) 20260615 : called once per second from THGem::Timer1Timer so
+    // the machine-specific GEM logic can drive the E87/AGV coordinator (poll car
+    // full -> CEID272, service handshake). Base is a no-op.
+    virtual void ServiceAgv();
+
+    //AI(secs-controlstate) 20260803 : called once per second from THGem::Timer1Timer so the
+    // machine-specific GEM logic can publish the GEM control state (SVID 4 / 9) and fire the
+    // change events (CEID 141 + 91/92/93) on an edge. Deliberately a periodic edge-detector,
+    // exactly as HT9045 does it, NOT a call inside each message handler : the state is written
+    // from four different places and firing an S6F11 from inside S2F42 would push an event out
+    // ahead of the HCACK reply it is still building. Base is a no-op.
+    virtual void PollGemControlState();
+
+    //AI(secs-e30-gate) 20260803 : operator-side control-state surface, reached from the machine UI
+    // through HSys.MyGem (an HTGem*), same convention as NoteLotStartTime / ReportSkipICCount.
+    // WITHOUT an operator control there is no way into or out of EQUIPMENT OFF-LINE, E30's
+    // "accept S1F17 only from HOST OFF-LINE" rule can never be exercised, and a machine that
+    // boots off-line can never be brought on-line at all. Base implementations are inert.
+    virtual void OperatorSetControlState(int iGemStdState);   // 1 = Off-Line(Equipment) / 4 = Local / 5 = Remote
+    virtual int  GetControlState();                           // GEM domain 1/4/5, 0 = not a GEM build
+    virtual AnsiString DescribeControlState();                // operator-facing text
+
+    //AI(secs-kyec-rcmd4-fix) 20260728 : transport -> logic notification that the HSMS link is
+    // gone (peer disconnect, socket error, Separate.req, or our own DropConnection). Lets the
+    // logic layer drop any latched host state that would otherwise outlive the host. Base is a
+    // no-op so THGem stays free of machine dependencies.
+    virtual void OnCommunicationLost();
+
+    //AI(secs-lotstarttime) 20260730 : production -> logic notification that the current work
+    // order has started (true) or ended (false), so SVID 1009 Lot Start Time can latch the
+    // moment. Called from BOTH the manual Lot Start / Lot End buttons and the SECS LOTSTART
+    // accept path. Latched, NOT recomputed in RefreshSVData : the host must be able to read
+    // back WHEN the lot started, not what time it is now. Base is a no-op.
+    //AI(secs-lotstarttime-persist) 20260730 : sWhen (already formatted) overrides "now", so a
+    // power-on work-order restore can re-latch the ORIGINAL start time instead of the resume
+    // moment. Empty = stamp now.
+    virtual void NoteLotStartTime(bool bStarted, AnsiString sWhen="");
+
+    //AI(secs-skipiccount) 20260802 : machine-specific hook - latch SVID 37010 with the
+    // number of ICs the operator removed at a SKIP, then fire CEID 78. Declared here so
+    // the alarm chokepoint can call it through HSys.MyGem (an HTGem*), matching the
+    // NoteLotStartTime convention above. Base is a no-op.
+    virtual void ReportSkipICCount(int iCount);
+
     virtual void AddSV();
     virtual void AddEC();
     virtual void AddAlarmList();

@@ -58,21 +58,45 @@ class TMyTray
 public:
     int Data[MAX_TRAY_X][MAX_TRAY_Y];   //AI(general) 20260601 : X-major Data[x][y], aligned to HT172
     int iBin[MAX_TRAY_X][MAX_TRAY_Y];
+    //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode carries the owning LotIndex and
+    //the IC 2D code per cell (mirror iBin), so the (Lot,Bin) routing key and the
+    //Production_Log Lot/2D columns survive the CCD->pick->place hand-off.
+    int iLot[MAX_TRAY_X][MAX_TRAY_Y];
+    AnsiString sCode2D[MAX_TRAY_X][MAX_TRAY_Y];
+    bool bManual2D[MAX_TRAY_X][MAX_TRAY_Y];   //AI(ht160s-ccd-manual2d) : per-cell flag, IC 2D was operator hand-entered
+    //AI(ht160s-lotpassfail) 20260709 : per-cell PASS/FAIL class frozen at CCD scan
+    //(0=none/error, 1=PASS, 2=FAIL). Mirrors iBin; feeds By Lot+PassFail routing and the
+    //Production_Log PassFail column so both read the SAME scan-time class (no place-time recompute).
+    int iPassClass[MAX_TRAY_X][MAX_TRAY_Y];
     AnsiString TrayID;
     eTrayKind Kind;   //AI(HT160S-Maintainer) 20260604 : tray role in stacking car
 
     TMyTray();
     void Clear();
     void SetAll(int data);
+    void Birth(int data, eTrayKind kind, AnsiString id);   //AI(ht160s-tray-source) : unified birth = Clear+SetAll+Kind+TrayID
+    void CopyFrom(const TMyTray &src);                     //AI(ht160s-tray-source) : deep copy (member-wise)
+    void MoveFrom(TMyTray &src);                           //AI(ht160s-tray-source) : copy + clear source (HT172 MoveTrayFrom semantics)
     bool HasIC();
     bool FullIC();
     bool HasThisIC(int data);
     bool FullThisIC(int data);
+    int  CountIC();   //AI(ht160s-agv-devicecount) 20260713 : cell count where Data!=0, ignores iBin pass/fail class
     //AI(HT160S-Maintainer) 20260601 : iBin sorting-bin grid helpers (mirror Data helpers)
     void ClearBin();
     void SetAllBin(int bin);
     void SetBin(int x, int y, int bin);
     int GetBin(int x, int y);
+    //AI(ht160s-lotbin) 20260615 : LotIndex + 2D-code grid helpers (mirror iBin helpers)
+    void ClearLotCode();
+    void SetLot(int x, int y, int lot);
+    int  GetLot(int x, int y);
+    void SetCode2D(int x, int y, AnsiString code);
+    AnsiString GetCode2D(int x, int y);
+    void SetPassClass(int x, int y, int c);   //AI(ht160s-lotpassfail) 20260709 : mirror SetBin
+    int  GetPassClass(int x, int y);          //AI(ht160s-lotpassfail) 20260709 : mirror GetBin
+    void SetManual2D(int x, int y, bool b);
+    bool GetManual2D(int x, int y);
     //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
     void SetKind(eTrayKind kind);
     eTrayKind GetKind();
@@ -86,7 +110,7 @@ public:
 //     Tray[2..] = normal work trays (eTrayKindNormal).
 //   Mainly used by Auto1~6; packed for AMR upload when AMR retrieves the car
 //   (upload payload not designed yet).
-#define MAX_TRAY_PER_CAR 30
+#define MAX_TRAY_PER_CAR 100
 //---------------------------------------------------------------------------
 class TMyCar
 {
@@ -129,13 +153,12 @@ public:
     bool Led[iMotLedTotalCnt];
     bool bHomeFlag;
     bool bHomeFinish;
+    DWORD dwHomeSensorWaitStart;   // GetTickCount stamp for the home-sensor confirm wait
     int SimulateSpeed;
     bool bShowSimulateCompoment;
     int Position;
     int EncoderPosition;
     bool bErrorMove;
-    int OriginRate;
-    int OriginRange;
     bool bIsServoMotor;
     bool (*MoveCheckCallBack)();
     int Tag;
@@ -158,6 +181,8 @@ public:
     int MotorMove(int p, int PreDonePos, bool bJogP);
     bool MotorMoveSKLED(int p);
     bool Home(AnsiString &sErr);
+    DWORD GetLastParaError(void);
+    DWORD VerifyHomeParaRange(void);
     void InitHomeTask();
     int ReadPos();
     int ReadEncoderPos();
@@ -178,6 +203,7 @@ public:
     int GetErrorIndex();
     int GetSoftLimitP();
     int GetSoftLimitN();
+    AnsiString SoftLimitDetail(int p);   // numeric target/limit line for out-of-limit popups
     int GetLastHomePos();
     double GetGearRatio();
     bool GetEnable();
@@ -206,6 +232,9 @@ public:
     void SetEnable(bool Value);
     void SetLimitLogic(bool logic);
     void SetIn1Logic(bool logic);
+    void SetHomeType(int Type);
+    void SetEncodeMultiple(int m);   // configure MC88X1 A/B encoder multiplier (3=x4 for all axes); applied at InitMotor
+    void SetEncodeDir(int d);        // configure MC88X1 encoder count direction (1=inverse default, 0=normal M05); applied at InitMotor
     void SetMotorKind(eMotorKind Kind);
     eMotorKind GetMotorKind();
     void SetMotionCardType(eMotionCardType Type);
@@ -276,6 +305,14 @@ public:
     void SetTraySingleData(int x, int y, int data);
     void SetTrayBin(int x, int y, int bin);   //AI(HT160S-Maintainer) 20260601 : write sorting bin for a cell
     int GetTrayBin(int x, int y);             //AI(HT160S-Maintainer) 20260601 : read sorting bin for a cell
+    void SetTrayLot(int x, int y, int lot);   //AI(ht160s-lotbin) 20260615 : write owning LotIndex for a cell
+    int  GetTrayLot(int x, int y);            //AI(ht160s-lotbin) 20260615 : read owning LotIndex for a cell
+    void SetTrayCode2D(int x, int y, AnsiString code);  //AI(ht160s-lotbin) 20260615 : write IC 2D code for a cell
+    AnsiString GetTrayCode2D(int x, int y);             //AI(ht160s-lotbin) 20260615 : read IC 2D code for a cell
+    void SetTrayPassClass(int x, int y, int c);         //AI(ht160s-lotpassfail) 20260709 : write frozen PASS/FAIL class
+    int  GetTrayPassClass(int x, int y);                //AI(ht160s-lotpassfail) 20260709 : read frozen PASS/FAIL class
+    void SetTrayManual2D(int x, int y, bool b);
+    bool GetTrayManual2D(int x, int y);
     void Refresh();
     void InitNewTray(int data);
     void InitEmptyTray();
@@ -285,6 +322,8 @@ public:
     void SetSubHTrayPanel(TTMyTray *ptr);
     void CopyTrayFrom(int Index);
     void MoveTrayFrom(int Index);
+    void CopyTrayFrom(TTrayMotor *MotPtr);   //AI(ht160s-tray-source) : motor-level copy (mirrors HT172 API)
+    void MoveTrayFrom(TTrayMotor *MotPtr);   //AI(ht160s-tray-source) : motor-level move = copy + clear source
     void SetTray(int data, bool bWithCover=false);
     void ClearTray();
     void SetTrayID(AnsiString ID);

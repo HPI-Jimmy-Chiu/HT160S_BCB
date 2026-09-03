@@ -1,6 +1,6 @@
 object fTeach: TfTeach
-  Left = 134
-  Top = 33
+  Left = 400
+  Top = 192
   BorderIcons = [biSystemMenu]
   BorderStyle = bsSingle
   Caption = 'Teach'
@@ -13,7 +13,7 @@ object fTeach: TfTeach
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poDefault
+  Position = poScreenCenter
   OnClose = FormClose
   OnCreate = FormCreate
   OnShow = FormShow
@@ -317,133 +317,6 @@ object fTeach: TfTeach
       ParentColor = False
       ParentFont = False
     end
-    object palMotorName: TPanel
-      Left = 12
-      Top = 44
-      Width = 337
-      Height = 44
-      BevelOuter = bvLowered
-      Color = 8421440
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWhite
-      Font.Height = -15
-      Font.Name = 'MS Sans Serif'
-      Font.Style = []
-      ParentFont = False
-      TabOrder = 0
-    end
-    object edNowPos: TEdit
-      Left = 116
-      Top = 98
-      Width = 126
-      Height = 24
-      ReadOnly = True
-      TabOrder = 1
-    end
-    object edEncoder: TEdit
-      Left = 116
-      Top = 132
-      Width = 126
-      Height = 24
-      ReadOnly = True
-      TabOrder = 2
-    end
-    object edSpeed: TEdit
-      Left = 116
-      Top = 166
-      Width = 126
-      Height = 24
-      TabOrder = 3
-      Text = '10'
-    end
-    object edStep: TEdit
-      Left = 116
-      Top = 200
-      Width = 126
-      Height = 24
-      TabOrder = 4
-      Text = '1.00'
-    end
-    object edTarget: TEdit
-      Left = 116
-      Top = 234
-      Width = 126
-      Height = 24
-      TabOrder = 5
-      Text = '0.00'
-    end
-    object btnMotorSet: TButton
-      Left = 252
-      Top = 98
-      Width = 96
-      Height = 28
-      Caption = 'SET'
-      TabOrder = 6
-    end
-    object btnMove: TButton
-      Left = 252
-      Top = 232
-      Width = 96
-      Height = 30
-      Caption = 'MOVE'
-      TabOrder = 7
-    end
-    object btnJogP: TButton
-      Left = 20
-      Top = 282
-      Width = 90
-      Height = 34
-      Caption = 'JOG +'
-      TabOrder = 8
-    end
-    object btnJogN: TButton
-      Left = 126
-      Top = 282
-      Width = 90
-      Height = 34
-      Caption = 'JOG -'
-      TabOrder = 9
-    end
-    object btnStepP: TButton
-      Left = 232
-      Top = 282
-      Width = 54
-      Height = 34
-      Caption = '+'
-      TabOrder = 10
-    end
-    object btnStepN: TButton
-      Left = 294
-      Top = 282
-      Width = 54
-      Height = 34
-      Caption = '-'
-      TabOrder = 11
-    end
-    object btnHome: TButton
-      Left = 20
-      Top = 326
-      Width = 96
-      Height = 36
-      Caption = 'HOME'
-      TabOrder = 12
-    end
-    object btnStop: TButton
-      Left = 132
-      Top = 326
-      Width = 96
-      Height = 36
-      Caption = 'STOP'
-      TabOrder = 13
-    end
-    object btnRefresh: TButton
-      Left = 244
-      Top = 326
-      Width = 96
-      Height = 36
-      Caption = 'REFRESH'
-      TabOrder = 14
-    end
     object ledStatus0: TALed
       Left = 118
       Top = 382
@@ -521,6 +394,156 @@ object fTeach: TfTeach
       Height = 22
       LEDStyle = LEDSqLarge
     end
+    object palMotorName: TPanel
+      Left = 12
+      Top = 44
+      Width = 337
+      Height = 44
+      BevelOuter = bvLowered
+      Color = 8421440
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWhite
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      TabOrder = 0
+    end
+    object edNowPos: TEdit
+      Left = 116
+      Top = 98
+      Width = 126
+      Height = 21
+      ReadOnly = True
+      TabOrder = 1
+    end
+    object edEncoder: TEdit
+      Left = 116
+      Top = 132
+      Width = 126
+      Height = 21
+      ReadOnly = True
+      TabOrder = 2
+    end
+    object edSpeed: TEdit
+      Left = 116
+      Top = 166
+      Width = 126
+      Height = 21
+      TabOrder = 3
+      Text = '10'
+      OnChange = edSpeedChange
+    end
+    object scbTeachSpeed: TScrollBar
+      Left = 252
+      Top = 168
+      Width = 96
+      Height = 20
+      Min = 1
+      PageSize = 0
+      Position = 1
+      TabOrder = 16
+      OnScroll = scbTeachSpeedScroll
+    end
+    object edStep: TEdit
+      Left = 116
+      Top = 200
+      Width = 126
+      Height = 21
+      TabOrder = 4
+      Text = '1.00'
+    end
+    object edTarget: TEdit
+      Left = 116
+      Top = 234
+      Width = 126
+      Height = 21
+      TabOrder = 5
+      Text = '0.00'
+    end
+    object btnMotorSet: TButton
+      Left = 252
+      Top = 98
+      Width = 96
+      Height = 28
+      Caption = 'SET'
+      TabOrder = 6
+      OnClick = btnSetTeachClick
+    end
+    object btnMove: TButton
+      Left = 252
+      Top = 232
+      Width = 96
+      Height = 30
+      Caption = 'MOVE'
+      TabOrder = 7
+      OnClick = btnMoveClick
+    end
+    object btnJogP: TButton
+      Left = 126
+      Top = 282
+      Width = 90
+      Height = 34
+      Caption = 'JOG +'
+      TabOrder = 8
+      OnMouseDown = btnJogPMouseDown
+      OnMouseUp = btnJogMouseUp
+    end
+    object btnJogN: TButton
+      Left = 20
+      Top = 282
+      Width = 90
+      Height = 34
+      Caption = 'JOG -'
+      TabOrder = 9
+      OnMouseDown = btnJogNMouseDown
+      OnMouseUp = btnJogMouseUp
+    end
+    object btnStepP: TButton
+      Left = 294
+      Top = 282
+      Width = 54
+      Height = 34
+      Caption = '+'
+      TabOrder = 10
+      OnClick = btnStepPClick
+    end
+    object btnStepN: TButton
+      Left = 232
+      Top = 282
+      Width = 54
+      Height = 34
+      Caption = '-'
+      TabOrder = 11
+      OnClick = btnStepNClick
+    end
+    object btnHome: TButton
+      Left = 20
+      Top = 326
+      Width = 96
+      Height = 36
+      Caption = 'HOME'
+      TabOrder = 12
+      OnClick = btnHomeClick
+    end
+    object btnStop: TButton
+      Left = 132
+      Top = 326
+      Width = 96
+      Height = 36
+      Caption = 'STOP'
+      TabOrder = 13
+      OnClick = btnStopClick
+    end
+    object btnRefresh: TButton
+      Left = 244
+      Top = 326
+      Width = 96
+      Height = 36
+      Caption = 'REFRESH'
+      TabOrder = 14
+      OnClick = btnRefreshClick
+    end
     object lstMotors: TListBox
       Left = 20
       Top = 562
@@ -528,6 +551,7 @@ object fTeach: TfTeach
       Height = 260
       ItemHeight = 13
       TabOrder = 15
+      OnClick = lstMotorsClick
     end
   end
   object palClient: TPanel
@@ -586,6 +610,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'SET NOW'
         TabOrder = 0
+        OnClick = btnSetTeachClick
       end
       object btnGoTeach: TButton
         Left = 114
@@ -594,6 +619,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'GO'
         TabOrder = 1
+        OnClick = btnGoTeachClick
       end
       object btnSave: TButton
         Left = 208
@@ -602,6 +628,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'SAVE'
         TabOrder = 2
+        OnClick = btnSaveClick
       end
       object btnReload: TButton
         Left = 302
@@ -610,6 +637,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'RELOAD'
         TabOrder = 3
+        OnClick = btnReloadClick
       end
       object btnIOForm: TButton
         Left = 396
@@ -618,16 +646,7 @@ object fTeach: TfTeach
         Height = 30
         Caption = 'IO TOOL'
         TabOrder = 4
-      end
-      object btnClose: TButton
-        Left = 490
-        Top = 10
-        Width = 86
-        Height = 30
-        Cancel = True
-        Caption = 'EXIT'
-        TabOrder = 5
-        OnClick = btnCloseClick
+        OnClick = btnIOFormClick
       end
     end
     object PageTeach: TPageControl
@@ -635,7 +654,7 @@ object fTeach: TfTeach
       Top = 110
       Width = 839
       Height = 770
-      ActivePage = tsEmptyTray
+      ActivePage = tsAdvanced
       Align = alClient
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
@@ -643,6 +662,7 @@ object fTeach: TfTeach
       Font.Name = 'MS Sans Serif'
       Font.Style = []
       ParentFont = False
+      TabIndex = 5
       TabOrder = 2
       object tsEmptyTray: TTabSheet
         Caption = 'Empty / Tray X'
@@ -650,13 +670,13 @@ object fTeach: TfTeach
           Left = 0
           Top = 0
           Width = 831
-          Height = 742
+          Height = 739
           Align = alClient
-          ColCount = 5
-          DefaultRowHeight = 24
-          FixedRows = 1
+          Color = 14670284
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsLoaderSort: TTabSheet
@@ -668,11 +688,11 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
-          ColCount = 5
-          DefaultRowHeight = 24
-          FixedRows = 1
+          Color = 14670284
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsAuto: TTabSheet
@@ -684,11 +704,11 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
-          ColCount = 5
-          DefaultRowHeight = 24
-          FixedRows = 1
+          Color = 14670284
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsSortZ: TTabSheet
@@ -700,11 +720,11 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
-          ColCount = 5
-          DefaultRowHeight = 24
-          FixedRows = 1
+          Color = 14670284
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
         end
       end
       object tsOthers: TTabSheet
@@ -716,11 +736,476 @@ object fTeach: TfTeach
           Width = 831
           Height = 742
           Align = alClient
-          ColCount = 5
-          DefaultRowHeight = 24
-          FixedRows = 1
+          Color = 14670284
           RowCount = 2
           TabOrder = 0
+          OnDblClick = grdTeachDblClick
+          OnSelectCell = grdTeachSelectCell
+        end
+      end
+      object tsAdvanced: TTabSheet
+        Caption = 'Advanced'
+        ImageIndex = 5
+        object pgcAdvanced: TPageControl
+          Left = 0
+          Top = 0
+          Width = 831
+          Height = 739
+          ActivePage = tsSortArm
+          Align = alClient
+          TabIndex = 0
+          TabOrder = 0
+          object tsSortArm: TTabSheet
+            Caption = 'Sort Arm'
+            object gbSortArmPickPlace: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 823
+              Height = 121
+              Align = alTop
+              Caption = 'SortArm Pick / Place Test'
+              TabOrder = 0
+              object lbSuckUse: TLabel
+                Left = 16
+                Top = 32
+                Width = 58
+                Height = 16
+                Caption = 'Suck Use'
+              end
+              object lbToArea: TLabel
+                Left = 176
+                Top = 32
+                Width = 49
+                Height = 16
+                Caption = 'To Area'
+              end
+              object lbSaCol: TLabel
+                Left = 336
+                Top = 32
+                Width = 69
+                Height = 16
+                Caption = 'Column (1..)'
+              end
+              object lbSaRow: TLabel
+                Left = 432
+                Top = 32
+                Width = 51
+                Height = 16
+                Caption = 'Row (1..)'
+              end
+              object lblSaStatus: TLabel
+                Left = 16
+                Top = 88
+                Width = 41
+                Height = 16
+                Caption = 'Ready'
+              end
+              object cbSuckUse: TComboBox
+                Left = 16
+                Top = 48
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                TabOrder = 0
+                Items.Strings = (
+                  'Suck1'
+                  'Suck2'
+                  'Suck3'
+                  'Suck4')
+              end
+              object cbToArea: TComboBox
+                Left = 176
+                Top = 48
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                TabOrder = 1
+                Items.Strings = (
+                  'Loader1'
+                  'Loader2'
+                  'Auto1'
+                  'Auto2'
+                  'Auto3'
+                  'Auto4'
+                  'Auto5'
+                  'Auto6')
+              end
+              object edSaCol: TEdit
+                Left = 336
+                Top = 48
+                Width = 81
+                Height = 24
+                TabOrder = 2
+                Text = '1'
+                OnClick = edSaColClick
+              end
+              object edSaRow: TEdit
+                Left = 432
+                Top = 48
+                Width = 81
+                Height = 24
+                TabOrder = 3
+                Text = '1'
+                OnClick = edSaRowClick
+              end
+              object chkSaZDown: TCheckBox
+                Left = 552
+                Top = 16
+                Width = 233
+                Height = 17
+                Caption = 'Z Down to teach Z after XY'
+                Checked = True
+                State = cbChecked
+                TabOrder = 4
+              end
+              object btnSaGo: TButton
+                Left = 544
+                Top = 42
+                Width = 177
+                Height = 33
+                Caption = 'GO (Move Suck To Cell)'
+                TabOrder = 5
+                OnClick = btnSaGoClick
+              end
+              object btnSaAllZUp: TButton
+                Left = 544
+                Top = 82
+                Width = 177
+                Height = 28
+                Caption = 'All Z Up (to Safe Z)'
+                TabOrder = 6
+                OnClick = btnSaAllZUpClick
+              end
+            end
+          end
+          object tsChannel: TTabSheet
+            Caption = 'Channel'
+            ImageIndex = 1
+            object gbCarGoUpGoDonw: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 823
+              Height = 73
+              Align = alTop
+              Caption = 'Car GoUp / GoDown Test (Empty / Loader / Color)'
+              TabOrder = 0
+              object lbCarArea: TLabel
+                Left = 16
+                Top = 24
+                Width = 53
+                Height = 16
+                Caption = 'Car Area'
+              end
+              object lbCarLoopTimes: TLabel
+                Left = 280
+                Top = 24
+                Width = 72
+                Height = 16
+                Caption = 'Loop Times'
+              end
+              object lblCarStatus: TLabel
+                Left = 672
+                Top = 48
+                Width = 41
+                Height = 16
+                Caption = 'Ready'
+              end
+              object cbCarArea: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'Empty'
+                Items.Strings = (
+                  'Empty'
+                  'Loader'
+                  'Color')
+              end
+              object chkCarLoop: TCheckBox
+                Left = 192
+                Top = 42
+                Width = 81
+                Height = 17
+                Caption = 'Loop'
+                TabOrder = 1
+              end
+              object edLoopTimes: TEdit
+                Left = 280
+                Top = 40
+                Width = 121
+                Height = 24
+                TabOrder = 2
+                Text = '1'
+              end
+              object btnCarGo: TButton
+                Left = 424
+                Top = 38
+                Width = 185
+                Height = 33
+                Caption = 'GO (GoUp -> GoDown)'
+                TabOrder = 3
+                OnClick = btnCarGoClick
+              end
+            end
+            object gbAutoGoUp: TGroupBox
+              Left = 0
+              Top = 73
+              Width = 823
+              Height = 80
+              Align = alTop
+              Caption = 'Auto GoUp Once Test (Auto1-6, single cylinder)'
+              TabOrder = 1
+              object lbAutoArea: TLabel
+                Left = 16
+                Top = 24
+                Width = 59
+                Height = 16
+                Caption = 'Auto Area'
+              end
+              object lblAutoStatus: TLabel
+                Left = 416
+                Top = 48
+                Width = 41
+                Height = 16
+                Caption = 'Ready'
+              end
+              object cbAutoArea: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'Auto1'
+                Items.Strings = (
+                  'Auto1'
+                  'Auto2'
+                  'Auto3'
+                  'Auto4'
+                  'Auto5'
+                  'Auto6')
+              end
+              object btnAutoGoUp: TButton
+                Left = 192
+                Top = 38
+                Width = 185
+                Height = 33
+                Caption = 'GO (GoUp Once)'
+                TabOrder = 1
+                OnClick = btnAutoGoUpClick
+              end
+            end
+          end
+          object tsTrayArm: TTabSheet
+            Caption = 'Tray Arm'
+            ImageIndex = 2
+            object lblTaStatus: TLabel
+              Left = 16
+              Top = 176
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
+            end
+            object gbTaGrab: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 823
+              Height = 80
+              Align = alTop
+              Caption = 'TrayArm Grab Test (Empty / Color / Loader)'
+              TabOrder = 0
+              object lbTaGrab: TLabel
+                Left = 16
+                Top = 24
+                Width = 64
+                Height = 16
+                Caption = 'Grab From'
+              end
+              object cbTaGrabChannel: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'Empty'
+                Items.Strings = (
+                  'Empty'
+                  'Color'
+                  'Loader')
+              end
+              object btnTaGrab: TButton
+                Left = 192
+                Top = 38
+                Width = 185
+                Height = 33
+                Caption = 'GO (Grab Tray)'
+                TabOrder = 1
+                OnClick = btnTaGrabClick
+              end
+            end
+            object gbTaPlace: TGroupBox
+              Left = 0
+              Top = 80
+              Width = 823
+              Height = 80
+              Align = alTop
+              Caption = 'TrayArm Place Test (Auto1-6 / recycle Empty / Color)'
+              TabOrder = 1
+              object lbTaPlace: TLabel
+                Left = 16
+                Top = 24
+                Width = 55
+                Height = 16
+                Caption = 'Place To'
+              end
+              object cbTaPlaceChannel: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'Auto1'
+                Items.Strings = (
+                  'Auto1'
+                  'Auto2'
+                  'Auto3'
+                  'Auto4'
+                  'Auto5'
+                  'Auto6'
+                  'Empty'
+                  'Color')
+              end
+              object btnTaPlace: TButton
+                Left = 192
+                Top = 38
+                Width = 185
+                Height = 33
+                Caption = 'GO (Place Tray)'
+                TabOrder = 1
+                OnClick = btnTaPlaceClick
+              end
+            end
+          end
+          object tsCCD: TTabSheet
+            Caption = 'CCD'
+            ImageIndex = 3
+            object lblCcdStatus: TLabel
+              Left = 16
+              Top = 120
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
+            end
+            object lblColorCcdStatus: TLabel
+              Left = 16
+              Top = 256
+              Width = 41
+              Height = 16
+              Caption = 'Ready'
+            end
+            object gbCcd: TGroupBox
+              Left = 0
+              Top = 0
+              Width = 823
+              Height = 100
+              Align = alTop
+              Caption = 'CCD Move To Cell Test (LoaderR / LoaderL)'
+              TabOrder = 0
+              object lbCcdChannel: TLabel
+                Left = 16
+                Top = 24
+                Width = 60
+                Height = 16
+                Caption = 'CCD Area'
+              end
+              object lbCcdCol: TLabel
+                Left = 176
+                Top = 24
+                Width = 69
+                Height = 16
+                Caption = 'Column (1..)'
+              end
+              object lbCcdRow: TLabel
+                Left = 296
+                Top = 24
+                Width = 51
+                Height = 16
+                Caption = 'Row (1..)'
+              end
+              object cbCcdChannel: TComboBox
+                Left = 16
+                Top = 40
+                Width = 145
+                Height = 24
+                Style = csDropDownList
+                ItemHeight = 16
+                ItemIndex = 0
+                TabOrder = 0
+                Text = 'LoaderR'
+                Items.Strings = (
+                  'LoaderR'
+                  'LoaderL')
+              end
+              object edCcdCol: TEdit
+                Left = 176
+                Top = 40
+                Width = 105
+                Height = 24
+                TabOrder = 1
+                Text = '1'
+                OnClick = edCcdColClick
+              end
+              object edCcdRow: TEdit
+                Left = 296
+                Top = 40
+                Width = 105
+                Height = 24
+                TabOrder = 2
+                Text = '1'
+                OnClick = edCcdRowClick
+              end
+              object btnCcdGo: TButton
+                Left = 424
+                Top = 36
+                Width = 185
+                Height = 33
+                Caption = 'GO (Move CCD To Cell)'
+                TabOrder = 3
+                OnClick = btnCcdGoClick
+              end
+            end
+            object gbColorCcd: TGroupBox
+              Left = 0
+              Top = 144
+              Width = 823
+              Height = 100
+              Caption = 'Color CCD Photo Test (Identity Tray, move only)'
+              TabOrder = 1
+              object btnColorCcdGo: TButton
+                Left = 16
+                Top = 36
+                Width = 280
+                Height = 33
+                Caption = 'GO (Move Color CCD To Photo Position)'
+                TabOrder = 0
+                OnClick = btnColorCcdGoClick
+              end
+            end
+          end
         end
       end
     end
@@ -728,6 +1213,7 @@ object fTeach: TfTeach
   object tmrUpdate: TTimer
     Enabled = False
     Interval = 200
+    OnTimer = tmrUpdateTimer
     Left = 664
     Top = 16
   end

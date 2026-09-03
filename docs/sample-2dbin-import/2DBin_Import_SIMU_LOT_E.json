@@ -1,0 +1,29 @@
+{
+  "Maps": [
+    {
+      "LotNumber": "SIMU_LOT_E",
+      "Items": [
+        { "Code2D": "2D_Simu_81", "Bin": 3 },
+        { "Code2D": "2D_Simu_82", "Bin": 4 },
+        { "Code2D": "2D_Simu_83", "Bin": 5 },
+        { "Code2D": "2D_Simu_84", "Bin": 6 },
+        { "Code2D": "2D_Simu_85", "Bin": 1 },
+        { "Code2D": "2D_Simu_86", "Bin": 2 },
+        { "Code2D": "2D_Simu_87", "Bin": 3 },
+        { "Code2D": "2D_Simu_88", "Bin": 4 },
+        { "Code2D": "2D_Simu_89", "Bin": 5 },
+        { "Code2D": "2D_Simu_90", "Bin": 6 },
+        { "Code2D": "2D_Simu_91", "Bin": 1 },
+        { "Code2D": "2D_Simu_92", "Bin": 2 },
+        { "Code2D": "2D_Simu_93", "Bin": 3 },
+        { "Code2D": "2D_Simu_94", "Bin": 4 },
+        { "Code2D": "2D_Simu_95", "Bin": 5 },
+        { "Code2D": "2D_Simu_96", "Bin": 6 },
+        { "Code2D": "2D_Simu_97", "Bin": 1 },
+        { "Code2D": "2D_Simu_98", "Bin": 2 },
+        { "Code2D": "2D_Simu_99", "Bin": 3 },
+        { "Code2D": "2D_Simu_100", "Bin": 4 }
+      ]
+    }
+  ]
+}

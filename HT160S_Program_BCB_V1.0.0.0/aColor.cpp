@@ -3,6 +3,7 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "aColor.h"
 #include "database.h"
@@ -11,10 +12,44 @@
 #include "GeneralSetting.h"
 #include "uteach.h"
 #include "ColorCcdSocket.h"
+#include "aTrayArm.h"   //AI(cleanout) 20260701 : TrayArmModule->IsCleanOutFinish() gates the Color CleanOut drain/finish
+#include "SecsGem\uHGemEquipment.h" //AI(ht160s-agv-identity2d) 20260714 : HGem->EventReport for CEID275
+#include "cStateRecordHT160.h"      //AI(ht160s-phantom-tray) 20260806 : gStateRecord forensic snapshot on the diaper's first fire
+#include "SecsGem\uAgvStation.h"    //AI(ht160s-agv-identity2d) 20260714 : AgvCoord.ReportLoaderIdentity + AMR_IDENTITY_CARRIER_INDEX
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 TColorModule *ColorModule=NULL;
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260805 : "diaper" for the Color has-tray latches. On-site notes
+//2 / 6 / 9 (KYEC 2026-08-05) : a CleanOut HUNG with the Color lane PHYSICALLY EMPTY while the
+//software still believed a tray was on the carriage. The operator named the gate exactly -
+//IsCleanOutFinish's "if(HSys.VMot.MMColorY->fHasTray) return false".
+//Why it can happen at all : MMColorY->fHasTray and bTrayReady are pure SOFTWARE latches. No
+//sensor stands behind either (RefreshStateFromSensors deliberately does not own bTrayReady -
+//see the note at the end of it), the only normal clearer is NotifyTrayPicked i.e. the TrayArm
+//actually picking, StampReadIdentity2D sets fHasTray=true UNCONDITIONALLY, and a keep-material
+//HOME preserves both on purpose (uHome.cpp ~897/919). So once they desync true, nothing on the
+//machine can ever bring them back - and an operator lifting the tray off the rear seat by hand
+//has no path at all. This layer cross-checks them against the CLAMP cylinders and the REAR SEAT
+//sensors, heals the contradiction so the machine keeps running, and leaves a breadcrumb.
+//THE BREADCRUMB IS THE POINT : if "DIAPER Color phantom tray" ever appears in the EventLog it
+//means an UPSTREAM owner minted a tray that was not there, and THAT owner is the real bug.
+//Debounce + rate-limit idiom copied from the SortArm fall-down detector (FALLDOWN_LOST_MS).
+static const int PHANTOM_TRAY_CONFIRM_MS=1500;   //contradiction must hold continuously this long
+static const int PHANTOM_TRAY_LOG_GAP_MS=60000;  //breadcrumb rate limit; the fire COUNT always grows
+static const char *ColorStatusName(int St);      //defined at the bottom, beside DescribeState
+//AI(ht160s-phantom-tray) 20260805 : tri-state IO read for the breadcrumb : 1=on, 0=off,
+//-1=point disabled (the same '-' convention IoDetail.txt uses). A helper instead of a nested
+//?: expression - nested conditionals building an AnsiString are a known BCB6 hazard here.
+static int TriReadSensor(TMySensor &Sen)
+{
+    if(Sen.Enable==false)
+        return -1;
+    if(Sen.IsOn())
+        return 1;
+    return 0;
+}
 //---------------------------------------------------------------------------
 TColorModule::TColorModule()
 {
@@ -23,26 +58,205 @@ TColorModule::TColorModule()
     InitialFlag();
 }
 //---------------------------------------------------------------------------
-void TColorModule::InitialFlag()
+void TColorModule::InitialFlag(bool bKeepMaterial)
 {
-    SupplyTask=1;
-    ReleaseTask=1;
+    bAmrLocked=false;
+    RefillSimInfeed();
+    Status=CS_IDLE;   //AI(ht160s-status) 20260703 : ladder-owned status reset
+    FeedTask=1;
+    FeedClampSub=0;
     SortBinTask=1;
     iICCount=0;
-    bInputHasTray=false;
     bInputFullTray=false;
-    bOutputHasTray=false;
-    bTrayReady=false;
-    bTrayPicked=false;
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves a PRESENTED
+    //identity tray (pick latch bTrayReady published AND rear still physically confirmed
+    //occupied). The scanned 2D + grid are NOT re-derivable from sensors; wiping them
+    //turned a good presented tray into an MES1426 leftover the operator had to remove.
+    //Gate mirrors the Loader bKeepRear idiom; real tier only (DUMMY/sim sensors are
+    //garbage -> fall back to today's wipe, sim behavior unchanged).
+    bool bKeepPresented=false;
+#ifndef SOFT_SIMULATE
+    if(bKeepMaterial && bTrayReady && bRearHasTray && HSys.LastSet.iRealDummy!=DUMMY)
+    {
+        if(HSys.Sen.SnColor_OutputBottomHasTray.Enable && HSys.Sen.SnColor_OutputBottomHasTray.IsOn())
+            bKeepPresented=true;
+        if(HSys.Sen.SnColor_TrayPos1.Enable && HSys.Sen.SnColor_TrayPos1.IsOn())
+            bKeepPresented=true;
+    }
+#endif
+    if(bKeepPresented==false)
+    {
+        bRearHasTray=false;
+        bTrayReady=false;
+        if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();   //AI(ht160s-tray-source) : hide Color grid on init
+    }
     bSupplyRequested=false;
     bFrontHasTray=false;
+    FrontSourceTray.Clear();   //AI(ht160s-color-align-empty) : no stale front-born grid across init/lot
     ScanTask=1;
     GoDownTask=1;
-    sTrayID2D="";
-    SupplyDelay.Clear();
-    ReleaseDelay.Clear();
+    //AI(phase6-loader-recycle) 20260625 : Color receive-tray flow (mirrors Empty).
+    GoUpTask=1;
+    //AI(ht160s-agv-identity2d) 20260714 : identity intake sub-ladders idle; drop any pending
+    //reservation on init/HOME (a mid-flight intake safely reverts to the recycle path).
+    ReadIdentityTask=1;
+    RaiseFrontTask=1;
+    ReadClampSub=0;
+    bReadIdentityPending=false;
+    ReadIdentityDelay.Clear();
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the return
+    //handshake (mirror of Empty; the TrayArm sender keeps Job/PlaceDest) and the
+    //return-history counter. sTrayID2D rides with the presented-tray keep above.
+    if(bKeepMaterial==false)
+    {
+        bReturnTray=false;
+        bTrayXToEmptyFinish=false;
+        iReturnedCount=0;
+    }
+    GoUpDelay.Clear();
+    if(bKeepPresented==false)
+        sTrayID2D="";
+    if(bKeepMaterial)
+        RecordProcess("HOME-RESUME Color: keptPresented="+IntToStr(bKeepPresented?1:0)+" id="+sTrayID2D+
+            " returnTray="+IntToStr(bReturnTray?1:0)+" returnedCount="+IntToStr(iReturnedCount));   //AI(ht160s-obsv-p0)
+    FeedDelay.Clear();
     GoDownDelay.Clear();
     ScanDelay.Clear();
+    //AI(ht160s-phantom-tray) 20260805 : diaper state. The FIRE COUNT is reset here on purpose -
+    //it is a per-run health figure ("how many times did the software lie about a tray this run"),
+    //and 0 is the only healthy value. The debounce window and the log rate limit are per-episode.
+    dwPhantomTrayStart=0;
+    dwPhantomTrayLogTick=0;
+    iPhantomTrayFireCount=0;
+    bCleanOutCarriageAlarmed=false;
+    TestUpTask=1;
+    TestDownTask=1;
+    TestDelay.Clear();
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-home-resume-w3b2) 20260711 : HOME PARK haul-target for this carriage.
+//Called by uHome at the case-1 PARK snapshot (module Task cursors are still intact
+//there -- the InitialAllTask wipe only runs after ProcessMotorHome returns true).
+//A mid-haul park must FINISH the interrupted transfer at re-acquire : re-clamping at
+//a mid-rail position and resuming blind would let the restarted ladder stage a second
+//tray and collide (EF-2). Direction from the ladder cursors; the clamp out-bits are
+//the actual carry gate (checked on the uHome side).
+//DoGoUpTray phase B hauls rear->front (target = receive Y); DoFeedTray hauls
+//front->rear (target = TrayArm pick Y). Completion is PHYSICAL only : it does NOT
+//set bTrayReady (a mid-scan identity tray must never be presented unscanned), so a
+//completed feed haul lands as a rear leftover -> existing MES1426 operator removal.
+//Material safe, identity never mis-routed; the Empty analog fully self-heals.
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook, mirror of Empty (see there).
+bool TColorModule::HomeDrainTick()
+{
+    bool bDone=true;
+    if(GoDownTask>=100 && GoDownTask<=600)
+    {
+        DoGoDownTray(1);
+        if(GoDownTask>=100 && GoDownTask<=600)
+            bDone=false;
+    }
+    if(GoUpTask>=100 && GoUpTask<=600)
+    {
+        DoGoUpTray(1);
+        if(GoUpTask>=100 && GoUpTask<=600)
+            bDone=false;
+    }
+    return bDone;
+}
+//---------------------------------------------------------------------------
+int TColorModule::GetHomeHaulTargetY()
+{
+    if(GoUpTask>=3000 && GoUpTask<8000)
+        return Teach.ColorReceiveTrayYPosition;
+    if(FeedTask>=2000 && FeedTask<7000)
+        return Teach.ColorTrayArmPickYPosition;
+    return -1;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw this module's wall-clock timeout
+//window (ScanDelay CCD shot) so a machine pause taken mid-scan is not charged
+//against the timeout budget -- no false scan-timeout on resume. Called from
+//csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
+//pause/resume edges, alongside HSys.CynPtr[]/SortArmSuck. Add future Color timeout
+//timers here; csystem needs no change.
+void TColorModule::PauseTimeoutTimers()
+{
+    ScanDelay.Pause();
+}
+//---------------------------------------------------------------------------
+void TColorModule::ReStartTimeoutTimers()
+{
+    ScanDelay.ReStart();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : AMR P3 (ColorTray) handoff interface, mirrors TAutoModule.
+void TColorModule::SetAmrLock(bool bLock)
+{
+    bAmrLocked=bLock;
+}
+//---------------------------------------------------------------------------
+bool TColorModule::IsAmrLocked()
+{
+    return bAmrLocked;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Ready = front stacking cylinders back home (not commanded
+//up); destack idle so the AGV may refill. Held stable by bAmrLocked.
+bool TColorModule::IsReadyForAmrHandoff()
+{
+    //AI(ht160s-agv) 20260625 : sim defense-in-depth - in SOFT_SIMULATE the front
+    //destacker out-bits are normally already false; assert ready so the PREP->READY
+    //gate cannot latch the lock on a laptop run. Real hardware keeps the interlock.
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Cyn.C_Color_FrontRiseTray_1.GetOutBit()==false
+            && HSys.Cyn.C_Color_FrontRiseTray_2.GetOutBit()==false
+            && HSys.Cyn.C_Color_FrontSeparateTray_1.GetOutBit()==false);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : shortage (call AGV). Sim drains iSimInfeedCount to 0; real
+//reads SnColor_InputEnd (ON=has tray, OFF=empty). Disabled sensor -> no call.
+bool TColorModule::IsInputShortageForAmr()
+{
+    if(IsSoftSimulate())
+        return (iSimInfeedCount<=0);
+    return (HSys.Sen.SnColor_InputEnd.Enable==true && HSys.Sen.SnColor_InputEnd.IsOff());
+}
+//---------------------------------------------------------------------------
+//AI(cleanout) 20260703 : supply-stack Full verdict for the CleanOut GoUp/finish gate.
+//Real machine reads SnColor_InputFullTray; sim returns false (NOT the iSimInfeedCount
+//threshold : the clean-out GoUp increments that count, so keying sim-Full off it could
+//latch Full mid-drain and dead-lock a laptop CleanOut).
+bool TColorModule::IsInputFullForAmr()
+{
+    if(IsSoftSimulate())
+        return false;
+    return (HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
+//real waits for SnColor_InputEnd to read a tray present (ON).
+bool TColorModule::IsInputHandoffFinishedForAmr()
+{
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Sen.SnColor_InputEnd.Enable==true && HSys.Sen.SnColor_InputEnd.IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : reset sim input-stack to configured max (AGV delivered a
+//full magazine). Real machine ignores the count (sensor-driven).
+void TColorModule::RefillSimInfeed()
+{
+    iSimInfeedCount=GeneralSetting.iSimAmrMaxTray[2];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : trays currently on the Color supply car (PanelMain6 header).
+//Sim drains per destack; real machine sensor-driven (count not maintained, reads max).
+int TColorModule::GetCarTrayCount()
+{
+    return iSimInfeedCount;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::IsSoftSimulate()
@@ -67,25 +281,50 @@ void TColorModule::RefreshStateFromSensors()
 
     if(IsInstalled()==false)
     {
-        bInputHasTray=false;
         bInputFullTray=false;
-        bOutputHasTray=false;
+        bFrontHasTray=false;
+        bRearHasTray=false;
         bTrayReady=false;
-        bTrayPicked=false;
         return;
     }
+
+    //AI(ht160s-color-align-empty) 20260629 : MIRROR Empty RefreshStateFromSensors sim early-out.
+    //In SOFT_SIMULATE / real-machine DUMMY there is no IO card, so InType=0 (active-low) HasTray
+    //inputs all read present and clobber bRearHasTray=true; the DoFeedTray case 10 leftover-tray
+    //guard then silently aborts every supply (MES1425 suppressed under DUMMY), so Color never
+    //presents an identity tray and the AMR TrayArm/SortArm hang. In sim/dummy tray state is a
+    //LATCH owned by the action ladders (DoGoDownTray->bFrontHasTray, DoFeedTray case7000->
+    //bTrayReady, receive path->bRearHasTray).
+    if(IsSoftSimulate())
+        return;
 
     if(HSys.Sen.SnColor_InputHasTray.Enable==true)
     {
         bHasInputSensor=true;
-        bInputHasTray=HSys.Sen.SnColor_InputHasTray.IsOn();
+        //AI(ht160s-color-align-empty) 20260627 : front-staged presence is SENSOR-driven,
+        //mirroring TEmptyModule (bFrontHasTray=SnEmpty_InputHasTray.IsOn()). SnColor_InputHasTray
+        //is the same hardware role as SnEmpty_InputHasTray, so bFrontHasTray tracks it directly
+        //(was a logical-only latch -- the divergence from Empty).
+        //AI(ht160s-front-sensor-validity) 20260802 : same rise1 gate as Empty (E1). This
+        //block says it mirrors TEmptyModule - it mirrored the missing gate too. The front
+        //rise-1 cylinder lifts the stack across the beam, so the read is valid only while
+        //rise1 is confirmed retracted; otherwise keep the last latched state.
+        //Light form for the same reason as Empty : Color only writes a latch here, it does
+        //not mint identity data the way the Loader's case 10 does.
+        //NOT affected : DoGoDownTray case 700's MES1424 confirm runs after rise1 is popped
+        //and settled, so its RefreshStateFromSensors call sees the gate open and updates
+        //normally - the confirm keeps its full strength.
+        bool bFrontReadValid=(HSys.Cyn.C_Color_FrontRiseTray_1.OffSensor.Enable==false) ||
+                              HSys.Cyn.C_Color_FrontRiseTray_1.OffSensor.IsOn();
+        if(bFrontReadValid)
+            bFrontHasTray=HSys.Sen.SnColor_InputHasTray.IsOn();
     }
 
     if(HSys.Sen.SnColor_InputFullTray.Enable==true)
     {
         bInputFullTray=HSys.Sen.SnColor_InputFullTray.IsOn();
         if(bInputFullTray)
-            bInputHasTray=true;
+            bFrontHasTray=true;
     }
     else
         bInputFullTray=false;
@@ -104,19 +343,39 @@ void TColorModule::RefreshStateFromSensors()
             bOutputState=true;
     }
 
+    //AI(ht160s-rear-sensor-validity) 20260802 : same defect, same fix as Empty (92e8bc3).
+    //The mechanism note (docs/plan/home-posture-manifest-plan-20260720.md:4,:55) applies to
+    //the fixed rear sensors generally: a TrayArm head lowered over the rest falsely lights
+    //them. TrayArm serves the Color rear from BOTH sides - it places identity trays for the
+    //scan (RequestReadIdentityTray contract) and picks them back after - so its head is over
+    //this sensor routinely. Without the gate a lowered head invented a phantom rear tray
+    //exactly as it did at Empty. Hold the last latched state while Z is down; the receive
+    //ladder's own latch writes (NotifyTrayXToEmptyFinish / case-7000 commit) are direct
+    //latch assignments and are unaffected.
+    if(bHasOutputSensor && HSys.Cyn.C_TrayArmZ_Up.IsOn()==false)
+        bHasOutputSensor=false;   //TrayArm head down : reading untrustworthy, keep the latch
+
     if(bHasOutputSensor)
-        bOutputHasTray=bOutputState;
+        bRearHasTray=bOutputState;
     else if(IsSoftSimulate())
-        bOutputHasTray=bTrayReady;
+    {
+        //AI(phase6-loader-recycle) 20260625 : while a receive (return) is in progress
+        //bRearHasTray is the rear-handoff LATCH owned by the receive ladder (set by
+        //NotifyTrayXToEmptyFinish, cleared by DoGoUpTray). Do NOT clobber it from the
+        //sim bTrayReady fallback here, or the latch is wiped and the TrayArm deposit /
+        //DoGoUpTray handshake breaks (Empty avoids this by returning early in sim).
+        if(bReturnTray==false && bTrayXToEmptyFinish==false)
+            bRearHasTray=bTrayReady;
+    }
 
     if(bHasInputSensor==false && IsSoftSimulate())
-        bInputHasTray=true;
+        bFrontHasTray=true;
 
     //AI(general) 20260609 : Removed the sensor-driven bTrayReady latch. It set
     //bTrayReady=true from any output-sensor read and never cleared it (only
     //DoReleaseTray did), so IsTrayReady() stayed latched true and DoColor case 100
     //always folded back to idle, never reaching the supply ladder. bTrayReady is
-    //now owned solely by the supply ladder (DoSupplyTray case 900 sets it,
+    //now owned solely by the supply ladder (DoFeedTray case 7000 sets it,
     //DoReleaseTray clears it), mirroring Empty's just-in-time ready model.
 }
 //---------------------------------------------------------------------------
@@ -165,12 +424,130 @@ void TColorModule::DoColor(int &Task)
 
         case 100:
             RefreshStateFromSensors();
-            if(bTrayReady && bTrayPicked)
+            //AI(ht160s-phantom-tray) 20260805 : cross-check the has-tray latches against the
+            //clamps + rear sensors BEFORE any branch below reads them. Placed here (not inside
+            //IsCleanOutFinish, which peers call as a pure predicate) because case 100 is both the
+            //production idle heartbeat AND where the CleanOut drain decision is taken, so one
+            //call covers both. Self-gated to a fully idle module + a 1500 ms debounce, so it is a
+            //no-op on a healthy machine.
+            GuardPhantomCarriageTray();
+            //AI(ht160s-agv-identity2d) 20260714 : Loader identity intake has TOP priority once
+            //reserved (mirrors bReturnTray reserve-on-set). Park idle on the pending flag ALONE
+            //(before the tray lands) so Color starts no new supply/destack during the receive
+            //window and IsReadyToReceiveIdentity() can reach true for the pick-time interlock.
+            //Run the scan+upload+retreat ladder once the TrayArm deposit lands (bRearHasTray).
+            //Held off while AMR-locked (same as the return path) so the front stack stays home.
+            if(bReadIdentityPending)
             {
-                DoReleaseTray(0);
-                Task=1500;
+                if(bAmrLocked)
+                {
+                    Task=1;
+                    break;
+                }
+                if(IsRearHasTray())
+                {
+                    Status=CS_RETURNING;
+                    DoReadIdentityRetreat(0);
+                    Task=1800;
+                }
+                else
+                {
+                    Status=CS_IDLE;
+                    Task=1;
+                }
                 break;
             }
+            //AI(phase6-loader-recycle) 20260625 : single-MColorY arbitration (CRITICAL).
+            //The receive (return) dispatch is placed BEFORE the supply godown/supply
+            //branches. Under sim IsSoftSimulate() is always true, so the godown branch
+            //below would otherwise win every idle pass and starve the return. Because
+            //DoColor owns a single Task at a time, once we enter the return ladder
+            //(Task=1700) no supply branch can run until DoGoUpTray completes, so the
+            //return cannot deadlock against supply. The bReturnTray latch is held until
+            //the deposit finishes (set in RequestReturnTray, cleared in case 1700).
+            if(bReturnTray)
+            {
+                //AI(ht160s-agv) 20260625 : DoGoUpTray also raises C_Color_FrontRise*/Separate,
+                //so hold it off while AMR-locked so the front stack stays home and the CEID273
+                //READY gate (IsReadyForAmrHandoff) can clear. Return resumes after the lock clears.
+                if(bAmrLocked)
+                {
+                    Task=1;
+                    break;
+                }
+                Status=CS_RETURNING;   //AI(ht160s-status) 20260703
+                DoGoUpTray(0);
+                Task=1700;
+                break;
+            }
+            //AI(cleanout) 20260701 : CleanOut drain phase. Once TrayArm has finished, Color stops
+            //supplying/destacking and GoUp-drains every tray back to the car (reuses the receive
+            //ladder at case 1700). Owns case 100 while draining so no GoDown/feed runs. Before
+            //TrayArm finishes (produce phase) Color supplies normally; outside CleanOut it is a no-op.
+            if(HSys.Sys.RunMode==Run_CleanOut &&
+               TrayArmModule!=NULL && TrayArmModule->IsCleanOutFinish())
+            {
+                if(bFrontHasTray || bRearHasTray)
+                {
+                    //AI(ht160s-agv-ruleB) 20260818 : RULE B, mirroring the Empty drain guard.
+                    //Empty already refuses to GoUp while AMR-locked; Color was the one drain path
+                    //without that test. Belt-and-braces : the coordinator also forces P1-P3 to IDLE
+                    //and releases their locks in Run_CleanOut, so the residual window is a single
+                    //coordinator tick at the Run_Normal -> Run_CleanOut boundary.
+                    if(bAmrLocked)
+                        break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
+                    //AI(cleanout) 20260703 : Full gate (user design, mirrors Empty). Hold
+                    //the drain and ask the operator to empty the stack; the modal repeats
+                    //until the Full sensor goes OFF. IsInputFullForAmr is sim-false.
+                    //AI(amr-unmanned batch2) 20260721 : supply-stack FULL = "stop bringing", not
+                    //"collect". AMR (unmanned) : GoUp anyway (mechanically safe, user ruling), no
+                    //modal, no AGV call - drains as next production consumes it. non-AMR keeps modal.
+                    if(IsInputFullForAmr() && GeneralSetting.bUseAMR==false)
+                    {
+                        do
+                        {
+                            ShowMyError("MES1427", "Color supply stack FULL (sensor) - remove stacked trays", &HSys.Sen.SnColor_InputFullTray, false, K_RETRY);
+                        }
+                        while(HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn());
+                    }
+                    Status=CS_RETURNING;   //AI(ht160s-status) 20260703 : CleanOut drain GoUp
+                    DoGoUpTray(0);
+                    Task=1700;
+                }
+                //AI(ht160s-phantom-tray) 20260805 : THE 2026-08-05 HANG, second half. The drain
+                //above only looks at the FRONT stack and the REAR seat - but IsCleanOutFinish
+                //ALSO gates on MMColorY->fHasTray. So a tray the CARRIAGE claims, with front and
+                //rear both clear, is invisible to the drain and blocks CleanOut FOR EVER : nothing
+                //to drain, Task=1 every pass, no timeout, no alarm, no operator hint. Snapshot
+                //15:20:25 was exactly that state (Status=REAR_READY bTrayReady=1 front=0 rear=0,
+                //and TrayArm had already latched bCleanOutFinish=1 so the presented tray would
+                //never be picked either).
+                //GuardPhantomCarriageTray at the top of this case heals the PHANTOM form within
+                //its debounce. Reaching here means the physical evidence does NOT prove the
+                //carriage empty (clamps still gripping, wrong iRealDummy tier, or no rear sensor
+                //to prove otherwise) - i.e. a genuinely stranded tray that the retired TrayArm
+                //will never come back for. Tell the operator ONCE (never a silent stop), then
+                //release the latch anyway : the drain has no path for a carriage tray, so holding
+                //it would only re-enter the same dead wait.
+                else if(bTrayReady || (HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray))
+                {
+                    if(bCleanOutCarriageAlarmed==false)
+                    {
+                        bCleanOutCarriageAlarmed=true;
+                        RecordProcess("CLEANOUT Color blocked by a carriage tray the drain cannot see : "+
+                                      DescribePhysicalTrayEvidence());
+                        ShowMyError("MES1428", LangT("Color carriage still holds a tray after clean-out - remove it"), K_RETRY);
+                    }
+                    ForceReleaseCarriageTrayLatch("cleanout-drain-blind");
+                    Task=1;
+                }
+                else
+                    Task=1;
+                break;
+            }
+            //AI(ht160s-color-align-empty) 20260627 : pickup release is now single-step in
+            //NotifyTrayPicked (mirrors TEmptyModule SetRearHasTray(false)); no separate
+            //DoReleaseTray pass. While a tray is presented at the rear, idle until it is picked.
             if(bTrayReady)
             {
                 Task=1;
@@ -181,20 +558,36 @@ void TColorModule::DoColor(int &Task)
             //DoGoDownTray). Stage 2 pushes that staged tray to the output and reads
             //its 2D code, but only when an AMR supply was actually requested (or
             //simulating), so the identity tray is not presented / scanned early.
-            if(bFrontHasTray==false)
+            if(bFrontHasTray==false && bReturnTray==false && bReadIdentityPending==false)
             {
-                if(bInputHasTray || IsSoftSimulate())
+                //AI(ht160s-agv) 20260625 : NARROW AMR lock. The FRONT-stack branches that
+                //raise C_Color_FrontRise*/Separate (this DoGoDownTray, and the bReturnTray
+                //DoGoUpTray above) are held off while the AGV refills the front stack, so
+                //IsReadyForAmrHandoff stays true and the lock can clear. The downstream
+                //branches (bTrayReady->DoReleaseTray, bSupplyRequested->DoFeedTray) keep
+                //running so TrayArm/SortArm are not starved.
+                if(bAmrLocked)
                 {
-                    DoGoDownTray(0);
-                    Task=1200;
-                }
-                else
                     Task=1;
+                    break;
+                }
+                //AI(ht160s-color-align-empty) 20260626 : mirror TEmptyModule::DoEmpty
+                //case 100 - always destack a front tray when the front buffer is empty
+                //(no bInputHasTray pre-gate). Color == Empty + CCD : identity is stamped
+                //by DoReadColor2D (real scan, or COLOR2D_ when CCD-off/HAS_TRAY/sim). A
+                //truly empty front magazine is caught upstream by MES1424 (DoGoDownTray case
+                //700 front-staging miss) or the coordinator source-dry path (SnColor_InputEnd
+                //-> IsInputShortageForAmr -> AGV call + WAR0962), so producing here cannot
+                //silently hang. (MES1421 at case 7000 is a rear-arrival fault, not source-dry.)
+                Status=CS_DESTACK;   //AI(ht160s-status) 20260703
+                DoGoDownTray(0);
+                Task=1200;
                 break;
             }
-            if(bSupplyRequested || IsSoftSimulate())
+            if(bSupplyRequested && bReturnTray==false && bReadIdentityPending==false)
             {
-                DoSupplyTray(0);
+                Status=CS_FEEDING;   //AI(ht160s-status) 20260703 : carrier will own the rear
+                DoFeedTray(0);
                 Task=1000;
             }
             else
@@ -202,35 +595,100 @@ void TColorModule::DoColor(int &Task)
             break;
 
         case 1000:
-            if(DoSupplyTray(1))
+            if(DoFeedTray(1))
                 Task=1;
             break;
 
         case 1200:
             if(DoGoDownTray(1))
+            {
+                if(IsSoftSimulate() && iSimInfeedCount>0)
+                    iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/GoDown
+                Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;
+            }
             break;
 
-        case 1500:
-            if(DoReleaseTray(1))
+        case 1700:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - do not START a front GoUp while this station
+            //is serving an AMR. GoUpTask==1 is the idle terminal, so only a NEW round is blocked;
+            //a stroke in flight completes (aborting mid-stroke drops the stack). This covers the
+            //DoGoUpTray(0) re-arm below, which had no lock test. It also settles a second problem :
+            //parking HERE re-runs the whole GoUp ladder from its terminal every scan, so P3 would
+            //otherwise read as motion-in-flight for the entire park; once the lock lands in the gap
+            //between rounds the park stops re-running and the station goes genuinely idle.
+            if(bAmrLocked && GoUpTask==1)
+                break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
+            //AI(phase6-loader-recycle) 20260625 : Color receive ladder (mirrors
+            //TEmptyModule::DoEmpty case 3000). Hold here until the TrayArm has finished
+            //depositing the returned tray onto Color's rear (NotifyTrayXToEmptyFinish
+            //sets bTrayXToEmptyFinish + bRearHasTray). Then DoGoUpTray stacks it back
+            //onto the front car. On completion the returned identity tray re-enters the
+            //supply pool (iSimInfeedCount++); a later DoFeedTray -> DoReadColor2D ->
+            //StampReadIdentity2D reproduces Kind=Identity + TrayID (no new code).
+            if(DoGoUpTray(1))
+            {
+                if(bReturnTray && bTrayXToEmptyFinish==false)
+                    return;
+                //AI(ht160s-home-resume-cg4) 20260713 : close-out blind-spot guard.
+                //NotifyTrayXToEmptyFinish sets bRearHasTray + bTrayXToEmptyFinish together,
+                //but the deposit Notify can land AFTER DoGoUpTray case 1000 already read
+                //bRearHasTray==false and ran the ladder to its 9000/10000 terminal without
+                //hauling (case 7000, which clears bRearHasTray, was skipped) -> the tray is
+                //still physically at the rear yet DoGoUpTray returned true. Committing now
+                //inflates iReturnedCount and strands the tray (next DoFeedTray case 10 raises
+                //MES1426). Require the rear actually cleared; else re-arm (DoGoUpTray(0)) and
+                //re-dispatch one more haul round. bRearHasTray is the member cleared at GoUp
+                //case 7000 (no RefreshStateFromSensors between there and the terminal), so
+                //this cannot livelock even on a stuck-ON rear sensor.
+                if(bReturnTray && bRearHasTray)
+                {
+                    DoGoUpTray(0);
+                    return;
+                }
+                bReturnTray=false;
+                iReturnedCount++;
+                iSimInfeedCount++;
+                Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);   //AI(ht160s-status) 20260703
                 Task=1;
+            }
+            break;
+
+        case 1800:
+            //AI(ht160s-agv-identity2d) 20260714 : Loader identity intake ladder -- receive at rear,
+            //carry to the CCD, read 2D, upload CEID275/SVID38204, retreat to the front car. Clears
+            //bReadIdentityPending on completion (inside DoReadIdentityRetreat).
+            if(DoReadIdentityRetreat(1))
+            {
+                Status=(bTrayReady ? CS_REAR_READY : CS_IDLE);
+                Task=1;
+            }
             break;
 
         case 2000:
             if(DoSortBin(1))
                 Task=1;
             break;
+        default:
+            //AI(ht160s-ladder-guard) 20260703 : a state number with no matching case
+            //(the 'number but no action' trap). Log it so a future dead-jump is a
+            //diagnosable EventLog event, not a silent stall, and restart the ladder.
+            LogLadderFault("Color.DoColor", Task);
+            Task=1;
+            break;
     }
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260608 : separate one tray off the front stack and stage
 //it at the front, mirroring TEmptyModule::DoGoDownTray. Sets bFrontHasTray on
-//success so DoSupplyTray can later push it to the output. Kept distinct so the
+//success so DoFeedTray can later push it to the output. Kept distinct so the
 //front buffer can be pre-staged (Empty-style pipelining) while the AMR pull request
 //is still pending. Color has no dedicated front-staging sensor, so staging is
-//logical; physical presence is confirmed at the output (DoSupplyTray case 800).
+//logical; physical presence is confirmed at the output (DoFeedTray case 7000).
 bool TColorModule::DoGoDownTray(int Flag)
 {
+    int Ret;
+
     if(Flag==0)
     {
         GoDownTask=1;
@@ -242,58 +700,84 @@ bool TColorModule::DoGoDownTray(int Flag)
     {
         case 1:
             if(IsTraySupplyMode()==false)
-                return true;
+            {
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : not tray-supply mode -> single DONE terminal
+                break;
+            }
             GoDownTask=10;
             break;
 
         case 10:
             RefreshStateFromSensors();
             if(bFrontHasTray)
-                return true;
-            if(bInputHasTray==false && IsSoftSimulate()==false)
-                return true;
+            {
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : idempotent re-entry -> single DONE terminal
+                break;
+            }
+            //AI(ht160s-color-align-empty) 20260626 : no bInputHasTray pre-abort here
+            //(mirrors TEmptyModule::DoGoDownTray case 10) - always destack; identity is
+            //supplied by DoReadColor2D and a missing real tray is caught by MES1421.
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 100 Push
             GoDownTask=100;
             break;
 
         case 100:
             //AI(HT160S-Maintainer) 20260608 : dual destacker, mirror Empty. Rise_1 up.
             if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 150 Push
                 GoDownTask=150;
+            }
             break;
 
         case 150:
             if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : one-shot re-arm before case 200 Push
                 GoDownTask=200;
+            }
             break;
 
         case 200:
             if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Rise_2 for its Pop at case 300
                 GoDownTask=300;
             }
             break;
 
         case 300:
+            //AI(HT160S-Maintainer) 20260701 : gate on PopCylinder's own confirm (sensor +
+            //alarm/timeout via TMyCylinder::Pop) instead of discarding its return and relying
+            //solely on the fixed settle timer below. The old code advanced to case 350/400
+            //(separation claw release) even if FrontRiseTray_2 never physically confirmed down --
+            //a slow/marginal cylinder let the claw open before the stack was actually caught,
+            //dropping the whole stack (mirrors the Empty godown noise report; identical pattern).
             if(GoDownDelay.Off())
             {
-                PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2);
-                GoDownDelay.Set(5);
-                GoDownDelay.On();
-                GoDownTask=350;
+                if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                {
+                    GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                    GoDownDelay.On();
+                    GoDownTask=350;
+                }
             }
             break;
 
         case 350:
             if(GoDownDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Separate for its Pop at case 400
                 GoDownTask=400;
+            }
             break;
 
         case 400:
             if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
             {
-                GoDownDelay.Set(5);
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
                 GoDownDelay.On();
                 GoDownTask=450;
             }
@@ -301,102 +785,489 @@ bool TColorModule::DoGoDownTray(int Flag)
 
         case 450:
             if(GoDownDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();   //AI(ht160s-feeder-unify) 20260706 : re-arm Rise_1 for its Pop at case 500
                 GoDownTask=500;
+            }
             break;
 
         case 500:
             if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
             {
-                //AI(HT160S-Maintainer) 20260608 : stage logically; no front sensor.
-                bFrontHasTray=true;
-                return true;
+                GoDownDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                GoDownDelay.On();
+                GoDownTask=600;
             }
             break;
+
+        case 600:
+            if(GoDownDelay.Off())
+                GoDownTask=700;
+            break;
+
+        case 700:
+            //AI(ht160s-color-align-empty) 20260627 : confirm the front-staged tray on
+            //SnColor_InputHasTray, mirroring TEmptyModule::DoGoDownTray case 7000. Front
+            //presence is now sensor-driven, so confirm here (after a settle) before declaring
+            //success -- else RefreshStateFromSensors could read the not-yet-settled sensor as
+            //empty and re-trigger a destack. Miss -> alarm + retry (Empty uses MES1024).
+            RefreshStateFromSensors();
+            if(HSys.Sen.SnColor_InputHasTray.Enable==true &&
+               HSys.Sen.SnColor_InputHasTray.IsOff() &&
+               HSys.LastSet.iRealDummy!=DUMMY)
+            {
+                bFrontHasTray=false;
+                Ret=ShowMyError("MES1424", LangT("Color front supply tray is missing"), &HSys.Sen.SnColor_InputHasTray, true, K_RETRY);
+                if(Ret==K_RETRY)
+                    GoDownTask=1;
+            }
+            else
+            {
+                bFrontHasTray=true;
+                BirthFrontTray();   //AI(ht160s-color-align-empty) : identity tray born at front (empty 2D; CCD updates later), mirror Empty
+                GoDownTask=99999;   //AI(ht160s-feeder-unify) 20260706 : route to single DONE terminal
+            }
+            break;
+
+        case 99999:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - Task returns to idle(1) HERE so
+            //IsCleanOutFinish's "GoDownTask==1" idle gate reads a completed drain as finished.
+            GoDownTask=1;
+            return true;
     }
     return false;
 }
 //---------------------------------------------------------------------------
-bool TColorModule::DoSupplyTray(int Flag)
+//AI(phase6-loader-recycle) 20260625 : stack a returned identity tray (sitting at the
+//rear handoff position) back onto the front supply car, then re-stage the front. This
+//is a near-verbatim port of TEmptyModule::DoGoUpTray (U4 : Empty and Color share the
+//destacker mechanism). Cylinder names C_Empty_*->C_Color_*, MoveEmptyY->MoveColorY,
+//Empty rear/front teach Y -> Color rear (ColorTrayArmPickYPosition) / front
+//(ColorReceiveTrayYPosition; ColorRead2DYPosition is now the middle CCD scan Y). The
+//rear-occupied latch is bRearHasTray (renamed from bOutputHasTray to match Empty; the
+//output/read position is Color's rear handoff slot). NOTE 20260720 : the Color rear
+//riser does NOT exist on this machine (mechanism+wiring absent, owner-confirmed); the
+//unused C_Color_RearRiseTray declaration was removed with the whole rear-riser family.
+bool TColorModule::DoGoUpTray(int Flag)
+{
+    if(Flag==0)
+    {
+        GoUpTask=1;
+        GoUpDelay.Clear();
+        return true;
+    }
+
+    switch(GoUpTask)
+    {
+        //AI(ht160s-feeder-unify) 20260706 : GoUp converted from .On()/.IsOn()||sim and .Pop()||sim
+        //to PushCylinder/PopCylinder (sim + Enable aware, in-position confirm + alarm-on-timeout),
+        //with a one-shot .Reset() re-arm before each poll and GoUpDelay settle - mirrors
+        //DoGoDownTray so GoUp is no longer "too fast / not smooth". Physical order unchanged.
+        case 1:
+            GoUpTask=10;
+            break;
+
+        case 10:
+            //AI(ht160s-goup-hastray-gate) 20260708 : confirm a FRONT tray is present before the
+            //raise. With an empty front rest the rise + Separate-pawl release (case 410) drops the
+            //stack above by one pitch (loud bang). No front tray -> skip the front raise (case
+            //100-600) and jump to rear handling (case 1000) so CleanOut drain and bReturnTray
+            //rear-return still complete. Mirrors DoGoDownTray case 10; sensor SnColor_InputHasTray
+            //-> bFrontHasTray. sim/dummy RefreshStateFromSensors early-returns and keeps the
+            //caller-maintained latch, so sim is unaffected.
+            RefreshStateFromSensors();
+            if(bFrontHasTray==false)
+            {
+                GoUpTask=1000;   //no front tray -> rear-handling terminal only, no empty raise
+                break;
+            }
+            GoUpTask=100;
+            break;
+
+        case 100:
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();   //one-shot re-arm before Push
+            GoUpTask=110;
+            break;
+
+        case 110:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))   //extend Rise_1 (confirmed)
+                GoUpTask=200;
+            break;
+
+        case 200:
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            GoUpTask=210;
+            break;
+
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))   //extend Separate (confirmed)
+            {
+                GoUpDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                GoUpDelay.On();
+                GoUpTask=300;
+            }
+            break;
+
+        case 300:
+            if(GoUpDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                GoUpTask=310;
+            }
+            break;
+
+        case 310:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))   //extend Rise_2 (confirmed)
+                GoUpTask=400;
+            break;
+
+        case 400:
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            GoUpTask=410;
+            break;
+
+        case 410:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))   //retract Separate (confirmed)
+            {
+                GoUpDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                GoUpDelay.On();
+                GoUpTask=500;
+            }
+            break;
+
+        case 500:
+            if(GoUpDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                GoUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))   //retract Rise_2 (confirmed)
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                GoUpTask=600;
+            }
+            break;
+
+        case 600:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))   //retract Rise_1 (confirmed)
+            {
+                bFrontHasTray=false;
+                GoUpTask=1000;
+            }
+            break;
+
+        case 1000:
+            RefreshStateFromSensors();
+            if(bRearHasTray)
+                GoUpTask=2000;
+            else
+                GoUpTask=9000;
+            break;
+
+        case 2000:
+            //AI(phase6-loader-recycle) 20260625 : carry the rear/output tray to the rear
+            //pickup Y (Color's rear handoff Y) before leaning/pushing it onto the car.
+            if(MoveColorY(Teach.ColorTrayArmPickYPosition))
+            {
+                HSys.Cyn.C_Color_LeanOnTray.Reset();
+                GoUpTask=3000;
+            }
+            break;
+
+        case 3000:
+            if(PushCylinder(HSys.Cyn.C_Color_LeanOnTray))
+            {
+                HSys.Cyn.C_Color_PushTray.Reset();
+                GoUpTask=4000;
+            }
+            break;
+
+        case 4000:
+            if(PushCylinder(HSys.Cyn.C_Color_PushTray))
+                GoUpTask=5000;
+            break;
+
+        case 5000:
+            //AI(ht160s-color-3pos) 20260626 : return the carriage to the FRONT car Y. The
+            //"front car" = the RECEIVE position (Teach.ColorReceiveTrayYPosition), not the
+            //CCD scan Y. ColorRead2DYPosition was repurposed to the middle scan station.
+            if(MoveColorY(Teach.ColorReceiveTrayYPosition))
+            {
+                HSys.Cyn.C_Color_PushTray.Reset();
+                GoUpTask=6000;
+            }
+            break;
+
+        case 6000:
+            if(PopCylinder(HSys.Cyn.C_Color_PushTray))
+            {
+                HSys.Cyn.C_Color_LeanOnTray.Reset();
+                GoUpTask=7000;
+            }
+            break;
+
+        case 7000:
+            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))
+            {
+                bFrontHasTray=true;
+                bRearHasTray=false;
+                GoUpTask=8000;
+            }
+            break;
+
+        case 8000:
+            GoUpTask=9000;
+            break;
+
+        case 9000:
+            GoUpTask=10000;
+            break;
+
+        case 10000:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - GoUpTask returns to idle(1) HERE so
+            //IsCleanOutFinish's "GoUpTask==1" idle gate reads a completed GoUp drain as finished.
+            GoUpTask=1;
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TColorModule::MoveColorY(int Position)
+{
+    //AI(HT160S-Maintainer) 20260622 : move the Color carriage in Y (front/back relative to the
+    //operator; X=left/right, Z=up/down). Ported VERBATIM from MoveEmptyY (same mechanism; Color
+    //only adds the middle CCD scan). Returns false on NULL / out-of-limit / TrayArm-collision so
+    //the caller's ladder WAITS instead of advancing as if the move had completed.
+    if(HSys.Mot.MColorY==NULL)
+        return false;
+    if(HSys.Mot.MColorY->CheckSoftLimit(Position)==false)
+    {
+        ShowMotorLimitError(HSys.Mot.MColorY->AlarmName[eMotOverLimitErr], LangT("Color Y motor will out of limit"), HSys.Mot.MColorY, Position);
+        return false;
+    }
+
+    #ifndef SOFT_SIMULATE
+    //AI(ht160s-color-align-empty) 20260627 : TrayArm anti-collision, ported verbatim from
+    //MoveEmptyY. If the TrayArm is NOT raised (Z-up off) and its X is at/near the Color pickup X,
+    //block the carriage Y move so the carriage cannot slam into the lowered arm.
+    int TrayArmPos=0;
+    if(HSys.Mot.MTrayArmX!=NULL)
+        TrayArmPos=HSys.Mot.MTrayArmX->ReadEncoderPos();
+    if(HSys.Cyn.C_TrayArmZ_Up.IsOn()==false &&
+       (TrayArmPos+500)>=Teach.TrayXArmToColorXPosition)
+    {
+        return false;
+    }
+    #endif
+
+    return HSys.Mot.MColorY->MotorMove(Position);
+}
+//---------------------------------------------------------------------------
+bool TColorModule::MoveColorCcdX(int Position)
+{
+    //AI(ht160s-color-ccd-xy) 20260628 : move the Color CCD reader (stepper, X axis) to a taught
+    //position. Mirrors TLoaderModule::MoveTopCcdX. Returns false on NULL / out-of-limit so the
+    //caller's ladder WAITS instead of advancing as if the move had completed.
+    if(HSys.Mot.MTopCCDX_Color==NULL)
+        return false;
+    if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Position)==false)
+    {
+        ShowMotorLimitError(HSys.Mot.MTopCCDX_Color->AlarmName[eMotOverLimitErr], LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color, Position);
+        return false;
+    }
+    return HSys.Mot.MTopCCDX_Color->MotorMove(Position);
+}
+//---------------------------------------------------------------------------
+bool TColorModule::MoveColorCcdToScan()
+{
+    //AI(ht160s-color-ccd-xy) 20260628 : move the carriage Y and the CCD reader X to the taught
+    //photo position TOGETHER (both commanded every call; returns true only when BOTH are in
+    //position). Mirrors TLoaderModule::MoveToCcdCell (parallel X+Y). Shared by production
+    //DoFeedTray case 3000 AND the Teach Advanced Color CCD photo test, so both move identically.
+    //MoveColorY keeps its soft-limit + (real-build) TrayArm anti-collision guard.
+    bool bYFlag=MoveColorY(Teach.ColorRead2DYPosition);
+    bool bXFlag=MoveColorCcdX(Teach.ColorRead2DXPosition);
+    return (bYFlag && bXFlag);
+}
+//---------------------------------------------------------------------------
+bool TColorModule::DoFeedTray(int Flag)
 {
     int Ret;
 
     if(Flag==0)
     {
-        SupplyTask=1;
-        SupplyDelay.Clear();
+        FeedTask=1;
+        FeedClampSub=0;
+        FeedDelay.Clear();
+        //AI(ht160s-color-align-empty) 20260627 : one-shot Reset clears a stale Push() Task
+        //left by an aborted supply (alarm/skip), mirroring TEmptyModule::DoFeedTray. Do NOT
+        //Reset before each Push() poll -- that restarts the non-blocking machine and hangs.
+        HSys.Cyn.C_Color_LeanOnTray.Reset();
+        HSys.Cyn.C_Color_PushTray.Reset();
         return true;
     }
 
-    switch(SupplyTask)
+    switch(FeedTask)
     {
         case 1:
             if(IsTraySupplyMode()==false)
-                return true;
-            SupplyTask=10;
+            {
+                FeedTask=13000;   //AI(ht160s-feeder-unify) 20260706 : not tray-supply mode -> single DONE terminal (case 13000)
+                break;
+            }
+            FeedTask=10;
             break;
 
         case 10:
+            //AI(ht160s-color-align-empty) 20260627 : mirror TEmptyModule::DoFeedTray case 10 --
+            //if the rear handoff slot is occupied, do not feed. In the supply context bTrayReady
+            //is false here (DoColor idles on bTrayReady otherwise) and bReturnTray is false (the
+            //return branch ran first), so a true bRearHasTray means a LEFTOVER tray stranded at
+            //the rear on startup/recovery -- not pickable (pickup gate is bTrayReady) and not
+            //re-stageable. Require the operator to remove it; the rear sensor clears bRearHasTray
+            //when they do. Avoids the silent cold-start deadlock WITHOUT auto-presenting
+            //(bRearHasTray is shared by the return/recycle path, so a sensor-backed pickup would
+            //mis-fire). Once the sensor reads empty the normal supply proceeds.
             RefreshStateFromSensors();
-            if(bOutputHasTray)
+            if(bRearHasTray)
             {
-                //AI(HT160S-Maintainer) 20260608 : a tray already sits at the output
-                //read position; still drive the 2D CCD read before TrayArm pickup.
+                if(HSys.LastSet.iRealDummy!=DUMMY)
+                {
+                    ShowMyError("MES1426", LangT("Color rear has a leftover tray - please remove it"), K_RETRY);
+                    RefreshStateFromSensors();
+                }
+                if(bRearHasTray)
+                {
+                    FeedTask=13000;   //AI(ht160s-feeder-unify) 20260706 : leftover rear tray -> single DONE terminal
+                    break;
+                }
+            }
+            FeedTask=1000;
+            break;
+
+        case 1000:
+            //AI(ht160s-color-align-empty) 20260627 : carriage to the FRONT receive Y
+            //(Teach.ColorReceiveTrayYPosition = Empty's EmptyCarFeedTrayYPosition analog).
+            if(MoveColorY(Teach.ColorReceiveTrayYPosition))
+                FeedTask=2000;
+            break;
+
+        case 2000:
+        {
+            //AI(ht160s-color-align-empty) 20260627 : standardized dual-cylinder clamp via
+            //DoClampTray (lean-stop first, push last), shared with Empty. SettleTicks=0
+            //keeps Color's behavior; the rear output sensor at case 7000 verifies the tray.
+            int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray,
+                                  FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iColorFeedClampSettleMs);
+            if(Clamp==1)
+            {
+                //AI(ht160s-color-align-empty) 20260627 : carriage clamped the front-staged tray
+                //-> hand the front-born identity grid onto the carriage motor (mirror Empty
+                //MoveFrom). The CCD photo step (case 3100) then only UPDATES its 2D TrayID.
+                if(HSys.VMot.MMColorY!=NULL)
+                {
+                    HSys.VMot.MMColorY->Tray.MoveFrom(FrontSourceTray);
+                    HSys.VMot.MMColorY->fHasTray=true;
+                    HSys.VMot.MMColorY->Refresh();
+                }
+                FeedTask=3000;
+            }
+            else if(Clamp==2)
+            {
+                //AI(ht160s-color-align-empty) 20260628 : push miss -- helper already Popped
+                //the push + reset FeedClampSub. Color-own code (NOT Empty JAM1030) + retry.
+                Ret=ShowMyError("MES1422", LangT("Color Push Tray Miss"), &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
+                if(Ret==K_RETRY)
+                    FeedTask=1000;
+            }
+            break;
+        }
+
+        //AI(ht160s-color-3pos) 20260627 : ===== CCD PHOTO STEP : the ONE difference vs
+        //TEmptyModule::DoFeedTray. After GoDown+clamp, carry the tray through the MIDDLE scan
+        //station and shoot the 2D identity. DoReadColor2D is an independent sub-ladder (its
+        //own ScanTask) that moves the CCD-X reader + LON/read/LOFF and births the identity
+        //tray. Tune the interleave / scan position here if the optics layout changes.
+        case 3000:
+            //AI(ht160s-color-ccd-xy) 20260628 : move carriage Y + CCD reader X TOGETHER via the
+            //shared MoveColorCcdToScan (mirrors Loader MoveToCcdCell). DoReadColor2D case 10 then
+            //re-asserts the CCD X position (a no-op once it is already there).
+            if(MoveColorCcdToScan())
+            {
                 DoReadColor2D(0);
-                SupplyTask=900;
-                break;
+                FeedTask=3100;
             }
-            //AI(HT160S-Maintainer) 20260608 : the front buffer must already hold a
-            //separated tray (staged by DoGoDownTray). Without it there is nothing to
-            //push to the output, so bail and let DoColor run a godown cycle first.
-            if(bFrontHasTray==false && IsSoftSimulate()==false)
+            break;
+
+        case 3100:
+            if(DoReadColor2D(1))
+                FeedTask=4000;
+            break;
+        //AI(ht160s-color-3pos) 20260627 : ===== end CCD photo step =====
+
+        case 4000:
+            //AI(ht160s-color-align-empty) 20260627 : carry the clamped tray to the REAR pickup
+            //Y (Empty's EmptyCarDischargeTrayYPosition analog). The front buffer is now empty
+            //-> clear bFrontHasTray so DoColor re-stages via DoGoDownTray next cycle. (THIS is
+            //the latch that was wrong before -- it stayed set and broke the 2nd pickup.)
+            if(MoveColorY(Teach.ColorTrayArmPickYPosition))
             {
-                bSupplyRequested=false;
-                return true;
+                bFrontHasTray=false;
+                FeedTask=5000;
             }
-            SupplyTask=600;
             break;
 
-        case 600:
-            if(PushCylinder(HSys.Cyn.C_Color_LeanOnTray))
-                SupplyTask=700;
+        case 5000:
+            //AI(ht160s-color-align-empty) 20260627 : release the carriage clamp at the rear
+            //BEFORE the TrayArm picks (mirror Empty case 5000/6000). Without this the Color
+            //cylinders still grip the tray when the TrayArm Z-downs + lifts -> collision.
+            if(PopCylinder(HSys.Cyn.C_Color_PushTray))
+                FeedTask=6000;
             break;
 
-        case 700:
-            if(PushCylinder(HSys.Cyn.C_Color_PushTray))
-                SupplyTask=800;
+        case 6000:
+            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))
+                FeedTask=7000;
             break;
 
-        case 800:
+        case 7000:
+            //AI(ht160s-color-align-empty) 20260627 : confirm the tray actually reached the
+            //rear/output (mirror Empty case 7000 / MES1021), then present it for TrayArm
+            //pickup. bTrayReady is Color's pickable latch (Empty sets bRearHasTray).
             RefreshStateFromSensors();
             if(HSys.Sen.SnColor_OutputBottomHasTray.Enable==true &&
-               bOutputHasTray==false && HSys.LastSet.iRealDummy!=DUMMY)
+               HSys.Sen.SnColor_OutputBottomHasTray.IsOff() &&
+               HSys.LastSet.iRealDummy!=DUMMY)
             {
-                Ret=ShowMyError("Color supply tray is not ready", K_RETRY);
+                //AI(amr-unmanned W7) 20260722 : REAR-ARRIVAL check (analog of Empty MES1021),
+                //NOT source-dry - by this case the tray was already destacked, clamped and
+                //carried to the rear, so an AGV supply/magazine refill cannot place a tray
+                //here; if it is absent it was lost/mis-positioned in transport (or the rear
+                //sensor faulted), which the AGV cannot clear. B-class genuine fault : alarm
+                //immediately in ALL modes. (The old bUseAMR iAmrFeedWaitSec wait was wired to
+                //the wrong sensor - it only delayed a real fault and stalled the feed
+                //silently meanwhile. The true Color source-dry path is SnColor_InputEnd ->
+                //IsInputShortageForAmr -> AGV call + WAR0962, handled by the coordinator.)
+                Ret=ShowMyError("MES1421", LangT("Color supply tray is not ready"), &HSys.Sen.SnColor_OutputBottomHasTray, true, K_RETRY);
                 if(Ret==K_RETRY)
-                    SupplyTask=1;
+                    FeedTask=1;
             }
             else
             {
-                //AI(HT160S-Maintainer) 20260608 : tray pushed to the read/output
-                //position; the front buffer is now empty. Read its 2D TrayID
-                //before it is ready for TrayArm pickup.
-                bFrontHasTray=false;
-                DoReadColor2D(0);
-                SupplyTask=900;
-            }
-            break;
-
-        case 900:
-            //AI(HT160S-Maintainer) 20260608 : drive Color 2D CCD (LON/read/LOFF).
-            //sTrayID2D filled by DoReadColor2D; empty when simulated or SKIPped.
-            if(DoReadColor2D(1))
-            {
                 bTrayReady=true;
-                bTrayPicked=false;
+                Status=CS_REAR_READY;   //AI(ht160s-status) 20260703 : clamps popped (case5000/6000) + presented
                 bSupplyRequested=false;
-                return true;
+                FeedTask=13000;
             }
             break;
+        case 13000:
+            //AI(ht160s-feeder-unify) 20260706 : single terminal - FeedTask returns to idle(1) HERE so
+            //IsCleanOutFinish's "FeedTask==1" idle gate reads a completed feed as finished.
+            FeedTask=1;
+            return true;
     }
     return false;
 }
@@ -418,11 +1289,15 @@ bool TColorModule::DoReadColor2D(int Flag)
     switch(ScanTask)
     {
         case 1:
-            //Offline / DUMMY : no real Color CCD, fabricate a TrayID so the AMR
-            //pull flow can still run without the camera.
-            if(IsSoftSimulate())
+            //AI(HT160S-Maintainer) 20260624 : per-CCD Enable. No real Color CCD scan
+            //in a sim tier OR when disabled -> fabricate a TrayID so the AMR pull
+            //flow keeps running. Enable=OFF now yields SIM data (was empty string).
+            //DUMMY always sim; HAS_TRAY/REALLY real-scan when bUseColorCcd, else sim.
+            if(IsSoftSimulate() || tSimuData.bRunSimulation || CosFunction.bUseColorCcd==false)
             {
                 sTrayID2D=AnsiString("COLOR2D_")+Now().FormatString("hhnnsszzz");
+                StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (sim/disabled identity)
+                ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                 return true;
             }
             EnsureColorCcdSocketCreated();
@@ -440,7 +1315,7 @@ bool TColorModule::DoReadColor2D(int Flag)
             }
             if(HSys.Mot.MTopCCDX_Color->CheckSoftLimit(Teach.ColorRead2DXPosition)==false)
             {
-                ShowMyMessage("Color CCD X motor will out of limit");
+                ShowMotorLimitError(HSys.Mot.MTopCCDX_Color->AlarmName[eMotOverLimitErr], LangT("Color CCD X motor will out of limit"), HSys.Mot.MTopCCDX_Color, Teach.ColorRead2DXPosition);
                 ScanTask=100;
                 break;
             }
@@ -451,10 +1326,12 @@ bool TColorModule::DoReadColor2D(int Flag)
         case 100:
             if(ColorCcdSocket==NULL || ColorCcdSocket->IsColorCcdConnected()==false)
             {
-                Ret=ShowMyError("Color CCD connect not ready", K_RETRY|K_SKIP);
+                Ret=ShowSystemError("ColorCCD_Connect", K_RETRY|K_SKIP);
                 if(Ret==K_SKIP)
                 {
                     sTrayID2D="";
+                    StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (skip; identity tray, empty 2D)
+                    ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                     return true;
                 }
                 EnsureColorCcdSocketCreated();
@@ -476,13 +1353,15 @@ bool TColorModule::DoReadColor2D(int Flag)
                     sTrayID2D=sCode;
                     if(ColorCcdSocket!=NULL)
                         ColorCcdSocket->ColorCcdEndShot();   //LOFF : end shot
+                    StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (real 2D read)
+                    ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                     return true;
                 }
                 else if(ScanDelay.Off())
                 {
                     if(ColorCcdSocket!=NULL)
                         ColorCcdSocket->ColorCcdEndShot();   //LOFF : end shot
-                    Ret=ShowMyError("Color CCD 2D no response", K_RETRY|K_SKIP);
+                    Ret=ShowSystemError("ColorCCD_2D", K_RETRY|K_SKIP|K_MANUAL_2D);
                     if(Ret==K_RETRY)
                     {
                         if(ColorCcdSocket!=NULL)
@@ -490,9 +1369,19 @@ bool TColorModule::DoReadColor2D(int Flag)
                         ScanDelay.SetMS(3000);
                         ScanDelay.On();
                     }
+                    else if(Ret==K_MANUAL_2D)
+                    {
+                        //AI(ht160s-ccd-manual2d) : operator hand-entered the tray identity 2D.
+                        sTrayID2D=fNote->ManualText;
+                        StampReadIdentity2D();
+                        ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
+                        return true;
+                    }
                     else
                     {
                         sTrayID2D="";
+                        StampReadIdentity2D();   //AI(ht160s-tray-source) : born here (skip; identity tray, empty 2D)
+                        ScanTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                         return true;
                     }
                 }
@@ -502,57 +1391,38 @@ bool TColorModule::DoReadColor2D(int Flag)
     return false;
 }
 //---------------------------------------------------------------------------
-bool TColorModule::DoReleaseTray(int Flag)
+//AI(ht160s-color-align-empty) 20260627 : identity-tray BIRTH model, aligned to TEmptyModule.
+//Born at the front staging point (BirthFrontTray, into FrontSourceTray), handed to the carriage
+//motor at clamp (DoFeedTray case 2000, MoveFrom). Identity trays carry no IC so the grid is
+//all-empty (Kind=Identity); the 2D code IS the identity (TrayID).
+void TColorModule::BirthFrontTray()
 {
-    if(Flag==0)
-    {
-        ReleaseTask=1;
-        ReleaseDelay.Clear();
-        return true;
-    }
-
-    switch(ReleaseTask)
-    {
-        case 1:
-            ReleaseTask=100;
-            break;
-
-        case 100:
-            if(PopCylinder(HSys.Cyn.C_Color_PushTray))
-                ReleaseTask=200;
-            break;
-
-        case 200:
-            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))
-                ReleaseTask=300;
-            break;
-
-        case 300:
-            if(PopCylinder(HSys.Cyn.C_Color_RearRiseTray))
-                ReleaseTask=400;
-            break;
-
-        case 400:
-            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
-                ReleaseTask=450;
-            break;
-
-        case 450:
-            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
-                ReleaseTask=500;
-            break;
-
-        case 500:
-            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
-            {
-                bTrayReady=false;
-                bTrayPicked=false;
-                bOutputHasTray=false;
-                return true;
-            }
-            break;
-    }
-    return false;
+    FrontSourceTray.Birth(EMPTY_IC, eTrayKindIdentity, "");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-color-align-empty) 20260627 : the CCD read only UPDATES the carried tray's 2D TrayID
+//(a data update, NOT a birth). Normal path: the grid was born at the front + handed to the
+//carriage, so just set TrayID. Recovery/startup (tray at rear, no front birth): birth it here so
+//the TrayArm always carries a valid identity grid.
+void TColorModule::StampReadIdentity2D()
+{
+    if(HSys.VMot.MMColorY==NULL)
+        return;
+    if(HSys.VMot.MMColorY->fHasTray==false)
+        HSys.VMot.MMColorY->Tray.Birth(EMPTY_IC, eTrayKindIdentity, sTrayID2D);
+    else
+        HSys.VMot.MMColorY->Tray.TrayID=sTrayID2D;
+    HSys.VMot.MMColorY->fHasTray=true;
+    HSys.VMot.MMColorY->Refresh();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : return-by-value deep copy of the presented identity tray.
+TMyTray TColorModule::GetSourceTray()
+{
+    if(HSys.VMot.MMColorY!=NULL)
+        return HSys.VMot.MMColorY->Tray;
+    TMyTray empty;
+    return empty;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::DoSortBin(int Flag)
@@ -566,6 +1436,7 @@ bool TColorModule::DoSortBin(int Flag)
     switch(SortBinTask)
     {
         case 1:
+            SortBinTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> keep task at idle(1)
             return true;
     }
     return false;
@@ -597,19 +1468,7 @@ bool TColorModule::IsSortBinMode()
 bool TColorModule::IsTrayReady()
 {
     RefreshStateFromSensors();
-    return IsInstalled() && IsTraySupplyMode() && bTrayReady && bTrayPicked==false;
-}
-//---------------------------------------------------------------------------
-bool TColorModule::IsInputHasTray()
-{
-    RefreshStateFromSensors();
-    return bInputHasTray;
-}
-//---------------------------------------------------------------------------
-bool TColorModule::IsOutputHasTray()
-{
-    RefreshStateFromSensors();
-    return bOutputHasTray;
+    return IsInstalled() && IsTraySupplyMode() && bTrayReady;
 }
 //---------------------------------------------------------------------------
 bool TColorModule::IsAcceptingIC()
@@ -625,8 +1484,561 @@ void TColorModule::RequestSupplyTray()
 //---------------------------------------------------------------------------
 void TColorModule::NotifyTrayPicked()
 {
+    //AI(ht160s-color-align-empty) 20260627 : single-step pickup release, mirroring TEmptyModule
+    //(TrayArm picks -> SetRearHasTray(false)). The carriage clamp was already released inline in
+    //DoFeedTray case 5000/6000, so just clear the rear-ready state + hide the grid; no separate
+    //DoReleaseTray pass (that branch + case 1500 are removed from DoColor).
+    bTrayReady=false;
+    bRearHasTray=false;
+    if(Status==CS_REAR_READY)
+        Status=CS_IDLE;   //AI(ht160s-status) 20260703 : TrayArm took the presented tray
+    if(HSys.VMot.MMColorY!=NULL) HSys.VMot.MMColorY->ClearTray();
+}
+//---------------------------------------------------------------------------
+//AI(phase6-loader-recycle) 20260625 : Color receive-tray contract, identical name and
+//semantics to TEmptyModule's so TrayArm::DoPlaceToColor and DoPlaceToEmpty are the same
+//shape. RequestReturnTray arms the receive ladder; the deposit handshake mirrors Empty.
+void TColorModule::RequestReturnTray()
+{
+    bReturnTray=true;
+    bTrayXToEmptyFinish=false;
+    //AI(ht160s-agv-identity2d) 20260714 : a recycle return SUPERSEDES a pending identity intake
+    //(e.g. a CleanOut in-flight divert re-routing an intake tray). Clearing bReadIdentityPending
+    //keeps the DoColor case-100 arbitration + the DoPlaceToColor gate consistent (recycle path).
+    bReadIdentityPending=false;
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : TrayArm reserves a Loader identity-tray intake (Color CCD
+//scan + S6F11 CEID275/SVID38204 upload for cloud reconciliation). Distinct from RequestReturnTray
+//(recycle): this arms the pick-time interlock + the DoReadIdentityRetreat ladder, NOT the GoUp-1700
+//return. Setting it makes DoColor case 100 drop to idle (start no new supply/destack) until the
+//intake completes.
+void TColorModule::RequestReadIdentityTray()
+{
+    //AI(ht160s-agv-identity2d) 20260714 : subordinate the intake to an in-flight recycle -- if a
+    //recycle return is already armed (e.g. a CleanOut divert), do NOT hijack it into the intake
+    //ladder (RequestReturnTray also clears bReadIdentityPending, so recycle wins symmetrically).
+    if(bReturnTray==false)
+        bReadIdentityPending=true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : an identity intake is reserved / in progress. TrayArm's
+//DoPlaceToColor uses this to pick the CONDITIONAL deposit gate: identity intake -> wait Color idle
+//(IsReadyToReceiveIdentity); recycle (bReturnTray) -> the plain rear-free gate. Applying the idle
+//gate to a bReturnTray recycle would deadlock (the recycle REQUIRES Color busy at case 1700).
+bool TColorModule::IsReceivingIdentity()
+{
+    return bReadIdentityPending;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : pick-time interlock (owner). TrayArm must NOT pick the Loader
+//identity tray / deposit it at Color's rear until Color is FULLY idle -- else the rear handoff can
+//collide with a Color carriage move. Idle = no sub-ladder stepping, status idle, carriage empty,
+//rear/present latches clear, cylinders home, not AMR-locked. Real machine also requires the clamp
+//cylinders released; sim skips the out-bit check (RefreshStateFromSensors is latch-only there, and
+//IsReadyForAmrHandoff is sim-true) so a headless intake can still reach ready.
+bool TColorModule::IsReadyToReceiveIdentity()
+{
+    RefreshStateFromSensors();
+    if(Status==CS_FEEDING || Status==CS_DESTACK || Status==CS_RETURNING)
+        return false;
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1 || ReadIdentityTask!=1)
+        return false;
+    if(bRearHasTray || bTrayReady)
+        return false;
+    if(HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray)
+        return false;
+    if(bAmrLocked)
+        return false;
+    if(IsReadyForAmrHandoff()==false)
+        return false;
+    if(IsSoftSimulate()==false &&
+       (HSys.Cyn.C_Color_LeanOnTray.GetOutBit() || HSys.Cyn.C_Color_PushTray.GetOutBit()))
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : lift the FRONT stack clear of the rest position so the just-
+//scanned identity tray can be set down at the front rest without a two-tray collision (owner:
+//"front has tray -> GoUp first"). Self-terminating EXTRACTION of DoGoUpTray's front-raise
+//(cases 100-600); NOT a range-poke of DoGoUpTray (whose case 600 tail-jumps to the rear-grab).
+//Returns true when the rest is clear (front empty, or after the raise). Physical order identical
+//to DoGoUpTray; uses ReadIdentityDelay (DoGoUpTray is never co-running under this DoColor Task).
+bool TColorModule::RaiseFrontStackClear(int Flag)
+{
+    if(Flag==0)
+    {
+        RaiseFrontTask=1;
+        ReadIdentityDelay.Clear();
+        return true;
+    }
+    switch(RaiseFrontTask)
+    {
+        case 1:
+            RefreshStateFromSensors();
+            if(bFrontHasTray==false)
+                return true;   // rest already clear -> nothing to lift
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+            RaiseFrontTask=110;
+            break;
+        case 110:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                RaiseFrontTask=210;
+            }
+            break;
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                ReadIdentityDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                ReadIdentityDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                RaiseFrontTask=310;
+            }
+            break;
+        case 310:
+            if(ReadIdentityDelay.Off())
+            {
+                if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                    RaiseFrontTask=410;
+            }
+            break;
+        case 410:
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            RaiseFrontTask=420;
+            break;
+        case 420:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                ReadIdentityDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                ReadIdentityDelay.On();
+                RaiseFrontTask=510;
+            }
+            break;
+        case 510:
+            if(ReadIdentityDelay.Off())
+            {
+                if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                {
+                    HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                    RaiseFrontTask=600;
+                }
+            }
+            break;
+        case 600:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                bFrontHasTray=false;
+                //AI(ht160s-agv-ruleB) 20260818 : return the cursor to its idle terminal on the
+                //success path. It used to stay at 600 and rely on the caller re-arming in the same
+                //scan, which made RaiseFrontTask!=1 merely coincidentally safe as an
+                //is-motion-running test. Now it means what it says.
+                RaiseFrontTask=1;
+                return true;
+            }
+            break;
+        default:
+            LogLadderFault("Color.RaiseFrontStackClear", RaiseFrontTask);
+            RaiseFrontTask=1;
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260714 : Loader identity-tray intake. TrayArm has deposited a Loader
+//identity tray at Color's REAR (rear->middle->front is the reverse of the supply feed). Clamp it,
+//carry to the middle CCD, read the 2D, upload S6F11 CEID275/SVID38204 RIGHT AFTER the scan (cloud
+//reconciliation, once per intake), then retreat to the front car (raise the front stack clear if
+//occupied, to avoid a two-tray collision) and set it down as an Identity tray for later supply.
+bool TColorModule::DoReadIdentityRetreat(int Flag)
+{
+    int Ret;
+    if(Flag==0)
+    {
+        ReadIdentityTask=1;
+        ReadClampSub=0;
+        ReadIdentityDelay.Clear();
+        RaiseFrontStackClear(0);
+        HSys.Cyn.C_Color_LeanOnTray.Reset();
+        HSys.Cyn.C_Color_PushTray.Reset();
+        return true;
+    }
+    switch(ReadIdentityTask)
+    {
+        case 1:
+            //owner #1 : receive at the rear handoff. Wait the TrayArm deposit (bRearHasTray via
+            //NotifyTrayXToEmptyFinish), park at the pick Y, then clamp. Carriage MUST be empty first
+            //(guaranteed by IsReadyToReceiveIdentity before deposit); a tray already on it is a
+            //can't-happen state -> log (not a silent stall) and hold rather than clamp a second tray.
+            RefreshStateFromSensors();
+            if(bRearHasTray==false)
+                break;
+            if(HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray)
+            {
+                LogLadderFault("Color.ReadIdentity.carriageNotClear", ReadIdentityTask);
+                break;
+            }
+            if(MoveColorY(Teach.ColorTrayArmPickYPosition)==false)
+                break;
+            {
+                //clamp rule (project-wide): front-stop LeanOnTray first, rear-hook PushTray last.
+                int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray,
+                                      ReadClampSub, ReadIdentityDelay, IsSoftSimulate(), GeneralSetting.iColorFeedClampSettleMs);
+                if(Clamp==1)
+                {
+                    //the intake tray arrived with NO software grid (came from the Loader via TrayArm),
+                    //so BIRTH it as Identity here; the CCD scan then fills the real 2D TrayID. This is
+                    //the B-4 fix: the front deposit later MoveFrom's this grid, keeping Kind=Identity.
+                    if(HSys.VMot.MMColorY!=NULL)
+                    {
+                        HSys.VMot.MMColorY->Tray.Birth(EMPTY_IC, eTrayKindIdentity, "");
+                        HSys.VMot.MMColorY->fHasTray=true;
+                        HSys.VMot.MMColorY->Refresh();
+                    }
+                    bRearHasTray=false;   //carried onto the carriage -> rear free (mirror GoUp case7000; re-arms a repeat intake)
+                    bTrayXToEmptyFinish=false;   //AI(ht160s-agv-identity2d) 20260714 : clear the deposit handshake latch (hygiene; matches the recycle path)
+                    ReadIdentityTask=100;
+                }
+                else if(Clamp==2)
+                {
+                    Ret=ShowMyError("MES1422", LangT("Color Push Tray Miss"), &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
+                    if(Ret==K_RETRY)
+                        ReadClampSub=0;
+                }
+            }
+            break;
+
+        case 100:
+            if(MoveColorCcdToScan())
+            {
+                DoReadColor2D(0);
+                ReadIdentityTask=200;
+            }
+            break;
+
+        case 200:
+            if(DoReadColor2D(1))   //fills sTrayID2D + StampReadIdentity2D (the 2D on the Identity grid)
+                ReadIdentityTask=300;
+            break;
+
+        case 300:
+            //upload S6F11 CEID275 right after the scan. Genuine + non-empty only: IsTrayID2DGenuine
+            //suppresses the real-machine reader-off "COLOR2D_" placeholder; a blank (operator-skipped
+            //read) is never uploaded (9045-faithful). EventReport self-gates on HSMS SELECTED.
+            if(sTrayID2D!="" && IsTrayID2DGenuine() && HGem!=NULL)
+                AgvCoord.ReportLoaderIdentity(HGem, AMR_IDENTITY_CARRIER_INDEX, sTrayID2D);
+            ReadIdentityTask=400;
+            break;
+
+        case 400:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - RaiseFrontStackClear drives the SAME front
+            //riser/separator cylinders as DoGoUpTray (its own header says the physical order is
+            //identical), so it is a GoUp for the purposes of the AMR rule. The module entry gate
+            //alone is not enough : this case re-arms the ladder every pass, so a lock arriving
+            //after the identity read began would otherwise never be seen. RaiseFrontTask==1 is the
+            //idle terminal, so a lift already in flight still completes.
+            if(bAmrLocked && RaiseFrontTask==1)
+                break;   //AI(ht160s-agv) front GoUp suspended during AMR handoff
+            //owner : before setting the tray down at the front rest, if the front already holds a
+            //tray, GoUp (lift the stack clear) first to avoid a two-tray collision; then deposit.
+            if(RaiseFrontStackClear(1))
+            {
+                RaiseFrontStackClear(0);   //re-arm; a still-occupied rest re-lifts next pass
+                RefreshStateFromSensors();
+                if(bFrontHasTray)
+                    break;
+                ReadIdentityTask=410;
+            }
+            break;
+
+        case 410:
+            //rest clear -> carry the clamped, scanned tray to the FRONT receive Y and set it down.
+            if(MoveColorY(Teach.ColorReceiveTrayYPosition))
+            {
+                HSys.Cyn.C_Color_PushTray.Reset();   //one-shot re-arm before the release Pop
+                ReadIdentityTask=420;
+            }
+            break;
+
+        case 420:
+            if(PopCylinder(HSys.Cyn.C_Color_PushTray))   //release rear-hook (PushTray) first
+            {
+                HSys.Cyn.C_Color_LeanOnTray.Reset();
+                ReadIdentityTask=430;
+            }
+            break;
+
+        case 430:
+            if(PopCylinder(HSys.Cyn.C_Color_LeanOnTray))   //release front-stop (LeanOnTray) last
+            {
+                //identity tray is now on the front rest; hand its scanned grid (Kind=Identity + real
+                //2D) to the front-staging holder so the later supply routes it correctly (B-4).
+                if(HSys.VMot.MMColorY!=NULL)
+                {
+                    FrontSourceTray.MoveFrom(HSys.VMot.MMColorY->Tray);
+                    HSys.VMot.MMColorY->fHasTray=false;
+                    HSys.VMot.MMColorY->Refresh();
+                }
+                bFrontHasTray=true;
+                bReadIdentityPending=false;   //intake complete -> release the receive lock; supply resumes
+                Status=CS_IDLE;
+                ReadIdentityTask=1;
+                return true;
+            }
+            break;
+
+        default:
+            LogLadderFault("Color.DoReadIdentityRetreat", ReadIdentityTask);
+            ReadIdentityTask=1;
+            break;
+    }
+    return false;
+}
+//AI(ht160s-color-align-empty) 20260627 : Color's rear-occupied latch is bRearHasTray (the
+//output/read position = Color's rear handoff slot). TrayArm waits IsRearHasTray()==false
+//before depositing, exactly as it waits on Empty's rear.
+bool TColorModule::IsRearHasTray()
+{
+    RefreshStateFromSensors();
+    return bRearHasTray;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260805 : does PHYSICAL evidence PROVE the Color carriage is empty ?
+//This is the "check whether motorY is really clamping a tray, and whether the rear/front
+//has-tray sensors are lit" test. Two independent pieces of evidence, BOTH required :
+//  (1) the CLAMP cylinders. A tray cannot ride the carriage unless C_Color_LeanOnTray (front
+//      stop) and C_Color_PushTray (rear hook) hold it - DoFeedTray case 2000 and
+//      DoReadIdentityRetreat case 1 clamp it, cases 5000/6000 and 420/430 release it. Both
+//      CONFIRMED retracted (out-bit low AND the Off sensor lit) means nothing is gripped.
+//  (2) the REAR SEAT sensors. There is exactly ONE window where the clamps are legitimately
+//      open with a tray still physically present : DoFeedTray pops them at the rear (5000/6000)
+//      and the tray then RESTS on the rear seat waiting for the TrayArm. SnColor_OutputBottom-
+//      HasTray / SnColor_TrayPos1 see precisely that tray, so both must read OFF as well.
+//Only honest LIVE reads are used - TMySensor::IsOn(), and TMyCylinder OffSensor.IsOn() for the
+//retract confirm - never a Status()/GetStatus-style path that honours the iRealDummy back door
+//and can read permanently present.
+//Deliberately CONSERVATIVE : returns false (no verdict, no heal) whenever the evidence is not
+//trustworthy - sim build, non-REALLY tier (DUMMY/HAS_TRAY force the inputs), a disabled clamp or
+//clamp-Off sensor, the TrayArm head lowered over the rear beam, or no rear sensor installed at
+//all. A MISSING sensor must never be read as "no tray".
+bool TColorModule::IsCarriageTrayPhysicallyAbsent()
+{
+    bool bAnyRearSensor=false;
+
+    if(IsSoftSimulate())
+        return false;                       //laptop build : no IO cards, every read is meaningless
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return false;                       //DUMMY / HAS_TRAY force the inputs -> no verdict
+
+    //(1) clamps must be retracted, and we must be ABLE to prove it
+    if(HSys.Cyn.C_Color_PushTray.Enable==false || HSys.Cyn.C_Color_LeanOnTray.Enable==false)
+        return false;
+    if(HSys.Cyn.C_Color_PushTray.GetOutBit() || HSys.Cyn.C_Color_LeanOnTray.GetOutBit())
+        return false;                       //still commanded out -> may be gripping a tray
+    if(HSys.Cyn.C_Color_PushTray.OffSensor.Enable==false ||
+       HSys.Cyn.C_Color_LeanOnTray.OffSensor.Enable==false)
+        return false;                       //cannot PROVE retracted -> no verdict
+    if(HSys.Cyn.C_Color_PushTray.OffSensor.IsOn()==false ||
+       HSys.Cyn.C_Color_LeanOnTray.OffSensor.IsOn()==false)
+        return false;                       //out-bit low but not seated home yet
+
+    //(2) rear seat must be readable and dark. TrayArm-head gate mirrors RefreshStateFromSensors
+    //(a head lowered over the rest falsely LIGHTS these) - with the head down a real tray can
+    //read absent, so refuse to judge. A DISABLED Z-up sensor must not silently disable the whole
+    //diaper, so the gate only bites when the point exists and reads dark.
+    if(HSys.Cyn.C_TrayArmZ_Up.OnSensor.Enable && HSys.Cyn.C_TrayArmZ_Up.OnSensor.IsOn()==false)
+        return false;
+    if(HSys.Sen.SnColor_OutputBottomHasTray.Enable)
+    {
+        bAnyRearSensor=true;
+        if(HSys.Sen.SnColor_OutputBottomHasTray.IsOn())
+            return false;
+    }
+    if(HSys.Sen.SnColor_TrayPos1.Enable)
+    {
+        bAnyRearSensor=true;
+        if(HSys.Sen.SnColor_TrayPos1.IsOn())
+            return false;
+    }
+    if(bAnyRearSensor==false)
+        return false;                       //no rear sensor installed -> never claim "absent"
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260805 : everything the verdict looked at, on one line, so the
+//breadcrumb stands alone - a future reader must be able to tell WHY it fired without also
+//owning the State Record zip. Tri-state IO values : 1=on 0=off -1=point disabled.
+AnsiString TColorModule::DescribePhysicalTrayEvidence()
+{
+    AnsiString s;
+    int iSwHasTray=0;
+
+    if(HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray)
+        iSwHasTray=1;
+    s  = "sw[fHasTray=" + IntToStr(iSwHasTray);
+    s += " bTrayReady="     + IntToStr(bTrayReady ? 1 : 0);
+    s += " bRearHasTray="   + IntToStr(bRearHasTray ? 1 : 0);
+    s += " bFrontHasTray="  + IntToStr(bFrontHasTray ? 1 : 0);
+    s += " status="         + AnsiString(ColorStatusName(Status));
+    s += " id="             + sTrayID2D + "]";
+    s += " cyn[PushTray out=" + IntToStr(HSys.Cyn.C_Color_PushTray.GetOutBit() ? 1 : 0)
+       + " off="              + IntToStr(TriReadSensor(HSys.Cyn.C_Color_PushTray.OffSensor))
+       + " LeanOn out="       + IntToStr(HSys.Cyn.C_Color_LeanOnTray.GetOutBit() ? 1 : 0)
+       + " off="              + IntToStr(TriReadSensor(HSys.Cyn.C_Color_LeanOnTray.OffSensor)) + "]";
+    s += " sen[OutputBottomHasTray=" + IntToStr(TriReadSensor(HSys.Sen.SnColor_OutputBottomHasTray))
+       + " TrayPos1="                + IntToStr(TriReadSensor(HSys.Sen.SnColor_TrayPos1))
+       + " InputHasTray="            + IntToStr(TriReadSensor(HSys.Sen.SnColor_InputHasTray))
+       + " TrayArmZup="              + IntToStr(TriReadSensor(HSys.Cyn.C_TrayArmZ_Up.OnSensor)) + "]";
+    s += " tier[softSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)
+       + " realDummy="    + IntToStr(HSys.LastSet.iRealDummy)
+       + " runMode="      + IntToStr(HSys.Sys.RunMode) + "]";
+    return s;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260805 : the heal. Drops ONLY the occupancy / ready latches that
+//claim a tray, and logs.
+//NOTE on what it deliberately does NOT touch : MMColorY->Tray (the identity grid) and
+//sTrayID2D are LEFT INTACT, so this is non-destructive. ClearTray() would have wiped the grid,
+//and there is one narrow window where that would lose a real identity : TrayArm DoPick case
+//4000 copies Color's grid (GetSourceTray) and calls NotifyTrayPicked in the SAME tick, but a
+//pick FROZEN by an alarm or pause right after the lift leaves the tray in the arm's jaws with
+//the rear seat already dark. Leaving the grid alone makes that window harmless - every consumer
+//gates on fHasTray, the next real tray overwrites the grid via MoveFrom/Birth, and on resume
+//case 4000 still finds the correct data. bSupplyRequested is also left alone : a pending AMR
+//supply demand must survive so Color feeds a REAL tray next.
+void TColorModule::ForceReleaseCarriageTrayLatch(AnsiString Why)
+{
+    AnsiString Evidence;
+    unsigned int dwNow=GetTickCount();
+    bool bLog;
+
+    Evidence=DescribePhysicalTrayEvidence();   //BEFORE the clear, so the log shows what was wrong
+    iPhantomTrayFireCount++;
+    //AI(ht160s-obsv-p2) 20260806 : FIRST fire per run captures a full State Record snapshot
+    //BEFORE the latches are cleared, so the contradiction (MotYHasTray=1 Grip=0, every gate
+    //input, the upstream module cursors) is preserved as forensic evidence for finding the
+    //UPSTREAM owner that minted the phantom. Once per run only - the same StuckWatchdog-style
+    //mid-run snapshot the machine already takes, and the log rate limit stays separate.
+    if(iPhantomTrayFireCount==1 && gStateRecord!=NULL)
+        gStateRecord->TriggerSnapshot("PhantomTrayColor");
+    bLog=true;
+    if(dwPhantomTrayLogTick!=0 && (int)(dwNow-dwPhantomTrayLogTick)<PHANTOM_TRAY_LOG_GAP_MS)
+        bLog=false;
+    if(bLog)
+    {
+        dwPhantomTrayLogTick=dwNow;
+        RecordProcess("DIAPER Color phantom tray latch cleared ("+Why+") #"+
+                      IntToStr(iPhantomTrayFireCount)+" : "+Evidence+
+                      " -- UPSTREAM DEFECT : a has-tray latch was set with no tray on the rail");
+    }
+
+    bTrayReady=false;
+    bRearHasTray=false;
+    if(HSys.VMot.MMColorY!=NULL)
+    {
+        HSys.VMot.MMColorY->fHasTray=false;   //occupancy only; Tray data + sTrayID2D kept on purpose
+        HSys.VMot.MMColorY->Refresh();
+    }
+    if(Status==CS_REAR_READY)
+        Status=CS_IDLE;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-phantom-tray) 20260805 : the detector. Called from DoColor case 100 - the module's
+//idle heartbeat, and also where the CleanOut drain decision is taken, so one call covers both
+//production and CleanOut.
+//Every gate below exists to make a FALSE heal impossible :
+//  - all five sub-ladders idle and Status not busy : never intervene mid-haul, where a clamped
+//    tray legitimately sits away from every sensor.
+//  - bReturnTray / bReadIdentityPending clear : a reserved receive owns the rear handoff.
+//  - PHANTOM_TRAY_CONFIRM_MS of CONTINUOUS contradiction : one noisy read never heals.
+//Returns true only when it actually fired.
+bool TColorModule::GuardPhantomCarriageTray()
+{
+    bool bClaimsTray;
+
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1 || ReadIdentityTask!=1 || RaiseFrontTask!=1 ||
+       Status==CS_FEEDING || Status==CS_DESTACK || Status==CS_RETURNING ||
+       bReturnTray || bReadIdentityPending)
+    {
+        dwPhantomTrayStart=0;
+        return false;
+    }
+
+    bClaimsTray=false;
     if(bTrayReady)
-        bTrayPicked=true;
+        bClaimsTray=true;
+    if(HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray)
+        bClaimsTray=true;
+    if(bClaimsTray==false || IsCarriageTrayPhysicallyAbsent()==false)
+    {
+        dwPhantomTrayStart=0;
+        return false;
+    }
+
+    if(dwPhantomTrayStart==0)
+    {
+        dwPhantomTrayStart=GetTickCount();
+        return false;
+    }
+    if((int)(GetTickCount()-dwPhantomTrayStart)<PHANTOM_TRAY_CONFIRM_MS)
+        return false;
+    dwPhantomTrayStart=0;
+
+    ForceReleaseCarriageTrayLatch("idle-crosscheck");
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TColorModule::IsCleanOutFinish()
+{
+    //AI(cleanout) 20260701 : Color participates in CleanOut (was: no participation). Not installed
+    //-> trivially finished. Otherwise it finishes only after TrayArm has finished (no more returns),
+    //its flow path is clear (no front/rear tray) and the front rise/separate cylinders are all home
+    //(IsReadyForAmrHandoff; sim-true). Until then DoColor case 100 GoUp-drains every tray to the car.
+    if(IsInstalled()==false)
+        return true;
+    //AI(cleanout) 20260701 : the CleanOut drain (GoUp of front/rear trays) lives in DoColor case
+    //100, which is UNREACHABLE in SortBin mode (case 10 branches to DoSortBin). A SortBin-mode
+    //Color must not gate CleanOut on a tray it will never drain -> treat it as trivially finished.
+    if(IsTraySupplyMode()==false)
+        return true;
+    if(HSys.Sys.RunMode!=Run_CleanOut)
+        return true;
+    if(TrayArmModule==NULL || TrayArmModule->IsCleanOutFinish()==false)
+        return false;
+    RefreshStateFromSensors();
+    if(bFrontHasTray || bRearHasTray)
+        return false;
+    if(IsReadyForAmrHandoff()==false)
+        return false;
+    //AI(cleanout) 20260703 : idle gate (mirrors Empty). Do NOT report finished while a drain
+    //sub-ladder is still stepping (Feed/GoDown/GoUp mid-flight) or a return is in progress, and
+    //only once the software identity grid on MMColorY is cleared. Prevents Color reading
+    //"finished" mid-GoUp, which stranded TrayArm's diverted in-hand tray.
+    if(FeedTask!=1 || GoDownTask!=1 || GoUpTask!=1)
+        return false;
+    if(bReturnTray)
+        return false;
+    if(Status==CS_FEEDING || Status==CS_RETURNING || Status==CS_DESTACK)
+        return false;   //AI(ht160s-status) 20260703 : status busy belt beside the cursor gate
+    if(HSys.VMot.MMColorY->fHasTray)
+        return false;
+    //AI(cleanout) 20260703 : Full gate - do not report finished while the supply stack is
+    //full (a drain GoUp is still owed but paused for the operator to empty). Sim-false.
+    if(IsInputFullForAmr())
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
+//AI(phase6-loader-recycle) 20260625 : TrayArm finished depositing the returned tray onto
+//Color's rear handoff slot. Mirrors Empty (sets the finish flag + marks rear occupied).
+//This is the SOLE trigger that lets the receive ladder (case 1700) proceed; sim does NOT
+//auto-advance it, matching Empty's single trigger point.
+void TColorModule::NotifyTrayXToEmptyFinish()
+{
+    bTrayXToEmptyFinish=true;
+    bRearHasTray=true;
 }
 //---------------------------------------------------------------------------
 void TColorModule::NotifyICPlaced(int Count)
@@ -655,6 +2067,276 @@ int TColorModule::GetICCount()
 AnsiString TColorModule::GetTrayID()
 {
     return sTrayID2D;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv-identity2d) 20260713 : is the last identity 2D a GENUINE value that may be
+// uploaded to the host as the identity-carrier SVID (AgvStation[AMR_IDENTITY_CARRIER_INDEX])
+//AI(secs-identity2d-38202) 20260805 : that SVID is 38202 Loader Carrier ID now, not 38204.
+// The Color CCD is still what reads the code - this function and its caller are unchanged -
+// only the number the value is published on moved, to match HT9045 / the customer RPTID 2000.
+// on CEID275 AGVLdID? True for a real Color-reader read, a
+// manual operator entry, OR any simulation context (laptop SOFT_SIMULATE / runtime
+// bRunSimulation) where the seeded "COLOR2D_" IS the intended test id and SHOULD reach the
+// SECS host simulator. FALSE only when a REAL machine runs with the Color CCD disabled
+// (bUseColorCcd==false), where DoReadColor2D fabricates a throwaway "COLOR2D_" placeholder
+// purely to keep the AMR pull flow moving -- that must NOT masquerade as a real carrier id.
+// Mirrors the fabricate condition in DoReadColor2D case 1 (keep the two in sync).
+bool TColorModule::IsTrayID2DGenuine()
+{
+    if(IsSoftSimulate() || tSimuData.bRunSimulation)
+        return true;
+    return CosFunction.bUseColorCcd;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced destacker test. Color has no production GoUp;
+//these cylinder-only GoDown/GoUp drive the front destacker (FrontRiseTray_1/_2/Separate)
+//in isolation, mirroring Empty's rise/separate choreography. No Y-motor / push / lean.
+bool TColorModule::TestGoDownTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestDownTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+
+    //AI(ht160s-feeder-unify) 20260706 : idiom aligned to production DoGoDownTray -
+    //PushCylinder/PopCylinder (confirm + alarm) + one-shot .Reset() re-arm; settle profile
+    //unchanged. Color has no front-separate interlock. Teach-only (Advanced test tab).
+    switch(TestDownTask)
+    {
+        case 1:
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+            TestDownTask=2000;
+            break;
+
+        case 2000:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                TestDownTask=3000;
+            }
+            break;
+
+        case 3000:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                TestDownTask=3600;
+            }
+            break;
+
+        case 3600:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                TestDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                TestDownTask=4000;
+            }
+            break;
+
+        case 4000:
+            if(TestDelay.Off())
+            {
+                if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                {
+                    TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                    TestDelay.On();
+                    TestDownTask=4100;
+                }
+            }
+            break;
+
+        case 4100:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                TestDownTask=5000;
+            }
+            break;
+
+        case 5000:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                TestDelay.On();
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                TestDownTask=6000;
+            }
+            break;
+
+        case 6000:
+            if(TestDelay.Off())
+                TestDownTask=6500;
+            break;
+
+        case 6500:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                TestDownTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+bool TColorModule::TestGoUpTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestUpTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+
+    //AI(ht160s-feeder-unify) 20260706 : idiom aligned to production DoGoUpTray -
+    //PushCylinder/PopCylinder (confirm + alarm) + one-shot .Reset() re-arm; settle profile
+    //unchanged. Color has no front-separate interlock. Teach-only (Advanced test tab).
+    switch(TestUpTask)
+    {
+        case 1:
+            HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+            TestUpTask=100;
+            break;
+
+        case 100:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+                TestUpTask=210;
+            }
+            break;
+
+        case 210:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                TestDelay.On();
+                TestUpTask=300;
+            }
+            break;
+
+        case 300:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                TestUpTask=310;
+            }
+            break;
+
+        case 310:
+            if(PushCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+                TestUpTask=400;
+            break;
+
+        case 400:
+            HSys.Cyn.C_Color_FrontSeparateTray_1.Reset();
+            TestUpTask=410;
+            break;
+
+        case 410:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontSeparateTray_1))
+            {
+                TestDelay.SetMS(GeneralSetting.iColorDestackSettleMs);
+                TestDelay.On();
+                TestUpTask=500;
+            }
+            break;
+
+        case 500:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_2.Reset();
+                TestUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_2))
+            {
+                HSys.Cyn.C_Color_FrontRiseTray_1.Reset();
+                TestUpTask=600;
+            }
+            break;
+
+        case 600:
+            if(PopCylinder(HSys.Cyn.C_Color_FrontRiseTray_1))
+            {
+                TestUpTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-status) 20260703 : eColorStatus display name (DescribeState / stbMain).
+static const char *ColorStatusName(int St)
+{
+    switch(St)
+    {
+        case CS_IDLE:       return "IDLE";
+        case CS_DESTACK:    return "DESTACK";
+        case CS_FEEDING:    return "FEEDING";
+        case CS_REAR_READY: return "REAR_READY";
+        case CS_RETURNING:  return "RETURNING";
+    }
+    return "?";
+}
+//---------------------------------------------------------------------------
+int TColorModule::GetStatus()
+{
+    return Status;
+}
+//---------------------------------------------------------------------------
+AnsiString TColorModule::DescribeState()
+{
+    //AI(ht160s-state-record-analysis) 20260622 : read-only inner-state dump for
+    //FeederDecision.txt. Reads latched members directly (does NOT call
+    //RefreshStateFromSensors, which clobbers the sim/dummy latch). The
+    //bTrayReady/bSupplyRequested are first : a latched bTrayReady
+    //with no pick is the Normal-mode (no AMR demand) idle-spin signature.
+    AnsiString s;
+    s  = "[Color]\r\n";
+    s += "  Status=" + AnsiString(ColorStatusName(Status)) + "\r\n";
+    s += "  bTrayReady=" + IntToStr(bTrayReady ? 1 : 0)
+       + "  bSupplyRequested=" + IntToStr(bSupplyRequested ? 1 : 0)
+       + "  bFrontHasTray=" + IntToStr(bFrontHasTray ? 1 : 0) + "\r\n";
+    //AI(ht160s-agv) 20260627 : AMR lock (P4 State Record).
+    s += "  bAmrLocked=" + IntToStr(bAmrLocked ? 1 : 0) + "\r\n";
+    s += "  Installed=" + IntToStr(IsInstalled() ? 1 : 0)
+       + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)
+       + "  Mode=" + AnsiString(IsTraySupplyMode() ? "TraySupply" : (IsSortBinMode() ? "SortBin" : "?")) + "\r\n";
+    s += "  bInputFullTray=" + IntToStr(bInputFullTray ? 1 : 0)
+       + "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0) + "\r\n";
+    s += "  FeedTask=" + IntToStr(FeedTask)
+       + "  GoDownTask=" + IntToStr(GoDownTask)
+       + "  GoUpTask=" + IntToStr(GoUpTask)
+       + "  ScanTask=" + IntToStr(ScanTask)
+       + "  SortBinTask=" + IntToStr(SortBinTask) + "\r\n";
+    s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
+       + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
+       + "  iReturnedCount=" + IntToStr(iReturnedCount) + "\r\n";
+    s += "  iICCount=" + IntToStr(iICCount)
+       + "  iSupplyThreshold=" + IntToStr(iSupplyThreshold)
+       + "  TrayID2D=" + sTrayID2D + "\r\n";
+    //AI(ht160s-phantom-tray) 20260805 : the 15:20:25 snapshot could NOT be read directly because
+    //this dump never printed MMColorY->fHasTray - the very flag the hang was blocked on. It had
+    //to be established by eliminating every other gate in IsCleanOutFinish. Print it, plus the
+    //two remaining sub-ladder cursors and the diaper counters (PhantomFires>0 means the software
+    //lied about a tray at least once this run, i.e. go find the upstream owner).
+    s += "  MotYHasTray=" + IntToStr((HSys.VMot.MMColorY!=NULL && HSys.VMot.MMColorY->fHasTray) ? 1 : 0)
+       + "  ReadIdentityTask=" + IntToStr(ReadIdentityTask)
+       + "  RaiseFrontTask=" + IntToStr(RaiseFrontTask)
+       + "  bReadIdentityPending=" + IntToStr(bReadIdentityPending ? 1 : 0) + "\r\n";
+    //AI(ht160s-clampgrip) 20260806 : physical grip verdict for the carriage clamp, beside the
+    //diaper counters. 1=gripping 0=tray gone -1=no verdict (sim / disabled / not clamped).
+    s += "  PhantomFires=" + IntToStr(iPhantomTrayFireCount)
+       + "  CleanOutCarriageAlarmed=" + IntToStr(bCleanOutCarriageAlarmed ? 1 : 0)
+       + "  Grip=" + IntToStr(GetClampGripVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())) + "\r\n";
+    return s;
 }
 //---------------------------------------------------------------------------
 void InitializeColorModule()

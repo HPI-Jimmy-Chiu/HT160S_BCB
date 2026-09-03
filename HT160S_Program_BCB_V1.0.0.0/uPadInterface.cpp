@@ -1,14 +1,19 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 //---------------------------------------------------------------------------
 #include "uPadInterface.h"
 #include "database.h"
+#include "cCommLog.h"
+#include "HTimer.h"
+#include "maintenance.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "SPComm"
 #pragma link "MyLed"
 #pragma link "BtnPanelLane"
+#pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 TfPadInterface *fPadInterface = NULL;
 //---------------------------------------------------------------------------
@@ -99,7 +104,7 @@ void PAD_PTR::SetItem(TMyLed *_mlEvent, TBtnPanelLane *_btnEvent, AnsiString _Pa
 }
 //---------------------------------------------------------------------------
 __fastcall TfPadInterface::TfPadInterface(TComponent* Owner)
-    : TForm(Owner, 0)
+    : TForm(Owner)
 {
     InitialVariable();
     BuildUI();
@@ -143,115 +148,21 @@ void TfPadInterface::InitialVariable()
     }
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260731 : static skeleton moved to uPadInterface.dfm
+//(DFM-first convention). Only the runtime language pass (LangT) and the
+//table-driven pad grid (PadButtonDefs -> PadItem) stay code-built.
 void TfPadInterface::BuildUI()
 {
-    TPanel *BottomPanel;
-    TLabel *LabelPtr;
-
-    Caption="Pad Interface";
-    Width=840;
-    Height=610;
-    Position=poDesigned;
-    OnShow=FormShow;
-    OnClose=FormClose;
-
-    pn_PadInterfaceTitle=new TPanel(this);
-    pn_PadInterfaceTitle->Parent=this;
-    pn_PadInterfaceTitle->Align=alTop;
-    pn_PadInterfaceTitle->Height=40;
-    pn_PadInterfaceTitle->Caption="Pad Interface";
-    pn_PadInterfaceTitle->Font->Style=TFontStyles()<<fsBold;
-
-    sb_PadInterface_Exit=new TButton(this);
-    sb_PadInterface_Exit->Parent=pn_PadInterfaceTitle;
-    sb_PadInterface_Exit->Caption="Exit";
-    sb_PadInterface_Exit->Width=80;
-    sb_PadInterface_Exit->Height=26;
-    sb_PadInterface_Exit->Left=pn_PadInterfaceTitle->Width-90;
-    sb_PadInterface_Exit->Top=7;
-    sb_PadInterface_Exit->Anchors=TAnchors()<<akTop<<akRight;
-    sb_PadInterface_Exit->OnClick=sb_PadInterface_ExitClick;
-
-    BottomPanel=new TPanel(this);
-    BottomPanel->Parent=this;
-    BottomPanel->Align=alBottom;
-    BottomPanel->Height=150;
-    BottomPanel->BevelOuter=bvNone;
-
-    LabelPtr=new TLabel(this);
-    LabelPtr->Parent=BottomPanel;
-    LabelPtr->Caption="Manual Send";
-    LabelPtr->Left=8;
-    LabelPtr->Top=10;
-
-    ed_PadInterface_ManualSend=new TEdit(this);
-    ed_PadInterface_ManualSend->Parent=BottomPanel;
-    ed_PadInterface_ManualSend->Left=92;
-    ed_PadInterface_ManualSend->Top=6;
-    ed_PadInterface_ManualSend->Width=230;
-    ed_PadInterface_ManualSend->Text="t051400000000";
-
-    sb_PadInterface_ManualSend=new TButton(this);
-    sb_PadInterface_ManualSend->Parent=BottomPanel;
-    sb_PadInterface_ManualSend->Caption="Send";
-    sb_PadInterface_ManualSend->Left=330;
-    sb_PadInterface_ManualSend->Top=5;
-    sb_PadInterface_ManualSend->Width=70;
-    sb_PadInterface_ManualSend->OnClick=sb_PadInterface_ManualSendClick;
-
-    btnResetCom=new TButton(this);
-    btnResetCom->Parent=BottomPanel;
-    btnResetCom->Caption="Reset COM";
-    btnResetCom->Left=408;
-    btnResetCom->Top=5;
-    btnResetCom->Width=82;
-    btnResetCom->OnClick=sb_PadInterface_ManualSendClick;
-
-    btnClearLog=new TButton(this);
-    btnClearLog->Parent=BottomPanel;
-    btnClearLog->Caption="Clear Log";
-    btnClearLog->Left=498;
-    btnClearLog->Top=5;
-    btnClearLog->Width=82;
-    btnClearLog->OnClick=ClearLog1Click;
-
-    cb_PadInterface_PadLedBling=new TCheckBox(this);
-    cb_PadInterface_PadLedBling->Parent=BottomPanel;
-    cb_PadInterface_PadLedBling->Caption="Blink LED";
-    cb_PadInterface_PadLedBling->Left=590;
-    cb_PadInterface_PadLedBling->Top=9;
-    cb_PadInterface_PadLedBling->Width=100;
-
-    Memo_PadInterface=new TMemo(this);
-    Memo_PadInterface->Parent=BottomPanel;
-    Memo_PadInterface->Left=8;
-    Memo_PadInterface->Top=36;
-    Memo_PadInterface->Width=BottomPanel->Width-16;
-    Memo_PadInterface->Height=BottomPanel->Height-44;
-    Memo_PadInterface->Anchors=TAnchors()<<akLeft<<akTop<<akRight<<akBottom;
-    Memo_PadInterface->ScrollBars=ssVertical;
-
-    pc_PadInterface=new TPageControl(this);
-    pc_PadInterface->Parent=this;
-    pc_PadInterface->Align=alClient;
-
-    tsPadFront=new TTabSheet(this);
-    tsPadFront->PageControl=pc_PadInterface;
-    tsPadFront->Caption="Front Pad";
-
-    tsPadRear=new TTabSheet(this);
-    tsPadRear->PageControl=pc_PadInterface;
-    tsPadRear->Caption="Rear Pad";
-
-    pn_PadInterface_Front=new TPanel(this);
-    pn_PadInterface_Front->Parent=tsPadFront;
-    pn_PadInterface_Front->Align=alClient;
-    pn_PadInterface_Front->BevelOuter=bvNone;
-
-    pn_PadInterface_Rear=new TPanel(this);
-    pn_PadInterface_Rear->Parent=tsPadRear;
-    pn_PadInterface_Rear->Align=alClient;
-    pn_PadInterface_Rear->BevelOuter=bvNone;
+    Caption=LangT("Pad Interface");
+    pn_PadInterfaceTitle->Caption=LangT("Pad Interface");
+    sb_PadInterface_Exit->Caption=LangT("Exit");
+    lb_PadInterface_ManualSend->Caption=LangT("Manual Send");
+    sb_PadInterface_ManualSend->Caption=LangT("Send");
+    btnResetCom->Caption=LangT("Reset COM");
+    btnClearLog->Caption=LangT("Clear Log");
+    cb_PadInterface_PadLedBling->Caption=LangT("Blink LED");
+    tsPadFront->Caption=LangT("Front Pad");
+    tsPadRear->Caption=LangT("Rear Pad");
 
     BuildPadPage(pn_PadInterface_Front, 0, 14);
     BuildPadPage(pn_PadInterface_Rear, 14, 17);
@@ -282,21 +193,28 @@ void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col
     if(Index<0 || Index>=CheckPadItem)
         return;
 
-    LeftBase=18+(Col*390);
-    TopBase=18+(Row*48);
+    //AI(ht160s-maintainer) 20260731 : the grid has to fit the tab-sheet client
+    //(816x353 at this form size) without scrollbars, with slack for theme/DPI
+    //variation in the caption and tab-strip heights. 8 rows reach
+    //18+7*40+32 = 330 and the rear page's 3rd column reaches 18+2*260+250 = 788.
+    //The old 48/390 pitch overflowed both, hiding front One Cycle and rear
+    //Retry / T Start / Rear Enable. Item content only reaches x=174, so the
+    //narrower cell costs nothing.
+    LeftBase=18+(Col*260);
+    TopBase=18+(Row*40);
 
     ItemPanel=new TPanel(this);
     ItemPanel->Parent=ParentPanel;
     ItemPanel->Left=LeftBase;
     ItemPanel->Top=TopBase;
-    ItemPanel->Width=360;
-    ItemPanel->Height=38;
+    ItemPanel->Width=250;
+    ItemPanel->Height=32;
     ItemPanel->BevelOuter=bvLowered;
 
     LedPtr=new TMyLed(this);
     LedPtr->Parent=ItemPanel;
     LedPtr->Left=8;
-    LedPtr->Top=10;
+    LedPtr->Top=8;
     LedPtr->Width=26;
     LedPtr->Height=16;
     LedPtr->Alias=PadButtonDefs[Index].InputName;
@@ -306,10 +224,10 @@ void TfPadInterface::AddPadItem(TPanel *ParentPanel, int Index, int Row, int Col
     BtnPtr=new TBtnPanelLane(this);
     BtnPtr->Parent=ItemPanel;
     BtnPtr->Left=44;
-    BtnPtr->Top=6;
+    BtnPtr->Top=4;
     BtnPtr->Width=130;
-    BtnPtr->Height=26;
-    BtnPtr->Caption=PadButtonDefs[Index].Caption;
+    BtnPtr->Height=24;
+    BtnPtr->Caption=LangT(PadButtonDefs[Index].Caption);
     BtnPtr->Alias=PadButtonDefs[Index].PadName;
     BtnPtr->Tag=PadButtonDefs[Index].PanelTag;
     BtnPtr->FalseColor=clBtnFace;
@@ -328,6 +246,18 @@ void __fastcall TfPadInterface::FormShow(TObject *Sender)
     Left=(1280-Width)/2;
     Top=(1024-Height)/2;
     bShow=true;
+    //AI(ht160s-maintainer) 20260620 : align to HT172 - clear stale button-down /
+    //LED visual state on (re)show so the panel starts from a clean display.
+    {
+        int i;
+        for(i=0; i<CheckPadItem; i++)
+        {
+            if(PadItem[i].btnEvent!=NULL)
+                PadItem[i].btnEvent->Down=false;
+            if(PadItem[i].mlEvent!=NULL)
+                PadItem[i].mlEvent->Value=false;
+        }
+    }
     if(bRs232Ok)
     {
         SendCommand("t050490000000");
@@ -459,6 +389,10 @@ bool TfPadInterface::GetPadSwitchStatus(AnsiString aName, bool *State)
 //---------------------------------------------------------------------------
 bool TfPadInterface::OpenCommPort()
 {
+    //AI(ht160s-maintainer) 20260620 : align to HT172 - idempotency guard so an
+    //already-open port is not re-StartComm'd.
+    if(bRs232Ok)
+        return true;
     if(PadComm==NULL)
     {
         RecordCommunication("[Connect]", "PadComm is not assigned");
@@ -549,6 +483,12 @@ void TfPadInterface::SendSwitchStatus(AnsiString aName, bool Type)
 {
     int i;
 
+    //AI(ht160s-maintainer) 20260616 : while the Pad Interface form is open the
+    //operator drives the panel manually, so suppress machine-driven writes to
+    //avoid fighting the manual buttons (HT172 SendSwitchStatus bShow guard).
+    if(bShow)
+        return;
+
     for(i=0; i<CheckPadItem; i++)
     {
         if(PadItem[i].PadName==aName)
@@ -570,7 +510,12 @@ void TfPadInterface::SendCommand(AnsiString sData)
 
     RecordCommunication("[Send]", sData);
     if(bRs232Ok==false || PadComm==NULL)
+    {
+        //AI(ht160s-maintainer) 20260620 : align to HT172 - record that the send was
+        //dropped because the Pad link is not ready, instead of a silent return.
+        RecordCommunication("[Connect Error]", "send dropped, Pad link not ready");
         return;
+    }
 
     SendText=sData+AnsiString('\r');
     iSize=SendText.Length();
@@ -636,28 +581,72 @@ void __fastcall TfPadInterface::ProcessReceiceData()
     int iAddress;
     int iPadKey;
 
+    AnsiString Entry;
+    AnsiString Frame;
+    int iPos;
+
     while(CommReceiveList->Count>0)
     {
-        S=CommReceiveList->Strings[0];
+        Entry=CommReceiveList->Strings[0];
         CommReceiveList->Delete(0);
         if(CommReceiveLength->Count>0)
             CommReceiveLength->Delete(0);
 
-        if(S.Length()>=14)
+        //AI(ht160s-maintainer) 20260616 : one receive event may carry several
+        //"\r"-delimited frames concatenated; split and process each, matching
+        //HT172 ProcessReceiceData. (A frame split ACROSS two receive events is
+        //not reassembled - same limitation as HT172, harmless at this frame size.)
+        do
         {
-            sAddress=S.SubString(4, 1);
-            iAddress=atoi(sAddress.c_str());
-            aPadKey=S.SubString(8, 6);
-            iPadKey=StrToIntDef("0x"+aPadKey, 0);
-            if(S.SubString(6, 2)=="00")
+            iPos=Entry.Pos("\r");
+            if(iPos>0)
+                Frame=Entry.SubString(1, iPos-1);
+            else
+                Frame=Entry;
+            Frame=Frame.Trim();
+
+            //AI(ht160s-maintainer) 20260619 : aligned to HT172 ProcessReceiceData -
+            //gate each frame type INDEPENDENTLY by its own minimum length. The
+            //trailing '\r' is already stripped above, so input/switch reports need
+            //>=13 (HT172 used >=14 on the buffer that still held the '\r') and the
+            //version reply needs >=8. S is computed first; SubString(6,2) on a short
+            //frame yields "", which matches no type. (HT172's bSendSwitchStatusing
+            //reset on '90' is omitted: that flag has no consumer in HT160.)
+            S=Frame.SubString(6, 2);
+            if(S=="00" && Frame.Length()>=13)
+            {
+                //panel key / LED-scan report
+                sAddress=Frame.SubString(4, 1);
+                iAddress=atoi(sAddress.c_str());
+                aPadKey=Frame.SubString(8, 6);
+                iPadKey=StrToIntDef("0x"+aPadKey, 0);
+                //a valid status frame proves the Pad panel is talking; the panel
+                //Power On/Off sensors are now live for CheckMotorPowerShutDown.
+                bPadEverCommunicated=true;
                 DoScanPanelLed(iAddress, iPadKey);
-            else if(S.SubString(6, 2)=="90")
+            }
+            else if(S=="20" && Frame.Length()>=8)
+            {
+                //version reply
+                bRequestVer=true;
+            }
+            else if(S=="90" && Frame.Length()>=13)
+            {
+                //switch-status report
+                sAddress=Frame.SubString(4, 1);
+                iAddress=atoi(sAddress.c_str());
+                aPadKey=Frame.SubString(8, 6);
+                iPadKey=StrToIntDef("0x"+aPadKey, 0);
+                bPadEverCommunicated=true;
                 DoUpdataPadStatus(iAddress, iPadKey);
+            }
+
+            if(iPos>0)
+                Entry=Entry.SubString(iPos+1, Entry.Length()-iPos);
+            else
+                Entry="";
         }
-        else if(S.Length()>=8 && S.SubString(6, 2)=="20")
-        {
-            bRequestVer=true;
-        }
+        while(Entry.Pos("\r")>0);
     }
 }
 //---------------------------------------------------------------------------
@@ -704,8 +693,81 @@ bool __fastcall TfPadInterface::ProcessScanKey(AnsiString aSenName)
 //---------------------------------------------------------------------------
 void __fastcall TfPadInterface::Main232()
 {
+    static int Task=1;
+    static HTimer HeartbeatTimer;
+    static HTimer VerTimeout;
+    static HTimer ReconnectDelay;
+
+    //AI(ht160s-maintainer) 20260616 : always process inbound frames so the
+    //operator can still watch live Pad status during a manual test (user
+    //requirement: keep RX visible).
     ProcessReceiceData();
+
+    //AI(ht160s-maintainer) 20260616 : while the Maintenance screen (or any of its
+    //modal sub-pages - ComPort / IOView / Pad) is open, suspend ALL spin-driven
+    //outbound traffic (auto LED send, scan-enable, version heartbeat, auto-
+    //reconnect) so a manual test is not disturbed. Manual button sends still work
+    //(they call SendCommand directly, not via spin). Same fMaintenance->Visible
+    //probe as csystem.cpp; RX above stays live. Reset Task so the heartbeat
+    //restarts cleanly once Maintenance closes.
+    if(fMaintenance!=NULL && fMaintenance->Visible)
+    {
+        Task=1;
+        return;
+    }
+
     ProcessSendDataNew();
+
+    //AI(ht160s-maintainer) 20260616 : enable physical-key scan reporting once the
+    //Pad link is up (HT172 uPadInterface.cpp Main232 bScanSwitch block). Without
+    //this the Pad never sends "00" status frames, so DoScanPanelLed never fires
+    //and panel buttons never reach HSys -> panel control looks dead. bScanSwitch
+    //is re-armed by ComPort::RS232Init on every (re)connect.
+    if(bRs232Ok && bScanSwitch)
+    {
+        SendCommand("t051400000000");
+        bScanSwitch=false;
+    }
+
+    //AI(ht160s-maintainer) 20260616 : link keep-alive + auto-reconnect, ported
+    //from HT172 uPadInterface.cpp Main232 (its tray-motor gate and InitialOK
+    //check are dropped - HT160 has neither). Every 10s poll the Pad version; a
+    //reply means the link is healthy; if the COM has dropped (bRs232Ok==false)
+    //reconnect via ResetComm. HT172 timings: 10s poll / 1s reply / 0.1s settle
+    //(HTimer.Set unit is 100ms, so 100/10/1).
+    switch(Task)
+    {
+        case 1:
+            HeartbeatTimer.Set(100);
+            HeartbeatTimer.On();
+            Task=10;
+        case 10:
+            if(HeartbeatTimer.Off())
+            {
+                RequestPadVersion();
+                VerTimeout.Set(10);
+                VerTimeout.On();
+                Task=20;
+            }
+            break;
+        case 20:
+            if(bRs232Ok && bRequestVer)
+                Task=1;
+            else if(bRs232Ok==false)
+            {
+                ReconnectDelay.Set(1);
+                ReconnectDelay.On();
+                ResetComm();
+                Task=50;
+            }
+            else if(VerTimeout.Off())
+                Task=1;
+            break;
+        case 50:
+            if(ReconnectDelay.Off())
+                Task=1;
+            break;
+    }
 }
 //---------------------------------------------------------------------------
 void TfPadInterface::RecordCommunication(AnsiString aTitle, AnsiString Command)
@@ -719,5 +781,9 @@ void TfPadInterface::RecordCommunication(AnsiString aTitle, AnsiString Command)
     Memo_PadInterface->Lines->Add(LineText);
     if(Memo_PadInterface->Lines->Count>1000)
         Memo_PadInterface->Lines->Delete(0);
+
+    //AI(ht160s-maintainer) 20260615 : persist Pad send/connect events to the
+    //daily PadLog CSV (RX is logged from ComPort::PadCommReceiveData).
+    g_PadCommLog.Log(aTitle, Command);
 }
 //---------------------------------------------------------------------------

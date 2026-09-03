@@ -15,6 +15,32 @@ void AddNoNeedHomeSensorList();
 void DoTemptureControl();
 void ProcessStartMode();
 void DoSystem();
+void DoSystemMessage();                  //AI(ht160s-maintainer) 20260627 : exposed so the modal Note Timer1 can re-drive tower light + buzzer + panel recovery LEDs while MainProc is suspended (HT172 note Timer1 -> DoSystemMessage parity)
+//AI(HT160S-Maintainer) 20260622 : immediate FormShow buzzer kicks for the modal dialogs
+//(MyMessageBox -> PlayMessageBuzzer, fNote -> PlayAlarmBuzzer). A modal ShowModal suspends
+//MainProc, so the per-scan DoSystemMessage buzzer driver never runs while the dialog is up;
+//these sound the same configured "Music Select" the instant the dialog appears.
+void PlayMessageBuzzer();
+void PlayAlarmBuzzer();
+//AI(secs-kyec-rcmd4) 20260728 : SECS host panel override (S2F41 PP_SIGNALTOWER / PP_MUSIC).
+//A latched host override of the per-RunState tower-lamp + buzzer table in DoSystemMessage.
+//State is file-static in csystem.cpp and reachable ONLY through these accessors, so the
+//SECS layer cannot touch the raw flags and every release path is greppable by name.
+//Colour domain 0=off / 1=on / 2=blink; pass -1 for a colour the host did not name (keeps
+//its previous value). Music class 1..4 -> SwMusic1..SwMusic4.
+//ClearSecsPanelOverride() is the operator escape and releases BOTH at once.
+void SetSecsTowerOverride(int Red, int Yellow, int Green);
+void ClearSecsTowerOverride();
+void SetSecsMusicOverride(int MusicClass);
+void ClearSecsMusicOverride();
+void ClearSecsPanelOverride();
+bool IsSecsPanelOverrideActive();
+//AI(secs-e30-gate) 20260803 : GEM control-state bridge for the maintenance SECS tab. Same shape as
+//the panel-override helpers above : the UI must not include the SECS headers, so these forward to
+//HSys.MyGem. Inert (0 / "" / no-op) on a build without the GEM object.
+void SecsOperatorSetControlState(int iGemStdState);
+int  SecsGetControlState();
+AnsiString SecsDescribeControlState();
 void ProcessRunStatus(bool bProgramStart=false);
 void ProcessMotion();
 bool DoInitialProgramStart();
@@ -41,8 +67,45 @@ bool CheckAllTrayFeedFinish(bool reset=false);
 void ChangeRunMode(RunModeEnum RunMode);
 int GetCalculateUPH(TDateTime tEndTime);
 bool HasAutoICInMachine();
-void InitialAllTask();
+void InitialAllTask(bool bKeepMaterial=false);
 void ScanAllMotorStatus();
 void RecordSafeDoorStates();
+//AI 20260619 : machine run-state command layer (see csystem.cpp). Pass the
+//trigger source so every Pause/Stop/home-abort is logged with WHO did it.
+//Single choke point for HSys.Sys.SystemStart + its mandatory motor-stop, so the
+//invariant "SystemStart=false always stops the motors" holds in ONE place.
+enum eMachineTrigger {
+    trigOperator,
+    trigSafetyDoor,
+    trigEmg,
+    trigServoAlarm,
+    trigHomeStop,
+    trigSecsRemote,
+    trigSystem
+};
+const char* MachineTriggerName(eMachineTrigger trig);
+void MachinePause(eMachineTrigger trig);
+void MachineStop(eMachineTrigger trig);
+void MachineHomeAbort(eMachineTrigger trig);
+//AI(machine-command-layer) 20260625 : single production-start gate (joins Pause/Stop/
+//HomeAbort). Operator button, SECS START and the panel key all funnel through
+//MachineStart so the lot/2D precondition gate + the SystemStart raise live in ONE place
+//(manual == auto). Returns a result; caller maps it (operator -> ShowMyMessage,
+//SECS -> HCACK). No modal here.
+enum eMachineStartResult {
+    msStarted,
+    msRejNoContext,
+    msRejBusy,
+    msRejNotReady
+};
+eMachineStartResult MachineStart(eMachineTrigger trig, AnsiString &Reason);
+#ifdef SOFT_SIMULATE
+//AI(HT160S-Maintainer) 20260619 : --selftest-home headless self-test (sim only).
+//g_SelfTestHome is set in WinMain from the --selftest-home command-line arg; MainProc
+//then auto-runs ONE full-machine home and sets g_SelfTestExitCode (0=home completed,
+//2=timeout) before Application->Terminate(). WinMain returns that code.
+extern bool g_SelfTestHome;
+extern int  g_SelfTestExitCode;
+#endif
 //---------------------------------------------------------------------------
 #endif

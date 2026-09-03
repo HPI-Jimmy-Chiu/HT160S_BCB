@@ -2,6 +2,8 @@
 #include <vcl.h>
 #include <stdlib.h>
 #pragma hdrstop
+#include "language.h"
+#include "mymessbox.h"
 
 #include "uQwertyKey.h"
 //---------------------------------------------------------------------------
@@ -328,7 +330,7 @@ bool TfQwertyKey::ValidateAndClamp(AnsiString &Text)
     {
         if(Text==AnsiString("") || Text==AnsiString("-") || Text==AnsiString(".") || Text==AnsiString("-."))
         {
-            MessageDlg("Input value is invalid.", mtWarning, TMsgDlgButtons() << mbOK, 0);
+            ShowMyOKMessageNoStop(LangT("Input value is invalid."));
             return false;
         }
         Value=atof(Text.c_str());
@@ -376,7 +378,14 @@ void __fastcall TfQwertyKey::FormShow(TObject *Sender)
     (void)Sender;
     bShow=true;
     if(edContent!=NULL)
+    {
         edContent->SetFocus();
+        // Pre-select the whole value (HT172 behaviour) so the operator can just type
+        // the new value to replace it, instead of manually selecting all first. The
+        // first key press deletes the selection via InsertContent (SelLength aware).
+        edContent->SelStart=0;
+        edContent->SelLength=edContent->Text.Length();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfQwertyKey::FormClose(TObject *Sender, TCloseAction &Action)
@@ -398,7 +407,10 @@ void __fastcall TfQwertyKey::edContentKeyPress(TObject *Sender, char &Key)
         btnOkClick(this);
         return;
     }
-    if(Key==8)
+    // Let control keys (backspace, Ctrl+C/Ctrl+V/Ctrl+X/Ctrl+A, ...) reach the
+    // TEdit so its built-in clipboard/editing shortcuts keep working; the
+    // numeric/symbol filters below only police printable characters.
+    if(Key<32)
         return;
     if(IsNumericMode())
     {

@@ -1,19 +1,30 @@
 //---------------------------------------------------------------------------
 #include "IncludeAllHeader.h"
 #pragma hdrstop
+#include "language.h"
 
 #include "database.h"
+#include "csystem.h"   //AI(ht160s-whitelist) 20260715 : HasICUnderMachine() guard for Sort-mode change
 #include "maintenance.h"
+#include "main.h"   //AI(ht160s-whitelist-override) 20260717 : fMain->UpdateSortModeFeatureBadge()
 #include "ComPort.h"
 #include "CosFunction.h"
 #include "GeneralSetting.h"
-#include "MCUDisplay.h"
+#include "MyBinDisp.h"
 #include "TopCcdSocket.h"
+#include "ColorCcdSocket.h"
+#include "CosFunction.h"
+#include "LotWebApiClient.h"
+#include "uFtpUploadThread.h"
 #include "iosetview.h"
 #include "uteach.h"
 #include "uMotorTest.h"
+#include "uQwertyKey.h"
+#include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : account book + level gating
 #include "mymessbox.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : ShowSecsGemLog
+#include "SecsGem/uAgvStation.h"   //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState for AMR tab
+#include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : AMR manual-inject test facility
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "ALed"
@@ -24,7 +35,6 @@ static bool bMusicTestOn[4]={false,false,false,false};
 static const TColor TOWER_LIGHT_GREEN_OFF=(TColor)22272;
 static const TColor TOWER_LIGHT_YELLOW_OFF=(TColor)881034;
 static const char *TOWER_LIGHT_INI_GROUP="tsMaintTowerLight";
-static const char *MCU_DISPLAY_INI_GROUP="Setup";
 static AnsiString MaintenanceWorkFileName="";
 static int TowerLightConfig[TOWER_LIGHT_ROW_COUNT][TOWER_LIGHT_COLOR_COUNT];
 static bool bTowerLightConfigLoaded=false;
@@ -97,14 +107,6 @@ static void SetMaintenanceWorkFileName(AnsiString FileName)
     if(RootPath==AnsiString(""))
         RootPath="..";
     MaintenanceWorkFileName=RootPath+AnsiString("\\system\\maintance.ini");
-}
-//---------------------------------------------------------------------------
-static AnsiString GetMCUDisplayIniFileName()
-{
-    AnsiString RootPath=HSys.CurrentDir;
-    if(RootPath==AnsiString(""))
-        RootPath="..";
-    return RootPath+AnsiString("\\system\\MCU.ini");
 }
 //---------------------------------------------------------------------------
 static int ReadEditInt(TEdit *Edit, int DefaultValue)
@@ -280,7 +282,7 @@ bool GetTowerLightConfigOutput(int RowIndex, int ColorIndex, bool BlinkPhase)
     if(State==TOWER_LIGHT_STATE_ON)
         return true;
     if(State==TOWER_LIGHT_STATE_BLINK)
-        return BlinkPhase;
+        return true;   //AI(HT160S-Maintainer) 20260622 : tower light must NOT blink (user) -> BLINK shows STEADY ON (BlinkPhase now unused)
     return false;
 }
 //---------------------------------------------------------------------------
@@ -304,35 +306,13 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
 
     iMaintenanceMenuCount=0;
     LastClickButton=NULL;
-    tmrTowerLightBlink=NULL;
     bTowerLightBlinkPhase=false;
-    spbMaintMCUDisplay=NULL;
-    tsMaintMCUDisplay=NULL;
-    chkMCUEnabled=NULL;
-    edMCUIP=NULL;
-    edMCUPort=NULL;
-    edMCUMaxQueue=NULL;
-    edMCUReconnect=NULL;
-    edMCUAddress=NULL;
-    edMCUText=NULL;
-    cbbMCUColor=NULL;
-    chkMCUCodeSymbol=NULL;
-    edMCULightValue=NULL;
-    lblMCUStatusEnabled=NULL;
-    lblMCUStatusConnected=NULL;
-    lblMCUStatusQueue=NULL;
-    lblMCUStatusError=NULL;
-    memMCULog=NULL;
-
-    spbMaintTopCcd=NULL;
-    tsMaintTopCcd=NULL;
-    edTopCcdIP=NULL;
-    edTopCcdPort=NULL;
-    chkTopCcdBottomReserved=NULL;
-    lblTopCcdStatusConn=NULL;
-    lblTopCcdStatusError=NULL;
-    edTopCcdResult=NULL;
-    memTopCcdLog=NULL;
+    bTopCcdShotOpen=false;     //AI(ht160s-maintainer) 20260804 : no manual shot open at power-on
+    bColorCcdShotOpen=false;
+    edAgvTimeoutSec=NULL;   //AI(amr-unmanned W5) 20260722 : dynamically built on the AMR page (BuildAgvTimeoutField)
+    //AI(ht160s-maintainer) 20260613 : Bin Display (MCU) / Top CCD / Color CCD / Lot
+    //WebAPI page controls now stream from the DFM, so they are already assigned by the
+    //time this body runs - do not NULL them and do not runtime-build the pages.
 
     for(PageIndex=0; PageIndex<MAX_MAINTENANCE_MENU_COUNT; PageIndex++)
     {
@@ -350,16 +330,15 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
         }
     }
 
-    BuildMCUDisplayPage();
-    BuildTopCcdPage();
+    bLoadingHardwareSettings=false;
     RegisterMaintenancePages();
     LayoutMaintenanceButtons();
     InitializeTowerLightPanels();
     LoadMaintenanceSettings();
 
-    tmrTowerLightBlink=new TTimer(this);
-    tmrTowerLightBlink->Interval=300;
-    tmrTowerLightBlink->OnTimer=tmrTowerLightBlinkTimer;
+    //AI(ht160s-maintainer) 20260613 : tmrTowerLightBlink now streams from the DFM
+    //(Interval=300, OnTimer wired there, Enabled=False). Enable it here so the first
+    //tick can only fire after the tower-light LEDs/config are initialized above.
     tmrTowerLightBlink->Enabled=true;
 
     SelectMaintenancePage(0);
@@ -368,110 +347,15 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     //before the page is opened (socket itself is configured by LoadConfig()).
     LoadTopCcdSettings();
     EnsureTopCcdSocketCreated();
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMaintenance::BuildMCUDisplayPage()
-{
-    TPanel *Panel;
-    TPanel *TestPanel;
-    TPanel *StatusPanel;
 
-    if(spbMaintMCUDisplay==NULL)
-    {
-        spbMaintMCUDisplay=new TSpeedButton(this);
-        spbMaintMCUDisplay->Parent=pnlMenu;
-        spbMaintMCUDisplay->Caption="Bin Display";
-        spbMaintMCUDisplay->Font->Height=-15;
-        spbMaintMCUDisplay->ParentFont=false;
-        spbMaintMCUDisplay->AllowAllUp=true;
-        spbMaintMCUDisplay->GroupIndex=1;
-    }
+    //AI(HT160S-Maintainer) 20260612 : read saved Color CCD endpoint + enable at
+    //power-on so the maintenance page reflects General.ini before it is opened.
+    LoadColorCcdSettings();
+    EnsureColorCcdSocketCreated();
 
-    if(tsMaintMCUDisplay==NULL)
-    {
-        tsMaintMCUDisplay=new TTabSheet(this);
-        tsMaintMCUDisplay->PageControl=pcMaintenance;
-        tsMaintMCUDisplay->Caption="Bin Display";
-    }
-
-    Panel=new TPanel(this);
-    Panel->Parent=tsMaintMCUDisplay;
-    Panel->Left=20;
-    Panel->Top=20;
-    Panel->Width=780;
-    Panel->Height=210;
-    Panel->BevelOuter=bvLowered;
-    Panel->Caption="";
-    Panel->Color=(TColor)12761254;
-
-    CreateMaintLabel(this, Panel, 16, 14, 160, 20, "Bin Display TCP Setup");
-    chkMCUEnabled=CreateMaintCheckBox(this, Panel, 16, 46, 120, "Enabled");
-    CreateMaintLabel(this, Panel, 16, 82, 80, 20, "IP");
-    edMCUIP=CreateMaintEdit(this, Panel, 108, 78, 160, "127.0.0.1");
-    CreateMaintLabel(this, Panel, 16, 118, 80, 20, "Port");
-    edMCUPort=CreateMaintEdit(this, Panel, 108, 114, 80, "7000");
-    CreateMaintLabel(this, Panel, 310, 82, 100, 20, "Max Queue");
-    edMCUMaxQueue=CreateMaintEdit(this, Panel, 420, 78, 80, "500");
-    CreateMaintLabel(this, Panel, 310, 118, 120, 20, "Reconnect(ms)");
-    edMCUReconnect=CreateMaintEdit(this, Panel, 420, 114, 80, "3000");
-    CreateMaintButton(this, Panel, 560, 76, 90, "Save", btnMCUSaveClick);
-    CreateMaintButton(this, Panel, 660, 76, 90, "Reload", btnMCUReloadClick);
-    CreateMaintButton(this, Panel, 560, 114, 190, "Refresh Status", btnMCURefreshClick);
-
-    StatusPanel=new TPanel(this);
-    StatusPanel->Parent=Panel;
-    StatusPanel->Left=16;
-    StatusPanel->Top=152;
-    StatusPanel->Width=734;
-    StatusPanel->Height=42;
-    StatusPanel->BevelOuter=bvLowered;
-    StatusPanel->Caption="";
-    lblMCUStatusEnabled=CreateMaintLabel(this, StatusPanel, 8, 12, 130, 20, "Enabled: -");
-    lblMCUStatusConnected=CreateMaintLabel(this, StatusPanel, 146, 12, 150, 20, "Connected: -");
-    lblMCUStatusQueue=CreateMaintLabel(this, StatusPanel, 304, 12, 110, 20, "Queue: 0");
-    lblMCUStatusError=CreateMaintLabel(this, StatusPanel, 420, 12, 300, 20, "Last Error: ");
-
-    TestPanel=new TPanel(this);
-    TestPanel->Parent=tsMaintMCUDisplay;
-    TestPanel->Left=20;
-    TestPanel->Top=246;
-    TestPanel->Width=780;
-    TestPanel->Height=210;
-    TestPanel->BevelOuter=bvLowered;
-    TestPanel->Caption="";
-    TestPanel->Color=(TColor)12761254;
-
-    CreateMaintLabel(this, TestPanel, 16, 14, 180, 20, "Manual Test");
-    CreateMaintLabel(this, TestPanel, 16, 52, 80, 20, "Address");
-    edMCUAddress=CreateMaintEdit(this, TestPanel, 108, 48, 80, "0");
-    CreateMaintLabel(this, TestPanel, 16, 88, 80, 20, "Text");
-    edMCUText=CreateMaintEdit(this, TestPanel, 108, 84, 80, "9");
-    CreateMaintLabel(this, TestPanel, 16, 124, 80, 20, "Color");
-    cbbMCUColor=new TComboBox(this);
-    cbbMCUColor->Parent=TestPanel;
-    cbbMCUColor->Left=108;
-    cbbMCUColor->Top=120;
-    cbbMCUColor->Width=120;
-    cbbMCUColor->Height=24;
-    cbbMCUColor->Style=csDropDownList;
-    cbbMCUColor->Items->Add("GREEN");
-    cbbMCUColor->Items->Add("RED");
-    cbbMCUColor->ItemIndex=0;
-    chkMCUCodeSymbol=CreateMaintCheckBox(this, TestPanel, 260, 48, 130, "Symbol Code");
-    CreateMaintLabel(this, TestPanel, 260, 88, 100, 20, "Light Value");
-    edMCULightValue=CreateMaintEdit(this, TestPanel, 370, 84, 80, "0");
-    CreateMaintButton(this, TestPanel, 520, 48, 150, "Send Display", btnMCUSendDisplayClick);
-    CreateMaintButton(this, TestPanel, 520, 86, 150, "Send Code", btnMCUSendCodeClick);
-    CreateMaintButton(this, TestPanel, 520, 124, 150, "Send Light", btnMCUSendLightClick);
-
-    memMCULog=new TMemo(this);
-    memMCULog->Parent=tsMaintMCUDisplay;
-    memMCULog->Left=20;
-    memMCULog->Top=474;
-    memMCULog->Width=780;
-    memMCULog->Height=300;
-    memMCULog->ScrollBars=ssVertical;
-    memMCULog->ReadOnly=true;
+    //AI(general) 20260611 : Lot WebAPI client power-on config + creation
+    LoadLotWebApiSettings();
+    EnsureLotWebApiClientCreated();
 }
 //---------------------------------------------------------------------------
 static AnsiString GetTopCcdIniFileName()
@@ -480,89 +364,6 @@ static AnsiString GetTopCcdIniFileName()
     if(RootPath==AnsiString(""))
         RootPath="..";
     return RootPath+AnsiString("\\system\\General.ini");
-}
-//---------------------------------------------------------------------------
-void __fastcall TfMaintenance::BuildTopCcdPage()
-{
-    TPanel *Panel;
-    TPanel *TestPanel;
-    TPanel *StatusPanel;
-
-    if(spbMaintTopCcd==NULL)
-    {
-        spbMaintTopCcd=new TSpeedButton(this);
-        spbMaintTopCcd->Parent=pnlMenu;
-        spbMaintTopCcd->Caption="Top CCD";
-        spbMaintTopCcd->Font->Height=-15;
-        spbMaintTopCcd->ParentFont=false;
-        spbMaintTopCcd->AllowAllUp=true;
-        spbMaintTopCcd->GroupIndex=1;
-    }
-
-    if(tsMaintTopCcd==NULL)
-    {
-        tsMaintTopCcd=new TTabSheet(this);
-        tsMaintTopCcd->PageControl=pcMaintenance;
-        tsMaintTopCcd->Caption="Top CCD";
-    }
-
-    Panel=new TPanel(this);
-    Panel->Parent=tsMaintTopCcd;
-    Panel->Left=20;
-    Panel->Top=20;
-    Panel->Width=780;
-    Panel->Height=170;
-    Panel->BevelOuter=bvLowered;
-    Panel->Caption="";
-    Panel->Color=(TColor)12761254;
-
-    CreateMaintLabel(this, Panel, 16, 14, 200, 20, "Top CCD TCP Setup");
-    CreateMaintLabel(this, Panel, 16, 50, 80, 20, "IP");
-    edTopCcdIP=CreateMaintEdit(this, Panel, 108, 46, 160, "172.16.8.89");
-    CreateMaintLabel(this, Panel, 16, 86, 80, 20, "Port");
-    edTopCcdPort=CreateMaintEdit(this, Panel, 108, 82, 80, "5001");
-    chkTopCcdBottomReserved=CreateMaintCheckBox(this, Panel, 310, 48, 240, "Bottom CCD (reserved)");
-    chkTopCcdBottomReserved->Enabled=false;
-    CreateMaintButton(this, Panel, 560, 44, 90, "Save", btnTopCcdSaveClick);
-    CreateMaintButton(this, Panel, 660, 44, 90, "Reload", btnTopCcdReloadClick);
-    CreateMaintButton(this, Panel, 560, 82, 90, "Connect", btnTopCcdConnectClick);
-    CreateMaintButton(this, Panel, 660, 82, 90, "Disconnect", btnTopCcdDisconnectClick);
-
-    StatusPanel=new TPanel(this);
-    StatusPanel->Parent=Panel;
-    StatusPanel->Left=16;
-    StatusPanel->Top=118;
-    StatusPanel->Width=734;
-    StatusPanel->Height=42;
-    StatusPanel->BevelOuter=bvLowered;
-    StatusPanel->Caption="";
-    lblTopCcdStatusConn=CreateMaintLabel(this, StatusPanel, 8, 12, 180, 20, "Connected: -");
-    lblTopCcdStatusError=CreateMaintLabel(this, StatusPanel, 200, 12, 520, 20, "Last Error: ");
-
-    TestPanel=new TPanel(this);
-    TestPanel->Parent=tsMaintTopCcd;
-    TestPanel->Left=20;
-    TestPanel->Top=206;
-    TestPanel->Width=780;
-    TestPanel->Height=110;
-    TestPanel->BevelOuter=bvLowered;
-    TestPanel->Caption="";
-    TestPanel->Color=(TColor)12761254;
-
-    CreateMaintLabel(this, TestPanel, 16, 14, 200, 20, "Manual Shot (LON)");
-    CreateMaintButton(this, TestPanel, 16, 48, 150, "Trigger Shot", btnTopCcdShotClick);
-    CreateMaintLabel(this, TestPanel, 190, 52, 80, 20, "Result");
-    edTopCcdResult=CreateMaintEdit(this, TestPanel, 280, 48, 400, "");
-    edTopCcdResult->ReadOnly=true;
-
-    memTopCcdLog=new TMemo(this);
-    memTopCcdLog->Parent=tsMaintTopCcd;
-    memTopCcdLog->Left=20;
-    memTopCcdLog->Top=332;
-    memTopCcdLog->Width=780;
-    memTopCcdLog->Height=300;
-    memTopCcdLog->ScrollBars=ssVertical;
-    memTopCcdLog->ReadOnly=true;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::LoadTopCcdSettings()
@@ -578,11 +379,14 @@ void __fastcall TfMaintenance::LoadTopCcdSettings()
             edTopCcdIP->Text=Ini->ReadString("TopCCD", "Address", "172.16.8.89");
         if(edTopCcdPort!=NULL)
             edTopCcdPort->Text=IntToStr(Ini->ReadInteger("TopCCD", "Port", 5001));
+        if(chkTopCcdEnable!=NULL)
+            chkTopCcdEnable->Checked=Ini->ReadBool("TopCCD", "Enable", true);
     }
     __finally
     {
         delete Ini;
     }
+    CosFunction.bUseTopCcd=(chkTopCcdEnable!=NULL) ? chkTopCcdEnable->Checked : true;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::SaveTopCcdSettings()
@@ -606,6 +410,7 @@ void __fastcall TfMaintenance::SaveTopCcdSettings()
     {
         Ini->WriteString("TopCCD", "Address", Address);
         Ini->WriteInteger("TopCCD", "Port", Port);
+        Ini->WriteBool("TopCCD", "Enable", (chkTopCcdEnable!=NULL) ? chkTopCcdEnable->Checked : true);
     }
     __finally
     {
@@ -620,6 +425,7 @@ void __fastcall TfMaintenance::SaveTopCcdSettings()
     EnsureTopCcdSocketCreated();
     if(TopCcdSocket!=NULL)
         TopCcdSocket->SetEndpoint(Address, Port);
+    CosFunction.bUseTopCcd=(chkTopCcdEnable!=NULL) ? chkTopCcdEnable->Checked : true;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RefreshTopCcdStatus()
@@ -642,14 +448,25 @@ void __fastcall TfMaintenance::RefreshTopCcdStatus()
                 edTopCcdResult->Text=Code;
                 AddTopCcdLog(AnsiString("Recv 2D = ")+Code);
             }
+            //AI(ht160s-maintainer) 20260804 : mirror the production read->LOFF pairing
+            //(aLoader / aColor). Gate on the shot latch, NOT on the "code changed"
+            //branch above : TopCcdGetResult() never clears bTopCcdReadDone so it keeps
+            //returning true, and re-reading the SAME code would otherwise skip the
+            //close and leave the reader lamp on.
+            if(bTopCcdShotOpen && bConnected)
+            {
+                TopCcdSocket->TopCcdEndShot();
+                bTopCcdShotOpen=false;
+                AddTopCcdLog("Auto end shot after read (send LOFF)");
+            }
         }
     }
     else
     {
         if(lblTopCcdStatusConn!=NULL)
-            lblTopCcdStatusConn->Caption="Connected: -";
+            lblTopCcdStatusConn->Caption=LangT("Connected: -");
         if(lblTopCcdStatusError!=NULL)
-            lblTopCcdStatusError->Caption="Last Error: not started";
+            lblTopCcdStatusError->Caption=LangT("Last Error: not started");
     }
 }
 //---------------------------------------------------------------------------
@@ -701,6 +518,16 @@ void __fastcall TfMaintenance::btnTopCcdDisconnectClick(TObject *Sender)
     (void)Sender;
     if(TopCcdSocket!=NULL)
     {
+        //AI(ht160s-maintainer) 20260804 : close an open shot BEFORE dropping the link.
+        //LOFF is an application command, so a bare TCP close would leave the reader
+        //lamp on with no channel left to turn it off. closesocket() keeps the default
+        //linger (SO_LINGER off), so the queued LOFF still goes out.
+        if(TopCcdSocket->IsTopCcdConnected() && bTopCcdShotOpen)
+        {
+            TopCcdSocket->TopCcdEndShot();
+            AddTopCcdLog("End shot before disconnect (send LOFF)");
+        }
+        bTopCcdShotOpen=false;
         TopCcdSocket->TopCcdDisconnect();
         AddTopCcdLog("Disconnect");
     }
@@ -720,10 +547,708 @@ void __fastcall TfMaintenance::btnTopCcdShotClick(TObject *Sender)
         else
         {
             TopCcdSocket->TopCcdTriggerShot();
+            bTopCcdShotOpen=true;
             AddTopCcdLog("Trigger shot (send LON)");
         }
     }
     RefreshTopCcdStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260804 : the manual test page could only OPEN a shot (LON)
+//and never close it, so after a manual trigger the reader kept its lamp on and kept
+//reading until some production cycle happened to send LOFF. Pair the trigger with an
+//explicit end-shot, the same way the aLoader / aColor read paths do.
+//No auto-timeout on purpose : during teach / alignment the operator legitimately wants
+//to keep the light on while positioning a part, so closing the shot stays their call.
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnTopCcdEndShotClick(TObject *Sender)
+{
+    (void)Sender;
+    EnsureTopCcdSocketCreated();
+    if(TopCcdSocket!=NULL)
+    {
+        if(!TopCcdSocket->IsTopCcdConnected())
+        {
+            AddTopCcdLog("Not connected, please Connect first");
+        }
+        else
+        {
+            TopCcdSocket->TopCcdEndShot();
+            bTopCcdShotOpen=false;
+            AddTopCcdLog("End shot (send LOFF)");
+        }
+    }
+    RefreshTopCcdStatus();
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260612 : Color-station 2D reader maintenance page.
+//Mirrors the Top CCD page (Connect/Disconnect/Trigger Shot + status + log) so the
+//Color CCD can be verified manually on-machine, and adds an Enable checkbox that
+//persists to [ColorCCD] Enable and drives connect/disconnect (HT172 behavior).
+//Shares General.ini via GetTopCcdIniFileName().
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::LoadColorCcdSettings()
+{
+    TIniFile *Ini;
+    AnsiString FileName;
+
+    FileName=GetTopCcdIniFileName();
+    Ini=new TIniFile(FileName);
+    try
+    {
+        if(edColorCcdIP!=NULL)
+            edColorCcdIP->Text=Ini->ReadString("ColorCCD", "Address", "172.16.8.100");
+        if(edColorCcdPort!=NULL)
+            edColorCcdPort->Text=IntToStr(Ini->ReadInteger("ColorCCD", "Port", 5000));
+        if(chkColorCcdEnable!=NULL)
+            chkColorCcdEnable->Checked=Ini->ReadBool("ColorCCD", "Enable", true);
+    }
+    __finally
+    {
+        delete Ini;
+    }
+    CosFunction.bUseColorCcd=(chkColorCcdEnable!=NULL) ? chkColorCcdEnable->Checked : true;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::SaveColorCcdSettings()
+{
+    TIniFile *Ini;
+    AnsiString FileName;
+    AnsiString Address;
+    int Port;
+    bool Enable;
+
+    FileName=GetTopCcdIniFileName();
+    ForceDirectories(ExtractFilePath(FileName));
+    Address=(edColorCcdIP!=NULL) ? edColorCcdIP->Text.Trim() : AnsiString("172.16.8.100");
+    if(Address==AnsiString(""))
+        Address="172.16.8.100";
+    Port=ReadEditInt(edColorCcdPort, 5000);
+    if(Port<=0 || Port>65535)
+        Port=5000;
+    Enable=(chkColorCcdEnable!=NULL) ? chkColorCcdEnable->Checked : true;
+
+    Ini=new TIniFile(FileName);
+    try
+    {
+        Ini->WriteString("ColorCCD", "Address", Address);
+        Ini->WriteInteger("ColorCCD", "Port", Port);
+        Ini->WriteBool("ColorCCD", "Enable", Enable);
+    }
+    __finally
+    {
+        delete Ini;
+    }
+
+    if(edColorCcdIP!=NULL)
+        edColorCcdIP->Text=Address;
+    if(edColorCcdPort!=NULL)
+        edColorCcdPort->Text=IntToStr(Port);
+
+    CosFunction.bUseColorCcd=Enable;
+    EnsureColorCcdSocketCreated();
+    if(ColorCcdSocket!=NULL)
+        ColorCcdSocket->SetEndpoint(Address, Port);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshColorCcdStatus()
+{
+    AnsiString Code;
+    bool bConnected;
+
+    if(ColorCcdSocket!=NULL)
+    {
+        ColorCcdSocket->ColorCcdPoll();
+        bConnected=ColorCcdSocket->IsColorCcdConnected();
+        if(lblColorCcdStatusConn!=NULL)
+            lblColorCcdStatusConn->Caption=AnsiString("Connected: ")+(bConnected ? "YES" : "NO");
+        if(lblColorCcdStatusError!=NULL)
+            lblColorCcdStatusError->Caption=AnsiString("Last Error: ")+ColorCcdSocket->GetLastError();
+        if(ColorCcdSocket->ColorCcdGetResult(Code))
+        {
+            if(edColorCcdResult!=NULL && Code!=edColorCcdResult->Text)
+            {
+                edColorCcdResult->Text=Code;
+                AddColorCcdLog(AnsiString("Recv 2D = ")+Code);
+            }
+            //AI(ht160s-maintainer) 20260804 : see RefreshTopCcdStatus - close on the
+            //shot latch, not on the "code changed" branch, or a repeated code leaves
+            //the reader lamp on.
+            if(bColorCcdShotOpen && bConnected)
+            {
+                ColorCcdSocket->ColorCcdEndShot();
+                bColorCcdShotOpen=false;
+                AddColorCcdLog("Auto end shot after read (send LOFF)");
+            }
+        }
+    }
+    else
+    {
+        if(lblColorCcdStatusConn!=NULL)
+            lblColorCcdStatusConn->Caption=LangT("Connected: -");
+        if(lblColorCcdStatusError!=NULL)
+            lblColorCcdStatusError->Caption=LangT("Last Error: not started");
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::AddColorCcdLog(AnsiString Text)
+{
+    if(memColorCcdLog==NULL)
+        return;
+    memColorCcdLog->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+Text);
+    while(memColorCcdLog->Lines->Count>200)
+        memColorCcdLog->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    SaveColorCcdSettings();
+    AddColorCcdLog("Save General.ini [ColorCCD] endpoint/enable");
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    LoadColorCcdSettings();
+    EnsureColorCcdSocketCreated();
+    if(ColorCcdSocket!=NULL)
+        ColorCcdSocket->LoadConfig();
+    AddColorCcdLog("Reload General.ini [ColorCCD] endpoint/enable");
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdConnectClick(TObject *Sender)
+{
+    (void)Sender;
+    SaveColorCcdSettings();
+    EnsureColorCcdSocketCreated();
+    if(ColorCcdSocket!=NULL)
+    {
+        if(ColorCcdSocket->ColorCcdConnect())
+            AddColorCcdLog(AnsiString("Connecting to ")+ColorCcdSocket->GetAddress()+AnsiString(":")+IntToStr(ColorCcdSocket->GetPort()));
+        else
+            AddColorCcdLog(AnsiString("Connect failed: ")+ColorCcdSocket->GetLastError());
+    }
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdDisconnectClick(TObject *Sender)
+{
+    (void)Sender;
+    if(ColorCcdSocket!=NULL)
+    {
+        //AI(ht160s-maintainer) 20260804 : see btnTopCcdDisconnectClick - LOFF first,
+        //otherwise the bare TCP close strands the reader with its lamp on.
+        if(ColorCcdSocket->IsColorCcdConnected() && bColorCcdShotOpen)
+        {
+            ColorCcdSocket->ColorCcdEndShot();
+            AddColorCcdLog("End shot before disconnect (send LOFF)");
+        }
+        bColorCcdShotOpen=false;
+        ColorCcdSocket->ColorCcdDisconnect();
+        AddColorCcdLog("Disconnect");
+    }
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdShotClick(TObject *Sender)
+{
+    (void)Sender;
+    EnsureColorCcdSocketCreated();
+    if(ColorCcdSocket!=NULL)
+    {
+        if(!ColorCcdSocket->IsColorCcdConnected())
+        {
+            AddColorCcdLog("Not connected, please Connect first");
+        }
+        else
+        {
+            ColorCcdSocket->ColorCcdTriggerShot();
+            bColorCcdShotOpen=true;
+            AddColorCcdLog("Trigger shot (send LON)");
+        }
+    }
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260804 : LOFF counterpart of btnColorCcdShotClick - see the
+//note above btnTopCcdEndShotClick.
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnColorCcdEndShotClick(TObject *Sender)
+{
+    (void)Sender;
+    EnsureColorCcdSocketCreated();
+    if(ColorCcdSocket!=NULL)
+    {
+        if(!ColorCcdSocket->IsColorCcdConnected())
+        {
+            AddColorCcdLog("Not connected, please Connect first");
+        }
+        else
+        {
+            ColorCcdSocket->ColorCcdEndShot();
+            bColorCcdShotOpen=false;
+            AddColorCcdLog("End shot (send LOFF)");
+        }
+    }
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkTopCcdEnableClick(TObject *Sender)
+{
+    (void)Sender;
+    //AI(HT160S-Maintainer) 20260624 : per-CCD Enable. Persists to [TopCCD] Enable
+    //and drives CosFunction.bUseTopCcd. OFF -> aLoader feeds simulated Top CCD 2D
+    //codes instead of polling the camera (REALLY only; HAS_TRAY/DUMMY always sim).
+    SaveTopCcdSettings();
+    EnsureTopCcdSocketCreated();
+    if(chkTopCcdEnable!=NULL && chkTopCcdEnable->Checked)
+    {
+        if(TopCcdSocket!=NULL)
+            TopCcdSocket->TopCcdConnect();
+        AddTopCcdLog("Enable Top CCD -> connect");
+    }
+    else
+    {
+        if(TopCcdSocket!=NULL)
+        {
+            //AI(ht160s-maintainer) 20260804 : disabling also drops the link, so close
+            //an open manual shot first (same reason as btnTopCcdDisconnectClick).
+            if(TopCcdSocket->IsTopCcdConnected() && bTopCcdShotOpen)
+            {
+                TopCcdSocket->TopCcdEndShot();
+                AddTopCcdLog("End shot before disconnect (send LOFF)");
+            }
+            bTopCcdShotOpen=false;
+            TopCcdSocket->TopCcdDisconnect();
+        }
+        AddTopCcdLog("Disable Top CCD -> use simulated 2D");
+    }
+    RefreshTopCcdStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkColorCcdEnableClick(TObject *Sender)
+{
+    (void)Sender;
+    //AI(HT160S-Maintainer) 20260612 : mirror HT172 Update2DParameter : the Enable
+    //checkbox drives connect/disconnect and persists to [ColorCCD] Enable.
+    SaveColorCcdSettings();
+    EnsureColorCcdSocketCreated();
+    if(chkColorCcdEnable!=NULL && chkColorCcdEnable->Checked)
+    {
+        if(ColorCcdSocket!=NULL)
+            ColorCcdSocket->ColorCcdConnect();
+        AddColorCcdLog("Enable Color CCD -> connect");
+    }
+    else
+    {
+        if(ColorCcdSocket!=NULL)
+        {
+            //AI(ht160s-maintainer) 20260804 : see chkTopCcdEnableClick - LOFF first.
+            if(ColorCcdSocket->IsColorCcdConnected() && bColorCcdShotOpen)
+            {
+                ColorCcdSocket->ColorCcdEndShot();
+                AddColorCcdLog("End shot before disconnect (send LOFF)");
+            }
+            bColorCcdShotOpen=false;
+            ColorCcdSocket->ColorCcdDisconnect();
+        }
+        AddColorCcdLog("Disable Color CCD -> disconnect");
+    }
+    RefreshColorCcdStatus();
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260611 : Lot WebAPI maintenance page (fetch 2D/Bin by Lot name)
+static bool bLotApiResultPending=false;
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::LoadLotWebApiSettings()
+{
+    EnsureLotWebApiClientCreated();
+    if(LotWebApiClient!=NULL)
+    {
+        LotWebApiClient->LoadConfig();
+        if(edWebapiPath!=NULL)
+            edWebapiPath->Text=LotWebApiClient->GetBaseUrl();
+        if(chkLotApiUsePull!=NULL)
+            chkLotApiUsePull->Checked=LotWebApiClient->GetUsePull();
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::SaveLotWebApiSettings()
+{
+    AnsiString Url;
+
+    Url=(edWebapiPath!=NULL) ? edWebapiPath->Text.Trim() : AnsiString("");
+    if(Url==AnsiString(""))
+        Url="http://127.0.0.1:8160/lot/";
+
+    EnsureLotWebApiClientCreated();
+    if(LotWebApiClient!=NULL)
+    {
+        LotWebApiClient->SetBaseUrl(Url);
+        if(chkLotApiUsePull!=NULL)
+            LotWebApiClient->SetUsePull(chkLotApiUsePull->Checked);
+        LotWebApiClient->SaveConfig();
+        Url=LotWebApiClient->GetBaseUrl();
+    }
+    if(edWebapiPath!=NULL)
+        edWebapiPath->Text=Url;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshLotWebApiStatus()
+{
+    AnsiString Body;
+    bool bOk;
+    int HttpStatus;
+
+    if(lblLotApiUrl!=NULL && edWebapiPath!=NULL)
+        lblLotApiUrl->Caption=AnsiString("URL: ")+edWebapiPath->Text;
+
+    if(LotWebApiClient==NULL)
+    {
+        if(lblLotApiStatus!=NULL)
+            lblLotApiStatus->Caption=LangT("State: not started");
+        return;
+    }
+
+    if(lblLotApiError!=NULL)
+        lblLotApiError->Caption=AnsiString("Last Error: ")+LotWebApiClient->GetLastError();
+
+    if(LotWebApiClient->IsBusy())
+    {
+        if(lblLotApiStatus!=NULL)
+            lblLotApiStatus->Caption=AnsiString("State: busy (")+LotWebApiClient->GetCurrentLot()+AnsiString(")");
+    }
+
+    // Consume the result exactly once when a manual fetch is pending.
+    if(bLotApiResultPending && LotWebApiClient->GetResult(Body, bOk, HttpStatus))
+    {
+        bLotApiResultPending=false;
+        if(lblLotApiStatus!=NULL)
+        {
+            lblLotApiStatus->Caption=AnsiString("State: done http=")+IntToStr(HttpStatus)+
+                AnsiString(bOk ? " OK" : " (no data)");
+        }
+        if(memLotApiResult!=NULL)
+        {
+            memLotApiResult->Clear();
+            memLotApiResult->Lines->Add(AnsiString("HTTP ")+IntToStr(HttpStatus)+
+                AnsiString(bOk ? " OK" : " FAIL"));
+            memLotApiResult->Lines->Add(Body);
+        }
+        AddLotWebApiLog(AnsiString("Fetch done http=")+IntToStr(HttpStatus)+
+            AnsiString(" len=")+IntToStr(Body.Length()));
+    }
+    else if(!LotWebApiClient->IsBusy() && !bLotApiResultPending)
+    {
+        if(lblLotApiStatus!=NULL && lblLotApiStatus->Caption.Pos("busy")>0)
+            lblLotApiStatus->Caption=LangT("State: idle");
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::AddLotWebApiLog(AnsiString Text)
+{
+    if(memLotApiLog==NULL)
+        return;
+    memLotApiLog->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+Text);
+    while(memLotApiLog->Lines->Count>200)
+        memLotApiLog->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : populate the FTP maintenance fields from the worker's
+// live config. The worker is created at startup, so it is non-null by the time
+// this screen shows; guarded anyway.
+void __fastcall TfMaintenance::LoadFtpConfigToUi()
+{
+    if(FtpUploadThd==NULL)
+        return;
+    AnsiString sHost, sUser, sPwd, sRemoteDir;
+    int iPort, iTimeoutMs, iRetry;
+    bool bEnable, bUploadReport;
+    FtpUploadThd->GetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
+                            bEnable, bUploadReport, iTimeoutMs, iRetry);
+    if(edFtpHost!=NULL)          edFtpHost->Text=sHost;
+    if(edFtpPort!=NULL)          edFtpPort->Text=IntToStr(iPort);
+    if(edFtpUser!=NULL)          edFtpUser->Text=sUser;
+    if(edFtpPwd!=NULL)           edFtpPwd->Text=sPwd;
+    if(edFtpRemoteDir!=NULL)     edFtpRemoteDir->Text=sRemoteDir;
+    if(chkFtpEnable!=NULL)       chkFtpEnable->Checked=bEnable;
+    if(chkFtpUploadReport!=NULL) chkFtpUploadReport->Checked=bUploadReport;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : push the FTP maintenance fields into the worker and
+// persist to General.ini [Ftp]. Starts from the live config so TimeoutMs/Retry
+// (no UI field) are preserved; port falls back if the field is non-numeric.
+void __fastcall TfMaintenance::SaveFtpConfigFromUi()
+{
+    if(FtpUploadThd==NULL)
+        return;
+    AnsiString sHost, sUser, sPwd, sRemoteDir;
+    int iPort, iTimeoutMs, iRetry;
+    bool bEnable, bUploadReport;
+    FtpUploadThd->GetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
+                            bEnable, bUploadReport, iTimeoutMs, iRetry);
+    if(edFtpHost!=NULL)          sHost=edFtpHost->Text.Trim();
+    if(edFtpPort!=NULL)          iPort=StrToIntDef(edFtpPort->Text.Trim(), iPort);
+    if(edFtpUser!=NULL)          sUser=edFtpUser->Text.Trim();
+    if(edFtpPwd!=NULL)           sPwd=edFtpPwd->Text;
+    if(edFtpRemoteDir!=NULL)     sRemoteDir=edFtpRemoteDir->Text.Trim();
+    if(chkFtpEnable!=NULL)       bEnable=chkFtpEnable->Checked;
+    if(chkFtpUploadReport!=NULL) bUploadReport=chkFtpUploadReport->Checked;
+    FtpUploadThd->SetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
+                            bEnable, bUploadReport, iTimeoutMs, iRetry);
+    FtpUploadThd->SaveConfig();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnFtpSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    SaveFtpConfigFromUi();
+    LoadFtpConfigToUi();   // reflect the normalized values (RemoteDir slashes, port)
+    AddFtpLog("Config saved.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnFtpReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    if(FtpUploadThd!=NULL)
+        FtpUploadThd->LoadConfig();
+    LoadFtpConfigToUi();
+    AddFtpLog("Config reloaded.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ftp) 20260721 : manual test buttons ONLY enqueue a job; the worker runs
+// it in the background and the outcome surfaces via RefreshFtpStatus. The UI never
+// touches WinINet, so a hung server cannot freeze the screen. Test jobs ignore the
+// Enable gate (that gate is for production uploads only).
+void __fastcall TfMaintenance::btnFtpTestConnClick(TObject *Sender)
+{
+    (void)Sender;
+    if(FtpUploadThd==NULL)
+        return;
+    SaveFtpConfigFromUi();   // test exactly what is on screen
+    FtpUploadThd->EnqueueTestConn();
+    AddFtpLog("Test connection requested.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnFtpTestUploadClick(TObject *Sender)
+{
+    (void)Sender;
+    if(FtpUploadThd==NULL)
+        return;
+    SaveFtpConfigFromUi();
+    FtpUploadThd->EnqueueTestUpload(GeneralSetting.sSerialNo);
+    AddFtpLog("Test upload requested.");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshFtpStatus()
+{
+    if(FtpUploadThd==NULL)
+    {
+        if(lblFtpState!=NULL)
+            lblFtpState->Caption="State: not started";
+        return;
+    }
+    if(lblFtpState!=NULL)
+        lblFtpState->Caption=AnsiString("State: ")+FtpUploadThd->GetStatusSnapshot();
+    if(lblFtpLastError!=NULL)
+        lblFtpLastError->Caption=AnsiString("Last Error: ")+FtpUploadThd->GetLastError();
+    if(memFtpResult!=NULL)
+    {
+        AnsiString sLog=FtpUploadThd->GetResultLog();
+        if(memFtpResult->Lines->Text!=sLog)
+            memFtpResult->Lines->Text=sLog;
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::AddFtpLog(AnsiString Text)
+{
+    if(memFtpLog==NULL)
+        return;
+    memFtpLog->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+Text);
+    while(memFtpLog->Lines->Count>200)
+        memFtpLog->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshAmrStatus()
+{
+    if(memAmrStatus!=NULL)
+    {
+        AnsiString sAmrDump = AgvCoord.DescribeAgvState();
+        if(memAmrStatus->Lines->Text != sAmrDump)
+            memAmrStatus->Lines->Text = sAmrDump;
+    }
+    BuildAmrInjectPanel();
+    BuildAgvTimeoutField();
+    //AI(amr-unmanned W5) 20260722 : keep the field in sync with the setting except while the
+    //operator is typing in it (do not clobber an in-progress edit; Save commits it).
+    if(edAgvTimeoutSec!=NULL && edAgvTimeoutSec->Focused()==false)
+        edAgvTimeoutSec->Text = IntToStr(GeneralSetting.iAgvTimeoutSec);
+    if(chkAmrTestMode!=NULL && chkAmrTestMode->Checked!=AmrInject.IsTestMode())
+        chkAmrTestMode->Checked = AmrInject.IsTestMode();
+    if(pnlAmrTestBanner!=NULL)
+        pnlAmrTestBanner->Visible = AmrInject.IsTestMode();
+    if(memAmrTx!=NULL && memAmrTx->Text!=AmrInject.GetLog())
+        memAmrTx->Text = AmrInject.GetLog();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::BuildAmrInjectPanel()
+{
+    if(pnlAmrInject==NULL || pnlAmrInject->ControlCount>0)
+        return;
+    const char *InName[3] = {"Loader", "Empty", "Color"};
+    const char *InEdge[3] = {"Short", "Ready", "Finish"};
+    int InEdgeCode[3] = {AIE_SHORTAGE, AIE_READY, AIE_FINISH};
+    const char *AuEdge[3] = {"Full", "Drain", "Take"};
+    int AuEdgeCode[3] = {AIE_FULL, AIE_DRAINED, AIE_TAKEN};
+    int i, e, y;
+    TButton *B;
+    y = 8;
+    CreateMaintLabel(this, pnlAmrInject, 8, y, 460, 18, "Supply P1-P3 : arm one-shot inject");
+    y += 22;
+    for(i=0; i<3; i++)
+    {
+        CreateMaintLabel(this, pnlAmrInject, 8, y+6, 60, 18, InName[i]);
+        for(e=0; e<3; e++)
+        {
+            B = CreateMaintButton(this, pnlAmrInject, 70+e*130, y, 120,
+                AnsiString(InName[i])+" "+InEdge[e], AmrInjectButtonClick);
+            B->Tag = i*10 + InEdgeCode[e];
+        }
+        y += 34;
+    }
+    y += 12;
+    CreateMaintLabel(this, pnlAmrInject, 8, y, 460, 18, "Discharge P4-P9 (Auto1-6) : arm one-shot inject");
+    y += 22;
+    for(i=0; i<6; i++)
+    {
+        CreateMaintLabel(this, pnlAmrInject, 8, y+6, 60, 18, AnsiString("Auto")+IntToStr(i+1));
+        for(e=0; e<3; e++)
+        {
+            B = CreateMaintButton(this, pnlAmrInject, 70+e*130, y, 120,
+                AnsiString("A")+IntToStr(i+1)+" "+AuEdge[e], AmrInjectButtonClick);
+            B->Tag = 1000 + i*10 + AuEdgeCode[e];
+        }
+        y += 34;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(amr-unmanned W5) 20260722 : build the AGV handshake-timeout (iAgvTimeoutSec) editor on
+//the AMR page. Created dynamically (same idiom as BuildAmrInjectPanel) and build-once,
+//guarded on edAgvTimeoutSec==NULL. A strip is freed below the inject panel (ends y620) by
+//lifting the TX-log memo at runtime so the DFM stays untouched (no designer / text-mode edit,
+//no component-strip risk).
+void __fastcall TfMaintenance::BuildAgvTimeoutField()
+{
+    if(edAgvTimeoutSec!=NULL)
+        return;
+    if(tsMaintAmr==NULL || memAmrTx==NULL)
+        return;
+    memAmrTx->Top = 664;
+    memAmrTx->Height = 248;
+    CreateMaintLabel(this, tsMaintAmr, 440, 632, 210, 20, "AGV Handshake Timeout (s):");
+    edAgvTimeoutSec = CreateMaintEdit(this, tsMaintAmr, 656, 630, 70, IntToStr(GeneralSetting.iAgvTimeoutSec));
+    CreateMaintButton(this, tsMaintAmr, 734, 628, 90, "Save", btnAgvTimeoutSaveClick);
+}
+//---------------------------------------------------------------------------
+//AI(amr-unmanned W5) 20260722 : commit the AGV handshake timeout. Clamp >=5 (mirrors the
+//GeneralSetting.Load footgun guard : HTimer::Off() is instant at 0, ~49.7d when negative),
+//persist to General.ini, then reflect the clamped value back into the edit.
+void __fastcall TfMaintenance::btnAgvTimeoutSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    int v = ReadEditInt(edAgvTimeoutSec, 300);
+    if(v < 5)
+        v = 5;
+    GeneralSetting.iAgvTimeoutSec = v;
+    GeneralSetting.Save();
+    if(edAgvTimeoutSec!=NULL)
+        edAgvTimeoutSec->Text = IntToStr(v);
+    RefreshAmrStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkAmrTestModeClick(TObject *Sender)
+{
+    (void)Sender;
+    if(chkAmrTestMode!=NULL)
+        AmrInject.SetTestMode(chkAmrTestMode->Checked);
+    RefreshAmrStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::AmrInjectButtonClick(TObject *Sender)
+{
+    if(Sender==NULL)
+        return;
+    int Tag  = ((TButton *)Sender)->Tag;
+    int kind = Tag / 1000;
+    int rem  = Tag % 1000;
+    int idx  = rem / 10;
+    int edge = rem % 10;
+    if(kind==1)
+        AmrInject.RequestAuto(idx, edge);
+    else
+        AmrInject.RequestInput(idx, edge);
+    RefreshAmrStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnLotApiSaveClick(TObject *Sender)
+{
+    AnsiString Url;
+
+    (void)Sender;
+    SaveLotWebApiSettings();
+    Url=(edWebapiPath!=NULL) ? edWebapiPath->Text : AnsiString("");
+    AddLotWebApiLog(AnsiString("Save General.ini [LotWebApi] BaseUrl=")+Url);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnLotApiReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    LoadLotWebApiSettings();
+    AddLotWebApiLog("Reload General.ini [LotWebApi] BaseUrl");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnLotApiFetchClick(TObject *Sender)
+{
+    AnsiString Lot;
+
+    (void)Sender;
+    EnsureLotWebApiClientCreated();
+    if(LotWebApiClient==NULL)
+        return;
+
+    // Save current URL first so the test uses the on-screen endpoint.
+    SaveLotWebApiSettings();
+
+    Lot=(edLotApiTestLot!=NULL) ? edLotApiTestLot->Text.Trim() : AnsiString("");
+    if(Lot==AnsiString(""))
+    {
+        AddLotWebApiLog("Fetch aborted: empty Lot ID");
+        return;
+    }
+
+    if(LotWebApiClient->IsBusy())
+    {
+        AddLotWebApiLog("Fetch aborted: a request is still in flight");
+        return;
+    }
+
+    if(memLotApiResult!=NULL)
+        memLotApiResult->Clear();
+
+    if(LotWebApiClient->StartLotRequest(Lot))
+    {
+        bLotApiResultPending=true;
+        if(lblLotApiStatus!=NULL)
+            lblLotApiStatus->Caption=AnsiString("State: busy (")+Lot+AnsiString(")");
+        AddLotWebApiLog(AnsiString("Fetch start Lot=")+Lot);
+    }
+    else
+    {
+        AddLotWebApiLog(AnsiString("Fetch start failed: ")+LotWebApiClient->GetLastError());
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::InitializeTowerLightPanels()
@@ -795,6 +1320,8 @@ void __fastcall TfMaintenance::LoadMaintenanceSettings()
     RefreshMCUDisplayStatus();
     LoadTopCcdSettings();
     RefreshTopCcdStatus();
+    LoadColorCcdSettings();
+    RefreshColorCcdStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::SaveMaintenanceSettings()
@@ -820,17 +1347,105 @@ void __fastcall TfMaintenance::SaveMaintenanceSettings()
     SaveHardwareSettings();
     SaveMCUDisplaySettings();
     SaveTopCcdSettings();
+    SaveColorCcdSettings();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::LoadHardwareSettings()
 {
     GeneralSetting.Load();
     BinAreaMap.LoadDefault();
+    bLoadingHardwareSettings=true;
     if(chkHardwareColorBinArea!=NULL)
         chkHardwareColorBinArea->Checked=GeneralSetting.bColorBinAreaInstalled;
     if(chkUseAMR!=NULL)
         chkUseAMR->Checked=GeneralSetting.bUseAMR;
+    if(cbBinPanelType!=NULL)
+    {
+        int idx=GeneralSetting.iBinDispPanelType;
+        if(idx<0 || idx>1) idx=0;
+        cbBinPanelType->ItemIndex=idx;
+    }
+    if(cbCommType!=NULL)
+        cbCommType->Checked=GeneralSetting.bBinDispUseMyComm;
+    if(chkSuck2QuadVacuum!=NULL)
+        chkSuck2QuadVacuum->Checked=GeneralSetting.bSuck2QuadVacuum;
+    //AI(ht160s-lotpassfail) 20260709 : 3-way sort-mode selector. ItemIndex maps 1:1 to
+    //GeneralSetting.iSortMode (0=Normal,1=LotBin,2=LotPassFail). This runs inside the
+    //bLoadingHardwareSettings window so setting ItemIndex will NOT fire the restart prompt.
+    if(rgSortMode!=NULL)
+        rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+    //AI(ht160s-whitelist-override) 20260717 : WhiteList is a per-lot overlay shown as a separate
+    //checkbox, not a base radio item. Reflect the live overlay state (still inside the loading
+    //window so the OnClick prompt stays suppressed).
+    if(chkWhiteListActive!=NULL)
+        chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
+    //AI(ht160s-whitelist-override) 20260717 : refresh the Main sort-mode badge after a settings
+    //reload (GeneralSetting.Load re-reads the base mode) so the badge cannot go stale vs an unsaved
+    //rgSortMode change that Load reverts. Cheap edge-triggered repaint; safe inside the load window.
+    if(fMain!=NULL)
+        fMain->UpdateSortModeFeatureBadge();
+    if(chkUsePredictiveAutoSupply!=NULL)
+        chkUsePredictiveAutoSupply->Checked=GeneralSetting.bUsePredictiveAutoSupply;
+    if(chkUseAmrRecoveryDivert!=NULL)
+        chkUseAmrRecoveryDivert->Checked=GeneralSetting.bUseAmrRecoveryDivert;
+    if(chkSkipUnknown2DAlarm!=NULL)
+        chkSkipUnknown2DAlarm->Checked=GeneralSetting.bSkipUnknown2DAlarm;   //AI(ht160s-whitelist) 20260727 : F1 load (Checked= fires OnClick; bLoadingHardwareSettings guards the write)
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        chkCcd2DCommaToUnderscore->Checked=GeneralSetting.bCcd2DCommaToUnderscore;   //AI(ht160s-ccd-2dsanitize) 20260807 : load (same OnClick guard)
+    {
+        TCheckBox *AutoChk[6];
+        int a;
+        AutoChk[0]=chkAutoEnable1; AutoChk[1]=chkAutoEnable2; AutoChk[2]=chkAutoEnable3;
+        AutoChk[3]=chkAutoEnable4; AutoChk[4]=chkAutoEnable5; AutoChk[5]=chkAutoEnable6;
+        for(a=0; a<6; a++)
+            if(AutoChk[a]!=NULL)
+                AutoChk[a]->Checked=GeneralSetting.bAutoEnabled[a];
+    }
+    {
+        TCheckBox *SuckChk[4];
+        int s;
+        SuckChk[0]=chkSuckEnable1; SuckChk[1]=chkSuckEnable2;
+        SuckChk[2]=chkSuckEnable3; SuckChk[3]=chkSuckEnable4;
+        for(s=0; s<4; s++)
+            if(SuckChk[s]!=NULL)
+                SuckChk[s]->Checked=GeneralSetting.bSuckerEnabled[s];
+        if(chkSortArmAutoSkip!=NULL)
+            chkSortArmAutoSkip->Checked=GeneralSetting.bSortArmAutoSkipOnPickFail;
+    }
+    //AI(ht160s-maintainer) 20260624 : Loader safe distance is stored as 1/100mm
+    //(teach/encoder domain) but edited in mm; show mm = stored/100. Existing
+    //below-range configs are displayed verbatim; only an operator re-save changes them.
+    if(edLoaderSafeDistance!=NULL)
+    {
+        AnsiString S;
+        S.sprintf("%.2f", (double)GeneralSetting.iLoaderYSafeDistance/100.0);
+        edLoaderSafeDistance->Text=S;
+    }
+    //AI(ht160s-statusbar) 20260624 : load machine identity into the edit fields
+    //(persisted in General.ini [MachineIdentity] by GeneralSetting). Guarded for
+    //NULL in case the DFM block is absent on an older form file.
+    if(edMachineModel!=NULL)
+        edMachineModel->Text=GeneralSetting.sMachineModel;
+    if(edHandlerID!=NULL)
+        edHandlerID->Text=GeneralSetting.sHandlerID;
+    if(edSerialNo!=NULL)
+        edSerialNo->Text=GeneralSetting.sSerialNo;
+    if(edSettle0!=NULL) edSettle0->Text=IntToStr(GeneralSetting.iEmptyDestackSettleMs);
+    if(edSettle1!=NULL) edSettle1->Text=IntToStr(GeneralSetting.iColorDestackSettleMs);
+    if(edSettle2!=NULL) edSettle2->Text=IntToStr(GeneralSetting.iLoaderDestackSettleMs);
+    if(edSettle3!=NULL) edSettle3->Text=IntToStr(GeneralSetting.iAutoPushConfirmSettleMs);
+    if(edSettle4!=NULL) edSettle4->Text=IntToStr(GeneralSetting.iAutoDischargePostYSettleMs);
+    if(edSettle5!=NULL) edSettle5->Text=IntToStr(GeneralSetting.iAutoFrontRiseDwellMs);
+    if(edSettle6!=NULL) edSettle6->Text=IntToStr(GeneralSetting.iAutoCleanOutRiseDwellMs);
+    if(edSettle7!=NULL) edSettle7->Text=IntToStr(GeneralSetting.iTrayArmClampSettleMs);
+    if(edSettle8!=NULL) edSettle8->Text=IntToStr(GeneralSetting.iEmptyFeedClampSettleMs);
+    if(edSettle9!=NULL) edSettle9->Text=IntToStr(GeneralSetting.iColorFeedClampSettleMs);
+    if(edUphMinSampleIC!=NULL) edUphMinSampleIC->Text=IntToStr(GeneralSetting.iUphMinSampleIC);
+    //AI(ht160s-prepick) 20260806 : SortArm pre-pick Auto-ready wait budget (Option page).
+    if(edPrePickWaitSec!=NULL) edPrePickWaitSec->Text=IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec);
+    bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
+    ApplyHardwareEditLock();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::SaveHardwareSettings()
@@ -839,9 +1454,120 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
         GeneralSetting.bColorBinAreaInstalled=chkHardwareColorBinArea->Checked;
     if(chkUseAMR!=NULL)
         GeneralSetting.bUseAMR=chkUseAMR->Checked;
+    if(cbBinPanelType!=NULL)
+    {
+        int idx=cbBinPanelType->ItemIndex;
+        if(idx<0) idx=0;
+        GeneralSetting.iBinDispPanelType=idx;
+    }
+    if(cbCommType!=NULL)
+        GeneralSetting.bBinDispUseMyComm=cbCommType->Checked;
+    if(chkSuck2QuadVacuum!=NULL)
+        GeneralSetting.bSuck2QuadVacuum=chkSuck2QuadVacuum->Checked;
+    if(rgSortMode!=NULL)
+    {
+        int idx=rgSortMode->ItemIndex;   //AI(ht160s-lotpassfail) 20260709 : -1 (unselected) -> Normal
+        //AI(ht160s-whitelist-override) 20260717 : base is {Normal,LotBin,LotPassFail} only;
+        //WhiteList is the overlay (chkWhiteListActive), never a base value.
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+        GeneralSetting.RecomputeEffectiveSortMode();
+    }
+    if(chkUsePredictiveAutoSupply!=NULL)
+        GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
+    if(chkUseAmrRecoveryDivert!=NULL)
+        GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
+    if(chkSkipUnknown2DAlarm!=NULL)
+        GeneralSetting.bSkipUnknown2DAlarm=chkSkipUnknown2DAlarm->Checked;   //AI(ht160s-whitelist) 20260727 : F1 save
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        GeneralSetting.bCcd2DCommaToUnderscore=chkCcd2DCommaToUnderscore->Checked;   //AI(ht160s-ccd-2dsanitize) 20260807 : save
+    {
+        TCheckBox *AutoChk[6];
+        int a;
+        AutoChk[0]=chkAutoEnable1; AutoChk[1]=chkAutoEnable2; AutoChk[2]=chkAutoEnable3;
+        AutoChk[3]=chkAutoEnable4; AutoChk[4]=chkAutoEnable5; AutoChk[5]=chkAutoEnable6;
+        for(a=0; a<6; a++)
+            if(AutoChk[a]!=NULL)
+                GeneralSetting.bAutoEnabled[a]=AutoChk[a]->Checked;
+    }
+    {
+        TCheckBox *SuckChk[4];
+        int s;
+        SuckChk[0]=chkSuckEnable1; SuckChk[1]=chkSuckEnable2;
+        SuckChk[2]=chkSuckEnable3; SuckChk[3]=chkSuckEnable4;
+        for(s=0; s<4; s++)
+            if(SuckChk[s]!=NULL)
+                GeneralSetting.bSuckerEnabled[s]=SuckChk[s]->Checked;
+        if(chkSortArmAutoSkip!=NULL)
+            GeneralSetting.bSortArmAutoSkipOnPickFail=chkSortArmAutoSkip->Checked;
+    }
+    //AI(ht160s-statusbar) 20260624 : capture machine identity from the edits before
+    //GeneralSetting.Save(), then push it to the cmydef globals + status-bar panels.
+    if(edMachineModel!=NULL)
+        GeneralSetting.sMachineModel=edMachineModel->Text;
+    if(edHandlerID!=NULL)
+        GeneralSetting.sHandlerID=edHandlerID->Text;
+    if(edSerialNo!=NULL)
+        GeneralSetting.sSerialNo=edSerialNo->Text;
     GeneralSetting.Save();
     BinAreaMap.LoadDefault();
+    UpdateMachineIdentity();
     RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotbin) 20260615 : Lock the Loader/Unloader hardware checkboxes while a
+//lot is running (MachineRun.bRunning, set at Lot Start, cleared at Lot End). These
+//are commissioning / sort-routing facts; changing them mid-lot would corrupt the
+//in-progress sort. bRunning is in-memory only, so a restart (without a started lot)
+//leaves the page editable again - matching the agreed "lock from Start to End" scope.
+void __fastcall TfMaintenance::ApplyHardwareEditLock()
+{
+    TCheckBox *Locked[13];
+    bool bEnable;
+    int i;
+
+    bEnable=(MachineRun.bRunning==false);
+    Locked[0]=chkHardwareColorBinArea;
+    Locked[1]=chkUseAMR;
+    Locked[2]=chkAutoEnable1; Locked[3]=chkAutoEnable2; Locked[4]=chkAutoEnable3;
+    Locked[5]=chkAutoEnable4; Locked[6]=chkAutoEnable5; Locked[7]=chkAutoEnable6;
+    Locked[8]=chkSuckEnable1; Locked[9]=chkSuckEnable2;
+    Locked[10]=chkSuckEnable3; Locked[11]=chkSuckEnable4;
+    Locked[12]=chkSuck2QuadVacuum;
+    for(i=0; i<13; i++)
+        if(Locked[i]!=NULL)
+            Locked[i]->Enabled=bEnable;
+    //AI(ht160s-suck2-quad) 20260712 : the quad-vacuum variant has only Nozzle2
+    //installed - the per-nozzle mask is forced by GeneralSetting.Load() and must not
+    //be hand-edited, so keep the nozzle checkboxes locked whenever the option is on.
+    //This runs after every load/toggle, so it wins over the blanket re-enable above.
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        if(chkSuckEnable1!=NULL) chkSuckEnable1->Enabled=false;
+        if(chkSuckEnable2!=NULL) chkSuckEnable2->Enabled=false;
+        if(chkSuckEnable3!=NULL) chkSuckEnable3->Enabled=false;
+        if(chkSuckEnable4!=NULL) chkSuckEnable4->Enabled=false;
+    }
+    //AI(ht160s-lotpassfail) 20260709 : the sort-mode selector is now a TRadioGroup (not a
+    //TCheckBox) so it cannot live in the array above; lock it separately so the mode cannot
+    //be switched mid-lot (would corrupt the in-progress dynamic binding).
+    if(rgSortMode!=NULL)
+        rgSortMode->Enabled=bEnable;
+    //AI(ht160s-whitelist-override) 20260717 : the WhiteList overlay toggle is locked on the same
+    //bRunning gate - the mode cannot flip mid-lot (would corrupt in-progress routing).
+    if(chkWhiteListActive!=NULL)
+        chkWhiteListActive->Enabled=bEnable;
+    //AI(ht160s-ccd-2dsanitize) 20260807 : same bRunning lock - flipping the sanitize
+    //mid-lot would mix sanitized and raw code forms in one run (routing + logs).
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        chkCcd2DCommaToUnderscore->Enabled=bEnable;
+
+    if(pnlHardwareHeader!=NULL)
+    {
+        if(bEnable)
+            pnlHardwareHeader->Caption=LangT("Hardware install setup");
+        else
+            pnlHardwareHeader->Caption=LangT("Hardware install setup (locked - lot running, end lot to edit)");
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RefreshHardwareSettingsStatus()
@@ -852,83 +1578,73 @@ void __fastcall TfMaintenance::RefreshHardwareSettingsStatus()
         lblHardwareErrorCode1001->Caption=AnsiString("1001 = no bin setting -> ")+BinAreaMap.GetAreaName(BinAreaMap.GetAreaByErrorBin(HT160_BIN_ERROR_NO_BIN_SETTING));
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260615 : convert a display-label string to the bin
+//value encoding: -1 blank(X), 0..99 digits, 100..125 A..Z.
+static int BinTextToDispValue(AnsiString s)
+{
+    s=s.Trim();
+    if(s=="")
+        return -1;
+    char c=s[1];
+    if(c>='0' && c<='9')
+        return atoi(s.c_str());
+    if(c>='A' && c<='Z')
+        return 100+(c-'A');
+    if(c>='a' && c<='z')
+        return 100+(c-'a');
+    return -1;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260615 : page repurposed from TCP MCU to COM bin
+//display. Settings live in General.ini [BinDisplay] (GeneralSetting). The old
+//TCP MaxQueue field has been removed; edMCUPort is reused as the Baud field.
 void __fastcall TfMaintenance::LoadMCUDisplaySettings()
 {
-    TIniFile *Ini;
-    AnsiString FileName;
-
-    FileName=GetMCUDisplayIniFileName();
-    Ini=new TIniFile(FileName);
-    try
-    {
-        if(chkMCUEnabled!=NULL)
-            chkMCUEnabled->Checked=Ini->ReadBool(MCU_DISPLAY_INI_GROUP, "Enabled", true);
-        if(edMCUIP!=NULL)
-            edMCUIP->Text=Ini->ReadString(MCU_DISPLAY_INI_GROUP, "IP", "127.0.0.1");
-        if(edMCUPort!=NULL)
-            edMCUPort->Text=IntToStr(Ini->ReadInteger(MCU_DISPLAY_INI_GROUP, "Port", 7000));
-        if(edMCUMaxQueue!=NULL)
-            edMCUMaxQueue->Text=IntToStr(Ini->ReadInteger(MCU_DISPLAY_INI_GROUP, "MaxQueue", 500));
-        if(edMCUReconnect!=NULL)
-            edMCUReconnect->Text=IntToStr(Ini->ReadInteger(MCU_DISPLAY_INI_GROUP, "ReconnectIntervalMs", 3000));
-    }
-    __finally
-    {
-        delete Ini;
-    }
+    if(chkMCUEnabled!=NULL)
+        chkMCUEnabled->Checked=GeneralSetting.bBinDisplayInstalled;
+    if(edMCUIP!=NULL)
+        edMCUIP->Text=GeneralSetting.sBinDispComPort;
+    if(edMCUReconnect!=NULL)
+        edMCUReconnect->Text=IntToStr(GeneralSetting.iBinDispDelaySec);
+    // edMCUPort is the old TCP-port edit, repurposed as the Baud field.
+    if(edMCUPort!=NULL)
+        edMCUPort->Text=IntToStr(GeneralSetting.iBinDispBaud);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::SaveMCUDisplaySettings()
 {
-    TIniFile *Ini;
-    AnsiString FileName;
-    int Port;
-    int MaxQueue;
-    int ReconnectInterval;
+    int Delay;
 
-    FileName=GetMCUDisplayIniFileName();
-    ForceDirectories(ExtractFilePath(FileName));
-    Port=ReadEditInt(edMCUPort, 7000);
-    MaxQueue=ReadEditInt(edMCUMaxQueue, 500);
-    ReconnectInterval=ReadEditInt(edMCUReconnect, 3000);
-    if(Port<=0 || Port>65535)
-        Port=7000;
-    if(MaxQueue<1)
-        MaxQueue=500;
-    if(ReconnectInterval<500)
-        ReconnectInterval=500;
+    GeneralSetting.bBinDisplayInstalled=(chkMCUEnabled!=NULL && chkMCUEnabled->Checked);
+    if(edMCUIP!=NULL && edMCUIP->Text.Trim()!=AnsiString(""))
+        GeneralSetting.sBinDispComPort=edMCUIP->Text.Trim();
+    Delay=ReadEditInt(edMCUReconnect, 5);
+    if(Delay<1)
+        Delay=1;
+    GeneralSetting.iBinDispDelaySec=Delay;
 
-    Ini=new TIniFile(FileName);
-    try
-    {
-        Ini->WriteBool(MCU_DISPLAY_INI_GROUP, "Enabled", chkMCUEnabled!=NULL ? chkMCUEnabled->Checked : true);
-        Ini->WriteString(MCU_DISPLAY_INI_GROUP, "IP", edMCUIP!=NULL ? edMCUIP->Text.Trim() : AnsiString("127.0.0.1"));
-        Ini->WriteInteger(MCU_DISPLAY_INI_GROUP, "Port", Port);
-        Ini->WriteInteger(MCU_DISPLAY_INI_GROUP, "MaxQueue", MaxQueue);
-        Ini->WriteInteger(MCU_DISPLAY_INI_GROUP, "ReconnectIntervalMs", ReconnectInterval);
-    }
-    __finally
-    {
-        delete Ini;
-    }
+    // edMCUPort is a Baud dropdown (combo). Fall back to 9600 (HT9046 standard) on junk.
+    int Baud;
+    Baud=9600;
+    if(edMCUPort!=NULL && edMCUPort->Text.Trim()!=AnsiString(""))
+        Baud=atoi(edMCUPort->Text.c_str());
+    if(Baud<300)
+        Baud=9600;
+    GeneralSetting.iBinDispBaud=Baud;
+    GeneralSetting.Save();
 
-    if(edMCUPort!=NULL)
-        edMCUPort->Text=IntToStr(Port);
-    if(edMCUMaxQueue!=NULL)
-        edMCUMaxQueue->Text=IntToStr(MaxQueue);
     if(edMCUReconnect!=NULL)
-        edMCUReconnect->Text=IntToStr(ReconnectInterval);
+        edMCUReconnect->Text=IntToStr(Delay);
+    if(edMCUPort!=NULL)
+        edMCUPort->Text=IntToStr(Baud);
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::RestartMCUDisplay()
 {
-    EnsureMCUDisplayCreated(Application);
-    if(HT160MCUDisplay!=NULL)
-    {
-        HT160MCUDisplay->Stop();
-        HT160MCUDisplay->Start();
-        HT160MCUDisplay->Spin();
-    }
+    // Re-apply COM endpoint + per-unit labels and (re)start the controller.
+    EnsureComPortCreated(Application);
+    if(fComPort!=NULL)
+        fComPort->ConfigureBinDisplay();
     RefreshMCUDisplayStatus();
 }
 //---------------------------------------------------------------------------
@@ -936,17 +1652,15 @@ void __fastcall TfMaintenance::RefreshMCUDisplayStatus()
 {
     bool bCreated;
 
-    bCreated=(HT160MCUDisplay!=NULL);
-    if(bCreated)
-        HT160MCUDisplay->Spin();
+    bCreated=(HSys.BinDisCtrl!=NULL);
     if(lblMCUStatusEnabled!=NULL)
-        lblMCUStatusEnabled->Caption=AnsiString("Enabled: ")+(bCreated && HT160MCUDisplay->IsEnabled() ? "YES" : "NO");
+        lblMCUStatusEnabled->Caption=AnsiString("Installed: ")+(GeneralSetting.bBinDisplayInstalled ? "YES" : "NO");
     if(lblMCUStatusConnected!=NULL)
-        lblMCUStatusConnected->Caption=AnsiString("Connected: ")+(bCreated && HT160MCUDisplay->IsConnected() ? "YES" : "NO");
+        lblMCUStatusConnected->Caption=AnsiString("COM: ")+(bCreated ? HSys.BinDisCtrl->GetComPort() : AnsiString("-"));
     if(lblMCUStatusQueue!=NULL)
-        lblMCUStatusQueue->Caption=AnsiString("Queue: ")+(bCreated ? IntToStr(HT160MCUDisplay->GetQueueCount()) : AnsiString("0"));
+        lblMCUStatusQueue->Caption=AnsiString("Status: ")+(bCreated ? HSys.BinDisCtrl->GetRunStatus() : AnsiString("-"));
     if(lblMCUStatusError!=NULL)
-        lblMCUStatusError->Caption=AnsiString("Last Error: ")+(bCreated ? HT160MCUDisplay->GetLastError() : AnsiString("not started"));
+        lblMCUStatusError->Caption=AnsiString("Units: ")+(bCreated ? IntToStr(HSys.BinDisCtrl->GetTotalInstalledUnit()) : AnsiString("0"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::AddMCULog(AnsiString Text)
@@ -973,7 +1687,7 @@ void __fastcall TfMaintenance::ApplyTowerLightConfigToLeds()
             if(Led==NULL)
                 continue;
             State=GetTowerLightConfigState(RowIndex, ColorIndex);
-            Led->Blink=(State==TOWER_LIGHT_STATE_BLINK);
+            Led->Blink=false;   //AI(HT160S-Maintainer) 20260622 : no blink on the tower-light grid -- show BLINK config as steady-on
             Led->Value=(State!=TOWER_LIGHT_STATE_OFF);
             Led->Invalidate();
         }
@@ -1024,6 +1738,105 @@ void __fastcall TfMaintenance::tmrTowerLightBlinkTimer(TObject *Sender)
     RefreshTowerLightPanels();
     RefreshMCUDisplayStatus();
     RefreshTopCcdStatus();
+    RefreshColorCcdStatus();
+    RefreshLotWebApiStatus();
+    RefreshFtpStatus();
+    RefreshAmrStatus();
+    RefreshSecsOverrideStatus();
+    RefreshSecsControlState();   //AI(secs-e30-gate) 20260803
+}
+//---------------------------------------------------------------------------
+//AI(secs-kyec-rcmd4-fix) 20260728 : host PP_SIGNALTOWER / PP_MUSIC override status + the
+//  screen-side operator escape. The only other release is the panel ALARM RESET key, and
+//  SnFKAlarmReset / SnRKAlarmReset are COMM_PAD sensors (IO_Table.csv) that arrive over the
+//  Pad RS232 link - with the Pad down there was no escape at all and no indication that an
+//  override was even armed. Driven off the existing 300 ms tmrTowerLightBlink refresh.
+void __fastcall TfMaintenance::RefreshSecsOverrideStatus()
+{
+    if(lblSecsOverrideState==NULL)
+        return;
+    bool bActive=IsSecsPanelOverrideActive();
+    if(bActive)
+        lblSecsOverrideState->Caption="Override: ACTIVE - host is driving the tower light / buzzer";
+    else
+        lblSecsOverrideState->Caption="Override: inactive";
+    if(btnSecsOverrideRelease!=NULL)
+        btnSecsOverrideRelease->Enabled=bActive;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsOverrideReleaseClick(TObject *Sender)
+{
+    (void)Sender;
+    if(IsSecsPanelOverrideActive()==false)
+        return;
+    ClearSecsPanelOverride();
+    RecordProcess("SECS: host panel override released from Maintenance screen");
+    RefreshSecsOverrideStatus();
+}
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : the operator's GEM control-state surface. Before this the machine had
+//  NO way at all to take itself off-line or on-line - the only thing that ever moved the control
+//  state was the host (S1F15 / S1F17 / RCMD ONLINE_*). That made SEMI E30's central rule
+//  unimplementable: the host may go on-line only from HOST OFF-LINE, precisely so an operator
+//  standing at the machine cannot be overridden remotely. Ported in shape from HT9045, which has
+//  the same four controls (three states + "accept host on-line request").
+//  Driven off the existing 300 ms tmrTowerLightBlink refresh, like RefreshSecsOverrideStatus.
+void __fastcall TfMaintenance::RefreshSecsControlState()
+{
+    if(lblSecsCtlState==NULL)
+        return;
+    int iState=SecsGetControlState();
+    AnsiString sText=SecsDescribeControlState();
+    if(iState==0)
+        lblSecsCtlState->Caption="State: (SECS/GEM not enabled on this machine)";
+    else
+        lblSecsCtlState->Caption="State: "+sText;
+    //Grey out the state we are already in, so the panel doubles as the indicator.
+    if(btnSecsCtlOffline!=NULL) btnSecsCtlOffline->Enabled=(iState!=0 && iState!=1);
+    if(btnSecsCtlLocal  !=NULL) btnSecsCtlLocal  ->Enabled=(iState!=0 && iState!=4);
+    if(btnSecsCtlRemote !=NULL) btnSecsCtlRemote ->Enabled=(iState!=0 && iState!=5);
+    if(chkSecsAcceptHostOnline!=NULL &&
+       chkSecsAcceptHostOnline->Checked!=GeneralSetting.bAcceptHostOnlineRequest)
+        chkSecsAcceptHostOnline->Checked=GeneralSetting.bAcceptHostOnlineRequest;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsCtlOfflineClick(TObject *Sender)
+{
+    (void)Sender;
+    SecsOperatorSetControlState(1);
+    RefreshSecsControlState();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsCtlLocalClick(TObject *Sender)
+{
+    (void)Sender;
+    SecsOperatorSetControlState(4);
+    RefreshSecsControlState();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::btnSecsCtlRemoteClick(TObject *Sender)
+{
+    (void)Sender;
+    SecsOperatorSetControlState(5);
+    RefreshSecsControlState();
+}
+//---------------------------------------------------------------------------
+//AI(secs-e30-gate) 20260803 : the commissioning switch, HT9045's GemCheckBoxAcceptHostOnlineRequest.
+//  Unchecked = the host's S1F17 is answered ONLACK=1 and RCMD ONLINE_* HCACK=2. Persisted, because
+//  a machine that forgets this across a power cycle is not a safety statement.
+//  Note VCL: assigning Checked fires OnClick, so RefreshSecsControlState must be idempotent - it is
+//  (it only assigns when the value differs).
+void __fastcall TfMaintenance::chkSecsAcceptHostOnlineClick(TObject *Sender)
+{
+    (void)Sender;
+    if(chkSecsAcceptHostOnline==NULL)
+        return;
+    if(GeneralSetting.bAcceptHostOnlineRequest==chkSecsAcceptHostOnline->Checked)
+        return;
+    GeneralSetting.bAcceptHostOnlineRequest=chkSecsAcceptHostOnline->Checked;
+    GeneralSetting.Save();
+    RecordProcess(AnsiString("SECS: AcceptHostOnlineRequest -> ")+
+                  (GeneralSetting.bAcceptHostOnlineRequest?"ON":"OFF")+" (Maintenance screen)");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenWorkFile()
@@ -1045,7 +1858,7 @@ void __fastcall TfMaintenance::RegisterMaintenancePages()
     TMaintenancePageDef PageDefs[]={
         {tsMaintTowerLight,  spbMaintTowerLight,  maShowPage, false},
         {tsMaintPassword,    spbMaintPassword,    maShowPage, false},
-        {tsMaintSoftSimu,    spbMaintSoftSimu,    maShowPage, false},
+        {tsMaintAmr,    spbMaintAmr,    maShowPage, false},
         {tsMaintFunctionDef, spbMaintFunctionDef, maShowPage, false},
         {tsMaintHardware,    spbMaintHardware,    maShowPage, false},
         {tsMaintIO,          spbMaintIO,          maOpenIOView, false},
@@ -1054,7 +1867,10 @@ void __fastcall TfMaintenance::RegisterMaintenancePages()
         {tsMaintCOM,         spbMaintCOM,         maOpenComPort, false},
         {tsMaintMCUDisplay,  spbMaintMCUDisplay,  maShowPage, false},
         {tsMaintTopCcd,      spbMaintTopCcd,      maShowPage, false},
+        {tsMaintColorCcd,    spbMaintColorCcd,    maShowPage, false},
+        {tsMaintLotApi,      spbMaintLotApi,      maShowPage, false},
         {tsMaintSECS,        spbMaintSECS,        maOpenSecs, false},
+        {tsMaintFtp,         spbMaintFtp,         maShowPage, false},
         {NULL,               spbMaintExit,        maCloseForm, true}
     };
     int PageIndex;
@@ -1144,7 +1960,26 @@ void __fastcall TfMaintenance::SelectMaintenancePage(int PageIndex)
     }
     if(MenuActions[PageIndex]==maOpenSecs)
     {
-        OpenSecsGemLog(MenuButtons[PageIndex]);
+        //AI(secs-audit-fix) 20260729 : select tsMaintSECS as a real page BEFORE popping the
+        //(non-modal) SECS/GEM log window. Previously this branch returned early, so the ONLY
+        //ActivePage assignment in this unit (below) never ran for tsMaintSECS - and since
+        //RegisterMaintenancePages sets TabVisible=false on every page there is no tab strip
+        //either. The page was therefore unreachable, which made the host-override escape it
+        //carries (lblSecsOverrideState / btnSecsOverrideRelease) dead UI: the label was
+        //repainted 3x/s by tmrTowerLightBlink and the button could never be clicked, even
+        //though the interface spec tells the customer it exists. Behaviour is additive - the
+        //log window still opens on the same single click; closing it now reveals the SECS/GEM
+        //page with the override status and the Release button. OpenSecsGemLog(NULL) is passed
+        //NULL so it does not undo the menu-button Down state we set here.
+        if(pcMaintenance!=NULL && MenuPages[PageIndex]!=NULL && MenuButtons[PageIndex]!=NULL)
+        {
+            pcMaintenance->ActivePage=MenuPages[PageIndex];
+            pnlTitle->Caption=MenuPages[PageIndex]->Caption;
+            MenuButtons[PageIndex]->Down=true;
+            LastClickButton=MenuButtons[PageIndex];
+            RefreshSecsOverrideStatus();
+        }
+        OpenSecsGemLog(NULL);
         return;
     }
 
@@ -1152,6 +1987,8 @@ void __fastcall TfMaintenance::SelectMaintenancePage(int PageIndex)
         return;
 
     pcMaintenance->ActivePage=MenuPages[PageIndex];
+    if(MenuPages[PageIndex]==tsMaintPassword)
+        ShowPasswordPage();   //AI(ht160s-password) 20260624 : build-once + refresh + level lock
     pnlTitle->Caption=MenuPages[PageIndex]->Caption;
     MenuButtons[PageIndex]->Down=true;
     LastClickButton=MenuButtons[PageIndex];
@@ -1168,6 +2005,35 @@ void __fastcall TfMaintenance::spbMaintenanceMenuClick(TObject *Sender)
     SelectMaintenancePage(Button->Tag);
 }
 //---------------------------------------------------------------------------
+//AI(poka-yoke) 20260616 : run-state lock for maintenance screens. While the
+//  machine is running, disable the menu buttons that open setup/diagnostic
+//  screens (IO View / Teach / Motor Test / Com Port) so the operator simply
+//  cannot click them. This is a pure visual interlock - it never calls
+//  ShowMyMessage (which would DecStopAllMotor + clear SystemStart and stop the
+//  machine). SECS log is intentionally left enabled (its EC editing is
+//  idle-guarded internally). Called every cycle from UpdateRunControlFlag so it
+//  self-heals when the machine stops. The old silent-return guards inside each
+//  Open* stay as a harmless backstop.
+void __fastcall TfMaintenance::UpdateRunStateLock()
+{
+    int PageIndex;
+    bool bRunning;
+    bool bLocked;
+
+    bRunning=HSys.Sys.SystemStart;
+    for(PageIndex=0; PageIndex<iMaintenanceMenuCount; PageIndex++)
+    {
+        if(MenuButtons[PageIndex]==NULL)
+            continue;
+        bLocked=(MenuActions[PageIndex]==maOpenIOView ||
+                 MenuActions[PageIndex]==maOpenTeach ||
+                 MenuActions[PageIndex]==maOpenMotorTest ||
+                 MenuActions[PageIndex]==maOpenComPort);
+        if(bLocked)
+            MenuButtons[PageIndex]->Enabled=(bRunning==false);
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenIOView(TSpeedButton *Button)
 {
     TSpeedButton *PreviousButton;
@@ -1182,10 +2048,16 @@ void __fastcall TfMaintenance::OpenIOView(TSpeedButton *Button)
         return;
     }
 //    RecordProcess("Enter IO");
-//    EventReport(SECS_EVENT.EnterIOPage);
+    //AI(secs-ceid-align9045) 20260729 : CEID 21 "Enter IO Page" (HT9045 main.cpp:24931).
+    //Routed through fMain because this unit has no SECS includes. Reported here, past the
+    //access-level reject above, so a denied entry sends nothing.
+    if(fMain!=NULL)
+        fMain->EmitEnterIOPage();
     if(fiosetview==NULL)
         fiosetview=new Tfiosetview(this);
 
+    //AI 20260619 : Maintenance open -> normal restore-on-close (IC->force / else ask).
+    fiosetview->bFromTeach=false;
     if(fiosetview->Visible)
         fiosetview->BringToFront();
     else
@@ -1301,59 +2173,70 @@ void __fastcall TfMaintenance::btnMCUSaveClick(TObject *Sender)
     (void)Sender;
     SaveMCUDisplaySettings();
     RestartMCUDisplay();
-    AddMCULog("Save MCU.ini and restart TCP client");
+    AddMCULog("Save bin display settings (General.ini) and restart COM");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::btnMCUReloadClick(TObject *Sender)
 {
     (void)Sender;
+    GeneralSetting.Load();
     LoadMCUDisplaySettings();
-    RestartMCUDisplay();
-    AddMCULog("Reload MCU.ini and restart TCP client");
+    RefreshMCUDisplayStatus();
+    AddMCULog("Reload bin display settings");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::btnMCUSendDisplayClick(TObject *Sender)
 {
     int Address;
-    AnsiString ColorText;
+    int Color;
+    int Value;
+    AnsiString Txt;
 
     (void)Sender;
-    SaveMCUDisplaySettings();
-    RestartMCUDisplay();
+    if(HSys.BinDisCtrl==NULL)
+        return;
+    Txt="";
+    if(edMCUText!=NULL)
+        Txt=edMCUText->Text;
     Address=ReadEditInt(edMCUAddress, 0);
-    ColorText=(cbbMCUColor!=NULL && cbbMCUColor->Text!=AnsiString("")) ? cbbMCUColor->Text : AnsiString("GREEN");
-    SetMCUBinDisplay(Address, edMCUText!=NULL ? edMCUText->Text : AnsiString("9"), ColorText);
-    AddMCULog(AnsiString("Send Display addr=")+IntToStr(Address)+AnsiString(" text=")+(edMCUText!=NULL ? edMCUText->Text : AnsiString("9"))+AnsiString(" color=")+ColorText);
+    Color=ReadEditInt(edMCULightValue, 3);
+    Value=BinTextToDispValue(Txt);
+    HSys.BinDisCtrl->SetUnitLabel(Address, Value, Color);
+    AddMCULog(AnsiString("Send Display addr=")+IntToStr(Address)+AnsiString(" text=")+Txt+AnsiString(" color=")+IntToStr(Color));
     RefreshMCUDisplayStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::btnMCUSendCodeClick(TObject *Sender)
 {
     int Address;
-    bool bSymbol;
+    int Value;
+    AnsiString Txt;
 
     (void)Sender;
-    SaveMCUDisplaySettings();
-    RestartMCUDisplay();
+    if(HSys.BinDisCtrl==NULL)
+        return;
+    Txt="";
+    if(edMCUText!=NULL)
+        Txt=edMCUText->Text;
     Address=ReadEditInt(edMCUAddress, 0);
-    bSymbol=(chkMCUCodeSymbol!=NULL && chkMCUCodeSymbol->Checked);
-    SetMCUBinCode(Address, edMCUText!=NULL ? edMCUText->Text : AnsiString("9"), bSymbol);
-    AddMCULog(AnsiString("Send Code addr=")+IntToStr(Address)+AnsiString(" text=")+(edMCUText!=NULL ? edMCUText->Text : AnsiString("9")));
+    Value=BinTextToDispValue(Txt);
+    HSys.BinDisCtrl->SetUnitBin(Address, Value);
+    AddMCULog(AnsiString("Send Code addr=")+IntToStr(Address)+AnsiString(" text=")+Txt);
     RefreshMCUDisplayStatus();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::btnMCUSendLightClick(TObject *Sender)
 {
     int Address;
-    int LightValue;
+    int Color;
 
     (void)Sender;
-    SaveMCUDisplaySettings();
-    RestartMCUDisplay();
+    if(HSys.BinDisCtrl==NULL)
+        return;
     Address=ReadEditInt(edMCUAddress, 0);
-    LightValue=ReadEditInt(edMCULightValue, 0);
-    SetMCUBinLight(Address, LightValue);
-    AddMCULog(AnsiString("Send Light addr=")+IntToStr(Address)+AnsiString(" value=")+IntToStr(LightValue));
+    Color=ReadEditInt(edMCULightValue, 3);
+    HSys.BinDisCtrl->SetUnitColor(Address, Color);
+    AddMCULog(AnsiString("Send Light addr=")+IntToStr(Address)+AnsiString(" color=")+IntToStr(Color));
     RefreshMCUDisplayStatus();
 }
 //---------------------------------------------------------------------------
@@ -1379,9 +2262,9 @@ void __fastcall TfMaintenance::RGB00Click(TObject *Sender)
     if(RowIndex<0 || RowIndex>5 || ColorIndex<0 || ColorIndex>2)
         return;
 
-    if(Led->Value==true && Led->Blink==false)
-        State=TOWER_LIGHT_STATE_BLINK;
-    else if(Led->Value==true && Led->Blink==true)
+    //AI(HT160S-Maintainer) 20260622 : blink removed (user) -- the grid cell toggles
+    //ON <-> OFF only (no BLINK state). Read Value only (the grid no longer shows Blink).
+    if(Led->Value==true)
         State=TOWER_LIGHT_STATE_OFF;
     else
         State=TOWER_LIGHT_STATE_ON;
@@ -1427,16 +2310,30 @@ void __fastcall TfMaintenance::FormClose(TObject *Sender, TCloseAction &Action)
     (void)Sender;
     (void)Action;
     SaveWorkFile(GetTowerLightIniFileName());
+    //AI(ht160s-ftp) 20260805 : on-site note 5 "FTP parameter is not saved in general.ini".
+    //The btnFtpSave path DID persist, but it was the ONLY path: every other maintenance
+    //page commits on change / on close, so an operator who edited edFtpHost / chkFtpEnable
+    //and simply left the screen lost the edit with no warning, and FormShow's
+    //LoadFtpConfigToUi then repainted the OLD worker values - indistinguishable from
+    //"the save is broken". Commit on close as the backstop (Save button unchanged).
+    //Safe to call unconditionally : SaveFtpConfigFromUi no-ops when the worker is NULL and
+    //starts from the LIVE config, so untouched fields round-trip to the same values.
+    SaveFtpConfigFromUi();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::FormShow(TObject *Sender)
 {
     (void)Sender;
     OpenWorkFile();
+    //AI(ht160s-ftp) 20260721 : populate the FTP page from the live worker config
+    //each time the maintenance screen opens (the worker exists by now).
+    LoadFtpConfigToUi();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkHardwareColorBinAreaClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     (void)Sender;
     if(chkHardwareColorBinArea!=NULL)
         GeneralSetting.bColorBinAreaInstalled=chkHardwareColorBinArea->Checked;
@@ -1445,9 +2342,610 @@ void __fastcall TfMaintenance::chkHardwareColorBinAreaClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::chkUseAMRClick(TObject *Sender)
 {
+    if(bLoadingHardwareSettings)
+        return;
     (void)Sender;
     if(chkUseAMR!=NULL)
         GeneralSetting.bUseAMR=chkUseAMR->Checked;
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-lotpassfail) 20260709 : Sort mode selector (Normal / By Lot+Bin / By Lot+PassFail).
+//iSortMode drives the routing core (GetMappedAutoIndex), the CCD-scan class freeze and the
+//dynamic binding table, all read across the run loop, so a clean restart is the safe way to
+//apply it. Warn (do not force), matching the user's "remind, not enforce" rule. The
+//bLoadingHardwareSettings guard MUST stay first : setting ItemIndex in LoadHardwareSettings
+//fires OnClick, and without the guard every page-load would pop this modal.
+void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    //AI(ht160s-whitelist) 20260715 : refuse to switch mode while ICs are still under the
+    // machine (would mix classification models on in-flight product) - revert the radio to
+    // the live value and warn. Same-source guard as the SECS LOTSTART SORTMODE path.
+    if(HasICUnderMachine())
+    {
+        if(rgSortMode!=NULL)
+        {
+            bLoadingHardwareSettings=true;              // suppress the re-entrant OnClick
+            rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+            bLoadingHardwareSettings=false;
+        }
+        ShowMyMessage("Cannot change Sort mode while ICs are still under the machine. "
+                      "Finish or clear the current material first.");
+        return;
+    }
+    if(rgSortMode!=NULL)
+    {
+        int idx=rgSortMode->ItemIndex;
+        //AI(ht160s-whitelist-override) 20260717 : base is {Normal,LotBin,LotPassFail} only.
+        GeneralSetting.iSortMode=(idx>=smNormal && idx<=smLotPassFail)?idx:smNormal;
+        GeneralSetting.RecomputeEffectiveSortMode();
+    }
+    RefreshHardwareSettingsStatus();
+    if(fMain!=NULL)
+        fMain->UpdateSortModeFeatureBadge();   //AI(ht160s-whitelist-override) 20260717 : Main mode badge
+    //AI(ht160s-whitelist) 20260715 : mode is a live value consumed at the next Lot Start
+    // (2D->Bin load) + per-scan routing; no software restart needed.
+    ShowMyMessage("Sort mode changed. It takes effect at the next Lot Start.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist-override) 20260717 : local activation of the WhiteList overlay for the NEXT
+//lot. WhiteList is a customer special mode, NOT normal production - it rides the work order and
+//auto-reverts to the base sort mode at Lot End. Same idle-only guard as rgSortModeClick : the
+//overlay must not flip while ICs are under the machine (would corrupt in-progress routing).
+void __fastcall TfMaintenance::chkWhiteListActiveClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(HasICUnderMachine())
+    {
+        if(chkWhiteListActive!=NULL)
+        {
+            bLoadingHardwareSettings=true;             // suppress the re-entrant OnClick
+            chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
+            bLoadingHardwareSettings=false;
+        }
+        ShowMyMessage("Cannot change WhiteList while ICs are still under the machine. "
+                      "Finish or clear the current material first.");
+        return;
+    }
+    if(chkWhiteListActive!=NULL)
+        GeneralSetting.SetWhiteListActive(chkWhiteListActive->Checked);
+    RefreshHardwareSettingsStatus();
+    if(fMain!=NULL)
+        fMain->UpdateSortModeFeatureBadge();
+    if(GeneralSetting.bWhiteListActive)
+        ShowMyMessage("By WhiteList armed. It takes effect at the next Lot Start and reverts to "
+                      "the base sort mode at Lot End.");
+    else
+        ShowMyMessage("By WhiteList cleared. The base sort mode will be used.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist) 20260716 : re-sync the Sort-mode radio to GeneralSetting.iSortMode
+//after a host (SECS LOTSTART SORTMODE) switch, WITHOUT firing rgSortModeClick : the
+//bLoadingHardwareSettings guard suppresses the re-entrant OnClick and its modal (which would
+//stall the HSMS receive path). Prevents a stale hardware-page selector from silently
+//reverting the host's change on the next SaveHardwareSettings.
+void __fastcall TfMaintenance::SyncSortModeSelectorFromSetting()
+{
+    bool bSaved=bLoadingHardwareSettings;
+    bLoadingHardwareSettings=true;
+    if(rgSortMode!=NULL)
+        rgSortMode->ItemIndex=GeneralSetting.iSortMode;
+    //AI(ht160s-whitelist-override) 20260717 : also re-sync the WhiteList overlay checkbox so a
+    //host SORTMODE switch (or a Lot End revert) is reflected on the hardware page too.
+    if(chkWhiteListActive!=NULL)
+        chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
+    bLoadingHardwareSettings=bSaved;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::chkUsePredictiveAutoSupplyClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkUsePredictiveAutoSupply!=NULL)
+        GeneralSetting.bUsePredictiveAutoSupply=chkUsePredictiveAutoSupply->Checked;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-amr-divert) 20260719 : AMR recovered-tray direct supply toggle. Read live by
+//the TrayArm divert path, so no restart warning; mirrors the predictive-supply checkbox
+//wiring (bLoadingHardwareSettings guard; not part of ApplyHardwareEditLock).
+void __fastcall TfMaintenance::chkUseAmrRecoveryDivertClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkUseAmrRecoveryDivert!=NULL)
+        GeneralSetting.bUseAmrRecoveryDivert=chkUseAmrRecoveryDivert->Checked;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-whitelist) 20260727 : F1 operator opt-in to silence WAR0475 (2D-not-in-any-lot).
+//Pure data/traceability skip (routes the readable-but-unmatched IC to the Error Auto), NOT a
+//physical interlock, so no restart warning; mirrors the AMR-divert checkbox wiring.
+void __fastcall TfMaintenance::chkSkipUnknown2DAlarmClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkSkipUnknown2DAlarm!=NULL)
+        GeneralSetting.bSkipUnknown2DAlarm=chkSkipUnknown2DAlarm->Checked;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ccd-2dsanitize) 20260807 : comma -> underscore 2D sanitize toggle. Same
+//idle-only guard as chkWhiteListActiveClick : flipping it while ICs are under the
+//machine would mix raw and sanitized code forms within one run (codes captured
+//before the flip vs codes read after it - routing keys and Production_Log identity
+//would disagree). Live value, consumed at the next read; no restart needed.
+void __fastcall TfMaintenance::chkCcd2DCommaToUnderscoreClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(HasICUnderMachine())
+    {
+        if(chkCcd2DCommaToUnderscore!=NULL)
+        {
+            bLoadingHardwareSettings=true;             // suppress the re-entrant OnClick
+            chkCcd2DCommaToUnderscore->Checked=GeneralSetting.bCcd2DCommaToUnderscore;
+            bLoadingHardwareSettings=false;
+        }
+        ShowMyMessage("Cannot change 2D comma replacement while ICs are still under the machine. "
+                      "Finish or clear the current material first.");
+        return;
+    }
+    if(chkCcd2DCommaToUnderscore!=NULL)
+        GeneralSetting.bCcd2DCommaToUnderscore=chkCcd2DCommaToUnderscore->Checked;
+    if(GeneralSetting.bCcd2DCommaToUnderscore)
+        ShowMyMessage("2D comma replacement ON : every comma in a scanned or hand-entered 2D "
+                      "code becomes an underscore. The work-order data must already use the "
+                      "underscore form.");
+    else
+        ShowMyMessage("2D comma replacement OFF : 2D codes are used exactly as read.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotbin) 20260615 : Per-Auto enable (By Lot+Bin mode only). Disabled
+//Autos are skipped by THT160LotBinBinding::ResolveAuto when binding new (LotID,Bin)
+//pairs. The flag is read in the run loop, so warn (do not force) the operator to
+//restart, matching the Sort-mode toggle behavior above.
+void __fastcall TfMaintenance::chkAutoEnableClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    TCheckBox *AutoChk[6];
+    int a;
+
+    (void)Sender;
+    AutoChk[0]=chkAutoEnable1; AutoChk[1]=chkAutoEnable2; AutoChk[2]=chkAutoEnable3;
+    AutoChk[3]=chkAutoEnable4; AutoChk[4]=chkAutoEnable5; AutoChk[5]=chkAutoEnable6;
+    for(a=0; a<6; a++)
+        if(AutoChk[a]!=NULL)
+            GeneralSetting.bAutoEnabled[a]=AutoChk[a]->Checked;
+    RefreshHardwareSettingsStatus();
+    ShowMyMessage("Auto enable changed. Please restart the software so the new "
+                  "Lot+Bin routing takes effect cleanly.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-suck2-quad) 20260712 : Suck2 quad-vacuum machine option (all 4 vacuum
+//generator circuits plumbed to the single Suck2 nozzle). The gang is latched once
+//at boot (LoadSuckerParameterFromDataBase), so warn (do not force) a restart,
+//matching the Sort-mode toggle above. Checking it also persists the pick mask to
+//Nozzle2-only right away (this variant physically has no other nozzle) and locks
+//the per-nozzle checkboxes via ApplyHardwareEditLock. The bLoadingHardwareSettings
+//wrapper around the Checked= writes is required : setting Checked fires OnClick.
+void __fastcall TfMaintenance::chkSuck2QuadVacuumClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkSuck2QuadVacuum!=NULL)
+        GeneralSetting.bSuck2QuadVacuum=chkSuck2QuadVacuum->Checked;
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        TCheckBox *SuckChk[4];
+        int s;
+        SuckChk[0]=chkSuckEnable1; SuckChk[1]=chkSuckEnable2;
+        SuckChk[2]=chkSuckEnable3; SuckChk[3]=chkSuckEnable4;
+        bLoadingHardwareSettings=true;
+        for(s=0; s<4; s++)
+        {
+            GeneralSetting.bSuckerEnabled[s]=(s==1);
+            if(SuckChk[s]!=NULL)
+                SuckChk[s]->Checked=(s==1);
+        }
+        bLoadingHardwareSettings=false;
+    }
+    GeneralSetting.Save();
+    ApplyHardwareEditLock();
+    RefreshHardwareSettingsStatus();
+    ShowMyMessage("Suck2 quad-vacuum mode changed. Please restart the software "
+                  "so the new vacuum gang takes effect cleanly.");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260616 : Per-nozzle (SortArm sucker) enable. Unchecked
+//slots are skipped by FindPickCells (which anchors the first ENABLED sucker to the
+//found cell), so a broken nozzle can be taken out of service. Read live each pick
+//cycle and the page is locked while a lot runs, so no restart is needed. At least
+//one nozzle must stay enabled - if the operator unchecks the last one, re-check it
+//and warn instead of leaving the machine unable to pick.
+void __fastcall TfMaintenance::chkSuckEnableClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    TCheckBox *SuckChk[4];
+    int s;
+    int iEnabledCount;
+
+    SuckChk[0]=chkSuckEnable1; SuckChk[1]=chkSuckEnable2;
+    SuckChk[2]=chkSuckEnable3; SuckChk[3]=chkSuckEnable4;
+
+    iEnabledCount=0;
+    for(s=0; s<4; s++)
+        if(SuckChk[s]!=NULL && SuckChk[s]->Checked)
+            iEnabledCount++;
+
+    if(iEnabledCount==0)
+    {
+        TCheckBox *Box=dynamic_cast<TCheckBox *>(Sender);
+        if(Box!=NULL)
+            Box->Checked=true;
+        ShowMyMessage(LangT("At least one nozzle must stay enabled."));
+        return;
+    }
+
+    for(s=0; s<4; s++)
+        if(SuckChk[s]!=NULL)
+            GeneralSetting.bSuckerEnabled[s]=SuckChk[s]->Checked;
+    GeneralSetting.Save();
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-autoskip) 20260714 : opt-in SortArm auto-skip on pick fail. Persists on click
+//(mirrors chkSuckEnableClick); read live by aSortArm each pick, page locked mid-lot.
+void __fastcall TfMaintenance::chkSortArmAutoSkipClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(chkSortArmAutoSkip!=NULL)
+        GeneralSetting.bSortArmAutoSkipOnPickFail=chkSortArmAutoSkip->Checked;
+    GeneralSetting.Save();
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260624 : Loader safe distance = minimum separation
+//between the two Loader-Y cars, consumed live by aLoader IsLoaderYMoveSafe.
+//Stored as 1/100mm in GeneralSetting.iLoaderYSafeDistance to match the teach/
+//encoder domain; operator edits in mm. Entry is via the on-screen keypad
+//(fQwertyKey), which clamps to 325..650 mm on OK; a YES/NO confirm gates the
+//save and the value persists live (mirrors the sucker-enable handler). The
+//redundant clamp below is a no-op safety net on the operator path only - it is
+//deliberately NOT placed in SaveHardwareSettings, so existing below-range
+//configs are never silently bumped on form close.
+void __fastcall TfMaintenance::edLoaderSafeDistanceClick(TObject *Sender)
+{
+    double mm;
+    int v;
+    AnsiString S;
+
+    if(bLoadingHardwareSettings)
+        return;
+    (void)Sender;
+    if(edLoaderSafeDistance==NULL || fQwertyKey==NULL)
+        return;
+    if(fQwertyKey->ShowQwertyKey(edLoaderSafeDistance, N_DOUBLE, 2, true, 325.0, 650.0, LangT("Loader Safe Distance (mm)"))==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save Loader safe distance?"))!=1)
+    {
+        S.sprintf("%.2f", (double)GeneralSetting.iLoaderYSafeDistance/100.0);
+        edLoaderSafeDistance->Text=S;
+        return;
+    }
+    mm=atof(edLoaderSafeDistance->Text.c_str());
+    if(mm<325.0)
+        mm=325.0;
+    if(mm>650.0)
+        mm=650.0;
+    v=(int)(mm*100.0+0.5);
+    GeneralSetting.iLoaderYSafeDistance=v;
+    GeneralSetting.Save();
+    S.sprintf("%.2f", (double)v/100.0);
+    edLoaderSafeDistance->Text=S;
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-settle-panel) 20260628 : map a settle-delay edit Tag to its GeneralSetting
+//member (single shared handler dispatches by Tag, mirrors chkAutoEnableClick).
+static int* SettleDelayValPtr(int Tag, AnsiString &title)
+{
+    switch(Tag)
+    {
+        case 0: title=LangT("Empty destack settle (ms)"); return &GeneralSetting.iEmptyDestackSettleMs;
+        case 1: title=LangT("Color destack settle (ms)"); return &GeneralSetting.iColorDestackSettleMs;
+        case 2: title=LangT("Loader destack settle (ms)"); return &GeneralSetting.iLoaderDestackSettleMs;
+        case 3: title=LangT("Auto push confirm settle (ms)"); return &GeneralSetting.iAutoPushConfirmSettleMs;
+        case 4: title=LangT("Auto discharge-Y settle (ms)"); return &GeneralSetting.iAutoDischargePostYSettleMs;
+        case 5: title=LangT("Auto front-rise dwell (ms)"); return &GeneralSetting.iAutoFrontRiseDwellMs;
+        case 6: title=LangT("Auto cleanout-rise dwell (ms)"); return &GeneralSetting.iAutoCleanOutRiseDwellMs;
+        case 7: title=LangT("TrayArm clamp settle (ms)"); return &GeneralSetting.iTrayArmClampSettleMs;
+        case 8: title=LangT("Empty feed-clamp settle (ms)"); return &GeneralSetting.iEmptyFeedClampSettleMs;
+        case 9: title=LangT("Color feed-clamp settle ms; 0=skip inline confirm"); return &GeneralSetting.iColorFeedClampSettleMs;
+    }
+    return NULL;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::edSettleDelayClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    TEdit *ed=(TEdit*)Sender;
+    AnsiString title;
+    int *pv=SettleDelayValPtr(ed->Tag, title);
+    if(pv==NULL)
+        return;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, 0.0, 5000.0, title)==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save settle time?"))!=1)
+    {
+        ed->Text=IntToStr(*pv);
+        return;
+    }
+    int v=ed->Text.ToIntDef(*pv);
+    if(v<0)
+        v=0;
+    if(v>5000)
+        v=5000;
+    *pv=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-uph) 20260709 : UPH min-sample warm-up threshold (hide the early
+//tiny-elapsed UPH spike). 0 = auto (one full tray). Same touch-numpad idiom as
+//edSettleDelayClick; value lives in GeneralSetting.iUphMinSampleIC / General.ini.
+//AI(ht160s-prepick) 20260806 : SortArm pre-pick Auto-ready wait budget, in seconds. The gate
+//itself (aSortArm DoPickFromLoader case 1) refuses to Z-down until the Auto the IC is routed to
+//already holds a receivable tray; this is how long it may hold quietly before MES1921 names the
+//Auto. Default 300 (5 min, user's ruling). -1 turns the gate off entirely, 0 = hold silently
+//and never alarm. Same touch-numpad idiom as edUphMinSampleICClick.
+void __fastcall TfMaintenance::edPrePickWaitSecClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    TEdit *ed=(TEdit*)Sender;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, -1.0, 36000.0,
+        LangT("SortArm pre-pick Auto wait (sec); -1=off, 0=silent"))==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save SortArm pre-pick wait?"))!=1)
+    {
+        ed->Text=IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec);
+        return;
+    }
+    int v=ed->Text.ToIntDef(GeneralSetting.iSortArmPrePickAutoWaitSec);
+    if(v<-1)
+        v=-1;
+    if(v>36000)
+        v=36000;
+    GeneralSetting.iSortArmPrePickAutoWaitSec=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::edUphMinSampleICClick(TObject *Sender)
+{
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    TEdit *ed=(TEdit*)Sender;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, 0.0, 9999.0,
+        LangT("UPH min sample (IC); 0=auto one tray"))==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save UPH min sample?"))!=1)
+    {
+        ed->Text=IntToStr(GeneralSetting.iUphMinSampleIC);
+        return;
+    }
+    int v=ed->Text.ToIntDef(GeneralSetting.iUphMinSampleIC);
+    if(v<0)
+        v=0;
+    if(v>9999)
+        v=9999;
+    GeneralSetting.iUphMinSampleIC=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//AI(ht160s-password) 20260628 : tsMaintPassword child controls now live in the
+// DFM (designer-visible). This routine runs on every page open: it fills the
+// level combo once, applies all bilingual captions via LangT so they follow the
+// language toggle, sets the role-based edit lock, and refreshes the user list.
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::ShowPasswordPage()
+{
+    int i;
+    bool bCanEdit;
+
+    if(cbbPwLevel!=NULL && cbbPwLevel->Items->Count==0)
+    {
+        for(i=ROLE_OPERATION; i<=ROLE_HONPREC; i++)
+            cbbPwLevel->Items->Add(IntToStr(i)+" - "+THT160UserRoleManager::GetLevelName(i));
+        cbbPwLevel->ItemIndex=ROLE_OPERATION;
+    }
+
+    if(labPwIdCaption!=NULL)    labPwIdCaption->Caption=LangT("Account ID");
+    if(labPwPassCaption!=NULL)  labPwPassCaption->Caption=LangT("Password");
+    if(labPwLevelCaption!=NULL) labPwLevelCaption->Caption=LangT("Level");
+    if(btnPwAddUpdate!=NULL)    btnPwAddUpdate->Caption=LangT("Add / Update");
+    if(btnPwDelete!=NULL)       btnPwDelete->Caption=LangT("Delete");
+    if(btnPwSave!=NULL)         btnPwSave->Caption=LangT("Save to File");
+    if(btnPwReload!=NULL)       btnPwReload->Caption=LangT("Reload");
+
+    RefreshPasswordGrid();
+
+    bCanEdit=UserRoleManager.HasLevel(ROLE_ENGINEER);
+    if(edPwId!=NULL)         edPwId->Enabled=bCanEdit;
+    if(edPwPass!=NULL)       edPwPass->Enabled=bCanEdit;
+    if(cbbPwLevel!=NULL)     cbbPwLevel->Enabled=bCanEdit;
+    if(btnPwAddUpdate!=NULL) btnPwAddUpdate->Enabled=bCanEdit;
+    if(btnPwDelete!=NULL)    btnPwDelete->Enabled=bCanEdit;
+    if(btnPwSave!=NULL)      btnPwSave->Enabled=bCanEdit;
+    if(btnPwReload!=NULL)    btnPwReload->Enabled=bCanEdit;
+    if(labPwHint!=NULL)
+    {
+        if(bCanEdit)
+            labPwHint->Caption=LangT("Accounts: ID / password / level 0-3. Stored in system\\login.txt.");
+        else
+            labPwHint->Caption=LangT("View only. Engineer level (2) or above is required to edit.");
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshPasswordGrid()
+{
+    int i;
+    AnsiString Line;
+
+    if(lbPwUsers==NULL)
+        return;
+
+    lbPwUsers->Items->BeginUpdate();
+    try
+    {
+        lbPwUsers->Items->Clear();
+        for(i=0; i<UserRoleManager.GetUserCount(); i++)
+        {
+            Line=UserRoleManager.GetUserID(i);
+            while(Line.Length()<16)
+                Line=Line+" ";
+            Line=Line+"  Lv"+IntToStr(UserRoleManager.GetUserLevel(i))+" "+
+                 THT160UserRoleManager::GetLevelName(UserRoleManager.GetUserLevel(i));
+            lbPwUsers->Items->Add(Line);
+        }
+    }
+    __finally
+    {
+        lbPwUsers->Items->EndUpdate();
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwListClick(TObject *Sender)
+{
+    int idx;
+
+    (void)Sender;
+    if(lbPwUsers==NULL || edPwId==NULL || cbbPwLevel==NULL)
+        return;
+    idx=lbPwUsers->ItemIndex;
+    if(idx<0 || idx>=UserRoleManager.GetUserCount())
+        return;
+    edPwId->Text=UserRoleManager.GetUserID(idx);
+    cbbPwLevel->ItemIndex=UserRoleManager.GetUserLevel(idx);
+    if(edPwPass!=NULL)
+        edPwPass->Text="";
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwIdClick(TObject *Sender)
+{
+    (void)Sender;
+    if(edPwId==NULL || fQwertyKey==NULL || edPwId->Enabled==false)
+        return;
+    fQwertyKey->ShowQwertyKey(edPwId, N_NO_SPACE, 0, false, 0, 0, LangT("Account ID"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
+{
+    (void)Sender;
+    if(edPwPass==NULL || fQwertyKey==NULL || edPwPass->Enabled==false)
+        return;
+    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE, 0, false, 0, 0, LangT("Password"));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
+{
+    AnsiString sID, sPass;
+    int iLevel;
+
+    (void)Sender;
+    if(edPwId==NULL || edPwPass==NULL || cbbPwLevel==NULL)
+        return;
+    sID=edPwId->Text.Trim();
+    sPass=edPwPass->Text;
+    iLevel=cbbPwLevel->ItemIndex;
+    if(sID==AnsiString(""))
+    {
+        ShowMyMessage(LangT("Please enter an account ID."));
+        return;
+    }
+    if(sPass==AnsiString(""))
+    {
+        ShowMyMessage(LangT("Please enter a password."));
+        return;
+    }
+    if(!UserRoleManager.IsValidLevel(iLevel))
+    {
+        ShowMyMessage(LangT("Please select a level (0-3)."));
+        return;
+    }
+    if(UserRoleManager.AddOrUpdateUser(sID, sPass, iLevel)==false)
+    {
+        ShowMyMessage(LangT("Account table is full (max 30)."));
+        return;
+    }
+    edPwPass->Text="";
+    RefreshPasswordGrid();
+    ShowMyMessage(LangT("Account saved in memory. Press 'Save to File' to keep it."));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
+{
+    int idx, iLevel;
+    AnsiString sID;
+
+    (void)Sender;
+    if(lbPwUsers==NULL)
+        return;
+    idx=lbPwUsers->ItemIndex;
+    if(idx<0 || idx>=UserRoleManager.GetUserCount())
+    {
+        ShowMyMessage(LangT("Please select an account to delete."));
+        return;
+    }
+    sID=UserRoleManager.GetUserID(idx);
+    iLevel=UserRoleManager.GetUserLevel(idx);
+    if(ShowMyMessageBox_YES_NO(Format(LangT("Delete account: %s ?"), ARRAYOFCONST((sID)))) !=1)
+        return;
+    UserRoleManager.DeleteUser(sID, iLevel);
+    RefreshPasswordGrid();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    SavePassword();
+    ShowMyMessage(LangT("User accounts saved to system\\login.txt."));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    ReadPassword();
+    RefreshPasswordGrid();
+    if(edPwId!=NULL)    edPwId->Text="";
+    if(edPwPass!=NULL)  edPwPass->Text="";
+    ShowMyMessage(LangT("User accounts reloaded from system\\login.txt."));
+}

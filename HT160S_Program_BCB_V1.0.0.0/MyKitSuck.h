@@ -75,6 +75,14 @@ public:
     TMySuckerDeviceInfo DeviceInfo;
     int Item;
     TMyLed *pLed;
+    // AI(ht160s-suck2-quad) 20260712 : quad-vacuum gang. On the machine variant where
+    // all 4 vacuum generator circuits feed the single Suck2 nozzle, the master sucker
+    // (index 1) gets iGangCount=4 and pGang[] pointing at all 4 suckers; its output
+    // primitives then drive every gang valve and the Sensor helpers judge across the
+    // gang (pick = all ON, release = all OFF). iGangCount==0 (default) = stock
+    // one-nozzle-one-generator behavior, bit for bit.
+    TMySucker *pGang[MAX_SUB_SUCKER_ITEM];
+    int iGangCount;
 
     bool Suck();
     bool Destroy();
@@ -87,11 +95,14 @@ public:
     void Normal();
     void Reset();
     bool GetStatus();
+    bool SensorAllOn();      // gang: every enabled sensor ON; normal: Sensor.IsOn()
+    bool SensorAnyOn();      // gang: any enabled sensor ON; normal: Sensor.IsOn()
+    bool GetStatusAllOn();   // GetStatus REALLY-guard + SensorAllOn (held check)
+    bool GetStatusAnyOn();   // GetStatus REALLY-guard + SensorAnyOn (residue check)
     bool GetOnBit();
     bool GetOffBit();
     void ResetSuckTask();
     void SetRetryCount(int Count);
-    void CheckIsFallDown();
     void PushOnTime();
     void PushOffTime();
 };

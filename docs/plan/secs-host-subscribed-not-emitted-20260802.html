@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>京元 host 訂了、HT-160S 沒發的 20 個事件 — 逐條裁定</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5;
+    --ink:#1a222c; --muted:#5b6675; --line:#d9dfe6;
+    --accent:#2b6f92; --accent-ink:#0f2b3a;
+    --good:#2e8f61; --bad:#c23b52; --warn:#b9791f; --info:#4a6fa5;
+    --mono:"Cascadia Mono","Consolas",ui-monospace,"Menlo",monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,"Microsoft JhengHei","Noto Sans TC",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f141a; --surface:#161d25; --surface-2:#1d2630;
+      --ink:#e2e8ef; --muted:#93a1b2; --line:#2a343f;
+      --accent:#5aa8cc; --accent-ink:#cfe6f2;
+      --good:#4bba86; --bad:#e0687d; --warn:#d69b45; --info:#7fa5d8;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5;
+    --ink:#1a222c; --muted:#5b6675; --line:#d9dfe6;
+    --accent:#2b6f92; --good:#2e8f61; --bad:#c23b52; --warn:#b9791f; --info:#4a6fa5;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f141a; --surface:#161d25; --surface-2:#1d2630;
+    --ink:#e2e8ef; --muted:#93a1b2; --line:#2a343f;
+    --accent:#5aa8cc; --good:#4bba86; --bad:#e0687d; --warn:#d69b45; --info:#7fa5d8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       line-height:1.65;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:1.7rem;margin:0 0 6px;color:var(--accent-ink);line-height:1.3}
+  :root[data-theme="dark"] h1,@media (prefers-color-scheme: dark){h1{color:var(--accent)}}
+  h2{font-size:1.22rem;margin:38px 0 12px;padding-bottom:7px;
+     border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:1.03rem;margin:24px 0 8px;color:var(--ink)}
+  .sub{color:var(--muted);font-size:.9rem;margin-bottom:22px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+        padding:16px 18px;margin:16px 0}
+  .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:14px 0}
+  table{border-collapse:collapse;width:100%;min-width:560px;font-size:.9rem}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--surface-2);font-weight:600;white-space:nowrap}
+  tr:nth-child(even) td{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
+  code,.mono{font-family:var(--mono);font-size:.87em;
+       background:var(--surface-2);padding:1px 5px;border-radius:4px}
+  .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:.78rem;
+        font-weight:600;white-space:nowrap;color:#fff}
+  .p-a{background:var(--muted)} .p-b{background:var(--good)}
+  .p-c{background:var(--warn)} .p-d{background:var(--info)} .p-e{background:var(--bad)}
+  .note{border-left:4px solid var(--warn);background:var(--surface);
+        padding:11px 15px;margin:14px 0;border-radius:0 8px 8px 0}
+  .note.good{border-left-color:var(--good)}
+  .note.bad{border-left-color:var(--bad)}
+  .big{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0}
+  .big>div{flex:1 1 150px;background:var(--surface);border:1px solid var(--line);
+           border-radius:10px;padding:14px;text-align:center}
+  .big .n{font-size:1.9rem;font-weight:700;line-height:1.1}
+  .big .l{font-size:.8rem;color:var(--muted);margin-top:4px}
+  ul{padding-left:22px} li{margin:4px 0}
+  .foot{margin-top:44px;padding-top:14px;border-top:1px solid var(--line);
+        color:var(--muted);font-size:.84rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>京元 host 訂了、HT-160S 沒發的 20 個事件</h1>
+<div class="sub">
+  2026-08-02　·　分支 <code>feat/iosetview-172-refactor</code>　·
+  依據 2026-07-31 現場 SECS log 與 2026-06-08 HT9045 同址 log 對比
+</div>
+
+<div class="card">
+  <strong>問題</strong>：2026-07-31 現場 log 顯示 host 用 S2F35 綁了 <strong>31 個 CEID</strong>，
+  其中 11 個當天真的收到，<strong>20 個一則都沒收到</strong>。本文逐條說明那 20 個是什麼、
+  為什麼沒發、該不該補。
+</div>
+
+<div class="note bad">
+  <strong>2026-08-02 修訂 — 本文第一版有兩處錯誤</strong><br>
+  第一版把 CEID <strong>48</strong> 與 <strong>78</strong> 列為「可補、零阻塞」，逐條查證後<strong>兩項都不成立</strong>：
+  48 <strong>早已實作</strong>（我的發射點掃描漏抓了 <code>EventReport(1, SECS_EVENT.X)</code> 這種帶
+  <code>1,</code> 前綴的寫法）；78 <strong>需要一個目前不存在的操作員輸入框</strong>才有意義。
+  CEID <strong>70</strong> 的語意也已從 9045 原始碼定案，結論與第一版的兩種猜測都不同。
+  <hr style="border:0;border-top:1px solid var(--line);margin:10px 0">
+  <strong>2026-08-02 第二次更新 — CEID 78 已裁定並實作完成</strong>（commit <code>8082f0f</code>）<br>
+  §三 描述的 (a)(b)(c) 三個動作全部已做。整個功能<strong>預設關閉</strong>（<code>[SECS] AskSkipICCount=false</code>），
+  所以「警報路徑多一個對話框」這個行為改變只在現場明確開啟後才發生；未開啟前，機台行為與舊版逐位相同。
+</div>
+
+<h2>一、結論：20 個裡沒有任何一個是「補一行就好」</h2>
+
+<div class="big">
+  <div><div class="n" style="color:var(--muted)">5</div><div class="l">A 假缺口<br>有發射點，當天沒觸發</div></div>
+  <div><div class="n" style="color:var(--warn)">1</div><div class="l">B 需新功能<br>缺 host 要的那個數字</div></div>
+  <div><div class="n" style="color:var(--info)">13</div><div class="l">D 機構不存在<br>正確的「沒有」</div></div>
+  <div><div class="n" style="color:var(--bad)">1</div><div class="l">E host 自己關掉</div></div>
+</div>
+
+<h2>二、<span class="pill p-a">A</span> 假缺口（5 個）— 我方有發射點，當天只是沒觸發</h2>
+<div class="tablewrap">
+<table>
+<tr><th>CEID</th><th>名稱</th><th>HT-160S 發射點</th><th>9045 06-08</th></tr>
+<tr><td><strong>9</strong></td><td>Switch Real Dummy Mode</td><td><code>SECS_EVENT.SwitchRunMode</code></td><td>未發</td></tr>
+<tr><td><strong>14</strong></td><td>Switch StartMode</td><td><code>main.cpp:1782</code></td><td>發 16 次</td></tr>
+<tr><td><strong>15</strong></td><td>Switch Setup File</td><td><code>SECS_EVENT.SwitchSetupFile</code></td><td>發 1 次</td></tr>
+<tr><td><strong>48</strong></td><td>Change EC</td><td><strong><code>uHGemHT160.cpp:1194</code></strong>（20260729 已加）</td><td>未發</td></tr>
+<tr><td><strong>275</strong></td><td>AMR LD ID</td><td><code>uAgvStation.cpp:217</code></td><td>發 2 次</td></tr>
+</table>
+</div>
+<p>這五個只是 07-31 當天<strong>沒有人切 Real/Dummy、沒切 Start Mode、沒換 recipe、沒改 EC、沒有身分盤上傳</strong>。
+機台一旦做這些動作就會發。</p>
+<div class="note bad">
+  <strong>發射點掃描的兩個盲點（我自己踩過，記下來）</strong><br>
+  HT-160S 的 <code>EventReport</code> 有<strong>三種寫法</strong>，只掃其中一種會漏判：
+  <ol style="margin:6px 0">
+    <li><code>EventReport(SECS_EVENT.X)</code></li>
+    <li><code>EventReport(1, SECS_EVENT.X)</code> ← <strong>CEID 48 漏在這裡</strong></li>
+    <li><code>EventReport(1, 275)</code> 字面值 ← <strong>CEID 275 漏在這裡</strong></li>
+  </ol>
+  另有陣列式 <code>EventReport(1, AutoCeid[i])</code> / <code>AutoFullCeid[i]</code> 需人工展開。
+</div>
+
+<h2>三、<span class="pill p-c">B</span> CEID 78 — 有發射時機，但沒有 host 要的那個數字</h2>
+
+<p>第一版說「兩個資料源本週剛好都到位，補一行就好」——<strong>那是錯的</strong>。從 host 自己的訂閱回推：</p>
+
+<div class="card mono" style="font-size:.85rem;line-height:1.9">
+host_links_S2F35.csv&nbsp;&nbsp;&nbsp;: CEID 78 &nbsp;→&nbsp; RPTID 517<br>
+host_reports_S2F33.csv : RPTID 517 &nbsp;→&nbsp; { SVID 37010 }<br>
+9045 uHGemHT9045_SV.cpp:681 : SVID 37010 = <strong>"Enter Skip IC Count"</strong> → <code>&amp;iJamSkipIC</code>
+</div>
+
+<p><strong>9045 的完整流程</strong>（<code>note.cpp:2170-2189</code>）：</p>
+<ol>
+  <li>操作員在<strong>卡料警報</strong>選 <strong>SKIP</strong></li>
+  <li>機台跳出輸入框 <strong>「Many ICs Taken Out From The Tray :」</strong></li>
+  <li>操作員<strong>手動輸入</strong>他從盤裡拿走幾顆 → <code>iJamSkipICCount</code></li>
+  <li><code>iJamSkipIC = iJamSkipICCount</code></li>
+  <li><strong>才</strong>發 CEID 78</li>
+</ol>
+
+<div class="note bad">
+  <strong>CEID 78 的全部意義，就是載那個「操作員手動拿走幾顆」的數字</strong>——用途是 MES 的庫存對帳。
+  沒有那個輸入框、沒有 SVID 37010，<strong>發 CEID 78 只會送出一個空事件</strong>。
+</div>
+
+<div class="tablewrap">
+<table>
+<tr><th>我們有的</th><th>是什麼</th><th>能不能當 37010 用</th></tr>
+<tr><td><code>tRunData.iAutoSkipCount</code></td><td><strong>機台</strong>在 SortArm 取料失敗時<strong>自動</strong>跳過的格數</td><td>❌ 不同的量（機台判定 vs 操作員申報）</td></tr>
+<tr><td><code>tRunData.JamCount</code></td><td>本週建立的 jam 事件計數</td><td>❌ 是「發生幾次卡料」，不是「拿走幾顆 IC」</td></tr>
+<tr><td>操作員輸入框</td><td><strong>不存在</strong></td><td>—</td></tr>
+</table>
+</div>
+
+<p><strong>要做就是一個真功能，不是一行發射</strong>：(a) 在 jam-SKIP 路徑加「你從盤裡拿走幾顆？」輸入框、
+(b) 新增 SVID 37010 綁那個數字、(c) 才發 CEID 78。</p>
+<div class="note" style="border-left-color:var(--good)">
+  <strong>✅ 2026-08-02：上述 (a)(b)(c) 已全數實作</strong>（commit <code>8082f0f</code>）<br>
+  下面那個「會在每天走到的警報路徑多一個對話框」的顧慮，是用<strong>設定旗標</strong>解決的：
+  <code>[SECS] AskSkipICCount</code> 預設 <code>false</code>，未開啟時完全不會跳輸入框、也不會發 CEID 78；要用時在 <code>General.ini</code> 把它改成 <code>1</code> 即可。<br>
+  操作員按取消（不填）則不發任何事件——沒回答的問題不等於「拿走 0 顆」。
+</div>
+
+<div class="note">
+  ⚠ (a) 會<strong>在操作員每天都會走到的警報路徑上多一個對話框</strong>——這是行為改變，需要人裁定，
+  不應由我單方面加。<strong>替代方案（送 <code>iAutoSkipCount</code>）我不建議</strong>：SVID 名稱是
+  <code>"Enter Skip IC Count"</code>，<em>Enter</em> 就是「操作員輸入」的意思，
+  塞機台自算的數字進去會誤導 host。
+</div>
+
+<h2>四、CEID 70 — 語意已定案，結論是「我們沒有」</h2>
+<p>第一版猜「可能是進入條碼頁、也可能是讀到條碼」。<strong>兩個都不對</strong>。從 9045 原始碼定案：</p>
+<div class="tablewrap">
+<table>
+<tr><th>觸發點</th><th>情境</th></tr>
+<tr><td><code>BarcodeReader.cpp:107</code></td><td>操作員在條碼輸入框按 <strong>ENTER</strong> → 字串存進 <code>asSecsGemBarCode</code></td></tr>
+<tr><td><code>mymessbox.cpp:1334</code></td><td><strong>ID／密碼驗證對話框</strong>輸入後 → 同樣存進 <code>asSecsGemBarCode</code></td></tr>
+</table>
+</div>
+<p>也就是說 CEID 70 = <strong>「操作員用條碼槍／鍵盤輸入了一個字串（工號、密碼、料號）並按 ENTER」</strong>，
+目的是把那個字串交給 host。它<strong>不是</strong> 2D 盤碼讀取。</p>
+<p><strong>HT-160S 沒有這個東西</strong>：我們的批號來自 WebAPI 與 CCD 的 2D 讀取，不是操作員條碼輸入；
+操作員身分變更我們已有 <strong>CEID 16 Switch UserLevel</strong> 在發。
+→ <strong>歸入 D 類，不實作。</strong></p>
+
+<h2>五、<span class="pill p-d">D</span> 分選機／9045 專屬機構（13 個）— 正確的「沒有」</h2>
+<div class="tablewrap">
+<table>
+<tr><th>CEID</th><th>名稱</th><th>為什麼分選機沒有</th><th>9045 06-08</th></tr>
+<tr><td>10</td><td>Switch Tester Online</td><td>沒有測試機連線</td><td>未發</td></tr>
+<tr><td>13</td><td>Switch Temperature Mode</td><td>沒有控溫機構</td><td>未發</td></tr>
+<tr><td>70</td><td>Barcode Reader Enter</td><td>操作員條碼／密碼輸入，我們沒有這條輸入鏈（見 §四）</td><td>發 13 次</td></tr>
+<tr><td>26</td><td>Get Test Result</td><td>沒有測試結果（我們的 bin 來自 WebAPI/2D，不是測試）</td><td>發 12 次</td></tr>
+<tr><td>34</td><td>Auto Clean Start</td><td>9045 的 auto-clean 是<strong>測試接點清潔</strong>；我們的 Clean Out 是<strong>排盤</strong>，不同概念且已有 CEID 4/42</td><td>發 1 次</td></tr>
+<tr><td>44</td><td>Site On Off</td><td>沒有測試 site</td><td><strong>發 31 次</strong></td></tr>
+<tr><td>45</td><td>Arm On Off</td><td>9045 的測試手臂啟停</td><td>未發</td></tr>
+<tr><td>50</td><td>Auto Clean Finish</td><td>同 34</td><td>發 1 次</td></tr>
+<tr><td>67</td><td>Tray Test Finish</td><td>沒有盤測試流程</td><td>發 6 次</td></tr>
+<tr><td>125</td><td>EESUG Offest Select</td><td>測試機專屬 offset</td><td>未發</td></tr>
+<tr><td>126</td><td>EESUG Offest Modify</td><td>同上</td><td>未發</td></tr>
+<tr><td>212</td><td>Energy Saving Start</td><td>無節能機構；我們對 <code>ENERGY_SAVING</code> RCMD 回 <strong>HCACK=2</strong>，與 9045 給京元的答案一致</td><td>發 1 次</td></tr>
+<tr><td>213</td><td>Energy Saving End</td><td>同上</td><td>發 1 次</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <strong>34 / 50 特別說明</strong>：名稱容易誤解。9045 的 <em>Auto Clean</em> 與 HT-160S 的
+  <em>Clean Out</em> <strong>不是同一件事</strong>——9045 自己同時有 CEID 4
+  <code>CleanOut Pressed</code> 和 CEID 34/50 <code>Auto Clean</code>。我們有前者、沒有後者。
+</div>
+
+<div class="note bad">
+  <strong>67 特別說明（要請京元改）</strong>：host 把
+  <strong>RPTID 524 = {38237, 38238, 38239}（Auto4-6 盤數）綁在 CEID 67</strong> 上。
+  那是測試機事件、分選機永不發射 → <strong>Auto4-6 的盤數永遠到不了 host</strong>。
+  這不是我方缺陷，是 host 綁錯事件。
+</div>
+
+<h2>六、<span class="pill p-e">E</span> host 自己關掉（1 個）</h2>
+<p>CEID <strong>80 Read Now Handler Data</strong>：07-31 <code>15:02:57.752</code> host 送
+<code>S2F37 &lt;L[2] &lt;Boolean 0x00&gt; &lt;L[1] &lt;U4 80&gt;&gt;&gt;</code> = <strong>明確 disable</strong>。
+它先在 <code>14:57:41</code> 關閉全部、<code>15:02:56</code> 重新開啟全部、然後<strong>只挑 80 關掉</strong>。
+這是 host 刻意不要的。</p>
+
+<h2>七、要請京元改的兩件事</h2>
+<ol>
+  <li><strong>RPTID 524 綁錯事件</strong>——建議改綁到已在 CEID 272 上的 RPTID 2001，
+      否則 Auto4-6 盤數永遠收不到。</li>
+  <li><strong>我們已經在發、他們卻沒訂的 16 個事件</strong>——含
+      <strong>Lot End(8)、Pause(2)、Auto 卸盤(136-138/145-147)、UPH 記錄(53)、Load Tray Finish(66)</strong>。
+      <strong>我方零工作量</strong>，他們在 provisioning 加幾行綁定就收得到。</li>
+</ol>
+
+<h2>八、9045 素材的其他發現</h2>
+
+<div class="note good">
+  <strong>8.1　CEID 27 佔 9045 全日事件的 63%</strong><br>
+  9045 06-08 共發 <strong>645 則、46 種</strong>，其中 <strong>CEID 27 Change Machine State 就發了 406 則</strong>。
+  這證實了我們本週補 <strong>SVID 1011 Machine State</strong> 的優先順序是對的——
+  它是 host 端資訊量最大的單一欄位。
+</div>
+
+<p><strong>8.2　<code>EventReport_ReportID.def</code> 全檔只有一列</strong>（<code>1 → 1027</code>）。
+這印證了先前判定：9045 的 <code>AddReprot()</code> 是個 no-op bug（迴圈跑 275 次但永遠寫死 RPTID 1），
+所以 9045 出廠時除 CEID 1 外每個事件都送空 <code>L,0</code>。<strong>我們沒有照抄那個 bug 是對的。</strong></p>
+
+<p><strong>8.3　9045 會發、我方無發射點的 16 個</strong>（超出本文那 20 個的範圍）：
+<code>23, 26, 34, 44, 49, 50, 55, 58, 59, 60, 63, 67, 70, 212, 213, 250</code>。
+其中<strong>只有兩個對分選機有意義</strong>：</p>
+<ul>
+  <li><strong>CEID 49 Tray Feed Finish</strong>：我們有 Tray Feed 功能，但
+      <code>CheckAllTrayFeedFinish()</code> 是<strong>回傳 false 的 stub</strong>
+      （<code>csystem.cpp:1955-1961</code>），所以永遠發不出來。既有已知缺口。</li>
+  <li><strong>CEID 23 Enter Debug Page</strong>：我們有維護頁面，可對應。低價值。</li>
+</ul>
+<p>其餘 13 個全是 ART／FT／contact-height 等測試機流程。</p>
+
+<h2>九、建議執行順序（修訂）</h2>
+<div class="tablewrap">
+<table>
+<tr><th>順序</th><th>項目</th><th>阻塞</th><th>工作量</th></tr>
+<tr><td>1</td><td><strong>發文請京元改 RPTID 524 綁定</strong>，並加訂我們已在發的 16 個事件</td><td><strong>需京元</strong></td><td><strong>零（我方）</strong></td></tr>
+<tr><td>2</td><td>CEID 78 —— <strong>已裁定並實作完成</strong>：jam-SKIP 路徑加操作員輸入框 + SVID 37010，預設關閉 <code>[SECS] AskSkipICCount=false</code></td><td><strong style="color:var(--good)">✅ 8082f0f</strong></td><td>已完成（上機待驗）</td></tr>
+<tr><td>3</td><td>CEID 49 Tray Feed Finish（需先實作 <code>CheckAllTrayFeedFinish()</code>，目前是回 false 的 stub）</td><td>無</td><td>中</td></tr>
+</table>
+</div>
+<div class="note bad">
+  <strong>第一版列的「CEID 48、78 各補一行」已作廢</strong>：48 早已實作，78 需要新功能。
+  （CEID 78 後來經使用者裁定而實作，但它確實不是「一行發射」，而是一個帶設定旗標的新功能。）<br>
+  修訂後，這 20 個裡<strong>沒有任何一個是我方可以單方面、低成本補完的</strong>——
+  真正划算的一手在第 1 項，而且工作量在京元那邊。
+</div>
+
+<div class="foot">
+  證據來源：<code>docs/plan/onsite-0731-kyec-secs/host_links_S2F35.csv</code>（host 訂閱）、
+  2026-07-31 現場 SECS log（我方發射）、
+  <code>D:\backup_version\HT9046\KYEC\20260626\EventReport_CEID.def</code>（9045 官方 292 筆字典）、
+  <code>D:\backup_version\HT9046\KYEC\20260626\2026_06_08\</code>（9045 同址實際 log，46 種 645 則）。<br>
+  ⚠ 分類經逐條開檔覆核；工作流的對抗式複驗因 session 額度中斷未執行。
+</div>
+
+</div>
+</body>
+</html>

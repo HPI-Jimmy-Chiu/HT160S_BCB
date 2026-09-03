@@ -10,6 +10,7 @@
 #include <ComCtrls.hpp>
 #include <Grids.hpp>
 #include <Buttons.hpp>
+#include <CheckLst.hpp>
 #include <Dialogs.hpp>
 #include <Menus.hpp>
 #include <Db.hpp>
@@ -25,12 +26,19 @@
 #include <jpeg.hpp>
 #include "ALed.hpp"
 //---------------------------------------------------------------------------
+// AI(general) 20260613 : The IO Table editor controls and their event handlers
+// were formerly created at runtime in EnsureIOTableEditor(); they now stream from
+// iosetview.dfm (inside pn_IODatabase) so they live in __published below (controls
+// + handlers must be __published for TReader::MethodAddress to resolve them).
+// bIOTableEditorReady (private) guards the one-time grid setup + initial load.
+// IMPORTANT: keep the __published section free of comments - the BCB6 form designer
+// parses this header on event clicks and raises "Incorrect method declaration in
+// class Tfiosetview" if it meets a comment among the members. Put notes out here.
 class Tfiosetview : public TForm
 {
 __published:
     TPanel *pn_IOSetViewMenu;
     TSpeedButton *sbIOExit;
-    TRadioButton *rbGeneralIO;
     TPageControl *PageIO;
     TTabSheet *ts_IOLoader;
     TGroupBox *GroupBox1;
@@ -39,8 +47,6 @@ __published:
     TEdit *ed_OutPort_1;
     TCheckBox *cbToolBit0;
     TComboBox *ComboBox1;
-    TDBNavigator *DBNavigator1;
-    TDBGrid *DBGrid1;
     TStringGrid *OutputInformationGrid;
     TMemo *MemoIOMap;
     TTable *ioTable;
@@ -50,12 +56,475 @@ __published:
     TDataSource *DataSource1;
     TPopupMenu *PopupMenu1;
     TMenuItem *SaveInputMap1;
-    TMyLed *MyLed1;
-    TBtnPanel *btnpnl1;
+    TMyLed *mlSnEmpty_InputEnd;
+    TMyLed *mlSnAuto1_InputEnd;
+    TMyLed *mlSnAuto2_InputEnd;
+    TMyLed *mlSnAuto3_InputEnd;
+    TMyLed *mlSnAuto4_InputEnd;
+    TMyLed *mlSnAuto5_InputEnd;
+    TMyLed *mlSnAuto6_InputEnd;
+    TBtnPanel *bpC_Empty_FrontRiseTray_2;
     TALed *ALedTool0;
-    TMyLed *MyLed36;
-    TMyLed *MyLed37;
-    TBtnPanel *BtnPanel6;
+    TMyLed *mlSnColor_InputEnd;
+    TMyLed *mlC_Color_FrontRiseTray_2_On;
+    TBtnPanel *bpC_Color_FrontRiseTray_2;
+    TTabSheet *tsMN200;
+    TLabel *lblMN200Summary;
+    TStringGrid *grdMN200;
+    TPanel *pnIOTableEditorToolbar;
+    TLabel *lblIOType;
+    TLabel *lblIOLane;
+    TLabel *lblIOSearch;
+    TComboBox *cbbType;
+    TComboBox *cbbLane;
+    TEdit *edtSearchIO;
+    TSpeedButton *btnAddIO;
+    TSpeedButton *btnDeleteIO;
+    TSpeedButton *btnModify;
+    TSpeedButton *sbUpdate;
+    TSpeedButton *sbIOEditorRefresh;
+    TStringGrid *strngrdIoTable;
+    TBtnPanel *bpC_Empty_FrontSeparateTray_1;
+    TMyLed *mlSnLoader_InputFullTray;
+    TMyLed *mlC_Empty_FrontRiseTray_1_On;
+    TMyLed *mlC_Empty_FrontRiseTray_2_On;
+    TMyLed *mlC_Empty_PushTray_On;
+    TMyLed *mlC_Empty_PushTray_Off;
+    TMyLed *mlC_Empty_LeanOnTray_On;
+    TMyLed *mlC_Empty_LeanOnTray_Off;
+    TMyLed *mlSnEmpty_InputHasTray;
+    TMyLed *mlSnEmpty_InputFullTray;
+    TMyLed *mlSnEmpty_OutputBottomHasTray;
+    TMyLed *mlC_Empty_FrontRiseTray_1_Off;
+    TBtnPanel *bpC_Empty_LeanOnTray;
+    TBtnPanel *bpC_Empty_FrontRiseTray_1;
+    TBtnPanel *bpC_Empty_PushTray;
+    TMyLed *mlSnLoader_InputHasTray;
+    TMyLed *mlSnLoader_OutputBottomHasTray;
+    TMyLed *mlSnLoader_TrayPos1;
+    TMyLed *mlSnLoader_TrayPos2;
+    TMyLed *mlC_Loader_FrontRiseTray_2_On;
+    TMyLed *mlC_Loader_FrontRiseTray_1_On;
+    TMyLed *mlSnLoader_Inputend;
+    TMyLed *mlC_Loader_FrontRiseTray_1_Off;
+    TBtnPanel *bpC_Loader_FrontSeparateTray_1;
+    TMyLed *mlC_Loader1_PushTray_Off;
+    TMyLed *mlC_Loader1_PushTray_On;
+    TMyLed *mlC_Loader1_LeanOnTray_On;
+    TMyLed *mlC_Loader1_LeanOnTray_Off;
+    TBtnPanel *bpC_Loader1_PushTray;
+    TBtnPanel *bpC_Loader1_LeanOnTray;
+    TMyLed *mlC_Loader2_PushTray_Off;
+    TMyLed *mlC_Loader2_PushTray_On;
+    TMyLed *mlC_Loader2_LeanOnTray_On;
+    TMyLed *mlC_Loader2_LeanOnTray_Off;
+    TBtnPanel *bpC_Loader2_PushTray;
+    TBtnPanel *bpC_Loader2_LeanOnTray;
+    TBtnPanel *bpC_Loader_FrontRiseTray_2;
+    TBtnPanel *bpC_Loader_FrontRiseTray_1;
+    TMyLed *mlC_TrayArm_FrontClamp_On;
+    TMyLed *mlC_TrayArm_FrontClamp_Off;
+    TMyLed *mlC_TrayArmZ_Up_On;
+    TMyLed *mlC_TrayArmZ_Down_On;
+    TMyLed *mlC_TrayArm_RearClamp_On;
+    TMyLed *mlC_TrayArm_RearClamp_Off;
+    TBtnPanel *bpC_TrayArmZ_Down;
+    TBtnPanel *bpC_TrayArm_FrontClamp;
+    TBtnPanel *bpC_TrayArm_RearClamp;
+    TBtnPanel *bpC_TrayArmZ_Up;
+    TMyLed *mlC_Auto1_FrontRiseTray_Off;
+    TMyLed *mlC_Auto1_FrontRiseTray_On;
+    TMyLed *mlC_Auto1_PushTray_On;
+    TMyLed *mlC_Auto1_PushTray_Off;
+    TMyLed *mlC_Auto1_LeanOnTray_On;
+    TMyLed *mlC_Auto1_LeanOnTray_Off;
+    TMyLed *mlSnAuto1_InputHasTray;
+    TMyLed *mlSnAuto1_InputFullTray;
+    TMyLed *mlSnAuto1_OutputBottomHasTray;
+    TBtnPanel *bpC_Auto1_LeanOnTray;
+    TBtnPanel *bpC_Auto1_FrontRiseTray;
+    TBtnPanel *bpC_Auto1_PushTray;
+    TMyLed *mlC_Auto2_FrontRiseTray_Off;
+    TMyLed *mlC_Auto2_FrontRiseTray_On;
+    TMyLed *mlC_Auto2_PushTray_On;
+    TMyLed *mlC_Auto2_PushTray_Off;
+    TMyLed *mlC_Auto2_LeanOnTray_On;
+    TMyLed *mlC_Auto2_LeanOnTray_Off;
+    TMyLed *mlSnAuto2_InputHasTray;
+    TMyLed *mlSnAuto2_InputFullTray;
+    TMyLed *mlSnAuto2_OutputBottomHasTray;
+    TBtnPanel *bpC_Auto2_LeanOnTray;
+    TBtnPanel *bpC_Auto2_FrontRiseTray;
+    TBtnPanel *bpC_Auto2_PushTray;
+    TMyLed *mlC_Auto3_FrontRiseTray_Off;
+    TMyLed *mlC_Auto3_FrontRiseTray_On;
+    TMyLed *mlC_Auto3_PushTray_On;
+    TMyLed *mlC_Auto3_PushTray_Off;
+    TMyLed *mlC_Auto3_LeanOnTray_On;
+    TMyLed *mlC_Auto3_LeanOnTray_Off;
+    TMyLed *mlSnAuto3_InputHasTray;
+    TMyLed *mlSnAuto3_InputFullTray;
+    TMyLed *mlSnAuto3_OutputBottomHasTray;
+    TBtnPanel *bpC_Auto3_LeanOnTray;
+    TBtnPanel *bpC_Auto3_FrontRiseTray;
+    TBtnPanel *bpC_Auto3_PushTray;
+    TMyLed *mlC_Auto4_FrontRiseTray_Off;
+    TMyLed *mlC_Auto4_FrontRiseTray_On;
+    TMyLed *mlC_Auto4_PushTray_On;
+    TMyLed *mlC_Auto4_PushTray_Off;
+    TMyLed *mlC_Auto4_LeanOnTray_On;
+    TMyLed *mlC_Auto4_LeanOnTray_Off;
+    TMyLed *mlSnAuto4_InputHasTray;
+    TMyLed *mlSnAuto4_InputFullTray;
+    TMyLed *mlSnAuto4_OutputBottomHasTray;
+    TBtnPanel *bpC_Auto4_LeanOnTray;
+    TBtnPanel *bpC_Auto4_FrontRiseTray;
+    TBtnPanel *bpC_Auto4_PushTray;
+    TMyLed *mlC_Auto5_FrontRiseTray_Off;
+    TMyLed *mlC_Auto5_FrontRiseTray_On;
+    TMyLed *mlC_Auto5_PushTray_On;
+    TMyLed *mlC_Auto5_PushTray_Off;
+    TMyLed *mlC_Auto5_LeanOnTray_On;
+    TMyLed *mlC_Auto5_LeanOnTray_Off;
+    TMyLed *mlSnAuto5_InputHasTray;
+    TMyLed *mlSnAuto5_InputFullTray;
+    TMyLed *mlSnAuto5_OutputBottomHasTray;
+    TBtnPanel *bpC_Auto5_LeanOnTray;
+    TBtnPanel *bpC_Auto5_FrontRiseTray;
+    TBtnPanel *bpC_Auto5_PushTray;
+    TMyLed *mlC_Auto6_FrontRiseTray_Off;
+    TMyLed *mlC_Auto6_FrontRiseTray_On;
+    TMyLed *mlC_Auto6_PushTray_On;
+    TMyLed *mlC_Auto6_PushTray_Off;
+    TMyLed *mlC_Auto6_LeanOnTray_On;
+    TMyLed *mlC_Auto6_LeanOnTray_Off;
+    TMyLed *mlSnAuto6_InputHasTray;
+    TMyLed *mlSnAuto6_InputFullTray;
+    TMyLed *mlSnAuto6_OutputBottomHasTray;
+    TBtnPanel *bpC_Auto6_LeanOnTray;
+    TBtnPanel *bpC_Auto6_FrontRiseTray;
+    TBtnPanel *bpC_Auto6_PushTray;
+    TMyLed *mlC_Color_FrontRiseTray_1_Off;
+    TMyLed *mlC_Color_FrontRiseTray_1_On;
+    TMyLed *mlC_Color_PushTray_On;
+    TMyLed *mlC_Color_PushTray_Off;
+    TMyLed *mlC_Color_LeanOnTray_On;
+    TMyLed *mlC_Color_LeanOnTray_Off;
+    TMyLed *mlSnColor_InputHasTray;
+    TMyLed *mlSnColor_InputFullTray;
+    TMyLed *mlSnColor_OutputBottomHasTray;
+    TMyLed *mlSnColor_TrayPos1;
+    TBtnPanel *bpC_Color_LeanOnTray;
+    TBtnPanel *bpC_Color_FrontRiseTray_1;
+    TBtnPanel *bpC_Color_PushTray;
+    TBtnPanel *bpC_Color_FrontSeparateTray_1;
+    TMyLed *mlSuck1;
+    TBtnPanel *bpSuck1_On;
+    TBtnPanel *bpSuck1_Off;
+    TMyLed *mlSuck2;
+    TBtnPanel *bpSuck2_On;
+    TBtnPanel *bpSuck2_Off;
+    TMyLed *mlSuck3;
+    TBtnPanel *bpSuck3_On;
+    TBtnPanel *bpSuck3_Off;
+    TMyLed *mlSuck4;
+    TBtnPanel *bpSuck4_On;
+    TBtnPanel *bpSuck4_Off;
+    TBtnPanel *bpSwTowerRed;
+    TBtnPanel *bpSwTowerYellow;
+    TBtnPanel *bpSwTowerGreen;
+    TBtnPanel *bpSwMusic1;
+    TBtnPanel *bpSwMusic2;
+    TBtnPanel *bpSwMusic3;
+    TBtnPanel *bpSwMusic4;
+    TMyLed *mlSnMotorPower;
+    TMyLed *mlSnEMG;
+    TMyLed *mlSnEMG_1;
+    TMyLed *mlSnEMG_2;
+    TMyLed *mlSnEMG_3;
+    TMyLed *mlSnEMG_4;
+    TMyLed *mlSnSafeDoorFront;
+    TMyLed *mlSnSafeSlideDoorLeft;
+    TMyLed *mlSnSafeSlideDoorRight;
+    TMyLed *mlSnSafeDoorLeft;
+    TMyLed *mlSnSafeDoorRight;
+    TMyLed *mlSnSafeAuto6;
+    TBtnPanel *bpSwMotorRelay;
+    TBtnPanel *bpSwLight;
+    TMyLed *mlSnSafeLock;
+    TMyLed *mlSnAirIsEnough;
+    TMyLed *mlSnIonFan_Power;
+    TMyLed *mlSnIonFan_Balance;
+    TMyLed *mlSnRKPowerOff;
+    TMyLed *mlSnRKPowerOn;
+    TMyLed *mlSnRKStart;
+    TMyLed *mlSnRKHome;
+    TMyLed *mlSnRKPause;
+    TMyLed *mlSnRKReset;
+    TMyLed *mlSnRKCleanOut;
+    TMyLed *mlSnRKSkip;
+    TMyLed *mlSnRKRetry;
+    TMyLed *mlSnRKOneCycle;
+    TMyLed *mlSnRKAlarmReset;
+    TMyLed *mlSnRKTray;
+    TMyLed *mlSnRKTrayFeed;
+    TMyLed *mlSnRearPadActive;
+    TMyLed *mlSnRKManualStep;
+    TMyLed *mlSnRKManualTStart;
+    TBtnPanel *bpSwRKPowerOff;
+    TBtnPanel *bpSwRKPowerOn;
+    TBtnPanel *bpSwRKReset;
+    TBtnPanel *bpSwRKPause;
+    TBtnPanel *bpSwRKHome;
+    TBtnPanel *bpSwRKStart;
+    TBtnPanel *bpSwRKOneCycle;
+    TBtnPanel *bpSwRKRetry;
+    TBtnPanel *bpSwRKSkip;
+    TBtnPanel *bpSwRKCleanOut;
+    TBtnPanel *bpSwRKTrayFeed;
+    TBtnPanel *bpSwRKTrayEnd;
+    TBtnPanel *bpSwRKAlarmReset;
+    TBtnPanel *bpSwRKManualStep;
+    TBtnPanel *bpSwRKManualTStart;
+    TPageControl *PageControl1;
+    TTabSheet *TabSheet1;
+    TPanel *Panel11;
+    TPanel *Panel97;
+    TPanel *Panel4;
+    TPanel *Panel6;
+    TPanel *Panel8;
+    TPanel *Panel10;
+    TPanel *Panel7;
+    TPanel *Panel5;
+    TPanel *Panel9;
+    TPanel *Panel12;
+    TPanel *Panel15;
+    TPanel *Panel13;
+    TPanel *Panel14;
+    TPanel *Panel52;
+    TPanel *Panel53;
+    TPanel *Panel98;
+    TPanel *Panel99;
+    TPanel *Panel100;
+    TPanel *Panel101;
+    TPanel *Panel102;
+    TGroupBox *GroupBox2;
+    TPanel *Panel28;
+    TPanel *Panel29;
+    TPanel *Panel32;
+    TPanel *pnl7;
+    TPanel *pnl8;
+    TTabSheet *ts_IOTapeLoadUnload;
+    TPageControl *PageControl2;
+    TTabSheet *TabSheet3;
+    TPanel *Panel22;
+    TPanel *Panel23;
+    TPanel *Panel24;
+    TPanel *Panel25;
+    TPanel *Panel26;
+    TPanel *Panel27;
+    TPanel *Panel16;
+    TPanel *Panel17;
+    TPanel *Panel18;
+    TPanel *Panel19;
+    TPanel *Panel20;
+    TPanel *Panel21;
+    TPanel *Panel31;
+    TPanel *Panel42;
+    TPanel *Panel43;
+    TPanel *Panel54;
+    TPanel *Panel66;
+    TPanel *Panel67;
+    TPanel *Panel68;
+    TPanel *Panel71;
+    TPanel *Panel72;
+    TPanel *Panel73;
+    TPanel *Panel103;
+    TPanel *Panel104;
+    TPanel *Panel105;
+    TPanel *Panel106;
+    TPanel *Panel107;
+    TTabSheet *TabSheet2;
+    TPanel *Panel108;
+    TPanel *Panel109;
+    TPanel *Panel110;
+    TPanel *Panel111;
+    TPanel *Panel112;
+    TPanel *Panel113;
+    TPanel *Panel114;
+    TPanel *Panel115;
+    TPanel *Panel116;
+    TPanel *Panel117;
+    TPanel *Panel118;
+    TPanel *Panel119;
+    TPanel *Panel120;
+    TPanel *Panel121;
+    TPanel *Panel122;
+    TPanel *Panel123;
+    TPanel *Panel124;
+    TPanel *Panel125;
+    TPanel *Panel126;
+    TPanel *Panel127;
+    TPanel *Panel128;
+    TPanel *Panel131;
+    TPanel *Panel132;
+    TPanel *Panel141;
+    TPanel *Panel143;
+    TPanel *Panel144;
+    TPanel *Panel145;
+    TPanel *Panel146;
+    TPanel *Panel147;
+    TPanel *Panel148;
+    TPanel *Panel149;
+    TPanel *Panel150;
+    TPanel *Panel151;
+    TPanel *Panel152;
+    TTabSheet *ts_IOTapeShuttle;
+    TPageControl *PageControl3;
+    TTabSheet *TabSheet5;
+    TPanel *Panel34;
+    TPanel *Panel35;
+    TPanel *Panel36;
+    TPanel *Panel37;
+    TPanel *Panel38;
+    TPanel *Panel39;
+    TPanel *Panel30;
+    TPanel *Panel33;
+    TPanel *Panel40;
+    TPanel *Panel41;
+    TPanel *Panel44;
+    TPanel *Panel45;
+    TPanel *Panel55;
+    TPanel *Panel56;
+    TPanel *Panel57;
+    TPanel *Panel58;
+    TTabSheet *ts_IOPanel;
+    TPanel *pn_IOPanel;
+    TPanel *pn_PanelFrontOb;
+    TSpeedButton *sb_IO_CommunicationPad;
+    TPanel *pn_PanelLampTitle;
+    TPanel *pn_PanelMusicTitle;
+    TPanel *pn_PanelLamp;
+    TPanel *pn_PanelMusic;
+    TTabSheet *ts_IOSystem;
+    TPanel *Panel129;
+    TPanel *Panel130;
+    TPanel *Panel173;
+    TPanel *Panel171;
+    TPanel *Panel172;
+    TPanel *Panel174;
+    TPanel *pnl1;
+    TPanel *pnl2;
+    TPanel *pnl3;
+    TPanel *pnl4;
+    TPanel *pnl5;
+    TPanel *pnl6;
+    TPanel *pnl9;
+    TPanel *Panel175;
+    TLabel *Label2;
+    TLabel *Label3;
+    TLabel *Label4;
+    TTabSheet *ts_IOTool;
+    TPanel *pn_IOTool;
+    TPanel *pn_ToolTitle;
+    TPanel *pn_IOTool1;
+    TLabel *lb_IOToolOBCard;
+    TLabel *lb_IOToolOBPort;
+    TLabel *lb_IOToolOBOut;
+    TLabel *lb_IOToolOBIn;
+    TALed *ALedTool1;
+    TALed *ALedTool2;
+    TALed *ALedTool3;
+    TALed *ALedTool4;
+    TALed *ALedTool5;
+    TALed *ALedTool6;
+    TALed *ALedTool7;
+    TEdit *ed_OutCard_1;
+    TEdit *ed_InCard_1;
+    TEdit *ed_InPort_1;
+    TCheckBox *cbToolBit1;
+    TCheckBox *cbToolBit2;
+    TCheckBox *cbToolBit3;
+    TCheckBox *cbToolBit4;
+    TCheckBox *cbToolBit5;
+    TCheckBox *cbToolBit6;
+    TCheckBox *cbToolBit7;
+    TCheckBox *cbToolLoop0;
+    TCheckBox *cbToolLoop1;
+    TCheckBox *cbToolLoop2;
+    TCheckBox *cbToolLoop3;
+    TCheckBox *cbToolLoop4;
+    TCheckBox *cbToolLoop5;
+    TCheckBox *cbToolLoop6;
+    TCheckBox *cbToolLoop7;
+    TPanel *pn_IOTool2;
+    TLabel *lb_IOToolOBCard1;
+    TLabel *lb_IOToolOBPort1;
+    TLabel *lb_IOToolOBOut1;
+    TLabel *lb_IOToolOBIn1;
+    TALed *ALedTool8;
+    TALed *ALedTool9;
+    TALed *ALedTool10;
+    TALed *ALedTool11;
+    TALed *ALedTool12;
+    TALed *ALedTool13;
+    TALed *ALedTool14;
+    TALed *ALedTool15;
+    TEdit *ed_OutPort_2;
+    TEdit *ed_OutCard_2;
+    TEdit *ed_InCard_2;
+    TEdit *ed_InPort_2;
+    TCheckBox *cbToolBit8;
+    TCheckBox *cbToolBit9;
+    TCheckBox *cbToolBit10;
+    TCheckBox *cbToolBit11;
+    TCheckBox *cbToolBit12;
+    TCheckBox *cbToolBit13;
+    TCheckBox *cbToolBit14;
+    TCheckBox *cbToolBit15;
+    TCheckBox *cbToolLoop8;
+    TCheckBox *cbToolLoop9;
+    TCheckBox *cbToolLoop10;
+    TCheckBox *cbToolLoop11;
+    TCheckBox *cbToolLoop12;
+    TCheckBox *cbToolLoop13;
+    TCheckBox *cbToolLoop14;
+    TCheckBox *cbToolLoop15;
+    TPanel *pn_IOTool3;
+    TSpeedButton *sbEnableIOChang;
+    TLabel *lb_IOToolOB1;
+    TLabel *lb_IOToolOB2;
+    TTabSheet *ts_IODatabase;
+    TPanel *pn_IODatabase;
+    TTabSheet *ts_IOMap;
+    TPanel *pn_IOMap;
+    TLabel *lb_IOMapOB1;
+    TPanel *lb_IOMapOBInputMap;
+    TPanel *lb_IOMapOBOutputMap;
+    TStringGrid *InputInformationGrid;
+    TTabSheet *ts_IOOthers;
+    TPanel *pn_PanelRearTitle;
+    TPanel *pn_PanelRearOb;
+    TLabel *lb_PanelRearPower;
+    TLabel *lb_PanelFrontRear;
+    TPanel *plIOForm;
+    TMenuItem *SaveOutputMap1;
+    TTabSheet *ts_IOSelfTest;
+    TRadioGroup *rgSelfTestMode;
+    TPanel *pnSelfTestPrecond;
+    TPanel *pnSelfTestDetect;
+    TLabel *lblSelfTestDetectHdr;
+    TCheckListBox *clbSelfTestItems;
+    TButton *btnSelfTestSelectAll;
+    TButton *btnSelfTestSelectNone;
+    TButton *btnSelfTestStart;
+    TButton *btnSelfTestStop;
+    TLabel *lblSelfTestProgress;
+    TPanel *pnSelfTestResult;
+    TLabel *lblSelfTestResultHdr;
+    TStringGrid *grdSelfTest;
+    TLabel *lblSelfTestSummary;
+    TMemo *memSelfTestLog;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall BtnPanelClick(TObject *Sender);
     void __fastcall ComboBox1Change(TObject *Sender);
@@ -68,85 +537,53 @@ __published:
     void __fastcall sbInputClick(TObject *Sender);
     void __fastcall sbIOExitClick(TObject *Sender);
     void __fastcall sbIORefreshClick(TObject *Sender);
-    void __fastcall sbIORingLoadClick(TObject *Sender);
     void __fastcall sbOutputClick(TObject *Sender);
     void __fastcall sbVacuumClick(TObject *Sender);
-    void __fastcall spbTerminalProgramClick(TObject *Sender);
     void __fastcall Timer1Timer(TObject *Sender);
-    void __fastcall tmr_IonFanTimer(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
+    void __fastcall btnAddIOClick(TObject *Sender);
+    void __fastcall btnDeleteIOClick(TObject *Sender);
+    void __fastcall btnModifyClick(TObject *Sender);
+    void __fastcall sbUpdateClick(TObject *Sender);
+    void __fastcall cbbTypeChange(TObject *Sender);
+    void __fastcall edtSearchIOChange(TObject *Sender);
+    void __fastcall strngrdIoTableDblClick(TObject *Sender);
+    void __fastcall strngrdIoTableSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
+    void __fastcall rgSelfTestModeClick(TObject *Sender);
+    void __fastcall btnSelfTestSelectAllClick(TObject *Sender);
+    void __fastcall btnSelfTestSelectNoneClick(TObject *Sender);
+    void __fastcall btnSelfTestStartClick(TObject *Sender);
+    void __fastcall btnSelfTestStopClick(TObject *Sender);
 private:
-    // The members below are NOT present in iosetview.dfm; they belong to the
-    // code-built (dynamic) IO view UI created in BuildUI()/EnsureIOTableEditor().
-    // They MUST stay out of __published, otherwise the BCB6 IDE Form Designer
-    // reports "Incorrect method declaration in class Tfiosetview" when it
-    // reconciles __published against the DFM (the bcc32 command-line build is
-    // unaffected either way). //AI(general) 20260603
-    TPanel *palHeader;
-    TLabel *lblTitle;
-    TLabel *lblSummary;
-    TLabel *lblSelected;
-    TCheckBox *chkManualOutput;
-    TButton *btnRefresh;
-    TButton *btnOutputOn;
-    TButton *btnOutputOff;
-    TButton *btnSuckerDestroy;
-    TPageControl *PageControl;
-    TTabSheet *tsSensors;
-    TTabSheet *tsCylinders;
-    TTabSheet *tsSwitches;
-    TTabSheet *tsSuckers;
-    TTabSheet *tsIOTable;
-    TPanel *pnIOTableEditorToolbar;
-    TComboBox *cbbType;
-    TComboBox *cbbLane;
-    TEdit *edtSearchIO;
-    TSpeedButton *btnAddIO;
-    TSpeedButton *btnDeleteIO;
-    TSpeedButton *btnModify;
-    TSpeedButton *sbUpdate;
-    TStringGrid *strngrdIoTable;
     TStringList *IOTableDeletedTags;
     TStringList *ManualOutputLog;
-    void __fastcall btnRefreshClick(TObject *Sender);
-    void __fastcall btnOutputOnClick(TObject *Sender);
-    void __fastcall btnOutputOffClick(TObject *Sender);
-    void __fastcall btnSuckerDestroyClick(TObject *Sender);
-    void __fastcall chkManualOutputClick(TObject *Sender);
-    void __fastcall GridSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
+    bool bIOTableEditorReady;
 
-    TStringGrid *grdSensors;
-    TStringGrid *grdCylinders;
-    TStringGrid *grdSwitches;
-    TStringGrid *grdSuckers;
-    TStringGrid *grdIOTable;
-
-    int SelectedKind;
-    int SelectedIndex;
-    int SelectedRow;
-    int SelectedCol;
     int iSelectRow;
     int iSelectCol;
 
-    void BuildUI();
-    void BuildHeader();
-    void BuildPages();
-    void SetupGrid(TStringGrid *Grid, int ColCount, const char **Headers, const int *Widths);
-    TStringGrid *CreateGrid(TWinControl *Parent, int ColCount, const char **Headers, const int *Widths);
-    void RefreshAll();
+    //AI(general) 20260617 : output state backup/restore on IO view exit (HT172 ref).
+    //BackupOutputData snapshots every switch/cylinder/sucker output on FormShow;
+    //RestoreOutputData writes them back if the operator toggled anything (bOutDataChange)
+    //and confirms restore on FormClose. Mirrors HT172 BackUpOutputData/RestoreOutputData.
+    bool bOutDataChange;
+    bool *bBackSwitchPortData;
+    bool *bBackCylinderPortData;
+    bool *bBackSuckPortData;
+    int iBackSwitchCount;
+    int iBackCylinderCount;
+    int iBackSuckCount;
+    void BackupOutputData();
+    void RestoreOutputData();
+    void FreeOutputBackup();
+
     void RefreshCurrentView();
-    void RefreshSummary();
-    void RefreshSensors();
-    void RefreshCylinders();
-    void RefreshSwitches();
-    void RefreshSuckers();
-    void RefreshIOTable();
+    void RefreshMN200();
     void RefreshLegacyIOControls();
     void RefreshLegacyIOMaps();
     void SetLegacyComponentHints();
     void SetLegacyComponentHints(TWinControl *PCtrl);
     void EnsureIOTableEditor();
-    void HideLegacyIOTableEditor();
     void SetupIOTableEditorGrid();
     void LoadIoTable(int iType, int iLane, int iIP);
     void SaveIoTableFromGrid();
@@ -156,6 +593,7 @@ private:
     bool ValidateIOTableGrid(TStringList *Errors);
     bool ValidateIOTableRow(int Row, TStringList *Errors);
     bool BackupIOTableFile(AnsiString *BackupFile);
+    void PruneIOTableBackups(AnsiString BackupDir, int MaxKeep);
     bool IsIOTableGridRowBlank(int Row);
     bool RowMatchesIOTableFilter(TIODATA *Data, int TypeFilter, int LaneFilter, AnsiString SearchText);
     int FindIOTableGridRowByTag(int Tag);
@@ -190,46 +628,81 @@ private:
     void SaveIOMap(bool InputSide);
     bool ResolveLegacyLedState(AnsiString AliasName, bool *State);
     bool ResolveLegacyButtonState(AnsiString AliasName, bool *State);
-    void UpdateSelectedInfo();
-    void UpdateManualButtons();
     TPageControl *GetLegacyPageIO();
-    void SelectLegacyIOPageByButton(TSpeedButton *Button);
     void UpdateLegacyPageTabsVisible();
     void ClearGridRows(TStringGrid *Grid);
     void SetGridRowCount(TStringGrid *Grid, int RowCount);
-    int CountIOType(AnsiString TypeName);
-    TIODATA *GetIODataByFilteredRow(AnsiString TypeName, int RowIndex);
-    AnsiString FormatAddress(int Lane, int IP, int Port, int Bit);
-    AnsiString FormatIODataAddress(TIODATA *Data);
-    AnsiString FormatIODriver(TIODATA *Data);
-    AnsiString FormatIODriver(TMyIo *IOPtr);
-    AnsiString FormatSensor(TMySensor *Sensor);
-    AnsiString FormatSwitch(TMySwitch *SwitchPtr);
-    AnsiString FormatEnable(bool Flag);
-    AnsiString FormatEnableInt(int Flag);
-    AnsiString FormatOnOff(bool Flag);
-    bool IsManualOutputEnabled();
-    bool CanManualOutput(AnsiString *Reason);
-    bool CanLegacyManualOutput(AnsiString *Reason);
-    void ShowManualOutputBlocked(AnsiString Reason);
-    bool GetSelectedSwitch(TMySwitch **SwitchPtr);
-    bool GetSelectedCylinder(TMyCylinder **CylinderPtr);
-    bool GetSelectedSucker(TMySucker **SuckerPtr);
-    bool IsLegacyGeneralIOMode();
     bool ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr);
     void SetRefreshTimerEnabled(bool Enabled);
-    void __fastcall btnAddIOClick(TObject *Sender);
-    void __fastcall btnDeleteIOClick(TObject *Sender);
-    void __fastcall btnModifyClick(TObject *Sender);
-    void __fastcall sbUpdateClick(TObject *Sender);
-    void __fastcall cbbTypeChange(TObject *Sender);
-    void __fastcall edtSearchIOChange(TObject *Sender);
-    void __fastcall strngrdIoTableDblClick(TObject *Sender);
-    void __fastcall strngrdIoTableSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
+    TBtnPanel *palSuckAll;
+    TBtnPanel *palDestroyAll;
+    TBtnPanel *palAllOff;
+    void CreateSuckerGroupButtons();
+    void __fastcall SuckGroupAllClick(TObject *Sender);
+
+    //AI 20260713 : ts_IOSelfTest Feature A - cylinder auto-poll. The run drives each
+    //selected cylinder out->in with the SAME manual-output idiom the IO view already
+    //uses (TMyCylinder::On()/Off(), see ToggleLegacyButtonOutput) and confirms travel
+    //with its OWN per-phase wall-clock deadline + OnSensor/OffSensor read. It does NOT
+    //use Push()/Pop(): on timeout those queue a numbered cylinder alarm into HAlarm,
+    //but MainProc is suspended while this view is visible (csystem.cpp fiosetview->Visible
+    //early-return), so those alarms would only batch-pop when the view closes. Keeping
+    //pass/fail in grdSelfTest/memSelfTestLog avoids polluting the live machine alarm queue.
+    bool bSelfTestRunning;
+    int  iSelfTestCursor;              // 0..HSys.iTotalCylinder-1, cylinder under test
+    int  iSelfTestPhase;              // 0=begin, 1=wait-extend, 2=wait-retract
+    int  iSelfTestRow;               // next grdSelfTest result row to write (>=1)
+    unsigned long dwSelfTestPhaseStart;   // GetTickCount at phase entry (wrap-safe diff)
+    int  iSelfTestPass;
+    int  iSelfTestFail;
+    int  iSelfTestSkip;
+    bool bStExtendConfirmed;
+    bool bStExtendTimeout;
+    bool bStRetractConfirmed;
+    bool bStRetractTimeout;
+    void SelfTestPopulateItems();
+    void SelfTestSetupGrid(int SelCount);
+    bool SelfTestPrecondition(AnsiString *Why);
+    bool SelfTestTierIsReal();
+    AnsiString SelfTestTierName();
+    int  SelfTestCountSelected();
+    int  SelfTestPhaseDeadline(TMyCylinder *Cyl, bool Extend);
+    void SelfTestStart();
+    void SelfTestStop(bool bByOperator);
+    void SelfTestCylinderTick();
+    void SelfTestFinishCurrentCylinder();
+    void SelfTestUpdateProgress();
+    void SelfTestUpdateSummary();
+    void SelfTestSetButtonsRunning(bool Running);
+    void SelfTestLog(AnsiString Line);
+    int  iSelfTestActiveMode;   // 0=cylinder, 1=sensor : the mode the running test uses
+
+    //AI 20260713 : ts_IOSelfTest Feature B - sensor guided (dual-edge dwell) verify. Watches
+    //every selected sensor in parallel; each PASSES once it has been held in BOTH states
+    //(ON and OFF) continuously for SELFTEST_SENSOR_HOLD_MS (ion-fan absolute-time latch idiom,
+    //csystem.cpp UpdateIonFanDebounce). Operator actuates sensors in any order; the grid
+    //fills live. It READS ONLY and drives NO output, so unlike cylinder mode it does NOT gate
+    //on EMG/door/air (the operator must open the door / reach in to trigger sensors) and has
+    //no mid-run safety abort. No physical actuation is possible under SOFT_SIMULATE -> SKIP.
+    enum { SELFTEST_MAX_SENSOR = 256 };
+    int  iSensorArrayCount;     // min(HSys.iTotalSensor, SELFTEST_MAX_SENSOR) for the run
+    int  iSensorSelTotal;       // number of selected sensors (grid rows)
+    int  iSensorSelCapable;     // selected AND confirm-capable (real IO + Enable)
+    unsigned long dwSensorLastTick;                        // gap re-arm (modal suspended the tick)
+    int  iSensorGridRow[SELFTEST_MAX_SENSOR];              // sensor index -> grid row, -1 if not selected
+    int  iSensorLastRaw[SELFTEST_MAX_SENSOR];              // last raw IsOn() (1/0), -1 = unsampled
+    unsigned long dwSensorStateSince[SELFTEST_MAX_SENSOR]; // tick the current raw state began
+    bool bSensorSeenOn[SELFTEST_MAX_SENSOR];               // observed a >=HOLD_MS ON hold
+    bool bSensorSeenOff[SELFTEST_MAX_SENSOR];              // observed a >=HOLD_MS OFF hold
+    bool SelfTestHasRealIO();
+    void SelfTestSensorStart(int SelCount);
+    void SelfTestSensorTick();
+    void SelfTestSensorFinalize();
 public:
     __fastcall Tfiosetview(TComponent* Owner);
     __fastcall ~Tfiosetview();
     bool fShow;
+    bool bFromTeach;   // true = opened from Teach -> FormClose skips restore prompt/force (HT172 Teach behavior)
 };
 //---------------------------------------------------------------------------
 extern PACKAGE Tfiosetview *fiosetview;

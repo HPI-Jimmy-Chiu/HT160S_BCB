@@ -216,10 +216,24 @@ object fNote: TfNote
         TabOrder = 5
         OnClick = BtnSkipClick
       end
+      object edtManual2D: TEdit
+        Left = 10
+        Top = 303
+        Width = 135
+        Height = 28
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -16
+        Font.Name = 'MS Sans Serif'
+        Font.Style = [fsBold]
+        ParentFont = False
+        TabOrder = 9
+        OnKeyPress = edtManual2DKeyPress
+      end
       object BtnStart: TPanel
         Tag = 7
         Left = 10
-        Top = 303
+        Top = 439
         Width = 135
         Height = 33
         BevelInner = bvRaised
@@ -237,7 +251,7 @@ object fNote: TfNote
       object BtnPause: TPanel
         Tag = 8
         Left = 10
-        Top = 353
+        Top = 489
         Width = 135
         Height = 33
         BevelInner = bvRaised
@@ -255,7 +269,7 @@ object fNote: TfNote
       object BtnOffBuzzer: TPanel
         Tag = 9
         Left = 10
-        Top = 402
+        Top = 530
         Width = 135
         Height = 33
         BevelInner = bvRaised
@@ -289,7 +303,7 @@ object fNote: TfNote
     end
   end
   object Timer1: TTimer
-    Interval = 250
+    Interval = 10
     OnTimer = Timer1Timer
     Left = 112
     Top = 472

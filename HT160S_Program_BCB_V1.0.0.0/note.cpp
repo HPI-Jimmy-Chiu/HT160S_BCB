@@ -2,10 +2,16 @@
 #include "IncludeAllHeader.h"
 #pragma hdrstop
 #include "database.h"
+#include "cEventLog.h"
 #include "cmydef.h"
 #include "csystem.h"
 #include "main.h"
 #include "mymessbox.h"
+#include "SecsGem/UsecegemMainFrom.h"
+#include "SecsGem/uHGemHT160.h"
+#include "GeneralSetting.h"   //AI(secs-skipiccount) 20260802 : [SECS] AskSkipICCount gate
+#include "uQwertyKey.h"       //AI(secs-skipiccount) 20260802 : operator numeric prompt
+#include "language.h"         //AI(secs-skipiccount) 20260802 : LangT for the prompt title
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma link "HTray"
@@ -20,6 +26,10 @@ static const TColor ALARM_COLOR=clRed;
 static const TColor SELECT_COLOR=clRed;
 static const TColor COMMAND_NORMAL=(TColor)8404992;
 static const TColor COMMAND_SKIP=(TColor)8421440;
+//AI(ht160s-maintainer) 20260627 : Note recovery-lamp blink heartbeat (HT172 FlushFlag
+//analog). Toggled every Timer1 tick (250ms) while the modal Note is up; FlushLabel
+//blinks each OFFERED recovery key's panel LED on the ON phase, solid when SELECTED.
+static bool NoteBlinkPhase=false;
 //---------------------------------------------------------------------------
 static void EnsureNote()
 {
@@ -27,39 +37,11 @@ static void EnsureNote()
         fNote=new TfNote(Application);
 }
 //---------------------------------------------------------------------------
-static AnsiString GetNoteLogFileName()
-{
-    AnsiString RootPath=HSys.LogRootDir;
-
-    if(RootPath=="")
-        RootPath=HSys.LogRootDir;
-
-    return RootPath+AnsiString("\\note\\process_")+FormatDateTime("yyyymmdd", Now())+AnsiString(".log");
-}
-//---------------------------------------------------------------------------
-static void AppendNoteLog(AnsiString S)
-{
-    TStringList *List;
-    AnsiString FileName;
-    AnsiString Line;
-
-    FileName=GetNoteLogFileName();
-    ForceDirectories(ExtractFilePath(FileName));
-    Line=FormatDateTime("yyyy/mm/dd hh:nn:ss", Now())+AnsiString(" ")+S;
-
-    List=new TStringList;
-    try
-    {
-        if(FileExists(FileName))
-            List->LoadFromFile(FileName);
-        List->Add(Line);
-        List->SaveToFile(FileName);
-    }
-    __finally
-    {
-        delete List;
-    }
-}
+//AI(HT160S-Maintainer) 20260615 : the legacy note process_*.log writer
+//(GetNoteLogFileName + AppendNoteLog, full-file rewrite, no lock) is removed.
+//Alarm / process / pass-time records now go through g_EventLog (cEventLog),
+//matching the HT172 RecordAlarmMessage -> EventLog CSV path. See note callers
+//ProcessErrMessage / RecordProcess / RecordAlarmMessagePassTime below.
 //---------------------------------------------------------------------------
 static void SetCommandButtonColor(TPanel *Panel, bool Selected)
 {
@@ -114,6 +96,7 @@ __fastcall TfNote::TfNote(TComponent* Owner)
     iBackMemo2Height=0;
     fMemoPos=false;
     sObjName="";
+    ManualText="";
     FlushPanel=NULL;
     FlushPanelColor=MACHINE_NORMAL;
     SystemError=new MyNoteStruct;
@@ -364,8 +347,28 @@ void __fastcall TfNote::FormShow(TObject *Sender)
             RecoveryButtons[Index]->Visible=((KeyCode & KeyComp[Index])!=0);
     }
 
+    //AI(ht160s-maintainer) 20260627 : do NOT set the recovery bLamp* here. While this
+    //Note is shown it is modal (ShowModal), so MainProc -> DoSystemMessage -> DoPanelLamp
+    //is suspended and a set-once here never reaches the Pad LEDs (that was the bug).
+    //FlushLabel(), pumped from Timer1Timer every 250ms tick, derives the lamps from the
+    //offered (Visible) / selected (Select[]) keys instead -- matches HT172 note.cpp.
+    if((KeyCode & K_MANUAL_2D)!=0)
+    {
+        edtManual2D->Visible=true;
+        edtManual2D->Text="";
+        try { edtManual2D->SetFocus(); } catch(...) {}
+    }
+    else
+        edtManual2D->Visible=false;
+
     if(FlushPanel!=NULL)
         FlushPanelColor=FlushPanel->Color;
+
+    //AI(HT160S-Maintainer) 20260622 : the alarm Note is modal and suspends MainProc, so the
+    //per-scan DoSystemMessage LED_ErrJam buzzer driver never runs while it is up. Kick it here
+    //so an alarm is audible the instant the screen appears (honours the OFF BUZZER latch).
+    if(bOffBuzzer==false)
+        PlayAlarmBuzzer();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
@@ -373,6 +376,12 @@ void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
     CloseBuzzerOff();
     bOffBuzzer=false;
     fShow=false;
+    //AI(ht160s-maintainer) 20260617 : prompt dismissed -> clear recovery LEDs.
+    bLampSkip=false;
+    bLampRetry=false;
+    bLampTrayFeed=false;
+    bLampTrayEnd=false;
+    bLampCleanOut=false;
     if(FlushPanel!=NULL)
         FlushPanel->Color=FlushPanelColor;
 }
@@ -380,15 +389,48 @@ void __fastcall TfNote::FormClose(TObject *Sender, TCloseAction &Action)
 void __fastcall TfNote::Timer1Timer(TObject *Sender)
 {
     static bool Blink=false;
+    //AI(ht160s-panel-sensitivity) 20260706 : Timer1 lowered 250ms->10ms (note.dfm) so
+    //physical operator-panel keys are scanned responsively while this modal Note
+    //suspends MainProc (HT172 note Timer1 is 1ms). ScanKey/FlushLabel/DoSystemMessage
+    //are per-scan idempotent (normal MainProc runs them far more often than 10ms), but
+    //the recovery-key + FlushPanel blink must stay ~2 Hz, so advance the blink phase
+    //only every 25 ticks (25 x 10ms = 250ms, the original cadence).
+    static int iBlinkDiv=0;
 
     if(fShow==false)
         return;
+
+    //AI(HT160S-Maintainer) 20260619 : physical operator-panel keys on the alarm
+    //screen (HT172 note ScanKey port). May Close() the form on Start/Pause, so
+    //re-check fShow before the blink work below.
+    ScanKey();
+    if(fShow==false)
+        return;
+
+    //AI(ht160s-maintainer) 20260627 : keep the front-panel recovery-key LEDs alive while
+    //this modal Note suspends MainProc (same reason as the FormShow PlayAlarmBuzzer kick).
+    //Toggle the blink heartbeat, recompute bLamp* from the offered/selected keys, then
+    //DoSystemMessage() pushes them to the Pad (it is the sole DoPanelLamp caller and also
+    //refreshes Start/Pause + tower light + buzzer). HT172 note.cpp Timer1 does the same
+    //(FlushLabel() then DoSystemMessage()).
+    //AI(ht160s-panel-sensitivity) 20260706 : ~250ms blink heartbeat, decoupled from
+    //the 10ms scan tick (advance both blink phases together every 25 ticks).
+    iBlinkDiv++;
+    if(iBlinkDiv>=25)
+    {
+        iBlinkDiv=0;
+        NoteBlinkPhase=!NoteBlinkPhase;
+        Blink=!Blink;
+    }
+
+    FlushLabel();
+    DoSystemMessage();
+
     if(bOffBuzzer)
         CloseBuzzerOff();
     if(FlushPanel==NULL)
         return;
 
-    Blink=!Blink;
     if(Blink)
         FlushPanel->Color=ALARM_COLOR;
     else
@@ -432,36 +474,268 @@ void __fastcall TfNote::BtnSkipClick(TObject *Sender)
     UpdateButtonStatus(Sender);
 }
 //---------------------------------------------------------------------------
+void __fastcall TfNote::edtManual2DKeyPress(TObject *Sender, char &Key)
+{
+    //AI(ht160s-ccd-manual2d) : operator hand-enters / handheld-scans the 2D code.
+    //A trailing CR (scanner terminator or Enter) commits: capture text, set the
+    //manual return code, log it, then close. Does NOT resume the machine -- only the
+    //Start button runs it (operator boundary).
+    if(Key==13)
+    {
+        Key=0;
+        if(edtManual2D->Text.Trim()=="")
+            return;
+        //AI(ht160s-ccd-2dsanitize) 20260807 : manual/handheld entry is treated like a
+        //real read, so it gets the same comma -> underscore sanitize as the Top CCD
+        //source (no-op unless enabled). The log records the sanitized form.
+        ManualText=GeneralSetting.SanitizeScanned2D(edtManual2D->Text.Trim());
+        ReturnCode=K_MANUAL_2D;
+        RecordProcess(AnsiString("MANUAL 2D entered : ")+ManualText);
+        Close();
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall TfNote::BtnStartClick(TObject *Sender)
 {
-    SoftStop=false;
-    SoftStart=true;
-    RecordProcess("START pressed");
-    Close();
+    //AI(HT160S-Maintainer) 20260623 : align with HT172/HT9045 BtnStartClick+Start
+    //gating. START (resume) only dismisses the alarm when the operator has
+    //selected one of the offered recovery keys, OR when the note offers no
+    //recovery keys at all (KeyCode==0, a pure informational message). If recovery
+    //keys ARE offered but none is selected, START does nothing so the operator
+    //cannot resume past an unaddressed alarm. Replaces the old unconditional
+    //Close() that let any alarm be cleared by a single key press.
+    int Index;
+
+    for(Index=0; Index<6; Index++)
+    {
+        if(Select[Index])
+        {
+            SoftStop=false;
+            SoftStart=true;
+            RecordProcess("START pressed");
+            Close();
+            return;
+        }
+    }
+
+    if(KeyCode==0)
+    {
+        SoftStop=false;
+        SoftStart=true;
+        RecordProcess("START pressed");
+        Close();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnPauseClick(TObject *Sender)
 {
-    SoftStart=false;
-    SoftStop=true;
-    HSys.DecStopAllMotor();
-    RecordProcess("PAUSE pressed");
-    Close();
+    //AI(HT160S-Maintainer) 20260623 : align with HT172/HT9045 BtnPauseClick
+    //gating. PAUSE (stop) only dismisses the alarm when the operator has selected
+    //one of the offered recovery keys, OR when the note offers no recovery keys
+    //(KeyCode==0). If recovery keys ARE offered but none is selected, PAUSE does
+    //nothing -- the operator MUST pick a recovery action first. Replaces the old
+    //unconditional Close() that let PAUSE clear every alarm (non-compliant).
+    int Index;
+
+    for(Index=0; Index<6; Index++)
+    {
+        if(Select[Index])
+        {
+            SoftStart=false;
+            SoftStop=true;
+            HSys.DecStopAllMotor();
+            RecordProcess("PAUSE pressed");
+            Close();
+            return;
+        }
+    }
+
+    if(KeyCode==0)
+    {
+        SoftStart=false;
+        SoftStop=true;
+        HSys.DecStopAllMotor();
+        RecordProcess("PAUSE pressed");
+        Close();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::BtnOffBuzzerClick(TObject *Sender)
 {
     bOffBuzzer=true;
     CloseBuzzerOff();
+    //AI(secs-kyec-rcmd4) 20260728 : acknowledging the buzzer also releases any SECS host
+    //panel override (S2F41 PP_MUSIC / PP_SIGNALTOWER), matching HT9045 which clears the pair
+    //from message-box / note acknowledge. Without it, Timer1 re-drives DoSystemMessage()
+    //100x/s and the override would come straight back.
+    ClearSecsPanelOverride();
     RecordProcess("OFF BUZZER pressed");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::FlushLabel()
 {
+    //AI(ht160s-maintainer) 20260627 : HT172 note.cpp FlushLabel port (reduced to the 5
+    //recovery keys that have a physical SwFK* LED -- Home/Manual2D have no panel LED, so
+    //they are not listed, exactly as HT172 omits SwRKHome from DoPanelLamp). Index order
+    //matches FormShow KeyComp / UpdateButtonStatus Select[] {SKIP,RETRY,TRAY_FEED,TRAY_END,
+    //CLEAN_OUT}. A SELECTED key is solid; an OFFERED-but-not-selected (Visible) key blinks
+    //on the NoteBlinkPhase ON half. Pushed to the Pad by the DoSystemMessage()->DoPanelLamp()
+    //call that follows in Timer1Timer.
+    TPanel *Ptr[5]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut};
+    bool   *bPtr[5]={&bLampSkip, &bLampRetry, &bLampTrayFeed, &bLampTrayEnd, &bLampCleanOut};
+    int i;
+
+    for(i=0; i<5; i++)
+    {
+        if(Select[i])
+            *bPtr[i]=true;
+        else if(NoteBlinkPhase && Ptr[i]->Visible)
+            *bPtr[i]=true;
+        else
+            *bPtr[i]=false;
+    }
+
+    //AI(HT160S-Maintainer) 20260701 : HT172 note.cpp FlushLabel Start/Pause "invitation
+    //blink" (HT172 lines 298-317). Once the operator has selected an offered recovery key,
+    //or when the alarm offers no recovery keys at all (KeyCode==0, pure acknowledge), blink
+    //the physical Start AND Pause LEDs on the NoteBlinkPhase ON half to cue "press Start to
+    //resume". DoSystemMessage yields bLampStart/bLampPause to this while fNote->fShow (see
+    //csystem.cpp), so these values reach the Pad via the DoPanelLamp() call that follows in
+    //Timer1Timer. HT160 buttons are TPanel (no on-screen FalseColor blink) -- panel LED only.
+    bool bAnySelected=false;
+    for(i=0; i<6; i++)
+    {
+        if(Select[i])
+            bAnySelected=true;
+    }
+    if((bAnySelected || KeyCode==0) && NoteBlinkPhase)
+    {
+        bLampStart=true;
+        bLampPause=true;
+    }
+    else
+    {
+        bLampStart=false;
+        bLampPause=false;
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::ScanKey()
 {
+    //AI(HT160S-Maintainer) 20260619 : HT172 note.cpp TfNote::ScanKey port. The
+    //alarm/recovery screen now responds to the physical operator panel. HT160
+    //sensors carry no Tag (unlike HT172 ScanPannelKey/.Tag), so each key is read
+    //directly and rising-edge latched so a held button fires once.
+    //AI 20260619 : read FRONT keys too (SnFK*||SnRK*). This machine is front-panel
+    //only, so the original rear-only (SnRK*) read made the alarm/recovery screen
+    //ignore every physical button. Aligned with the main run screen (ScanPanelKeys)
+    //and TfHome::ScanKey, which already read SnFK*||SnRK*.
+    //recovery keys (Skip/Retry/TrayFeed/TrayEnd/CleanOut/Home) just select the
+    //matching on-screen button (UpdateButtonStatus, same as a touch); Start and
+    //Pause run the existing click handlers. SECS events mirror HT172; HT160 has
+    //no PressReset/PressTrayEnd/HasICUnderMachine, so the nearest event is used.
+    static bool bWasStart=false;
+    static bool bWasPause=false;
+    static bool bWasSkip=false;
+    static bool bWasRetry=false;
+    static bool bWasTrayFeed=false;
+    static bool bWasTrayEnd=false;
+    static bool bWasCleanOut=false;
+    static bool bWasReset=false;
+
+    TPanel *Ptr[6]={BtnSkip, BtnRetry, BtnTrayFeed, BtnTrayEnd, BtnCleanOut, BtnHome};
+    bool bKey[6];
+    bKey[0]=HSys.Sen.SnFKSkip.IsOn()     || HSys.Sen.SnRKSkip.IsOn();
+    bKey[1]=HSys.Sen.SnFKRetry.IsOn()    || HSys.Sen.SnRKRetry.IsOn();
+    bKey[2]=HSys.Sen.SnFKTrayFeed.IsOn() || HSys.Sen.SnRKTrayFeed.IsOn();
+    bKey[3]=HSys.Sen.SnFKTrayEnd.IsOn()  || HSys.Sen.SnRKTrayEnd.IsOn();
+    bKey[4]=HSys.Sen.SnFKCleanOut.IsOn() || HSys.Sen.SnRKCleanOut.IsOn();
+    bKey[5]=HSys.Sen.SnFKHome.IsOn()     || HSys.Sen.SnRKHome.IsOn();
+
+    for(int i=0; i<6; i++)
+    {
+        if(Ptr[i]->Visible && bKey[i])
+        {
+            UpdateButtonStatus(Ptr[i]);
+            //AI(HT160S-Maintainer) 20260701 : selecting any offered recovery key from the
+            //physical panel also acknowledges the alarm buzzer, matching HT172 note.cpp:211
+            //and HT9045 note.cpp:1422 (both clear bAlarmBuzzer in this same key loop). The
+            //next Timer1 DoSystemMessage() then keeps LED_ErrJam muted; FormClose resets
+            //bOffBuzzer so the next alarm sounds again. Touch-screen selection is unchanged.
+            bOffBuzzer=true;
+        }
+    }
+
+    bool bStart=HSys.Sen.SnFKStart.IsOn()      || HSys.Sen.SnRKStart.IsOn();
+    bool bPause=HSys.Sen.SnFKPause.IsOn()      || HSys.Sen.SnRKPause.IsOn();
+    bool bReset=HSys.Sen.SnFKAlarmReset.IsOn() || HSys.Sen.SnRKAlarmReset.IsOn();
+
+    if(bStart && bWasStart==false)
+    {
+        EventReport(SECS_EVENT.DoStart);
+        BtnStartClick(this);
+    }
+    else if(bPause && bWasPause==false)
+    {
+        EventReport(SECS_EVENT.DoPause);
+        BtnPauseClick(this);
+    }
+    else if(bKey[0] && bWasSkip==false)
+    {
+        RecordProcess("SKIP pressed");
+        EventReport(SECS_EVENT.DoSkip);
+    }
+    else if(bKey[1] && bWasRetry==false)
+    {
+        RecordProcess("RETRY pressed");
+        EventReport(SECS_EVENT.DoRetry);
+    }
+    else if(bKey[2] && bWasTrayFeed==false)
+    {
+        RecordProcess("TRAY FEED pressed");
+        EventReport(SECS_EVENT.DoTrayFeed);
+    }
+    else if(bKey[3] && bWasTrayEnd==false)
+    {
+        RecordProcess("TRAY END pressed");
+        //AI(secs-ceid-align9045) 20260729 : the TRAY END key used to report DoTrayFeed, i.e.
+        //the exact same CEID as the TRAY FEED key one branch up, so the host could not tell
+        //the two panel keys apart. HT9045 has a dedicated Tray End event (CEID 31 DoTrayEnd,
+        //note.cpp DoTrayEnd) - use it. Panel behaviour is unchanged; only the reported id is.
+        EventReport(SECS_EVENT.DoTrayEnd);
+    }
+    else if(bKey[4] && bWasCleanOut==false)
+    {
+        RecordProcess("CLEAN OUT pressed");
+        EventReport(SECS_EVENT.DoCleanOut);
+    }
+    else if(bReset && bWasReset==false)
+    {
+        RecordProcess("ALARM RESET pressed");
+        EventReport(SECS_EVENT.DoAlarmReset);
+        //AI(HT160S-Maintainer) 20260701 : latch the OFF BUZZER acknowledge (HT172
+        //note.cpp bAlarmBuzzer=false / HT9045 note AlarmReset parity) so the per-scan
+        //DoSystemMessage LED_ErrJam driver stays muted. Without this latch the Timer1
+        //DoSystemMessage() call that runs right after ScanKey() re-drove the buzzer the
+        //same 250ms tick, so the physical ALARM RESET key appeared to do nothing. The
+        //on-screen Off Buzzer button already worked because it sets bOffBuzzer=true.
+        bOffBuzzer=true;
+        CloseBuzzerOff();
+        //AI(secs-kyec-rcmd4) 20260728 : the panel ALARM RESET key also releases any SECS host
+        //panel override (S2F41 PP_MUSIC / PP_SIGNALTOWER). This is HT9045's primary release
+        //site ported. The main-screen twin lives in TfMain::ScanPanelKeys for the no-dialog
+        //case, which HT9045 covers and HT160 did not.
+        ClearSecsPanelOverride();
+    }
+
+    bWasStart=bStart;
+    bWasPause=bPause;
+    bWasSkip=bKey[0];
+    bWasRetry=bKey[1];
+    bWasTrayFeed=bKey[2];
+    bWasTrayEnd=bKey[3];
+    bWasCleanOut=bKey[4];
+    bWasReset=bReset;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfNote::Start()
@@ -473,17 +747,13 @@ void __fastcall TfNote::LevelProcessErrMessage()
 {
 }
 //---------------------------------------------------------------------------
-bool __fastcall TfNote::CheckCodeIsExist(AnsiString Str)
-{
-    return false;
-}
-//---------------------------------------------------------------------------
 void __fastcall TfNote::ProcessErrMessage(AnsiString EC, AnsiString Str, int Type)
 {
     if(EC=="" && Str=="")
         return;
     RecordHappenTime=GetTickCount();
-    AppendNoteLog(AnsiString("ALARM,")+EC+AnsiString(",")+Str+AnsiString(",TYPE=")+IntToStr(Type));
+    // EventLog columns: AlarmCode=EC, Message=Str, ErrorPart="TYPE=n".
+    g_EventLog.Log(EC, Str, AnsiString("TYPE=")+IntToStr(Type));
 }
 //---------------------------------------------------------------------------
 void TfNote::GetFlushPanel(TWinControl *PCtrl, AnsiString PanelName)
@@ -528,7 +798,13 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
 {
     EnsureNote();
     if(fNote->fShow)
+    {
+        //AI(ht160s-obsv-p0) 20260720 : a second alarm raised behind an open Note modal was
+        //silently discarded (no EventLog, no SECS) - offline timelines then miss a real
+        //alarm. Record the drop; single-modal behavior unchanged.
+        RecordProcess("ALARM DROPPED (modal busy): "+Code+" "+Message);
         return 0;
+    }
 
     HSys.DecStopAllMotor();
     HSys.Sys.SystemStart=false;
@@ -537,6 +813,7 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
 
     fNote->Reset();
     fNote->KeyCode=KCode;
+    fNote->ManualText="";
     fNote->edtAlarmCode->Text=Code;
     fNote->edtAlarmMsg->Text=Message;
     fNote->Memo1->Clear();
@@ -548,8 +825,73 @@ static int ShowNoteAlarm(AnsiString Code, AnsiString Message, AnsiString Detail,
     if(fNote->FlushPanel==NULL)
         fNote->FlushPanel=fNote->pn_System;
 
-    fNote->ProcessErrMessage(Code, Message, 1);
+    //AI(ht160s-obsv-p2) 20260720 : persist the Detail (sensor expect/actual/IO line) in the
+    //EventLog Message column - it previously lived only in the on-screen Memo.
+    fNote->ProcessErrMessage(Code, (Detail!="") ? (Message+" | "+Detail) : Message, 1);
+    AlarmReport(Code, Message, true);    //AI(ht160s-secsgem) 20260625 : S5F1 alarm set
+    DWORD dwPauseStart=GetTickCount();   //AI(HT160S-Maintainer) 20260626 : measure operator pause
     fNote->ShowModal();
+    int iPauseSec=(int)((GetTickCount()-dwPauseStart)/1000);
+    AlarmReport(Code, Message, false);   //AI(ht160s-secsgem) 20260625 : S5F1 alarm clear (operator handled)
+
+    //AI(HT160S-Maintainer) 20260626 : persist the operator recovery decision + pause time
+    //into the EventLog (Recovery/PauseTime columns) so a shipped log shows how each alarm
+    //was cleared, aligning post-mortem with HT172/HT9045. ReturnCode holds one K_ bit.
+    AnsiString sRecovery;
+    switch(fNote->ReturnCode)
+    {
+        case K_SKIP:      sRecovery="SKIP";      break;
+        case K_RETRY:     sRecovery="RETRY";     break;
+        case K_TRAY_FEED: sRecovery="TRAY_FEED"; break;
+        case K_TRAY_END:  sRecovery="TRAY_END";  break;
+        case K_CLEAN_OUT: sRecovery="CLEAN_OUT"; break;
+        case K_HOME:      sRecovery="HOME";      break;
+        case K_MANUAL_2D: sRecovery="MANUAL_2D"; break;
+        default:          sRecovery="START";     break;
+    }
+    g_EventLog.LogRecovery(sRecovery, iPauseSec, Code, Message);
+
+    //AI(secs-skipiccount) 20260802 : SVID 37010 + CEID 78 "Jam Skip IC Count". When the
+    //operator clears an alarm with SKIP the machine writes material off, and KYEC's host
+    //subscribes to CEID 78 -> RPTID 517 -> {37010} to reconcile its inventory. HT9045 asks
+    //"Many ICs Taken Out From The Tray :" at the same point (note.cpp:2178) and reports what
+    //the operator typed; that TYPED number is the entire payload, which is why the prompt and
+    //the event cannot be separated - firing CEID 78 without it sends an empty report.
+    //
+    //OPT-IN, and default OFF, because this is an EXTRA DIALOG on a path the operator hits
+    //every day: General.ini [SECS] AskSkipICCount. With it off nothing here runs and the
+    //behaviour is bit-identical to before.
+    //
+    //Placed AFTER LogRecovery so the EventLog row is already written even if the operator
+    //cancels the prompt, and after ShowModal so no second modal is ever open at once.
+    //Cancel -> report nothing (an unanswered prompt is not "zero removed"; zero would be a
+    //claim we cannot make). Deliberately NOT gated on the alarm being a JAM* code: on
+    //HT-160S the inventory-relevant moment is the SKIP itself, whatever raised it - a
+    //pick-fail SKIP writes cells off exactly like a jam does.
+    if(fNote->ReturnCode==K_SKIP && GeneralSetting.bAskSkipICCount &&
+       HSys.MyGem!=NULL && fMain!=NULL && fQwertyKey!=NULL)
+    {
+        TEdit *Scratch=new TEdit(fMain);
+        try
+        {
+            Scratch->Parent=fMain;
+            Scratch->Visible=false;
+            Scratch->Text="0";
+            if(fQwertyKey->ShowQwertyKey(Scratch, N_INTEGER, 0, true, 0.0, 9999.0,
+                                         LangT("How many ICs were taken out of the tray?")))
+            {
+                int iRemoved=Scratch->Text.ToIntDef(0);
+                HSys.MyGem->ReportSkipICCount(iRemoved);
+                RecordProcess(AnsiString().sprintf("SKIP IC count : %d (alarm %s)",
+                                                   iRemoved, Code.c_str()));
+            }
+        }
+        __finally
+        {
+            delete Scratch;
+        }
+    }
+
     return fNote->ReturnCode;
 }
 //---------------------------------------------------------------------------
@@ -574,6 +916,28 @@ void ShowMotorError(AnsiString Code, AnsiString sFunc)
     ShowNoteAlarm(Code, "Motor Error", Detail, K_RETRY, "pn_System");
     fAllMotorHome=false;
     ChangeRunMode(Run_Home);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260625 : motor soft-limit alarm via the full Note panel
+//(code + message + numeric detail line), mirroring HT9045 ShowErrorMessage("WAR0154",
+//.., "X=..") for the In-Arm X limit. Detail carries the explicit target / soft-limit
+//values. RETRY lets the operator correct teach / re-home and resume.
+int ShowMotorLimitError(AnsiString Code, AnsiString Message, AnsiString Detail)
+{
+    return ShowNoteAlarm(Code, Message, Detail, K_RETRY, "pn_System");
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : motor-aware overload. Builds the Note Detail from
+//the motor NumberAlias ("[M0x] <Alias>", the Motor-view token) plus SoftLimitDetail
+//(target/now/limit), so a soft-limit alarm names the axis to open on the Motor view.
+//Caller passes the per-motor registered over-limit code pMot->AlarmName[eMotOverLimitErr].
+//NULL pMot -> empty Detail. ASCII; no C++11; AnsiString flows.
+int ShowMotorLimitError(AnsiString Code, AnsiString Message, TMyMotor *pMot, int p)
+{
+    AnsiString Detail;
+    if(pMot!=NULL)
+        Detail=pMot->NumberAlias+AnsiString("  ")+pMot->SoftLimitDetail(p);
+    return ShowNoteAlarm(Code, Message, Detail, K_RETRY, "pn_System");
 }
 //---------------------------------------------------------------------------
 int ShowSuckError(TMySucker &Ptr, int CodeType, int KCode, AnsiString HappenRegion)
@@ -702,6 +1066,66 @@ int ShowMyError(AnsiString sMyError, int KCode)
     return ShowNoteAlarm(sMyError, sMyError, "", KCode, "pn_System");
 }
 //---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260626 : code-carrying overload. Aligns the alarm to a
+//HT9045 code string (WAR/JAM/MES) shown to the operator and sent as the SECS AlarmID,
+//while sMyError keeps the human-readable detail. Legacy 1-arg form (string as both
+//code and message) is preserved for not-yet-migrated callers.
+int ShowMyError(AnsiString Code, AnsiString sMyError, int KCode)
+{
+    return ShowNoteAlarm(Code, sMyError, "", KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : Detail-carrying overload. Same as the
+//Code+message form but forwards a Detail string (e.g. a TriggerLine IO token)
+//to ShowNoteAlarm instead of hard-coding "". Code stays byte-stable (SECS ALID
+//is hashed from Code only); the IO context rides in Detail.
+int ShowMyError(AnsiString Code, AnsiString sMyError, AnsiString Detail, int KCode)
+{
+    return ShowNoteAlarm(Code, sMyError, Detail, KCode, "pn_System");
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : device-typed trigger-line token. Turns a sensor
+//into a canonical string naming its IOsetview Alias (TMySensor.Name), its address
+//(Card/Lane/IP/Port/Bit via the bound TMyIo) and expected-vs-actual state, so an
+//alarm Detail can point the operator straight at the IO point. NULL Input prints
+//addr(unbound). ASCII-only; no C++11; AnsiString flows. Non-const ref because
+//IsOn()/GetLane() etc are non-const members.
+AnsiString TriggerLine(TMySensor &Sn, bool bExpectedOn)
+{
+    AnsiString Addr;
+    if(Sn.Input==NULL)
+        Addr="addr(unbound)";
+    else
+        Addr=AnsiString().sprintf("addr(Card=%d Lane=%d IP=%d Port=%d Bit=%d)",
+                                  Sn.Input->GetCard(), Sn.Input->GetLane(),
+                                  Sn.Input->GetIP(), Sn.Input->GetPort(),
+                                  Sn.Input->GetBit());
+    AnsiString Expect;
+    if(bExpectedOn)
+        Expect="ON";
+    else
+        Expect="OFF";
+    AnsiString Actual;
+    if(Sn.IsOn())
+        Actual="ON";
+    else
+        Actual="OFF";
+    return Sn.Name + " expect=" + Expect + " actual=" + Actual + " " + Addr;
+}
+//---------------------------------------------------------------------------
+//AI(HT160S-Maintainer) 20260630 : sensor-aware overload. Injects a SHORT IO tag
+//[IO=<Alias>] into the persisted Message (EventLog + SECS ALTX) AND the FULL
+//TriggerLine into the on-screen Detail, from one TMySensor pointer. NULL pSn ->
+//no tag (safe for accessor-returned pointers). Code unchanged -> SECS ALID stable.
+int ShowMyError(AnsiString Code, AnsiString Msg, TMySensor *pSn, bool bExpectedOn, int KCode)
+{
+    if(pSn==NULL)
+        return ShowMyError(Code, Msg, KCode);
+    AnsiString Full=TriggerLine(*pSn, bExpectedOn);
+    AnsiString Msg2=Msg+" [IO="+pSn->Name+"]";
+    return ShowMyError(Code, Msg2, Full, KCode);
+}
+//---------------------------------------------------------------------------
 int ShowTNTError(int CodeType, int KCode)
 {
     return ShowNoteAlarm(AnsiString().sprintf("TNT%04d", CodeType), "TNT Error", "", KCode, "pn_TempAndTest");
@@ -722,13 +1146,10 @@ void RecordProcess(AnsiString S)
         return;
 
     LastRecord=S;
-    AppendNoteLog(AnsiString("PROCESS,")+S);
+    // Operator / process action: AlarmCode="PROCESS", Message=S.
+    g_EventLog.Log("PROCESS", S, "");
     if(fNote!=NULL && fNote->Memo1!=NULL)
         fNote->Memo1->Lines->Add(FormatDateTime("hh:nn:ss", Now())+AnsiString(" ")+S);
-}
-//---------------------------------------------------------------------------
-void LevelRecordProcess()
-{
 }
 //---------------------------------------------------------------------------
 void SearchMessage(AnsiString Code)
@@ -738,28 +1159,7 @@ void SearchMessage(AnsiString Code)
 //---------------------------------------------------------------------------
 void RecordAlarmMessagePassTime(AnsiString AlarmCode, DWORD StartTime, AnsiString HappenTime, int Type)
 {
-    AppendNoteLog(AnsiString("PASS,")+AlarmCode+AnsiString(",")+HappenTime+AnsiString(",TYPE=")+IntToStr(Type));
-}
-//---------------------------------------------------------------------------
-bool CheckAlarmIsShow()
-{
-    return true;
-}
-//---------------------------------------------------------------------------
-void SetShowAlarmLocation(int iType, int iPosition)
-{
-}
-//---------------------------------------------------------------------------
-void SetShowSuckerLocation(AnsiString sSuckerName)
-{
-}
-//---------------------------------------------------------------------------
-void ShowImageTrayFuntion()
-{
-}
-//---------------------------------------------------------------------------
-AnsiString GetRefrenceCode(AnsiString S)
-{
-    return "No Code";
+    // Alarm pass / elapsed-time record routed to EventLog.
+    g_EventLog.Log(AlarmCode, AnsiString("PASS ")+HappenTime, AnsiString("TYPE=")+IntToStr(Type));
 }
 //---------------------------------------------------------------------------

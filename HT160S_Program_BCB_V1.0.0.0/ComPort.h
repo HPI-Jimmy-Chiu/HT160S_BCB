@@ -9,7 +9,15 @@
 #include <ComCtrls.hpp>
 #include <ExtCtrls.hpp>
 #include "SPComm.hpp"
+#include "ICommPort.h"
 //---------------------------------------------------------------------------
+// AI(ht160s-maintainer) 20260615 : Bin-display LED COM support (no DFM control; the
+// port is created at runtime and wired to HSys.BinDisCtrl->CommBin). Notes kept out
+// of the class body so the BCB6 form designer never meets a comment in it:
+//   BinComm                 - the runtime-created TComm for the LED bin display.
+//   ConfigureBinDisplay()   - (re)configure that COM + its run gate.
+//   ApplyBinDisplayConfig() - push GeneralSetting per-unit text+color to the LED bin
+//                             display (old-160 startup/apply behavior; re-callable).
 class TfComPort : public TForm
 {
 __published:
@@ -19,7 +27,9 @@ __published:
     TPanel *pnlLog;
     TLabel *labPadCom;
     TLabel *labManualSend;
+    TLabel *labPadBaud;
     TComboBox *cbPadComm;
+    TComboBox *cbPadBaud;
     TButton *sbUpdate;
     TButton *spbResetCom;
     TButton *btnStopCom;
@@ -43,17 +53,23 @@ private:
     AnsiString GetWorkFileName();
     void EnsurePadInterface();
     void ConfigurePadComm();
+    int GetSelectedBaud();
+    ICommPort *BinComm;
 public:
     __fastcall TfComPort(TComponent* Owner);
     __fastcall ~TfComPort();
 
     void __fastcall SaveWorkFile();
     void __fastcall OpenWorkFile();
-    bool __fastcall RS232Init();
+    bool __fastcall RS232Init(bool bNotifyOperator=false);
+    void StopPadCom();
     void StopAllCom();
     void Spin();
+    void ConfigureBinDisplay();
+    void ApplyBinDisplayConfig();
     void MemoAddString(TMemo *Memo, AnsiString Title, AnsiString Text);
     bool bShow;
+    bool bPadAutoStarted;
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfComPort *fComPort;

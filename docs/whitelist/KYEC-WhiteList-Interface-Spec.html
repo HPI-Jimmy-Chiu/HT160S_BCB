@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HT160S 白名單分選功能 - 客戶介接規格書</title>
+<style>
+:root{--fg:#1a2634;--muted:#5b6b7c;--line:#d6dee6;--accent:#0b5cad;--accent2:#08427d;--codebg:#f4f7fa;--th:#0b5cad;--thfg:#fff;--zebra:#f7fafd;--note:#eef5fc;}
+*{box-sizing:border-box;}
+body{font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;color:var(--fg);line-height:1.7;max-width:900px;margin:0 auto;padding:48px 32px 96px;background:#fff;font-size:15.5px;}
+h1{font-size:26px;font-weight:700;color:var(--accent2);margin:0 0 8px;padding-bottom:16px;border-bottom:3px solid var(--accent);}
+h2{font-size:20px;font-weight:700;color:var(--accent2);margin:40px 0 12px;padding-left:11px;border-left:5px solid var(--accent);}
+h3{font-size:16.5px;font-weight:700;color:var(--fg);margin:26px 0 10px;}
+p{margin:10px 0;}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px;box-shadow:0 1px 2px rgba(10,40,80,.06);}
+th{background:var(--th);color:var(--thfg);text-align:left;font-weight:600;padding:9px 12px;border:1px solid var(--accent2);}
+td{padding:8px 12px;border:1px solid var(--line);vertical-align:top;}
+tr:nth-child(even) td{background:var(--zebra);}
+code{background:var(--codebg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:Consolas,"Courier New",monospace;font-size:13.5px;color:var(--accent2);}
+pre{background:var(--codebg);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;}
+pre code{background:none;border:none;padding:0;color:var(--fg);font-size:13.5px;line-height:1.55;}
+hr{border:none;border-top:1px solid var(--line);margin:34px 0;}
+strong{color:var(--accent2);}
+ul,ol{margin:10px 0;padding-left:26px;} li{margin:5px 0;}
+blockquote{background:var(--note);border-left:4px solid var(--accent);margin:12px 0;padding:10px 16px;color:var(--muted);}
+blockquote strong{color:var(--accent2);}
+h1 + table th{background:#eef5fc;color:var(--accent2);}
+h1 + table th, h1 + table td{border-color:var(--line);}
+@media print{body{padding:0;font-size:12px;}h2{page-break-after:avoid;}table,pre{page-break-inside:avoid;}}
+</style>
+</head>
+<body>
+<h1 id="ht160s">HT160S 白名單分選功能 — 客戶介接規格書</h1>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>設備</td>
+<td>HT160S IC 分類機（Sorter）</td>
+</tr>
+<tr>
+<td>對象</td>
+<td>客戶 EAP / IT 介接端</td>
+</tr>
+<tr>
+<td>版本</td>
+<td>v1.3（2026-08-04）—— 僅一項變更：§2.4 的 SECS 模式回讀（SVID 66032）已取消，設定端（§2.2 / §2.3 的 LOTSTART + SORTMODE）與白名單檔案格式（§3）完全未變</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1">1. 功能概述</h2>
+<p>白名單分選（By WhiteList）為特殊分選模式。啟用後，機台僅處理白名單檔案內列出的 2D 碼：</p>
+<ul>
+<li><strong>名單內的 IC</strong>：依檔案指定的 Bin 分選至對應料盤。</li>
+<li><strong>名單外的 IC</strong>（讀得到 2D 碼但不在名單內）：判定為拒收，送入 Error 區，並記錄於生產報表；不彈出操作員視窗、不中斷生產。</li>
+</ul>
+<p>白名單為臨時覆蓋（overlay）模式，隨單一 Lot 生效：</p>
+<ul>
+<li>於 Lot Start 啟用，於 Lot End 自動還原為機台原本的基礎分選模式。</li>
+<li>每一個需要白名單的 Lot 皆須於啟動時明確指定；未指定者以基礎模式生產。</li>
+</ul>
+<p><strong>By WhiteList 不是機台「基礎分選模式」的第四個選項。</strong> 機台維護畫面的 Sort Mode 選擇器固定為三選一
+（Normal／By Lot+Bin／By Lot+PassFail，此為基礎模式、開機沿用）；白名單是疊加在其上的臨時覆蓋，
+啟用時取代分選行為，Lot End 後基礎模式原封不動地回來。</p>
+<hr />
+<h2 id="2-secs">2. 模式切換（SECS）</h2>
+<h3 id="21">2.1 指令</h3>
+<p>主機以 <code>S2F41 Host Command</code>、指令名 <code>LOTSTART</code>，在 Lot 清單中夾帶一組 <code>SORTMODE</code> 選項對切換：</p>
+<table>
+<thead>
+<tr>
+<th>選項對值</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WHITELIST</code></td>
+<td>本 Lot 套用白名單覆蓋</td>
+</tr>
+<tr>
+<td><code>NORMAL</code></td>
+<td>本 Lot <strong>不</strong>套用白名單覆蓋，維持機台維護畫面 Sort Mode 選擇器的原設定（可能是 Normal、By Lot+Bin 或 By Lot+PassFail）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>值不分大小寫。</li>
+<li><code>NORMAL</code> 指的是「不加白名單」，<strong>不代表把基礎模式設成 Normal</strong>；機台的基礎模式由現場人員在維護畫面設定，主機不會、也無法用這組選項對去改它。</li>
+<li>省略 <code>SORTMODE</code> 選項對時，等同 <code>NORMAL</code>（不套用白名單，使用基礎模式）。</li>
+<li><strong>每個白名單 Lot 都必須帶 <code>SORTMODE = WHITELIST</code>。</strong></li>
+<li>選項對隨 Lot 一併送出；一次 <code>LOTSTART</code> 至多一組 <code>SORTMODE</code>，重複時以最後一組為準。</li>
+<li><strong><code>LOTSTART</code> 帶的 Lot 批號＝京元批（京元內部批號）</strong>，與正常生產（WebAPI）一致。此批號即機台分選與 Soter 報表所用的身分（col7 Kyec Lot），且須與白名單檔案內該批的 <code>KYECLotID</code> 一致（見 §3.2）；客戶批號另由檔案 <code>LOTID</code> 提供（Soter col6）。</li>
+</ul>
+<h3 id="22">2.2 電文範例</h3>
+<p>啟用白名單並開 Lot（<code>LOTSTART</code> 批號填<strong>京元批</strong>，例 <code>NQ4000NAA1</code>）：</p>
+<pre><code>S2F41 W
+&lt;L [2]
+  &lt;A &quot;LOTSTART&quot;&gt;
+  &lt;L [2]
+    &lt;A &quot;NQ4000NAA1&quot;&gt;
+    &lt;L [2] &lt;A &quot;SORTMODE&quot;&gt; &lt;A &quot;WHITELIST&quot;&gt;&gt;
+  &gt;
+&gt;
+</code></pre>
+<p>使用基礎模式並開 Lot（<code>LOTSTART</code> 批號同為京元批）：</p>
+<pre><code>S2F41 W
+&lt;L [2]
+  &lt;A &quot;LOTSTART&quot;&gt;
+  &lt;L [2]
+    &lt;A &quot;NQ4000NAA2&quot;&gt;
+    &lt;L [2] &lt;A &quot;SORTMODE&quot;&gt; &lt;A &quot;NORMAL&quot;&gt;&gt;
+  &gt;
+&gt;
+</code></pre>
+<h3 id="23-hcack">2.3 回覆碼（HCACK）</h3>
+<table>
+<thead>
+<tr>
+<th>HCACK</th>
+<th>意義</th>
+<th>條件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>接受；模式已切換、Lot 已建立</td>
+<td>清單解析成功且設備閒置</td>
+</tr>
+<tr>
+<td>1</td>
+<td>電文結構錯誤</td>
+<td>外層非預期清單</td>
+</tr>
+<tr>
+<td>2</td>
+<td>參數錯誤</td>
+<td>選項對長度非 2；名稱非 <code>SORTMODE</code>；值非 <code>NORMAL</code> 或 <code>WHITELIST</code>；有選項對但無 Lot；清單截斷；Lot 數超過 64</td>
+</tr>
+<tr>
+<td>4</td>
+<td>設備忙碌（整包拒絕）</td>
+<td>設備生產中、機台內有在製 IC、或該 Lot 已啟動</td>
+</tr>
+</tbody>
+</table>
+<p>任何錯誤或忙碌拒絕時，不建立任何 Lot、不改變模式。</p>
+<h3 id="24-svid-66032">2.4 模式回讀（⚠ 2026-08-04 起已取消）</h3>
+<blockquote>
+<p>⚠️ <strong>本節的 SECS 回讀能力已於 2026-08-04 移除。</strong></p>
+<p>原本主機可用 <code>S1F3</code> 查詢 SVID <code>66032</code> 讀回有效分選模式。依客戶「HT-160S 只公佈 HT-90XX 家族編號」的裁定，本機自訂的 66xxx 段（含 66032）已<strong>全數下架</strong>，而 HT-90XX 家族<strong>沒有</strong>分選模式的對應編號（家族中唯一近似的 35530「[I27] Manual sort mode」是 HT9045/46 的 BOOLEAN 機台選項，型別與語意皆不合），因此<strong>沒有替代的 SVID</strong>。</p>
+<p><strong>設定端完全未變</strong>：主機仍以 <code>LOTSTART</code> 的 <code>SORTMODE</code> 選項對切換白名單模式（§2.2、§2.3 全部有效，<code>HCACK=0</code> 即代表模式切換成功）。改變的只是「回讀」——主機無法再用 <code>S1F3</code> 確認目前模式。若查詢已下架的 66032，<code>S1F4</code> 該格會回<strong>空清單</strong> <code>&lt;L[0]&gt;</code>（清單長度不變，可與「已註冊但無值」的 <code>&lt;A[0]&gt;</code> 區分），不是錯誤碼。</p>
+<p><strong>替代確認方式</strong>：看機台端 —— 維護畫面的 Sort Mode 選擇器與白名單面板的啟用狀態，或 Process 記錄中的 <code>WhiteList: ...</code> 行。若貴端的流程必須有 SECS 回讀，請配發一個 HT-90XX 家族編號給本方實作。</p>
+<p>以下原有的值域說明保留供理解機台行為之用（機台的模式判定邏輯完全未變，只是不再對外公佈編號）：</p>
+</blockquote>
+<p>原先主機以 <code>S1F3</code> 查詢 SVID <code>66032</code>（INT4），回覆目前<strong>有效</strong>分選模式（基礎模式 + 白名單覆蓋合併後的結果）：</p>
+<table>
+<thead>
+<tr>
+<th>回值</th>
+<th>意義</th>
+<th>來源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Normal</td>
+<td>基礎模式（維護畫面 Sort Mode 選擇器）</td>
+</tr>
+<tr>
+<td>1</td>
+<td>By Lot + Bin</td>
+<td>基礎模式（維護畫面 Sort Mode 選擇器）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>By Lot + PassFail</td>
+<td>基礎模式（維護畫面 Sort Mode 選擇器）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>By WhiteList 覆蓋生效中</td>
+<td>臨時覆蓋（不屬於 Sort Mode 選擇器）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>0 / 1 / 2</code> 是機台三選一的<strong>基礎模式</strong>；<code>3</code> 不是選擇器的第四個選項，而是「白名單覆蓋已生效」這件事，此時基礎模式仍在背後保留著。</li>
+<li>白名單 Lot 進行中為 <code>3</code>；Lot End 自動還原後，回到該機台的基礎模式（<code>0</code>、<code>1</code> 或 <code>2</code>）。⚠ 這仍是機台內部的行為，只是自 2026-08-04 起無法由 SECS 讀出。</li>
+<li><strong><code>SORTMODE = NORMAL</code> 的 Lot 不保證回報 <code>0</code>。</strong> <code>NORMAL</code> 只代表不套白名單，回讀值取決於現場 Sort Mode 選擇器的原設定，可能是 <code>0</code>、<code>1</code> 或 <code>2</code>。主機若要確認「白名單有沒有生效」，判斷準則是 <code>= 3</code> 或 <code>≠ 3</code>，不要用 <code>= 0</code> 當作 NORMAL 的檢查條件。</li>
+</ul>
+<hr />
+<h2 id="3">3. 白名單檔案</h2>
+<h3 id="31">3.1 路徑與規則</h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>資料夾（絕對路徑）</td>
+<td><code>D:\HT160S_BCB\HT160S_WhiteList\</code></td>
+</tr>
+<tr>
+<td>完整檔案路徑</td>
+<td><code>D:\HT160S_BCB\HT160S_WhiteList\WhiteList.json</code></td>
+</tr>
+<tr>
+<td>路徑由來</td>
+<td>白名單資料夾恆為 <code>&lt;程式根目錄&gt;\HT160S_WhiteList\</code>；機台軟體安裝根目錄為 <code>D:\HT160S_BCB</code>（含 <code>EXE\</code>、<code>system\</code>，由安裝程式固定佈署），故絕對路徑如上</td>
+</tr>
+<tr>
+<td>檔名</td>
+<td>固定 <code>WhiteList.json</code>（Windows 檔名不分大小寫；不可改名）</td>
+</tr>
+<tr>
+<td>編碼</td>
+<td>UTF-8 純文字</td>
+</tr>
+<tr>
+<td>存取</td>
+<td>機台只讀不寫；資料夾於第一次執行白名單 Lot Start 時自動建立（機台若從未跑過白名單，此資料夾可能尚未存在，手動建立即可）</td>
+</tr>
+<tr>
+<td>載入時機</td>
+<td>每次 Lot Start 載入一次，整個 Lot 常駐</td>
+</tr>
+</tbody>
+</table>
+<p>檔案為權威名單。Lot Start 時若檔案不存在、無法解析或不符 §3.2 規則，機台<strong>不載入任何 2D 資料</strong>，
+並在按下生產 <strong>Start</strong>（或 One Cycle）時擋下、顯示明確原因。</p>
+<blockquote>
+<p>注意：被擋下的是<strong>生產啟動</strong>，不是 Lot Start 這個動作本身。Lot Start 仍會建立工單並進入生產待命，
+只是名單是空的；請以 Start 的提示訊息（或機台 Process 記錄中的 <code>WhiteList: ...</code> 行）判斷檔案是否被接受。</p>
+</blockquote>
+<h3 id="32">3.2 檔案格式</h3>
+<p>根物件含一個 <code>QRCodeIDHis</code> 陣列，每個元素代表一個 Lot，內含 Lot 資訊與 <code>ICInfo</code> 陣列（逐顆 IC）。</p>
+<table>
+<thead>
+<tr>
+<th>層級</th>
+<th>欄位</th>
+<th>內容</th>
+<th>型別</th>
+<th>必填</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lot</td>
+<td><code>LOTID</code></td>
+<td>客戶批號（→ Soter 報表 col6 Cust lot）</td>
+<td>字串（不可空）</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Lot</td>
+<td><code>Substage</code></td>
+<td>站點</td>
+<td>字串</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Lot</td>
+<td><code>ProductCode</code></td>
+<td>產品型號</td>
+<td>字串</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Lot</td>
+<td><code>KYECLotID</code></td>
+<td>京元批號＝機台分選／報表身分（→ Soter col7 Kyec Lot）；須與 host <code>LOTSTART</code> 送的批號一致</td>
+<td>字串（不可空）</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Lot</td>
+<td><code>ICInfo</code></td>
+<td>該 Lot 的 IC 陣列</td>
+<td>陣列</td>
+<td>是</td>
+</tr>
+<tr>
+<td>IC</td>
+<td><code>QRCodeID</code></td>
+<td>IC 2D 碼</td>
+<td>字串</td>
+<td>是</td>
+</tr>
+<tr>
+<td>IC</td>
+<td><code>HBin</code></td>
+<td>分選 Bin</td>
+<td>字串</td>
+<td>是</td>
+</tr>
+</tbody>
+</table>
+<p>格式規則：</p>
+<ul>
+<li><code>HBin</code> 須為<strong>字串</strong>（例：<code>"1"</code>），其編號對應機台已設定之 Bin。</li>
+<li><code>QRCodeID</code> 以完全一致（含大小寫）方式比對 CCD 讀值。</li>
+<li>同一檔案內 <code>QRCodeID</code> 不可重複。</li>
+<li><code>LOTID</code> 不可為空。</li>
+<li><strong><code>KYECLotID</code> 為必填、不可為空</strong>：它是該批白名單所屬的京元批號，機台於載入時記錄。
+  只要檔案中<strong>任何一個</strong> Lot 缺少 <code>KYECLotID</code>（欄位不存在、空字串或只有空白），整份檔案視為無效 → 機台不載入任何資料。</li>
+<li>欄位名稱不分大小寫；<code>QRCodeID</code> 之值分大小寫。</li>
+</ul>
+<blockquote>
+<p><strong>雙批號對應（務必理解）</strong>：機台將「京元批」與「客戶批」視為兩個不同身分。
+- <strong>京元批</strong>＝host <code>LOTSTART</code> 送的批號＝檔案 <code>KYECLotID</code>（兩者須一致）＝機台分選綁定與 Soter 報表 <strong>col7 Kyec Lot</strong> 的身分。
+- <strong>客戶批</strong>＝檔案 <code>LOTID</code>，逐顆記於 Soter 報表 <strong>col6 Cust lot</strong>。
+- 一個京元批可對應多個客戶批：檔案內可有多個 <code>QRCodeIDHis</code> 元素、<code>KYECLotID</code> 相同而 <code>LOTID</code> 不同，機台會併於同一京元批之下、各顆保留自己的客戶批。</p>
+</blockquote>
+<p><strong>機台強制檢查項目</strong>（不符即整份檔案退回，不載入任何資料，並於生產 Start 時顯示對應訊息）：</p>
+<table>
+<thead>
+<tr>
+<th>檢查</th>
+<th>訊息</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>檔案存在</td>
+<td><code>WhiteList file not found : &lt;路徑&gt;</code></td>
+</tr>
+<tr>
+<td>可解析為 JSON</td>
+<td><code>WhiteList file is not valid JSON : &lt;路徑&gt;</code></td>
+</tr>
+<tr>
+<td>根物件有 <code>QRCodeIDHis</code>（或 <code>2DIDHistory</code>）陣列</td>
+<td><code>WhiteList file has no QRCodeIDHis lot list (customer format required)</code></td>
+</tr>
+<tr>
+<td>至少一個 Lot</td>
+<td><code>WhiteList file contains no lot data</code></td>
+</tr>
+<tr>
+<td>每個 Lot 有非空 <code>LOTID</code></td>
+<td><code>WhiteList rejected : lot #&lt;序號&gt; has no LOTID (mandatory) !</code></td>
+</tr>
+<tr>
+<td>每個 Lot 有非空 <code>KYECLotID</code></td>
+<td><code>WhiteList rejected : lot &lt;LOTID&gt; has no KYECLotID (mandatory) !</code></td>
+</tr>
+<tr>
+<td>每個 Lot 的 <code>KYECLotID</code> 等於 host <code>LOTSTART</code> 送的批號（京元批）</td>
+<td><code>WhiteList rejected : lot &lt;LOTID&gt; KYECLotID (&lt;檔案值&gt;) != Lot Start lot (&lt;LOTSTART值&gt;) !</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>退檔為機台<strong>主動偵測並處理</strong>的結果，非軟體異常：每次退檔都會寫入機台 EventLog（<code>D:\HT160S_Log\EventLog</code>，事件碼 <code>WRN_WHITELIST_REJECT</code>）與 Process 記錄，並在生產 Start 時以上表訊息擋下。<strong>Lot Start 動作本身照常完成，被擋下的是後續的生產 Start</strong>；機台不會用空名單進行分選。</p>
+</blockquote>
+<p>其餘欄位（<code>Substage</code>、<code>ProductCode</code>）與 <code>QRCodeID</code> 唯一性屬<strong>資料品質要求</strong>：機台不會因此退回檔案，
+但缺漏會直接反映在生產報表（欄位空白）；重複的 <code>QRCodeID</code> 以<strong>最後一筆</strong>為準（後者覆蓋前者的 Bin），機台不另行警告，故請務必確保檔案內 2D 碼不重複。
+<code>HBin</code> 若誤寫成數字（<code>1</code> 而非 <code>"1"</code>）機台讀不到，該顆會被視為 Bin 0，請務必用字串。</p>
+<h3 id="33">3.3 範例檔</h3>
+<pre><code class="language-json">{
+  &quot;QRCodeIDHis&quot;: [
+    {
+      &quot;LOTID&quot;: &quot;A5921.RCS.TEST99&quot;,
+      &quot;KYECLotID&quot;: &quot;NQ4000NAA1&quot;,
+      &quot;Substage&quot;: &quot;FT1&quot;,
+      &quot;ProductCode&quot;: &quot;TESTDEV-A123&quot;,
+      &quot;ICInfo&quot;: [
+        { &quot;QRCodeID&quot;: &quot;WLTEST2D0001&quot;, &quot;HBin&quot;: &quot;1&quot; },
+        { &quot;QRCodeID&quot;: &quot;WLTEST2D0002&quot;, &quot;HBin&quot;: &quot;2&quot; },
+        { &quot;QRCodeID&quot;: &quot;WLTEST2D0003&quot;, &quot;HBin&quot;: &quot;3&quot; }
+      ]
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h2 id="4">4. 名單內／外處理</h2>
+<table>
+<thead>
+<tr>
+<th>情況</th>
+<th>處理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2D 讀取成功且在名單內</td>
+<td>依 <code>HBin</code> 分選至對應料盤</td>
+</tr>
+<tr>
+<td>2D 讀取成功但不在名單內</td>
+<td>判定拒收 → Error 區，報表記為 NotWhitelisted；不彈窗、不中斷</td>
+</tr>
+<tr>
+<td>2D 讀取失敗（CCD 誤讀）</td>
+<td>走機台既有重讀／人工流程，與白名單無關</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5">5. 客戶需提供之資料</h2>
+<ul>
+<li>每顆 IC 的 <code>QRCodeID</code>，須與 CCD 讀值完全一致。</li>
+<li>每顆 IC 的 <code>HBin</code>，其編號須對應機台已設定之 Bin。</li>
+<li>Lot 層之 <code>LOTID</code>（客戶批）、<code>KYECLotID</code>（京元批，須與 host <code>LOTSTART</code> 送的批號一致）、<code>Substage</code>、<code>ProductCode</code>（四項皆為必填）。</li>
+</ul>
+<hr />
+<h2 id="6">6. 使用流程</h2>
+<ol>
+<li>依 §3.2 格式製作 <code>WhiteList.json</code>（每個 Lot 都要有 <code>KYECLotID</code>）。</li>
+<li>將檔案放入機台 <code>D:\HT160S_BCB\HT160S_WhiteList\</code> 資料夾（完整路徑 <code>D:\HT160S_BCB\HT160S_WhiteList\WhiteList.json</code>）。</li>
+<li>主機以 <code>LOTSTART</code>（批號＝京元批，須與檔案 <code>KYECLotID</code> 一致）+ <code>SORTMODE = WHITELIST</code> 開 Lot。</li>
+<li>（選用）確認模式已切換：<code>LOTSTART</code> 回 <code>HCACK=0</code> 即代表切換成功。⚠ 2026-08-04 起<strong>不再能</strong>以 <code>S1F3</code> 查詢 SVID 66032 回讀（見 §2.4）；需要目視確認時請看機台維護畫面的白名單面板。</li>
+<li>Lot End 後，機台自動還原為基礎分選模式（<code>0</code>／<code>1</code>／<code>2</code>，視現場 Sort Mode 設定）。</li>
+</ol>
+<blockquote>
+<p><strong>「白名單模式已切換成功」不代表白名單檔案已被接受。</strong> 兩者是分開的：
+模式由 <code>LOTSTART</code> 的 <code>SORTMODE</code> 決定（<code>HCACK=0</code> 即成功），檔案則在 Lot Start 當下才讀取與檢查。
+檔案若不合格，模式仍是白名單，但機台名單為空、生產 Start 會被擋下。檔案是否被接受，
+請看機台端的提示訊息或 Process 記錄中的 <code>WhiteList: ...</code> 行。
+⚠ 這一點在 2026-08-04 移除 66032 回讀後更重要：模式切換成功與檔案有效<strong>都不能</strong>靠 SECS 回讀確認。</p>
+</blockquote>
+<p>操作員亦可於機台維護畫面的白名單面板勾選啟用，效果與 SECS 相同：於下一次 Lot Start 生效、Lot End 自動還原；機台內有在製 IC 時不可切換。</p>
+</body>
+</html>

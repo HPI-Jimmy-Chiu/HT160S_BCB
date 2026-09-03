@@ -4,8 +4,8 @@ object fMotorTest: TfMotorTest
   BorderIcons = [biSystemMenu]
   BorderStyle = bsSingle
   Caption = 'Motor Test'
-  ClientHeight = 920
-  ClientWidth = 1200
+  ClientHeight = 850
+  ClientWidth = 1210
   Color = 12761254
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,17 +13,18 @@ object fMotorTest: TfMotorTest
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poDefault
+  Position = poScreenCenter
+  OnActivate = FormActivate
   OnClose = FormClose
   OnCreate = FormCreate
   OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
   object palMotorControl: TPanel
-    Left = 840
+    Left = 850
     Top = 0
     Width = 360
-    Height = 920
+    Height = 850
     Align = alRight
     BevelInner = bvLowered
     Color = 12761254
@@ -461,21 +462,85 @@ object fMotorTest: TfMotorTest
       ParentColor = False
       ParentFont = False
     end
-    object lblMotorList: TLabel
-      Left = 18
-      Top = 730
-      Width = 110
-      Height = 20
-      AutoSize = False
-      Caption = 'Motor List'
-      Color = 12761254
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -13
-      Font.Name = 'MS Sans Serif'
-      Font.Style = []
-      ParentColor = False
-      ParentFont = False
+    object ledStatus0: TALed
+      Left = 116
+      Top = 584
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus1: TALed
+      Left = 116
+      Top = 608
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus2: TALed
+      Left = 116
+      Top = 632
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus3: TALed
+      Left = 116
+      Top = 656
+      Width = 22
+      Height = 22
+      TrueColor = clRed
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus4: TALed
+      Left = 116
+      Top = 680
+      Width = 22
+      Height = 22
+      TrueColor = clRed
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus5: TALed
+      Left = 116
+      Top = 704
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus6: TALed
+      Left = 284
+      Top = 584
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus7: TALed
+      Left = 284
+      Top = 608
+      Width = 22
+      Height = 22
+      TrueColor = clRed
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus8: TALed
+      Left = 284
+      Top = 632
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus9: TALed
+      Left = 284
+      Top = 656
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
+    end
+    object ledStatus10: TALed
+      Left = 284
+      Top = 680
+      Width = 22
+      Height = 22
+      LEDStyle = LEDSqLarge
     end
     object palMotorName: TPanel
       Left = 12
@@ -484,7 +549,6 @@ object fMotorTest: TfMotorTest
       Height = 40
       BevelOuter = bvLowered
       Color = 8421440
-      Caption = ''
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWhite
       Font.Height = -15
@@ -497,7 +561,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 92
       Width = 124
-      Height = 24
+      Height = 21
       ReadOnly = True
       TabOrder = 1
     end
@@ -505,7 +569,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 122
       Width = 124
-      Height = 24
+      Height = 21
       ReadOnly = True
       TabOrder = 2
     end
@@ -513,7 +577,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 152
       Width = 124
-      Height = 24
+      Height = 21
       TabOrder = 3
       Text = '20'
       OnClick = edMotorInputClick
@@ -526,14 +590,14 @@ object fMotorTest: TfMotorTest
       Min = 1
       PageSize = 0
       Position = 20
-      TabOrder = 28
+      TabOrder = 33
       OnScroll = scrSpeedPercentScroll
     end
     object edStep: TEdit
       Left = 116
       Top = 182
       Width = 124
-      Height = 24
+      Height = 21
       TabOrder = 4
       Text = '1.00'
       OnClick = edMotorInputClick
@@ -542,7 +606,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 212
       Width = 124
-      Height = 24
+      Height = 21
       TabOrder = 5
       Text = '0.00'
       OnClick = edMotorInputClick
@@ -551,7 +615,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 242
       Width = 124
-      Height = 24
+      Height = 21
       TabOrder = 6
       Text = '0.00'
       OnClick = edMotorInputClick
@@ -560,7 +624,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 272
       Width = 124
-      Height = 24
+      Height = 21
       TabOrder = 7
       Text = '0.00'
       OnClick = edMotorInputClick
@@ -569,7 +633,7 @@ object fMotorTest: TfMotorTest
       Left = 116
       Top = 302
       Width = 124
-      Height = 24
+      Height = 21
       TabOrder = 8
       Text = '1'
       OnClick = edMotorInputClick
@@ -639,7 +703,7 @@ object fMotorTest: TfMotorTest
       OnClick = btnGoPos2Click
     end
     object btnJogP: TButton
-      Left = 18
+      Left = 132
       Top = 342
       Width = 90
       Height = 34
@@ -649,9 +713,9 @@ object fMotorTest: TfMotorTest
       OnMouseUp = btnJogMouseUp
     end
     object btnJogN: TButton
-      Left = 124
+      Left = 18
       Top = 342
-      Width = 90
+      Width = 95
       Height = 34
       Caption = 'JOG -'
       TabOrder = 15
@@ -659,7 +723,7 @@ object fMotorTest: TfMotorTest
       OnMouseUp = btnJogMouseUp
     end
     object btnStepP: TButton
-      Left = 230
+      Left = 292
       Top = 342
       Width = 54
       Height = 34
@@ -668,7 +732,7 @@ object fMotorTest: TfMotorTest
       OnClick = btnStepPClick
     end
     object btnStepN: TButton
-      Left = 292
+      Left = 230
       Top = 342
       Width = 54
       Height = 34
@@ -774,118 +838,27 @@ object fMotorTest: TfMotorTest
       TabOrder = 25
       OnClick = btnCloseClick
     end
-    object ledStatus0: TALed
-      Left = 116
-      Top = 584
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus1: TALed
-      Left = 116
-      Top = 608
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus2: TALed
-      Left = 116
-      Top = 632
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus3: TALed
-      Left = 116
-      Top = 656
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 255
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus4: TALed
-      Left = 116
-      Top = 680
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 255
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus5: TALed
-      Left = 116
-      Top = 704
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus6: TALed
-      Left = 284
-      Top = 584
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus7: TALed
-      Left = 284
-      Top = 608
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 255
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus8: TALed
-      Left = 284
-      Top = 632
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus9: TALed
-      Left = 284
-      Top = 656
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object ledStatus10: TALed
-      Left = 284
-      Top = 680
-      Width = 22
-      Height = 22
-      FalseColor = 12632256
-      TrueColor = 65280
-      LEDStyle = LEDSqLarge
-    end
-    object lstMotors: TListBox
+    object btnServoOn: TButton
       Left = 18
-      Top = 752
-      Width = 328
-      Height = 124
-      ItemHeight = 13
-      MultiSelect = True
+      Top = 736
+      Width = 160
+      Height = 36
+      Caption = 'SERVO ON'
       TabOrder = 26
-      OnClick = lstMotorsClick
+      OnClick = btnServoOnClick
+    end
+    object btnServoOff: TButton
+      Left = 186
+      Top = 736
+      Width = 160
+      Height = 36
+      Caption = 'SERVO OFF'
+      TabOrder = 28
+      OnClick = btnServoOffClick
     end
     object palMessage: TPanel
       Left = 18
-      Top = 884
+      Top = 780
       Width = 328
       Height = 28
       Alignment = taLeftJustify
@@ -897,23 +870,22 @@ object fMotorTest: TfMotorTest
   object PageMotorTest: TPageControl
     Left = 0
     Top = 0
-    Width = 840
-    Height = 920
+    Width = 850
+    Height = 850
     ActivePage = tsOperate
     Align = alClient
+    TabIndex = 0
     TabOrder = 1
     object tsOperate: TTabSheet
       Caption = 'Operate'
       object grdOperate: TStringGrid
         Left = 0
         Top = 0
-        Width = 832
-        Height = 892
+        Width = 842
+        Height = 822
         Align = alClient
         ColCount = 8
-        DefaultRowHeight = 24
         FixedCols = 0
-        FixedRows = 1
         RowCount = 2
         TabOrder = 0
       end
@@ -965,103 +937,11 @@ object fMotorTest: TfMotorTest
         Height = 848
         Align = alClient
         ColCount = 16
-        DefaultRowHeight = 24
         FixedCols = 0
-        FixedRows = 1
         RowCount = 2
         TabOrder = 1
         OnDblClick = grdMotorParameterDblClick
         OnSelectCell = grdMotorParameterSelectCell
-      end
-    end
-    object tsMotorTable: TTabSheet
-      Caption = 'Mot Table View'
-      ImageIndex = 2
-      object palMotorTableTools: TPanel
-        Left = 0
-        Top = 0
-        Width = 832
-        Height = 44
-        Align = alTop
-        BevelOuter = bvLowered
-        Color = 12761254
-        TabOrder = 0
-        object lblMotorTableSearch: TLabel
-          Left = 128
-          Top = 14
-          Width = 48
-          Height = 16
-          AutoSize = False
-          Caption = 'Search'
-          Color = 12761254
-          ParentColor = False
-        end
-        object btnMotorTableReload: TButton
-          Left = 8
-          Top = 8
-          Width = 112
-          Height = 28
-          Caption = 'RELOAD TABLE'
-          TabOrder = 0
-          OnClick = btnMotorTableReloadClick
-        end
-        object edMotorTableSearch: TEdit
-          Left = 180
-          Top = 10
-          Width = 180
-          Height = 21
-          TabOrder = 1
-        end
-        object btnMotorTableFind: TButton
-          Left = 368
-          Top = 8
-          Width = 78
-          Height = 28
-          Caption = 'FIND'
-          TabOrder = 2
-          OnClick = btnMotorTableFindClick
-        end
-        object btnMotorTableLocateActive: TButton
-          Left = 454
-          Top = 8
-          Width = 118
-          Height = 28
-          Caption = 'LOCATE ACTIVE'
-          TabOrder = 3
-          OnClick = btnMotorTableLocateActiveClick
-        end
-        object btnMotorTableEdit: TButton
-          Left = 580
-          Top = 8
-          Width = 86
-          Height = 28
-          Caption = 'EDIT CELL'
-          TabOrder = 4
-          OnClick = btnMotorTableEditClick
-        end
-        object btnMotorTableSave: TButton
-          Left = 674
-          Top = 8
-          Width = 86
-          Height = 28
-          Caption = 'SAVE TABLE'
-          TabOrder = 5
-          OnClick = btnMotorTableSaveClick
-        end
-      end
-      object grdMotorTable: TStringGrid
-        Left = 0
-        Top = 44
-        Width = 832
-        Height = 848
-        Align = alClient
-        ColCount = 1
-        DefaultRowHeight = 24
-        FixedCols = 0
-        FixedRows = 1
-        RowCount = 2
-        TabOrder = 1
-        OnDblClick = grdMotorTableDblClick
       end
     end
     object tsInformation: TTabSheet
@@ -1074,9 +954,7 @@ object fMotorTest: TfMotorTest
         Height = 892
         Align = alClient
         ColCount = 8
-        DefaultRowHeight = 24
         FixedCols = 0
-        FixedRows = 1
         RowCount = 2
         TabOrder = 0
       end
@@ -1137,10 +1015,7 @@ object fMotorTest: TfMotorTest
         Height = 848
         Align = alClient
         ColCount = 3
-        DefaultRowHeight = 24
         FixedCols = 0
-        FixedRows = 1
-        RowCount = 5
         TabOrder = 1
       end
     end
@@ -1200,9 +1075,7 @@ object fMotorTest: TfMotorTest
         Height = 848
         Align = alClient
         ColCount = 3
-        DefaultRowHeight = 24
         FixedCols = 0
-        FixedRows = 1
         RowCount = 18
         TabOrder = 1
       end

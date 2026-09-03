@@ -1,0 +1,1357 @@
+//----------------------------------------------------------------------------
+// MyBinDisp.cpp
+// AI(ht160s-maintainer) 20260615 : LED-only Bin display controller, ported from
+// HT172 TMyBinDispCtrl / TMyBinDispHT9046. TFT path NOT ported. Adaptations:
+//   TQPF_Timer.SetSecAndOn(n) -> HTimer.Set(n)+On(); log -> TStringList buffer;
+//   MyDBIProcess -> LogBinDisplay; the HT172 256-bin sliding special case (which
+//   needed iTestBinCount/BinSelect) is removed - HT160 uses one label per unit.
+//----------------------------------------------------------------------------
+#include "IncludeAllHeader.h"
+#include <stdio.h>
+#include <string.h>
+#pragma hdrstop
+#include "language.h"
+
+#include "MyBinDisp.h"
+#include "cCommLog.h"
+#include "GeneralSetting.h"
+//----------------------------------------------------------------------------
+#pragma package(smart_init)
+//----------------------------------------------------------------------------
+#define Bin_CR        13
+#define Bin_LF        10
+//----------------------------------------------------------------------------
+const unsigned char T_HEX2ASCII[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+const unsigned char T_ASXII2HEX[] = {0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,0,10,11,12,13,14,15};
+//----------------------------------------------------------------------------
+TMyBinDispCtrl::TMyBinDispCtrl()
+{
+    for(int i=0; i<Bin_MAX_NUM; i++)
+    {
+        bHasUnitArray[i]=false;
+        bSetBin[i]=false;
+        for(int j=0; j<TEST_MAX_BIN; j++)
+            iSetBin[i][j]=-1;
+        iSetColor[i]=1;
+        Alias[i]="";
+        bSliding[i]=true;
+        iVersion[i]=0;
+        iBinNow[i]=0;
+        iColorNow[i]=1;
+        bHasError[i]=false;
+    }
+
+    slBinDispLog=new TStringList;
+    iSetColor[0]=3;
+    iSetColor[1]=3;
+    iSetColor[2]=3;
+
+    bStopProcess=false;
+    bStartSetColor=false;
+    bStartSetBin=false;
+    bHasUnit=false;
+    BinDispRecv=false;
+    ComPort="";
+    ComParity=None;
+
+    iDelaySec=5;
+    InitialOK=false;
+
+    iTotalInstalledUnit=-1;
+    iBinDispCtrlTask=1;
+    bFirstInit=true;
+    iRusStatus=0;
+    iUsedBinNumber=0;
+    iTestBinCount=47;
+    bTimerRun=false;
+    Addr=0;
+    iStartSetBinTask=1;
+    iStartSetColorTask=1;
+    iStartGetStatusTask=1;
+    CommBin=NULL;
+    ZeroMemory(iErrCount, sizeof(iErrCount));
+    ZeroMemory(iCount, sizeof(iCount));
+    ZeroMemory(bGetStatus, sizeof(bGetStatus));
+    ZeroMemory(bSetColor, sizeof(bSetColor));
+}
+//----------------------------------------------------------------------------
+TMyBinDispCtrl::~TMyBinDispCtrl()
+{
+    try
+    {
+        if(slBinDispLog!=NULL)
+        {
+            delete slBinDispLog;
+            slBinDispLog=NULL;
+        }
+    }
+    catch(...)
+    {
+    }
+}
+//----------------------------------------------------------------------------
+unsigned char TMyBinDispCtrl::T_HEX2ASCII_Mac(unsigned char hex2ascii) {return(T_HEX2ASCII[(hex2ascii)&0x0f]);}
+unsigned char TMyBinDispCtrl::T_ASXII2HEX_Mac(unsigned char ascii2hex)
+{
+    if(ascii2hex-'0'>22 || ascii2hex-'0'<0)
+        return 0;
+    return(T_ASXII2HEX[ascii2hex-'0']);
+}
+void  TMyBinDispCtrl::SetComParity(TParity Parity)  {ComParity=Parity;}
+bool  TMyBinDispCtrl::UnitHasInstall(int Index)     {return bHasUnitArray[Index];}
+void  TMyBinDispCtrl::CloseUnit(int Index)          {bHasUnitArray[Index]=false;}
+void  TMyBinDispCtrl::OpenUnit(int Index)           {bHasUnitArray[Index]=true;}
+void  TMyBinDispCtrl::SetDelayTime(int Sec)         {iDelaySec=Sec;}
+int   TMyBinDispCtrl::GetDelayTime()                {return iDelaySec;}
+int   TMyBinDispCtrl::GetTotalInstalledUnit()       {return iTotalInstalledUnit+1;}
+int   TMyBinDispCtrl::GetColorNow(int Index)        {return iColorNow[Index];}
+int   TMyBinDispCtrl::GetBinNow(int Index)          {return iBinNow[Index];}
+bool  TMyBinDispCtrl::GerErrNow(int Index)          {return bHasError[Index];}
+void  TMyBinDispCtrl::SerErrNow(int Index,bool bErr){bHasError[Index]=bErr;}
+//----------------------------------------------------------------------------
+AnsiString TMyBinDispCtrl::GetRunStatus()
+{
+    AnsiString Message="";
+    switch(iRusStatus)
+    {
+        case 0: Message="Initialing...";    break;
+        case 1: Message="Get status...";    break;
+        case 2: Message="Color Setting.";   break;
+        case 3: Message="Bin Setting.";     break;
+        case 4: Message="Display Error!!";  break;
+        case 5: Message="Bin Running.";     break;
+    }
+    return Message;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::SetComPort(AnsiString port)
+{
+    ComPort=port;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::ProcessStopStart(bool Value)
+{
+    bStopProcess=Value;
+    if(bFirstInit==true)
+    {
+        iBinDispCtrlTask=1;
+        bStartSetColor=true;
+        bStartSetBin=true;
+        bFirstInit=false;
+    }
+    else
+    {
+        if(bStopProcess==true)
+            iBinDispCtrlTask=50;
+    }
+}
+//----------------------------------------------------------------------------
+unsigned char TMyBinDispCtrl::A_Create_LCR(unsigned char *Sptr, unsigned char length)
+{
+    unsigned char Btmp,Btmp1;
+    Btmp1=0;
+    do
+    {
+        Btmp =T_ASXII2HEX_Mac(*Sptr);
+        Sptr++;
+        Btmp =(Btmp<<4)|T_ASXII2HEX_Mac(*Sptr);
+        Btmp1+=Btmp;
+        Sptr++;
+        --length;
+        if(length==0)
+            break;
+    }
+    while(--length);
+    return ((~Btmp1)+1);
+}
+//----------------------------------------------------------------------------
+void __fastcall TMyBinDispCtrl::CommBinReceiveData(TObject *Sender,
+      Pointer Buffer, WORD BufferLength)
+{
+    // AI(ht160s-bindisplay) 20260624 : accumulate across receive events and raise
+    // BinDispRecv only once a full frame (':' .. LF) is buffered. SPComm delivers a
+    // whole frame in one event (so this matches the old overwrite behavior), but
+    // TMyComm delivers a 9600bps reply across many partial events; the state machine
+    // (case 200) consumes the Pos() match the instant BinDispRecv is true, so it must
+    // not see a partial frame. sReadBuffer is cleared at SEND time (DoStartSetBin/
+    // DoStartSetColor/DoStartGetStatus), so a stale frame cannot cause a false Pos==1.
+    if(BufferLength==0 || BufferLength>=1024)
+        return;
+    ZeroMemory(BinDispCom2Buffer, sizeof(BinDispCom2Buffer));
+    strncpy(BinDispCom2Buffer, (char*)Buffer, BufferLength);
+    BinDispCom2Buffer[BufferLength]='\x0';
+
+    // Bound the accumulator; if a terminator never arrives, restart from this chunk.
+    if(sReadBuffer.Length()+(int)BufferLength >= 1024)
+        sReadBuffer="";
+    sReadBuffer += AnsiString(BinDispCom2Buffer);
+
+    AnsiString asHex=Chararr2Hexstring(BinDispCom2Buffer,BufferLength);
+    LogBinDisplay("Recv", asHex, true);
+
+    int iColon=sReadBuffer.Pos(":");
+    if(iColon>=1)
+    {
+        for(int i=iColon; i<=sReadBuffer.Length(); i++)
+        {
+            if(sReadBuffer[i]==(char)Bin_LF)
+            {
+                BinDispRecv=true;
+                break;
+            }
+        }
+    }
+}
+//----------------------------------------------------------------------------
+bool TMyBinDispCtrl::GetCOMPortStatus(AnsiString Com)
+{
+    HANDLE h=INVALID_HANDLE_VALUE;
+    AnsiString CN="\\\\.\\"+Com;
+    h=::CreateFile(CN.c_str(),
+        GENERIC_READ|GENERIC_WRITE,
+        0,
+        0,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+        0);
+    CloseHandle(h);
+    if(h==INVALID_HANDLE_VALUE)
+        return false;
+    return true;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::InstalledUnit(int Index)
+{
+    bHasUnitArray[Index]=true;
+    bHasUnit=true;
+    bSetBin[Index]=true;
+    if(iTotalInstalledUnit<Index)
+        iTotalInstalledUnit=Index;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::Spin()
+{
+    // AI(ht160s-bindisplay) 20260623 : run-gate only. The concrete protocol owns
+    // the state machine in ProcessTick() (LED switch lives in TMyBinDispHT9046).
+    if(InitialOK==false)
+        return;
+    if(bStopProcess==false)
+        return;
+    if(bTimerRun)
+        return;
+
+    bTimerRun=true;
+    ProcessTick();
+    bTimerRun=false;
+}
+//----------------------------------------------------------------------------
+// LED (HT9046) state machine: open COM -> GetStatus(version) -> Color -> Bin.
+//----------------------------------------------------------------------------
+void TMyBinDispHT9046::ProcessTick()
+{
+    AnsiString Str;
+    int &Task=iBinDispCtrlTask;
+    AnsiString CN;
+
+    switch(Task)
+    {
+        case 1:
+            iRusStatus=0;
+            if(ComPort.Pos("COM")==0)
+            {
+                return;          // bTimerRun is reset by Spin() after ProcessTick
+            }
+            bStartSetBin=true;
+            for(int i=0; i<iUsedBinNumber; i++)
+            {
+                bHasError[i]=false;
+            }
+            #ifndef SOFT_SIMULATE
+            bStartSetColor=true;
+            if(GetCOMPortStatus(ComPort))
+            {
+                StartComport(CommBin,ComPort);
+                Task=50;
+                iStartGetStatusTask=1;
+            }
+            else
+            {
+                StopComport(CommBin,ComPort);
+            }
+            #else
+                bStartSetColor=false;
+                Task=50;
+                iStartGetStatusTask=1;
+            #endif
+            break;
+        case 50:
+            if(DoStartGetStatus())
+            {
+                Task=100;
+            }
+            break;
+        case 100:
+            if(bHasUnit==false)
+                break;
+            #ifndef SOFT_SIMULATE
+            if(GetCOMPortStatus(ComPort))
+            {
+                iRusStatus=0;
+                CommBin->StopComm();
+
+                for(int i=0; i<iUsedBinNumber; i++)
+                {
+                    iBinNow[i]=0;
+                    iColorNow[i]=1;
+                }
+
+                bStartSetColor=true;
+                bStartSetBin=true;
+                Task=1;
+                break;
+            }
+            #endif
+            // AI(ht160s-maintainer) 20260615 : HT172's LED Spin never reached the
+            // color pass (case 200 was unreachable). HT160 needs per-unit color
+            // (old-160 behavior), so run the color pass first when one is pending.
+            if(bStartSetColor)
+            {
+                iStartSetColorTask=1;
+                Task=200;
+            }
+            else if(bStartSetBin)
+            {
+                iStartSetBinTask=1;
+                Task=300;
+            }
+            else
+            {
+                iStartSetBinTask=100;
+                Task=300;
+            }
+            break;
+        case 200:
+            if(DoStartSetColor())
+            {
+                bStartSetColor=false;
+                Task=100;
+            }
+            break;
+        case 300:
+            if(DoStartSetBin())
+            {
+                Task=100;
+            }
+            break;
+    }
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::WriteTargetBin(int Index, int *bin, int color)
+{
+    if(Index>iUsedBinNumber)
+        return;
+    if(Index<0)
+        return;
+
+    // bin = -1      : blank (shows X)
+    // bin = 0~99    : digits 0~99
+    // bin = 100~125 : letters A~Z
+
+    iSetColor[Index]=color;
+    for(int i=0; i<TEST_MAX_BIN; i++)
+    {
+        iSetBin[Index][i]=bin[i];
+        bStartSetBin=true;
+        bStartSetColor=true;
+        bSetBin[Index]=true;
+    }
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::WriteTargetBin(int color)
+{
+    bStartSetBin=true;
+    bStartSetColor=true;
+    for(int i=0; i<Bin_MAX_NUM; i++)
+    {
+        iSetColor[i]=color;
+        bSetBin[i]=true;
+    }
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::SetUnitLabel(int Index, int value, int color)
+{
+    if(Index<0 || Index>=Bin_MAX_NUM)
+        return;
+    iSetColor[Index]=color;
+    iSetBin[Index][0]=value;
+    iSetBin[Index][1]=-1;
+    bSliding[Index]=true;
+    bSetBin[Index]=true;
+    bSetColor[Index]=true;
+    bStartSetBin=true;
+    bStartSetColor=true;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::SetUnitBin(int Index, int value)
+{
+    if(Index<0 || Index>=Bin_MAX_NUM)
+        return;
+    iSetBin[Index][0]=value;
+    iSetBin[Index][1]=-1;
+    bSliding[Index]=true;
+    bSetBin[Index]=true;
+    bStartSetBin=true;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::SetUnitColor(int Index, int color)
+{
+    if(Index<0 || Index>=Bin_MAX_NUM)
+        return;
+    iSetColor[Index]=color;
+    bSetColor[Index]=true;
+    bStartSetColor=true;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::LogBinDisplay(AnsiString asAction, AnsiString asMessage, bool bMemo)
+{
+    if(slBinDispLog==NULL)
+        return;
+    AnsiString asLine=FormatDateTime("yyyy-mm-dd hh:nn:ss", Now())+", "+asAction+", "+asMessage;
+    slBinDispLog->Add(asLine);
+    while(slBinDispLog->Count>500)
+        slBinDispLog->Delete(0);
+
+    //AI(general) 20260617 : routine TX/Recv frames flood the daily CSV during
+    //production (one pair per bin update). Persist them only when verbose tracing
+    //is enabled; always persist non-routine events (open/close/errors/no-reply)
+    //so faults stay traceable. The 500-line in-memory memo above is unaffected.
+    bool bRoutineFrame = (asAction == "TX" || asAction == "Recv");
+    if(GeneralSetting.bBinDispLogVerbose || bRoutineFrame == false)
+        g_BinDispCommLog.Log(asAction, asMessage);
+    // P3 TODO: when bMemo, also echo to the ComPort bin memo.
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::AddBinDisplayLog(AnsiString asAction, AnsiString asMessage)
+{
+    LogBinDisplay(asAction, asMessage, false);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::FlushBinDisplayLog()
+{
+    if(slBinDispLog==NULL)
+        return;
+    try
+    {
+        slBinDispLog->SaveToFile("BinDisplayLog.txt");
+    }
+    catch(...)
+    {
+    }
+}
+//----------------------------------------------------------------------------
+void TMyBinDispCtrl::SetUsedBinNumber(int iNum)
+{
+    if(iNum>0 && iNum<Bin_MAX_NUM)
+    {
+        iUsedBinNumber=iNum;
+    }
+    else
+    {
+        iUsedBinNumber=Bin_MAX_NUM;
+    }
+}
+//----------------------------------------------------------------------------
+AnsiString TMyBinDispCtrl::Chararr2Hexstring(char* cstr, int iNum)
+{
+    AnsiString tempStr="";
+    for(int i=0; i<iNum; i++)
+        tempStr+=" "+AnsiString().sprintf("%02X",(Byte)cstr[i]);
+    return tempStr;
+}
+//----------------------------------------------------------------------------
+bool TMyBinDispCtrl::StartComport(ICommPort *Comm,AnsiString port)
+{
+    bool bret=false;
+    AnsiString CN="", Str="";
+    try
+    {
+        if(Comm==NULL)
+        {
+            SetComPort(port);
+            SetDelayTime(100);
+            InitialOK=true;
+            return false;
+        }
+        Comm->SetParity((int)ComParity);
+        Comm->SetOnReceiveData(CommBinReceiveData);
+        CN="\\\\.\\"+port;
+        Comm->SetCommName(CN);
+        Comm->StartComm();
+        Str.sprintf("BinDisp, Start Comm OK., %s", Comm->GetCommName());
+        LogBinDisplay("Open", Str, true);
+        bret=true;
+    }
+    catch(...)
+    {
+        ShowMyMessage(LangT("Error open com port"));
+        if(Comm!=NULL)
+            Str.sprintf("BinDisp, Start Comm NG!, %s", Comm->GetCommName());
+        LogBinDisplay("OpenNG", Str, true);
+    }
+    return bret;
+}
+//----------------------------------------------------------------------------
+bool TMyBinDispCtrl::StopComport(ICommPort *Comm,AnsiString port)
+{
+    bool bret=false;
+    AnsiString CN="", Str="";
+    try
+    {
+        if(Comm==NULL)
+        {
+            SetComPort(port);
+            SetDelayTime(100);
+            InitialOK=true;
+            return false;
+        }
+        Comm->SetParity((int)ComParity);
+        Comm->SetOnReceiveData(CommBinReceiveData);
+        CN="\\\\.\\"+port;
+        Comm->SetCommName(CN);
+        Comm->StopComm();
+        Str.sprintf("BinDisp, Stop Comm OK., %s", Comm->GetCommName());
+        LogBinDisplay("Close", Str, true);
+        bret=true;
+    }
+    catch(...)
+    {
+        ShowMyMessage(LangT("Error close com port"));
+        if(Comm!=NULL)
+            Str.sprintf("BinDisp, Stop Comm NG!, %s", Comm->GetCommName());
+        LogBinDisplay("CloseNG", Str, true);
+    }
+    return bret;
+}
+//============================================================================
+// TMyBinDispHT9046 : concrete LED serial protocol
+//============================================================================
+void TMyBinDispHT9046::WriteBin(int Addr, int Command, short Value)
+{
+    unsigned char Btmp1;
+    AnsiString Str;
+    // AI(ht160s-maintainer) 20260616 : the HT9046 board is a single Modbus slave
+    // at the high (color) address; bin/version share that address and differ only
+    // by register. The inherited Addr+1 (low) target had no listener on this
+    // machine - use the same Addr+32(+38) hex base as WriteColor.
+    int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+    sprintf(SendBuffer, ":%02X06008%d00%02d00%c%c", wAddr, Command, Value, Bin_CR, Bin_LF);
+
+    Btmp1=A_Create_LCR((unsigned char*)&SendBuffer[1], 12);
+    SendBuffer[13]=T_HEX2ASCII_Mac(Btmp1>>4);
+    SendBuffer[14]=T_HEX2ASCII_Mac(Btmp1);
+    CommBin->WriteCommData(SendBuffer, strlen(SendBuffer));
+
+    Str.sprintf(":%02X06008%d00%02d00, WriteBin", wAddr, Command, Value);
+    LogBinDisplay("TX", Str, true);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispHT9046::WriteColor(int Addr, short Value)
+{
+    unsigned char Btmp1;
+    AnsiString Str;
+    if(Addr>=10)
+        sprintf(SendBuffer, ":%02X06008200%02d00%c%c", Addr+38, Value, Bin_CR, Bin_LF);
+    else
+        sprintf(SendBuffer, ":%02X06008200%02d00%c%c", Addr+32, Value, Bin_CR, Bin_LF);
+    Btmp1=A_Create_LCR((unsigned char*)&SendBuffer[1], 12);
+    SendBuffer[13]=T_HEX2ASCII_Mac(Btmp1>>4);
+    SendBuffer[14]=T_HEX2ASCII_Mac(Btmp1);
+    CommBin->WriteCommData(SendBuffer, strlen(SendBuffer));
+
+    if(Addr>=10)
+        Str.sprintf(":%02X06008200%02d, WriteColor", Addr+38, Value);
+    else
+        Str.sprintf(":%02X06008200%02d, WriteColor", Addr+32, Value);
+    LogBinDisplay("TX", Str, true);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispHT9046::ReadVersion(int Addr)
+{
+    unsigned char Btmp1;
+    AnsiString Str;
+    // AI(ht160s-maintainer) 20260616 : read version from the same high address as
+    // WriteColor (see WriteBin note). The old Addr+1 target never replied, so
+    // iVersion stayed 0 and every bin/color reply was rejected as NoReply.
+    int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+    sprintf(SendBuffer, ":%02X030080000100%c%c", wAddr, Bin_CR, Bin_LF);
+
+    Btmp1=A_Create_LCR((unsigned char*)&SendBuffer[1], 12);
+    SendBuffer[13]=T_HEX2ASCII_Mac(Btmp1>>4);
+    SendBuffer[14]=T_HEX2ASCII_Mac(Btmp1);
+    CommBin->WriteCommData(SendBuffer, strlen(SendBuffer));
+
+    Str.sprintf(":%02X0300800001, ReadVersion", wAddr);
+    LogBinDisplay("TX", Str, true);
+}
+//----------------------------------------------------------------------------
+bool TMyBinDispHT9046::DoStartSetBin()
+{
+    AnsiString sCheckWord="";
+    int &Task=iStartSetBinTask;
+
+    if(bStartSetBin==true)
+    {
+        iRusStatus=3;
+    }
+    else
+    {
+        iRusStatus=5;
+    }
+
+    switch(Task)
+    {
+        case 1:
+            Addr=0;
+            Task=100;
+            for(int i=0; i<iUsedBinNumber; i++)
+            {
+                bSliding[i]=true;
+                bSetBin[i]=true;
+                iCount[i]=0;
+            }
+            break;
+        case 100:
+            while(1)
+            {
+                if(Addr>=iUsedBinNumber)
+                {
+                    Addr=0;
+                    if(bStartSetBin)
+                    {
+                        Task=1000;
+                        bStartSetBin=false;
+                    }
+                    break;
+                }
+
+                if(bSliding[Addr]==true && bSetBin[Addr]==true && bHasUnitArray[Addr])
+                {
+                    if(iSetBin[Addr][iCount[Addr]]==-1)
+                    {
+                        iCount[Addr]=0;
+                    }
+
+                    if(iSetBin[Addr][0]==-1)                    // not set, show X
+                    {
+                        WriteBin(Addr, 1, 123-100);
+                    }
+                    else if(iSetBin[Addr][iCount[Addr]]<100)    // digit
+                    {
+                        WriteBin(Addr, 0, iSetBin[Addr][iCount[Addr]]);
+                    }
+                    // AI(ht160s-maintainer) 20260617 : HT160 layout puts Color
+                    // at the last unit (index 8); 9045 Addr<=3 only covered its
+                    // low-index L/E/C, so include the Color unit to send its letter.
+                    else if(Addr<=3 || Addr==BIN_DISP_UNIT_COUNT-1 || iSetBin[Addr][iCount[Addr]]==104)
+                    {
+                        WriteBin(Addr, 1, iSetBin[Addr][iCount[Addr]]-100);
+                    }
+                    else
+                    {
+                        Addr++;
+                        break;
+                    }
+
+                    Task=200;
+                    BinDispRecv=false;
+                    sReadBuffer="";
+                    BinDisDelay.Set(2);
+                    BinDisDelay.On();
+                    break;
+                }
+                Addr++;
+            }
+            break;
+        case 200:
+            if(BinDispRecv)
+            {
+                if(Addr>=iUsedBinNumber)
+                {
+                    Task=100;
+                    break;
+                }
+                // AI(ht160s-maintainer) 20260616 : reply echoes the high address
+                // (Addr+32/+38), so the checkword must use that same hex base.
+                int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+                if(iVersion[Addr]==1)
+                {
+                    sCheckWord.sprintf(":%02X06020010", wAddr);
+                }
+                else if(iVersion[Addr]==2)
+                {
+                    if(iSetBin[Addr][0]==-1)
+                        sCheckWord.sprintf(":%02X060201%02d", wAddr, 123-100);
+                    else if(iSetBin[Addr][iCount[Addr]]<100)
+                        sCheckWord.sprintf(":%02X060200%02d", wAddr, iSetBin[Addr][iCount[Addr]]);
+                    else
+                        sCheckWord.sprintf(":%02X060201%02d", wAddr, iSetBin[Addr][iCount[Addr]]-100);
+                }
+
+                if(sReadBuffer.Pos(sCheckWord)==1)
+                {
+                    iBinNow[Addr]=iSetBin[Addr][iCount[Addr]];
+                    bHasError[Addr]=false;
+                    iErrCount[Addr]=0;
+
+                    iCount[Addr]++;
+                    if(iSetBin[Addr][iCount[Addr]]==-1 ||
+                       iCount[Addr]>=iTestBinCount)
+                    {
+                        iCount[Addr]=0;
+                    }
+                    if(iSetBin[Addr][0]==-1 || iSetBin[Addr][1]==-1)
+                    {
+                        bSliding[Addr]=false;
+                    }
+                    Addr++;
+                    if(Addr>=iUsedBinNumber)
+                    {
+                        Task=100;
+                        break;
+                    }
+                }
+                else
+                {
+                    iErrCount[Addr]++;
+                }
+                Task=100;
+            }
+            else if(BinDisDelay.Off())
+            {
+                iErrCount[Addr]++;
+                Task=100;
+            }
+
+            if(Addr>=iUsedBinNumber)
+            {
+                Addr=0;
+            }
+            if(iErrCount[Addr]>2)
+            {
+                //AI(ht160s-maintainer) 20260616 : do not block the whole bus on a
+                //silent unit. Log the anomaly, flag the unit, clear its work flags
+                //and advance to the next address so other units still get updated.
+                AnsiString asErr;
+                asErr.sprintf("Addr=%d, no Bin reply, skip", Addr+1);
+                LogBinDisplay("BinNoReply", asErr, true);
+                iRusStatus=4;
+                bHasError[Addr]=true;
+                bSliding[Addr]=false;
+                bSetBin[Addr]=false;
+                iErrCount[Addr]=0;
+                Addr++;
+                Task=100;
+            }
+            break;
+        case 1000:
+            BinDisDelay.Set(iDelaySec);
+            BinDisDelay.On();
+            Task=1100;
+        case 1100:
+            if(BinDisDelay.Off())
+            {
+                for(int i=0; i<iUsedBinNumber ; i++)
+                    if(bHasUnitArray[i])
+                        bSetBin[i]=true;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//----------------------------------------------------------------------------
+bool TMyBinDispHT9046::DoStartSetColor()
+{
+    AnsiString sCheckWord="";
+    int &Task=iStartSetColorTask;
+    iRusStatus=2;
+    switch(Task)
+    {
+        case 1:
+            Addr=0;
+            Task=100;
+            for(int i=0; i<iUsedBinNumber; i++)
+                bSetColor[i]=true;
+            break;
+        case 100:
+            while(1)
+            {
+                if(Addr>=iUsedBinNumber)
+                    return true;
+
+                if(bSetColor[Addr]==true && bHasUnitArray[Addr])
+                {
+                    WriteColor(Addr, iSetColor[Addr]);
+                    Task=200;
+                    BinDispRecv=false;
+                    sReadBuffer="";
+                    BinDisDelay.Set(2);
+                    BinDisDelay.On();
+                    break;
+                }
+                Addr++;
+            }
+            break;
+        case 200:
+            if(BinDispRecv)
+            {
+                if(iVersion[Addr]==1)
+                {
+                    if(Addr>=10)
+                        sCheckWord.sprintf(":%02X06020010", Addr+38);
+                    else
+                        sCheckWord.sprintf(":%02X06020010", Addr+32);
+                }
+                else if(iVersion[Addr]==2)
+                {
+                    if(Addr>=10)
+                        sCheckWord.sprintf(":%02X060202%02d", Addr+38, iSetColor[Addr]);
+                    else
+                        sCheckWord.sprintf(":%02X060202%02d", Addr+32, iSetColor[Addr]);
+                }
+
+                if(sReadBuffer.Pos(sCheckWord)==1)
+                {
+                    iColorNow[Addr]=iSetColor[Addr];
+                    bHasError[Addr]=false;
+                    iErrCount[Addr]=0;
+                    bSetColor[Addr]=false;
+                }
+                else
+                {
+                    iErrCount[Addr]++;
+                }
+                Task=100;
+            }
+            else if(BinDisDelay.Off())
+            {
+                iErrCount[Addr]++;
+                Task=100;
+            }
+
+            if(iErrCount[Addr]>2)
+            {
+                //AI(ht160s-maintainer) 20260616 : a unit that never echoes its color
+                //used to force a full StopComm + restart, stalling every other unit.
+                //Now just log + flag the unit and move on to the next address.
+                AnsiString asErr;
+                asErr.sprintf("Addr=%d, no Color reply, skip", Addr+1);
+                LogBinDisplay("ColorNoReply", asErr, true);
+                iRusStatus=4;
+                bHasError[Addr]=true;
+                bSetColor[Addr]=false;
+                iErrCount[Addr]=0;
+                Addr++;
+                Task=100;
+            }
+            break;
+    }
+    return false;
+}
+//----------------------------------------------------------------------------
+bool TMyBinDispHT9046::DoStartGetStatus()
+{
+    AnsiString sCheckWord="";
+    int &Task=iStartGetStatusTask;
+    iRusStatus=1;
+
+    switch(Task)
+    {
+        case 1:
+            Addr=0;
+            Task=100;
+            for(int i=0; i<iUsedBinNumber; i++)
+            {
+                bGetStatus[i]=true;
+                bHasUnitArray[Addr]=true;
+            }
+            break;
+        case 100:
+            while(1)
+            {
+                if(Addr>=iUsedBinNumber)
+                    return true;
+
+                if(bGetStatus[Addr]==true)
+                {
+                    ReadVersion(Addr);
+                    Task=200;
+                    BinDispRecv=false;
+                    sReadBuffer="";
+                    BinDisDelay.Set(2);
+                    BinDisDelay.On();
+                    break;
+                }
+                Addr++;
+            }
+            break;
+        case 200:
+            if(BinDispRecv)
+            {
+                // AI(ht160s-maintainer) 20260616 : version reply echoes the high
+                // address (Addr+32/+38); match the checkword to it.
+                int wAddr=(Addr>=10)?(Addr+38):(Addr+32);
+                sCheckWord.sprintf(":%02X03020001", wAddr);
+                if(sReadBuffer.Pos(sCheckWord)==1)
+                {
+                    iVersion[Addr]=1;
+                }
+                else
+                {
+                    sCheckWord.sprintf(":%02X03020002", wAddr);
+
+                    if(sReadBuffer.Pos(sCheckWord)==1)
+                    {
+                        iVersion[Addr]=2;
+                    }
+                    else
+                    {
+                        iVersion[Addr]=0;
+                    }
+                }
+                if(iVersion[Addr]!=0)
+                {
+                    bHasUnitArray[Addr]=true;
+                    bGetStatus[Addr]=false;
+                    iErrCount[Addr]=0;
+                }
+                else
+                {
+                    iErrCount[Addr]++;
+                }
+                Task=100;
+            }
+            else if(BinDisDelay.Off())
+            {
+                iErrCount[Addr]++;
+                Task=100;
+            }
+
+            if(iErrCount[Addr]>2)
+            {
+                //AI(ht160s-maintainer) 20260616 : a unit that never returns its
+                //version used to be retried forever, blocking GetStatus from ever
+                //completing. Log + flag it, clear its poll flag and skip ahead.
+                AnsiString asErr;
+                asErr.sprintf("Addr=%d, no Version reply, skip", Addr+1);
+                LogBinDisplay("VerNoReply", asErr, true);
+                iRusStatus=4;
+                bHasError[Addr]=true;
+                bGetStatus[Addr]=false;
+                iVersion[Addr]=0;
+                iErrCount[Addr]=0;
+                Addr++;
+                Task=100;
+            }
+            break;
+    }
+    return false;
+}
+//----------------------------------------------------------------------------
+// TFT (HT9011 graphic panel) protocol. Frame builders ported 1:1 from HT9045
+// 905.8 BinDisplay/MyBinDisp.cpp (single serial chain; magazine NOT ported).
+// 20-byte binary frame: 0x3A addr ByteCount(2) FuncCode(2) DataItem(2) data(9)
+// LRC CR LF. FuncCode 0x03=text, 0x02=font/layout, 0x00/0x01=background.
+// LRC reuses base A_Create_LCR (== 9045 A_Create_LRC: (~sum)+1).
+// T3 STATUS: builders complete; ProcessTick still a no-op stub -- T4 wires the
+// DoOnce/DoCycle state machine that calls them.
+//----------------------------------------------------------------------------
+TMyBinDispTFT::TMyBinDispTFT()
+{
+    // High-address table per unit (0x20..), mirroring the LED Addr+32 scheme.
+    for(int i=0; i<Bin_MAX_NUM; i++)
+        iAddArrayTFT[i]=0x20+i;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::ShowCommLog(char *cmd, int Address, AnsiString sFun)
+{
+    AnsiString asHex=Chararr2Hexstring(cmd, 20);
+    AnsiString sLog;
+    if(Address==-1)
+        sLog="Recv, "+asHex;
+    else
+        sLog="Send u"+IntToStr(Address)+", "+sFun+" ["+asHex+"]";
+    LogBinDisplay("TFT", sLog, true);
+}
+//----------------------------------------------------------------------------
+// FuncCode 0x03 : text input. iDisplabel selects the field (1=Bin 2="Bin"
+// 3="EA" 4=Count). Each char -> its ASCII code. HT9045 routed this via
+// MyASCIIToDec(), which returns the ASCII value for any printable char, so a
+// direct (unsigned char) cast is exactly equivalent for bin-label text.
+void TMyBinDispTFT::command_TFT_Input(char *cStr, int index, int iDisplabel, AnsiString sValue)
+{
+    int iHeader         =0x3a,
+        iByteCount   [2]={0x00, 0x00},
+        iFunctionCode[2]={0x00, 0x00},
+        iDataItem    [2]={0x00, 0x01},
+        iNumberOfData[9]={0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
+    unsigned char cLRC1=0x00;
+
+    iFunctionCode[1]=0x03;
+    iByteCount[1]   =0x0d;
+    iDataItem[1]    =iDisplabel;
+
+    int iLen=0;
+    if(sValue!="")
+    {
+        iLen=sValue.Length();
+        if(iLen>9)
+            iLen=9;
+        for(int i=0; i<iLen; i++)
+            iNumberOfData[i]=(unsigned char)sValue[i+1];
+    }
+    else
+    {
+        iNumberOfData[0]=0x00;
+    }
+
+    sprintf(cStr, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1],
+            iFunctionCode[0], iFunctionCode[1], iDataItem[0], iDataItem[1],
+            iNumberOfData[0], iNumberOfData[1], iNumberOfData[2], iNumberOfData[3],
+            iNumberOfData[4], iNumberOfData[5], iNumberOfData[6], iNumberOfData[7],
+            iNumberOfData[8]);
+    cLRC1=A_Create_LCR((unsigned char*)&cStr[1], 16);   // addr..data[8], excl header
+    cStr[17]=cLRC1;
+    cStr[18]=Bin_CR;
+    cStr[19]=Bin_LF;
+}
+//----------------------------------------------------------------------------
+// FuncCode 0x02 : font/layout for a field (position, size, RGB color, fill).
+void TMyBinDispTFT::command_TFT_Font(char *cStr, int index, int iDisplabel,
+        Byte iXPos, Byte iYPos, Byte iWidth, Byte iHeigh, Byte iFontSize, Byte iFill, int iColor)
+{
+    int iHeader         =0x3a,
+        iFunctionCode[2]={0x00, 0x00},
+        iByteCount   [2]={0x00, 0x00},
+        iDataItem    [2]={0x00, 0x01},
+        iNumberOfData[9]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    unsigned char cLRC1=0x00;
+
+    iFunctionCode[1]=0x02;
+    iByteCount[1]   =0x0d;
+    iDataItem[1]    =iDisplabel;
+
+    iNumberOfData[0]=iXPos;
+    iNumberOfData[1]=iYPos;
+    iNumberOfData[2]=iWidth;
+    iNumberOfData[3]=iHeigh;
+
+    if(iColor==1)            // red
+    {
+        iNumberOfData[4]=0xff; iNumberOfData[5]=0x00; iNumberOfData[6]=0x00;
+    }
+    else if(iColor==2)       // green
+    {
+        iNumberOfData[4]=0x22; iNumberOfData[5]=0x8b; iNumberOfData[6]=0x22;
+    }
+    else if(iColor==3)       // orange
+    {
+        iNumberOfData[4]=0xff; iNumberOfData[5]=0x80; iNumberOfData[6]=0x00;
+    }
+    else if(iColor==4)       // light gray (transparent-bg "EA" & Count text)
+    {
+        iNumberOfData[4]=0xff; iNumberOfData[5]=0xff; iNumberOfData[6]=0xf0;
+    }
+    else                     // black
+    {
+        iNumberOfData[4]=0x00; iNumberOfData[5]=0x00; iNumberOfData[6]=0x00;
+    }
+
+    iNumberOfData[7]=iFontSize;
+    iNumberOfData[8]=iFill;
+
+    sprintf(cStr, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1],
+            iFunctionCode[0], iFunctionCode[1], iDataItem[0], iDataItem[1],
+            iNumberOfData[0], iNumberOfData[1], iNumberOfData[2], iNumberOfData[3],
+            iNumberOfData[4], iNumberOfData[5], iNumberOfData[6], iNumberOfData[7],
+            iNumberOfData[8]);
+    cLRC1=A_Create_LCR((unsigned char*)&cStr[1], 16);
+    cStr[17]=cLRC1;
+    cStr[18]=Bin_CR;
+    cStr[19]=Bin_LF;
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::ReadVersion_TFT(int index)
+{
+    int iHeader         =0x3a,
+        iByteCount   [2]={0x00, 0x0d},
+        iFunctionCode[2]={0x08, 0x00},
+        iDataItem    [2]={0x30, 0x30},
+        iNumberOfData[9]={0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x31};
+    unsigned char cLRC1=0x00;
+    char cSendCommand[20]="";
+    sprintf(cSendCommand, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1],
+            iFunctionCode[0], iFunctionCode[1], iDataItem[0], iDataItem[1],
+            iNumberOfData[0], iNumberOfData[1], iNumberOfData[2], iNumberOfData[3],
+            iNumberOfData[4], iNumberOfData[5], iNumberOfData[6], iNumberOfData[7],
+            iNumberOfData[8]);
+    cLRC1=A_Create_LCR((unsigned char*)&cSendCommand[1], 16);
+    cSendCommand[17]=cLRC1;
+    cSendCommand[18]=Bin_CR;
+    cSendCommand[19]=Bin_LF;
+
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "ReadVersion");
+}
+//----------------------------------------------------------------------------
+// Bin value encoding matches SetUnitLabel: 104=E(Empty) 111=L(Loader)
+// 102=C(Color) -1=blank 0..99=digit (also 999 = explicit Empty sentinel).
+void TMyBinDispTFT::WriteBin_TFT(int index, int ivalue)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+    {
+        if(index==1)
+            sWrite="Empty";
+        else
+            sWrite="  E";
+    }
+    else if(ivalue==111)
+        sWrite="Loader";
+    else if(ivalue==102)
+        sWrite="Color";
+    else if(ivalue==-1)
+        sWrite="---";
+    else
+        sWrite.sprintf("%03d", ivalue);
+
+    command_TFT_Input(cSendCommand, index, 0x01, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write Bin : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::WriteBinWord_TFT(int index, int ivalue)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+        sWrite="";
+    else if(ivalue==111)
+        sWrite="";
+    else if(ivalue==102)
+        sWrite="";
+    else
+        sWrite="Bin";
+
+    command_TFT_Input(cSendCommand, index, 0x02, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write Bin Word : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::WriteEA_TFT(int index, int ivalue)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+        sWrite="";
+    else if(ivalue==111)
+        sWrite="";
+    else if(ivalue==102)
+        sWrite="";
+    else
+        sWrite="EA";
+
+    command_TFT_Input(cSendCommand, index, 0x03, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write EA : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::WriteCount_TFT(int index, int ivalue, int iCount)
+{
+    char cSendCommand[20]="";
+    AnsiString sWrite="";
+    if(ivalue==999 || ivalue==104)
+        sWrite="";
+    else if(ivalue==111)
+        sWrite="";
+    else if(ivalue==102)
+        sWrite="";
+    else if(ivalue==-1)
+        sWrite="";
+    else
+        sWrite.sprintf("%d", iCount);
+
+    command_TFT_Input(cSendCommand, index, 0x04, sWrite);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Write Count : "+sWrite);
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontBin_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+    if(iValue==999 || iValue==104)        // Empty
+    {
+        iXPos=0x10; iYPos=0x20; iWidth=0x00; iHeigh=0x00; iFontSize=0x14; iFill=0xff;
+    }
+    else if(iValue==111)                  // Loader
+    {
+        iXPos=0x09; iYPos=0x20; iWidth=0x00; iHeigh=0x00; iFontSize=0x14; iFill=0xff;
+    }
+    else if(iValue==102)                  // Color
+    {
+        iXPos=0x09; iYPos=0x20; iWidth=0x00; iHeigh=0x00; iFontSize=0x14; iFill=0xff;
+    }
+    else
+    {
+        iXPos=0x15; iYPos=0x15; iWidth=0x00; iHeigh=0x00; iFontSize=0x03; iFill=0xff;
+    }
+    command_TFT_Font(cSendCommand, index, 0x01, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set Bin Font");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontBinWord_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+
+    if(iValue==999 || iValue==104)        // Empty : keep default (blank)
+    {
+    }
+    else if(iValue==111)                  // Loader : keep default
+    {
+    }
+    else if(iValue==102)                  // Color : keep default
+    {
+    }
+    else                                  // BIN
+    {
+        iXPos=0x09; iYPos=0x01; iWidth=0x00; iHeigh=0x00; iFontSize=0x01; iFill=0xff;
+        // If color 3 (R+G), draw the "Bin" word blank so it does not clash with
+        // the "---" bin field display.
+        if(iColor==3)
+            iColor=-1;
+    }
+    command_TFT_Font(cSendCommand, index, 0x02, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set Bin Word Font");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontEA_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+    iColor=4;
+    if(iValue==999 || iValue==104)        // Empty : keep default
+    {
+    }
+    else if(iValue==111)                  // Loader : keep default
+    {
+    }
+    else if(iValue==102)                  // Color : keep default
+    {
+    }
+    else
+    {
+        iXPos=0x60; iYPos=0x58; iWidth=0x00; iHeigh=0x00; iFontSize=0x01; iFill=0xff;
+    }
+    command_TFT_Font(cSendCommand, index, 0x03, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set EA Font");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetFontCount_TFT(int index, int iColor, int iValue)
+{
+    char cSendCommand[20]="";
+    Byte iXPos=0x00, iYPos=0x00, iWidth=0x00, iHeigh=0x00, iFontSize=0x00, iFill=0x00;
+    iColor=4;
+    if(iValue==999 || iValue==104)        // Empty : keep default
+    {
+    }
+    else if(iValue==111)                  // Loader : keep default
+    {
+    }
+    else if(iValue==102)                  // Color : keep default
+    {
+    }
+    else
+    {
+        iXPos=0x01; iYPos=0x58; iWidth=0x00; iHeigh=0x00; iFontSize=0x01; iFill=0xff;
+    }
+    command_TFT_Font(cSendCommand, index, 0x04, iXPos, iYPos, iWidth, iHeigh, iFontSize, iFill, iColor);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set Count Font");
+}
+//----------------------------------------------------------------------------
+// Background fill. NOTE T4: the `index<3` data-item branch is the 9045 layout
+// (its L/E/C live at units 0/1/2); HT160's layout is Empty=0 Loader=1 Color=8,
+// so revisit this gate when wiring ProcessTick (mirrors the LED Color-letter fix).
+void TMyBinDispTFT::SetBackGround_TFT(int index)
+{
+    int iHeader         =0x3a,
+        iByteCount[2]   ={0x00, 0x0d},
+        iFunctionCode[2]={0x00, 0x01},
+        iDataItem[2]    ={0x00, 0x02},
+        iNumberOfData[9]={0x30, 0x30, 0x00, 0x59, 0xaa, 0x30, 0x69, 0x69, 0x69},
+        iDelimiter[2]   ={0x0d, 0x0a};
+    char cSendCommand[20]="";
+    unsigned char Btmp1;
+
+    if(index<3)
+        iDataItem[1]=0x00;
+
+    Btmp1=iAddArrayTFT[index]+iByteCount[0]+iByteCount[1]+iFunctionCode[0]+iFunctionCode[1]+iDataItem[0]+iDataItem[1]+
+          iNumberOfData[0]+iNumberOfData[1]+iNumberOfData[2]+iNumberOfData[3]+iNumberOfData[4]+
+          iNumberOfData[5]+iNumberOfData[6]+iNumberOfData[7]+iNumberOfData[8];
+    Btmp1=~Btmp1;
+    Btmp1+=1;
+
+    sprintf(cSendCommand, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1], iFunctionCode[0],
+            iFunctionCode[1], iDataItem[0], iDataItem[1], iNumberOfData[0], iNumberOfData[1],
+            iNumberOfData[2], iNumberOfData[3], iNumberOfData[4], iNumberOfData[5], iNumberOfData[6],
+            iNumberOfData[7], iNumberOfData[8], Btmp1, iDelimiter[0], iDelimiter[1]);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set BackGround");
+}
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::SetNoBackGround_TFT(int index)
+{
+    int iHeader         =0x3a,
+        iFunctionCode[2]={0x00, 0x04},
+        iByteCount[2]   ={0x00, 0x0d},
+        iDataItem[2]    ={0x00, 0x01},
+        iNumberOfData[9]={0x30, 0x30, 0x30, 0x30, 0x30, 0x00, 0x00, 0x07, 0x00},
+        iDelimiter[2]   ={0x0d, 0x0a};
+    char cSendCommand[20]="";
+    unsigned char Btmp1;
+
+    Btmp1=iAddArrayTFT[index]+iByteCount[0]+iByteCount[1]+iFunctionCode[0]+iFunctionCode[1]+iDataItem[0]+iDataItem[1]+
+          iNumberOfData[0]+iNumberOfData[1]+iNumberOfData[2]+iNumberOfData[3]+iNumberOfData[4]+
+          iNumberOfData[5]+iNumberOfData[6]+iNumberOfData[7]+iNumberOfData[8];
+    Btmp1=~Btmp1;
+    Btmp1+=1;
+
+    sprintf(cSendCommand, "%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+            iHeader, iAddArrayTFT[index], iByteCount[0], iByteCount[1], iFunctionCode[0],
+            iFunctionCode[1], iDataItem[0], iDataItem[1], iNumberOfData[0], iNumberOfData[1],
+            iNumberOfData[2], iNumberOfData[3], iNumberOfData[4], iNumberOfData[5], iNumberOfData[6],
+            iNumberOfData[7], iNumberOfData[8], Btmp1, iDelimiter[0], iDelimiter[1]);
+    CommBin->WriteCommData(cSendCommand, 20);
+    ShowCommLog(cSendCommand, index, "Set NoBackGround");
+}
+//----------------------------------------------------------------------------
+// TFT state machine. FRAMEWORK SKELETON: still a safe no-op (T4 wires the
+// open-COM -> ReadVersion_TFT -> DoOnce(layout) -> DoCycle(bin/EA/count) flow
+// using the builders above). PanelType=1 today = quiescent controller.
+//----------------------------------------------------------------------------
+void TMyBinDispTFT::ProcessTick()
+{
+    // Intentionally idle until the TFT state machine is wired (T4).
+}
+//----------------------------------------------------------------------------

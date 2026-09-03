@@ -1,0 +1,16 @@
+{
+  "_comment": "HT160S WhiteList sort-mode sample. Deploy as D:\\HT160S_BCB\\HT160S_WhiteList\\WhiteList.json (fixed folder + fixed file name; the folder is always <program root>\\HT160S_WhiteList). In By WhiteList mode this file is the authoritative 2D->Bin source (loaded at Lot Start, replacing the WebAPI pull). Only 2D codes listed here are sorted, each to its listed HBin (routed through the static Bin->Auto recipe table, same as Normal mode); any scanned 2D code NOT in this list is sent silently to the Error bin. Customer schema (KYEC-WhiteList-Interface-Spec 3.2): root QRCodeIDHis[] -> lot { LOTID, KYECLotID, Substage, ProductCode, ICInfo[] } -> IC { QRCodeID, HBin }. LOTID MUST match the lot declared by the host (SET_LOT_INFO/LOTSTART) or entered by the operator, else Start is blocked. KYECLotID is MANDATORY on every lot - one lot without it invalidates the WHOLE file and Lot Start is refused. HBin is a STRING. 2D codes are byte-exact (case-sensitive) and must be unique across the file. The _comment key is ignored by the parser.",
+  "QRCodeIDHis": [
+    {
+      "LOTID": "LOT001",
+      "KYECLotID": "KYEC-INTERNAL-0001",
+      "Substage": "FT1",
+      "ProductCode": "SAMPLEDEV-A1",
+      "ICInfo": [
+        { "QRCodeID": "A1B2C3D4E5", "HBin": "1" },
+        { "QRCodeID": "F6G7H8I9J0", "HBin": "2" },
+        { "QRCodeID": "K1L2M3N4O5", "HBin": "1" }
+      ]
+    }
+  ]
+}

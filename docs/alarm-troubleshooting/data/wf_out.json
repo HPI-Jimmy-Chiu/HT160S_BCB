@@ -1,0 +1,1356 @@
+{
+ "free_string": [
+  {
+   "code": "WAR0154",
+   "message": "Sorting Arm X motor will out of limit",
+   "category": "motor-limit",
+   "trigger": "aSortArm.cpp:677 MoveSortArmX(): if(HSys.Mot.MSortingArmX->CheckSoftLimit(Position)==false) -> raise at aSortArm.cpp:679 ShowMotorLimitError(\"WAR0154\",\"Sorting Arm X motor will out of limit\", HSys.Mot.MSortingArmX->SoftLimitDetail(Position)). CheckSoftLimit is a pure numeric compare: return (p<=Motor->SoftLimitP && p>=Motor->SoftLimitN) at MyMotor.cpp:506. This is a PRE-MOVE software soft-limit guard, not a physical limit-switch trip; it fires before the motor is commanded, when the requested X target falls outside the configured band. SoftLimitDetail (MyMotor.cpp:512-516) prints the numeric line 'target=%d  now=%d  soft limit N=%d ~ P=%d  (unit:1/100mm)'. VERIFIED sole WAR0154 raise site (grep: only aSortArm.cpp:679). The XY pre-check at aSortArm.cpp:2250 runs the same CheckSoftLimit but returns Err=\"Sorting Arm X target over soft limit\" instead of raising this code.",
+   "root_causes": [
+    "A SortArm X destination teach value (e.g. an Auto/Loader sort-column X, or a Pitch X target) is set beyond the configured soft-limit band [SoftLimitN, SoftLimitP].",
+    "Computed cell/slot X target (GetSortArmCellX from base X + column/pitch, aSortArm.cpp:2248) overshoots the physical range for a given tray geometry or column index; this XPosition flows into MoveSortArmX (aSortArm.cpp:810/819/2319).",
+    "SoftLimitN/SoftLimitP in the motor table for MSortingArmX configured too tight to cover the required travel.",
+    "Arm home/origin offset shifted from lost steps or a bad home, so 'now' is out of calibration and an otherwise-valid target resolves outside the band.",
+    "The SortArm teach-advanced test path (uteach case 30 -> MoveSuckerToCell -> MoveSortArmX, aSortArm.cpp:2319; see uteach.cpp:1421) commanded an X target outside the band and re-raised WAR0154. NOTE: the generic Motor Test / Teach jog (uMotorTest.cpp:2560 / uteach.cpp:870) uses the SAME CheckSoftLimit guard but raises its own per-motor over-limit code, NOT WAR0154."
+   ],
+   "devices": [
+    {
+     "name": "MSortingArmX",
+     "kind": "motor",
+     "expected": "Requested X target within the configured soft-limit band, i.e. SoftLimitN <= target <= SoftLimitP, so CheckSoftLimit() returns true and the move is allowed.",
+     "actual": "Requested target is below SoftLimitN or above SoftLimitP, so CheckSoftLimit() (MyMotor.cpp:506) returns false and the move is refused before any motion is commanded.",
+     "check_where": "MotionView (live MSortingArmX position + configured soft-limit N/P band); the target/now/N~P values are also printed on the Note detail line."
+    },
+    {
+     "name": "Requested X target (Position arg to MoveSortArmX)",
+     "kind": "logic",
+     "expected": "The caller-computed destination (Teach SortArm X position or GetSortArmCellX-derived slot target, or a teach-advanced-test target) lands inside SoftLimitN..SoftLimitP.",
+     "actual": "The computed target is out of range for the current calibration; SoftLimitDetail shows 'target=' outside the 'soft limit N=.. ~ P=..' band.",
+     "check_where": "Note detail line (SoftLimitDetail: target vs now vs N~P, unit 1/100mm); State Record / EventLog for the preceding move-decision context."
+    },
+    {
+     "name": "MSortingArmX SoftLimitN / SoftLimitP",
+     "kind": "logic",
+     "expected": "Soft-limit band wide enough to cover every valid SortArm X destination (all Auto/Loader sort-column teach positions plus slot pitch spread).",
+     "actual": "Band set too tight (or shifted), clipping a legitimate destination and rejecting the move.",
+     "check_where": "MotionView soft-limit fields for MSortingArmX; motor-table config values that seed Motor->SoftLimitN/SoftLimitP."
+    }
+   ],
+   "operator_action": "Read the Note detail line: it shows target, now, and the soft-limit band N ~ P (unit 1/100mm). Alarm is RETRY (K_RETRY, note.cpp:857). Only press Retry after the arm position / teach has been corrected; if it recurs immediately on Retry, stop and call an engineer rather than repeatedly retrying (the target is genuinely out of band).",
+   "engineer_action": "Open MSortingArmX in MotionView and compare the 'target' from the Note detail line against SoftLimitN/SoftLimitP. If a teach position (SortArm X sort-column) or a computed slot target (GetSortArmCellX) exceeds the band, correct the teach value; if the travel is legitimately required, widen SoftLimitN/P in the motor table. Rule out lost-steps / bad home offset that shifted 'now' out of calibration by re-homing SortArm X. Remember this is a software CheckSoftLimit guard (MyMotor.cpp:506), not a hardware limit switch, so there is no IO LED to read in IOsetview - verify against the numeric detail line and MotionView only.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently. Trigger verified verbatim: aSortArm.cpp:677 CheckSoftLimit==false -> raise aSortArm.cpp:679; compare at MyMotor.cpp:506 (p<=SoftLimitP && p>=SoftLimitN); SoftLimitDetail format at MyMotor.cpp:514; K_RETRY via note.cpp:857. Confirmed sole WAR0154 raise site and that aSortArm.cpp:2250 returns an Err string instead. All three devices, their expected/actual states, and the N<=target<=P polarity are correct as drafted; the 'no IO LED / software guard' framing is accurate. Only correction: root-cause #5 originally implied uMotorTest.cpp:2560 / uteach.cpp:870 raise WAR0154 - they share the CheckSoftLimit gate but emit their own per-motor codes; the real WAR0154 test-context path is the SortArm teach-advanced test (aSortArm.cpp:2319 MoveSuckerToCell->MoveSortArmX, uteach.cpp:1421). Refined that bullet; no device or trigger changes."
+  },
+  {
+   "code": "MES1022",
+   "message": "Empty supply magazine empty",
+   "category": "source-dry",
+   "trigger": "TEmptyModule::DoEmpty(int &Task) case 100: if(IsInputShortageForAmr() && HSys.Sys.RunMode!=Run_CleanOut){ ... int Ret=ShowMyError(\"MES1022\", LangT(\"Empty supply magazine empty\"), &HSys.Sen.SnEmpty_InputEnd, true, K_RETRY); } -- if() at aEmpty.cpp:317, raise at aEmpty.cpp:343. In AMR mode (GeneralSetting.bUseAMR, line 319) the alarm is deferred: AmrFeedWaitTimer.SetMS(iAmrFeedWaitSec*1000) waits (bWaitingAmrFeed latch, lines 321-332) for an AGV refill and only raises after that timer expires. IsInputShortageForAmr() at aEmpty.cpp:159-163: sim = iSimInfeedCount<=0; real = HSys.Sen.SnEmpty_InputEnd.Enable==true && SnEmpty_InputEnd.IsOff(). NOTE: enclosing function is TEmptyModule::DoEmpty(int &Task), NOT MainProc() as the draft stated.",
+   "root_causes": [
+    "Empty supply magazine ran dry - SnEmpty_InputEnd reads OFF (no tray at input source) on real hardware",
+    "AMR mode: AGV did not refill within iAmrFeedWaitSec (AmrFeedWaitTimer expired while still shortage)",
+    "SnEmpty_InputEnd sensor fault/misalignment reading OFF while trays are actually present",
+    "SOFT_SIMULATE only: iSimInfeedCount drained to 0 (virtual car empty)"
+   ],
+   "devices": [
+    {
+     "name": "SnEmpty_InputEnd",
+     "kind": "sensor",
+     "expected": "ON = tray present at the Empty input/supply magazine (Enable must be true; a disabled sensor makes IsInputShortageForAmr return false and no alarm fires)",
+     "actual": "OFF = source dry -> IsInputShortageForAmr() true on real hardware (aEmpty.cpp:163)",
+     "check_where": "IOsetview and Note detail line (alarm pSn = &HSys.Sen.SnEmpty_InputEnd, bExpectedOn=true)"
+    },
+    {
+     "name": "AmrFeedWaitTimer / bWaitingAmrFeed",
+     "kind": "logic",
+     "expected": "AMR mode: timer running (bWaitingAmrFeed true) giving the AGV up to iAmrFeedWaitSec to refill before alarming (aEmpty.cpp:321-329)",
+     "actual": "Timer expired (AmrFeedWaitTimer.Off()==true) with source still dry -> alarm raised; latch cleared once refill detected (aEmpty.cpp:359-363)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "iSimInfeedCount",
+     "kind": "logic",
+     "expected": "SOFT_SIMULATE: >0 (virtual magazine has stock)",
+     "actual": "<=0 in sim triggers the shortage (aEmpty.cpp:162); Retry calls RefillSimInfeed() to restock the virtual car (aEmpty.cpp:351-352)",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Reload the Empty supply magazine (or let the AGV refill), then press Retry. Retry (K_RETRY) sets Task=1 which walks case 1->10->100 and re-checks IsInputShortageForAmr; the alarm clears once stock is back. In simulation, Retry auto-refills the virtual car (RefillSimInfeed).",
+   "engineer_action": "Confirm SnEmpty_InputEnd reads ON in IOsetview with a stocked magazine; if trays are present but it reads OFF, check the sensor gap/alignment/wiring (and that the sensor is Enable=true, else no shortage is ever detected). In AMR mode verify the AGV actually delivered and review GeneralSetting.iAmrFeedWaitSec. Note: CleanOut mode suppresses this alarm (RunMode!=Run_CleanOut guard at line 317); the only recovery button is Retry.",
+   "verdict": "CORRECTED",
+   "verify_note": "Raise site re-located independently: aEmpty.cpp:343 inside TEmptyModule::DoEmpty(int &Task) case 100, gated by if() at line 317; IsInputShortageForAmr() at aEmpty.cpp:159-163. Trigger condition, file:line, AMR deferral (lines 319-332), CleanOut guard, all three devices, and SnEmpty_InputEnd polarity (healthy ON / fault OFF, Enable-gated) all CONFIRMED against source. Single correction: draft named the enclosing function 'MainProc()'; the actual function is TEmptyModule::DoEmpty(int &Task). Device set is accurate and none invented -- SnEmpty_InputEnd is the only physical IO; the other two are logic state (timer latch, sim counter)."
+  },
+  {
+   "code": "JAM1030",
+   "message": "Empty Push Tray Miss",
+   "category": "tray-flow",
+   "trigger": "TEmptyModule::DoFeedTray() FeedTask case 2000: Clamp = DoClampTray(C_Empty_LeanOnTray, C_Empty_PushTray, FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iEmptyFeedClampSettleMs) at aEmpty.cpp:486-487; the else-if(Clamp==2) branch raises ShowMyError(\"JAM1030\", LangT(\"Empty Push Tray Miss\"), &C_Empty_PushTray.OnSensor, true, K_RETRY) at aEmpty.cpp:492. Clamp==2 is returned by DoClampTray case 30 (mycylin.cpp:76-82, 'return 2' at line 80), which is entered from case 20 (mycylin.cpp:64-74) when, after the iEmptyFeedClampSettleMs settle delay expires, IsCylinderOnReady(&Push) is FALSE at mycylin.cpp:67 (Push.OnSensor never came ON): the push cylinder was commanded to extend but its confirm sensor never latched, so case 30 retracts it and returns 2 to the caller to alarm. Note: bSoftSimulate short-circuits every DoClampTray case to return 1, so JAM1030 only fires on a real machine.",
+   "root_causes": [
+    "C_Empty_PushTray extended but its OnSensor did not confirm within iEmptyFeedClampSettleMs (no tray under the clamp, short stroke, or low air pressure)",
+    "Feed slot had no tray for the clamp to close against (upstream feed/singulation miss)",
+    "Push-cylinder confirm sensor (OnSensor) mis-aligned, dirty, or wiring/air fault so it never reads ON at the extended position",
+    "Empty-Y carrier not at the taught feed position so the tray sits outside the clamp and the push never seats"
+   ],
+   "devices": [
+    {
+     "name": "C_Empty_PushTray",
+     "kind": "cylinder",
+     "expected": "After the push stroke + iEmptyFeedClampSettleMs settle, OnSensor reads ON (IsCylinderOnReady TRUE at mycylin.cpp:67) - clamp reached / tray captured",
+     "actual": "Commanded to extend but OnSensor stays OFF after the settle delay; DoClampTray case 30 retracts it (Push.Pop) and returns 2, firing JAM1030",
+     "check_where": "Note detail line (alarm pSn = &C_Empty_PushTray.OnSensor, bExpectedOn=true) and IOsetview"
+    },
+    {
+     "name": "C_Empty_LeanOnTray",
+     "kind": "cylinder",
+     "expected": "Lean-stop is driven first in DoClampTray case 0 (Lean.Push()) and must confirm its OnSensor before the push step (case 10) runs; TMyCylinder::Push() only returns true once OnSensor.IsOn()",
+     "actual": "Not the JAM1030 trigger device - if lean never confirms, DoClampTray stalls at case 0 returning 0 (no alarm). A stuck/unconfirmed lean is therefore a distinct upstream cause the engineer should rule out, but it does not itself raise JAM1030",
+     "check_where": "IOsetview"
+    },
+    {
+     "name": "MEmptyY",
+     "kind": "motor",
+     "expected": "Positioned at Teach.EmptyCarFeedTrayYPosition (FeedTask case 1000 MoveEmptyY completed, aEmpty.cpp:477) so the tray sits under the push clamp",
+     "actual": "If mis-positioned, the tray is not under the push clamp, so the push confirm sensor never latches and DoClampTray returns 2",
+     "check_where": "MotionView"
+    }
+   ],
+   "operator_action": "Confirm a tray is actually present at the Empty feed slot, then press Retry (K_RETRY). Retry sets FeedTask=1000, which re-positions Empty-Y to the taught feed Y and re-attempts the lean+push clamp.",
+   "engineer_action": "Verify C_Empty_PushTray strokes fully and its OnSensor (reed/proximity) latches ON at the extended position within iEmptyFeedClampSettleMs; check supply air pressure and the sensor gap/wiring. Confirm MEmptyY stops at Teach.EmptyCarFeedTrayYPosition. Rule out the upstream lean cylinder: C_Empty_LeanOnTray must confirm first, else the flow stalls in case 0 without raising JAM1030.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located raise site independently: aEmpty.cpp:492 (ShowMyError JAM1030), DoClampTray call at aEmpty.cpp:486-487, Clamp==2 from mycylin.cpp DoClampTray case 30 (return 2 at line 80) via case 20 IsCylinderOnReady(&Push)==FALSE at line 67. Trigger condition, polarity (bExpectedOn=true / healthy OnSensor ON), and all three devices match the code. Motor identifier HSys.Mot.MEmptyY and case-1000 MoveEmptyY(Teach.EmptyCarFeedTrayYPosition) confirmed. Verified TMyCylinder::Push() (mycylin.cpp:197) waits for OnSensor.IsOn() before returning true, so the Lean-cylinder 'distinct upstream cause' framing is real, not invented - Lean is honestly labeled as NOT the direct trigger. Only tightening applied: exact file:line ranges. No devices removed or corrected."
+  },
+  {
+   "code": "MES0924",
+   "message": "Loader rear has a leftover tray - please remove it",
+   "category": "tray-flow",
+   "trigger": "aLoader.cpp:1147-1149 (DoLoader rear-leftover watchdog). Raised when ALL of the guard at aLoader.cpp:1140-1145 hold: LoaderNo==1 (evaluated once per cycle) && HSys.LastSet.iRealDummy!=DUMMY && bRearResidualAlarmed==false (once per episode) && bRearDischargeInProgress==false && bRearReadyForPick==false && IsRearOccupied()==true. A tray sits in the rear output-bottom with NO published pick-readiness and NO discharge in flight, so it can never become pickable (bRearReadyForPick's only TRUE setter is DoDischargeTray case 4000 at aLoader.cpp:2032, and a new discharge cannot start while the rear is occupied) -> silent TrayArm starvation (TAJOB_LOADER_RECOVERY pins the arm with no alarm). Reached only when the Loader reset routine could NOT preserve the rear hold: the bKeepRear gate (aLoader.cpp:86 = bRearReadyForPick && IsOutputBottomOccupied()) is false, so a cold start over a leftover tray or a mid-discharge abort (readiness latch never set) falls through to this Note instead of the auto-preserve path. Sensor-aware ShowMyError(&SnLoader_OutputBottomHasTray, bExpectedOn=false, K_RETRY): healthy=OFF (rear clear), fault=ON.",
+   "root_causes": [
+    "Cold start / power-up over a tray physically left in the Loader rear output-bottom (bKeepRear false at reset, aLoader.cpp:86)",
+    "Mid-discharge abort left a tray of unknown Kind/ID in the rear - bRearReadyForPick was never published (DoDischargeTray never reached case 4000), so auto-pick is disallowed to avoid misrouting a cover/identity tray into the normal pool; operator removal is required",
+    "SnLoader_OutputBottomHasTray false-ON (sensor stuck/misaligned over an actually-clear rear) driving IsRearOccupied() true"
+   ],
+   "devices": [
+    {
+     "name": "SnLoader_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "OFF - rear output-bottom clear in normal flow",
+     "actual": "ON - a leftover tray occupies the rear; on a real machine RefreshRearState reads IsOn() (aLoader.cpp:694) -> bRearHasTray=true -> IsRearOccupied() true",
+     "check_where": "IOsetview (also printed on the Note detail line - sensor-aware alarm)"
+    },
+    {
+     "name": "bRearReadyForPick",
+     "kind": "logic",
+     "expected": "TRUE for a legitimately-discharged, TrayArm-pickable rear tray (set only at DoDischargeTray case 4000, aLoader.cpp:2032)",
+     "actual": "FALSE - the leftover tray's Kind/ID are unknown, so it was never published as pickable",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "bRearDischargeInProgress",
+     "kind": "logic",
+     "expected": "TRUE only while a discharge is settling toward the rear (set at case-100 commit, aLoader.cpp:1983; cleared at case 4000, aLoader.cpp:2031)",
+     "actual": "FALSE - no discharge in flight, yet the rear is occupied (dead-end condition)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "bRearResidualAlarmed",
+     "kind": "logic",
+     "expected": "FALSE going in; latched TRUE by this alarm at aLoader.cpp:1147 (fires once per episode)",
+     "actual": "Set TRUE at raise; re-armed only on the rear sensor-empty edge (RefreshRearState, aLoader.cpp:711) or on reset (aLoader.cpp:96)",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Manually remove the leftover tray from the Loader rear output-bottom, then choose RETRY. Removing the tray drops SnLoader_OutputBottomHasTray OFF; RefreshRearState clears bRearReadyForPick and re-arms bRearResidualAlarmed on that empty edge (aLoader.cpp:710-711), so the watchdog can fire again for a fresh episode.",
+   "engineer_action": "In IOsetview confirm SnLoader_OutputBottomHasTray goes OFF once the rear is physically clear - if it stays ON, service/realign the sensor. In the State Record verify bRearReadyForPick==false and bRearDischargeInProgress==false (the dead-end signature) and that this followed a cold start or an aborted DoDischargeTray (never reached case 4000) - the tray Kind/ID were lost (bKeepRear false at aLoader.cpp:86), which is why auto-collect is disallowed and manual removal is required.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located raise site at aLoader.cpp:1147-1149 (not 1148); guard confirmed at 1140-1145 exactly as drafted. Verified sensor polarity (bExpectedOn=false, sensor-aware overload, real-machine read at RefreshRearState line 694), bRearReadyForPick sole TRUE setter at case 4000 line 2032, bRearDischargeInProgress set/clear at 1983/2031, and the re-arm at RefreshRearState line 711 + reset line 96. bKeepRear gate confirmed at line 86. All four devices are real code identifiers with correct expected/actual states; none invented. Only wording tightened ('InitialFlag' -> the reset routine's bKeepRear gate)."
+  },
+  {
+   "code": "MES0921",
+   "message": "Loader Tray Count Mismatch",
+   "category": "identity",
+   "trigger": "aLoader.cpp:1464 (TLoaderModule::DoFeedTray, aLoader.cpp:1299; switch(State->FeedTask) at 1341; case 9000). Raised when the AMR count-vs-sensor cross-check at aLoader.cpp:1454-1458 is TRUE: GeneralSetting.bUseAMR && iCarTrayTotal>0 && (iCarTrayTotal - iFeedSerial)<=0 && HSys.Sen.SnLoader_Inputend.Enable==true && HSys.Sen.SnLoader_Inputend.IsOn(). Meaning: the SECS-declared magazine total (iCarTrayTotal, latched at car arrival from iSecsCarTrayCount = host LoaderTrayCount, aLoader.cpp:563) has been fully consumed by iFeedSerial, yet the supply-car stock sensor SnLoader_Inputend STILL reads a tray. NOT in Run_CleanOut (breaks first, aLoader.cpp:1462). This is a logic/count-vs-hardware disagreement, not a single-IO fault; the free-string ShowMyError has NO sensor overload (K_RETRY|K_CLEAN_OUT), so no IO name is printed on the Note.",
+   "root_causes": [
+    "SECS host sent a LoaderTrayCount smaller than the trays physically loaded on the car (iCarTrayTotal / iSecsCarTrayCount too low)",
+    "Extra trays loaded on the car beyond the declared count",
+    "iFeedSerial miscounted (a feed double-counted or skipped) so the count reads drained early",
+    "SnLoader_Inputend stuck ON / false-triggered while the car is actually empty"
+   ],
+   "devices": [
+    {
+     "name": "iCarTrayTotal (SECS LoaderTrayCount via iSecsCarTrayCount, latched at car arrival)",
+     "kind": "logic",
+     "expected": "Equals the physical tray count on the car (IC + cover + identity)",
+     "actual": "Consumed: iCarTrayTotal - iFeedSerial <= 0 while the car is not actually empty",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "iFeedSerial (trays fed so far this car; ++ at case 9500 aLoader.cpp:1577)",
+     "kind": "logic",
+     "expected": "Less than iCarTrayTotal while trays remain to feed",
+     "actual": ">= iCarTrayTotal (count says the car is drained)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "SnLoader_Inputend",
+     "kind": "sensor",
+     "expected": "OFF - consistent with the count saying the car is drained",
+     "actual": "ON - a tray still physically present, contradicting the count",
+     "check_where": "IOsetview"
+    }
+   ],
+   "operator_action": "Choose RETRY to feed the tray the sensor still sees and continue (State->FeedTask resets to 1, aLoader.cpp:1466), or CLEAN OUT to enter drain mode (RunMode=Run_CleanOut, bCleanOut=true, FeedTask=10000, aLoader.cpp:1469-1471). Physically verify how many trays remain on the car versus the host-declared count.",
+   "engineer_action": "Compare the SECS-reported LoaderTrayCount (iCarTrayTotal) against the actual trays on the car and the fed count (iFeedSerial) in the State Record (dumped together at aLoader.cpp:2296-2299 with Remain=iCarTrayTotal-iFeedSerial). If the host count was wrong, correct the AMR/SECS LoaderTrayCount source (SetExpectedCarTrayCount, aLoader.cpp:573); if SnLoader_Inputend is stuck ON, service the sensor in IOsetview. Confirm iFeedSerial increments exactly once per fed tray (case 9500 mint, aLoader.cpp:1577, gated by SnLoader_InputHasTray confirm).",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently. ShowMyError(\"MES0921\",...) confirmed at aLoader.cpp:1464 inside TLoaderModule::DoFeedTray case 9000. Trigger condition matches the real if() at aLoader.cpp:1454-1458 verbatim, with the Run_CleanOut break at 1462. iCarTrayTotal latch from SECS (aLoader.cpp:563 via SetExpectedCarTrayCount) and iFeedSerial reset(567)/++ at case 9500(1577) verified. Sensor .Name alias 'SnLoader_Inputend' confirmed at database.cpp:1084; it is a TMySensor (database.h:295) with IOsetview LED mlSnLoader_Inputend (iosetview.h:114). Polarity verified: alarm fires on .IsOn()==true (tray present) while the count says drained, so healthy-consistent state is OFF. Free-string ShowMyError has no sensor overload, so no IO name prints on the Note. All three devices and both operator branches confirmed accurate; entry returned unchanged."
+  },
+  {
+   "code": "MES1024",
+   "message": "Front Empty Tray Is Miss Error",
+   "category": "tray-flow",
+   "trigger": "TEmptyModule::DoGoDownTray() case 700, aEmpty.cpp:713-722. The raise if() (lines 714-716) reads ONLY the front has-tray sensor: if(HSys.Sen.SnEmpty_InputHasTray.Enable==true && HSys.Sen.SnEmpty_InputHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY){ bFrontHasTray=false; ShowMyError(\"MES1024\", LangT(\"Front Empty Tray Is Miss Error\"), &SnEmpty_InputHasTray, true, K_RETRY); }. Case 700 is the confirm step at the tail of the destack cycle: earlier cases lower one tray to the front singulated slot (Rise_1 push case 100 / Rise_2 push case 150 / Separate push case 200; Rise_2 pop case 300, Separate pop case 400, Rise_1 pop case 500; settle-timer gates at cases 300/350/450/600). After GoDown, SnEmpty_InputHasTray must read ON; if it is Enabled and OFF and not in DUMMY, the tray is missing and the alarm fires. bFrontHasTray is forced false at line 718 before the alarm. Recovery K_RETRY sets GoDownTask=1 (line 720-721), re-running the whole destack.",
+   "root_causes": [
+    "Destack lowered no tray to the front position (supply magazine empty, or the rise/separate claws failed to catch and lower a single tray)",
+    "Tray dropped during separation - a slow/marginal Rise_2 down-confirm let the separation claw open before the stack was caught (see the case 300 guard comment, aEmpty.cpp:656-662)",
+    "SnEmpty_InputHasTray mis-aligned / dirty / wiring fault reading OFF with a tray actually present at the front slot",
+    "Front-separate interlock (IsFrontSeparateBlockedBy C_Loader_FrontSeparateTray_1, case 200) mis-sequenced so separation timing released the wrong count",
+    "Machine not in DUMMY (iRealDummy!=DUMMY), so the physical sensor confirm is armed"
+   ],
+   "devices": [
+    {
+     "name": "SnEmpty_InputHasTray",
+     "kind": "sensor",
+     "expected": "ON after destack - a single empty tray seated at the front singulated position (Enable=true, IsOn())",
+     "actual": "OFF (IsOff()) - no tray detected at the front slot when case 700 checks; this is the only device read at the raise line",
+     "check_where": "IOsetview and Note detail line (alarm pSn = SnEmpty_InputHasTray, so the IO name prints)"
+    },
+    {
+     "name": "C_Empty_FrontRiseTray_1",
+     "kind": "cylinder",
+     "expected": "Upstream destack actuator (not read at the raise site): pushed at case 100 (aEmpty.cpp:628) to support the stack, popped at case 500 (line 700); its confirm sensors report full stroke",
+     "actual": "If it fails to catch/hold or its pop-confirm stalls, no tray is lowered to the front and case 700 finds the sensor OFF",
+     "check_where": "IOsetview"
+    },
+    {
+     "name": "C_Empty_FrontRiseTray_2",
+     "kind": "cylinder",
+     "expected": "Upstream destack actuator (not read at the raise site): pushed at case 150 (aEmpty.cpp:636), popped with confirm at case 300 (line 665) to hold the stack before separation",
+     "actual": "A slow/marginal down-confirm can release before the stack is caught and drop it (case 300 guard, lines 656-662), leaving nothing at the front slot",
+     "check_where": "IOsetview"
+    },
+    {
+     "name": "C_Empty_FrontSeparateTray_1",
+     "kind": "cylinder",
+     "expected": "Upstream destack actuator (not read at the raise site): pushed at case 200 (aEmpty.cpp:647) behind the Loader front-separate interlock, popped at case 400 (line 683) to release exactly one tray downward",
+     "actual": "If separation mis-times, either no tray or the wrong count reaches the front slot and the confirm at case 700 fails",
+     "check_where": "IOsetview"
+    }
+   ],
+   "operator_action": "Confirm a single empty tray actually reached the front singulated slot and the input magazine is not empty, then press Retry (K_RETRY re-runs the destack from GoDownTask=1).",
+   "engineer_action": "First verify SnEmpty_InputHasTray in IOsetview - alignment/cleanliness/wiring - since it is the only device the raise site reads; it should be ON with a tray present. If the sensor is sound but reading OFF, the destack failed upstream: check the three destack cylinders (C_Empty_FrontRiseTray_1 pop at case 500, C_Empty_FrontRiseTray_2 pop-confirm at case 300, C_Empty_FrontSeparateTray_1 pop at case 400) for full stroke and confirm sensors in IOsetview, and inspect for a stack drop during separation (the case 300 marginal-confirm failure mode). Confirm the machine is not in DUMMY mode (iRealDummy!=DUMMY), else the physical check is bypassed.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently: ShowMyError(\"MES1024\",...) at aEmpty.cpp:719, inside case 700 of TEmptyModule::DoGoDownTray (if() at lines 714-716). Trigger condition, file:line, sensor polarity (Enable&&IsOff, bExpectedOn=true), and recovery (K_RETRY->GoDownTask=1) all match the draft. All three cylinders are real code identifiers and genuinely part of this function's destack (Push/Pop cases confirmed by line number), so none is invented - retained as upstream root-cause actuators with an explicit note that case 700 itself reads only SnEmpty_InputHasTray. One minor prose correction applied: the claw cycle spans cases 100-500 (Rise_1 pushes at case 100), not '150-500' as the draft stated. No devices removed."
+  },
+  {
+   "code": "MES0920",
+   "message": "Loader Tray Empty",
+   "category": "tray-flow",
+   "trigger": "aLoader.cpp:1538, raised in DoFeedTray case 9000 else-branch. Reached when the real-machine presence test at aLoader.cpp:1483-1486 is FALSE: NOT((SnLoader_Inputend.Enable==false || SnLoader_Inputend.IsOn()) && (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn())). I.e. the supply car reads dry (SnLoader_Inputend OFF) OR the push-cylinder On-position sensor never confirmed a tray at the destacker. Suppressed while HSys.Sys.RunMode==Run_CleanOut (breaks silently, aLoader.cpp:1508). When GeneralSetting.bUseAMR, the alarm is deferred one full wait window: State->FeedWaitTimer set to iAmrFeedWaitSec*1000 ms and only on its expiry does control fall through to line 1538 (aLoader.cpp:1524-1537). Sensor-aware ShowMyError(&SnLoader_Inputend, bExpectedOn=true, K_RETRY|K_CLEAN_OUT). VERIFIED against source; draft trigger, file:line and negated condition are correct.",
+   "root_causes": [
+    "Supply magazine / feed car genuinely out of trays - SnLoader_Inputend reads OFF (source dry) - the normal case",
+    "AMR did not refill the magazine within iAmrFeedWaitSec so the per-side feed-wait deferral timed out (bUseAMR path only)",
+    "Push-cylinder On-position sensor (C_LoaderN_PushTray.OnSensor) never confirmed a tray physically reached the destacker",
+    "SnLoader_Inputend supply-stock sensor faulty/disconnected, reading false-OFF over a loaded car"
+   ],
+   "devices": [
+    {
+     "name": "SnLoader_Inputend",
+     "kind": "sensor",
+     "expected": "ON - supply car still holds stock (code comment aLoader.cpp:1479: 'ON = car still has stock')",
+     "actual": "OFF - supply car reads dry / source empty (or sensor disconnected reading false-OFF)",
+     "check_where": "IOsetview (mlSnLoader_Inputend LED); also printed on the Note detail line - this is a sensor-aware alarm on SnLoader_Inputend"
+    },
+    {
+     "name": "C_Loader1_PushTray / C_Loader2_PushTray  (.OnSensor - push-cylinder On-position confirm; PushCylinder selected by LoaderNo at aLoader.cpp:1328/1334)",
+     "kind": "cylinder",
+     "expected": "OnSensor ON - push cylinder reached its On/pushed position, i.e. a tray physically arrived at the destacker (physical-arrival interlock, aLoader.cpp:1480-1481)",
+     "actual": "OnSensor OFF - no tray sensed at the push cylinder / cylinder did not confirm the On position",
+     "check_where": "IOsetview (this cylinder sensor is NOT printed on the Note line - read its LED directly)"
+    },
+    {
+     "name": "State->FeedWaitTimer / State->bWaitingAmrFeed  (per-Loader-side AMR feed-wait; ONLY active when GeneralSetting.bUseAMR)",
+     "kind": "logic",
+     "expected": "Cleared/cancelled - a tray arrived (SnLoader_Inputend ON + push On sensor) before the wait window closed, clearing the wait at aLoader.cpp:1488-1489",
+     "actual": "FeedWaitTimer expired after iAmrFeedWaitSec ms with no refill (bWaitingAmrFeed latched true), so control falls through to the MES0920 alarm at line 1538. Not involved when bUseAMR is off (immediate alarm).",
+     "check_where": "State Record / EventLog (logic/timer state - no single IO point)"
+    }
+   ],
+   "operator_action": "Refill the Loader supply magazine (or wait for / re-dispatch the AMR), then choose RETRY. On RETRY the feed resumes at the carriage-confirm step (FeedTask=9500), NOT a full re-destack - confirming an existing separated tray via SnLoader_InputHasTray, so it will not re-clamp/cut a tray already separated below. Choose CLEAN OUT instead to enter CleanOut run mode and drain the whole machine of remaining ICs.",
+   "engineer_action": "In IOsetview confirm mlSnLoader_Inputend toggles ON when a stocked car is present (rules out a false-OFF from a disconnected/faulty sensor). Check the push cylinder On-position sensor (C_Loader1_PushTray/C_Loader2_PushTray .OnSensor) actually goes ON when a tray reaches the destacker - if it never confirms, the presence AND-test fails even with stock present. If AMR-fed, verify GeneralSetting.iAmrFeedWaitSec covers a full AMR refill cycle and that the AGV call is firing; the only valid cancel of the deferral is the real push-cylinder/Inputend read, not a sim handoff flag.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently: grep of MES0920 hits exactly aLoader.cpp:1538 (DoFeedTray case 9000 else-branch). Confirmed the negated presence test at 1483-1486, the CleanOut silent-break at 1508, and the AMR deferral at 1524-1537. SnLoader_Inputend polarity (ON=has stock) verified against code comment 1479 and the case-3500 pre-gate (1412-1413). PushCylinder->OnSensor is a real TMySensor member of TMyCylinder (mycylin.h:37) and PushCylinder resolves to C_Loader1_PushTray / C_Loader2_PushTray by LoaderNo (1328/1334). All three drafted devices are genuinely read at or gating this raise site; no invented devices. Refinements only: cylinder described as On-position confirm (not asserting mechanical 'forward'); FeedWaitTimer scoped as bUseAMR-only; cylinder check_where clarified as IOsetview-only since only SnLoader_Inputend prints on the Note line."
+  },
+  {
+   "code": "JAM0913",
+   "message": "Loader Tray Lost On Carriage",
+   "category": "tray-flow",
+   "trigger": "aLoader.cpp:1596 in TLoaderModule::DoFeedTray, case 9500 (post-godown carriage confirm). The alarm is the else-path taken when the confirm guard at aLoader.cpp:1568-1570 is FALSE, i.e. real machine (IsSoftSimulate()==false) AND HSys.Sen.SnLoader_InputHasTray.Enable==true AND SnLoader_InputHasTray.IsOff() after the front-destacker transfer sequence (case 8200 LeanCylinder->Push, case 8300 PushCylinder->Push). Only SnLoader_InputHasTray is read at this if(); the call is sensor-aware ShowMyError(&SnLoader_InputHasTray, bExpectedOn=true, K_SKIP|K_RETRY) so healthy=ON, fault=OFF. Tray identity (fHasTray/iFeedSerial/TrayID) is minted only in the pass branch at lines 1572-1587, so a lost tray leaves no phantom state. K_SKIP -> FeedTask=10000 (finish feed, no tray); K_RETRY -> FeedTask=1 (re-run whole feed).",
+   "root_causes": [
+    "Destacked tray did not seat on the LoaderY carriage - dropped, jammed, or mis-separated during the front-destacker godown (DoFrontDestackDown at case 4100) and the following case 8200/8300 push sequence",
+    "SnLoader_InputHasTray carriage has-tray sensor faulty, misaligned, or disconnected (reads OFF over a present tray) - this is the only device the raise if() actually evaluates",
+    "LoaderY carriage not correctly parked at feed-Y (MoveLoaderY to GetLoaderFeedY at case 1000) so a present tray lands off the sensor",
+    "Upstream: PushCylinder (C_LoaderN_PushTray) / LeanCylinder (C_LoaderN_LeanOnTray) did not complete their case 8300/8200 advance, so the tray never reached the carriage before the confirm"
+   ],
+   "devices": [
+    {
+     "name": "SnLoader_InputHasTray",
+     "kind": "sensor",
+     "expected": "ON - a tray is seated on the LoaderY carriage after the godown; the guard at aLoader.cpp:1568-1570 passes and mint runs",
+     "actual": "OFF - the only condition the raise if() reads that is FALSE on a real, Enabled point; carriage empty, destacked tray never landed (or sensor fault)",
+     "check_where": "IOsetview (also printed on the Note detail line - sensor-aware alarm passing &SnLoader_InputHasTray)"
+    },
+    {
+     "name": "C_Loader1_PushTray / C_Loader2_PushTray",
+     "kind": "cylinder",
+     "expected": "Pushed (advanced) - .Push() completed at case 8300 (aLoader.cpp:1442) to seat the tray on the carriage before the confirm",
+     "actual": "NOT read at the raise if() - upstream suspect only: if stuck/not fully advanced the tray never reached the carriage, so SnLoader_InputHasTray reads OFF",
+     "check_where": "IOsetview (solenoid output + OnSensor/OffSensor position points)"
+    },
+    {
+     "name": "C_Loader1_LeanOnTray / C_Loader2_LeanOnTray",
+     "kind": "cylinder",
+     "expected": "Pushed - .Push() completed at case 8200 (aLoader.cpp:1437) leaning/holding the separated tray during transfer",
+     "actual": "NOT read at the raise if() - upstream suspect only: if it misfired the tray is not held and can drop off the carriage before the confirm",
+     "check_where": "IOsetview (solenoid output + position sensors)"
+    },
+    {
+     "name": "MMLoaderY_1 / MMLoaderY_2 (TrayMotor->fHasTray)",
+     "kind": "logic",
+     "expected": "fHasTray still false at case 9500 - the mint (fHasTray=true, iFeedSerial++, Tray.SetKind) at aLoader.cpp:1572-1587 runs only when the confirm passes",
+     "actual": "fHasTray stays false and no identity is minted on the JAM0913 path, so SKIP/RETRY need no rollback (case 10 fHasTray short-circuit stays false)",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Choose RETRY to re-run the whole feed (FeedTask=1) after clearing/reseating the tray, or SKIP to finish this feed with no tray (FeedTask=10000; nothing was minted so no rollback). Open the Loader front and remove any tray hung between the destacker and the LoaderY carriage before RETRY, so the re-driven godown does not clamp a second tray onto it.",
+   "engineer_action": "In IOsetview watch SnLoader_InputHasTray while manually cycling C_LoaderN_PushTray / C_LoaderN_LeanOnTray over a present tray - if it stays OFF with a tray physically on the carriage, the sensor or its wiring is the fault (this is the only point the raise if() reads). Confirm the LoaderY carriage stops at GetLoaderFeedY(LoaderNo) in MotionView so the tray lands on the sensor, and check the front-destacker separation timing in DoFrontDestackDown (case 4100) plus the case 8200/8300 push completion.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently: aLoader.cpp:1596, case 9500 of TLoaderModule::DoFeedTray. Verified the guard at 1568-1570 (IsSoftSimulate() || SnLoader_InputHasTray.Enable==false || SnLoader_InputHasTray.IsOn()) so the alarm fires on real+Enabled+IsOff(); polarity bExpectedOn=true => healthy ON / fault OFF is correct. Confirmed device identities: PushCylinder=C_Loader1/2_PushTray, LeanCylinder=C_Loader1/2_LeanOnTray (aLoader.cpp:1328-1336), pushed at case 8200/8300 (1437/1442); TrayMotor=MMLoaderY_1/2 (1330/1336) with fHasTray minted only in the pass branch (1572). K-codes K_SKIP|K_RETRY and resume targets 10000/1 verified (1596-1600). Correction applied: clarified that only SnLoader_InputHasTray is read at the raise if(); the two cylinders and fHasTray are real, in-function upstream contributors from the preceding godown sequence, not devices evaluated at the raise line - device 'actual' wording adjusted accordingly. No invented devices."
+  },
+  {
+   "code": "MES1023",
+   "message": "Empty supply stack FULL (sensor) - remove stacked trays",
+   "category": "stack-full",
+   "trigger": "Raised in TEmptyModule::DoEmpty(int &Task) [aEmpty.cpp:265], case 100 [277-393], in the lot-finish CleanOut drain-GoUp path. Enclosing gate: if(bLotFinish && (bFrontHasTray || bRearHasTray)) [aEmpty.cpp:373]; then if(bAmrLocked) break; [375-376] (Full gate only runs when NOT AMR-locked); then if(IsOutputCarFullForAmr()) [381] { do { ShowMyError(\"MES1023\", \"Empty supply stack FULL (sensor) - remove stacked trays\", &HSys.Sen.SnEmpty_InputFullTray, false, K_RETRY); } while(HSys.Sen.SnEmpty_InputFullTray.Enable==true && HSys.Sen.SnEmpty_InputFullTray.IsOn()); } [383-388]. The do/while re-shows the modal until the Full sensor clears, then Status=ES_RETURNING; DoGoUpTray(0); Task=3000. IsOutputCarFullForAmr() [aEmpty.cpp:169-174]: real = SnEmpty_InputFullTray.Enable==true && SnEmpty_InputFullTray.IsOn(); sim (IsSoftSimulate) returns false, so it never blocks a laptop CleanOut. NOTE: draft said MainProc() - the actual function is TEmptyModule::DoEmpty(int&); also the bAmrLocked break precondition (375-376) was missing from the draft.",
+   "root_causes": [
+    "Empty supply stack is physically full - SnEmpty_InputFullTray reads ON - so the CleanOut drain GoUp cannot push the drained tray back into the supply stack",
+    "SnEmpty_InputFullTray stuck ON / mis-aligned while the stack actually has room",
+    "Operator has not yet removed stacked trays from the Empty supply magazine during the CleanOut drain"
+   ],
+   "devices": [
+    {
+     "name": "SnEmpty_InputFullTray",
+     "kind": "sensor",
+     "expected": "OFF - room in the supply stack for the drained tray to GoUp (the do/while exits and DoGoUpTray proceeds)",
+     "actual": "ON - stack full; do/while at aEmpty.cpp:383-387 loops the modal while (Enable && IsOn()) stays true",
+     "check_where": "IOsetview (LED mlSnEmpty_InputFullTray) and Note Detail line - TriggerLine prints 'SnEmpty_InputFullTray expect=OFF actual=ON addr(...)' plus [IO=SnEmpty_InputFullTray] in the message (note.cpp:1043,1055)"
+    },
+    {
+     "name": "bLotFinish",
+     "kind": "logic",
+     "expected": "true - the enclosing gate requires the lot to be finished for the drain-GoUp path to run",
+     "actual": "true (this is a CleanOut/lot-finish drain context; without it case 100 takes the normal feed/GoDown paths above)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "bFrontHasTray / bRearHasTray",
+     "kind": "logic",
+     "expected": "at least one true - a tray still sits on the feeder to drain back up into the supply stack (gate is bLotFinish && (bFrontHasTray || bRearHasTray))",
+     "actual": "at least one is true (that is why the drain GoUp is attempting), and the Full sensor blocks the return",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "bAmrLocked",
+     "kind": "logic",
+     "expected": "false - the Full gate/drain-GoUp only executes when not in an AMR handoff (if bAmrLocked the block breaks at aEmpty.cpp:376 before reaching MES1023)",
+     "actual": "false when this alarm fires (AMR=0 operator drain, or AMR idle)",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Remove the stacked trays from the Empty supply magazine/stack. The alarm modal auto-repeats (do/while) and only clears once SnEmpty_InputFullTray goes OFF, after which the drain GoUp (DoGoUpTray) proceeds. This alarm never appears in SOFT_SIMULATE (IsOutputCarFullForAmr returns false in sim).",
+   "engineer_action": "Physically clear the stacked trays and confirm SnEmpty_InputFullTray de-asserts (OFF) in IOsetview / on the Note Detail line (actual=OFF). If it stays ON with an empty or partial stack, suspect a stuck or mis-aligned Full sensor (check Enable and the addr shown in the TriggerLine). This alarm only appears in the lot-finish / CleanOut drain-GoUp path, only when bAmrLocked is false, and is sim-suppressed.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located the raise at aEmpty.cpp:385 (do 383 / while 387, gate 381); it is inside TEmptyModule::DoEmpty(int&) [line 265], case 100 [277-393], NOT MainProc() as the draft claimed - corrected. Confirmed IsOutputCarFullForAmr() [aEmpty.cpp:169-174]: real reads HSys.Sen.SnEmpty_InputFullTray.Enable && IsOn(), sim returns false. Verified ShowMyError/TriggerLine (note.cpp:1050-1056, 1023-1043): bExpectedOn=false -> Detail shows expect=OFF, actual reflects IsOn(), and message gets [IO=SnEmpty_InputFullTray]; so device polarity (expected OFF / actual ON) is correct. Added the omitted bAmrLocked break precondition (aEmpty.cpp:375-376). All draft devices are real code identifiers and correctly polarized; none removed or invented."
+  },
+  {
+   "code": "JAM%d02 (JAM1102..1602, one per Auto1..Auto6)",
+   "message": "Auto push tray miss - the push cylinder did not confirm its advanced (tray-loaded) OnSensor after pushing a tray into the working carrier",
+   "category": "tray-flow",
+   "trigger": "TAutoModule::DoFeedTray (aAuto1To6.cpp:543, switch(FeedTask) at :560), case 5200 raise site at D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:664. Flow: case 5000 (:640) commands PushCylinder->Push() and arms FeedDelay=GeneralSetting.iAutoPushConfirmSettleMs (:642); case 5100 (:648-656) waits for the settle delay then reads IsCylinderOnReady(PushCylinder,...) (:652). On FALSE it goes 5100->5200. Case 5200 (:659) calls PushCylinder->Pop() (:661) to retract, then ShowMyError(sprintf(\"JAM%d02\",11+iFeedAuto), ErrorText, &PushCylinder->OnSensor, true, K_RETRY) (:664). bExpectedOn=true so the healthy state of the printed IO is ON; the ShowMyError overload (note.cpp:1050-1056) prints [IO=<PushCylinder->OnSensor.Name>] plus a TriggerLine expected/actual detail. K_RETRY (:665-666) sets FeedTask=5000 to re-push. NOTE: IsCylinderOnReady (mycylin.cpp:24-33) returns true if OnSensor.Enable==false or soft-simulate, so this alarm only fires when the OnSensor is enabled and real IO is running.",
+   "root_causes": [
+    "Tray physically jammed / mis-seated so the push cylinder cannot fully extend to its advanced position",
+    "Push cylinder advanced-position confirm sensor (OnSensor) failed, mis-wired, or knocked out of alignment so IsCylinderOnReady reads OnSensor.IsOn()==false",
+    "Low air pressure / faulty solenoid so the cylinder stalls short of the advanced OnSensor",
+    "GeneralSetting.iAutoPushConfirmSettleMs (settle window armed at aAuto1To6.cpp:642) too short for this cylinder to reach OnSensor before the case-5100 confirm read"
+   ],
+   "devices": [
+    {
+     "name": "C_Auto1_PushTray (representative; C_Auto2..6_PushTray for the other stations, from GetPush() aAuto1To6.cpp:266-278)",
+     "kind": "cylinder",
+     "expected": "Advanced/pushed after Push()+settle, its OnSensor confirming ON so IsCylinderOnReady() is true at case 5100 (line 652) and flow proceeds to 6000",
+     "actual": "Did not reach advanced: IsCylinderOnReady() false at case 5100 (OnSensor not ON within iAutoPushConfirmSettleMs), then Pop()-retracted in case 5200 before the alarm",
+     "check_where": "IOsetview (push solenoid output + the cylinder's advanced-confirm sensor LED); the Note detail line also names the OnSensor IO because pSn=&PushCylinder->OnSensor"
+    },
+    {
+     "name": "C_AutoN_PushTray->OnSensor (advanced-position confirm sensor member of the push cylinder; its .Name is printed as [IO=...])",
+     "kind": "sensor",
+     "expected": "ON when the push cylinder is fully advanced with the tray seated (bExpectedOn=true); IsCylinderOnReady returns OnSensor.IsOn()",
+     "actual": "OFF - never read ON within the iAutoPushConfirmSettleMs settle window, so IsCylinderOnReady returned false",
+     "check_where": "Note detail line (this sensor's IO name and expected/actual are printed via TriggerLine); confirm live in IOsetview"
+    }
+   ],
+   "operator_action": "Open the station, remove or re-seat the jammed/mis-seated tray, then choose Retry to re-run the push (FeedTask returns to case 5000). If it repeats, stop and call an engineer.",
+   "engineer_action": "In IOsetview observe the push solenoid output and its advanced-confirm OnSensor LED while cycling: if the cylinder extends fully but the OnSensor LED stays OFF the sensor/wiring/alignment is faulty; if it stalls short check air pressure and mechanical binding. If motion is fine but timing-marginal, raise GeneralSetting.iAutoPushConfirmSettleMs. Confirm the cylinder's OnSensor is Enabled (a disabled OnSensor makes IsCylinderOnReady auto-pass, masking this fault). Applies identically to all 6 Auto stations (code index = 11+ai).",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located raise site independently: aAuto1To6.cpp:664 in TAutoModule::DoFeedTray (fn :543, switch(FeedTask) :560), case 5200. Verified the 5100->5200 gate is IsCylinderOnReady(PushCylinder,...) at :652 returning false; verified IsCylinderOnReady reads Cylinder->OnSensor.IsOn() (mycylin.cpp:24-33, with Enable/soft-sim short-circuits); verified GetPush returns C_Auto1..6_PushTray (:266-278); verified ShowMyError(pSn,bExpectedOn) prints [IO=pSn->Name] and a TriggerLine detail (note.cpp:1050-1056), bExpectedOn=true => healthy=ON; verified settle uses GeneralSetting.iAutoPushConfirmSettleMs (:642) and K_RETRY resets FeedTask=5000 (:665-666). Both drafted devices are genuinely read by the code with correct polarity; added the OnSensor.Enable masking caveat that the draft omitted."
+  },
+  {
+   "code": "JAM%d11 (JAM1111..1611, one per Auto1..Auto6)",
+   "message": "Auto rear tray data staged but no-tray sensor - TrayArm reported a tray delivered to the Auto rear yet the physical rear-bottom sensor sees no tray",
+   "category": "tray-source",
+   "trigger": "TAutoModule::DoFeedTray case 200 in D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp. Pre-move rear cross-check: at lines 587-588 if(IsSoftSimulate() || IsSensorOnReady(GetOutputBottomHasTray(iFeedAuto))) advance to case 1000; ELSE ShowMyError(sprintf(\"JAM%d11\",11+iFeedAuto), ErrorText, GetOutputBottomHasTray(iFeedAuto), true, K_SKIP|K_RETRY) at line 595. This case is reached only because FindFeedAuto (case 100, lines 452-466) returned this station, which requires State[i].bRearHasTray && bRearDeliveredPending[i] (with bCarHasTray==false) - i.e. the TrayArm-delivered latch claims a tray is staged. RefreshAutoState (lines 417-423) keeps bRearHasTray latched true even when the raw rear sensor reads OFF as long as bRearDeliveredPending==true, so a phantom staging survives to here and the rear sensor being OFF makes IsSensorOnReady() false. On K_SKIP (596-608) the code clears bRearHasTray/bRearCanUse/bRearDeliveredPending/RearGrid/RearKind/RearTrayID, sets AS_IDLE, and aborts with NO Y motion; K_RETRY stays in case 200 and re-reads next cycle.",
+   "root_causes": [
+    "Tray was never actually delivered by TrayArm, or slid off / was removed after the delivered-latch (bRearDeliveredPending) was set",
+    "Rear-bottom OutputBottomHasTray sensor failed, is disabled (Enable==false), mis-wired or misaligned so a present tray reads OFF",
+    "Stale/phantom rear-delivered latch (bRearDeliveredPending) from a prior aborted or HOME-interrupted cycle keeps bRearHasTray latched despite an OFF sensor",
+    "Tray present but sitting outside the rear-bottom sensor's detection window"
+   ],
+   "devices": [
+    {
+     "name": "SnAuto1_OutputBottomHasTray (representative; SnAuto2_..SnAuto6_OutputBottomHasTray per station via GetOutputBottomHasTray)",
+     "kind": "sensor",
+     "expected": "ON - a tray physically sits at the Auto rear staging bottom, matching the software delivered-latch",
+     "actual": "OFF (or sensor NULL/Enable==false) - IsSensorOnReady() returns false while software believes a tray was delivered",
+     "check_where": "IOsetview (rear-bottom has-tray sensor LED); the Note detail line also prints this sensor's IO name because pSn=GetOutputBottomHasTray(iFeedAuto)"
+    },
+    {
+     "name": "bRearDeliveredPending[i] (delivered latch) guarding State[i].bRearHasTray",
+     "kind": "logic",
+     "expected": "Set true only when TrayArm actually handed a tray off to this Auto rear (set at DoPlace case4000 after the Z-lift is confirmed up); it protects bRearHasTray from being cleared by an OFF sensor in RefreshAutoState",
+     "actual": "Set true while no tray is physically present - a phantom/stranded delivered latch that keeps bRearHasTray latched true (RefreshAutoState lines 417-423), so FindFeedAuto still selects the station",
+     "check_where": "State Record / EventLog (rear-delivered latch and bRearHasTray state)"
+    }
+   ],
+   "operator_action": "Remove any stranded tray at the Auto rear. If a tray really is there and the sensor should see it, choose Retry to recheck the sensor. If there is genuinely no tray, choose Skip to clear the staged rear data (TrayArm will re-supply on demand).",
+   "engineer_action": "Verify SnAutoN_OutputBottomHasTray in IOsetview against a known-present tray: fix the sensor/wiring/alignment or re-enable its Enable flag if a present tray reads OFF. If the latch is phantom (no tray, sensor healthy), Skip clears bRearHasTray/bRearDeliveredPending for that station. Confirm per-station via State Record. Applies to all 6 Auto stations (sprintf index = 11+ai, ai=0..5).",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located raise site independently: aAuto1To6.cpp:595 in DoFeedTray case 200; if() at 587-588 matches. Sensor names confirmed via GetOutputBottomHasTray (lines 350-361). Precondition confirmed via FindFeedAuto (452-466) requiring bRearHasTray && bRearDeliveredPending, and phantom survival confirmed via RefreshAutoState (417-423). K_SKIP clear-list confirmed at 601-608. Corrected the logic-device row to name bRearDeliveredPending (the real guarding latch) rather than the incidental bRearCanUse."
+  },
+  {
+   "code": "MES%d20 (MES1120, MES1220, MES1320, MES1420, MES1520, MES1620 - one per Auto1..Auto6; code = sprintf(\"MES%d20\", 11+Index))",
+   "message": "Auto output stack FULL (physical sensor). The station's InputFullTray sensor reads ON, so the output stack has no room for the next tray. A K_RETRY modal blocks the station and re-reads the sensor in a loop until the operator empties the stack and the sensor goes OFF.",
+   "category": "stack-full",
+   "trigger": "Two raise sites, BOTH real-machine-only (each guarded so the sim path never reaches ShowMyError) and both ultimately gated on the same InputFullTray physical sensor being ON. (1) ServiceCarFull discharge path, D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp: at line 1616-1624 the sim path early-returns (continue) so only the real machine falls through; line 1626-1627 reads FullSensor=GetInputFullTray(Index) and bSensorFull=(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn()); the if() at line 1629 `if(bSensorFull)` enters a do{ ShowMyError(sprintf(\"MES%d20\",11+Index), ErrorText, FullSensor, false, K_RETRY); FullSensor=GetInputFullTray(Index); } while(FullSensor!=NULL && FullSensor->Enable==true && FullSensor->IsOn()); (raise on line 1635), then Car[Index].Clear() + InitAutoCarStack(Index) once the sensor confirms OFF. (2) Clean-out GoUp Full gate (CleanOutTask case 4000), line 953 `if(IsSoftSimulate()==false && IsOutputCarFullForAmr(Index))` - IsOutputCarFullForAmr (aAuto1To6.cpp:1329-1337) on the real machine returns FullSensor->Enable && FullSensor->IsOn(), i.e. the same InputFullTray sensor; inside it runs the identical do/while modal, raise on line 960, then Car[Index].Clear()+InitAutoCarStack(Index). bExpectedOn=false at both raise sites, so healthy = sensor OFF; the modal loops until the sensor reads OFF.",
+   "root_causes": [
+    "Output stack physically full of finished trays - normal end-of-batch condition on an AMR=0 / operator-tended machine; operator (or AGV) has not yet removed the trays",
+    "Finished trays not cleared, so a clean-out GoUp (case 4000) or a discharge/service cycle cannot proceed into the full stack",
+    "SnAutoN_InputFullTray full sensor stuck/false ON (blocked by debris, misaligned, or mis-wired) while the stack is actually not full - the modal will then never self-clear because it keeps re-reading IsOn()==true"
+   ],
+   "devices": [
+    {
+     "name": "SnAuto1_InputFullTray (representative; also SnAuto2_InputFullTray .. SnAuto6_InputFullTray, selected by GetInputFullTray(Index), Index=station-1)",
+     "kind": "sensor",
+     "expected": "OFF - output stack has room. ShowMyError is called with bExpectedOn=false, so TriggerLine prints expect=OFF (note.cpp:1034-1037).",
+     "actual": "ON - stack detected full. TriggerLine prints actual=ON (Sn.IsOn()==true); the do/while modal re-reads GetInputFullTray(Index) each pass and only closes once Enable && IsOn goes false.",
+     "check_where": "IOsetview (this sensor's IO LED). The Note also prints it directly on the Detail line - ShowMyError(...,pSn=FullSensor,...) routes through TriggerLine (note.cpp:1043) which prints \"<Sn.Name> expect=OFF actual=ON addr(Card/Lane/IP/Port/Bit)\", and injects [IO=<Sn.Name>] into the message (note.cpp:1055)."
+    }
+   ],
+   "operator_action": "Remove the finished trays from that Auto station's output stack. The K_RETRY modal re-reads the InputFullTray sensor on each loop and closes automatically once the sensor goes OFF; the code then clears the car count and re-initializes the stack (Car[Index].Clear() + InitAutoCarStack(Index)). No manual count entry is needed - it is sensor-driven.",
+   "engineer_action": "Confirm which station fired from the code = 11+Index (11=Auto1 .. 16=Auto6). If the stack is visibly empty but the modal will not close, inspect SnAutoN_InputFullTray in IOsetview for a stuck/false ON (blocked optic, misaligned tray-full flag, or wiring/short) - the modal cannot self-clear while IsOn() stays true. Read the Note Detail line for the exact IO name + address printed by TriggerLine. This alarm is real-machine only (site 1 sim path continues before the sensor read at line 1616-1624; site 2 is gated by IsSoftSimulate()==false at line 953), so it cannot be reproduced under SOFT_SIMULATE - test on the real machine. Note the neighboring code MES%d25 (line 1647) is a DIFFERENT alarm - logical car-count full (Car[Index].iTrayCount>=MAX_TRAY_PER_CAR) with no sensor - do not confuse them.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located both raise sites independently by grepping \"MES%d20\": aAuto1To6.cpp:960 (Clean-out GoUp case 4000) and aAuto1To6.cpp:1635 (ServiceCarFull). Confirmed the real if() conditions: line 1629 `if(bSensorFull)` (bSensorFull built at 1627 from FullSensor->Enable && FullSensor->IsOn()) and line 953 `if(IsSoftSimulate()==false && IsOutputCarFullForAmr(Index))`. Verified GetInputFullTray (aAuto1To6.cpp:322-334) returns &HSys.Sen.SnAuto1_InputFullTray..SnAuto6_InputFullTray, and IsOutputCarFullForAmr (1329-1337) reduces to the same sensor on the real machine (sim branch uses Car iTrayCount but is excluded by the IsSoftSimulate()==false guard). Confirmed bExpectedOn=false semantics via ShowMyError/TriggerLine (note.cpp:1023-1056): expect=OFF healthy, actual=ON when fault, and Sn.Name is printed on the Detail line. Draft device, polarity, both file:line raise sites, and the sim-guard/real-machine-only claim are all correct. Only refinement: made explicit that site (2)'s entry gate is IsOutputCarFullForAmr(), which on the real machine equals the same InputFullTray sensor read (draft already noted this). No invented devices; MES%d20 has exactly one IO - the InputFullTray sensor (the logical-count path is the separate MES%d25 else-branch)."
+  },
+  {
+   "code": "WAR%d30 (WAR1130..1630, one per Auto1..Auto6; code = 11+iFeedAuto)",
+   "message": "Auto feed tray miss - after the Y carrier moved to the feed position, the rear-bottom has-tray sensor no longer confirms the tray.",
+   "category": "tray-flow",
+   "trigger": "TAutoModule::DoFeedTray, case 3000, D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:619-628 (raise at line 626). In case 1000 (line 615) MoveAutoY(iFeedAuto, GetAutoFeedY(iFeedAuto)) drives the feed-Y move; on completion FeedTask=3000. At case 3000: BottomSensor=GetOutputBottomHasTray(iFeedAuto) (line 620); if(IsSoftSimulate() || IsSensorOnReady(BottomSensor)) advance to case 4000 (line 621), ELSE ShowMyError(sprintf(\"WAR%d30\",11+iFeedAuto), \"Auto%d Feed Tray Miss\", BottomSensor, true, K_RETRY) at line 626. bExpectedOn=true. K_RETRY sets FeedTask=1000 (line 627-628) to re-run the Y move and re-check. Alarm fires only when NOT sim AND the sensor is enabled AND not on-ready (IsSensorOnReady also returns true when the sensor is disabled, which suppresses this alarm).",
+   "root_causes": [
+    "Tray shifted, tilted, or dropped during/after the feed-Y move so it left the rear-bottom sensor window",
+    "Rear-bottom has-tray sensor (SnAutoN_OutputBottomHasTray) fault or misalignment - reads OFF with a tray physically present",
+    "MAutoY_N feed axis did not actually reach the taught feed-Y position (GetAutoFeedY), so the tray is not aligned under the sensor",
+    "Wrong / drifted GetAutoFeedY teach value for this station"
+   ],
+   "devices": [
+    {
+     "name": "SnAuto1_OutputBottomHasTray (representative; SnAuto2..6_OutputBottomHasTray)",
+     "kind": "sensor",
+     "expected": "Enabled and reading ON / on-ready after the feed-Y move - a tray is present at the rear-bottom feed position. This is the exact IO the if() at aAuto1To6.cpp:621 tests (via GetOutputBottomHasTray, lines 350-362).",
+     "actual": "Enabled but reading OFF - no tray sensed at the feed position after the Y move. (If the sensor were disabled or in sim, IsSensorOnReady would return true and this alarm would NOT fire - so the fact it fired means the sensor is enabled and OFF.)",
+     "check_where": "IOsetview (rear-bottom has-tray sensor LED) AND the Note detail line: ShowMyError prints [IO=<sensor Name>] and a TriggerLine (expected-ON vs actual) because pSn=BottomSensor (note.cpp:1054-1055)."
+    },
+    {
+     "name": "MAutoY_1 (representative; MAutoY_2..6) - Auto Y feed axis",
+     "kind": "motor",
+     "expected": "Reached GetAutoFeedY(iFeedAuto) in case 1000 (MoveAutoY returned true, via GetAutoMotor -> HSys.Mot.MAutoY_N, lines 196-208) so the tray sits under the rear-bottom sensor.",
+     "actual": "Possibly short of / off the taught feed-Y target, leaving the tray outside the sensor window. NOTE: the WAR%d30 if() at line 621 does NOT read the motor - it reads only BottomSensor; the motor is the upstream root cause the engineer verifies separately.",
+     "check_where": "MotionView (MAutoY_N commanded vs actual position / soft-limit state)."
+    }
+   ],
+   "operator_action": "Check the tray at the Auto rear feed position; re-seat it if displaced or removed, then choose Retry to re-run the Y move and re-read the sensor.",
+   "engineer_action": "Because the alarm fired, the rear-bottom sensor is enabled and reading OFF. First confirm MAutoY_N reached the feed-Y target in MotionView; re-teach GetAutoFeedY if it is off. Then verify SnAutoN_OutputBottomHasTray against a known-good seated tray in IOsetview (the Note also prints [IO=SnAutoN_OutputBottomHasTray]). Warning-class (WAR), retry-only (K_RETRY). Applies to all 6 Auto stations (code = 11+iFeedAuto, Auto1=WAR1130 .. Auto6=WAR1630).",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located raise site independently: aAuto1To6.cpp:626, TAutoModule::DoFeedTray case 3000 (block 619-630), condition at line 621. Sensor confirmed via GetOutputBottomHasTray (SnAutoN_OutputBottomHasTray, lines 350-362) - it is the exact IO in the if() and is printed on the Note (note.cpp:1050-1056, bExpectedOn=true). Motor confirmed via GetAutoMotor -> HSys.Mot.MAutoY_N (lines 196-208), moved by MoveAutoY in case 1000; kept as a legitimate upstream root cause but clarified it is NOT read by this alarm's condition. Corrections to the draft: control variable is FeedTask (not Task); MoveAutoY takes GetAutoFeedY(iFeedAuto); added the disabled-sensor suppression nuance (IsSensorOnReady) and the line-621 sensor-only clarification for the motor. No invented devices; LeanCylinder/PushCylinder (case 4000/5000) correctly excluded as they act after this alarm."
+  },
+  {
+   "code": "WAR0475",
+   "message": "2D code not found in any lot",
+   "category": "identity",
+   "trigger": "aLoader.cpp:1790 ShowMyError(\"WAR0475\", LangT(\"2D code not found in any lot : \")+sCode, K_RETRY|K_SKIP|K_MANUAL_2D). Enclosing function is TLoaderModule::DoCcdCheck (aLoader.cpp:1611), case 5500 (5500 body aLoader.cpp:1739-1837). Fires when the Top-CCD 2D code WAS read (b2DOk==true at aLoader.cpp:1746) BUT the reverse lookup LotRegistry.FindByCode2D(sCode, HitLot, Bin, HitLotIndex) returns false (if() at aLoader.cpp:1756, else branch at 1788, raise at 1790). Same alarm re-raised in the manual-entry helper TLoaderModule::BindManual2D at aLoader.cpp:1883 when a hand-entered code also fails FindByCode2D (guard at 1858).",
+   "root_causes": [
+    "The scanned IC 2D code is not present in any loaded Lot's 2D-Bin registry (wrong or incomplete WorkOrder/Lot loaded into LotRegistry)",
+    "Correct lot data not downloaded/loaded into LotRegistry before production started",
+    "Top CCD misread the code into a value that does not exist in any registered lot"
+   ],
+   "devices": [
+    {
+     "name": "LotRegistry (loaded Lot 2D->Bin reverse lookup)",
+     "kind": "logic",
+     "expected": "Contains the scanned 2D code so FindByCode2D resolves owning Lot (HitLotIndex) + Bin",
+     "actual": "FindByCode2D(sCode,...) returns false - code absent from every loaded lot (aLoader.cpp:1756 takes the else at 1788)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "sCode (the 2D string returned by ReadTopCcd2DCode)",
+     "kind": "logic",
+     "expected": "Matches a code registered in some loaded lot",
+     "actual": "Appended to the Note message as the unresolved value; in BindManual2D the equivalent is the hand-entered 'code'",
+     "check_where": "Note detail line"
+    }
+   ],
+   "operator_action": "Note offers Retry / Skip / Manual 2D. Retry (K_RETRY) re-triggers a Top-CCD shot (TopCcdTriggerShot) + 3s delay and re-reads. Manual 2D (K_MANUAL_2D) opens hand-entry via BindManual2D, which reuses the SAME FindByCode2D lookup. Skip (else branch, effectively K_SKIP) routes the IC to the Error Auto: SetTrayBin(HT160_BIN_ERROR_NO_BIN_SETTING), SetTrayLot(-1), and increments MachineRun.iUnknown2D.",
+   "engineer_action": "Pure logic/data fault - there is no single physical device to read at this raise site. Confirm the correct Lot / WorkOrder 2D-Bin data is loaded into LotRegistry: compare the 2D code printed in the Note detail line against the loaded lots. If the lot is right but this one code misses, suspect a Top-CCD misread (check the read chain / lighting). If many codes miss, the wrong or an incomplete lot/WorkOrder was loaded before Start.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located both raise sites independently via Grep + Read. aLoader.cpp:1790 (DoCcdCheck case 5500) and aLoader.cpp:1883 (BindManual2D) both confirmed verbatim. Trigger chain verified: b2DOk==true (1746) AND FindByCode2D==false (1756 -> else 1788 -> 1790). Skip-branch side effects (iUnknown2D++, HT160_BIN_ERROR_NO_BIN_SETTING, Lot=-1) confirmed at 1800-1810. Enclosing function name corrected/confirmed as DoCcdCheck (definition at aLoader.cpp:1611). Both devices are genuine logic/data items; no physical IO/cylinder/motor is read at this site, so no invented devices. Draft was accurate; only clarified the manual-path variable is 'code' not 'sCode' and pinned the enclosing function line."
+  },
+  {
+   "code": "MES1021",
+   "message": "Bottom Empty Tray Is Miss Error",
+   "category": "tray-flow",
+   "trigger": "TEmptyModule::DoFeedTray() case 7000: if(HSys.Sen.SnEmpty_OutputBottomHasTray.Enable==true && HSys.Sen.SnEmpty_OutputBottomHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY) -> ShowMyError(\"MES1021\", LangT(\"Bottom Empty Tray Is Miss Error\"), &HSys.Sen.SnEmpty_OutputBottomHasTray, true, K_SKIP|K_RETRY). if() at aEmpty.cpp:518-520, raise at aEmpty.cpp:522 (case label 517). By the time this check runs, the feed has already: moved the Empty Y to the discharge position (case 4000, MoveEmptyY(Teach.EmptyCarDischargeTrayYPosition)), popped the push clamp (case 5000, C_Empty_PushTray.Pop()), and popped the lean-on clamp (case 6000, C_Empty_LeanOnTray.Pop()). Case 7000 is the rear/bottom sensor confirming a tray is actually seated at the output-bottom position. The else branch (sensor ON / DUMMY / sensor disabled) latches bRearHasTray=true and Status=ES_REAR_READY.",
+   "root_causes": [
+    "Tray never reached the rear output-bottom position, or dropped/shifted when the clamps were released at case 5000/6000",
+    "SnEmpty_OutputBottomHasTray mis-aligned, dirty, or wiring fault reading OFF while a tray is actually present",
+    "MEmptyY discharge teach position (EmptyCarDischargeTrayYPosition) mis-set / axis under- or over-shot, so the tray parks off the bottom sensor",
+    "Feed never delivered a tray (upstream source dry) yet the ladder still advanced to case 7000",
+    "iRealDummy!=DUMMY (real run) so the physical sensor confirm is active - in DUMMY the check is bypassed and the alarm never fires"
+   ],
+   "devices": [
+    {
+     "name": "SnEmpty_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "ON at case 7000 - tray seated at the Empty rear/output-bottom position (this is the ONLY device the MES1021 if() actually reads; bExpectedOn=true)",
+     "actual": "OFF - no tray detected at the output-bottom position (sensor .Enable must also be true for the alarm to arm)",
+     "check_where": "IOsetview (LED mlSnEmpty_OutputBottomHasTray) and the Note detail line (alarm pSn = &SnEmpty_OutputBottomHasTray prints this IO name)"
+    },
+    {
+     "name": "MEmptyY",
+     "kind": "motor",
+     "expected": "Parked at Teach.EmptyCarDischargeTrayYPosition (commanded at case 4000, MoveEmptyY returned true) so the tray sits directly under SnEmpty_OutputBottomHasTray",
+     "actual": "MoveEmptyY already returned true so the axis reached its commanded target; if the teach value itself is wrong the tray parks off the sensor even though the move 'succeeded' - verify the taught discharge position, not just move-complete",
+     "check_where": "MotionView (compare live MEmptyY position against the EmptyCarDischargeTrayYPosition teach value)"
+    },
+    {
+     "name": "C_Empty_PushTray",
+     "kind": "cylinder",
+     "expected": "Popped/released at case 5000 (must have returned Pop()==true to advance past 5000)",
+     "actual": "Still popped/released in BOTH healthy and faulty runs - NOT a state differentiator for this alarm. Suspect it only as a mechanical root cause: if releasing the clamp let the tray shift or drop, the bottom sensor then reads OFF",
+     "check_where": "IOsetview (its OnSensor / off feedback LED)"
+    },
+    {
+     "name": "C_Empty_LeanOnTray",
+     "kind": "cylinder",
+     "expected": "Popped/released at case 6000 (the step immediately before the check; must have returned Pop()==true to reach case 7000)",
+     "actual": "Still popped/released in both healthy and faulty runs - NOT a state differentiator. Candidate mechanical root cause only: releasing this clamp could let the tray move off the bottom detector",
+     "check_where": "IOsetview (its off-feedback LED)"
+    },
+    {
+     "name": "iRealDummy",
+     "kind": "logic",
+     "expected": "!=DUMMY on a real production run, which arms the sensor confirm at case 7000",
+     "actual": "If ==DUMMY the entire if() is skipped (else branch latches bRearHasTray=true) so MES1021 never fires - only relevant when diagnosing why the alarm does or does not appear",
+     "check_where": "State Record / EventLog (HSys.LastSet.iRealDummy)"
+    }
+   ],
+   "operator_action": "Confirm a tray is physically present at the Empty rear/output-bottom position. Retry (K_RETRY) sets FeedTask=1 and re-runs the whole feed from the start; Skip (K_SKIP) abandons this tray - clears bRearHasTray and bFrontHasTray, sets Status=ES_IDLE, and jumps to terminal case 13000 (which returns FeedTask to idle=1).",
+   "engineer_action": "Primary suspect is SnEmpty_OutputBottomHasTray - check its alignment/cleanliness/wiring in IOsetview against the actual tray presence (this is the only device the alarm reads). Verify MEmptyY reached the correct taught discharge position in MotionView (a mis-taught EmptyCarDischargeTrayYPosition parks the tray off the sensor even though the move completes). The clamp cylinders C_Empty_PushTray/C_Empty_LeanOnTray have already popped successfully to reach case 7000, so their own state is not the fault - inspect them only for mechanical release disturbing/dropping the tray. Confirm the machine is not left in DUMMY mode (iRealDummy) which would suppress the check entirely.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently: aEmpty.cpp DoFeedTray() case 7000, if() at 518-520, ShowMyError at 522. Trigger condition and K_SKIP/K_RETRY handling match the draft exactly. Sensor SnEmpty_OutputBottomHasTray verified real (database.h:288, name database.cpp:1077, IOsetview LED, is the rear detector per aEmpty.cpp:220-224); polarity IsOff()+bExpectedOn=true confirmed (healthy ON / fault OFF). CORRECTED the C_Empty_PushTray device: the draft implied a 'seated' gate before pop (none exists) and treated the cylinder as a fault-state differentiator - in reality it is Pop()'d at case 5000 and must already be popped to reach 7000, so it is popped in both healthy and faulty runs; reframed as a mechanical-only root cause. ADDED C_Empty_LeanOnTray (symmetric, popped case 6000) and ADDED MEmptyY (the case-4000 discharge-position motor the draft omitted; real Alias 'MEmptyY' database.cpp:1179). iRealDummy logic gate confirmed."
+  },
+  {
+   "code": "MES%d25 (MES1125..MES1625, one per Auto1..Auto6; station code = 11+Index)",
+   "message": "Auto output car full by tray-count book-keeping - actual modal text \"Auto{N} output car full (100 trays) - change car then confirm\". Pure logical-count full; the physical InputFullTray sensor is NOT tripped (that path is the sibling MES%d20). K_RETRY-only overload, no pSn/IO printed.",
+   "category": "stack-full",
+   "trigger": "TAutoModule::ServiceCarFull(), D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:1643 (else-if) raising at :1647. Whole function is gated by RunMode==Run_Normal (:1567). Per station: bLogicalFull=(Car[Index].iTrayCount>=MAX_TRAY_PER_CAR) at :1614 (MAX_TRAY_PER_CAR=100, MotorAndIO/MyMotor.h:113). The sensor path is tried first: FullSensor=GetInputFullTray(Index); bSensorFull=(FullSensor!=NULL && FullSensor->Enable && FullSensor->IsOn()) at :1626-1627; if(bSensorFull) -> MES%d20 (:1635). This MES%d25 branch is the else-if, so it fires only when bSensorFull==false (sensor OFF, disabled, or NULL) AND iTrayCount>=100. Call: ShowMyError(sprintf(\"MES%d25\",11+Index), ErrorText, K_RETRY) at :1647 - the K_RETRY-only overload with NO pSn, i.e. a pure logic/counter alarm. On confirm: Car[Index].Clear() (:1648), InitAutoCarStack(Index) (:1649), bOperatorHolding[Index]=false (:1650).",
+   "root_causes": [
+    "Normal end-of-car: 100 trays have been FED into this Auto's output car since it was last cleared. iTrayCount is a book-keeping cap incremented only on the feed path (aAuto1To6.cpp:721, rear tray promoted to working) and reset only by Car.Clear() (MyMotor.cpp:275); it is never touched by discharge or cleanout (design comment aAuto1To6.cpp:1553-1554). This is the standard car-change trigger on machines where no physical InputFullTray sensor is enabled.",
+    "The physical SnAuto{N}_InputFullTray sensor reads OFF / is disabled / is unconfigured, so the sensor path (MES%d20) did not fire and this logical-count fallback took over.",
+    "Operator serviced/changed the physical car earlier WITHOUT confirming the modal, so Car.Clear() never ran and iTrayCount kept climbing to 100 - it can trip even when the physical car is not physically full, because the count is never auto-reset by discharge."
+   ],
+   "devices": [
+    {
+     "name": "Car[Index].iTrayCount vs MAX_TRAY_PER_CAR (=100) (software tray counter)",
+     "kind": "logic",
+     "expected": "iTrayCount < 100 (car has book-kept capacity)",
+     "actual": "iTrayCount >= 100 (logical full). Counter incremented ONLY on feed at aAuto1To6.cpp:721 and reset ONLY by Car.Clear() at MyMotor.cpp:275; never incremented or reset by discharge/cleanout",
+     "check_where": "State Record / EventLog (Car tray counter; this alarm carries no pSn, so no IO LED / no Note detail line)"
+    },
+    {
+     "name": "SnAuto{N}_InputFullTray (N=Index+1; SnAuto1_InputFullTray .. SnAuto6_InputFullTray, via GetInputFullTray, aAuto1To6.cpp:322-333)",
+     "kind": "sensor",
+     "expected": "For MES%d25 (not MES%d20) to fire this sensor must read OFF / be disabled / unconfigured -> bSensorFull==false at :1627. If it were ON, the sibling sensor alarm MES%d20 fires instead at :1635",
+     "actual": "OFF / disabled / absent (confirming this is the logical-count full, not the physical-sensor full). It is READ here as the discriminator between the two branches, but is NOT the raise device of this alarm",
+     "check_where": "IOsetview (IO LED view)"
+    }
+   ],
+   "operator_action": "Change / empty the output car, then choose Retry / confirm on the modal. On confirm the code clears the car data (Car.Clear, :1648), re-initializes the stack (InitAutoCarStack, :1649) and clears bOperatorHolding (:1650), re-arming feeding for that Auto. NOTE: if you service the physical car WITHOUT confirming this modal, the count is not reset and the alarm will keep returning.",
+   "engineer_action": "No single IO to check - this is the logical (counter) full path, distinct from the physical-sensor path MES%d20 (which prints the SnAuto{N}_InputFullTray IO name). CORRECTION vs draft: iTrayCount is NOT counted on discharge. It is incremented only on the feed path (aAuto1To6.cpp:721, rear tray promoted to working position) and reset only by Car.Clear() / TMyCar init (MyMotor.cpp:275, iTrayCount=0); it is never incremented on discharge and never auto-reset by discharge or cleanout (see design comment aAuto1To6.cpp:1553-1554). So if this fires while the car is not physically full, either 100 trays really were fed since the last confirmed car change, or a car was serviced without confirming the modal so Clear() never ran. Confirm whether SnAuto{N}_InputFullTray is enabled/wired - if it is, the machine should normally trip MES%d20 first; if it is not enabled, this logical cap is the intended full-detection. Only active in RunMode==Run_Normal (:1567). Applies to all 6 Auto stations (code=11+Index, MES1125..MES1625).",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located raise site independently: ShowMyError(\"MES%d25\",11+Index) at aAuto1To6.cpp:1647 inside the else-if(bLogicalFull) at :1643, function ServiceCarFull. CONFIRMED the trigger condition, file:line, K_RETRY-only/no-pSn overload, MAX_TRAY_PER_CAR=100 (MyMotor.h:113), and the primary logic-counter device. CORRECTED the draft's engineer_action/root cause: it claimed iTrayCount is incremented on discharge (DoDischargeTray) - false. The only two writes to iTrayCount are aAuto1To6.cpp:721 (+1 on FEED) and MyMotor.cpp:275 (=0 on Clear); the design comment at :1553-1554 confirms it grows only on feed and is never reset by discharge/cleanout. ADDED the real gate sensor SnAuto{N}_InputFullTray (GetInputFullTray, :322-333) whose OFF/disabled state at :1627 is exactly what routes to this logical branch instead of MES%d20. Also noted the RunMode==Run_Normal gate at :1567."
+  },
+  {
+   "code": "MES%d23 (MES1123..MES1623, one per Auto1..Auto6; code = 11+Index)",
+   "message": "Auto clean-out residual tray after drain - a station still shows a physical tray (front/full/rear sensor ON) after the drain ladder latched done. This is an EventLog diagnostic line, NOT an operator modal - the machine does not stop on it.",
+   "category": "clean-out",
+   "trigger": "TAutoModule::ServiceCleanOutResidualWatchdog, D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:1110-1132; the actual log call is line 1128, inside the if() at line 1124. Called from DoAuto ONLY when BOTH conditions hold: line 1657 if(HSys.Sys.RunMode==Run_CleanOut && AllStationsDrainLatched()) then line 1664 ServiceCleanOutResidualWatchdog(). (Draft correction: the draft omitted the RunMode==Run_CleanOut half of this gate - the watchdog runs only in Clean Out mode, not whenever stations happen to be drain-latched.) AllStationsDrainLatched() (line 1044) is a PURE LOGIC latch on State[Index].bCleanOutFinish - it reads no sensors, so the drain can latch done while a tray is still physically present. Real machine only: line 1112 IsSoftSimulate() early-return, so sim never logs it. Per station the watchdog reads three sensors: Front=GetInputHasTray, Full=GetInputFullTray, Rear=GetOutputBottomHasTray; bFrontOn/bFullOn/bRearOn = (sensor!=NULL && .Enable==true && .IsOn()). Line 1124 if(bFrontOn==false && bFullOn==false && bRearOn==false) continue; ELSE line 1128 g_EventLog.Log(sprintf(\"MES%d23\",11+Index), \"Auto%d clean-out residual tray after drain - remove it\", Where) where Where=sprintf(\"front=%d full=%d rear=%d\",...). One line per episode via the bCleanOutResidualLogged[Index] latch (set true line 1131, cleared in InitialFlag line 95). This is g_EventLog.Log, NOT ShowMyError - no modal, no operator gate, machine keeps running.",
+   "root_causes": [
+    "A tray was left stranded at an Auto station (front feed position, full/output stack, or rear/output-bottom staging) when the clean-out drain completed",
+    "One of the three station sensors stuck ON (blocked/misaligned/mis-wired) so the drain-done logic latch reports a phantom residual tray while the station is really empty",
+    "The pure logic latch AllStationsDrainLatched() (State[].bCleanOutFinish) latched done while a tray was still physically present - drain ladder cleared the software flags at case 7000 before the physical tray left"
+   ],
+   "devices": [
+    {
+     "name": "SnAuto1_InputHasTray (per station SnAuto2..6_InputHasTray) - front feed-position tray sensor; code comment line 1089 'residual tray at this Auto front feed position'",
+     "kind": "sensor",
+     "expected": "OFF (IsOn()==false) after drain - no residual tray at the front feed position",
+     "actual": "ON (IsOn()==true) when the log line's Where field shows front=1",
+     "check_where": "State Record / EventLog (the MES%d23 line's Where field front=/full=/rear=); then confirm live in IOsetview"
+    },
+    {
+     "name": "SnAuto1_InputFullTray (per station SnAuto2..6_InputFullTray) - full-stack tray sensor; code comment line 1092 'output stack still holds trays'",
+     "kind": "sensor",
+     "expected": "OFF (IsOn()==false) after drain - stack empty",
+     "actual": "ON (IsOn()==true) when the log line's Where field shows full=1",
+     "check_where": "State Record / EventLog (Where full= flag); then confirm live in IOsetview"
+    },
+    {
+     "name": "SnAuto1_OutputBottomHasTray (per station SnAuto2..6_OutputBottomHasTray) - rear / output-bottom staging sensor; code comment line 1089/1095 'residual tray at this Auto rear staging'",
+     "kind": "sensor",
+     "expected": "OFF (IsOn()==false) after drain - no residual tray at the rear staging",
+     "actual": "ON (IsOn()==true) when the log line's Where field shows rear=1",
+     "check_where": "State Record / EventLog (Where rear= flag); then confirm live in IOsetview"
+    },
+    {
+     "name": "bCleanOutResidualLogged[Index] - per-station once-per-episode log latch (aAuto1To6.h:61); AllStationsDrainLatched() / State[Index].bCleanOutFinish - the logic latch that gates the watchdog",
+     "kind": "logic-state",
+     "expected": "bCleanOutFinish latched true only when the station is truly drained (no physical tray); bCleanOutResidualLogged false at episode start (reset in InitialFlag)",
+     "actual": "bCleanOutFinish==true (drain latched) while a physical sensor still reads ON - the mismatch that produces the log; bCleanOutResidualLogged set true after the first log so only one line per episode is written",
+     "check_where": "State Record / EventLog (bCleanOutFinish latch and ResidualLogged flag are dumped in the Auto state trace, e.g. aAuto1To6.cpp:1507)"
+    }
+   ],
+   "operator_action": "This is a diagnostic log line, not a modal - the machine does not stop and there is no recovery button. After the clean-out, physically inspect the flagged Auto station and remove any residual tray from the location the Where field points to (front = front feed position, full = full/output stack, rear = rear/output-bottom staging).",
+   "engineer_action": "Open the D:\\HT160S_Log EventLog, find the MES1123..MES1623 line for the affected station and read its Where field (front=N full=N rear=N) to see which of the three sensors is ON. Map: front -> SnAutoN_InputHasTray, full -> SnAutoN_InputFullTray, rear -> SnAutoN_OutputBottomHasTray. Cross-check that sensor live in IOsetview: if a tray is really there, remove it; if the station is empty but the sensor still reads ON, the sensor is blocked/misaligned/mis-wired - fix the sensor. Note the gate is a pure logic latch (State[].bCleanOutFinish via AllStationsDrainLatched, line 1044) so a stuck sensor can also mean the drain latched prematurely. Logged once per episode (bCleanOutResidualLogged latch, reset in InitialFlag line 95). Never appears in SOFT_SIMULATE (IsSoftSimulate early-return line 1112). Fires only in Run_CleanOut mode. Applies to all 6 Auto stations (code = 11+Index).",
+   "verdict": "CORRECTED",
+   "verify_note": "Raise site re-located and confirmed at aAuto1To6.cpp:1128 (log call) inside the if() at line 1124, function ServiceCleanOutResidualWatchdog (1110-1132). Confirmed: it is g_EventLog.Log not ShowMyError (no modal); IsSoftSimulate early-return line 1112; the three sensors and their .Name aliases via GetInputHasTray/GetInputFullTray/GetOutputBottomHasTray (lines 308/322/350) all real with correct front/full/rear flag mapping; polarity IsOn()==ON==residual present; latch cleared in InitialFlag line 95. CORRECTION applied to the trigger: the draft's DoAuto gate description omitted RunMode==Run_CleanOut - the real gate at line 1657 is if(HSys.Sys.RunMode==Run_CleanOut && AllStationsDrainLatched()), so the watchdog runs only in Clean Out mode. Also clarified AllStationsDrainLatched() (line 1044) is a pure logic latch on State[].bCleanOutFinish and reads no sensors, which is exactly why a latched-done drain can still coincide with a physically present tray. Added the logic-state (latch/counter) device the draft lacked, per the 'name the logic variable' guidance."
+  },
+  {
+   "code": "WAR16121",
+   "message": "Color CCD connect not ready (Color Tray ID no respond)",
+   "category": "vision",
+   "trigger": "aColor.cpp:1179 ShowSystemError(\"ColorCCD_Connect\", K_RETRY|K_SKIP); the key ColorCCD_Connect maps to WAR16121 at database.cpp:931-932 (message confirmed at database.cpp:936). Raised in TColorModule::DoReadColor2D case 100 when the real if() at aColor.cpp:1177 is true: `ColorCcdSocket==NULL || ColorCcdSocket->IsColorCcdConnected()==false`. IsColorCcdConnected() returns (iState==COLORCCD_CONNECTED) (ColorCcdSocket.cpp:283), so ==false means the link is not in the connected state. This path is only reached on real hardware with the reader enabled: case 1 (aColor.cpp:1146) short-circuits and fabricates a TrayID when `IsSoftSimulate() || tSimuData.bRunSimulation || CosFunction.bUseColorCcd==false`.",
+   "root_causes": [
+    "TCP socket to the Color CCD vision PC not connected (ColorCcdSocket is NULL, or IsColorCcdConnected() reports iState != COLORCCD_CONNECTED)",
+    "bUseColorCcd (General.ini [ColorCCD] Enable) is ON but the reader is unreachable (vision PC off, wrong Address/Port, cable/switch fault)",
+    "Color reader program not started or not listening on the configured port"
+   ],
+   "devices": [
+    {
+     "name": "ColorCcdSocket (Color CCD TCP link)",
+     "kind": "logic",
+     "expected": "non-null AND IsColorCcdConnected()==true (iState==COLORCCD_CONNECTED)",
+     "actual": "NULL, or IsColorCcdConnected()==false (iState != COLORCCD_CONNECTED)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "CosFunction.bUseColorCcd",
+     "kind": "logic",
+     "expected": "reflects General.ini [ColorCCD] Enable (default true, CosFunction.cpp:1846); should be ON only when a Color reader is physically present and reachable (OFF makes case 1 fabricate a TrayID and this alarm is never reached)",
+     "actual": "ON while the socket is disconnected, so execution reaches case 100 and alarms",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Note offers Retry / Skip. Retry (else branch, aColor.cpp:1187-1189) re-runs EnsureColorCcdSocketCreated() and ColorCcdSocket->ColorCcdConnect(), then re-checks case 100. Skip (aColor.cpp:1180-1185) sets an empty tray identity (sTrayID2D=\"\", StampReadIdentity2D()) and returns the scan ladder to idle (ScanTask=1).",
+   "engineer_action": "This is a link fault, not a motion fault. Verify the Color CCD vision PC is powered and its reader program is listening, and that [ColorCCD] Address and Port in system\\General.ini match the reader (ColorCcdSocket::LoadConfig, ColorCcdSocket.cpp:64-65); check the cable/switch between the controller and the vision PC. If no Color reader is installed on this machine, set [ColorCCD] Enable = false (drives CosFunction.bUseColorCcd) so the identity-2D path is simulated instead of alarming.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located the raise site independently: trigger, code->WAR16121 mapping, message, and the IsColorCcdConnected()==false polarity all CONFIRMED against aColor.cpp:1177-1179 / database.cpp:931-936 / ColorCcdSocket.cpp:283. ColorCcdSocket and CosFunction.bUseColorCcd devices confirmed real and relevant. CORRECTION: removed the draft's MTopCCDX_Color device - it is a real motor but is commanded back in case 10 (aColor.cpp:1172) and is NOT read at the raise site (case 100); the socket-connection state is independent of the reader's X position, so listing it (with an invented 'positioned but link down' actual state) would misdirect the engineer on a pure TCP/link fault."
+  },
+  {
+   "code": "WAR0330",
+   "message": "Top CCD API not ready",
+   "category": "vision",
+   "trigger": "aLoader.cpp:1722 ShowMyError(\"WAR0330\", LangT(\"Top CCD API not ready\"), K_SKIP|K_RETRY|K_TRAY_END). Raised in TLoaderModule::DoCcdCheck (aLoader.cpp:1611) case 5000: after BinData=ReadTopCcdBin(LoaderNo, State->CcdX, State->CcdY, bCcdOk) at aLoader.cpp:1681 returns bCcdOk==false -- the else (aLoader.cpp:1720) of `if(bCcdOk)` (aLoader.cpp:1682). ReadTopCcdBin (aLoader.cpp:1061-1071) is a STUB: it sets bOk=true and returns HAS_OK_IC only when `tFunction.UseCCD==false || IsSoftSimulate() || tSimuData.bRunSimulation` (aLoader.cpp:1067); otherwise (UseCCD ON, real build, not run-simulation) it sets bOk=false and returns EMPTY_IC (aLoader.cpp:1069-1070). It never queries any socket/API -- on real hardware it always fails, so this is a readiness/not-implemented fault, NOT an API-timeout.",
+   "root_causes": [
+    "tFunction.UseCCD is ON but ReadTopCcdBin (aLoader.cpp:1061-1071) is a stub: on a real build with run-simulation off it unconditionally sets bOk=false and returns EMPTY_IC (aLoader.cpp:1069). There is no socket/API read attempted in this path.",
+    "Machine is running a real (non-SOFT_SIMULATE) build with tSimuData.bRunSimulation==false, so the bOk=false branch of ReadTopCcdBin is always taken while UseCCD is enabled.",
+    "The Top-CCD Bin-classification read integration is not wired for HT160S real hardware -- only the separate 2D-code path (state 5500 via ReadTopCcd2DCode / TopCcdSocket) is implemented; the bin read returns a placeholder failure."
+   ],
+   "devices": [
+    {
+     "name": "tFunction.UseCCD",
+     "kind": "logic",
+     "expected": "OFF when no Bin-classification CCD read is available -- ReadTopCcdBin then hits the `UseCCD==false` gate (aLoader.cpp:1067), returns HAS_OK_IC with bOk=true, and WAR0330 never fires. ON only if a working bin-classification read exists.",
+     "actual": "ON, so on a real build ReadTopCcdBin falls through to bOk=false / EMPTY_IC (aLoader.cpp:1069-1070) and raises WAR0330.",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "tSimuData.bRunSimulation",
+     "kind": "logic",
+     "expected": "ON during run-simulation makes ReadTopCcdBin return HAS_OK_IC with bOk=true (aLoader.cpp:1067), suppressing this alarm.",
+     "actual": "OFF (production run), so the real-hardware stub branch (bOk=false) is taken.",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "IsSoftSimulate()",
+     "kind": "logic",
+     "expected": "true on the SOFT_SIMULATE dev/laptop build -> ReadTopCcdBin returns bOk=true (aLoader.cpp:1067) and the alarm is suppressed.",
+     "actual": "false on a real-machine build, so with tFunction.UseCCD ON and run-simulation off the bOk=false branch always fires.",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Note offers Retry / Skip / Tray End (K_RETRY|K_SKIP|K_TRAY_END). Retry sets CcdTask=3000 to re-move to the cell and re-read (aLoader.cpp:1723-1724) -- on real hardware this re-fails, since ReadTopCcdBin is a stub. Skip bumps iTopCcdCount, marks the cell EMPTY_IC via SetTraySingleData, and resets CcdTask=1 (aLoader.cpp:1725-1730). Tray End wipes remaining UNCHECK cells of the active tray to EMPTY via ChangeActiveTrayData(LoaderNo, UNCHECK_IC, EMPTY_IC) and resets CcdTask=1 (aLoader.cpp:1731-1735).",
+   "engineer_action": "This is a logic/readiness fault with no single IO LED -- do NOT look for a sensor or motor. The raise path (ReadTopCcdBin, aLoader.cpp:1061-1071) never queries a socket/API, so checking that a vision PC 'is responding' will not help. Confirm tFunction.UseCCD in State Record: because ReadTopCcdBin's real-hardware branch always returns bOk=false, if no bin-classification CCD read is installed then UseCCD must be OFF (which routes cells as HAS_OK_IC and stops the alarm). If a bin CCD read IS expected, note that ReadTopCcdBin is currently a stub -- the bin-classification integration must be implemented in firmware before UseCCD can be enabled on real hardware.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located raise site independently: aLoader.cpp:1722 in TLoaderModule::DoCcdCheck case 5000 -- CONFIRMED, matches draft (if bCcdOk at 1682, else at 1720, ShowMyError at 1722; ReadTopCcdBin call at 1681; def at 1061-1071 with bOk=false at 1069). Trigger condition and all file:lines in the draft are correct. CORRECTED the device list: draft's HSys.LastSet.iRealDummy and TopCcdSocket are both invented for this alarm -- ReadTopCcdBin reads neither; iRealDummy/TopCcdSocket only participate in the separate 2D-code path (state 5500 / ReadTopCcd2DCode), not the bin read that raises WAR0330. Replaced them with the three real logic gates ReadTopCcdBin actually reads: tFunction.UseCCD (cprod.h:92), tSimuData.bRunSimulation, and IsSoftSimulate() (all at aLoader.cpp:1067). Also corrected root-causes and engineer_action to reflect that this is a stub/not-implemented failure, not an API-timeout -- no socket read occurs in this path."
+  },
+  {
+   "code": "WAR0462",
+   "message": "Top CCD 2D no response (2DID communication time out)",
+   "category": "vision",
+   "trigger": "aLoader.cpp:1815 ShowSystemError(\"TopCCD_2D\", K_RETRY|K_SKIP|K_MANUAL_2D). The key TopCCD_2D maps to code WAR0462 via the paired arrays CcdName[1]/CcdCode[1] at database.cpp:931-932 (message string database.cpp:935). Raised inside DoCcdCheck (function starts aLoader.cpp:1611), case 5500, in the else-if branch at aLoader.cpp:1813 'else if(State->CcdDelay.Off())'. It fires when the 3000ms poll window State->CcdDelay (armed SetMS(3000) at aLoader.cpp:1713 on entering state 5500) expires while ReadTopCcd2DCode(LoaderNo,CcdX,CcdY,b2DOk) at aLoader.cpp:1745 has kept returning b2DOk==false. On the real-hardware path (aLoader.cpp:1099-1104) that means TopCcdSocket->TopCcdPoll()/TopCcdGetResult(sCode) never buffered a decoded 2D reply before the timer ran out.",
+   "root_causes": [
+    "Top CCD vision PC received the trigger shot (TopCcdTriggerShot issued at aLoader.cpp:1712 before entering the poll state) but did not return a decoded 2D string within the 3000ms window",
+    "TCP/socket link to the Top CCD reader (TopCcdSocket) dropped or stalled after the shot was triggered so TopCcdGetResult never returns true",
+    "IC 2D barcode unreadable at the taught read position (blurred/rotated/absent/poor lighting) so the reader has nothing to reply with"
+   ],
+   "devices": [
+    {
+     "name": "TopCcdSocket (Top CCD 2D reader socket link)",
+     "kind": "logic",
+     "expected": "TopCcdSocket->TopCcdGetResult(sCode) returns true with a decoded 2D code within the 3000ms poll window (b2DOk becomes true at aLoader.cpp:1746)",
+     "actual": "no reply buffered - TopCcdGetResult keeps returning false, so b2DOk stays false and control falls to the CcdDelay.Off() timeout branch",
+     "check_where": "State Record / EventLog (also the maintenance-page Top CCD connect indicator / CosFunction.bUseTopCcd flag)"
+    },
+    {
+     "name": "State->CcdDelay (Top CCD 3000ms poll timer)",
+     "kind": "logic",
+     "expected": "cleared/re-armed by a successful 2D read (b2DOk true) before it expires; while running, .Off() returns false",
+     "actual": "expired - State->CcdDelay.Off() returns true (aLoader.cpp:1813) with b2DOk still false, which raises the alarm",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "The Note offers Retry / Skip / Manual 2D. Retry (K_RETRY) re-triggers the shot via TopCcdSocket->TopCcdTriggerShot() and re-arms the 3000ms poll (SetMS(3000)+On(), aLoader.cpp:1818-1821). Manual 2D (K_MANUAL_2D) calls BindManual2D so the operator hand-enters the IC 2D code, which is then resolved through the normal Bin/Lot bind path. Skip (else branch, aLoader.cpp:1826-1833) routes the IC to the Error bin (SetTrayBin HT160_BIN_ERROR_NO_BIN_SETTING), sets Lot=-1 and an empty 2D code, calls TopCcdEndShot() and returns to CcdTask=1. Note: unlike the sibling WAR0475 'not found in any lot' branch, this WAR0462 Skip path does NOT increment iUnknown2D or any counter.",
+   "engineer_action": "Confirm the Top CCD link is connected (maintenance-page Top CCD connect indicator; the CosFunction.bUseTopCcd flag gates the real poll) and the vision PC program is running and decoding. Verify the read position - MoveToCcdCell (aLoader.cpp:440, driven in DoCcdCheck case 3000 at aLoader.cpp:1667) actually presents the IC 2D code to the reader - and check camera focus/lighting and that the barcode is present and legible. If a companion WAR16120 (TopCCD_Connect) is also firing, treat the socket/cable/power as the primary fault.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located the raise site independently. CONFIRMED: aLoader.cpp:1815 ShowSystemError(\"TopCCD_2D\",...) in DoCcdCheck (starts 1611) case 5500 else-if at 1813; TopCCD_2D->WAR0462 mapping at database.cpp:931-932 with message at 935; trigger = State->CcdDelay.Off() after ReadTopCcd2DCode (1745) returns b2DOk==false, real-HW poll at 1099-1104, 3000ms timer armed at 1713. Both devices are correctly pure logic/socket state (no physical IO sensor exists for this comm timeout) - left as-is. CORRECTED one factual error: the draft's operator_action claimed the Skip path 'bumps iUnknown2D'; it does not. The WAR0462 no-response Skip branch (lines 1826-1833) increments no counter - the iUnknown2D++ (aLoader.cpp:1802) belongs to the WAR0475 '2D code not found in any lot' Skip branch, a different alarm. MoveToCcdCell referenced in engineer_action was verified as a real function (aLoader.cpp:440)."
+  },
+  {
+   "code": "WAR16120",
+   "message": "Top CCD connect not ready (Loader Tray ID no respond)",
+   "category": "vision",
+   "trigger": "aLoader.cpp:1701 `Ret=ShowSystemError(\"TopCCD_Connect\", K_RETRY|K_SKIP);`. Key TopCCD_Connect -> code WAR16120 via database.cpp:931-932 (CcdName[0]/CcdCode[0]) and mapNameToAlarm at database.cpp:943; message string is CcdEng[0] at database.cpp:934. Raised in DoCcdCheck case 5000. First the enclosing gate at aLoader.cpp:1694 must hold: `if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)` (i.e. after a good Top-CCD bin read that returned HAS_OK_IC, with 2D-bin-map enabled). Inside it, the alarm fires when the inner if at aLoader.cpp:1696-1700 is true: `HSys.LastSet.iRealDummy==REALLY && TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected()==false && CosFunction.bUseTopCcd && IsSoftSimulate()==false`. IsTopCcdConnected() returns (iState==TOPCCD_CONNECTED) after re-polling (TopCcdSocket.cpp:280-284), so false means the socket is not in the connected state.",
+   "root_causes": [
+    "TCP socket to the Top CCD vision PC is not in TOPCCD_CONNECTED state (cable unplugged, vision PC off, wrong IP/port, program not listening)",
+    "CosFunction.bUseTopCcd (General.ini [TopCCD] Enable) is ON on a REALLY machine but the reader is not reachable",
+    "Network/socket dropped between init and this scan; TopCcdPoll reconnect (2s throttle) has not yet re-established the link"
+   ],
+   "devices": [
+    {
+     "name": "TopCcdSocket (TCP link, iState)",
+     "kind": "logic",
+     "expected": "iState==TOPCCD_CONNECTED, so IsTopCcdConnected() returns true (TopCcdSocket.cpp:283)",
+     "actual": "iState != TOPCCD_CONNECTED; IsTopCcdConnected() returns false (aLoader.cpp:1698) — this is the actual fault",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "CosFunction.bUseTopCcd",
+     "kind": "logic",
+     "expected": "reflects General.ini [TopCCD] Enable; ON only when a Top CCD reader is present and reachable",
+     "actual": "ON while the socket is disconnected (gate at aLoader.cpp:1698)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "CosFunction.bUse2DBinMap",
+     "kind": "logic",
+     "expected": "ON to run the Top-CCD 2D bin-map path; this alarm is only reachable when it is ON (enclosing gate aLoader.cpp:1694)",
+     "actual": "ON (path entered)",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "HSys.LastSet.iRealDummy",
+     "kind": "logic",
+     "expected": "REALLY only on a real machine with the reader wired",
+     "actual": "REALLY with no live Top CCD connection (gate at aLoader.cpp:1696)",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Note offers Retry / Skip. On Retry (aLoader.cpp:1701-1707) the ladder simply breaks with CcdTask left at 5000, so case 5000 re-runs: ReadTopCcdBin then the connect check run again, and the reconnect is implicit inside IsTopCcdConnected() -> TopCcdPoll(), which re-calls TopCcdConnect() throttled to once per 2s (TopCcdSocket.cpp:272-276). There is NO explicit reconnect call in the retry path (the draft's EnsureColorCcdSocketCreated is a Color-CCD helper, ColorCcdSocket.cpp:22, and is never called here; the Top-CCD equivalent EnsureTopCcdSocketCreated is likewise not called on Retry). On Skip the cell bin is set to HT160_BIN_ERROR_2D_SCAN_FAIL and the ladder returns to idle (CcdTask=1, aLoader.cpp:1702-1706).",
+   "engineer_action": "Verify the Top CCD vision PC is powered and its program listening, and that the machine's [TopCCD] Address/Port (General.ini) match. Check the network cable/switch. On the maintenance page use the Top CCD connect control (btnTopCcdConnect, maintenance.cpp:488-491 calls TopCcdSocket->TopCcdConnect via EnsureTopCcdSocketCreated) to force a reconnect and confirm the socket reaches TOPCCD_CONNECTED. If no Top CCD is installed, turn [TopCCD] Enable OFF so CosFunction.bUseTopCcd is false and the 2D path is bypassed; or turn [2DBinMap] off (bUse2DBinMap) if the whole 2D bin-map feature is not used.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located raise site independently. CONFIRMED: aLoader.cpp:1701 ShowSystemError(\"TopCCD_Connect\",K_RETRY|K_SKIP) in DoCcdCheck case 5000; WAR16120 mapping at database.cpp:931-932/943 and message at database.cpp:934; trigger inner-if at aLoader.cpp:1696-1700 matches draft verbatim; IsTopCcdConnected()==iState==TOPCCD_CONNECTED at TopCcdSocket.cpp:283. CORRECTED the operator_action: the draft claimed Retry 're-issues EnsureColorCcdSocketCreated + reconnect' — false. Retry just breaks (CcdTask stays 5000) and reconnect happens implicitly via IsTopCcdConnected()->TopCcdPoll()->TopCcdConnect() (2s throttle); EnsureColorCcdSocketCreated is a Color-CCD function never called here. Also made the trigger complete by adding the enclosing gate CosFunction.bUse2DBinMap && BinData==HAS_OK_IC (aLoader.cpp:1694) and added bUse2DBinMap as a device. All three original devices verified as really read at the raise site with correct polarity."
+  },
+  {
+   "code": "WAR0970",
+   "message": "Color CCD 2D no response (Tray ID communication time out)",
+   "category": "vision",
+   "trigger": "aColor.cpp:1214 ShowSystemError(\"ColorCCD_2D\", K_RETRY|K_SKIP|K_MANUAL_2D); the name \"ColorCCD_2D\" maps to code WAR0970 at database.cpp:931-932/943 (message at database.cpp:937). Raised inside TColorModule::DoReadColor2D(int Flag) (function at aColor.cpp:1128), switch case 200: line 1201 'if(ColorCcdSocket!=NULL && ColorCcdSocket->ColorCcdGetResult(sCode))' is false (no decoded tray-ID returned) AND the else-if at line 1210 'ScanDelay.Off()' is true - the 3000ms shot timer armed in case 100 (ScanDelay.SetMS(3000);ScanDelay.On() at aColor.cpp:1193-1194, right after ColorCcdTriggerShot at 1192) has expired. ColorCcdEndShot (LOFF) fires at 1213, then the alarm. The socket was already confirmed connected in case 100 (a drop there raises the separate ColorCCD_Connect/WAR16121), so WAR0970 is specifically shot-triggered-but-no-decode-within-3000ms.",
+   "root_causes": [
+    "Color CCD vision PC received the trigger (LON) but did not return a decoded tray-ID 2D within the 3000ms window",
+    "Socket link to the Color reader dropped AFTER the shot was triggered (case 100 connect check had already passed), so ColorCcdGetResult keeps returning false until the timeout",
+    "Identity-tray 2D barcode unreadable at the taught ColorRead2DXPosition (missing / blurred / misaligned / poor lighting) so the reader never produces a code"
+   ],
+   "devices": [
+    {
+     "name": "ColorCcdSocket (Color CCD reader link)",
+     "kind": "logic",
+     "expected": "ColorCcdGetResult(sCode) returns true with a non-empty tray-ID string inside the 3000ms window (aColor.cpp:1201)",
+     "actual": "keeps returning false; no decoded code arrives, so control falls to the ScanDelay.Off() timeout branch (aColor.cpp:1210) which runs ColorCcdEndShot then raises the alarm",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "ScanDelay (3000ms shot poll timer)",
+     "kind": "logic",
+     "expected": "a successful ColorCcdGetResult returns (case 200 -> ScanTask=1, aColor.cpp:1207-1208) before ScanDelay.Off() ever evaluates true",
+     "actual": "timer expired: ScanDelay.Off() returns true at aColor.cpp:1210 with no result yet, which is the exact condition that fires WAR0970",
+     "check_where": "State Record / EventLog"
+    },
+    {
+     "name": "MTopCCDX_Color",
+     "kind": "motor",
+     "expected": "moved to and resting at Teach.ColorRead2DXPosition (commanded in the same ladder, case 10, aColor.cpp:1166-1172) so the 2D reader physically faces the identity-tray barcode",
+     "actual": "reported in position, but the reader still returned no code within the window (confirm it truly reached the taught position and the code is under the reader)",
+     "check_where": "MotionView"
+    }
+   ],
+   "operator_action": "The Note offers Retry / Skip / Manual 2D. Retry (K_RETRY) re-issues ColorCcdTriggerShot and re-arms the 3000ms timer (aColor.cpp:1215-1221). Manual 2D (K_MANUAL_2D) adopts the operator-typed identity: sTrayID2D=fNote->ManualText, stamps it onto the carried identity tray, returns the ladder to idle (aColor.cpp:1222-1228). Skip sets an empty identity (sTrayID2D=\"\") and returns to idle (aColor.cpp:1230-1236).",
+   "engineer_action": "Confirm the Color CCD link is up and the vision program is decoding: CosFunction.bUseColorCcd must be enabled (otherwise the flow fabricates a COLOR2D_ id and never reaches this alarm - aColor.cpp:1146), and the socket must stay connected through the shot (a drop after case 100 surfaces as this timeout, not as ColorCCD_Connect). Verify MTopCCDX_Color reaches the taught ColorRead2DXPosition in MotionView so the reader faces the identity-tray 2D; then check camera focus/lighting and that the tray-ID barcode is present and legible.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located raise site independently: aColor.cpp:1214 ShowSystemError(\"ColorCCD_2D\",...) in TColorModule::DoReadColor2D case 200 else-if(ScanDelay.Off()) at line 1210; name->WAR0970 mapping verified at database.cpp:931-932/943, message at 937. Trigger (ColorCcdGetResult false + 3000ms ScanDelay.Off) matches the real if(). All three devices are genuinely referenced in this ladder: ColorCcdSocket read at 1201, ScanDelay armed at 1193-1194 and polled at 1210, MTopCCDX_Color (real alias, database.cpp:1196) commanded to Teach.ColorRead2DXPosition in case 10 (1166-1172). No invented devices; polarities correct. Only refined the ScanDelay expected/actual wording (timer is not explicitly 'cleared' - a successful read simply returns before Off() evaluates true) and clarified that a mid-shot socket drop manifests as WAR0970 rather than the connect alarm."
+  },
+  {
+   "code": "MES1426",
+   "message": "Color rear has a leftover tray",
+   "category": "tray-flow",
+   "trigger": "TColorModule::DoFeedTray case 10 (start of a supply feed), aColor.cpp:973-987. RefreshStateFromSensors() runs (line 973), then `if(bRearHasTray)` (line 974) AND `if(HSys.LastSet.iRealDummy!=DUMMY)` (line 976) raise `ShowMyError(\"MES1426\", LangT(\"Color rear has a leftover tray - please remove it\"), K_RETRY)` at aColor.cpp:978. This is the 3-arg Code/Msg/KCode overload (no pSn), so NO IO name is printed on the Note. bRearHasTray is derived in RefreshStateFromSensors (aColor.cpp:274-289): bOutputState becomes true from SnColor_OutputBottomHasTray.IsOn() (line 277, only if .Enable==true) OR SnColor_TrayPos1.IsOn() (line 284, only if .Enable==true), then `if(bHasOutputSensor) bRearHasTray=bOutputState;` (line 288-289). Because the guard is iRealDummy!=DUMMY, IsSoftSimulate() is false and the sim early-out at line 253 is bypassed, so the sensor path above is the live one. In this supply context bTrayReady (pickup gate) is false and the return branch already ran, so a true bRearHasTray means a tray was stranded at the Color rear handoff slot on startup/recovery: not pickable and not re-stageable, so the operator must remove it. After the dialog, RefreshStateFromSensors re-runs (line 979); if still set the feed goes to DONE terminal case 13000, if cleared it proceeds to case 1000.",
+   "root_causes": [
+    "A tray was left / stranded at the Color rear handoff slot after a prior fault, abort, or power-cycle",
+    "Rear presence sensor (SnColor_OutputBottomHasTray or SnColor_TrayPos1) stuck ON or misread, making bRearHasTray true with no real tray",
+    "bRearHasTray latch held true from an interrupted receive/recycle path before the sensor refresh"
+   ],
+   "devices": [
+    {
+     "name": "bRearHasTray",
+     "kind": "logic",
+     "expected": "false - the rear handoff slot is empty before a new supply feed begins (checked at aColor.cpp:974)",
+     "actual": "true - rear slot flagged occupied (leftover tray), blocking the feed",
+     "check_where": "State Record / EventLog (logic latch; also dumped in the Color state string at aColor.cpp:1668. This alarm prints NO IO name on the Note)"
+    },
+    {
+     "name": "SnColor_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "OFF when .Enable==true - no tray at the rear/output slot (line 277)",
+     "actual": "ON - a leftover tray is present, or the sensor is stuck ON; drives bOutputState -> bRearHasTray",
+     "check_where": "IOsetview (IO LED view)"
+    },
+    {
+     "name": "SnColor_TrayPos1",
+     "kind": "sensor",
+     "expected": "OFF when .Enable==true - no tray at the rear position (line 284)",
+     "actual": "ON - detects the leftover tray; parallel rear sensor that also drives bOutputState -> bRearHasTray",
+     "check_where": "IOsetview (IO LED view)"
+    }
+   ],
+   "operator_action": "Physically remove the leftover tray from the Color rear handoff slot; the rear presence sensor then clears bRearHasTray. Press RETRY: RefreshStateFromSensors re-checks (aColor.cpp:979) and, if clear, the supply feed proceeds to case 1000. If still occupied, the feed drops to the DONE terminal (case 13000) without presenting a tray.",
+   "engineer_action": "If no tray is physically present but the alarm persists, check SnColor_OutputBottomHasTray and SnColor_TrayPos1 in IOsetview for a stuck-ON sensor (confirm each is Enabled; a stuck ON here forces bRearHasTray true). Review State Record / EventLog for an interrupted receive/recycle path that left bRearHasTray latched before the sensor refresh.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently. Trigger confirmed at aColor.cpp:978 inside DoFeedTray case 10, gated by if(bRearHasTray) && iRealDummy!=DUMMY, K_RETRY, 3-arg overload with no sensor pointer (no IO name on Note) - matches draft. bRearHasTray derivation confirmed at aColor.cpp:274-289 from SnColor_OutputBottomHasTray.IsOn() OR SnColor_TrayPos1.IsOn() (each only when .Enable==true), assigned via bOutputState. All three devices are real code identifiers, really read on this path, polarity correct (IsOn==true = tray present, so expected OFF / actual ON). Added the .Enable==true gating caveat to the two sensors; otherwise the draft was accurate."
+  },
+  {
+   "code": "MES1424",
+   "message": "Color front supply tray is missing",
+   "category": "tray-flow",
+   "trigger": "TColorModule::DoGoDownTray case 700 (aColor.cpp:646). The front destack runs entirely on cylinders: C_Color_FrontRiseTray_1 Push (case 100, :564) -> C_Color_FrontRiseTray_2 Push (case 150, :572) -> C_Color_FrontSeparateTray_1 Push (case 200, :580) -> Rise_2 Pop (case 300, :598) -> Separate_1 Pop (case 400, :616) -> Rise_1 Pop (case 500, :633), each followed by a GeneralSetting.iColorDestackSettleMs settle. At case 700 the code calls RefreshStateFromSensors() then `if(HSys.Sen.SnColor_InputHasTray.Enable==true && HSys.Sen.SnColor_InputHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY)` (aColor.cpp:653-655) and raises `ShowMyError(\"MES1424\", ..., &HSys.Sen.SnColor_InputHasTray, true, K_RETRY)` (aColor.cpp:658). K_RETRY sets GoDownTask=1 (aColor.cpp:659-660) to re-destack. The alarm is guarded OUT when the sensor is disabled (Enable==false) or the machine is in DUMMY mode (iRealDummy==DUMMY) -- both take the else branch and declare success.",
+   "root_causes": [
+    "Color front supply stack is empty - the destack separated no tray onto the front buffer",
+    "A front destacker cylinder failed to complete its cycle (dual rise C_Color_FrontRiseTray_1/_2 to lift-and-hold the stack, or the separation claw C_Color_FrontSeparateTray_1 to isolate a single tray), so no tray was released onto the front buffer",
+    "SnColor_InputHasTray stuck OFF (misaligned / dirty / faulty) while Enable==true, so a landed tray reads as absent (note: Enable==false does NOT cause this alarm - it bypasses the check)",
+    "iColorDestackSettleMs too short - case 700 reads the sensor before the separated tray has finished seating"
+   ],
+   "devices": [
+    {
+     "name": "SnColor_InputHasTray",
+     "kind": "sensor",
+     "expected": "ON - a front-staged tray landed on the Color front input/supply buffer after the destack",
+     "actual": "OFF - no tray detected at the front buffer when case 700 samples it",
+     "check_where": "IOsetview (sensor LED); the alarm passes this sensor as pSn with bExpectedOn=true so its IO name is printed on the Note detail line"
+    },
+    {
+     "name": "C_Color_FrontRiseTray_1",
+     "kind": "cylinder",
+     "expected": "Push up at case 100 to lift/hold the front stack, then Pop down at case 500 to lower the bottom tray onto the front buffer",
+     "actual": "Did not complete its Push/Pop cycle, so no tray was lowered onto the buffer",
+     "check_where": "IOsetview (cylinder LED)"
+    },
+    {
+     "name": "C_Color_FrontSeparateTray_1",
+     "kind": "cylinder",
+     "expected": "Push in at case 200 (separation claw isolates a single tray) then Pop out at case 400 to release exactly one tray",
+     "actual": "Failed to separate/release one tray from the stack",
+     "check_where": "IOsetview (cylinder LED)"
+    }
+   ],
+   "operator_action": "Refill the Color front supply stack and clear any mis-fed or jammed tray at the front destacker, then press RETRY (GoDownTask returns to 1 and re-runs the destack).",
+   "engineer_action": "In IOsetview confirm SnColor_InputHasTray toggles ON with a tray physically on the front buffer (rule out a stuck/dirty/misaligned sensor); watch the front destacker cylinders C_Color_FrontRiseTray_1, C_Color_FrontRiseTray_2 and the separation claw C_Color_FrontSeparateTray_1 all cycle during the godown; if the tray seats slightly after the sensor is sampled, raise iColorDestackSettleMs in system/General.ini. MColorY (Y transport) is NOT part of this godown path and should not be suspected for this alarm.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located the raise site at aColor.cpp:658 (if at :653-655) - trigger condition CONFIRMED verbatim, including the Enable/IsOff/!=DUMMY guard and K_RETRY->GoDownTask=1 at :659-660. SnColor_InputHasTray polarity CONFIRMED (IsOff() fires the alarm -> healthy=ON, fault=OFF) and it is the IO printed on the Note line. C_Color_FrontRiseTray_1 CONFIRMED as a real destack cylinder (Push case 100 :564, Pop case 500 :633); description corrected from 'Reset then Pop' to 'Push then Pop'. REMOVED MColorY - it is invented for this alarm: the entire DoGoDownTray path (cases 1-700, lines 537-668) contains no MColorY move and SnColor_InputHasTray is a fixed front-input sensor, so MColorY position cannot cause or affect this fault. ADDED C_Color_FrontSeparateTray_1 (separation claw, Push case 200 :580 / Pop case 400 :616) as a genuinely load-bearing destack cylinder. Corrected the root cause that blamed 'Enable=false' - Enable==false is inside the guard and suppresses the alarm rather than causing it."
+  },
+  {
+   "code": "MES1427",
+   "message": "Color supply stack full (sensor)",
+   "category": "stack-full",
+   "trigger": "aColor.cpp DoColor() case 100. Fires only in the CleanOut drain phase: the gate `if(HSys.Sys.RunMode==Run_CleanOut && TrayArmModule!=NULL && TrayArmModule->IsCleanOutFinish())` (aColor.cpp:384-385) with a tray still present `if(bFrontHasTray || bRearHasTray)` (line 387) and the supply stack full `if(IsInputFullForAmr())` (line 392). A do/while then raises `ShowMyError(\"MES1427\", \"Color supply stack FULL (sensor) - remove stacked trays\", &HSys.Sen.SnColor_InputFullTray, false, K_RETRY)` at aColor.cpp:396 and repeats `while(HSys.Sen.SnColor_InputFullTray.Enable==true && HSys.Sen.SnColor_InputFullTray.IsOn())` (aColor.cpp:394-398). bExpectedOn=false, so healthy=OFF. IsInputFullForAmr() (aColor.cpp:186-191) returns false under IsSoftSimulate(), so this can only fire on a real machine during a CleanOut drain.",
+   "root_causes": [
+    "During the CleanOut drain, Color GoUp-returns every remaining tray to the car, but the Color supply/return stack filled up (SnColor_InputFullTray ON) so the drained trays have nowhere to go",
+    "Operator has not yet removed the stacked trays the drain is pushing back into the magazine",
+    "SnColor_InputFullTray stuck/misread ON (sensor fault) even though the stack is not physically full"
+   ],
+   "devices": [
+    {
+     "name": "SnColor_InputFullTray",
+     "kind": "sensor",
+     "expected": "OFF - room remains in the Color supply/return stack (bExpectedOn=false at raise site, and the do/while exits only when this reads OFF)",
+     "actual": "ON - the do/while loop keeps re-showing MES1427 as long as SnColor_InputFullTray.Enable && IsOn()",
+     "check_where": "IOsetview (TMyLed mlSnColor_InputFullTray, alias SnColor_InputFullTray). The alarm also prints this IO on the Note line: ShowMyError appends \" [IO=SnColor_InputFullTray]\" plus a TriggerLine detail (note.cpp:1050-1056)."
+    }
+   ],
+   "operator_action": "Remove the stacked trays from the Color supply/return magazine. The modal repeats (K_RETRY) until SnColor_InputFullTray reads OFF; pressing RETRY re-checks the sensor, and once the stack is physically cleared the loop exits and the drain resumes (Status=CS_RETURNING; DoGoUpTray(0); Task=1700 at aColor.cpp:400-402).",
+   "engineer_action": "In IOsetview confirm SnColor_InputFullTray toggles OFF when trays are removed and ON when full (rule out a stuck sensor that would trap the drain in the do/while). Note this gate arms ONLY during a CleanOut drain (RunMode==Run_CleanOut && TrayArm IsCleanOutFinish()) and is qualified by IsInputFullForAmr(), which returns false in SOFT_SIMULATE (aColor.cpp:188-189), so it never fires in sim - reproduce only on a real machine. The same Full verdict also blocks TColorModule CleanOut-finish (IsInputFullForAmr() at aColor.cpp:1402-1403), so a stuck-ON sensor also prevents the drain from ever completing.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently. Trigger condition, file:line (aColor.cpp:384-398, ShowMyError at :396), and bExpectedOn=false->healthy-OFF all match the real if()/while. SnColor_InputFullTray verified as a real TMySensor (database.h:333, Name set database.cpp:1122, IOsetview LED iosetview.dfm:4743-4749) and is actually read at the while condition (aColor.cpp:398) and in IsInputFullForAmr() (aColor.cpp:190). ShowMyError overload (note.cpp:1050-1056) confirmed to append the IO name to the message and emit a TriggerLine detail, so 'prints this IO on the Note line' is correct. Sim-false gate confirmed at aColor.cpp:188-189. No device invented; polarity correct. Draft is accurate; only minor wording/line-precision refinements applied."
+  },
+  {
+   "code": "MES1421",
+   "message": "Color supply tray is not ready",
+   "category": "tray-flow",
+   "trigger": "In TColorModule::DoFeedTray(int Flag) (aColor.cpp:935), switch(FeedTask) case 7000: after case 4000 carries the clamped tray to the rear pickup Y via MoveColorY(Teach.ColorTrayArmPickYPosition) and cases 5000/6000 pop C_Color_PushTray then C_Color_LeanOnTray, RefreshStateFromSensors() runs (aColor.cpp:1079) and then `if(HSys.Sen.SnColor_OutputBottomHasTray.Enable==true && HSys.Sen.SnColor_OutputBottomHasTray.IsOff() && HSys.LastSet.iRealDummy!=DUMMY)` at aColor.cpp:1080-1082. Under GeneralSetting.bUseAMR it first arms AmrFeedWaitTimer (SetMS(iAmrFeedWaitSec*1000)) and breaks; only after that timer expires with the sensor still OFF does it reach `Ret=ShowMyError(\"MES1421\", LangT(\"Color supply tray is not ready\"), &HSys.Sen.SnColor_OutputBottomHasTray, true, K_RETRY)` at aColor.cpp:1102 (K_RETRY -> FeedTask=1). Single-instance Color module; NOT a per-Auto-station sprintf family. Confirmed against source.",
+   "root_causes": [
+    "Color supply magazine ran dry - no tray was actually fed to the rear pickup slot (the intended normal meaning of this alarm)",
+    "Tray dropped or mis-positioned during MColorY carriage transport to ColorTrayArmPickYPosition (clamp lost grip during cases 2000-4000, or carriage under-travelled)",
+    "SnColor_OutputBottomHasTray sensor misaligned/dirty (never sees the delivered tray) - note Enable=false disarms the check entirely, it does not fire the alarm",
+    "AMR mode only (bUseAMR): the AGV did not refill/deliver a supply tray within iAmrFeedWaitSec"
+   ],
+   "devices": [
+    {
+     "name": "SnColor_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "ON - a tray is present at the Color rear/output pickup slot when the carriage reaches case 7000 (the .Enable==true && .IsOff() clause is the sole IO read at the raise site)",
+     "actual": "OFF - RefreshStateFromSensors() re-read the sensor and it reports no tray at the rear pickup slot; polarity is IsOff()->fault, so healthy=ON / fault=OFF",
+     "check_where": "IOsetview (sensor LED); the alarm also prints this IO on the Note detail line (passed as the pSn arg to ShowMyError)"
+    },
+    {
+     "name": "RealDummy mode (HSys.LastSet.iRealDummy)",
+     "kind": "logic-state",
+     "expected": "iRealDummy != DUMMY - the check is armed ONLY in real/normal production; this is the third clause of the trigger if()",
+     "actual": "If iRealDummy==DUMMY the whole check is skipped (else-branch presents the tray, MES1421 suppressed). A fired MES1421 therefore confirms the machine is NOT in DUMMY mode.",
+     "check_where": "State Record / EventLog (RealDummy tier / iRealDummy)"
+    },
+    {
+     "name": "MColorY",
+     "kind": "motor",
+     "expected": "Reached Teach.ColorTrayArmPickYPosition at the prior case 4000 (rear pickup Y) so the fed tray sits over SnColor_OutputBottomHasTray",
+     "actual": "NOT read in the MES1421 trigger - check as an upstream cause: an under-travel leaves the tray short of the sensor. A genuine soft-limit fault on MColorY raises its own eMotOverLimitErr (aColor.cpp:887), not MES1421.",
+     "check_where": "MotionView (axis position vs teach ColorTrayArmPickYPosition)"
+    },
+    {
+     "name": "C_Color_PushTray / C_Color_LeanOnTray",
+     "kind": "cylinder",
+     "expected": "Gripped the supply tray through the carriage move (cases 2000-4000) and are POPPED/retracted at cases 5000/6000 just before the case 7000 sensor check",
+     "actual": "NOT read in the MES1421 trigger - check as an upstream cause: if a clamp lost grip during transport the tray was left behind and never reached the rear sensor. (Their .OnSensor is what MES1422 'Color Push Tray Miss' at aColor.cpp:1021 checks, not MES1421.)",
+     "check_where": "IOsetview (cylinder on/off + OnSensor LEDs)"
+    }
+   ],
+   "operator_action": "Refill the Color supply magazine. If a tray is jammed in transit, clear it. In AMR mode confirm the AGV actually delivered a supply tray to the Color source. Press RETRY - the feed restarts at FeedTask=1.",
+   "engineer_action": "The only device the MES1421 if() actually reads is SnColor_OutputBottomHasTray (plus the iRealDummy!=DUMMY gate); confirm in IOsetview that this sensor toggles ON when a tray physically sits at the rear/output slot and that its Enable is true (Enable=false disarms the check, it does not raise). MColorY and C_Color_PushTray/C_Color_LeanOnTray are upstream ladder steps (cases 4000/5000/6000), not read here - verify in MotionView that MColorY reaches ColorTrayArmPickYPosition and in IOsetview that the clamps held the tray through transport, only as root-cause checks for why the tray is absent. In AMR mode, if the wait expires too fast raise iAmrFeedWaitSec in system/General.ini.",
+   "verdict": "CORRECTED",
+   "verify_note": "Raise site re-located independently: aColor.cpp:1102 inside TColorModule::DoFeedTray case 7000, trigger if() at aColor.cpp:1080-1082. Trigger condition, file:line, function, and the case 4000/5000/6000 lead-in are CONFIRMED exactly as drafted, as is SnColor_OutputBottomHasTray (read at trigger, polarity IsOff()->fault correct, printed on Note detail line via pSn). Corrections: (1) the draft framed MColorY and C_Color_PushTray/C_Color_LeanOnTray as if read at the raise site - they are real identifiers (HSys.Mot.MColorY, HSys.Cyn.C_Color_*) but are upstream steps, not part of the if(); re-framed as upstream-cause devices and noted the cylinders are already retracted by the time the alarm fires. (2) Added the RealDummy/iRealDummy gate, which is the actual third clause of the trigger and suppresses the alarm in DUMMY mode - it was missing from the draft. No invented devices were found."
+  },
+  {
+   "code": "MES1422",
+   "message": "Color Push Tray Miss",
+   "category": "cylinder",
+   "trigger": "DoFeedTray case 2000 (aColor.cpp:997-1026): `int Clamp=DoClampTray(HSys.Cyn.C_Color_LeanOnTray, HSys.Cyn.C_Color_PushTray, FeedClampSub, FeedDelay, IsSoftSimulate(), GeneralSetting.iColorFeedClampSettleMs)` at aColor.cpp:1002-1003. DoClampTray (mycylin.cpp:40-85) runs lean-stop first (case 0), push last (case 10), starts a settle timer of iColorFeedClampSettleMs, then at case 20 (line 67) tests `IsCylinderOnReady(&Push,...)` i.e. C_Color_PushTray.OnSensor. If the push confirm has NOT made when the timer elapses it advances to case 30, retracts the push via `Push.Pop()`, resets FeedClampSub=0 and returns 2 (line 80). Clamp==2 raises `ShowMyError(\"MES1422\", LangT(\"Color Push Tray Miss\"), &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY)` at aColor.cpp:1021; K_RETRY sends feed back to case 1000 to re-approach and re-clamp.",
+   "root_causes": [
+    "Push cylinder C_Color_PushTray was commanded to extend but its ON/confirm reed sensor (OnSensor) did not read ON within iColorFeedClampSettleMs (DoClampTray case 20 failed, case 30 retracted and returned 2)",
+    "Low shop-air pressure or a mechanical bind preventing C_Color_PushTray from reaching its confirmed extended position",
+    "iColorFeedClampSettleMs too short - the confirm actually arrives just after the case-20 check",
+    "OnSensor reed-switch / wiring fault: the cylinder physically extended but the on-sensor never reported ON",
+    "Mis-seated tray at the front receive position so the push cannot reach its confirmed stroke (a fully-absent tray normally trips MES1424 first, not MES1422)"
+   ],
+   "devices": [
+    {
+     "name": "C_Color_PushTray (its .OnSensor)",
+     "kind": "cylinder",
+     "expected": "ON - push cylinder fully extended and its on-sensor (OnSensor) confirmed within iColorFeedClampSettleMs",
+     "actual": "OFF - push was commanded but OnSensor never made; DoClampTray case 20 confirm failed and case 30 retracted the push (Push.Pop) and returned 2",
+     "check_where": "Note detail line (the alarm prints [IO=<C_Color_PushTray.OnSensor.Name>] plus an expected-ON/actual TriggerLine); also IOsetview push on-sensor LED"
+    }
+   ],
+   "operator_action": "Confirm a tray is present and correctly seated at the Color front receive position, clear any jam, check shop-air pressure, then press RETRY (feed returns to case 1000 to re-approach and re-clamp).",
+   "engineer_action": "In IOsetview jog C_Color_PushTray and watch its OnSensor LED make/break at full stroke; verify air pressure and cylinder speed. If the confirm is merely late, raise iColorFeedClampSettleMs in system/General.ini [Color]. Confirm a tray is actually present at the front (SnColor_InputHasTray LED in IOsetview) - a fully-missing tray normally raises MES1424 upstream in DoGoDownTray, so an MES1422 usually means the tray is present but the push under-strokes or its sensor is faulty. Note: a lean-stop (C_Color_LeanOnTray) failure raises that cylinder's own OnAlarmCode via its Task=50 timeout, NOT MES1422 - by the time MES1422 fires the lean-stop has already confirmed.",
+   "verdict": "CORRECTED",
+   "verify_note": "Raise site verified independently at aColor.cpp:1021; DoFeedTray case 2000 and the DoClampTray helper (mycylin.cpp:40-85) confirm the trigger mechanism exactly as drafted (lean first, push last, settle, confirm C_Color_PushTray.OnSensor, Pop+return 2 on miss). Device C_Color_PushTray (.OnSensor) confirmed: it is the sensor passed to ShowMyError with bExpectedOn=true (healthy ON / fault OFF), and the pSn overload at note.cpp:1050-1056 prints [IO=OnSensor.Name] on the Note. CORRECTED by removing two draft devices: (1) C_Color_LeanOnTray is not read at the raise site and is a hard precondition - DoClampTray only reaches case 30/return-2 after case 0 required Lean.Push()==true, and a real lean failure raises the lean cylinder's own alarm (mycylin.cpp Task=50 SetCylinderAlarm), never MES1422; the draft's 'if lean-stop failed' actual-state is impossible here. (2) SnColor_InputHasTray is not read at the raise site; a missing front tray has its own dedicated alarm MES1424 at aColor.cpp:653-658. Both folded into root_causes/engineer_action as context rather than as MES1422 check-devices."
+  },
+  {
+   "code": "MES1721",
+   "message": "TrayArm pick blocked - rear source not ready",
+   "category": "tray-flow",
+   "trigger": "aTrayArm.cpp:274, TTrayArmModule::OnPickGateBlocked(AnsiString Source). A DoPick case 1/10 readiness gate held the arm at Z-UP for a full watchdog window. On the first blocked tick the timer is armed: PickWaitTimer.Clear(); PickWaitTimer.SetMS(TRAYARM_PICK_GATE_ALARM_MS=60000); PickWaitTimer.On(); bPickWaitArmed=true; return (aTrayArm.cpp:253-257). On a later tick, if the timer has NOT expired it returns early (aTrayArm.cpp:259 'if(PickWaitTimer.Off()==false) return;'); once PickWaitTimer.Off()==true (window elapsed still blocked) it clears the arm and does HSys.DecStopAllMotor(); HSys.Sys.SystemStart=false; gStateRecord->TriggerSnapshot(\"TrayArmPickBlocked_\"+Source) (aTrayArm.cpp:261-273), then ShowMyError(\"MES1721\", LangT(\"TrayArm pick blocked - rear source not ready\")+\" (\"+Source+\")\", K_RETRY) at aTrayArm.cpp:274 (3-arg free-string form, no pSn -> Note prints only the source label, not an IO detail line). The block itself is a producer predicate returning false: Empty source -> EmptyModule->IsRearReadyForPick()==false (call sites aTrayArm.cpp:683 for TAJOB_EMPTYTRAY_TO_AUTO and :701 for TAJOB_AMR_SUPPLY non-Color); Loader source -> LoaderModule->IsRearReadyForPick()==false (aTrayArm.cpp:716). A poll gap > TRAYARM_PICK_GATE_SCAN_GAP_MS (1500ms; modal Note / IOsetview open / machine stopped) re-arms instead of firing (aTrayArm.cpp:248-257), so the alarm can only fire late, never early. Identity picks from Color are excluded (comment aTrayArm.cpp:698-699; they gate on Color's own bTrayReady).",
+   "root_causes": [
+    "Source=Empty: rear empty-tray never presented or carrier still delivering - EmptyModule->IsRearReadyForPick() false because bRearHasTray==false (SnEmpty_OutputBottomHasTray OFF, aEmpty.cpp:1202) or FeedTask not parked at 1 or 13000 i.e. feed ladder mid-handoff (aEmpty.cpp:1204-1205)",
+    "Source=Empty: transport clamps C_Empty_PushTray / C_Empty_LeanOnTray out-bits still actuated at pick time - carrier still owns the tray (aEmpty.cpp:1206-1207)",
+    "Source=Empty: Status==ES_FEEDING or ES_RETURNING, or bRearReturnInProgress true - a ladder actively owns the rear (aEmpty.cpp:1200-1203)",
+    "Source=Loader: discharge never completed - bRearReadyForPick latch still false because DoDischargeTray never reached case-4000 success (aLoader.cpp:749), or SnLoader_OutputBottomHasTray OFF so IsRearOccupied() false (aLoader.cpp:691-696,716-720)",
+    "A leftover/jammed tray on the source rear prevents a clean fresh present, or the producer module stalled so IsRearReadyForPick() never returns true within the 60s TRAYARM_PICK_GATE_ALARM_MS window"
+   ],
+   "devices": [
+    {
+     "name": "SnEmpty_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "ON when Source=Empty - an empty tray is present and settled on the Empty rear ready to hand off (RefreshStateFromSensors sets bRearHasTray=IsOn(), aEmpty.cpp:220-237)",
+     "actual": "OFF - no tray delivered to the Empty rear yet, so bRearHasTray==false and IsRearReadyForPick() stays false (aEmpty.cpp:1202)",
+     "check_where": "IOsetview (Note detail names the source: \"(Empty)\")"
+    },
+    {
+     "name": "C_Empty_PushTray",
+     "kind": "cylinder",
+     "expected": "out-bit OFF (retracted) at pick time - carrier has released the tray to the rear (aEmpty.cpp:1206 requires GetOutBit()==false)",
+     "actual": "out-bit still ON (actuated) - transport clamp still gripping, ComputeRearPickReadyNoRefresh returns false (aEmpty.cpp:1206-1207)",
+     "check_where": "IOsetview"
+    },
+    {
+     "name": "C_Empty_LeanOnTray",
+     "kind": "cylinder",
+     "expected": "out-bit OFF (retracted) at pick time (aEmpty.cpp:1206 requires GetOutBit()==false)",
+     "actual": "out-bit still ON (actuated) - carrier still owns the tray, gate holds (aEmpty.cpp:1206-1207)",
+     "check_where": "IOsetview"
+    },
+    {
+     "name": "SnLoader_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "ON when Source=Loader - discharged empty tray settled on the Loader rear (RefreshRearState sets bRearHasTray=IsOn(), aLoader.cpp:691-696; IsRearOccupied() returns it, :716-720)",
+     "actual": "OFF - Loader rear not occupied, IsRearOccupied() false so IsRearReadyForPick() false (aLoader.cpp:749)",
+     "check_where": "IOsetview (Note detail names the source: \"(Loader)\")"
+    },
+    {
+     "name": "bRearReadyForPick (Loader latch)",
+     "kind": "logic",
+     "expected": "true - published only at DoDischargeTray case-4000 success (carriage retreated to feed Y, Push/Lean clamps Pop-confirmed at cases 2000/3000); IsRearReadyForPick()=IsRearOccupied() && bRearReadyForPick (aLoader.cpp:738-749)",
+     "actual": "false - discharge ladder never completed / was interrupted (e.g. by a HOME) or the rear went empty and re-armed it false (aLoader.cpp:710), so TrayArm never gets clearance",
+     "check_where": "State Record / EventLog (Loader DescribeState / DumpStatus)"
+    },
+    {
+     "name": "PickWaitTimer / bPickWaitArmed",
+     "kind": "logic",
+     "expected": "cleared - gate passes and DoPick advances (PickWaitTimer.Clear(); bPickWaitArmed=false at aTrayArm.cpp:722-724) before the 60s window elapses",
+     "actual": "armed and expired (bPickWaitArmed==true and PickWaitTimer.Off()==true still blocked, aTrayArm.cpp:259) - the direct trigger of the alarm",
+     "check_where": "State Record / EventLog (snapshot TrayArmPickBlocked_<Source>; FeederDecision.txt carries every gate input incl. RearPickReady and the clamp out-bits)"
+    }
+   ],
+   "operator_action": "Note offers Retry (K_RETRY). Read the source named in the Note detail (Empty or Loader). Confirm an empty tray is physically present and fully settled on that rear. If the carrier is mid-delivery, wait and Retry; if a leftover tray is jammed on the rear, clear it, then Retry.",
+   "engineer_action": "In IOsetview watch SnEmpty_OutputBottomHasTray (or SnLoader_OutputBottomHasTray) toggle ON as a tray arrives, and confirm C_Empty_PushTray / C_Empty_LeanOnTray out-bits drop to OFF after the carrier releases (Empty path). For Loader, confirm DoDischargeTray reaches case 4000 so bRearReadyForPick latches true. Open the State Record snapshot TrayArmPickBlocked_<Source> and FeederDecision.txt for the exact gate inputs (RearPickReady, RearLeanOut, RearPushOut, FeedTask) at the moment of the stall. Window = TRAYARM_PICK_GATE_ALARM_MS (60000ms), aTrayArm.cpp:24; poll-gap re-arm = TRAYARM_PICK_GATE_SCAN_GAP_MS (1500ms), aTrayArm.cpp:23.",
+   "verdict": "CONFIRMED",
+   "verify_note": "Re-located the raise site independently: ShowMyError(\"MES1721\", ...) at aTrayArm.cpp:274 inside OnPickGateBlocked(Source). Trigger condition confirmed against the real code: watchdog armed at :253-257 (SetMS TRAYARM_PICK_GATE_ALARM_MS=60000, constant :24), fires only after PickWaitTimer.Off()==true past the early-return at :259, with DecStopAllMotor + SystemStart=false + TriggerSnapshot at :270-273. Gate call sites confirmed: Empty :683 and :701, Loader :716; Color excluded (:698-699); poll-gap re-arm 1500ms (:23,:248-257). Device polarity confirmed: SnEmpty_OutputBottomHasTray drives bRearHasTray in RefreshStateFromSensors (aEmpty.cpp:220-237, ON=present); ComputeRearPickReadyNoRefresh (aEmpty.cpp:1193-1209) reads bRearHasTray/bRearReturnInProgress (:1202), FeedTask 1/13000 (:1204), and C_Empty_LeanOnTray/C_Empty_PushTray out-bits (:1206). Loader side confirmed: IsRearReadyForPick=IsRearOccupied() && bRearReadyForPick (aLoader.cpp:749); SnLoader_OutputBottomHasTray read in RefreshRearState (:691-696) via IsRearOccupied (:716-720); bRearReadyForPick set at case-4000. No invented devices. Only refinements vs draft: tightened the Status/bRearReturnInProgress root cause and the Loader sensor citation to RefreshRearState (:691-696) rather than the :749 return line, and noted the 3-arg free-string form prints only the source label."
+  },
+  {
+   "code": "MES1722",
+   "message": "TrayArm holds an unidentified tray - open the clamps in Teach and remove it",
+   "category": "identity",
+   "trigger": "Two REAL-only raise sites, both inside #ifndef SOFT_SIMULATE and gated HSys.LastSet.iRealDummy!=DUMMY, both call ShowMyError(\"MES1722\", ..., K_RETRY). (1) PICK GATE, aTrayArm.cpp:734-739 (in DoPick, immediately before PickTask=1000 / DoLowerClampRaise): if(iRealDummy!=DUMMY && ((C_TrayArm_FrontClamp.OnSensor.Enable && .IsOn()) || (C_TrayArm_RearClamp.OnSensor.Enable && .IsOn()))) -> ShowMyError at :738, return false at :739. The if() reads ONLY the two clamp On reeds - it does NOT read bHasTray; the arm was dispatched to a fresh pick (so the carry latch was empty) yet a clamp reed reads closed-on-a-tray, and diving would double-stack. (2) RESIDUE NOTIFY, DoTrayArm case 100 (case label :1179), aTrayArm.cpp:1239-1242: else if(bResiduePendingNotify) one-shot, ShowMyError at :1242. bResiduePendingNotify is set in TTrayArmModule::InitialFlag (aTrayArm.cpp:58-69, flag set at :68) - the residue-adopt block that InitialAllTask -> TrayArmModule->InitialFlag (database.cpp:66) runs during a full-machine HOME - when bHasTray==false (checked at :59) yet BOTH clamp On reeds read On; the arm is adopted as residue (bHasTray=true, bResiduePendingNotify=true). The sibling un-adopt branch at :1232 [(bFrontEn||bRearEn) && bAnyOn==false] clears the latch once no reed reads On, so the notify only fires while a reed is still On.",
+   "root_causes": [
+    "Arm reached a fresh pick already gripping a tray the bHasTray / MMTrayArmX->fHasTray carry latch never recorded - aborted carry, power loss mid-carry, or an ASYMMETRIC single-reed HOME: uHome keeps clamps closed on EITHER clamp On reed but InitialFlag residue-adopt needs BOTH On, so a one-reed-On arm is NOT adopted and is dispatched to a fresh pick closed-jawed (comment aTrayArm.cpp:726-733)",
+    "Full-machine HOME with a tray in the jaws: TTrayArmModule::InitialFlag (invoked by InitialAllTask, csystem.cpp:1018 / database.cpp:42-66) adopts it as residue when BOTH clamp On reeds read On, setting bResiduePendingNotify (aTrayArm.cpp:58-69, flag :68) - NOTE: the draft's 'InitialAllTask (aTrayArm.cpp:59-68)' misnamed this; the adopt code lives in InitialFlag, InitialAllTask is only the HOME driver that calls it",
+    "A TrayArm clamp On reed (C_TrayArm_FrontClamp.OnSensor / C_TrayArm_RearClamp.OnSensor) stuck or mis-adjusted On, faking a held tray the carry latch never recorded and re-firing the alarm with no tray present"
+   ],
+   "devices": [
+    {
+     "name": "C_TrayArm_FrontClamp.OnSensor",
+     "kind": "sensor",
+     "expected": "OFF at a fresh pick / at HOME when the arm is truly empty (jaws open, no tray gripped)",
+     "actual": "ON (clamp-closed reed reads a tray gripped). At site 1 EITHER clamp On reed fires the alarm; at the HOME residue-adopt (site 2, InitialFlag :61) BOTH must read On",
+     "check_where": "IOsetview (TrayArm front-clamp On/closed reed)"
+    },
+    {
+     "name": "C_TrayArm_RearClamp.OnSensor",
+     "kind": "sensor",
+     "expected": "OFF at a fresh pick / at HOME when the arm is truly empty (jaws open)",
+     "actual": "ON (clamp-closed reed reads a tray gripped). Same as front: either reed On fires site 1, both required for the HOME residue-adopt (InitialFlag :62)",
+     "check_where": "IOsetview (TrayArm rear-clamp On/closed reed)"
+    },
+    {
+     "name": "bHasTray / MMTrayArmX->fHasTray (TrayArm carry latch)",
+     "kind": "logic",
+     "expected": "consistent with the reeds - false only when the clamp On reeds read OFF (arm truly empty)",
+     "actual": "false (no known carry) while a clamp On reed reads ON - the desync. Read literally at InitialFlag adopt (aTrayArm.cpp:59, requires bHasTray==false). At pick-gate site 1 the if() does NOT read it, but the arm only reaches a fresh pick when the latch is empty",
+     "check_where": "State Record / EventLog (TrayArm status dump: bHasTray / fHasTray)"
+    },
+    {
+     "name": "bResiduePendingNotify",
+     "kind": "logic",
+     "expected": "false (no adopted residue pending notify)",
+     "actual": "true - TTrayArmModule::InitialFlag adopted a both-reeds-On residue during HOME (aTrayArm.cpp:68) and pends a one-shot notify; drives the case-100 raise at aTrayArm.cpp:1242 (site 2 only)",
+     "check_where": "State Record / EventLog"
+    }
+   ],
+   "operator_action": "Open the TrayArm clamps in Teach and physically remove the tray the arm is holding, then Retry (K_RETRY). No application restart is needed: once no clamp On reed reads On, DoTrayArm case 100 un-adopts (aTrayArm.cpp:1232) and clears bHasTray / MMTrayArmX->fHasTray / bResiduePendingNotify, so production resumes.",
+   "engineer_action": "In IOsetview confirm C_TrayArm_FrontClamp.OnSensor and C_TrayArm_RearClamp.OnSensor On/closed reeds are correctly adjusted and not stuck On - a mis-latched reed both false-adopts a phantom residue at HOME (InitialFlag, aTrayArm.cpp:58-69) and re-fires the pick gate (site 1) with no tray present. The fault is a mismatch between the carry latch (bHasTray=false) and the clamp On reeds (=tray gripped), typically after an aborted/interrupted carry or a full-machine HOME. Confirm bHasTray / fHasTray in the TrayArm status dump (State Record / EventLog). Only REAL (non-DUMMY) tier and non-SOFT_SIMULATE builds arm either gate.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located both raise sites in aTrayArm.cpp without trusting the draft. CONFIRMED: pick-gate if() at :734-736 (reads only the two clamp On reeds, gated iRealDummy!=DUMMY, in #ifndef SOFT_SIMULATE), ShowMyError :738, return false :739; residue path DoTrayArm case 100, else if(bResiduePendingNotify) :1239, ShowMyError :1242, un-adopt sibling :1232. All four devices are real code identifiers read at these sites with correct polarity (OnSensor.IsOn() = clamp closed on tray). CORRECTED: the draft attributed the residue-adopt / bResiduePendingNotify set to 'InitialAllTask (aTrayArm.cpp:59-68)' - it is actually TTrayArmModule::InitialFlag (aTrayArm.cpp:41, adopt block 58-69, flag set :68); InitialAllTask (csystem.cpp:1018 / TDataModule1::InitialAllTask database.cpp:42) is only the full-machine HOME driver that calls InitialFlag (database.cpp:66). Also corrected the line attribution (ShowMyError :738 vs return false :739; draft put both at 738) and clarified that the site-1 if() does not read bHasTray, only the clamp reeds."
+  },
+  {
+   "code": "MES1723",
+   "message": "TrayArm place blocked - destination rear not free",
+   "category": "tray-flow",
+   "trigger": "aTrayArm.cpp:306 in TTrayArmModule::OnPlaceGateBlocked(Dest) (aTrayArm.cpp:277-307), the place-side mirror of the pick watchdog. First blocked tick arms PlaceWaitTimer.SetMS(TRAYARM_PLACE_GATE_ALARM_MS=60000) at aTrayArm.cpp:292-294 (or re-arms on a >1500ms poll gap, TRAYARM_PICK_GATE_SCAN_GAP_MS, aTrayArm.cpp:286-295 - so it fires late, never early). Once bPlaceWaitArmed==true and PlaceWaitTimer.Off()==true (still blocked, aTrayArm.cpp:297-298) it does ClearPlaceGateWatch(); HSys.DecStopAllMotor(); HSys.Sys.SystemStart=false; gStateRecord->TriggerSnapshot(\"TrayArmPlaceBlocked_\"+Dest); then ShowMyError(\"MES1723\", LangT(...)+\" (\"+Dest+\")\", K_RETRY) at aTrayArm.cpp:302-306. THREE distinct block sources tick this watchdog: (1) Dest=\"Auto\" - after X-in-position, aTrayArm.cpp:882-887: if(IsSoftSimulate()==false && AutoModule!=NULL && iAutoTarget>=0 && AutoModule->IsRearHasTray(iAutoTarget)) OnPlaceGateBlocked(\"Auto\"); the target Auto rear is still occupied. (2) Dest=\"Empty\"/\"Color\" rear-clear wait, DoPlaceToEmpty/DoPlaceToColor case 500, aTrayArm.cpp:1062-1069 / 1135-1142: proceeds only when IsRearHasTray()==false; else OnPlaceGateBlocked. (3) Dest=\"Empty\"/\"Color\" anti-collision gate, aTrayArm.cpp:1056-1060 / 1129-1133: if the receiver GetStatus()==ES_FEEDING / CS_FEEDING (carrier actively feeding a tray to its rear) OnPlaceGateBlocked. ShowMyError passes NO sensor pointer, so the Note prints only the free string + \"(Dest)\" - the specific IO must be read in IOsetview.",
+   "root_causes": [
+    "Dest=Auto: target Auto rear physically holds a tray - SnAuto<n>_OutputBottomHasTray ON drives State[Index].bRearHasTray true via RefreshAutoState (aAuto1To6.cpp:404-423), so IsRearHasTray(iAutoTarget) true (aAuto1To6.cpp:494-499)",
+    "Dest=Auto: OR the delivered-but-unconsumed latch bRearDeliveredPending[iAutoTarget] pins bRearHasTray true even with the sensor OFF (aAuto1To6.cpp:421-422)",
+    "Dest=Empty/Color: receiver rear not cleared - SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) or SnColor_OutputBottomHasTray/SnColor_TrayPos1 (aColor.cpp:274-289) still ON keeps IsRearHasTray()==true through the case-500 rear-clear wait",
+    "Dest=Empty/Color: receiver stuck in the feed state - EmptyModule->GetStatus()==ES_FEEDING / ColorModule->GetStatus()==CS_FEEDING for the full 60s window (anti-collision gate, aTrayArm.cpp:1056-1060 / 1129-1133), independent of the rear sensor",
+    "Mid-carry full-machine HOME wiped the receiver's bReturnTray handshake; resume re-signs RequestReturnTray at aTrayArm.cpp:1208-1214 only when IsCarriedTrayAlreadyDeposited()==false, so if that heal did not run the receiver kept/refilled its rear while the arm waited at case 500",
+    "A destination rear sensor stuck/mis-adjusted ON with no physical tray, or receiver GoUp-clear never completed within TRAYARM_PLACE_GATE_ALARM_MS (60s)"
+   ],
+   "devices": [
+    {
+     "name": "SnAuto<n>_OutputBottomHasTray (n=iAutoTarget+1, Auto1..Auto6)",
+     "kind": "sensor",
+     "expected": "OFF - the target Auto rear is free to receive the placed tray. Destination station is dynamic (iAutoTarget); the same gate covers all 6 Auto stations, so read the matching SnAuto1..SnAuto6_OutputBottomHasTray",
+     "actual": "ON - the Auto rear still holds a tray, RefreshAutoState sets State[iAutoTarget].bRearHasTray=true so IsRearHasTray(iAutoTarget) returns true (aAuto1To6.cpp:404-423,494-499)",
+     "check_where": "IOsetview (Note detail prints \"(Auto)\"; the target index iAutoTarget comes from the TrayArm DumpStatus in the snapshot, not from the Note)"
+    },
+    {
+     "name": "SnEmpty_OutputBottomHasTray",
+     "kind": "sensor",
+     "expected": "OFF at place time when Dest=Empty (Empty raised and freed its rear); RefreshStateFromSensors then reports IsRearHasTray()==false (aEmpty.cpp:220-237)",
+     "actual": "ON - Empty rear still occupied, the case-500 rear-clear wait never passes (aTrayArm.cpp:1062-1069)",
+     "check_where": "IOsetview (Note detail prints \"(Empty)\")"
+    },
+    {
+     "name": "SnColor_OutputBottomHasTray (and SnColor_TrayPos1)",
+     "kind": "sensor",
+     "expected": "OFF at place time when Dest=Color (Color raised and freed its rear). Color's bRearHasTray is set true by EITHER SnColor_OutputBottomHasTray OR SnColor_TrayPos1 (aColor.cpp:274-289), so both must read OFF",
+     "actual": "ON - Color rear still occupied on one of the two sensors, IsRearHasTray()==true so the case-500 rear-clear wait never passes (aTrayArm.cpp:1135-1142)",
+     "check_where": "IOsetview (Note detail prints \"(Color)\")"
+    },
+    {
+     "name": "Receiver Status ES_FEEDING / CS_FEEDING (EmptyModule/ColorModule GetStatus)",
+     "kind": "logic",
+     "expected": "Not FEEDING at place time - the receiver's tray-feed motion has completed, so the anti-collision gate lets the deposit proceed",
+     "actual": "Stuck in ES_FEEDING (Empty, aTrayArm.cpp:1056-1060) / CS_FEEDING (Color, aTrayArm.cpp:1129-1133) for the whole 60s window - a real-machine-only block source that fires MES1723 even with the rear sensor OFF (bRearHasTray not yet latched mid-feed)",
+     "check_where": "State Record / EventLog (Empty/Color DumpStatus Status field)"
+    },
+    {
+     "name": "bRearDeliveredPending (Auto latch) / bReturnTray (Empty/Color receiver handshake)",
+     "kind": "logic",
+     "expected": "Auto rear signed free (bRearHasTray false, no delivered-pending latch) and the receiver's return handshake present (bReturnTray set by RequestReturnTray) so it GoUp-clears its rear",
+     "actual": "Auto rear latched occupied by bRearDeliveredPending (aAuto1To6.cpp:421-422), OR after a mid-carry HOME the receiver's bReturnTray was wiped and only re-signed on resume via RequestReturnTray when IsCarriedTrayAlreadyDeposited()==false (aTrayArm.cpp:1208-1214) - if that heal was skipped the receiver kept/refilled its rear",
+     "check_where": "State Record / EventLog (Auto DumpStatus RearHasTray/DeliveredPending; Empty/Color DumpStatus bReturnTray/bRearHasTray)"
+    },
+    {
+     "name": "PlaceWaitTimer / bPlaceWaitArmed",
+     "kind": "logic",
+     "expected": "cleared - the rear frees (or feed completes) and DoPlace advances, ClearPlaceGateWatch() closes the window (aTrayArm.cpp:299,309-314,888,1064,1137)",
+     "actual": "armed and expired (bPlaceWaitArmed==true, PlaceWaitTimer.Off()==true) with the destination still blocked - this is the exact fire condition of the alarm (aTrayArm.cpp:289-306)",
+     "check_where": "State Record / EventLog (snapshot TrayArmPlaceBlocked_<Dest>)"
+    }
+   ],
+   "operator_action": "The Note offers Retry (K_RETRY). Read the destination named in parentheses in the Note (Auto / Empty / Color). A tray is still sitting on that receiver's rear (or the receiver is mid-feed). Clear/remove the blocking tray so the rear is free, then Retry.",
+   "engineer_action": "In IOsetview confirm the destination rear sensor reads OFF when the rear is empty: for Dest=Auto that is SnAuto<n>_OutputBottomHasTray of the target station (get iAutoTarget from the TrayArm DumpStatus in the TrayArmPlaceBlocked_Auto snapshot); for Dest=Empty that is SnEmpty_OutputBottomHasTray; for Dest=Color check BOTH SnColor_OutputBottomHasTray and SnColor_TrayPos1. If a sensor stays ON with no physical tray it is stuck/mis-adjusted. If the rear reads clear but the alarm still fired for Empty/Color, check the receiver Status in the snapshot - a stuck ES_FEEDING/CS_FEEDING trips the anti-collision gate independently of the sensor. If the block followed a mid-carry full-machine HOME, the receiver's bReturnTray handshake was torn and only re-signed on resume when the carried tray was not already deposited (aTrayArm.cpp:1208-1214) - verify the receiver actually GoUp-clears its rear. Window = TRAYARM_PLACE_GATE_ALARM_MS (60s), aTrayArm.cpp:25.",
+   "verdict": "CORRECTED",
+   "verify_note": "Re-located the raise site independently: ShowMyError(\"MES1723\",...,K_RETRY) at aTrayArm.cpp:306 inside OnPlaceGateBlocked (277-307). CONFIRMED the trigger (bPlaceWaitArmed && PlaceWaitTimer.Off()==true, 60s window, 1500ms poll-gap re-arm), the Auto block condition (aTrayArm.cpp:882-887, AutoModule->IsRearHasTray reads SnAuto<n>_OutputBottomHasTray via RefreshAutoState, aAuto1To6.cpp:404-423,494-499), and the Empty/Color case-500 rear-clear blocks reading SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) / SnColor_OutputBottomHasTray (aColor.cpp:274-289). CORRECTED/ADDED: (1) the draft omitted the receiver-FEEDING anti-collision block source (aTrayArm.cpp:1056-1060 Empty ES_FEEDING, 1129-1133 Color CS_FEEDING) - a real third path that fires MES1723 with Dest=Empty/Color independent of the rear sensor; added as a logic device. (2) Color's rear-occupied latch is driven by SnColor_OutputBottomHasTray OR SnColor_TrayPos1 (aColor.cpp:281-285), so both must be checked - draft named only OutputBottomHasTray. (3) The Auto latch member is bRearDeliveredPending (aAuto1To6.cpp:421-422), distinct from the receiver-side bReturnTray handshake; clarified both. (4) Minor: stop line is HSys.Sys.SystemStart=false, not Sys.SystemStart. All named devices are real code identifiers read at the cited raise site; none invented or removed."
+  }
+ ],
+ "motor": {
+  "error_types": [
+   {
+    "index": 0,
+    "enum_name": "eMotPwrErr",
+    "label": "Power Off",
+    "meaning": "Servo drive is de-energized: the A6 amp asserts ALM while holding INP (in-position, no command in flight) and the card servo-alarm status bit is also set. Interpreted as 'servo power lost'. Classifier branch GetErrorIndex()==0 (MyMotor.cpp:734-735); code = 50000+index*10+0.",
+    "signal_source": "Led[iAlarmLed]=MotDI bit 0x80 (A6 driver ALM, sampled only when ServoAlarmOn) AND Led[iServoalarmLed]=MC88X1PGetMotionInput bit 0x10 (card servo-alarm) AND Led[iInposLed]=MotDI bit 0x40 (A6 INP). Root physical: servo power relay SwMotorRelay / SnMotorPower.",
+    "expected": "Drive energized: SwMotorRelay ON, SnMotorPower present; ALM=0, servo-alarm status=0. In the Motor status grid the Alarm/ServoAlarm LEDs are dark.",
+    "actual": "ALM(0x80)+servo-alarm(0x10)+INP(0x40) all ON simultaneously = amp powered down / SRV-ON dropped while axis idle.",
+    "check_where": "IOsetview (SwMotorRelay output / SnMotorPower input) plus the main Motor status grid (Alarm / ServoAlarm / InPos LEDs for that axis).",
+    "engineer_action": "Restore servo/main power; a latched OT/servo alarm is NOT software-clearable (MC88X1 SetServoOn is a no-op), so do a SwMotorRelay Off->On power-cycle, then re-HOME the axis. HOME deliberately cuts and restores motor power and owns this recovery (uHome ProcessMotorHome case 20)."
+   },
+   {
+    "index": 1,
+    "enum_name": "eMotTorqueErr",
+    "label": "Out Of Torque",
+    "meaning": "Drive tripped its alarm while a move was still in progress (INP not yet reached) - the axis could not reach/hold the commanded position: over-torque, overload, or a following stall. Classifier branch GetErrorIndex()==1 (MyMotor.cpp:736-737); code = 50000+index*10+1.",
+    "signal_source": "Led[iAlarmLed]=MotDI 0x80 (A6 ALM) AND Led[iServoalarmLed]=MotionInput 0x10 (card servo-alarm), with Led[iInposLed]=MotDI 0x40 OFF (not in position).",
+    "expected": "No ALM; INP asserts at the end of each PTP move; commanded NowPos and Encoder converge within the following-error tolerance.",
+    "actual": "ALM+servo-alarm set while INP is still 0 -> axis stalled under load / exceeded torque limit mid-move; encoder lags command.",
+    "check_where": "MotionView (command NowPos vs Encoder following gap for the stalled axis) plus the Motor status grid (Alarm+ServoAlarm ON, InPos OFF).",
+    "engineer_action": "Clear the mechanical binding/overload on that axis, verify the A6 torque limit and load/gear, clear the driver alarm via a SwMotorRelay power-cycle, then re-HOME."
+   },
+   {
+    "index": 2,
+    "enum_name": "eMotCWOnErr",
+    "label": "CW sensor ON",
+    "meaning": "Axis is sitting on the CW (+) end hard-limit switch. The lit CW limit also force-sets the Alarm LED (ScanMotorStatus:999-1000). Classifier branch GetErrorIndex()==2 (MyMotor.cpp:738-739); code = 50000+index*10+2.",
+    "signal_source": "Led[iCwLed]=MC88X1PGetMotionInput bit 0x04 (+LM / CW hard-limit input); Led[iAlarmLed] is forced true by the lit limit.",
+    "expected": "CW/+LM hard-limit input OFF (axis inside its travel band); iCwLed LED dark in IOsetview.",
+    "actual": "+LM CW limit input ON -> axis physically pressed against / overran the CW end stop.",
+    "check_where": "IOsetview (the CW / +LM limit input LED for that axis) plus MotionView (Now Position at the CW extreme).",
+    "engineer_action": "Jog the axis OFF the limit with JogN (away from CW); inspect the +LM switch wiring/mounting and check for mechanical overrun. Note: during HOME an on-limit alarm is treated as expected (csystem.cpp:482-483 continue), so this only stops the machine mid-run."
+   },
+   {
+    "index": 3,
+    "enum_name": "eMotCCWOnErr",
+    "label": "CCW sensor ON",
+    "meaning": "Axis is sitting on the CCW (-) end hard-limit switch; the lit CCW limit force-sets the Alarm LED. Classifier branch GetErrorIndex()==3 (MyMotor.cpp:740-741); code = 50000+index*10+3.",
+    "signal_source": "Led[iCcwLed]=MC88X1PGetMotionInput bit 0x08 (-LM / CCW hard-limit input); Led[iAlarmLed] forced true by the lit limit.",
+    "expected": "CCW/-LM hard-limit input OFF (axis inside travel); iCcwLed LED dark.",
+    "actual": "-LM CCW limit input ON -> axis pressed against / overran the CCW end stop.",
+    "check_where": "IOsetview (the CCW / -LM limit input LED for that axis) plus MotionView (Now Position at the CCW extreme).",
+    "engineer_action": "Jog the axis OFF the limit with JogP (away from CCW); inspect the -LM switch and mechanical overrun. On-limit during HOME is expected (continue); this only halts mid-run."
+   },
+   {
+    "index": 4,
+    "enum_name": "eMotSoftPErr",
+    "label": "Soft P position",
+    "meaning": "The card software +comp-limit tripped: command position reached/exceeded the configured positive soft limit SoftLimitP. Classifier branch GetErrorIndex()==4 (MyMotor.cpp:742-743); code = 50000+index*10+4.",
+    "signal_source": "Led[iSoftcwLed]=MC88X1PGetMotionInput bit 0x01 (card soft/comp CW limit, set from SoftLimitP via SetMC88X1SoftLimit) AND Led[iAlarmLed].",
+    "expected": "Now Position within [SoftLimitN, SoftLimitP]; soft-CW flag off.",
+    "actual": "Position at/beyond SoftLimitP -> card positive comp-limit asserted.",
+    "check_where": "MotionView (Now Position vs the axis SoftLimitP value).",
+    "engineer_action": "Jog the axis back inside the soft-limit band; verify teach targets and the SoftLimitP config for that axis; re-HOME if the position reference was lost."
+   },
+   {
+    "index": 5,
+    "enum_name": "eMotSoftNErr",
+    "label": "Soft N position",
+    "meaning": "The card software -comp-limit tripped: command position reached/fell below the configured negative soft limit SoftLimitN. Classifier branch GetErrorIndex()==5 (MyMotor.cpp:744-745); code = 50000+index*10+5.",
+    "signal_source": "Led[iSoftccwLed]=MC88X1PGetMotionInput bit 0x02 (card soft/comp CCW limit, set from SoftLimitN) AND Led[iAlarmLed].",
+    "expected": "Now Position within [SoftLimitN, SoftLimitP]; soft-CCW flag off.",
+    "actual": "Position at/below SoftLimitN -> card negative comp-limit asserted.",
+    "check_where": "MotionView (Now Position vs the axis SoftLimitN value).",
+    "engineer_action": "Jog the axis back inside the soft-limit band; verify teach targets and the SoftLimitN config; re-HOME if the position reference is wrong."
+   },
+   {
+    "index": 6,
+    "enum_name": "eMotPosErr",
+    "label": "position Error / home+restart",
+    "meaning": "A6 driver ALM asserted ALONE (no card servo-alarm status, no hard limit, no soft-limit) - a position/following-deviation alarm from the amp. Recovery per the name is re-home + restart. Classifier branch GetErrorIndex()==6 (MyMotor.cpp:746-747); csystem.cpp:500-501 also folds the never-returned iRef==9 into 6. code = 50000+index*10+6.",
+    "signal_source": "Led[iAlarmLed]=MotDI 0x80 (A6 ALM) set while Led[iServoalarmLed], Led[iCwLed], Led[iCcwLed], Led[iSoftcwLed], Led[iSoftccwLed] are all OFF. A6 position/deviation (Err) alarm.",
+    "expected": "ALM off; encoder tracks command (following error within tolerance); axis reaches and holds each target.",
+    "actual": "Driver ALM latched from an excessive position/following deviation with no accompanying limit or card servo-alarm bit.",
+    "check_where": "MotionView (command NowPos vs Encoder following gap) plus the Motor status grid (Alarm ON, all limit/servo-alarm LEDs OFF).",
+    "engineer_action": "Re-HOME and restart the axis (per the alarm name). The latched amp alarm is not software-clearable, so power-cycle SwMotorRelay first, then re-HOME; investigate cause of the deviation (encoder coupling, gain, mechanical drag)."
+   },
+   {
+    "index": 7,
+    "enum_name": "eMotUnDefErr",
+    "label": "Undefine",
+    "meaning": "Software fall-through of GetErrorIndex(): the Led[] snapshot matched none of the defined ALM/servo-alarm/limit/soft-limit patterns (MyMotor.cpp:750, the final 'return 7'). From the ScanAllMotorStatus path Led[iAlarmLed] is always true, so the 'else if(Led[iAlarmLed]) return 6' branch catches first and 7 is effectively unreachable there - it only surfaces on an inconsistent/transient status read. code = 50000+index*10+7.",
+    "signal_source": "None - pure logic default of the classifier when no recognized status-bit combination is present (no dedicated IO). The logic variable is the returned errIndex itself.",
+    "expected": "A genuine fault always matches a defined branch (0-6/8); errIndex 7 should not appear in normal operation.",
+    "actual": "Status snapshot had no classifiable alarm bit -> transient/jittered MotDI+MotionInput read, or an alarm source not modeled by ScanMotorStatus.",
+    "check_where": "State Record / EventLog (the raised 5xxx7 code and the surrounding Led snapshot) then re-read the Motor status grid live to see if it persists.",
+    "engineer_action": "Re-scan the axis; if it recurs, capture the raw MotDI/MotionInput words (ReadStatus) - likely a status-word/wiring anomaly. Treat as an unclassified driver alarm and power-cycle + re-HOME."
+   },
+   {
+    "index": 8,
+    "enum_name": "eMotOverLimitErr",
+    "label": "Target will Out Of Limit",
+    "meaning": "A commanded move target lies outside the soft-limit band, so the move is rejected BEFORE any motion. This is the primary runtime use: raised directly (not through GetErrorIndex) by the per-axis pre-move guard when CheckSoftLimit(target)==false. (The GetErrorIndex()==8 branch, MyMotor.cpp:748-749, only fires when iAlarmLed is off but the MotionInput servo-alarm bit is set - unreachable from the gated scan path.) Raised as AlarmName[eMotOverLimitErr] via ShowMotorLimitError; code = 50000+index*10+8.",
+    "signal_source": "Logic/soft-limit compare, no IO bit: CheckSoftLimit(p) = (p<=SoftLimitP && p>=SoftLimitN) in MyMotor.cpp:503-507; sets bErrorMove in MotorMoveSub (MyMotor.cpp:523). Callers: aAuto1To6.cpp:370-373, aLoader.cpp:268/434, aEmpty.cpp:247, aColor.cpp:887/917/1168, aTrayArm.cpp:409, aSortArm.cpp:722/736/750.",
+    "expected": "Requested target within [SoftLimitN, SoftLimitP]; CheckSoftLimit returns true and MotorMove proceeds.",
+    "actual": "Requested target outside the soft-limit band -> CheckSoftLimit false, bErrorMove=true, move blocked; the Note prints SoftLimitDetail 'target=.. now=.. soft limit N=.. ~ P=.. (unit:1/100mm)' (MyMotor.cpp:512-516, note.cpp:865-871).",
+    "check_where": "Note detail line (the printed SoftLimitDetail target/now/limit values, prefixed by the axis NumberAlias) plus MotionView (configured SoftLimitN/P vs the teach target).",
+    "engineer_action": "Correct the teach position or the requested target so it falls inside [SoftLimitN, SoftLimitP], or fix the SoftLimitN/SoftLimitP configuration for that axis; re-HOME if the axis position reference is off (a lost datum can push a valid target out of band)."
+   }
+  ]
+ },
+ "sucker": {
+  "error_types": [
+   {
+    "index": 0,
+    "enum_name": "eSuckPickErr",
+    "label": "60000  Suck--Pick Up Error (ShowSuckError CodeType 1, SUCxxx1)",
+    "meaning": "Pick-up confirmation failed. TMySucker::Suck() drove vacuum ON (On() = OffDestroy()+OnSuck(), i.e. blow valve OffSw off, suck valve OnSw on) and waited OnAlarmTime for the vacuum sensor to confirm ON; it never came ON, so the IC was not sucked onto the nozzle.",
+    "expected": "HEALTHY: after the suck command the vacuum sensor of the picking nozzle (TMySucker::Sensor, per-nozzle alias SuckAa/SuckAb/SuckAc/SuckAd = SuckerName Suck1..Suck4) reads ON within OnAlarmTime, so SensorAllOn()==true and Suck() advances Task 1->50->100 returning true.",
+    "actual": "FAULT: vacuum sensor stays OFF past OnAlarmTime. Entry gate MyKitSuck.cpp:195 `if(Sensor.Enable==true && SensorAllOn()==false && HSys.LastSet.iRealDummy==REALLY)` sends Task=50; the OnAlarmTime timer expires with sensor still OFF at MyKitSuck.cpp:220-225 `else if(Delay.Off()){Error=true; OffSuck(); Task=1; return false;}`. aSortArm SuckSelectedSlots latches bPickSuckErr[slot] (aSortArm.cpp:1178-1183) and later raises ShowSuckError(*Sucker,1,...) at aSortArm.cpp:1741.",
+    "check_where": "IOsetview — vacuum sensor LED of the failed nozzle (Suck.Sensor SuckAa..SuckAd). It should latch ON right after the Suck-Z presses down; on this fault the LED never lights.",
+    "engineer_action": "Confirm an IC is actually present in the source tray cell (empty cell = expected no-pick). If IC present but sensor never lights: check air/vacuum supply pressure, check for a leak or clogged/worn nozzle tip and bad seal (IC tilted), and verify the suck solenoid OnSw fires (IOsetview output) and the vacuum-sensor wiring. Root causes: no IC / leak / clogged nozzle / low vacuum / sensor dead."
+   },
+   {
+    "index": 1,
+    "enum_name": "eSuckDestroyErr",
+    "label": "60001  Suck--Destory Error (release; ShowSuckError CodeType 2 at place, SUCxxx2)",
+    "meaning": "Release/destroy confirmation failed. TMySucker::Destroy() drove vacuum OFF + blow (Off() = OffSuck()+OnDestroy(), suck valve OnSw off, blow valve OffSw on) and waited OffAlarmTime for the vacuum sensor to drop OFF; the sensor stayed ON, so the IC did not release from the nozzle.",
+    "expected": "HEALTHY: after the release command the vacuum sensor falls OFF within OffAlarmTime, so SensorAnyOn()==false and Destroy() advances Task 1->50->100 returning true (IC placed into the target cell).",
+    "actual": "FAULT: vacuum sensor still reads ON past OffAlarmTime. Entry gate MyKitSuck.cpp:262 `if(Sensor.Enable==true && SensorAnyOn()==true && HSys.LastSet.iRealDummy==REALLY)` sends Task=50; the OffAlarmTime timer expires with sensor still ON at MyKitSuck.cpp:287-292 `else if(Delay.Off()){Error=true; OffDestroy(); Task=1; return false;}`. Raised via ShowSuckError(*Sucker,2,K_RETRY|K_SKIP,\"SortArm Place\") at aSortArm.cpp:1389.",
+    "check_where": "IOsetview — vacuum sensor LED of the placing nozzle (Suck.Sensor SuckAa..SuckAd). It should extinguish when the blow fires; on this fault the LED stays lit.",
+    "engineer_action": "Verify the blow/destroy valve OffSw actually fires and positive-pressure air is present (IOsetview output + air line). Check the IC is not physically stuck to the nozzle and the suck solenoid OnSw truly dropped. If the sensor is lit with no vacuum, suspect a stuck-ON or shorted vacuum sensor. Root causes: IC stuck (didn't release) / solenoid stuck ON / no blow air / sensor stuck ON."
+   },
+   {
+    "index": 2,
+    "enum_name": "eSuckVacOffErr",
+    "label": "60002  Suck--Vacuum Sensor Off Error (lost vacuum while holding)",
+    "meaning": "A nozzle that should be holding an IC lost its vacuum — the held-vacuum monitor read the vacuum sensor OFF while the slot is marked carrying (bHasIC). This is the vacuum-sensor-OFF primitive judged by TMySucker::GetStatus()/SensorAllOn().",
+    "expected": "HEALTHY: while a SortArm slot carries an IC (Slot[s].bHasIC==true) the nozzle's vacuum sensor is held continuously ON, so GetStatusAllOn()==true (GetStatus REALLY-guard MyKitSuck.cpp:106-111 + SensorAllOn MyKitSuck.cpp:82-92).",
+    "actual": "FAULT: vacuum sensor reads OFF mid-hold. The held re-read at aSortArm.cpp:1533 and :1565 `if(Sucker->GetStatusAllOn()==false)` trips. GetStatus() is Sensor.IsOn() on the real machine (MyKitSuck.cpp:72-77). A momentary/partial loss surfaces here before the debounce window escalates it to a confirmed drop (60003).",
+    "check_where": "IOsetview — vacuum sensor LED of the holding nozzle (Suck.Sensor SuckAa..SuckAd). It should stay solid ON during transit; on this fault it flickers or drops OFF.",
+    "engineer_action": "Inspect for a developing leak or marginal seal on that nozzle, air-pressure sag under load, a partially clogged tip, or an intermittent vacuum sensor / loose connector. Note: REALLY-only — never fires in SOFT_SIMULATE (GetStatus returns true when iRealDummy!=REALLY). Root causes: leak / marginal seal / clogged / intermittent sensor."
+   },
+   {
+    "index": 3,
+    "enum_name": "eSuckDropErr",
+    "label": "60003  Suck--Device Be Droped Error (ShowSuckError CodeType 3, SUCxxx3)",
+    "meaning": "A held IC physically dropped in transit. A holding nozzle's vacuum sensor read OFF and stayed OFF past the fall-down debounce window (FALLDOWN_LOST_MS) while the arm carried the IC from Loader toward Auto. The machine decel-stops all motion and the SortArm slot is written off (never counted as placed).",
+    "expected": "HEALTHY: while carrying an IC the vacuum sensor is continuously ON; CheckIsFallDown() (MyKitSuck.cpp:327-333) sees Sensor.IsOn()==true and does nothing, and the module monitor CheckHoldFallDown never confirms an OFF.",
+    "actual": "FAULT: vacuum sensor OFF persisting FALLDOWN_LOST_MS. Per-nozzle primitive MyKitSuck.cpp:331 `if(Sensor.IsOn()==false) Normal();` drops the outputs; the debounced module monitor CheckHoldFallDown (aSortArm.cpp:1526-1616) confirms via GetStatusAllOn()==false (:1533/:1565), calls HSys.StopAllMotor() (:1578), and raises ShowSuckError(*DropSucker,3,...) at aSortArm.cpp:1596. bAtPick decides whether the Loader source cell is restored (K_RETRY) or abandoned EMPTY_IC (K_SKIP).",
+    "check_where": "IOsetview — vacuum sensor LED of the dropped nozzle (Suck.Sensor SuckAa..SuckAd), plus the Note detail line which prints the dropped cell identity (\"SortArm IC Dropped At Pick/In Transit R.. C.. 2D=..\").",
+    "engineer_action": "Retrieve the dropped IC from the machine, then find why the seal failed completely: sudden vacuum loss, worn/cracked nozzle, IC snagged during travel, or vacuum-pressure collapse. Distinguished from 60002 only by the debounced, motion-halting confirmation. Root cause: dropped (seal broke) / abrupt vacuum loss."
+   },
+   {
+    "index": 4,
+    "enum_name": "eSuckIniOffErr",
+    "label": "60004  Suck--Initial Sensor Off Error (registered taxonomy; no active runtime raise)",
+    "meaning": "Initial-state sensor self-check taxonomy: at init/reset with vacuum energized the nozzle's vacuum sensor should confirm ON; a stuck-OFF sensor or dead vacuum path would be this code. IMPORTANT — this is a REGISTERED taxonomy code only: the init self-check TMyKitSuck::CheckVaccumIsIniaialON (MyKitSuck.cpp:657-677) has no caller anywhere in HT160S, and no runtime site raises eSuckIniOffErr. On the live machine the same 'vacuum won't turn ON' condition surfaces instead as eSuckPickErr (60000).",
+    "expected": "HEALTHY (intended semantic): with vacuum commanded ON at initialization the vacuum sensor reads ON (GetStatus()==true).",
+    "actual": "FAULT (intended semantic): vacuum sensor stays OFF when vacuum is energized. No live if() raises this in HT160S; it exists in mapAlarmCodeList / AlarmList.csv (database.cpp:911,898) as Name+\"_SuckIniOffErr\" for the taxonomy.",
+    "check_where": "IOsetview — vacuum sensor LED of the nozzle (Suck.Sensor SuckAa..SuckAd); it would fail to light when vacuum is applied at init.",
+    "engineer_action": "Treat as documentation/taxonomy: if seen it originates from the sensor never asserting ON — check dead vacuum generator, no air supply, disconnected/stuck-OFF sensor, wiring. In practice diagnose the live pick fault 60000 with the same checks. State-wise verify in State Record / EventLog that the code is a registered entry, not a fired event."
+   },
+   {
+    "index": 5,
+    "enum_name": "eSuckIniOnErr",
+    "label": "60005  Suck--Initial Sensor On Error (residue/stuck-ON at init; registered taxonomy)",
+    "meaning": "At power-up/reset/init a nozzle with NO IC assigned should hold no vacuum (sensor OFF); instead the vacuum sensor reads ON. The intended logic lives in TMyKitSuck::CheckVaccumIsIniaialON (MyKitSuck.cpp:657-677): if GetStatus()==true (:662) while Item is a Null/empty type (:664-667) it forces Normal() and sets Flag=true (:669-670). IMPORTANT — CheckVaccumIsIniaialON has no active caller in HT160S; 60005 is a registered taxonomy code (AlarmList.csv), not raised at runtime.",
+    "expected": "HEALTHY: at idle/init with no IC assigned (Item==SuckNullIC/SuckHasNullIC/test variants) the vacuum sensor reads OFF, so GetStatus()==false and CheckVaccumIsIniaialON takes the else branch (:673-675) calling Normal() with no flag.",
+    "actual": "FAULT (intended semantic): vacuum sensor reads ON at init on an empty nozzle. CheckVaccumIsIniaialON GetStatus()==true with an empty Item -> Normal()+Flag=true (MyKitSuck.cpp:662-671). Because the function is not wired in, no live if() raises the code today.",
+    "check_where": "IOsetview — vacuum sensor LED of the nozzle (Suck.Sensor SuckAa..SuckAd); on this condition the LED is lit at startup with no IC held.",
+    "engineer_action": "If the vacuum sensor is lit at init with nothing picked, check for a vacuum solenoid stuck ON / mis-wired (NC) OnSw, a stuck or shorted vacuum sensor, or a stray IC still adhered from the previous cycle. Root causes: stuck-ON valve / sensor stuck ON / residue IC. Confirm in State Record / EventLog whether 60005 is merely the registered taxonomy entry versus an actual fired event."
+   }
+  ]
+ },
+ "critic": "The payload I received to critique is degenerate — 7 stub objects `{\"devs\":0}` with no code, trigger, file:line, or devices — so nothing was actually extracted. I ground-truthed all 60 codes directly in the source instead. Here is the completeness report.\n\n{\n  \"payload_status\": \"DEGENERATE — the 7 supplied 'extracted' entries are all empty stubs {\\\"devs\\\":0}: no code, no trigger, no file:line, no devices. Nothing in the payload can be quality-assessed. Against the 60-code required list this means EVERY code is effectively unextracted/missing. Report below is my independent ground-truth so the writer can regenerate.\",\n  \"required_pattern_count\": 30,\n  \"required_code_count\": 60,\n  \"extracted_usable\": 0,\n\n  \"UNVERIFIABLE\": [\n    {\n      \"code\": \"WAR16120\",\n      \"verdict\": \"UNVERIFIABLE\",\n      \"reason\": \"Catalog-only. Appears ONLY as a seed string in database.cpp:932 (CcdCode[0], 'Top CCD connect not ready'). No ShowMyError/ShowSystemError/ShowNoteAlarm raise site anywhere in *.cpp. The live CCD error path is ShowCCDError()->code 'CCD%04d' (note.cpp:989-991), which never emits WAR16120. Trigger cannot be grounded in any if() — there is no raise site.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/database.cpp:932\"\n    },\n    {\n      \"code\": \"WAR16121\",\n      \"verdict\": \"UNVERIFIABLE\",\n      \"reason\": \"Catalog-only (database.cpp:932 CcdCode[2], 'Color CCD connect not ready'). No live raise site; same as WAR16120.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/database.cpp:932\"\n    },\n    {\n      \"code\": \"WAR0462\",\n      \"verdict\": \"UNVERIFIABLE\",\n      \"reason\": \"Catalog-only (database.cpp:932 CcdCode[1], 'Top CCD 2D no response'). No live raise site; the real 2D-timeout path uses ShowCCDError/CCD%04d, not WAR0462.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/database.cpp:932\"\n    },\n    {\n      \"code\": \"WAR0970\",\n      \"verdict\": \"UNVERIFIABLE\",\n      \"reason\": \"Catalog-only (database.cpp:932 CcdCode[3], 'Color CCD 2D no response'). No live raise site.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/database.cpp:932\"\n    }\n  ],\n\n  \"THIN_OR_NEEDS_CARE\": [\n    {\n      \"code\": \"MES%d23 (MES1123..MES1623)\",\n      \"issue\": \"NOT a modal alarm. Raised via g_EventLog.Log(...) at aAuto1To6.cpp:1128 — EventLog/State-Record only, no ShowMyError, no operator dialog, no recovery keys. Any troubleshooting entry MUST say check_where = 'State Record / EventLog' (never IOsetview LED as a modal). Devices are the per-Auto trio bFrontOn/bFullOn/bRearOn (front/full/rear output sensors of that Auto); 'Where' string front=/full=/rear= is logged.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:1128\"\n    },\n    {\n      \"code\": \"MES0921\",\n      \"issue\": \"Pure-logic count mismatch, NOT a single-IO fault. Signature carries no pSn (K_RETRY|K_CLEAN_OUT only). Trigger = iCarTrayTotal>0 && (iCarTrayTotal - iFeedSerial)<=0 && SnLoader_Inputend.Enable && SnLoader_Inputend.IsOn(). Devices: logic counters iCarTrayTotal / iFeedSerial (State Record/EventLog) gated by sensor SnLoader_Inputend (IOsetview). Do NOT invent a lost-tray sensor.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aLoader.cpp:1464\"\n    },\n    {\n      \"code\": \"MES%d25 (MES1125..MES1625)\",\n      \"issue\": \"Pure-logic 'car full' (Car[Index] reached MAX_TRAY_PER_CAR), no pSn. Device = logical car counter / bLogicalFull (State Record), NOT a full-tray sensor. Distinct from MES%d20 which IS the physical FullSensor.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aAuto1To6.cpp:1647\"\n    },\n    {\n      \"code\": \"WAR0330\",\n      \"issue\": \"Logic/comms state, no pSn (K_SKIP|K_RETRY|K_TRAY_END). 'Top CCD API not ready' — check_where = maintenance CCD status panel / State Record, not an IO LED.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aLoader.cpp:1722\"\n    },\n    {\n      \"code\": \"WAR0475\",\n      \"issue\": \"Logic/data state (2D code not matched to any lot), no pSn, TWO raise sites (aLoader.cpp:1790 and 1883). Device = scanned 2D string vs lot binding table; check_where = State Record / Note detail (message appends sCode). Not an IO.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aLoader.cpp:1790 & 1883\"\n    },\n    {\n      \"code\": \"MES1426 / MES1721 / MES1722 / MES1723\",\n      \"issue\": \"All pure-logic (no pSn). MES1426=bRearHasTray still set after RefreshStateFromSensors (aColor.cpp:978, backed by Color rear sensor). MES1721=rear source not ready (aTrayArm.cpp:274). MES1722=TrayArm holds unidentified tray, TWO sites aTrayArm.cpp:738 & 1242. MES1723=place dest rear not free (aTrayArm.cpp:306). Name the state variable (bRearHasTray / fHasTray / source-ready predicate), not a fabricated sensor.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aTrayArm.cpp:274,306,738,1242 ; aColor.cpp:978\"\n    },\n    {\n      \"code\": \"WAR0154\",\n      \"issue\": \"Raised via ShowMotorLimitError (note.cpp:855/865 -> ShowNoteAlarm), NOT ShowMyError. It is a MOTOR soft-limit pre-check on MSortingArmX; check_where = MotionView (axis position/limit) + Note detail line ([M0x] alias + target/now/limit via SoftLimitDetail). Device = motor MSortingArmX, not a sensor/cylinder.\",\n      \"file\": \"D:/HT160S_BCB/HT160S_Program_BCB_V1.0.0.0/aSortArm.cpp:679\"\n    }\n  ],\n\n  \"GROUNDED_OK_reference_map\": [\n    {\"code\":\"JAM0913\",\"file\":\"aLoader.cpp:1596\",\"device\":\"SnLoader_InputHasTray\",\"trigger\":\"destacked tray did not confirm on carriage (case 400); pSn SnLoader_InputHasTray, bExpectedOn=true, K_SKIP|K_RETRY\",\"check_where\":\"IOsetview + Note detail\"},\n    {\"code\":\"JAM1030\",\"file\":\"aEmpty.cpp:492\",\"device\":\"C_Empty_PushTray.OnSensor\",\"trigger\":\"Empty push-tray cylinder did not reach pushed sensor; pSn C_Empty_PushTray.OnSensor, K_RETRY\",\"check_where\":\"IOsetview (cylinder confirm sensor)\"},\n    {\"code\":\"JAM%d02 (1102..1602)\",\"file\":\"aAuto1To6.cpp:664\",\"device\":\"PushCylinder->OnSensor (Auto push cyl of station 11+ai)\",\"trigger\":\"case 5200 — push confirm failed then Pop; pSn PushCylinder->OnSensor, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"JAM%d11 (1111..1611)\",\"file\":\"aAuto1To6.cpp:595\",\"device\":\"GetOutputBottomHasTray(Auto)\",\"trigger\":\"case 200 — rear tray DATA staged (bRearDeliveredPending) but rear no-tray sensor off; pSn OutputBottomHasTray, K_SKIP|K_RETRY\",\"check_where\":\"IOsetview + State Record (bRearHasTray/bRearDeliveredPending)\"},\n    {\"code\":\"MES0920\",\"file\":\"aLoader.cpp:1538\",\"device\":\"SnLoader_Inputend\",\"trigger\":\"Loader supply source dry; pSn SnLoader_Inputend, K_RETRY|K_CLEAN_OUT\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES0924\",\"file\":\"aLoader.cpp:1148\",\"device\":\"Loader rear leftover tray (logic bRearHasTray, no self-collect)\",\"trigger\":\"rear leftover after HOME/mid-discharge; K_RETRY\",\"check_where\":\"State Record + physical rear inspection\"},\n    {\"code\":\"MES1021\",\"file\":\"aEmpty.cpp:522\",\"device\":\"SnEmpty_OutputBottomHasTray\",\"trigger\":\"bottom empty tray missing; pSn, K_SKIP|K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1022\",\"file\":\"aEmpty.cpp:343\",\"device\":\"SnEmpty_InputEnd\",\"trigger\":\"empty supply magazine empty; pSn, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1023\",\"file\":\"aEmpty.cpp:385\",\"device\":\"SnEmpty_InputFullTray\",\"trigger\":\"empty supply stack FULL; pSn, bExpectedOn=false, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1024\",\"file\":\"aEmpty.cpp:719\",\"device\":\"SnEmpty_InputHasTray\",\"trigger\":\"front empty tray missing; pSn, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES%d20 (1120..1620)\",\"file\":\"aAuto1To6.cpp:960 & 1635\",\"device\":\"FullSensor = GetInputFullTray(Auto)\",\"trigger\":\"Auto output stack FULL (physical); pSn FullSensor, bExpectedOn=false, K_RETRY loop\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1421\",\"file\":\"aColor.cpp:1102\",\"device\":\"SnColor_OutputBottomHasTray\",\"trigger\":\"Color supply tray not ready; pSn, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1422\",\"file\":\"aColor.cpp:1021\",\"device\":\"C_Color_PushTray.OnSensor\",\"trigger\":\"Color push-tray cylinder confirm failed; pSn, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1424\",\"file\":\"aColor.cpp:658\",\"device\":\"SnColor_InputHasTray\",\"trigger\":\"Color front supply tray missing; pSn, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"MES1427\",\"file\":\"aColor.cpp:396\",\"device\":\"SnColor_InputFullTray\",\"trigger\":\"Color supply stack FULL; pSn, bExpectedOn=false, K_RETRY\",\"check_where\":\"IOsetview\"},\n    {\"code\":\"WAR%d30 (1130..1630)\",\"file\":\"aAuto1To6.cpp:626\",\"device\":\"BottomSensor = GetOutputBottomHasTray(Auto)\",\"trigger\":\"case 3000 — feed tray miss after Y move; pSn, K_RETRY->refeed\",\"check_where\":\"IOsetview\"}\n  ],\n\n  \"summary\": {\n    \"missing_all_60_due_to_empty_payload\": true,\n    \"codes_with_no_live_raise_site_UNVERIFIABLE\": [\"WAR16120\",\"WAR16121\",\"WAR0462\",\"WAR0970\"],\n    \"codes_that_are_log_only_not_modal\": [\"MES%d23\"],\n    \"codes_that_are_pure_logic_no_single_IO\": [\"MES0921\",\"MES%d25\",\"MES1426\",\"MES1721\",\"MES1722\",\"MES1723\",\"WAR0330\",\"WAR0475\"],\n    \"code_raised_via_motor_limit_helper_not_ShowMyError\": [\"WAR0154\"],\n    \"codes_with_two_raise_sites\": {\"WAR0475\":[\"aLoader.cpp:1790\",\"aLoader.cpp:1883\"],\"MES1722\":[\"aTrayArm.cpp:738\",\"aTrayArm.cpp:1242\"],\"MES%d20\":[\"aAuto1To6.cpp:960\",\"aAuto1To6.cpp:1635\"]},\n    \"action_required\": \"Re-run extraction; the writer must produce 56 groundable troubleshooting entries (60 codes minus the 4 catalog-only CCD codes) and explicitly mark WAR16120/WAR16121/WAR0462/WAR0970 as catalog-registered-but-not-wired (recommend either documenting them as reserved/HT9045-parity placeholders or wiring the real CCD raise path to emit them instead of CCD%04d).\"\n  }\n}"
+}

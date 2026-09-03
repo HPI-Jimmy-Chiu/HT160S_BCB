@@ -1,9 +1,10 @@
-#include "IncludeAllHeader.h"       //Dell 將.h統一,可加速build
+#include "IncludeAllHeader.h"       //Dell : unify all .h into one to speed up build
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #include <TypInfo.hpp>
 #include <stdlib.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "iosetview.h"
 #include "csystem.h"
@@ -45,17 +46,6 @@ enum eIOTableEditorColumn
     eIOTableColTotal
 };
 
-static void SetOrdProperty(TObject *ObjectPtr, const char *PropName, int Value)
-{
-    PPropInfo PropInfo;
-
-    if(ObjectPtr==NULL || PropName==NULL)
-        return;
-
-    PropInfo=GetPropInfo(ObjectPtr, AnsiString(PropName));
-    if(PropInfo!=NULL)
-        SetOrdProp(ObjectPtr, PropInfo, Value);
-}
 
 static bool TextEndsWith(AnsiString Value, AnsiString Suffix)
 {
@@ -67,24 +57,7 @@ static bool TextEndsWith(AnsiString Value, AnsiString Suffix)
     return Value.SubString(ValueLength-SuffixLength+1, SuffixLength)==Suffix;
 }
 
-static TTimer *FindNamedTimer(TComponent *Owner, const char *TimerName)
-{
-    TComponent *ComponentPtr;
 
-    if(Owner==NULL || TimerName==NULL)
-        return NULL;
-
-    ComponentPtr=Owner->FindComponent(AnsiString(TimerName));
-    return dynamic_cast<TTimer *>(ComponentPtr);
-}
-
-enum eIOViewSelectKind
-{
-    eIOViewNone     =0,
-    eIOViewSwitch   =1,
-    eIOViewCylinder =2,
-    eIOViewSucker   =3
-};
 
 struct TIOMapItem
 {
@@ -127,8 +100,9 @@ void RegisterIOViewStreamClasses()
     RegisterClass(__classid(TPopupMenu));
     RegisterClass(__classid(TMenuItem));
     RegisterClass(__classid(TDataSource));
-    RegisterClass(__classid(TDBNavigator));
-    RegisterClass(__classid(TDBGrid));
+    //AI(general) 20260613 : TDBNavigator/TDBGrid registrations removed - the
+    //DBNavigator1/DBGrid1 controls were deleted from iosetview.dfm. TTable and
+    //TDataSource stay registered because ioTable/DataSource1 remain in the DFM.
     RegisterClass(__classid(TTable));
     RegisterClass(__classid(TMemo));
     RegisterClass(__classid(TImage));
@@ -142,45 +116,49 @@ void RegisterIOViewStreamClasses()
 __fastcall Tfiosetview::Tfiosetview(TComponent* Owner)
     : TForm(Owner)
 {
-    palHeader=NULL;
-    lblTitle=NULL;
-    lblSummary=NULL;
-    lblSelected=NULL;
-    chkManualOutput=NULL;
-    btnRefresh=NULL;
-    btnOutputOn=NULL;
-    btnOutputOff=NULL;
-    btnSuckerDestroy=NULL;
-    PageControl=NULL;
-    tsSensors=NULL;
-    tsCylinders=NULL;
-    tsSwitches=NULL;
-    tsSuckers=NULL;
-    tsIOTable=NULL;
-    grdSensors=NULL;
-    grdCylinders=NULL;
-    grdSwitches=NULL;
-    grdSuckers=NULL;
-    grdIOTable=NULL;
-    pnIOTableEditorToolbar=NULL;
-    cbbType=NULL;
-    cbbLane=NULL;
-    edtSearchIO=NULL;
-    btnAddIO=NULL;
-    btnDeleteIO=NULL;
-    btnModify=NULL;
-    sbUpdate=NULL;
-    strngrdIoTable=NULL;
+    //AI(general) 20260613 : the IO Table editor controls (pnIOTableEditorToolbar,
+    //cbbType, cbbLane, edtSearchIO, btnAddIO/btnDeleteIO/btnModify/sbUpdate,
+    //sbIOEditorRefresh, strngrdIoTable) are now streamed from iosetview.dfm. They
+    //must NOT be set to NULL here: DFM streaming runs inside the base TForm(Owner)
+    //constructor before this body, so a NULL assignment would clobber the wired
+    //pointers. EnsureIOTableEditor() now runs grid setup once via the flag below.
+    bIOTableEditorReady=false;
     IOTableDeletedTags=new TStringList();
     ManualOutputLog=new TStringList();
-    SelectedKind=eIOViewNone;
-    SelectedIndex=-1;
-    SelectedRow=-1;
-    SelectedCol=-1;
     iSelectRow=0;
     iSelectCol=0;
+    bOutDataChange=false;
+    bFromTeach=false;
+    bBackSwitchPortData=NULL;
+    bBackCylinderPortData=NULL;
+    bBackSuckPortData=NULL;
+    iBackSwitchCount=0;
+    iBackCylinderCount=0;
+    iBackSuckCount=0;
+    palSuckAll=NULL;
+    palDestroyAll=NULL;
+    palAllOff=NULL;
     Color=IO_COLOR_FORM;
     fShow=false;
+    //AI 20260713 : ts_IOSelfTest cylinder auto-poll runtime state (Feature A).
+    bSelfTestRunning=false;
+    iSelfTestCursor=0;
+    iSelfTestPhase=0;
+    iSelfTestRow=1;
+    dwSelfTestPhaseStart=0;
+    iSelfTestPass=0;
+    iSelfTestFail=0;
+    iSelfTestSkip=0;
+    bStExtendConfirmed=false;
+    bStExtendTimeout=false;
+    bStRetractConfirmed=false;
+    bStRetractTimeout=false;
+    iSelfTestActiveMode=0;
+    iSensorArrayCount=0;
+    iSensorSelTotal=0;
+    iSensorSelCapable=0;
+    dwSensorLastTick=0;
+    CreateSuckerGroupButtons();
 }
 //---------------------------------------------------------------------------
 __fastcall Tfiosetview::~Tfiosetview()
@@ -189,168 +167,136 @@ __fastcall Tfiosetview::~Tfiosetview()
     IOTableDeletedTags=NULL;
     delete ManualOutputLog;
     ManualOutputLog=NULL;
+    FreeOutputBackup();
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::BuildUI()
+//AI(ht160s-maintainer) 20260618 : group Suck/Destroy/AllOff buttons for the Sucker
+//tab, mirroring HT172 palAllOn/palAllOff/palCloseAll. Built in code (no DFM edit) and
+//parented to TabSheet5, placed to the right of the four sucker panels. Their Alias is
+//left empty so RefreshLegacyIOControls skips them instead of marking them unbound.
+void Tfiosetview::CreateSuckerGroupButtons()
 {
-    Color=IO_COLOR_FORM;
-    Font->Name="Arial";
-    Font->Size=10;
-    BuildHeader();
-    BuildPages();
+    TWinControl *ParentCtrl=dynamic_cast<TWinControl *>(FindComponent("TabSheet5"));
+    if(ParentCtrl==NULL)
+        return;
+
+    int Left  =385;
+    int Width =56;
+    int Height=22;
+
+    palSuckAll=new TBtnPanel(this);
+    palSuckAll->Parent        =ParentCtrl;
+    palSuckAll->Name          ="palSuckAll";
+    palSuckAll->Left          =Left;
+    palSuckAll->Top           =80;
+    palSuckAll->Width         =Width;
+    palSuckAll->Height        =Height;
+    palSuckAll->BevelInner    =bvRaised;
+    palSuckAll->BevelOuter    =bvRaised;
+    palSuckAll->Color         =IO_COLOR_BUTTON_OFF;
+    palSuckAll->TrueColor     =IO_COLOR_BUTTON_ON;
+    palSuckAll->FalseColor    =IO_COLOR_BUTTON_OFF;
+    palSuckAll->FalseFontColor=clWhite;
+    palSuckAll->TrueFontColor =clBlack;
+    palSuckAll->Caption       =LangT("Suck");
+    palSuckAll->Tag           =0;
+    palSuckAll->Style         =tsButtons;
+    palSuckAll->Font->Charset =DEFAULT_CHARSET;
+    palSuckAll->Font->Color   =clWhite;
+    palSuckAll->Font->Name    ="Arial";
+    palSuckAll->Font->Size    =10;
+    palSuckAll->OnClick       =SuckGroupAllClick;
+
+    palDestroyAll=new TBtnPanel(this);
+    palDestroyAll->Parent        =ParentCtrl;
+    palDestroyAll->Name          ="palDestroyAll";
+    palDestroyAll->Left          =Left;
+    palDestroyAll->Top           =110;
+    palDestroyAll->Width         =Width;
+    palDestroyAll->Height        =Height;
+    palDestroyAll->BevelInner    =bvRaised;
+    palDestroyAll->BevelOuter    =bvRaised;
+    palDestroyAll->Color         =IO_COLOR_BUTTON_OFF;
+    palDestroyAll->TrueColor     =IO_COLOR_BUTTON_ON;
+    palDestroyAll->FalseColor    =IO_COLOR_BUTTON_OFF;
+    palDestroyAll->FalseFontColor=clWhite;
+    palDestroyAll->TrueFontColor =clBlack;
+    palDestroyAll->Caption       =LangT("Destroy");
+    palDestroyAll->Tag           =1;
+    palDestroyAll->Style         =tsButtons;
+    palDestroyAll->Font->Charset =DEFAULT_CHARSET;
+    palDestroyAll->Font->Color   =clWhite;
+    palDestroyAll->Font->Name    ="Arial";
+    palDestroyAll->Font->Size    =10;
+    palDestroyAll->OnClick       =SuckGroupAllClick;
+
+    palAllOff=new TBtnPanel(this);
+    palAllOff->Parent        =ParentCtrl;
+    palAllOff->Name          ="palSuckAllOff";
+    palAllOff->Left          =Left;
+    palAllOff->Top           =140;
+    palAllOff->Width         =Width;
+    palAllOff->Height        =Height;
+    palAllOff->BevelInner    =bvRaised;
+    palAllOff->BevelOuter    =bvRaised;
+    palAllOff->Color         =IO_COLOR_BUTTON_OFF;
+    palAllOff->TrueColor     =IO_COLOR_BUTTON_ON;
+    palAllOff->FalseColor    =IO_COLOR_BUTTON_OFF;
+    palAllOff->FalseFontColor=clWhite;
+    palAllOff->TrueFontColor =clBlack;
+    palAllOff->Caption       =LangT("All Off");
+    palAllOff->Tag           =2;
+    palAllOff->Style         =tsButtons;
+    palAllOff->Font->Charset =DEFAULT_CHARSET;
+    palAllOff->Font->Color   =clWhite;
+    palAllOff->Font->Name    ="Arial";
+    palAllOff->Font->Size    =10;
+    palAllOff->OnClick       =SuckGroupAllClick;
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::BuildHeader()
+//AI(ht160s-maintainer) 20260618 : drive every sucker in each kit to a fixed end state,
+//reusing TMySucker On()/Off()/Normal() so semantics match HT172 palAllSuck/Destroy/Off.
+//Suck = vacuum on + blow off; Destroy = vacuum off + blow on; All Off = both off.
+//Suck/Destroy respect per-sucker Enable; All Off forces every sucker off (HT172 parity).
+void __fastcall Tfiosetview::SuckGroupAllClick(TObject *Sender)
 {
-    palHeader=new TPanel(this);
-    palHeader->Parent=this;
-    palHeader->Align=alTop;
-    palHeader->Height=86;
-    palHeader->BevelOuter=bvNone;
-    palHeader->Color=IO_COLOR_HEADER;
+    TBtnPanel *ButtonPtr=dynamic_cast<TBtnPanel *>(Sender);
+    if(ButtonPtr==NULL)
+        return;
 
-    lblTitle=new TLabel(palHeader);
-    lblTitle->Parent=palHeader;
-    lblTitle->Left=16;
-    lblTitle->Top=10;
-    lblTitle->Caption="HT160S IO View";
-    lblTitle->Font->Color=clWhite;
-    lblTitle->Font->Size=16;
-    lblTitle->Font->Style=TFontStyles() << fsBold;
+    int Action=ButtonPtr->Tag;
+    AnsiString ActionName;
+    if(Action==0)
+        ActionName="SUCK_ALL";
+    else if(Action==1)
+        ActionName="DESTROY_ALL";
+    else
+        ActionName="ALL_OFF";
 
-    lblSummary=new TLabel(palHeader);
-    lblSummary->Parent=palHeader;
-    lblSummary->Left=18;
-    lblSummary->Top=48;
-    lblSummary->Width=900;
-    lblSummary->Caption="";
-    lblSummary->Font->Color=clWhite;
-
-    btnRefresh=new TButton(palHeader);
-    btnRefresh->Parent=palHeader;
-    btnRefresh->Left=940;
-    btnRefresh->Top=14;
-    btnRefresh->Width=90;
-    btnRefresh->Height=28;
-    btnRefresh->Caption="Refresh";
-    btnRefresh->OnClick=btnRefreshClick;
-
-    chkManualOutput=new TCheckBox(palHeader);
-    chkManualOutput->Parent=palHeader;
-    chkManualOutput->Left=1045;
-    chkManualOutput->Top=18;
-    chkManualOutput->Width=145;
-    chkManualOutput->Caption="Manual output";
-    chkManualOutput->Font->Color=clWhite;
-    chkManualOutput->OnClick=chkManualOutputClick;
-
-    btnOutputOn=new TButton(palHeader);
-    btnOutputOn->Parent=palHeader;
-    btnOutputOn->Left=1205;
-    btnOutputOn->Top=14;
-    btnOutputOn->Width=80;
-    btnOutputOn->Height=28;
-    btnOutputOn->Caption="ON";
-    btnOutputOn->OnClick=btnOutputOnClick;
-
-    btnOutputOff=new TButton(palHeader);
-    btnOutputOff->Parent=palHeader;
-    btnOutputOff->Left=1295;
-    btnOutputOff->Top=14;
-    btnOutputOff->Width=80;
-    btnOutputOff->Height=28;
-    btnOutputOff->Caption="OFF";
-    btnOutputOff->OnClick=btnOutputOffClick;
-
-    btnSuckerDestroy=new TButton(palHeader);
-    btnSuckerDestroy->Parent=palHeader;
-    btnSuckerDestroy->Left=1385;
-    btnSuckerDestroy->Top=14;
-    btnSuckerDestroy->Width=110;
-    btnSuckerDestroy->Height=28;
-    btnSuckerDestroy->Caption="Destroy";
-    btnSuckerDestroy->OnClick=btnSuckerDestroyClick;
-
-    lblSelected=new TLabel(palHeader);
-    lblSelected->Parent=palHeader;
-    lblSelected->Left=940;
-    lblSelected->Top=52;
-    lblSelected->Width=520;
-    lblSelected->Caption="Selected: none";
-    lblSelected->Font->Color=clWhite;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::BuildPages()
-{
-    const char *SensorHeaders[]   = {"No", "Alias", "Status", "Lane", "IP", "Port", "Bit", "Type", "Enable", "IOPos", "Driver"};
-    const int SensorWidths[]      = {40, 220, 70, 55, 55, 55, 45, 55, 60, 120, 110};
-    const char *CylinderHeaders[] = {"No", "Cylinder", "Out", "On Sen", "Off Sen", "Enable", "Addr", "OnAddr", "OffAddr"};
-    const int CylinderWidths[]    = {40, 220, 65, 80, 80, 70, 120, 120, 120};
-    const char *SwitchHeaders[]   = {"No", "Switch", "Out", "Enable", "Addr", "IOPos", "Driver"};
-    const int SwitchWidths[]      = {40, 220, 65, 70, 120, 160, 110};
-    const char *SuckerHeaders[]   = {"No", "Sucker", "Row", "Col", "Vacuum", "Suck Out", "Destroy Out", "Enable", "SensorAddr", "OnAddr", "OffAddr"};
-    const int SuckerWidths[]      = {40, 120, 45, 45, 70, 80, 90, 70, 120, 120, 120};
-    const char *IOTableHeaders[]  = {"No", "Type", "Alias", "Lane", "ModuleType", "IP", "Port", "Bit", "InType", "ISA Base", "Enable", "OnAlarmTime", "OffAlarmTime", "OnDelayTime", "OffDelayTime", "Note"};
-    const int IOTableWidths[]     = {50, 90, 210, 50, 70, 55, 65, 45, 55, 65, 60, 85, 85, 85, 85, 260};
-
-    PageControl=new TPageControl(this);
-    PageControl->Parent=this;
-    PageControl->Align=alClient;
-    PageControl->TabPosition=tpTop;
-
-    tsSensors=new TTabSheet(PageControl);
-    tsSensors->PageControl=PageControl;
-    tsSensors->Caption="Sensors";
-    grdSensors=CreateGrid(tsSensors, 11, SensorHeaders, SensorWidths);
-
-    tsCylinders=new TTabSheet(PageControl);
-    tsCylinders->PageControl=PageControl;
-    tsCylinders->Caption="Cylinders";
-    grdCylinders=CreateGrid(tsCylinders, 9, CylinderHeaders, CylinderWidths);
-
-    tsSwitches=new TTabSheet(PageControl);
-    tsSwitches->PageControl=PageControl;
-    tsSwitches->Caption="Switches";
-    grdSwitches=CreateGrid(tsSwitches, 7, SwitchHeaders, SwitchWidths);
-
-    tsSuckers=new TTabSheet(PageControl);
-    tsSuckers->PageControl=PageControl;
-    tsSuckers->Caption="Suckers";
-    grdSuckers=CreateGrid(tsSuckers, 11, SuckerHeaders, SuckerWidths);
-
-    tsIOTable=new TTabSheet(PageControl);
-    tsIOTable->PageControl=PageControl;
-    tsIOTable->Caption="IO Table";
-    grdIOTable=CreateGrid(tsIOTable, eIOTableColTotal, IOTableHeaders, IOTableWidths);
-}
-//---------------------------------------------------------------------------
-TStringGrid *Tfiosetview::CreateGrid(TWinControl *Parent, int ColCount, const char **Headers, const int *Widths)
-{
-    TStringGrid *Grid=new TStringGrid(Parent);
-    Grid->Parent=Parent;
-    Grid->Align=alClient;
-    SetupGrid(Grid, ColCount, Headers, Widths);
-    return Grid;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::SetupGrid(TStringGrid *Grid, int ColCount, const char **Headers, const int *Widths)
-{
-    Grid->ColCount=ColCount;
-    Grid->RowCount=2;
-    Grid->FixedRows=1;
-    Grid->FixedCols=0;
-    Grid->DefaultRowHeight=22;
-    Grid->FixedColor=IO_COLOR_GRID_FIXED;
-    Grid->Color=clWhite;
-    Grid->Font->Name="Arial";
-    Grid->Font->Size=9;
-    Grid->Options=Grid->Options << goRowSelect << goColSizing;
-    Grid->OnSelectCell=GridSelectCell;
-    for(int Col=0; Col<ColCount; Col++)
+    for(int SuckerIndex=0; SuckerIndex<HSys.iTotalSucker; SuckerIndex++)
     {
-        Grid->Cells[Col][0]=Headers[Col];
-        Grid->ColWidths[Col]=Widths[Col];
+        TMyKitSuck *Kit=&HSys.SuckPtr[SuckerIndex];
+        for(int RowIndex=0; RowIndex<Kit->MaxItemR; RowIndex++)
+        {
+            for(int ColIndex=0; ColIndex<Kit->MaxItemC; ColIndex++)
+            {
+                TMySucker *SuckerPtr=&Kit->Suck[RowIndex][ColIndex];
+                if(Action==2)
+                    SuckerPtr->Normal();
+                else if(SuckerPtr->Enable)
+                {
+                    if(Action==0)
+                        SuckerPtr->On();
+                    else
+                        SuckerPtr->Off();
+                }
+            }
+        }
     }
+
+    bOutDataChange=true;
+    LogManualOutputAction("SuckerGroup", ActionName, "OK");
+    RefreshCurrentView();
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::SetGridRowCount(TStringGrid *Grid, int RowCount)
@@ -369,439 +315,83 @@ void Tfiosetview::ClearGridRows(TStringGrid *Grid)
     }
 }
 //---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatEnable(bool Flag)
+//AI(general) 20260613 : MN200 connection status page. Shows card open state, ring
+//count, and per-ring start/device/error captured by OpenMN200Card(), plus the
+//count of enabled MotionNet IO points in IO_Table. Under SOFT_SIMULATE the card is
+//never opened, so the page reports simulation mode instead of live ring data.
+void Tfiosetview::RefreshMN200()
 {
-    if(Flag)
-        return "YES";
-    return "NO";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatEnableInt(int Flag)
-{
-    if(Flag!=0)
-        return "YES";
-    return "NO";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatOnOff(bool Flag)
-{
-    if(Flag)
-        return "ON";
-    return "OFF";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatAddress(int Lane, int IP, int Port, int Bit)
-{
-    AnsiString Str;
-    Str.sprintf("L%d IP%d P%d B%d", Lane, IP, Port, Bit);
-    return Str;
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatIODataAddress(TIODATA *Data)
-{
-    if(Data==NULL)
-        return "";
-    return FormatAddress(Data->iLane, Data->iIP, Data->iPort, Data->iBit);
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatIODriver(TIODATA *Data)
-{
-    if(Data==NULL)
-        return "";
-    if(IsPadCommunicationData(Data))
-        return "Pad COM";
-    if(Data->iEnable!=0 && Data->iISABase==eMotionNet)
-        return "TMyMN200_IO";
-    return "TMyIo";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatIODriver(TMyIo *IOPtr)
-{
-    if(IOPtr==NULL)
-        return "";
-    return IOPtr->GetDriverName();
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatSensor(TMySensor *Sensor)
-{
-    if(Sensor==NULL || Sensor->Enable==false)
-        return "DISABLED";
-    if(Sensor->IsOn())
-        return "ON";
-    return "OFF";
-}
-//---------------------------------------------------------------------------
-AnsiString Tfiosetview::FormatSwitch(TMySwitch *SwitchPtr)
-{
-    if(SwitchPtr==NULL)
-        return "";
-    return FormatAddress(SwitchPtr->Card/100, SwitchPtr->Card%100, SwitchPtr->Port, SwitchPtr->Bit);
-}
-//---------------------------------------------------------------------------
-int Tfiosetview::CountIOType(AnsiString TypeName)
-{
-    int Count=0;
-    AnsiString Target=TypeName.UpperCase();
-    if(HSys.IOTable==NULL)
-        return 0;
-    for(int Index=0; Index<HSys.IOTable->Count; Index++)
-    {
-        TIODATA *Data=(TIODATA *)HSys.IOTable->Items[Index];
-        if(Data!=NULL && Data->Type.UpperCase()==Target)
-            Count++;
-    }
-    return Count;
-}
-//---------------------------------------------------------------------------
-TIODATA *Tfiosetview::GetIODataByFilteredRow(AnsiString TypeName, int RowIndex)
-{
-    int Count=0;
-    AnsiString Target=TypeName.UpperCase();
-    if(HSys.IOTable==NULL || RowIndex<1)
-        return NULL;
-    for(int Index=0; Index<HSys.IOTable->Count; Index++)
-    {
-        TIODATA *Data=(TIODATA *)HSys.IOTable->Items[Index];
-        if(Data!=NULL && Data->Type.UpperCase()==Target)
-        {
-            Count++;
-            if(Count==RowIndex)
-                return Data;
-        }
-    }
-    return NULL;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSummary()
-{
-    AnsiString Str;
+    if(grdMN200==NULL)
+        return;
+
+    //AI(general) 20260613 : header/column setup formerly done by the removed
+    //code-built BuildPages(); set here so the DFM StringGrid shows MN200 columns.
+    grdMN200->ColCount=4;
+    grdMN200->FixedRows=1;
+    grdMN200->Cells[0][0]=LangT("Ring");
+    grdMN200->Cells[1][0]=LangT("Started");
+    grdMN200->Cells[2][0]=LangT("Devices");
+    grdMN200->Cells[3][0]=LangT("ErrorCode");
+
+    TMN200Connection *Conn=GetMN200Connection();
+
+    int MotionNetPoints=0;
     int IOCount=(HSys.IOTable==NULL)?0:HSys.IOTable->Count;
-    Str.sprintf("IO=%d  Sensor=%d  Cylinder=%d  Switch=%d  SuckerGroup=%d  Path=%s",
-                IOCount,
-                CountIOType("Sensor"),
-                HSys.iTotalCylinder,
-                HSys.iTotalSwitch,
-                HSys.iTotalSucker,
-                HSys.IoTablePath.c_str());
-    lblSummary->Caption=Str;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSensors()
-{
-    int Count=CountIOType("Sensor");
-    SetGridRowCount(grdSensors, Count+1);
-    ClearGridRows(grdSensors);
-    for(int Row=1; Row<=Count; Row++)
-    {
-        TIODATA *Data=GetIODataByFilteredRow("Sensor", Row);
-        if(Data==NULL)
-            continue;
-
-        if(IsPadCommunicationData(Data))
-        {
-            bool PadState=false;
-            ResolvePadCommunicationInputState(Data->Alias, &PadState);
-            grdSensors->Cells[0][Row]=IntToStr(Row);
-            grdSensors->Cells[1][Row]=Data->Alias;
-            grdSensors->Cells[2][Row]=FormatOnOff(PadState);
-            grdSensors->Cells[3][Row]="";
-            grdSensors->Cells[4][Row]="";
-            grdSensors->Cells[5][Row]="";
-            grdSensors->Cells[6][Row]="";
-            grdSensors->Cells[7][Row]="COMM";
-            grdSensors->Cells[8][Row]="COMM";
-            grdSensors->Cells[9][Row]="Pad COM";
-            grdSensors->Cells[10][Row]="Pad COM";
-            continue;
-        }
-
-        TMyIo TempIO;
-        TMyMN200_IO TempMN200IO;
-        TMyIo *TempIOPtr=&TempIO;
-        if(Data->iEnable!=0 && Data->iISABase==eMotionNet)
-            TempIOPtr=&TempMN200IO;
-        TempIOPtr->iCard=Data->iLane*100+Data->iIP;
-        TempIOPtr->iLane=Data->iLane;
-        TempIOPtr->iIP=Data->iIP;
-        TempIOPtr->iPort=Data->iPort;
-        TempIOPtr->iBit=Data->iBit;
-        TempIOPtr->ISABase=Data->iISABase;
-        TempIOPtr->iModuleType=Data->iModuleType;
-        bool RawOn=TempIOPtr->IsOn();
-        bool IsOn=(Data->iInType==1)?RawOn:!RawOn;
-
-        grdSensors->Cells[0][Row]=IntToStr(Row);
-        grdSensors->Cells[1][Row]=Data->Alias;
-        if(Data->iEnable!=0)
-            grdSensors->Cells[2][Row]=FormatOnOff(IsOn);
-        else
-            grdSensors->Cells[2][Row]="DISABLED";
-        grdSensors->Cells[3][Row]=IntToStr(Data->iLane);
-        grdSensors->Cells[4][Row]=IntToStr(Data->iIP);
-        grdSensors->Cells[5][Row]=IntToStr(Data->iPort);
-        grdSensors->Cells[6][Row]=IntToStr(Data->iBit);
-        grdSensors->Cells[7][Row]=IntToStr(Data->iInType);
-        grdSensors->Cells[8][Row]=FormatEnableInt(Data->iEnable);
-        grdSensors->Cells[9][Row]=Data->IOPos;
-        grdSensors->Cells[10][Row]=FormatIODriver(Data);
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshCylinders()
-{
-    SetGridRowCount(grdCylinders, HSys.iTotalCylinder+1);
-    ClearGridRows(grdCylinders);
-    for(int Index=0; Index<HSys.iTotalCylinder; Index++)
-    {
-        TMyCylinder *Cyn=&HSys.CynPtr[Index];
-        grdCylinders->Cells[0][Index+1]=IntToStr(Index);
-        grdCylinders->Cells[1][Index+1]=Cyn->CylinderName;
-        grdCylinders->Cells[2][Index+1]=FormatOnOff(Cyn->GetOutBit());
-        grdCylinders->Cells[3][Index+1]=FormatSensor(&Cyn->OnSensor);
-        grdCylinders->Cells[4][Index+1]=FormatSensor(&Cyn->OffSensor);
-        grdCylinders->Cells[5][Index+1]=FormatEnable(Cyn->Enable);
-        grdCylinders->Cells[6][Index+1]=FormatSwitch(&Cyn->Switch);
-        grdCylinders->Cells[7][Index+1]=FormatAddress(Cyn->OnSensor.Card/100, Cyn->OnSensor.Card%100, Cyn->OnSensor.Port, Cyn->OnSensor.Bit);
-        grdCylinders->Cells[8][Index+1]=FormatAddress(Cyn->OffSensor.Card/100, Cyn->OffSensor.Card%100, Cyn->OffSensor.Port, Cyn->OffSensor.Bit);
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSwitches()
-{
-    SetGridRowCount(grdSwitches, HSys.iTotalSwitch+1);
-    ClearGridRows(grdSwitches);
-    for(int Index=0; Index<HSys.iTotalSwitch; Index++)
-    {
-        TMySwitch *SwitchPtr=&HSys.SwPtr[Index];
-        bool PadState=false;
-        grdSwitches->Cells[0][Index+1]=IntToStr(Index);
-        grdSwitches->Cells[1][Index+1]=SwitchPtr->Name;
-        if(IsPadCommunicationOutput(SwitchPtr->Name))
-        {
-            ResolvePadCommunicationOutputState(SwitchPtr->Name, &PadState);
-            grdSwitches->Cells[2][Index+1]=FormatOnOff(PadState);
-            grdSwitches->Cells[3][Index+1]="COMM";
-            grdSwitches->Cells[4][Index+1]="Pad COM";
-            grdSwitches->Cells[5][Index+1]="Pad COM";
-            grdSwitches->Cells[6][Index+1]="Pad COM";
-        }
-        else
-        {
-            grdSwitches->Cells[2][Index+1]=FormatOnOff(SwitchPtr->Status());
-            grdSwitches->Cells[3][Index+1]=FormatEnable(SwitchPtr->Enable);
-            grdSwitches->Cells[4][Index+1]=FormatSwitch(SwitchPtr);
-            grdSwitches->Cells[5][Index+1]=SwitchPtr->IOPos;
-            grdSwitches->Cells[6][Index+1]=FormatIODriver(SwitchPtr->Output);
-        }
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshSuckers()
-{
-    int TotalRows=0;
-    for(int SuckerIndex=0; SuckerIndex<HSys.iTotalSucker; SuckerIndex++)
-        TotalRows+=HSys.SuckPtr[SuckerIndex].MaxItemR*HSys.SuckPtr[SuckerIndex].MaxItemC;
-
-    SetGridRowCount(grdSuckers, TotalRows+1);
-    ClearGridRows(grdSuckers);
-
-    int Row=1;
-    for(int SuckerIndex=0; SuckerIndex<HSys.iTotalSucker; SuckerIndex++)
-    {
-        TMyKitSuck *Kit=&HSys.SuckPtr[SuckerIndex];
-        for(int RowIndex=0; RowIndex<Kit->MaxItemR; RowIndex++)
-        {
-            for(int ColIndex=0; ColIndex<Kit->MaxItemC; ColIndex++)
-            {
-                TMySucker *Sucker=&Kit->Suck[RowIndex][ColIndex];
-                grdSuckers->Cells[0][Row]=IntToStr(Row-1);
-                grdSuckers->Cells[1][Row]=Sucker->SuckerName;
-                grdSuckers->Cells[2][Row]=IntToStr(RowIndex);
-                grdSuckers->Cells[3][Row]=IntToStr(ColIndex);
-                grdSuckers->Cells[4][Row]=FormatSensor(&Sucker->Sensor);
-                grdSuckers->Cells[5][Row]=FormatOnOff(Sucker->GetOnBit());
-                grdSuckers->Cells[6][Row]=FormatOnOff(Sucker->GetOffBit());
-                grdSuckers->Cells[7][Row]=FormatEnable(Sucker->Enable);
-                grdSuckers->Cells[8][Row]=FormatAddress(Sucker->Sensor.Card/100, Sucker->Sensor.Card%100, Sucker->Sensor.Port, Sucker->Sensor.Bit);
-                grdSuckers->Cells[9][Row]=FormatSwitch(&Sucker->OnSw);
-                grdSuckers->Cells[10][Row]=FormatSwitch(&Sucker->OffSw);
-                Row++;
-            }
-        }
-    }
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::RefreshIOTable()
-{
-    int Count=(HSys.IOTable==NULL)?0:HSys.IOTable->Count;
-    SetGridRowCount(grdIOTable, Count+1);
-    ClearGridRows(grdIOTable);
-    for(int Index=0; Index<Count; Index++)
+    for(int Index=0; Index<IOCount; Index++)
     {
         TIODATA *Data=(TIODATA *)HSys.IOTable->Items[Index];
-        if(Data==NULL)
-            continue;
-        grdIOTable->Cells[eIOTableColTag][Index+1]=IntToStr(Data->Tag);
-        grdIOTable->Cells[eIOTableColType][Index+1]=Data->Type;
-        grdIOTable->Cells[eIOTableColAlias][Index+1]=Data->Alias;
-        grdIOTable->Cells[eIOTableColLane][Index+1]=IOTableCellFromInt(Data->iLane);
-        grdIOTable->Cells[eIOTableColModuleType][Index+1]=IOTableCellFromInt(Data->iModuleType);
-        grdIOTable->Cells[eIOTableColIP][Index+1]=IOTableIPToCell(Data);
-        grdIOTable->Cells[eIOTableColPort][Index+1]=IOTablePortToCell(Data);
-        grdIOTable->Cells[eIOTableColBit][Index+1]=IOTableCellFromInt(Data->iBit);
-        grdIOTable->Cells[eIOTableColInType][Index+1]=IOTableCellFromInt(Data->iInType);
-        grdIOTable->Cells[eIOTableColISABase][Index+1]=IOTableCellFromInt(Data->iISABase);
-        grdIOTable->Cells[eIOTableColEnable][Index+1]=IOTableCellFromInt(Data->iEnable);
-        grdIOTable->Cells[eIOTableColOnAlarmTime][Index+1]=IOTableCellFromInt(Data->iOnAlarmTime);
-        grdIOTable->Cells[eIOTableColOffAlarmTime][Index+1]=IOTableCellFromInt(Data->iOffAlarmTime);
-        grdIOTable->Cells[eIOTableColOnDelayTime][Index+1]=IOTableCellFromInt(Data->iOnDelayTime);
-        grdIOTable->Cells[eIOTableColOffDelayTime][Index+1]=IOTableCellFromInt(Data->iOffDelayTime);
-        grdIOTable->Cells[eIOTableColNote][Index+1]=GetIOTableNote(Data);
+        if(Data!=NULL && Data->iEnable!=0 && Data->iISABase==eMotionNet)
+            MotionNetPoints++;
+    }
+
+    AnsiString Summary;
+#ifdef SOFT_SIMULATE
+    Summary.sprintf("SOFT_SIMULATE active - MN200 card NOT opened (IO is simulated).  MotionNet IO points in table=%d",
+                    MotionNetPoints);
+#else
+    if(Conn!=NULL && Conn->bOpened)
+        Summary.sprintf("MN200 opened.  Rings=%d  MotionNet IO points=%d  LastMsg=%s",
+                        Conn->iNumLine, MotionNetPoints, Conn->sLastMessage.c_str());
+    else
+        Summary.sprintf("MN200 NOT opened (LastError=%d %s).  MotionNet IO points=%d",
+                        (Conn==NULL)?0:Conn->iLastError,
+                        (Conn==NULL)?"":Conn->sLastMessage.c_str(),
+                        MotionNetPoints);
+#endif
+    if(lblMN200Summary!=NULL)
+        lblMN200Summary->Caption=Summary;
+
+    int Rings=(Conn==NULL)?0:Conn->iNumLine;
+    if(Rings<0)
+        Rings=0;
+    if(Rings>MN200_MAX_RING)
+        Rings=MN200_MAX_RING;
+    SetGridRowCount(grdMN200, Rings+1);
+    ClearGridRows(grdMN200);
+    for(int i=0; i<Rings; i++)
+    {
+        grdMN200->Cells[0][i+1]=IntToStr(i);
+        grdMN200->Cells[1][i+1]=(Conn->bRingStarted[i])?AnsiString("YES"):AnsiString("NO");
+        grdMN200->Cells[2][i+1]=IntToStr(Conn->iNumDev[i]);
+        grdMN200->Cells[3][i+1]=IntToStr(Conn->iRingError[i]);
     }
 }
 //---------------------------------------------------------------------------
+//AI(general) 20260613 : the IO Table editor controls (toolbar, filter combos,
+//search edit, action buttons, grid) and their combo Items now live in
+//iosetview.dfm, parented to pn_IODatabase. This routine no longer builds them;
+//it only performs the one-time grid header/format setup and the initial load,
+//guarded by bIOTableEditorReady so repeated FormShow/button calls do not redo it.
 void Tfiosetview::EnsureIOTableEditor()
 {
-    TPanel *Host;
-    TLabel *LabelPtr;
-    TSpeedButton *RefreshButton;
-    int LaneIndex;
-
-    if(strngrdIoTable!=NULL)
+    if(bIOTableEditorReady)
+        return;
+    if(strngrdIoTable==NULL)
         return;
 
-    Host=dynamic_cast<TPanel *>(FindComponent("pn_IODatabase"));
-    if(Host==NULL)
-        return;
-
-    HideLegacyIOTableEditor();
-
-    pnIOTableEditorToolbar=new TPanel(Host);
-    pnIOTableEditorToolbar->Parent=Host;
-    pnIOTableEditorToolbar->Align=alTop;
-    pnIOTableEditorToolbar->Height=48;
-    pnIOTableEditorToolbar->BevelOuter=bvNone;
-    pnIOTableEditorToolbar->Color=IO_COLOR_FORM;
-
-    LabelPtr=new TLabel(pnIOTableEditorToolbar);
-    LabelPtr->Parent=pnIOTableEditorToolbar;
-    LabelPtr->Left=10;
-    LabelPtr->Top=7;
-    LabelPtr->Caption="Type";
-
-    cbbType=new TComboBox(pnIOTableEditorToolbar);
-    cbbType->Parent=pnIOTableEditorToolbar;
-    cbbType->Left=10;
-    cbbType->Top=22;
-    cbbType->Width=105;
-    cbbType->Style=csDropDownList;
-    cbbType->Items->Add("All");
-    cbbType->Items->Add("Sensor");
-    cbbType->Items->Add("Sucker");
-    cbbType->Items->Add("Switch");
-    cbbType->Items->Add("Cylinder");
-    cbbType->ItemIndex=0;
-    cbbType->OnChange=cbbTypeChange;
-
-    LabelPtr=new TLabel(pnIOTableEditorToolbar);
-    LabelPtr->Parent=pnIOTableEditorToolbar;
-    LabelPtr->Left=125;
-    LabelPtr->Top=7;
-    LabelPtr->Caption="Lane";
-
-    cbbLane=new TComboBox(pnIOTableEditorToolbar);
-    cbbLane->Parent=pnIOTableEditorToolbar;
-    cbbLane->Left=125;
-    cbbLane->Top=22;
-    cbbLane->Width=75;
-    cbbLane->Style=csDropDownList;
-    cbbLane->Items->Add("All");
-    for(LaneIndex=0; LaneIndex<10; LaneIndex++)
-        cbbLane->Items->Add(IntToStr(LaneIndex));
-    cbbLane->ItemIndex=0;
-    cbbLane->OnChange=cbbTypeChange;
-
-    LabelPtr=new TLabel(pnIOTableEditorToolbar);
-    LabelPtr->Parent=pnIOTableEditorToolbar;
-    LabelPtr->Left=212;
-    LabelPtr->Top=7;
-    LabelPtr->Caption="Search Alias";
-
-    edtSearchIO=new TEdit(pnIOTableEditorToolbar);
-    edtSearchIO->Parent=pnIOTableEditorToolbar;
-    edtSearchIO->Left=212;
-    edtSearchIO->Top=22;
-    edtSearchIO->Width=180;
-    edtSearchIO->OnChange=edtSearchIOChange;
-
-    btnAddIO=new TSpeedButton(pnIOTableEditorToolbar);
-    btnAddIO->Parent=pnIOTableEditorToolbar;
-    btnAddIO->Left=410;
-    btnAddIO->Top=12;
-    btnAddIO->Width=70;
-    btnAddIO->Height=28;
-    btnAddIO->Caption="Add";
-    btnAddIO->OnClick=btnAddIOClick;
-
-    btnDeleteIO=new TSpeedButton(pnIOTableEditorToolbar);
-    btnDeleteIO->Parent=pnIOTableEditorToolbar;
-    btnDeleteIO->Left=488;
-    btnDeleteIO->Top=12;
-    btnDeleteIO->Width=70;
-    btnDeleteIO->Height=28;
-    btnDeleteIO->Caption="Delete";
-    btnDeleteIO->OnClick=btnDeleteIOClick;
-
-    btnModify=new TSpeedButton(pnIOTableEditorToolbar);
-    btnModify->Parent=pnIOTableEditorToolbar;
-    btnModify->Left=566;
-    btnModify->Top=12;
-    btnModify->Width=70;
-    btnModify->Height=28;
-    btnModify->Caption="Modify";
-    btnModify->OnClick=btnModifyClick;
-
-    sbUpdate=new TSpeedButton(pnIOTableEditorToolbar);
-    sbUpdate->Parent=pnIOTableEditorToolbar;
-    sbUpdate->Left=644;
-    sbUpdate->Top=12;
-    sbUpdate->Width=70;
-    sbUpdate->Height=28;
-    sbUpdate->Caption="Save";
-    sbUpdate->OnClick=sbUpdateClick;
-
-    RefreshButton=new TSpeedButton(pnIOTableEditorToolbar);
-    RefreshButton->Parent=pnIOTableEditorToolbar;
-    RefreshButton->Left=722;
-    RefreshButton->Top=12;
-    RefreshButton->Width=80;
-    RefreshButton->Height=28;
-    RefreshButton->Caption="Refresh";
-    RefreshButton->OnClick=sbIORefreshClick;
-
-    strngrdIoTable=new TStringGrid(Host);
-    strngrdIoTable->Parent=Host;
-    strngrdIoTable->Align=alClient;
-    strngrdIoTable->OnSelectCell=strngrdIoTableSelectCell;
-    strngrdIoTable->OnDblClick=strngrdIoTableDblClick;
-
+    bIOTableEditorReady=true;
     SetupIOTableEditorGrid();
     LoadIoTable(0, 0, 0);
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::HideLegacyIOTableEditor()
-{
-    const char *Names[]={"DBNavigator1", "DBGrid1", "pn_IODatabaseOB0"};
-    TComponent *ComponentPtr;
-    TControl *ControlPtr;
-
-    for(int Index=0; Index<3; Index++)
-    {
-        ComponentPtr=FindComponent(Names[Index]);
-        ControlPtr=dynamic_cast<TControl *>(ComponentPtr);
-        if(ControlPtr!=NULL)
-            ControlPtr->Visible=false;
-    }
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::SetupIOTableEditorGrid()
@@ -825,7 +415,7 @@ void Tfiosetview::SetupIOTableEditorGrid()
     strngrdIoTable->Options=TGridOptions() << goFixedVertLine << goFixedHorzLine << goVertLine << goHorzLine << goRangeSelect << goColSizing;
     for(int Col=0; Col<eIOTableColTotal; Col++)
     {
-        strngrdIoTable->Cells[Col][0]=Headers[Col];
+        strngrdIoTable->Cells[Col][0]=LangT(Headers[Col]);
         strngrdIoTable->ColWidths[Col]=Widths[Col];
     }
 }
@@ -1175,9 +765,45 @@ bool Tfiosetview::BackupIOTableFile(AnsiString *BackupFile)
     if(!CopyFile(HSys.IoTablePath.c_str(), BackupName.c_str(), false))
         return false;
 
+    PruneIOTableBackups(BackupDir, 10);
+
     if(BackupFile!=NULL)
         *BackupFile=BackupName;
     return true;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260613 : keep at most MaxKeep IO_Table backup files in BackupDir
+//and delete the oldest first, so the system backup folder does not grow without
+//bound. Backup names are IO_Table_yyyymmdd_hhnnss.csv, so an ascending name sort
+//is also chronological; the first (Count-MaxKeep) entries are therefore the oldest.
+void Tfiosetview::PruneIOTableBackups(AnsiString BackupDir, int MaxKeep)
+{
+    TSearchRec SearchRec;
+    TStringList *Names;
+    AnsiString Mask;
+    int FindResult;
+    int DeleteCount;
+
+    if(BackupDir==AnsiString("") || MaxKeep<0)
+        return;
+
+    Names=new TStringList();
+    Mask=BackupDir+AnsiString("\\IO_Table_*.csv");
+    FindResult=FindFirst(Mask, faAnyFile, SearchRec);
+    while(FindResult==0)
+    {
+        if((SearchRec.Attr & faDirectory)==0)
+            Names->Add(SearchRec.Name);
+        FindResult=FindNext(SearchRec);
+    }
+    FindClose(SearchRec);
+
+    Names->Sort();
+    DeleteCount=Names->Count-MaxKeep;
+    for(int Index=0; Index<DeleteCount; Index++)
+        DeleteFile(BackupDir+AnsiString("\\")+Names->Strings[Index]);
+
+    delete Names;
 }
 //---------------------------------------------------------------------------
 int Tfiosetview::FindIOTableGridRowByTag(int Tag)
@@ -1246,7 +872,7 @@ void Tfiosetview::SaveIoTableFromGrid()
             ErrorMessage=ErrorMessage+AnsiString("\r\n")+Errors->Strings[Index];
         if(Errors->Count>20)
             ErrorMessage=ErrorMessage+AnsiString("\r\n...");
-        ShowMessage(ErrorMessage);
+        ShowMyOKMessageNoStop(LangT(ErrorMessage));
         delete Errors;
         return;
     }
@@ -1255,7 +881,7 @@ void Tfiosetview::SaveIoTableFromGrid()
     BackupFile="";
     if(!BackupIOTableFile(&BackupFile))
     {
-        ShowMessage("IO_Table.csv backup failed. Save aborted.");
+        ShowMyOKMessageNoStop(LangT("IO_Table.csv backup failed. Save aborted."));
         return;
     }
 
@@ -1289,47 +915,55 @@ void Tfiosetview::SaveIoTableFromGrid()
 
         Lines->SaveToFile(HSys.IoTablePath);
         HSys.LoadIoData();
+        //AI(general) 20260616 : LoadIoData only rebuilds the raw IOTable list.
+        //Cylinder/Switch/Sucker/Sensor runtime objects (CynPtr/SwPtr/SuckPtr/SenPtr)
+        //copy their IP/Port/Bit from IOTable at startup and are NOT refreshed by
+        //LoadIoData, so edited addresses for those types stayed stale until restart.
+        //Re-run the bind step here so sbUpdate takes effect live.
+        HSys.LoadSensorParameterFromDataBase();
+        HSys.LoadCylinderParameterFromDataBase();
+        HSys.LoadSwitchParameterFromDataBase();
+        HSys.LoadSuckerParameterFromDataBase();
+        //AI(ht160s-alarm-code-rebind) 20260731 : LoadCylinderParameterFromDataBase rewrites
+        //EVERY cylinder's OnAlarmCode/OffAlarmCode to the raw i*100 / i*100+1 scheme
+        //(database.cpp:1349-1350). At startup that is immediately overwritten by
+        //CreateSystemAlarmCode (database.cpp:794 then :799 - they are a PAIR); here the second
+        //half was missing, so PRESSING THE UPDATE BUTTON on this screen (sbUpdateClick ->
+        //SaveIoTableFromGrid; merely opening the screen does NOT do it) reverted the whole
+        //registry for the rest of the session. Two levels of damage : the i*100 codes are absent
+        //from mapAlarmCodeList, so all 39 cylinders degraded to note.cpp's "Cylinder Error Code
+        //Undefine Error" branch with no message, remedy or flush panel; and cylinder index 0 -
+        //C_TrayArmZ_Up - gets OnAlarmCode = 0*100 = 0, where SetCylinderAlarm returns immediately
+        //on AlarmCode==0 (mycylin.cpp:101-102), so its push-timeout alarm went fully SILENT.
+        //Side effects to know about : CreateSystemAlarmCode clears and rebuilds mapNameToAlarm +
+        //mapAlarmCodeList and rewrites system\AlarmList.csv. Safe here because MainProc is frozen
+        //for the whole session on this screen, nothing else writes those maps, and SecsGem is
+        //timer-driven with no worker thread - if that ever changes, this call must be gated.
+        HSys.CreateSystemAlarmCode();
         if(IOTableDeletedTags!=NULL)
             IOTableDeletedTags->Clear();
         LoadIoTable((cbbType==NULL)?0:cbbType->ItemIndex, (cbbLane==NULL)?0:cbbLane->ItemIndex, 0);
         RefreshLegacyIOControls();
         RefreshLegacyIOMaps();
         if(BackupFile!=AnsiString(""))
-            ShowMessage(AnsiString("IO_Table.csv saved.\r\nBackup: ")+BackupFile);
+            ShowMyOKMessageNoStop(Format(LangT("IO_Table.csv saved.\r\nBackup: %s"),ARRAYOFCONST((BackupFile))));
         else
-            ShowMessage("IO_Table.csv saved.");
+            ShowMyOKMessageNoStop(LangT("IO_Table.csv saved."));
     }
     catch(...)
     {
-        ShowMessage("IO_Table.csv save failed.");
+        ShowMyOKMessageNoStop(LangT("IO_Table.csv save failed."));
     }
 
     delete Fields;
     delete Lines;
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::RefreshAll()
-{
-    RefreshSummary();
-    RefreshSensors();
-    RefreshCylinders();
-    RefreshSwitches();
-    RefreshSuckers();
-    RefreshIOTable();
-    RefreshLegacyIOControls();
-    UpdateSelectedInfo();
-    UpdateManualButtons();
-}
-//---------------------------------------------------------------------------
 void Tfiosetview::RefreshCurrentView()
 {
-    if(lblSummary!=NULL && grdSensors!=NULL && grdCylinders!=NULL &&
-       grdSwitches!=NULL && grdSuckers!=NULL && grdIOTable!=NULL)
-    {
-        RefreshAll();
-        return;
-    }
-
+    //AI(general) 20260613 : the code-built generic-grid view was removed; the
+    //live IO view is the DFM legacy LED/panel layout that RefreshLegacyIOControls
+    //repaints from current IO state.
     RefreshLegacyIOControls();
 }
 //---------------------------------------------------------------------------
@@ -1726,12 +1360,12 @@ void Tfiosetview::FillIOMapGrid(TStringGrid *Grid, bool InputSide)
     Grid->ColCount=6;
     Grid->FixedRows=1;
     Grid->FixedCols=0;
-    Grid->Cells[0][0]="Lane";
+    Grid->Cells[0][0]=LangT("Lane");
     Grid->Cells[1][0]="IP";
-    Grid->Cells[2][0]="Port";
-    Grid->Cells[3][0]="Bit";
-    Grid->Cells[4][0]="Type";
-    Grid->Cells[5][0]="Alias";
+    Grid->Cells[2][0]=LangT("Port");
+    Grid->Cells[3][0]=LangT("Bit");
+    Grid->Cells[4][0]=LangT("Type");
+    Grid->Cells[5][0]=LangT("Alias");
     Grid->ColWidths[0]=45;
     Grid->ColWidths[1]=45;
     Grid->ColWidths[2]=55;
@@ -1873,7 +1507,7 @@ void Tfiosetview::SaveIOMap(bool InputSide)
     Grid=dynamic_cast<TStringGrid *>(FindComponent(InputSide?"InputInformationGrid":"OutputInformationGrid"));
     if(Grid==NULL)
     {
-        ShowMessage("IO map grid not found.");
+        ShowMyOKMessageNoStop(LangT("IO map grid not found."));
         return;
     }
 
@@ -1883,7 +1517,7 @@ void Tfiosetview::SaveIOMap(bool InputSide)
         ForceDirectories(DirName);
     FileName=DirName+(InputSide?AnsiString("\\InputMap.csv"):AnsiString("\\OutputMap.csv"));
     SaveIOMapGrid(Grid, FileName);
-    ShowMessage(AnsiString("Saved ")+FileName);
+    ShowMyOKMessageNoStop(Format(LangT("Saved %s"),ARRAYOFCONST((FileName))));
 }
 //---------------------------------------------------------------------------
 bool Tfiosetview::ResolveLegacyLedState(AnsiString AliasName, bool *State)
@@ -1957,7 +1591,7 @@ bool Tfiosetview::ResolveLegacyLedState(AnsiString AliasName, bool *State)
                     if(SuckerPtr->Sensor.Enable==false)
                         return false;
                     if(State!=NULL)
-                        *State=SuckerPtr->GetStatus();
+                        *State=SuckerPtr->Sensor.IsOn();   // show live vacuum sensor, not dummy-gated GetStatus (align HT172/9045/plain-SENSOR)
                     return true;
                 }
                 if(AliasName==SuckerPtr->OnPortName || AliasName==SuckerPtr->OnPortName+AnsiString("_On"))
@@ -2066,113 +1700,6 @@ bool Tfiosetview::ResolveLegacyButtonState(AnsiString AliasName, bool *State)
     return false;
 }
 //---------------------------------------------------------------------------
-bool Tfiosetview::IsManualOutputEnabled()
-{
-    return (chkManualOutput!=NULL && chkManualOutput->Checked==true);
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::CanManualOutput(AnsiString *Reason)
-{
-    if(Reason!=NULL)
-        *Reason=AnsiString("");
-
-    if(HSys.Sys.SystemStart)
-    {
-        if(Reason!=NULL)
-            *Reason="Manual output is blocked while machine is running.";
-        return false;
-    }
-
-    if(IsSafeDoorOpen()>0)
-    {
-        if(Reason!=NULL)
-            *Reason="Manual output is blocked while safe door is open.";
-        return false;
-    }
-
-    if(!IsManualOutputEnabled())
-    {
-        if(Reason!=NULL)
-            *Reason="Manual output is locked.";
-        return false;
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::CanLegacyManualOutput(AnsiString *Reason)
-{
-    if(!CanManualOutput(Reason))
-        return false;
-
-    if(!IsLegacyGeneralIOMode())
-    {
-        if(Reason!=NULL)
-            *Reason="General IO mode is required for manual output.";
-        return false;
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::ShowManualOutputBlocked(AnsiString Reason)
-{
-    if(Reason==AnsiString(""))
-        Reason="Manual output is blocked.";
-    LogManualOutputAction("ManualOutput", "BLOCK", Reason);
-    ShowMessage(Reason);
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::GetSelectedSwitch(TMySwitch **SwitchPtr)
-{
-    if(SwitchPtr!=NULL)
-        *SwitchPtr=NULL;
-    if(SelectedKind!=eIOViewSwitch || SelectedIndex<0 || SelectedIndex>=HSys.iTotalSwitch)
-        return false;
-    if(SwitchPtr!=NULL)
-        *SwitchPtr=&HSys.SwPtr[SelectedIndex];
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::GetSelectedCylinder(TMyCylinder **CylinderPtr)
-{
-    if(CylinderPtr!=NULL)
-        *CylinderPtr=NULL;
-    if(SelectedKind!=eIOViewCylinder || SelectedIndex<0 || SelectedIndex>=HSys.iTotalCylinder)
-        return false;
-    if(CylinderPtr!=NULL)
-        *CylinderPtr=&HSys.CynPtr[SelectedIndex];
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::GetSelectedSucker(TMySucker **SuckerPtr)
-{
-    if(SuckerPtr!=NULL)
-        *SuckerPtr=NULL;
-    if(SelectedKind!=eIOViewSucker || SelectedIndex<0 || HSys.iTotalSucker<=0)
-        return false;
-    TMyKitSuck *Kit=&HSys.SuckPtr[0];
-    int Total=Kit->MaxItemR*Kit->MaxItemC;
-    if(SelectedIndex>=Total || Kit->MaxItemC<=0)
-        return false;
-    int RowIndex=SelectedIndex/Kit->MaxItemC;
-    int ColIndex=SelectedIndex%Kit->MaxItemC;
-    if(SuckerPtr!=NULL)
-        *SuckerPtr=&Kit->Suck[RowIndex][ColIndex];
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Tfiosetview::IsLegacyGeneralIOMode()
-{
-    TRadioButton *GeneralRadio;
-
-    GeneralRadio=dynamic_cast<TRadioButton *>(FindComponent("rbGeneralIO"));
-    if(GeneralRadio!=NULL)
-        return GeneralRadio->Checked;
-
-    return IsManualOutputEnabled();
-}
-//---------------------------------------------------------------------------
 bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
 {
     AnsiString AliasName;
@@ -2239,11 +1766,14 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
                     if(SuckerPtr->Enable==false || SuckerPtr->OnSw.Enable==false)
                         return false;
 
+                    // AI 20260622 : 9045-style interlock. Vacuum(V) and blow(D) are mutually
+                    // exclusive per nozzle -- turning V ON uses On() (= OffDestroy + OnSuck),
+                    // which also clears blow, so both can never be energized at once.
                     CurrentState=SuckerPtr->GetOnBit();
                     if(CurrentState)
                         SuckerPtr->OffSuck();
                     else
-                        SuckerPtr->OnSuck();
+                        SuckerPtr->On();
                     return true;
                 }
                 if(AliasName==SuckerPtr->OffPortName)
@@ -2251,11 +1781,14 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
                     if(SuckerPtr->Enable==false || SuckerPtr->OffSw.Enable==false)
                         return false;
 
+                    // AI 20260622 : 9045-style interlock. Turning blow(D) ON uses Off()
+                    // (= OffSuck + OnDestroy), which also clears vacuum(V), so V and D are
+                    // mutually exclusive per nozzle.
                     CurrentState=SuckerPtr->GetOffBit();
                     if(CurrentState)
                         SuckerPtr->OffDestroy();
                     else
-                        SuckerPtr->OnDestroy();
+                        SuckerPtr->Off();
                     return true;
                 }
             }
@@ -2265,64 +1798,104 @@ bool Tfiosetview::ToggleLegacyButtonOutput(TBtnPanel *ButtonPtr)
     return false;
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::UpdateSelectedInfo()
+//AI(general) 20260617 : snapshot every output state before the operator can toggle
+//them in the IO view. OutValue is the last commanded output level; cylinders and
+//suckers are driven through their member switches, so read those. Suck data is
+//flattened as [(kit*ROW+r)*COL+c]*2 + (0=OnSw,1=OffSw). Mirrors HT172 BackUpOutputData.
+void Tfiosetview::BackupOutputData()
 {
-    AnsiString Str="Selected: none";
-    TMySwitch *SwitchPtr=NULL;
-    TMyCylinder *CylinderPtr=NULL;
-    TMySucker *SuckerPtr=NULL;
+    FreeOutputBackup();
 
-    if(GetSelectedSwitch(&SwitchPtr) && SwitchPtr!=NULL)
-        Str="Selected switch: "+SwitchPtr->Name;
-    else if(GetSelectedCylinder(&CylinderPtr) && CylinderPtr!=NULL)
-        Str="Selected cylinder: "+CylinderPtr->CylinderName;
-    else if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-        Str="Selected sucker: "+SuckerPtr->SuckerName;
+    iBackSwitchCount=HSys.iTotalSwitch;
+    if(iBackSwitchCount>0)
+    {
+        bBackSwitchPortData=new bool[iBackSwitchCount];
+        for(int i=0; i<iBackSwitchCount; i++)
+            bBackSwitchPortData[i]=HSys.SwPtr[i].OutValue;
+    }
 
-    lblSelected->Caption=Str;
+    iBackCylinderCount=HSys.iTotalCylinder;
+    if(iBackCylinderCount>0)
+    {
+        bBackCylinderPortData=new bool[iBackCylinderCount];
+        for(int i=0; i<iBackCylinderCount; i++)
+            bBackCylinderPortData[i]=HSys.CynPtr[i].Switch.OutValue;
+    }
+
+    iBackSuckCount=HSys.iTotalSucker;
+    if(iBackSuckCount>0)
+    {
+        int Total=iBackSuckCount*MAX_SUCKER_ROW*MAX_SUCKER_COL*2;
+        bBackSuckPortData=new bool[Total];
+        for(int i=0; i<Total; i++)
+            bBackSuckPortData[i]=false;
+        for(int Kit=0; Kit<iBackSuckCount; Kit++)
+        {
+            TMyKitSuck *KitPtr=&HSys.SuckPtr[Kit];
+            for(int Row=0; Row<KitPtr->MaxItemR && Row<MAX_SUCKER_ROW; Row++)
+            {
+                for(int Col=0; Col<KitPtr->MaxItemC && Col<MAX_SUCKER_COL; Col++)
+                {
+                    int Base=((Kit*MAX_SUCKER_ROW+Row)*MAX_SUCKER_COL+Col)*2;
+                    bBackSuckPortData[Base+0]=KitPtr->Suck[Row][Col].OnSw.OutValue;
+                    bBackSuckPortData[Base+1]=KitPtr->Suck[Row][Col].OffSw.OutValue;
+                }
+            }
+        }
+    }
 }
 //---------------------------------------------------------------------------
-void Tfiosetview::UpdateManualButtons()
+//AI(general) 20260617 : drive every output back to the snapshot taken on entry.
+//Cylinders/suckers are restored through their member switches (raw OnOff) so the
+//component logic is not re-triggered, matching HT172 RestoreOutputData.
+void Tfiosetview::RestoreOutputData()
 {
-    bool HasSwitch=(SelectedKind==eIOViewSwitch);
-    bool HasCylinder=(SelectedKind==eIOViewCylinder);
-    bool HasSucker=(SelectedKind==eIOViewSucker);
-    bool Manual=CanManualOutput(NULL);
-    btnOutputOn->Enabled=Manual && (HasSwitch || HasCylinder || HasSucker);
-    btnOutputOff->Enabled=Manual && (HasSwitch || HasCylinder || HasSucker);
-    btnSuckerDestroy->Enabled=Manual && HasSucker;
-    btnOutputOn->Font->Color=btnOutputOn->Enabled?clBlack:clGray;
-    btnOutputOff->Font->Color=btnOutputOff->Enabled?clBlack:clGray;
-    btnSuckerDestroy->Font->Color=btnSuckerDestroy->Enabled?clBlack:clGray;
+    for(int i=0; i<iBackSwitchCount && i<HSys.iTotalSwitch; i++)
+        HSys.SwPtr[i].OnOff(bBackSwitchPortData[i]);
+
+    for(int i=0; i<iBackCylinderCount && i<HSys.iTotalCylinder; i++)
+        HSys.CynPtr[i].Switch.OnOff(bBackCylinderPortData[i]);
+
+    for(int Kit=0; Kit<iBackSuckCount && Kit<HSys.iTotalSucker; Kit++)
+    {
+        TMyKitSuck *KitPtr=&HSys.SuckPtr[Kit];
+        for(int Row=0; Row<KitPtr->MaxItemR && Row<MAX_SUCKER_ROW; Row++)
+        {
+            for(int Col=0; Col<KitPtr->MaxItemC && Col<MAX_SUCKER_COL; Col++)
+            {
+                int Base=((Kit*MAX_SUCKER_ROW+Row)*MAX_SUCKER_COL+Col)*2;
+                KitPtr->Suck[Row][Col].OnSw.OnOff(bBackSuckPortData[Base+0]);
+                KitPtr->Suck[Row][Col].OffSw.OnOff(bBackSuckPortData[Base+1]);
+            }
+        }
+    }
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::FreeOutputBackup()
+{
+    if(bBackSwitchPortData!=NULL)
+    {
+        delete[] bBackSwitchPortData;
+        bBackSwitchPortData=NULL;
+    }
+    if(bBackCylinderPortData!=NULL)
+    {
+        delete[] bBackCylinderPortData;
+        bBackCylinderPortData=NULL;
+    }
+    if(bBackSuckPortData!=NULL)
+    {
+        delete[] bBackSuckPortData;
+        bBackSuckPortData=NULL;
+    }
+    iBackSwitchCount=0;
+    iBackCylinderCount=0;
+    iBackSuckCount=0;
 }
 //---------------------------------------------------------------------------
 TPageControl *Tfiosetview::GetLegacyPageIO()
 {
     return dynamic_cast<TPageControl *>(FindComponent("PageIO"));
-}
-//---------------------------------------------------------------------------
-void Tfiosetview::SelectLegacyIOPageByButton(TSpeedButton *Button)
-{
-    TPageControl *LegacyPage;
-    TPanel *TitlePanel;
-    int PageIndex;
-
-    if(Button==NULL)
-        return;
-
-    LegacyPage=GetLegacyPageIO();
-    if(LegacyPage==NULL)
-        return;
-
-    PageIndex=Button->Tag-1;
-    if(PageIndex<0 || PageIndex>=LegacyPage->PageCount)
-        return;
-
-    LegacyPage->ActivePageIndex=PageIndex;
-    TitlePanel=dynamic_cast<TPanel *>(FindComponent("plIOForm"));
-    if(TitlePanel!=NULL)
-        TitlePanel->Caption=Button->Caption;
-    UpdateLegacyPageTabsVisible();
 }
 //---------------------------------------------------------------------------
 void Tfiosetview::UpdateLegacyPageTabsVisible()
@@ -2345,202 +1918,65 @@ void Tfiosetview::UpdateLegacyPageTabsVisible()
 //---------------------------------------------------------------------------
 void Tfiosetview::SetRefreshTimerEnabled(bool Enabled)
 {
-//    TTimer *LegacyTimer;
-//
-//    if(tmrRefresh!=NULL)
-//    {
-//        tmrRefresh->Enabled=Enabled;
-//        return;
-//    }
-//
-//    LegacyTimer=FindNamedTimer(this, "Timer1");
-//    if(LegacyTimer!=NULL)
-//        LegacyTimer->Enabled=Enabled;
+    //AI(general) 20260613 : Timer1 is a DFM component (OnTimer=Timer1Timer) shipped
+    //with Enabled=False. FormShow calls this with true so the live legacy IO view
+    //(RefreshLegacyIOControls) is re-scanned periodically; without it a sensor that
+    //changes after the window opens never updates on screen.
+    if(Timer1!=NULL)
+        Timer1->Enabled=Enabled;
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormShow(TObject *Sender)
 {
     (void)Sender;
     EnsureIOTableEditor();
+    //AI(secs-audit-fix) 20260729 : release the SECS host panel override (PP_SIGNALTOWER / PP_MUSIC)
+    //once, HERE, and physically silence the buzzer - and do it BEFORE BackupOutputData() below.
+    //Opening this view makes MainProc early-return (csystem.cpp), which freezes the SwMusic outputs
+    //at their last written value and kills both operator escapes (the panel ALARM RESET rung is
+    //inside the skipped ScanPanelKeys; the Maintenance Release button is on another form), so an
+    //armed override would sit here sounding with no way out. Order matters twice over :
+    //  - BEFORE the snapshot, so bBackSwitchPortData cannot record a host-driven SwMusic=ON that
+    //    the on-close RestoreOutputData would then drive back ON with the override flag already
+    //    cleared - i.e. a buzzer nobody can silence, worse than the bug this fixes.
+    //  - BEFORE the operator can toggle anything, so CloseBuzzerOff() cannot cancel a MUSIC test
+    //    they started (SwMusic1..4 are manual test buttons in this very view).
+    //A packet that arrives later leaves the flag armed but silent - nothing re-drives outputs while
+    //the spin is suspended - and MainProc resuming on close puts the machine back in charge.
+    if(IsSecsPanelOverrideActive())
+    {
+        ClearSecsPanelOverride();
+        CloseBuzzerOff();
+        RecordProcess("IO Set View opened : SECS host panel override released (machine spin suspended, no other escape)");
+    }
+    BackupOutputData();
+    bOutDataChange=false;
     RefreshCurrentView();
     RefreshLegacyIOMaps();
     UpdateLegacyPageTabsVisible();
     SetRefreshTimerEnabled(true);
+    //AI 20260713 : ts_IOSelfTest - re-arm the cylinder self-test tab on each open.
+    bSelfTestRunning=false;
+    SelfTestSetButtonsRunning(false);
+    SelfTestPopulateItems();
     fShow=true;
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnRefreshClick(TObject *Sender)
-{
-    (void)Sender;
-    RefreshCurrentView();
-    RefreshLegacyIOMaps();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::chkManualOutputClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(IsManualOutputEnabled() && !CanManualOutput(&Reason))
-    {
-        chkManualOutput->Checked=false;
-        ShowManualOutputBlocked(Reason);
-    }
-    UpdateManualButtons();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::GridSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect)
-{
-    (void)ACol;
-    CanSelect=true;
-    SelectedKind=eIOViewNone;
-    SelectedIndex=-1;
-    SelectedRow=ARow;
-    SelectedCol=ACol;
-
-    if(ARow>0)
-    {
-        if(Sender==grdSwitches)
-        {
-            SelectedKind=eIOViewSwitch;
-            SelectedIndex=ARow-1;
-        }
-        else if(Sender==grdCylinders)
-        {
-            SelectedKind=eIOViewCylinder;
-            SelectedIndex=ARow-1;
-        }
-        else if(Sender==grdSuckers)
-        {
-            SelectedKind=eIOViewSucker;
-            SelectedIndex=ARow-1;
-        }
-    }
-    UpdateSelectedInfo();
-    UpdateManualButtons();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnOutputOnClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(!CanManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        return;
-    }
-
-    TMySwitch *SwitchPtr=NULL;
-    TMyCylinder *CylinderPtr=NULL;
-    TMySucker *SuckerPtr=NULL;
-    if(GetSelectedSwitch(&SwitchPtr) && SwitchPtr!=NULL)
-    {
-        SwitchPtr->On();
-        SyncPadSwitchStatus(SwitchPtr->Name, SwitchPtr->Status());
-        LogManualOutputAction(SwitchPtr->Name, "ON", "OK");
-    }
-    else if(GetSelectedCylinder(&CylinderPtr) && CylinderPtr!=NULL)
-    {
-        CylinderPtr->On();
-        LogManualOutputAction(CylinderPtr->CylinderName, "ON", "OK");
-    }
-    else if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-    {
-        SuckerPtr->On();
-        LogManualOutputAction(SuckerPtr->SuckerName, "ON", "OK");
-    }
-    else
-    {
-        LogManualOutputAction("ManualOutput", "ON", "NO_SELECTION");
-        ShowMessage("No output selected.");
-    }
-    RefreshCurrentView();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnOutputOffClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(!CanManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        return;
-    }
-
-    TMySwitch *SwitchPtr=NULL;
-    TMyCylinder *CylinderPtr=NULL;
-    TMySucker *SuckerPtr=NULL;
-    if(GetSelectedSwitch(&SwitchPtr) && SwitchPtr!=NULL)
-    {
-        SwitchPtr->Off();
-        SyncPadSwitchStatus(SwitchPtr->Name, SwitchPtr->Status());
-        LogManualOutputAction(SwitchPtr->Name, "OFF", "OK");
-    }
-    else if(GetSelectedCylinder(&CylinderPtr) && CylinderPtr!=NULL)
-    {
-        CylinderPtr->Off();
-        LogManualOutputAction(CylinderPtr->CylinderName, "OFF", "OK");
-    }
-    else if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-    {
-        SuckerPtr->Normal();
-        LogManualOutputAction(SuckerPtr->SuckerName, "OFF", "OK");
-    }
-    else
-    {
-        LogManualOutputAction("ManualOutput", "OFF", "NO_SELECTION");
-        ShowMessage("No output selected.");
-    }
-    RefreshCurrentView();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::btnSuckerDestroyClick(TObject *Sender)
-{
-    AnsiString Reason;
-
-    (void)Sender;
-    if(!CanManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        return;
-    }
-
-    TMySucker *SuckerPtr=NULL;
-    if(GetSelectedSucker(&SuckerPtr) && SuckerPtr!=NULL)
-    {
-        SuckerPtr->Off();
-        LogManualOutputAction(SuckerPtr->SuckerName, "DESTROY", "OK");
-    }
-    else
-    {
-        LogManualOutputAction("ManualOutput", "DESTROY", "NO_SELECTION");
-        ShowMessage("No sucker selected.");
-    }
-    RefreshCurrentView();
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::BtnPanelClick(TObject *Sender)
 {
     TBtnPanel *ButtonPtr;
-    AnsiString Reason;
 
+    //AI(general) 20260613 : direct manual toggle, matching HT172 IOSetViewOutput.
+    //The previous IsManualOutputEnabled()/CanLegacyManualOutput() gate is removed;
+    //ToggleLegacyButtonOutput already refuses unbound or disabled outputs.
     ButtonPtr=dynamic_cast<TBtnPanel *>(Sender);
     if(ButtonPtr==NULL)
         return;
 
-    if(!CanLegacyManualOutput(&Reason))
-    {
-        ShowManualOutputBlocked(Reason);
-        RefreshCurrentView();
-        return;
-    }
-
     if(!ToggleLegacyButtonOutput(ButtonPtr))
     {
         LogManualOutputAction(ButtonPtr->Alias, "TOGGLE", "UNBOUND_OR_DISABLED");
-        ShowMessage("Output is not bound or disabled.");
+        ShowMyOKMessageNoStop(LangT("Output is not bound or disabled."));
     }
     else
     {
@@ -2548,6 +1984,7 @@ void __fastcall Tfiosetview::BtnPanelClick(TObject *Sender)
         ResolveLegacyButtonState(ButtonPtr->Alias, &State);
         SyncPadSwitchStatus(ButtonPtr->Alias, State);
         LogManualOutputAction(ButtonPtr->Alias, "TOGGLE", State?AnsiString("ON"):AnsiString("OFF"));
+        bOutDataChange=true;
     }
 
     RefreshCurrentView();
@@ -2630,14 +2067,6 @@ void __fastcall Tfiosetview::sbIORefreshClick(TObject *Sender)
     }
     RefreshCurrentView();
     RefreshLegacyIOMaps();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::sbIORingLoadClick(TObject *Sender)
-{
-    TSpeedButton *Button;
-
-    Button=dynamic_cast<TSpeedButton *>(Sender);
-    SelectLegacyIOPageByButton(Button);
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::sbOutputClick(TObject *Sender)
@@ -2725,7 +2154,7 @@ void __fastcall Tfiosetview::btnModifyClick(TObject *Sender)
         return;
 
     Header=strngrdIoTable->Cells[iSelectCol][0];
-    Value=InputBox("Modify IO Table", Header, strngrdIoTable->Cells[iSelectCol][iSelectRow]);
+    Value=InputBox(LangT("Modify IO Table"), Header, strngrdIoTable->Cells[iSelectCol][iSelectRow]);
     strngrdIoTable->Cells[iSelectCol][iSelectRow]=Value;
 }
 //---------------------------------------------------------------------------
@@ -2762,27 +2191,724 @@ void __fastcall Tfiosetview::strngrdIoTableSelectCell(TObject *Sender, int ACol,
     CanSelect=true;
 }
 //---------------------------------------------------------------------------
-void __fastcall Tfiosetview::spbTerminalProgramClick(TObject *Sender)
-{
-    (void)Sender;
-}
-//---------------------------------------------------------------------------
 void __fastcall Tfiosetview::Timer1Timer(TObject *Sender)
 {
     (void)Sender;
+    if(!fShow)
+        return;
     RefreshCurrentView();
+    RefreshMN200();
     UpdateLegacyPageTabsVisible();
-}
-//---------------------------------------------------------------------------
-void __fastcall Tfiosetview::tmr_IonFanTimer(TObject *Sender)
-{
-    (void)Sender;
+    //AI 20260713 : ts_IOSelfTest cylinder auto-poll is advanced one phase per 200ms tick
+    //here (this timer is the sole cylinder driver while the view is open - MainProc is
+    //suspended by csystem.cpp fiosetview->Visible early-return).
+    if(bSelfTestRunning)
+    {
+        if(iSelfTestActiveMode==1)
+            SelfTestSensorTick();
+        else
+            SelfTestCylinderTick();
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall Tfiosetview::FormClose(TObject *Sender,
       TCloseAction &Action)
 {
-    fShow=false;      
+    (void)Sender;
+    (void)Action;
+    //AI 20260713 : never leave a cylinder self-test running across a close. SelfTestStop
+    //retracts the in-flight cylinder (every tested cylinder already ends retracted). The
+    //restore-on-close path below then reverts outputs to the FormShow snapshot - EXCEPT
+    //when opened from Teach (bFromTeach), which by design skips restore; in that case the
+    //cylinders are simply left in their retracted end state.
+    if(bSelfTestRunning)
+        SelfTestStop(true);
+    //AI 20260619 : restore-on-close decision tree, aligned with HT172
+    //(maintenance.cpp spbIoMonitorClick). If any output was toggled in this IO view :
+    //  - opened from Teach (bFromTeach) -> do NOTHING : no prompt, no restore. HT172's
+    //    Teach opens iosetview with no backup/restore; its IO tool is a free-form probe.
+    //  - else material present (HasICUnderMachine()) -> FORCE restore, no choice
+    //    (safety : never leave outputs disturbed with product in the machine).
+    //  - else (machine empty) -> ASK the operator whether to restore.
+    if(bOutDataChange && bFromTeach==false)
+    {
+        if(HasICUnderMachine())
+        {
+            ShowMyMessage(LangT("IO already change, will restore IO!!"));
+            RestoreOutputData();
+        }
+        else if(ShowMyMessageBox_YES_NO(LangT("IO already change, want to restore?"))==TMyMessageBox::msgrtnYES)
+        {
+            RestoreOutputData();
+        }
+    }
+    bOutDataChange=false;
+    bFromTeach=false;
+    FreeOutputBackup();
+    fShow=false;
 }
 //---------------------------------------------------------------------------
+//AI 20260713 : ts_IOSelfTest Feature A - cylinder auto-poll. See iosetview.h for the
+//design rationale (On()/Off() manual-drive idiom + self-owned deadline, NOT Push/Pop).
+void __fastcall Tfiosetview::rgSelfTestModeClick(TObject *Sender)
+{
+    (void)Sender;
+    if(bSelfTestRunning)
+        return;
+    SelfTestPopulateItems();
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestSelectAllClick(TObject *Sender)
+{
+    (void)Sender;
+    if(bSelfTestRunning || clbSelfTestItems==NULL)
+        return;
+    for(int i=0; i<clbSelfTestItems->Items->Count; i++)
+        clbSelfTestItems->Checked[i]=true;
+    SelfTestUpdateProgress();
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestSelectNoneClick(TObject *Sender)
+{
+    (void)Sender;
+    if(bSelfTestRunning || clbSelfTestItems==NULL)
+        return;
+    for(int i=0; i<clbSelfTestItems->Items->Count; i++)
+        clbSelfTestItems->Checked[i]=false;
+    SelfTestUpdateProgress();
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestStartClick(TObject *Sender)
+{
+    (void)Sender;
+    SelfTestStart();
+}
+//---------------------------------------------------------------------------
+void __fastcall Tfiosetview::btnSelfTestStopClick(TObject *Sender)
+{
+    (void)Sender;
+    if(bSelfTestRunning)
+        SelfTestStop(true);
+}
+//---------------------------------------------------------------------------
+bool Tfiosetview::SelfTestTierIsReal()
+{
+    //Confirm-capable tier : REALLY or HAS_TRAY read real position sensors; DUMMY skips
+    //them (matches TMyCylinder::Push gate iRealDummy!=DUMMY); SOFT_SIMULATE has no IO.
+    #ifdef SOFT_SIMULATE
+    return false;
+    #else
+    return (HSys.LastSet.iRealDummy!=DUMMY);
+    #endif
+}
+//---------------------------------------------------------------------------
+AnsiString Tfiosetview::SelfTestTierName()
+{
+    #ifdef SOFT_SIMULATE
+    return AnsiString("SIM");
+    #else
+    if(HSys.LastSet.iRealDummy==REALLY)
+        return AnsiString("REALLY");
+    if(HSys.LastSet.iRealDummy==HAS_TRAY)
+        return AnsiString("HAS_TRAY");
+    return AnsiString("DUMMY");
+    #endif
+}
+//---------------------------------------------------------------------------
+int Tfiosetview::SelfTestCountSelected()
+{
+    int n=0;
+    if(clbSelfTestItems==NULL)
+        return 0;
+    for(int i=0; i<clbSelfTestItems->Items->Count; i++)
+        if(clbSelfTestItems->Checked[i])
+            n++;
+    return n;
+}
+//---------------------------------------------------------------------------
+int Tfiosetview::SelfTestPhaseDeadline(TMyCylinder *Cyl, bool Extend)
+{
+    //Reuse the cylinder's own tuned in-position timeout as the self-test wait budget so
+    //the harness allows about as long as production would (production alarms at exactly
+    //this value). No artificial floor : a deliberately tight OnAlarmTime must be honored,
+    //else the tool would give a sticky fast cylinder a false PASS. Only a ceiling remains.
+    int t=Extend?Cyl->OnAlarmTime:Cyl->OffAlarmTime;
+    if(t<=0)
+        t=3000;   //untuned -> generous default (this is NOT a floor on tuned values)
+    t+=500;       //slack for the 200ms Timer1 poll granularity
+    if(t>10000)
+        t=10000;
+    return t;
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestPopulateItems()
+{
+    if(clbSelfTestItems==NULL)
+        return;
+    clbSelfTestItems->Items->BeginUpdate();
+    clbSelfTestItems->Items->Clear();
+    if(rgSelfTestMode!=NULL && rgSelfTestMode->ItemIndex==0)
+    {
+        for(int i=0; i<HSys.iTotalCylinder; i++)
+        {
+            AnsiString nm=HSys.CynPtr[i].CylinderName;
+            if(nm==AnsiString(""))
+                nm=AnsiString("Cyl#")+IntToStr(i);
+            clbSelfTestItems->Items->Add(nm);
+        }
+        for(int i=0; i<clbSelfTestItems->Items->Count && i<HSys.iTotalCylinder; i++)
+            clbSelfTestItems->Checked[i]=HSys.CynPtr[i].Switch.Enable;
+        if(lblSelfTestDetectHdr!=NULL)
+            lblSelfTestDetectHdr->Caption=LangT("Detection - cylinders (select items)");
+    }
+    else
+    {
+        for(int i=0; i<HSys.iTotalSensor && i<SELFTEST_MAX_SENSOR; i++)
+        {
+            AnsiString nm=HSys.SenPtr[i].Name;
+            if(nm==AnsiString(""))
+                nm=AnsiString("Sen#")+IntToStr(i);
+            clbSelfTestItems->Items->Add(nm);
+        }
+        for(int i=0; i<clbSelfTestItems->Items->Count && i<HSys.iTotalSensor && i<SELFTEST_MAX_SENSOR; i++)
+            clbSelfTestItems->Checked[i]=HSys.SenPtr[i].Enable;
+        if(lblSelfTestDetectHdr!=NULL)
+            lblSelfTestDetectHdr->Caption=LangT("Detection - sensors (select items)");
+    }
+    clbSelfTestItems->Items->EndUpdate();
+    SelfTestUpdateProgress();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSetupGrid(int SelCount)
+{
+    if(grdSelfTest==NULL)
+        return;
+    int rows=(SelCount>0)?(1+SelCount):2;
+    grdSelfTest->ColCount=6;
+    grdSelfTest->RowCount=rows;
+    grdSelfTest->FixedCols=0;
+    grdSelfTest->FixedRows=1;
+    grdSelfTest->ColWidths[0]=34;
+    grdSelfTest->ColWidths[1]=176;
+    grdSelfTest->ColWidths[2]=78;
+    grdSelfTest->ColWidths[3]=72;
+    grdSelfTest->ColWidths[4]=72;
+    grdSelfTest->ColWidths[5]=76;
+    grdSelfTest->Cells[0][0]=AnsiString("#");
+    grdSelfTest->Cells[2][0]=LangT("Tier");
+    grdSelfTest->Cells[5][0]=LangT("Result");
+    if(iSelfTestActiveMode==1)
+    {
+        grdSelfTest->Cells[1][0]=LangT("Sensor");
+        grdSelfTest->Cells[3][0]=LangT("ON-hold");
+        grdSelfTest->Cells[4][0]=LangT("OFF-hold");
+    }
+    else
+    {
+        grdSelfTest->Cells[1][0]=LangT("Cylinder");
+        grdSelfTest->Cells[3][0]=LangT("Extend");
+        grdSelfTest->Cells[4][0]=LangT("Retract");
+    }
+    for(int r=1; r<grdSelfTest->RowCount; r++)
+        for(int c=0; c<grdSelfTest->ColCount; c++)
+            grdSelfTest->Cells[c][r]=AnsiString("");
+}
+//---------------------------------------------------------------------------
+bool Tfiosetview::SelfTestPrecondition(AnsiString *Why)
+{
+    if(HSys.Sys.SystemStart)
+    {
+        if(Why!=NULL) *Why=LangT("Machine is running. Stop the machine before self-test.");
+        return false;
+    }
+    //Only cylinder mode drives actuators, so only it requires the physical-safety inputs
+    //clear. Sensor mode reads only and REQUIRES the operator to open the door / reach in to
+    //trigger sensors, so gating it on EMG/door/air would defeat its own purpose.
+    if(rgSelfTestMode!=NULL && rgSelfTestMode->ItemIndex==0)
+    {
+        if(IsEMGPressed()>0)
+        {
+            if(Why!=NULL) *Why=LangT("Emergency stop is pressed.");
+            return false;
+        }
+        if(IsSafeDoorOpen()>0)
+        {
+            if(Why!=NULL) *Why=LangT("Safety door is open.");
+            return false;
+        }
+        if(IsAirCheck())
+        {
+            if(Why!=NULL) *Why=LangT("Air pressure is not ready.");
+            return false;
+        }
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestStart()
+{
+    if(bSelfTestRunning)
+        return;
+    iSelfTestActiveMode=(rgSelfTestMode!=NULL)?rgSelfTestMode->ItemIndex:0;
+    AnsiString Why;
+    if(!SelfTestPrecondition(&Why))
+    {
+        ShowMyOKMessageNoStop(Why);
+        return;
+    }
+    int sel=SelfTestCountSelected();
+    if(sel<=0)
+    {
+        ShowMyOKMessageNoStop((iSelfTestActiveMode==1)?LangT("No sensor selected."):LangT("No cylinder selected."));
+        return;
+    }
+    iSelfTestPass=0;
+    iSelfTestFail=0;
+    iSelfTestSkip=0;
+    iSelfTestRow=1;
+    SelfTestSetupGrid(sel);
+    if(iSelfTestActiveMode==1)
+    {
+        //Sensor mode reads only and drives nothing, so it neither needs nor forces a restore.
+        //Do NOT clear bOutDataChange : a prior cylinder run or manual output toggle may have
+        //set it, and that pending restore must survive an intervening sensor test.
+        SelfTestSensorStart(sel);
+    }
+    else
+    {
+        iSelfTestCursor=0;
+        iSelfTestPhase=0;
+        bStExtendConfirmed=false;
+        bStExtendTimeout=false;
+        bStRetractConfirmed=false;
+        bStRetractTimeout=false;
+        bOutDataChange=true;    //outputs will be driven -> restore-on-close path applies
+    }
+    bSelfTestRunning=true;
+    SelfTestSetButtonsRunning(true);
+    SelfTestLog(AnsiString("=== ")+((iSelfTestActiveMode==1)?AnsiString("sensor"):AnsiString("cylinder"))+
+                AnsiString(" self-test start (")+IntToStr(sel)+
+                AnsiString(" items, tier=")+SelfTestTierName()+AnsiString(") ==="));
+    SelfTestUpdateSummary();
+    SelfTestUpdateProgress();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestStop(bool bByOperator)
+{
+    bool bWasRunning=bSelfTestRunning;
+    bSelfTestRunning=false;
+    //Cylinder mode only : bring the in-flight cylinder back to retracted (safe) on abort.
+    //Sensor mode drives nothing, so never toggle a cylinder output here.
+    if(iSelfTestActiveMode==0 && bByOperator && iSelfTestCursor>=0 && iSelfTestCursor<HSys.iTotalCylinder)
+        HSys.CynPtr[iSelfTestCursor].Off();
+    if(iSelfTestActiveMode==1)
+        SelfTestSensorFinalize();
+    SelfTestSetButtonsRunning(false);
+    if(bWasRunning)
+        SelfTestLog(bByOperator?AnsiString("=== stopped by operator ==="):AnsiString("=== complete ==="));
+    SelfTestUpdateSummary();
+    if(lblSelfTestProgress!=NULL)
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : ")+LangT("done");
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestCylinderTick()
+{
+    if(clbSelfTestItems==NULL)
+    {
+        SelfTestStop(false);
+        return;
+    }
+    //AI 20260713 : mid-run safety re-check. While this view is visible MainProc() early-
+    //returns (csystem.cpp) so the machine's own EMG / safety-door / air reaction is NOT
+    //running - this 200ms timer is the only live logic and it is the sole driver of the
+    //cylinder outputs. Re-evaluate the safety inputs every tick and abort (retracting the
+    //in-flight cylinder via SelfTestStop) the instant any trips; the Start-time
+    //SelfTestPrecondition check alone would let a run keep cycling through an emergency.
+    if(IsEMGPressed()>0 || IsSafeDoorOpen()>0 || IsAirCheck())
+    {
+        SelfTestLog(AnsiString("=== safety trip (EMG / door / air) - aborted ==="));
+        SelfTestStop(true);
+        return;
+    }
+    unsigned long now=GetTickCount();
 
+    switch(iSelfTestPhase)
+    {
+    case 0:   //pick next selected cylinder and drive it out
+        {
+            while(iSelfTestCursor<HSys.iTotalCylinder &&
+                  (iSelfTestCursor>=clbSelfTestItems->Items->Count ||
+                   clbSelfTestItems->Checked[iSelfTestCursor]==false))
+                iSelfTestCursor++;
+            if(iSelfTestCursor>=HSys.iTotalCylinder)
+            {
+                SelfTestStop(false);
+                return;
+            }
+            bStExtendConfirmed=false;
+            bStExtendTimeout=false;
+            bStRetractConfirmed=false;
+            bStRetractTimeout=false;
+            HSys.CynPtr[iSelfTestCursor].On();
+            dwSelfTestPhaseStart=now;
+            iSelfTestPhase=1;
+            SelfTestUpdateProgress();
+        }
+        break;
+    case 1:   //waiting for extend (On) confirm or deadline
+        {
+            TMyCylinder *Cyl=&HSys.CynPtr[iSelfTestCursor];
+            //Switch.Enable gates the physical output : if the output is disabled, On()/Off()
+            //are no-ops (myswitch.cpp), so the cylinder never moves and can never confirm -
+            //treat it as non-confirmable (-> SKIP), NOT a FAIL from an unreachable sensor.
+            bool canConfirm=Cyl->Switch.Enable && SelfTestTierIsReal() && Cyl->OnSensor.Enable;
+            unsigned long deadline=(unsigned long)SelfTestPhaseDeadline(Cyl, true);
+            bool advance=false;
+            if(canConfirm)
+            {
+                if(Cyl->IsOn())
+                {
+                    bStExtendConfirmed=true;
+                    advance=true;
+                }
+                else if((now-dwSelfTestPhaseStart)>deadline)
+                {
+                    bStExtendTimeout=true;
+                    advance=true;
+                }
+            }
+            else if((now-dwSelfTestPhaseStart)>deadline)
+            {
+                advance=true;
+            }
+            if(advance)
+            {
+                Cyl->Off();
+                dwSelfTestPhaseStart=now;
+                iSelfTestPhase=2;
+            }
+        }
+        break;
+    case 2:   //waiting for retract (Off) confirm or deadline
+        {
+            TMyCylinder *Cyl=&HSys.CynPtr[iSelfTestCursor];
+            bool canConfirm=Cyl->Switch.Enable && SelfTestTierIsReal() && Cyl->OffSensor.Enable;
+            unsigned long deadline=(unsigned long)SelfTestPhaseDeadline(Cyl, false);
+            bool done=false;
+            if(canConfirm)
+            {
+                if(Cyl->IsOff())
+                {
+                    bStRetractConfirmed=true;
+                    done=true;
+                }
+                else if((now-dwSelfTestPhaseStart)>deadline)
+                {
+                    bStRetractTimeout=true;
+                    done=true;
+                }
+            }
+            else if((now-dwSelfTestPhaseStart)>deadline)
+            {
+                done=true;
+            }
+            if(done)
+                SelfTestFinishCurrentCylinder();
+        }
+        break;
+    default:
+        iSelfTestPhase=0;
+        break;
+    }
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestFinishCurrentCylinder()
+{
+    TMyCylinder *Cyl=&HSys.CynPtr[iSelfTestCursor];
+    bool bReal=SelfTestTierIsReal();
+
+    AnsiString ext;
+    if(!(bReal && Cyl->Switch.Enable && Cyl->OnSensor.Enable))
+        ext=AnsiString("--");
+    else if(bStExtendConfirmed)
+        ext=AnsiString("OK");
+    else if(bStExtendTimeout)
+        ext=AnsiString("FAIL");
+    else
+        ext=AnsiString("?");
+
+    AnsiString ret;
+    if(!(bReal && Cyl->Switch.Enable && Cyl->OffSensor.Enable))
+        ret=AnsiString("--");
+    else if(bStRetractConfirmed)
+        ret=AnsiString("OK");
+    else if(bStRetractTimeout)
+        ret=AnsiString("FAIL");
+    else
+        ret=AnsiString("?");
+
+    AnsiString res;
+    if(bStExtendTimeout || bStRetractTimeout)
+    {
+        res=AnsiString("FAIL");
+        iSelfTestFail++;
+    }
+    else if(bStExtendConfirmed || bStRetractConfirmed)
+    {
+        res=AnsiString("PASS");
+        iSelfTestPass++;
+    }
+    else
+    {
+        res=AnsiString("SKIP");   //driven but no confirmable sensor (SIM/DUMMY/no sensor)
+        iSelfTestSkip++;
+    }
+
+    if(grdSelfTest!=NULL)
+    {
+        if(iSelfTestRow>=grdSelfTest->RowCount)
+            grdSelfTest->RowCount=iSelfTestRow+1;
+        grdSelfTest->Cells[0][iSelfTestRow]=IntToStr(iSelfTestCursor);
+        grdSelfTest->Cells[1][iSelfTestRow]=Cyl->CylinderName;
+        grdSelfTest->Cells[2][iSelfTestRow]=SelfTestTierName();
+        grdSelfTest->Cells[3][iSelfTestRow]=ext;
+        grdSelfTest->Cells[4][iSelfTestRow]=ret;
+        grdSelfTest->Cells[5][iSelfTestRow]=res;
+    }
+    iSelfTestRow++;
+
+    SelfTestLog(Cyl->CylinderName+AnsiString("  ext=")+ext+
+                AnsiString("  ret=")+ret+AnsiString("  -> ")+res);
+
+    iSelfTestCursor++;
+    iSelfTestPhase=0;
+    SelfTestUpdateSummary();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestUpdateProgress()
+{
+    if(lblSelfTestProgress==NULL)
+        return;
+    if(bSelfTestRunning && iSelfTestActiveMode==1)
+    {
+        lblSelfTestProgress->Caption=LangT("Verify sensors")+AnsiString(" : ")+
+            IntToStr(iSelfTestPass)+AnsiString(" / ")+IntToStr(iSensorSelTotal)+
+            AnsiString(" ")+LangT("passed")+AnsiString("   (")+
+            LangT("actuate each ON then OFF, hold ~2s")+AnsiString(")");
+    }
+    else if(bSelfTestRunning && iSelfTestCursor<HSys.iTotalCylinder)
+    {
+        //Count against the SELECTED subset, not the whole cylinder array : iSelfTestRow is
+        //the 1-based position of the item currently under test (it increments once per
+        //finished cylinder), and SelfTestCountSelected() is the true denominator.
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : ")+
+            IntToStr(iSelfTestRow)+AnsiString(" / ")+IntToStr(SelfTestCountSelected())+
+            AnsiString("  ")+HSys.CynPtr[iSelfTestCursor].CylinderName;
+    }
+    else if(bSelfTestRunning)
+    {
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : ")+LangT("finishing");
+    }
+    else
+    {
+        lblSelfTestProgress->Caption=LangT("Progress")+AnsiString(" : -   (")+
+            IntToStr(SelfTestCountSelected())+AnsiString(" ")+LangT("selected")+AnsiString(")");
+    }
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestUpdateSummary()
+{
+    if(lblSelfTestSummary==NULL)
+        return;
+    lblSelfTestSummary->Caption=AnsiString("PASS ")+IntToStr(iSelfTestPass)+
+        AnsiString("    FAIL ")+IntToStr(iSelfTestFail)+
+        AnsiString("    SKIP ")+IntToStr(iSelfTestSkip);
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSetButtonsRunning(bool Running)
+{
+    if(btnSelfTestStart!=NULL)     btnSelfTestStart->Enabled=!Running;
+    if(btnSelfTestSelectAll!=NULL) btnSelfTestSelectAll->Enabled=!Running;
+    if(btnSelfTestSelectNone!=NULL)btnSelfTestSelectNone->Enabled=!Running;
+    if(rgSelfTestMode!=NULL)        rgSelfTestMode->Enabled=!Running;
+    if(clbSelfTestItems!=NULL)      clbSelfTestItems->Enabled=!Running;
+    if(btnSelfTestStop!=NULL)       btnSelfTestStop->Enabled=Running;
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestLog(AnsiString Line)
+{
+    if(memSelfTestLog==NULL)
+        return;
+    memSelfTestLog->Lines->Add(FormatDateTime("hh:nn:ss  ", Now())+Line);
+    while(memSelfTestLog->Lines->Count>200)
+        memSelfTestLog->Lines->Delete(0);
+}
+//---------------------------------------------------------------------------
+//AI 20260713 : ts_IOSelfTest Feature B - sensor guided dual-edge dwell verify.
+//SELFTEST_SENSOR_HOLD_MS : a sensor must read a state CONTINUOUSLY this long for that edge
+//to count (rejects bounce + proves a deliberate actuation, not the resting state alone).
+//GAP re-arm : if the Timer1 tick was suspended (a modal) longer than this, restart every
+//hold clock so suspended time is not charged as a continuous hold (ion-fan idiom).
+static const unsigned long SELFTEST_SENSOR_HOLD_MS=2000;
+static const unsigned long SELFTEST_SENSOR_GAP_MS =1500;
+//---------------------------------------------------------------------------
+bool Tfiosetview::SelfTestHasRealIO()
+{
+    //Sensor readings are real hardware on ANY non-sim build (REALLY/HAS_TRAY/DUMMY) -
+    //unlike cylinder confirm, DUMMY is NOT excluded : the machine ignores sensors in DUMMY
+    //logic, but the physical sensor still reads and verifying it is the whole point here.
+    #ifdef SOFT_SIMULATE
+    return false;
+    #else
+    return true;
+    #endif
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSensorStart(int SelCount)
+{
+    (void)SelCount;
+    iSensorArrayCount=HSys.iTotalSensor;
+    if(iSensorArrayCount>SELFTEST_MAX_SENSOR)
+    {
+        SelfTestLog(AnsiString("WARN : sensor count ")+IntToStr(HSys.iTotalSensor)+
+                    AnsiString(" exceeds cap ")+IntToStr((int)SELFTEST_MAX_SENSOR)+
+                    AnsiString(" ; only the first are tested."));
+        iSensorArrayCount=SELFTEST_MAX_SENSOR;
+    }
+    bool bRealIO=SelfTestHasRealIO();
+    AnsiString tier=SelfTestTierName();
+    iSensorSelTotal=0;
+    iSensorSelCapable=0;
+    int row=1;
+    for(int i=0; i<iSensorArrayCount; i++)
+    {
+        iSensorGridRow[i]=-1;
+        iSensorLastRaw[i]=-1;
+        dwSensorStateSince[i]=0;
+        bSensorSeenOn[i]=false;
+        bSensorSeenOff[i]=false;
+
+        bool bSelected=(clbSelfTestItems!=NULL && i<clbSelfTestItems->Items->Count &&
+                        clbSelfTestItems->Checked[i]);
+        if(!bSelected)
+            continue;
+
+        TMySensor *Sen=&HSys.SenPtr[i];
+        bool bCapable=(bRealIO && Sen->Enable);
+        iSensorGridRow[i]=row;
+        iSensorSelTotal++;
+        if(bCapable)
+            iSensorSelCapable++;
+        if(grdSelfTest!=NULL && row<grdSelfTest->RowCount)
+        {
+            grdSelfTest->Cells[0][row]=IntToStr(i);
+            grdSelfTest->Cells[1][row]=Sen->Name;
+            grdSelfTest->Cells[2][row]=tier;
+            grdSelfTest->Cells[3][row]=bCapable?LangT("wait"):AnsiString("--");
+            grdSelfTest->Cells[4][row]=bCapable?LangT("wait"):AnsiString("--");
+            grdSelfTest->Cells[5][row]=bCapable?AnsiString("..."):AnsiString("SKIP");
+        }
+        row++;
+    }
+    dwSensorLastTick=GetTickCount();
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSensorTick()
+{
+    unsigned long now=GetTickCount();
+    //Re-arm every hold clock if the tick was suspended (a modal) longer than the gap.
+    bool bGap=(dwSensorLastTick!=0 && (now-dwSensorLastTick)>SELFTEST_SENSOR_GAP_MS);
+    dwSensorLastTick=now;
+
+    bool bRealIO=SelfTestHasRealIO();
+    int pass=0;
+    for(int i=0; i<iSensorArrayCount; i++)
+    {
+        if(iSensorGridRow[i]<0)
+            continue;   //not selected
+        TMySensor *Sen=&HSys.SenPtr[i];
+        if(!(bRealIO && Sen->Enable))
+            continue;   //not confirm-capable -> stays SKIP (set at start)
+        if(bSensorSeenOn[i] && bSensorSeenOff[i])
+        {
+            pass++;
+            continue;   //already passed; row already final
+        }
+
+        int raw=Sen->IsOn()?1:0;
+        int prevRaw=iSensorLastRaw[i];
+        bool prevOn=bSensorSeenOn[i];
+        bool prevOff=bSensorSeenOff[i];
+
+        if(bGap || prevRaw<0 || raw!=prevRaw)
+        {
+            iSensorLastRaw[i]=raw;
+            dwSensorStateSince[i]=now;   //(re)start the continuous-hold clock
+        }
+        if((now-dwSensorStateSince[i])>=SELFTEST_SENSOR_HOLD_MS)
+        {
+            if(raw==1)
+                bSensorSeenOn[i]=true;
+            else
+                bSensorSeenOff[i]=true;
+        }
+        bool bNowPass=(bSensorSeenOn[i] && bSensorSeenOff[i]);
+        if(bNowPass)
+            pass++;
+
+        bool bDirty=(raw!=prevRaw) || (bSensorSeenOn[i]!=prevOn) || (bSensorSeenOff[i]!=prevOff);
+        if(bDirty && grdSelfTest!=NULL)
+        {
+            int row=iSensorGridRow[i];
+            if(row>=1 && row<grdSelfTest->RowCount)
+            {
+                AnsiString c3;   //AI(bcb6-ternary) 20260723 : nested ?: -> AnsiString miscompiles in BCB6; use if/else
+                if(bSensorSeenOn[i]) c3=AnsiString("OK");
+                else if(raw==1) c3=LangT("hold");
+                else c3=LangT("wait");
+                grdSelfTest->Cells[3][row]=c3;
+                AnsiString c4;
+                if(bSensorSeenOff[i]) c4=AnsiString("OK");
+                else if(raw==0) c4=LangT("hold");
+                else c4=LangT("wait");
+                grdSelfTest->Cells[4][row]=c4;
+                grdSelfTest->Cells[5][row]=bNowPass?AnsiString("PASS"):AnsiString("...");
+            }
+        }
+    }
+    iSelfTestPass=pass;
+    iSelfTestFail=0;
+    iSelfTestSkip=iSensorSelTotal-pass;   //pending + not-capable, lumped as "not verified"
+    SelfTestUpdateSummary();
+    SelfTestUpdateProgress();
+
+    //Finish once every confirm-capable selected sensor has passed (or none are capable).
+    if(pass>=iSensorSelCapable)
+        SelfTestStop(false);
+}
+//---------------------------------------------------------------------------
+void Tfiosetview::SelfTestSensorFinalize()
+{
+    //Freeze the grid on stop : any selected capable sensor not yet passed becomes SKIP (we
+    //cannot tell "faulty" from "operator never actuated it"), then settle the PASS/SKIP tally.
+    int pass=0;
+    for(int i=0; i<iSensorArrayCount; i++)
+    {
+        int row=iSensorGridRow[i];
+        if(row<0)
+            continue;
+        bool bPassed=(bSensorSeenOn[i] && bSensorSeenOff[i]);
+        if(bPassed)
+            pass++;
+        else if(grdSelfTest!=NULL && row>=1 && row<grdSelfTest->RowCount)
+        {
+            if(grdSelfTest->Cells[5][row]!=AnsiString("SKIP"))
+                grdSelfTest->Cells[5][row]=AnsiString("SKIP");
+        }
+    }
+    iSelfTestPass=pass;
+    iSelfTestFail=0;
+    iSelfTestSkip=iSensorSelTotal-pass;
+    SelfTestUpdateSummary();
+}
+//---------------------------------------------------------------------------

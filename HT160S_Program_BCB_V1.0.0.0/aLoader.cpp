@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <IniFiles.hpp>
 #pragma hdrstop
+#include "language.h"
 
 #include "aLoader.h"
 #include "database.h"
@@ -16,7 +17,11 @@
 #include "uteach.h"
 #include "TopCcdSocket.h"
 #include "main.h"            //AI(HT160S-Maintainer) 20260609 : chkLoadTray on fMain
+#include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID66 LoadTrayFinish
+#include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 #include "GeneralSetting.h"   //AI(HT160S-Maintainer) 20260610 : LoaderYSafeDistance interlock
+#include "cEventLog.h"        //AI(ht160s-overcount-tripqueue) 20260721 : g_EventLog for INF_OVERTRAY / WRN_TRIP_NOCOUNT / WRN_TRIP_UNDELIVERED
+#include "cSoterOutput.h"     //AI(ht160s-virtual2d) 20260808 : NoteVirtual2D - taint the Soter flush window when a 2D code is fabricated
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -37,7 +42,34 @@ static int ClampIntValue(int Value, int MinValue, int MaxValue)
 //---------------------------------------------------------------------------
 TLoaderModule::TLoaderModule()
 {
+    //AI(ht160s-rearready-p0) 20260705 : hard-zero the rear hold BEFORE InitialFlag --
+    //InitialFlag now preserves a sensor-confirmed settled rear tray across runtime
+    //resets, and must never "preserve" uninitialized ctor garbage on this first call.
+    bRearHasTray=false;
+    bRearDischargeInProgress=false;
+    bRearReadyForPick=false;
+    bRearResidualAlarmed=false;
+    RearKind=eTrayKindNormal;
+    //AI(ht160s-overcount-tripqueue) 20260721 : allocate the per-car trip FIFO BEFORE
+    //InitialFlag (its non-keep path clears/frees the queue).
+    TripQueue=new TList;
+    bTripSeen=false;
+    bOverTrayLogged=false;
+    bOverTrayLogInited=false;   //AI(ht160s-overcount-tripqueue) 20260721 : OverTrayLog InitLog deferred to first over-tray (LogRootDir not ready at ctor)
     InitialFlag();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : free the trip FIFO. Entries are new'd in
+//EnqueueTrip; free each before deleting the list itself.
+TLoaderModule::~TLoaderModule()
+{
+    if(TripQueue!=NULL)
+    {
+        for(int i=0; i<TripQueue->Count; i++)
+            delete (TTripEntry*)TripQueue->Items[i];
+        delete TripQueue;
+        TripQueue=NULL;
+    }
 }
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -50,17 +82,112 @@ static const int LOADER_Y_OWNER_SORTARM=1;
 //so the owner model can grow to a third actor without touching existing call sites.
 static const int LOADER_Y_OWNER_TRAYARM=2;
 //---------------------------------------------------------------------------
-void TLoaderModule::InitialFlag()
+void TLoaderModule::InitialFlag(bool bKeepMaterial)
 {
+    bAmrLocked=false;
+    //AI(ht160s-home-resume-w1) 20260711 : keep-material HOME preserves the AMR car ledger
+    //(host tray count + derived car total here, feed serial below) -- the physical car
+    //stack does not change across a HOME, but zeroing these made GetFedTrayKind classify
+    //the remaining cover/identity trays as Normal and broke the MES0921 cross-check.
+    if(bKeepMaterial==false)
+    {
+        //AI(ht160s-overcount-tripqueue) 20260721 : drop all pending trips on a cold /
+        //non-keep reset. Log leftovers first (host over-declared / a car not fully drained)
+        //for the audit trail, then free every entry.
+        if(TripQueue!=NULL && TripQueue->Count>0)
+        {
+            int nRemain=0;
+            for(int i=0; i<TripQueue->Count; i++)
+            {
+                TTripEntry *e=(TTripEntry*)TripQueue->Items[i];
+                nRemain += (e->iTotal - e->iServed);
+                delete e;
+            }
+            g_EventLog.Log("WRN_TRIP_UNDELIVERED",
+                "Loader reset dropped "+IntToStr(TripQueue->Count)+" trip(s), "+
+                IntToStr(nRemain)+" tray(s) unconsumed", "");
+            TripQueue->Clear();
+        }
+        bTripSeen=false;
+        bOverTrayLogged=false;
+        iSecsCarTrayCount=0;     //AI(ht160s-agv) 20260627 : no host count yet
+        RefillSimInfeed();
+    }
     ResetSide(&Side[0]);
     ResetSide(&Side[1]);
-    bRearHasTray=false;
+    //AI(ht160s-rearready-p0) 20260705 : PRESERVE a settled rear tray across a runtime
+    //reset (InitialAllTask on HOME / OneCycle finish / recovery). Wiping the published
+    //latch while the tray physically stayed parked let the rear sensor re-latch
+    //bRearHasTray with NO path back to bRearReadyForPick=true (its only setter is
+    //DoDischargeTray case 4000, and a new discharge cannot start while the rear is
+    //occupied) -> TAJOB_LOADER_RECOVERY pinned the TrayArm forever with no alarm.
+    //Keep the whole rear hold (latch + Kind/ID/grid) when the settled tray is still
+    //physically confirmed. A mid-discharge abort (latch still false) deliberately does
+    //NOT preserve : that leftover is not known-safe to auto-pick, so it goes to the
+    //MES0924 residual Note in DoLoader instead (operator removes it).
+    bool bKeepRear = bRearReadyForPick && IsOutputBottomOccupied();
+    if(bKeepRear==false)
+    {
+        bRearHasTray=false;
+        bRearReadyForPick=false;      //AI(ht160s-rearready-state) 20260703 : rear not pickable until a discharge completes at case 4000
+        RearKind=eTrayKindNormal;
+        RearTrayID="";
+        RearSourceTray.Clear();
+    }
+    bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no discharge settling in flight at init (all ladders reset to 1)
+    bRearResidualAlarmed=false;       //AI(ht160s-rearready-p0) 20260705 : a new stranded episode after a reset may alarm again
     iFrontOwner=0;
     iTopCcdCount=0;
     iYOwner[0]=LOADER_Y_OWNER_NONE;
     iYOwner[1]=LOADER_Y_OWNER_NONE;
     SimuCcdCycleIndex=0;
+    //AI(ht160s-overcount-tripqueue) 20260721 : feed serial retired -- per-trip iServed in
+    //TripQueue replaces it. keep-material preserves the whole queue (trips + iServed); the
+    //non-keep reset above already dropped + freed the trips.
+    //AI(ht160s-rearready-p0) 20260705 : RearKind/RearTrayID/RearSourceTray moved into
+    //the bKeepRear guard above -- wiping them while the tray stays parked would
+    //misroute a preserved cover/identity tray as Normal.
+    if(bKeepMaterial)
+    {
+        int nHeadServed=0, nHeadTotal=0;
+        if(TripQueue!=NULL && TripQueue->Count>0)
+        {
+            TTripEntry *h=(TTripEntry*)TripQueue->Items[0];
+            nHeadServed=h->iServed; nHeadTotal=h->iTotal;
+        }
+        RecordProcess("HOME-RESUME Loader: keptRear="+IntToStr(bKeepRear?1:0)+" rearKind="+IntToStr(RearKind)+
+            " rearID="+RearTrayID+" trips="+IntToStr(TripQueue!=NULL?TripQueue->Count:0)+
+            " head="+IntToStr(nHeadServed)+"/"+IntToStr(nHeadTotal));   //AI(ht160s-obsv-p0 + overcount-tripqueue)
+    }
     CurrentLotNumber="";
+    TestUpTask=1;
+    TestDownTask=1;
+    TestDelay.Clear();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-actuator-timer) 20260627 : freeze/thaw the per-side wall-clock timeout
+//windows (CcdDelay Top-CCD scan timeout + FeedWaitTimer source-dry AMR wait MES0920) so a machine pause taken mid-scan is not
+//charged against the timeout budget -- no false CCD-timeout on resume. Called from
+//csystem PauseActuatorTimeoutTimers/ReStartActuatorTimeoutTimers on the SystemStart
+//pause/resume edges, alongside HSys.CynPtr[]/SortArmSuck.
+void TLoaderModule::PauseTimeoutTimers()
+{
+    Side[0].CcdDelay.Pause();
+    Side[1].CcdDelay.Pause();
+    Side[0].FeedWaitTimer.Pause();
+    Side[1].FeedWaitTimer.Pause();
+    Side[0].Rise1WaitTimer.Pause();   //AI(ht160s-anti-ghost-d) 20260720 : mid-settle pause must not charge the case-10 rise1 wait
+    Side[1].Rise1WaitTimer.Pause();
+}
+//---------------------------------------------------------------------------
+void TLoaderModule::ReStartTimeoutTimers()
+{
+    Side[0].CcdDelay.ReStart();
+    Side[1].CcdDelay.ReStart();
+    Side[0].FeedWaitTimer.ReStart();
+    Side[1].FeedWaitTimer.ReStart();
+    Side[0].Rise1WaitTimer.ReStart();   //AI(ht160s-anti-ghost-d) 20260720
+    Side[1].Rise1WaitTimer.ReStart();
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::ResetSide(TLoaderSideState *State)
@@ -70,6 +197,7 @@ void TLoaderModule::ResetSide(TLoaderSideState *State)
     State->FeedTask=1;
     State->CcdTask=1;
     State->DischargeTask=1;
+    State->DestackTask=1;
     State->bTrayEmpty=false;
     State->bCcdLeftToRight=true;
     State->CcdX=0;
@@ -78,6 +206,10 @@ void TLoaderModule::ResetSide(TLoaderSideState *State)
     State->bCleanOutFinish=false;
     State->FeedDelay.Clear();
     State->CcdDelay.Clear();
+    State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : clear AMR feed deferral on side reset
+    State->FeedWaitTimer.Clear();
+    State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) 20260720 : clear rise1-settle wait on side reset
+    State->Rise1WaitTimer.Clear();
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsValidLoaderNo(int LoaderNo)
@@ -122,12 +254,23 @@ int TLoaderModule::GetTrayYCount()
 //---------------------------------------------------------------------------
 double TLoaderModule::GetTrayXPitch()
 {
-    return TrayForm.XPitch;
+    return TrayForm.XPitch*100.0;   //AI(ht160s-maintainer) 20260624 : mm to 1/100mm to match teach coords (same root cause as aSortArm; CCD cell scan pitch was 100x too small).
 }
 //---------------------------------------------------------------------------
 double TLoaderModule::GetTrayYPitch()
 {
-    return TrayForm.YPitch;
+    return TrayForm.YPitch*100.0;   //AI(ht160s-maintainer) 20260624 : mm to 1/100mm, see GetTrayXPitch.
+}
+//---------------------------------------------------------------------------
+double TLoaderModule::GetTrayXStart()
+{
+    //AI(ht160s-maintainer) 20260624 : tray corner->first-IC offset X (mm->1/100mm), P2 HT172-align. Same TrayForm as SortArm => CCD shares origin.
+    return TrayForm.XStart*100.0;
+}
+//---------------------------------------------------------------------------
+double TLoaderModule::GetTrayYStart()
+{
+    return TrayForm.YStart*100.0;
 }
 //---------------------------------------------------------------------------
 int TLoaderModule::GetLoaderFeedY(int LoaderNo)
@@ -183,22 +326,40 @@ bool TLoaderModule::MoveLoaderY(int LoaderNo, int Position)
         return false;
     if(Motor->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Loader Y motor will out of limit");
+        ShowMotorLimitError(Motor->AlarmName[eMotOverLimitErr], LangT("Loader Y motor will out of limit"), Motor, Position);
         return false;
     }
+    #ifndef SOFT_SIMULATE
+    //AI(ht160s-trayarm-empty-handoff) 20260701 : TrayArm anti-collision, ported verbatim from
+    //MoveEmptyY/MoveColorY (Loader was the only source lacking it). If the TrayArm is NOT raised
+    //(Z-up off) and its X is at/near the Loader pickup X, block EITHER car's Y move so a shared-rail
+    //carriage cannot slam into the lowered arm. Z-gated, so a Z-UP wait never blocks Loader Y (no
+    //mutual deadlock). One MoveLoaderY serves LoaderNo 1/2, so this covers both cars.
+    int TrayArmPos=0;
+    if(HSys.Mot.MTrayArmX!=NULL)
+        TrayArmPos=HSys.Mot.MTrayArmX->ReadEncoderPos();
+    if(HSys.Cyn.C_TrayArmZ_Up.IsOn()==false &&
+       (TrayArmPos+500)>=Teach.TrayXArmToLoaderXPosition)
+    {
+        return false;
+    }
+    #endif
     return Motor->MotorMove(Position);
 }
 //---------------------------------------------------------------------------
-bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
+bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position, AnsiString *WhyBlocked)
 {
     //AI(HT160S-Maintainer) 20260610 : framework for option C (opposite-side tray
     //clamped + minimum distance). The two Loader-Y cars share the same physical
-    //rail, so their encoder positions are directly comparable (same units, as the
-    //legacy 160 discharge interlock did). Rules :
+    //rail. NOTE the two encoders read OPPOSITE signs for the same physical travel,
+    //so the gap math abs()-normalizes each side to its physical magnitude first.
+    //Rules :
     //  - Only the OTHER car holding a tray (fHasTray) is a collision risk; an empty
-    //    car parked clear is ignored.
-    //  - If the target position of THIS car would sit closer than the configured
-    //    safe distance to the OTHER car's current encoder position, block the move.
+    //    car parked clear is ignored. (Empty parked cars are NOT yet protected - see
+    //    the decouple/choreography follow-up.)
+    //  - When both cars are loaded they cannot cross, so keep a FIXED order : require THIS
+    //    car to end at least the safe distance on its OWN side of the OTHER car. A leading car
+    //    may always advance further forward; only closing-in / crossing is blocked.
     //  - Safe distance is read from GeneralSetting.iLoaderYSafeDistance
     //    ([Safety] LoaderYSafeDistance in General.ini, default 10000).
     //  - When data cannot be evaluated (NULL motors) the move is allowed so this
@@ -207,7 +368,6 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
     TTrayMotor *OtherMotor=NULL;
     TTrayMotor *OtherTray=NULL;
     int OtherPos;
-    int Gap;
 
     OtherNo=(LoaderNo==1) ? 2 : 1;
     if(OtherNo==1)
@@ -221,25 +381,109 @@ bool TLoaderModule::IsLoaderYMoveSafe(int LoaderNo, int Position)
         OtherTray=HSys.VMot.MMLoaderY_2;
     }
 
+    //AI(ht160s-loader) 20260707 (Option B, on-site) : a tray deposited on the rear REST
+    //(awaiting TrayArm pickup) has NO carriage/encoder, so the two-car checks below are
+    //blind to it. A loaded car SORTING at the top rows comes within SafeDist of that parked
+    //tray (rest ~= discharge Y vs the top sort row) and the two overhanging trays clash.
+    //Keep a loaded mover SafeDist away from the rest whenever the rear is occupied. Exempt
+    //the discharging car itself (Status==LS_ToRear : it is the one placing at the rest and
+    //its own retreat runs empty) else it would block its own landing. PeekRearOccupied() is
+    //the NON-MUTATING physical-presence truth (sim: bRearHasTray latch, cleared by
+    //NotifyTrayArmPickRearTray; real: live SnLoader_OutputBottomHasTray going OFF once the
+    //TrayArm lifts the tray clear, latch fallback when the sensor is disabled).
+    //RefreshRearState is deliberately NOT called here so the per-tick interlock and the
+    //DescribeState state-record dump stay read-only (no latch writes from this path).
+    {
+        TTrayMotor *ThisTrayRear=(LoaderNo==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
+        TLoaderSideState *ThisSideRear=GetSide(LoaderNo);
+        bool bThisDischarging=(ThisSideRear!=NULL && ThisSideRear->Status==LS_ToRear);
+        if(ThisTrayRear!=NULL && ThisTrayRear->fHasTray && bThisDischarging==false &&
+           GeneralSetting.iLoaderYSafeDistance>0 && PeekRearOccupied())
+        {
+            int RestAbs=GetLoaderDischargeY(LoaderNo);
+            if(RestAbs<0) RestAbs=-RestAbs;
+            int TgtAbsRear=Position;
+            if(TgtAbsRear<0) TgtAbsRear=-TgtAbsRear;
+            int Diff=TgtAbsRear-RestAbs;
+            if(Diff<0) Diff=-Diff;
+            if(Diff<GeneralSetting.iLoaderYSafeDistance)
+            {
+                if(WhyBlocked!=NULL)
+                    *WhyBlocked="rear-rest";
+                return false;
+            }
+        }
+    }
+
     if(OtherMotor==NULL || OtherTray==NULL)
         return true;
 
     //AI(HT160S-Maintainer) 20260610 : "opposite-side tray clamped" condition.
     //fHasTray is the logical tray-held state set true after the Push/Lean clamp
     //completes in DoFeedTray, so it is the available proxy for a clamped tray.
-    if(OtherTray->fHasTray==false)
+    //AI(ht160s-loader) 20260707 : the comment above is optimistic -- fHasTray is actually
+    //minted LATE, at DoFeedTray case 9500 (confirm-then-mint), yet the tray is physically
+    //destacked onto the carriage at case 4100 and clamped at 8200/8300. Through that
+    //4100..9500 window the feeding car overhangs a tray while fHasTray is still false, so a
+    //loaded OTHER car read "empty" here and was allowed to close in -> the two overhanging
+    //trays clash (on-site 20260707 : LD1 clamp timing, LD2 hits LD1). Also treat a car that
+    //is mid-FEED (Status==LS_FEEDING) as occupied so the collision backstop protects it for
+    //the WHOLE feed, not only after the late mint. fHasTray still minted at 9500 (confirm-
+    //then-mint invariant intact); the feeding car is stationary at its feed Y and completes
+    //independently, so a blocked mover can never deadlock it.
+    TLoaderSideState *OtherSide=GetOtherSide(LoaderNo);
+    bool bOtherFeeding=(OtherSide!=NULL && OtherSide->Status==LS_FEEDING);
+    if(OtherTray->fHasTray==false && bOtherFeeding==false)
+        return true;
+
+    //AI(ht160s-sortarm) 20260624 : collision happens ONLY when BOTH cars carry a tray
+    //(operator-confirmed mechanical fact : the two carriages pass freely on their rails; it is
+    //the two overhanging TRAYS that clash). So an empty car - crucially a just-discharged car
+    //heading back to feed - may ALWAYS move past a loaded car. This is the core deadlock break :
+    //empty Loader1 no longer gets trapped behind loaded Loader2, and two empty cars near the
+    //home/origin zone no longer block each other. Restrict only when THIS car is loaded too.
+    TTrayMotor *ThisTray=(LoaderNo==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
+    if(ThisTray==NULL || ThisTray->fHasTray==false)
         return true;
 
     if(GeneralSetting.iLoaderYSafeDistance<=0)
         return true;
 
+    //AI(ht160s-sortarm) 20260624 : ORDER-AWARE + sign-normalized interlock for the both-loaded
+    // case. The two encoders read OPPOSITE signs for the same physical travel (Y1 +, Y2 -), so
+    // abs()-normalize each to its physical magnitude first (rail is always >=0; manual negate, NOT
+    // std::abs which this BCB6 unit lacks). The two loaded cars cannot cross, so they hold a fixed
+    // order : enforce only that THIS car ends at least SafeDist on its OWN side of the OTHER car.
+    //   - THIS car AHEAD : may move freely FURTHER ahead, only as far back as Other+SafeDist. So a
+    //     leading car is NEVER blocked from advancing just because the trailing car sits close
+    //     behind (that over-block was the bug in the earlier swept-interval form).
+    //   - THIS car BEHIND : may move freely further back, only up to Other-SafeDist.
+    // Lets the front car keep going forward AND forbids closing-in / crossing.
+    TTrayMotor *ThisMotor=(LoaderNo==1) ? HSys.Mot.MLoaderY_1 : HSys.Mot.MLoaderY_2;
+    int ThisCur=(ThisMotor!=NULL) ? ThisMotor->ReadEncoderPos() : Position;
+    if(ThisCur<0)
+        ThisCur=-ThisCur;
+    int Tgt=Position;
+    if(Tgt<0)
+        Tgt=-Tgt;
     OtherPos=OtherMotor->ReadEncoderPos();
-    Gap=Position-OtherPos;
-    if(Gap<0)
-        Gap=-Gap;
-    if(Gap<GeneralSetting.iLoaderYSafeDistance)
+    if(OtherPos<0)
+        OtherPos=-OtherPos;
+    if(ThisCur>=OtherPos)
+    {
+        //this car leads : stay at least SafeDist ahead (forward moves always pass)
+        if(Tgt>=OtherPos+GeneralSetting.iLoaderYSafeDistance)
+            return true;
+        if(WhyBlocked!=NULL)
+            *WhyBlocked=(OtherTray->fHasTray==false) ? AnsiString("gap:other-feeding") : AnsiString("gap:both-loaded");
         return false;
-    return true;
+    }
+    //this car trails : stay at least SafeDist behind
+    if(Tgt<=OtherPos-GeneralSetting.iLoaderYSafeDistance)
+        return true;
+    if(WhyBlocked!=NULL)
+        *WhyBlocked=(OtherTray->fHasTray==false) ? AnsiString("gap:other-feeding") : AnsiString("gap:both-loaded");
+    return false;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::MoveTopCcdX(int Position)
@@ -248,7 +492,7 @@ bool TLoaderModule::MoveTopCcdX(int Position)
         return false;
     if(HSys.Mot.MTopCCDX->CheckSoftLimit(Position)==false)
     {
-        ShowMyMessage("Top CCD X motor will out of limit");
+        ShowMotorLimitError(HSys.Mot.MTopCCDX->AlarmName[eMotOverLimitErr], LangT("Top CCD X motor will out of limit"), HSys.Mot.MTopCCDX, Position);
         return false;
     }
     return HSys.Mot.MTopCCDX->MotorMove(Position);
@@ -256,11 +500,247 @@ bool TLoaderModule::MoveTopCcdX(int Position)
 //---------------------------------------------------------------------------
 bool TLoaderModule::MoveToCcdCell(int LoaderNo, int CellX, int CellY)
 {
+    //AI(ht160s-maintainer) 20260627 : CCD scan no longer applies the tray-datum model
+    //(XStart/YStart bias). The TopCCD base teach (GetTopCcdFirstX/GetLoaderFirstCcdY) is
+    //the first-cell scan position directly: pos = base + cell*pitch.
     int XPos=RoundPosition((double)GetTopCcdFirstX()+((double)CellX)*GetTrayXPitch());
     int YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+((double)CellY)*GetTrayYPitch());
     bool bXFlag=MoveTopCcdX(XPos);
     bool bYFlag=MoveLoaderY(LoaderNo, YPos);
     return (bXFlag && bYFlag);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-ccd-teach-test) 20260628 : Teach Advanced CCD move-to-cell test support. Mirrors
+//SortArm CanMoveSuckerToCell/MoveSuckerToCell. Drives the Top CCD over a chosen tray cell on
+//LoaderR(=2)/LoaderL(=1) so RD can verify CCD-to-cell alignment from the Teach screen. Reuses the
+//existing private MoveToCcdCell (commands+polls both axes and re-checks the shared-rail interlock
+//each tick). Cells are 0-based here; the uteach caller converts 1-based UI by -1.
+bool TLoaderModule::CanMoveCcdToCell(int LoaderNo, int CellX, int CellY, AnsiString &Err)
+{
+    int XPos;
+    int YPos;
+    TTrayMotor *Y;
+
+    Err="";
+    if(IsValidLoaderNo(LoaderNo)==false)
+    {
+        Err="Invalid Loader number";
+        return false;
+    }
+    if(CellX<0 || CellX>=GetTrayXCount())
+    {
+        Err="Column out of tray range (1.."+IntToStr(GetTrayXCount())+")";
+        return false;
+    }
+    if(CellY<0 || CellY>=GetTrayYCount())
+    {
+        Err="Row out of tray range (1.."+IntToStr(GetTrayYCount())+")";
+        return false;
+    }
+    XPos=RoundPosition((double)GetTopCcdFirstX()+((double)CellX)*GetTrayXPitch());
+    YPos=RoundPosition((double)GetLoaderFirstCcdY(LoaderNo)+((double)CellY)*GetTrayYPitch());
+    if(HSys.Mot.MTopCCDX==NULL || HSys.Mot.MTopCCDX->CheckSoftLimit(XPos)==false)
+    {
+        Err="Top CCD X target over soft limit";
+        return false;
+    }
+    Y=(LoaderNo==2) ? HSys.Mot.MLoaderY_2 : HSys.Mot.MLoaderY_1;
+    if(Y==NULL || Y->CheckSoftLimit(YPos)==false)
+    {
+        Err="Loader Y target over soft limit";
+        return false;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
+bool TLoaderModule::MoveCcdToCell(int LoaderNo, int CellX, int CellY, int &Task)
+{
+    //AI(ht160s-ccd-teach-test) 20260628 : task-stepped wrapper. MoveToCcdCell commands then polls
+    //the Top CCD X + the chosen Loader Y to in-position and re-checks IsLoaderYMoveSafe every tick
+    //(waits, never fails hard, if the other carriage blocks the shared rail). Bad args -> Task=900,
+    //finish with no motion (mirror SortArm). Caller validates first via CanMoveCcdToCell.
+    if(IsValidLoaderNo(LoaderNo)==false ||
+       CellX<0 || CellX>=GetTrayXCount() ||
+       CellY<0 || CellY>=GetTrayYCount())
+    {
+        return true;   //AI(ht160s-ladder-guard) 20260703 : bad args, abort (was dead Task=900)
+    }
+    if(MoveToCcdCell(LoaderNo, CellX, CellY))
+        return true;
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : AMR P1 (Loader) handoff interface, mirrors TAutoModule.
+void TLoaderModule::SetAmrLock(bool bLock)
+{
+    bAmrLocked=bLock;
+}
+//---------------------------------------------------------------------------
+bool TLoaderModule::IsAmrLocked()
+{
+    return bAmrLocked;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Ready = front stacking cylinders back home (not commanded
+//up); destack idle so the AGV may refill. Held stable by bAmrLocked.
+bool TLoaderModule::IsReadyForAmrHandoff()
+{
+    //AI(ht160s-agv) 20260625 : sim defense-in-depth - in SOFT_SIMULATE the front
+    //destacker out-bits are normally already false; assert ready so the PREP->READY
+    //gate cannot latch the lock on a laptop run. Real hardware keeps the interlock.
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Cyn.C_Loader_FrontRiseTray_1.GetOutBit()==false
+            && HSys.Cyn.C_Loader_FrontRiseTray_2.GetOutBit()==false
+            && HSys.Cyn.C_Loader_FrontSeparateTray_1.GetOutBit()==false);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : shortage (call AGV). Sim drains iSimInfeedCount to 0; real
+//reads SnLoader_Inputend (ON=has tray, OFF=empty). Disabled sensor -> no call.
+bool TLoaderModule::IsInputShortageForAmr()
+{
+    if(IsSoftSimulate())
+        return (iSimInfeedCount<=0);
+    return (HSys.Sen.SnLoader_Inputend.Enable==true && HSys.Sen.SnLoader_Inputend.IsOff());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : Finish = refill complete. Sim auto-completes (no sensor);
+//real waits for SnLoader_Inputend to read a tray present (ON).
+bool TLoaderModule::IsInputHandoffFinishedForAmr()
+{
+    if(IsSoftSimulate())
+        return true;
+    return (HSys.Sen.SnLoader_Inputend.Enable==true && HSys.Sen.SnLoader_Inputend.IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260623 : reset sim input-stack to configured max (AGV delivered a
+//full magazine). Real machine ignores the count (sensor-driven).
+void TLoaderModule::RefillSimInfeed()
+{
+    //AI(ht160s-overcount-tripqueue) 20260721 : RefillSimInfeed now ONLY seeds the SIM
+    //input-stack count (Motion-View header + sim shortage read). The per-car physical
+    //total + cover/identity boundary moved into TripQueue (see EnqueueTrip); the old
+    //iCarTrayTotal/iFeedSerial scalars are retired. Real machine is sensor-driven and
+    //ignores this count. Sim seed = the configured per-zone max.
+    iSimInfeedCount = GeneralSetting.iSimAmrMaxTray[0];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260627 : the AGV coordinator latches the host-declared LoaderTrayCount
+//on car arrival. Retained for API compatibility / callers that only want to record the
+//last-declared value; EnqueueTrip is the live path (it sets iSecsCarTrayCount too). 0 = host silent.
+void TLoaderModule::SetExpectedCarTrayCount(int n)
+{
+    iSecsCarTrayCount = (n>0) ? n : 0;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : enqueue one per-car feed trip at CEID274
+//(InfeedRefill). nWork = host-declared WORK-tray count (S2F41 LoaderTrayCount); the
+//physical total adds the firmware cover/identity header (same math the old RefillSimInfeed
+//used). nWork<=0 = the host sent START_AGV with no LoaderTrayCount CP : do NOT guess a
+//total (a wrong guess mis-tags trays + floods Color 2D) -- skip the enqueue, warn, and let
+//that car's trays fall to the over-count Cover path at mint (Normal if host was always
+//silent). Also tops up the sim input stock so a sim run drains the arrived car.
+void TLoaderModule::EnqueueTrip(int nWork)
+{
+    iSecsCarTrayCount = (nWork>0) ? nWork : 0;   // last-declared value, for the dump
+    if(nWork<=0)
+    {
+        g_EventLog.Log("WRN_TRIP_NOCOUNT",
+            "Loader START_AGV without LoaderTrayCount - car not enqueued", "");
+        return;
+    }
+    //AI(ht160s-overcount-tripqueue) 20260721 : clamp BOTH header terms to >=0 so iTotal
+    //matches GetFedTrayKind's boundary math exactly (it clamps idCount/cvCount the same
+    //way). Only a negative IDENTITY is a documented sentinel; a negative Cover in a bad
+    //ini would otherwise make iTotal and the mint boundaries diverge (review fix, low).
+    int iHeader = ((GeneralSetting.iAmrCoverTray[0]>0)    ? GeneralSetting.iAmrCoverTray[0]    : 0)
+                + ((GeneralSetting.iAmrIdentityTray[0]>0) ? GeneralSetting.iAmrIdentityTray[0] : 0);
+    TTripEntry *e = new TTripEntry;
+    e->iTotal  = nWork + iHeader;
+    e->iServed = 0;
+    TripQueue->Add(e);
+    bTripSeen = true;
+    bOverTrayLogged = false;                     // new car -> a fresh over-count episode may log again
+    //AI(ht160s-overcount-tripqueue) 20260721 : seed the sim/display stock to the TOTAL
+    //REMAINING across all queued trips (bounded), not an unconditional accumulate. The
+    //sole per-feed decrement (case 1000) is IsSoftSimulate()-gated, so a real-machine '+='
+    //would grow the Motion-View header forever; recompute keeps it a true per-car snapshot.
+    {
+        int nRemain=0;
+        for(int i=0; i<TripQueue->Count; i++)
+        {
+            TTripEntry *q=(TTripEntry*)TripQueue->Items[i];
+            nRemain += (q->iTotal - q->iServed);
+        }
+        iSimInfeedCount = nRemain;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-overcount-tripqueue) 20260721 : source-dry reconcile. Called on the first
+//SnLoader_Inputend-OFF (source dry) detection in the AMR feed path. A dry magazine is
+//physically empty, so any trip still open (iServed<iTotal) declared trays that were never
+//delivered (host over-declared, or the car was short / jammed / partly removed). Closing
+//every open trip here keeps the NEXT car's cover/identity boundary clean -- the single
+//scalar it replaced self-healed because RefillSimInfeed reset the counters on every car;
+//the FIFO needs this explicit per-car close instead. Does NOT fire on the V1b overlap
+//(there the source only goes dry after both trips are already fully consumed + popped, so
+//the queue is empty and this is a no-op). WRN only when it actually closes an open trip.
+void TLoaderModule::FlushTripsOnDry()
+{
+    if(TripQueue==NULL || TripQueue->Count==0)
+        return;
+    int nTrips=TripQueue->Count, nShort=0;
+    for(int i=0; i<nTrips; i++)
+    {
+        TTripEntry *e=(TTripEntry*)TripQueue->Items[i];
+        nShort += (e->iTotal - e->iServed);
+        delete e;
+    }
+    TripQueue->Clear();
+    g_EventLog.Log("WRN_TRIP_SHORT",
+        "Loader source dry with "+IntToStr(nTrips)+" open trip(s), "+
+        IntToStr(nShort)+" declared tray(s) never delivered - trips closed", "");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) 20260625 : Phase 6 A.2 - D2 stack-position convention.
+//No sensor reads the tray kind; software infers it from the feed order on the
+//shared supply car. Confirmed convention: the identity tray is fed LAST, the top
+//cover just before it, the rest are normal work trays.
+//   feedSerial==total   => Identity
+//   feedSerial==total-1 => Cover
+//   else                => Normal
+//Single source of truth for the kind-by-position rule.
+eTrayKind TLoaderModule::GetFedTrayKind(int feedSerial, int total)
+{
+    //AI(ht160s-amr0-fix) 20260708 : identity/cover stack ordering is an AMR-supply
+    //concept only. Under manual production (bUseAMR==false) iFeedSerial is not bounded
+    //by a real magazine total (it resets only at init / via the AGV coordinator, which
+    //is inert when AMR is off), so once it passes iSimAmrMaxTray[0] every fed tray would
+    //be spuriously tagged Identity and misrouted back to Color in DecidePlaceDestAfterPick.
+    //Force Normal so recovered empties recycle to the Empty pool / requesting Autos.
+    if(GeneralSetting.bUseAMR==false)
+        return eTrayKindNormal;
+    //AI(ht160s-loader-worktray-count) 20260713 : config-driven header boundaries. The trailing
+    //iAmrIdentityTray[0] trays are identity (fed LAST), the iAmrCoverTray[0] before them are
+    //cover, the rest are work. Defaults 1 identity + 1 cover reproduce the old total / total-1
+    //rule. A negative identity (Color-style sentinel) contributes no identity trays here.
+    {
+        int idCount = (GeneralSetting.iAmrIdentityTray[0]>0) ? GeneralSetting.iAmrIdentityTray[0] : 0;
+        int cvCount = (GeneralSetting.iAmrCoverTray[0]>0)    ? GeneralSetting.iAmrCoverTray[0]    : 0;
+        if(feedSerial > total - idCount)
+            return eTrayKindIdentity;
+        if(feedSerial > total - idCount - cvCount)
+            return eTrayKindCover;
+    }
+    return eTrayKindNormal;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-agv) 20260624 : trays currently on the shared Loader supply car, for the
+//PanelMain6 Motion View header. Sim drains this per feed; the real machine is
+//sensor-driven and does not maintain the count (reads the configured max).
+int TLoaderModule::GetCarTrayCount()
+{
+    return iSimInfeedCount;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsSoftSimulate()
@@ -285,6 +765,40 @@ bool TLoaderModule::IsContinuousFeed()
     return true;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-cleanout-amr) 20260731 : "the SOURCE has no more trays to hand over." SOURCE ONLY --
+//deliberately does NOT consult SnLoader_InputHasTray. Draining a tray still at the input is
+//exactly what Clean Out exists to do, so it must never veto the DECISION to enter Clean Out.
+//On site 20260730 the AMR auto-CleanOut branch used IsSupplyCarDry() and so kept falling through
+//to the MES0920 operator prompt (the "Clean out?" button) whenever a tray sat at the input while
+//the car was already dry. IsSupplyCarDry() (source AND input) stays the CleanOut RETIRE gate,
+//where the input term is load-bearing : it keeps the side alive to self-collect a stranded front
+//tray (see the DoLoader comment above the retire guard), and it is the gate's own guarantee that
+//no tray is abandoned. Two callers, opposite requirements -- hence two predicates.
+bool TLoaderModule::IsSupplySourceDry()
+{
+    if(IsSoftSimulate())
+        return (IsContinuousFeed()==false);
+    return (HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOff());
+}
+//---------------------------------------------------------------------------
+bool TLoaderModule::IsSupplyCarDry()
+{
+    //AI(ht160s-loader) 20260706 : "the supply car has no more trays to feed." Extracted from
+    //DoLoader's CleanOut retire gate for readability (was an inline ?: + && expression).
+    //Sim/DUMMY has no InputEnd card, so chkLoadTray (IsContinuousFeed) stands in for car stock.
+    //Real: source InputEnd AND the input has-tray point must BOTH read empty (a disabled point
+    //counts as empty) -- a side is NOT retired while a tray still sits at the input, so every
+    //tray inside the machine is processed before CleanOut finishes.
+    //AI(ht160s-cleanout-amr) 20260731 : the input term applies to the RETIRE gate ONLY. The
+    //CleanOut ENTRY decision now calls IsSupplySourceDry() instead -- see that function.
+    if(IsSoftSimulate())
+        return (IsContinuousFeed()==false);
+
+    bool bSourceEmpty = (HSys.Sen.SnLoader_Inputend.Enable==false    || HSys.Sen.SnLoader_Inputend.IsOff());
+    bool bInputEmpty  = (HSys.Sen.SnLoader_InputHasTray.Enable==false || HSys.Sen.SnLoader_InputHasTray.IsOff());
+    return bSourceEmpty && bInputEmpty;
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::IsOutputBottomOccupied()
 {
     if(IsSoftSimulate())
@@ -292,6 +806,25 @@ bool TLoaderModule::IsOutputBottomOccupied()
     else if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true)
         return HSys.Sen.SnLoader_OutputBottomHasTray.IsOn();
     return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-loader) 20260708 : NON-MUTATING value-identical twin of IsRearOccupied().
+//IsRearOccupied() calls RefreshRearState() first, which reads the rear sensor and can
+//WRITE bRearHasTray / clear bRearReadyForPick+bRearResidualAlarmed -- side effects that
+//must not run from the IsLoaderYMoveSafe interlock (polled every Loader/SortArm Y-move
+//tick) nor from the DescribeState state-record dump (documented read-only; Empty's
+//ComputeRearPickReadyNoRefresh is the same pattern). Value-equivalence per config :
+//sim -> bRearHasTray latch (RefreshRearState is a sim no-op, so IsRearOccupied returns
+//the latch too); real+sensor-enabled -> live sensor (exactly what the refresh would
+//latch); real+sensor-disabled -> refresh leaves the latch unchanged -> latch here too.
+//Keep in lockstep with RefreshRearState if its semantics ever change.
+bool TLoaderModule::PeekRearOccupied()
+{
+    if(IsSoftSimulate())
+        return bRearHasTray;
+    if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true)
+        return HSys.Sen.SnLoader_OutputBottomHasTray.IsOn();
+    return bRearHasTray;
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::RefreshRearState()
@@ -308,12 +841,6 @@ void TLoaderModule::RefreshRearState()
     if(IsSoftSimulate())
         return;
 
-    if(HSys.Sen.SnLoader_OutputHasTray.Enable==true)
-    {
-        bHasRearSensor=true;
-        if(HSys.Sen.SnLoader_OutputHasTray.IsOn())
-            bSensorState=true;
-    }
     if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true)
     {
         bHasRearSensor=true;
@@ -322,7 +849,21 @@ void TLoaderModule::RefreshRearState()
     }
 
     if(bHasRearSensor)
+    {
         bRearHasTray=bSensorState;
+        if(bSensorState==false)
+        {
+            //AI(ht160s-rearready-p0) 20260705 : no tray = not pickable, ever. Clears a
+            //stale TRUE latch left by a hand-removed tray (NotifyTrayArmPickRearTray
+            //never ran) so the published state always matches the physical rear -- a
+            //stale TRUE would otherwise satisfy IsRearReadyForPick through the NEXT
+            //discharge's landing window (case 1000, clamps still ON). The case-100
+            //re-arm in DoDischargeTray is the primary guard; this is the belt. The
+            //empty rear also re-arms the MES0924 residual Note for a fresh episode.
+            bRearReadyForPick=false;
+            bRearResidualAlarmed=false;
+        }
+    }
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsRearOccupied()
@@ -334,6 +875,31 @@ bool TLoaderModule::IsRearOccupied()
 bool TLoaderModule::IsRearHasTray()
 {
     return IsRearOccupied();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-trayarm-empty-handoff) 20260701 / AI(ht160s-rearready-state) 20260703 REDESIGN :
+//"safe for TrayArm to grab" predicate. The rear is pickable ONLY after DoDischargeTray case 4000
+//success publishes bRearReadyForPick=true (carriage retreated to feed Y + Push/Lean clamps already
+//Pop-confirmed at cases 2000/3000; TMyCylinder::Pop does not advance the ladder until the Off
+//sensor confirms on a REALLY machine). The latch is false through cases 1000..3000 and re-armed
+//false at discharge start, so it ALSO covers the on-machine interference (mirrors Empty commit
+//564154c) where RefreshRearState re-latches bRearHasTray the instant the carriage LANDS the tray
+//(case 1000, both clamps still ON) : bRearReadyForPick is not set until case 4000, so a bare
+//bRearHasTray can no longer read as pickable. This replaces the old "block while DischargeTask in
+//1000..4000" step-range gate, whose inclusive <=4000 terminal boundary stranded the settled tray
+//(DischargeTask latches at 4000 after a completed discharge) -> deadlock. See the function body.
+bool TLoaderModule::IsRearReadyForPick()
+{
+    //AI(ht160s-rearready-state) 20260703 : REDESIGN -- gate on the producer-published
+    //bRearReadyForPick latch (set only at DoDischargeTray case 4000 success), NOT on the
+    //DoDischargeTray step number. Removes the cross-module step-range coupling and the old
+    //>=1000 && <=4000 terminal off-by-one : DischargeTask latches at 4000 after a completed
+    //discharge, so the inclusive <=4000 blocked the settled+pickable state forever -> TrayArm
+    //never picked -> rear stranded -> deadlock. IsRearOccupied() stays as an independent
+    //sensor/occupancy confirmation belt (state = source of truth, sensor = confirm). Deliberately
+    //NO clamp out-bit belt : the Push/Lean clamps legitimately hold a tray at the FRONT all
+    //through feed/CCD/sort, so an unconditional out-bit test would false-block TrayArm.
+    return IsRearOccupied() && bRearReadyForPick;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::IsLoaderReadyForSort(int LoaderNo)
@@ -423,15 +989,102 @@ bool TLoaderModule::IsSortOwnerHeld(int LoaderNo)
     return (State->Status==LS_SORTING);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : PHYSICAL grip verdict for this side's Y carriage, for the
+//SortArm boundary confirm just before its irreversible pick Z-down.
+//On-site 2026-08-05 (user report) : a tray suddenly jumped out of a Loader-Y carriage clamp.
+//The software kept fHasTray=1 / HasOK=1, so SortArm would have driven the nozzle down onto an
+//empty carriage. The user's rule is the fix : the PushTray cylinder must be ON (its On reed
+//lit) for "has tray" to mean anything. Public so SortArm can ask without reaching into
+//HSys.Cyn; the per-side cylinder lookup stays here.
+//Tri-state : 1=gripping, 0=tray gone, -1=no verdict (see mycylin.h).
+int TLoaderModule::GetCarriageGripVerdict(int LoaderNo)
+{
+    TMyCylinder *Push=NULL;
+
+    if(IsValidLoaderNo(LoaderNo)==false)
+        return -1;
+    if(LoaderNo==1)
+        Push=&HSys.Cyn.C_Loader1_PushTray;
+    else
+        Push=&HSys.Cyn.C_Loader2_PushTray;
+    return GetClampGripVerdict(Push, IsSoftSimulate());
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-clampgrip) 20260806 : the On reed SortArm hands to ShowMyError so the alarm screen
+//names the real IO point (same idiom as the MES1422 / JAM0913 call sites).
+TMySensor *TLoaderModule::GetCarriagePushOnSensor(int LoaderNo)
+{
+    if(IsValidLoaderNo(LoaderNo)==false)
+        return NULL;
+    if(LoaderNo==1)
+        return &HSys.Cyn.C_Loader1_PushTray.OnSensor;
+    return &HSys.Cyn.C_Loader2_PushTray.OnSensor;
+}
+//---------------------------------------------------------------------------
 bool TLoaderModule::IsAllCleanOutFinish()
 {
     //AI(HT160S-Maintainer) 20260605 : both Loader sides have drained in CleanOut.
-    return (Side[0].bCleanOutFinish && Side[1].bCleanOutFinish);
+    if(Side[0].bCleanOutFinish==false || Side[1].bCleanOutFinish==false)
+        return false;
+    //AI(ht160s-cleanout-latch) 20260731 : never declare the Loader drained while a Y carriage is
+    //still holding a tray. Every sensor test below reads a SHARED FIXED point (front feed, rear
+    //output, supply car) - none of them can see product already clamped on a carriage. On site
+    //20260730 17:32 both sides read fHasTray=1 with CleanOutFin=1. Software-flag test, no sensor,
+    //so it holds in sim/DUMMY too. Paired with the un-retire clear in DoLoader : a side that is
+    //back on the ladder drops its latch, so this test is the backstop for a retired-but-loaded
+    //side rather than the primary guard.
+    if(HSys.VMot.MMLoaderY_1!=NULL && HSys.VMot.MMLoaderY_1->fHasTray)
+        return false;
+    if(HSys.VMot.MMLoaderY_2!=NULL && HSys.VMot.MMLoaderY_2->fHasTray)
+        return false;
+    //AI(cleanout) 20260701 : physical residual + supply-car gate. The old check trusted
+    //only the per-side software carriage flag and could finish with a tray still parked at
+    //the shared front feed position / rear output / supply car (on-machine 2026-07-01 : a
+    //Loader empty tray was left behind). REALLY mode now requires the shared front, rear and
+    //supply-car sensors all clear so no tray is left in the pipeline; SOFT_SIMULATE/DUMMY has
+    //no IO card (InType=0 inputs read present), so it trusts the action latches there and
+    //skips the raw sensor read (mirrors RefreshStateFromSensors early-out). Enable-gated so an
+    //uninstalled point never blocks. Rear (bRearHasTray) is cleared by TrayArm recovery.
+    if(IsSoftSimulate()==false)
+    {
+        if(HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+            return false;   //residual tray on the front feed position
+        if(HSys.Sen.SnLoader_OutputBottomHasTray.Enable && HSys.Sen.SnLoader_OutputBottomHasTray.IsOn())
+            return false;   //residual tray at the rear output position
+        if(HSys.Sen.SnLoader_Inputend.Enable && HSys.Sen.SnLoader_Inputend.IsOn())
+            return false;   //supply car still has stock (drain it before finishing)
+    }
+    if(bRearHasTray)
+        return false;       //rear latch still set : TrayArm has not recovered it yet
+    return true;
 }
 //---------------------------------------------------------------------------
 void TLoaderModule::NotifyTrayArmPickRearTray()
 {
+    //AI(ht160s-tray-source) 20260625 : Phase 6 A.5 - rear tray taken by TrayArm;
+    //the data has been transferred to the arm, so clear the rear hold too
+    //(extends the Phase 1-5 "cleared rear => cleared grid" invariant).
     bRearHasTray=false;
+    bRearReadyForPick=false;   //AI(ht160s-rearready-state) 20260703 : tray taken -> rear no longer pickable
+    RearKind=eTrayKindNormal;
+    RearTrayID="";
+    RearSourceTray.Clear();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) 20260625 : Phase 6 A.5 - rear-tray accessors (return-by-value).
+eTrayKind TLoaderModule::GetRearTrayKind()
+{
+    return RearKind;
+}
+//---------------------------------------------------------------------------
+TMyTray TLoaderModule::GetRearSourceTray()
+{
+    return RearSourceTray;
+}
+//---------------------------------------------------------------------------
+AnsiString TLoaderModule::GetRearTrayID()
+{
+    return RearTrayID;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::AcquireFrontOwner(int LoaderNo)
@@ -501,6 +1154,34 @@ bool TLoaderModule::HasActiveTrayData(int LoaderNo, int Data)
     for(int YIndex=0; YIndex<YCount; YIndex++)
         for(int XIndex=0; XIndex<XCount; XIndex++)
             if(TrayMotor->Tray.Data[XIndex][YIndex]==Data)
+                return true;
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-sortarm) 20260625 : robust "this side still has pickable ICs" predicate
+//used by DoSortArm case 1 to KEEP picking the active side until its tray is fully
+//drained (operator rule : never abandon a half-picked tray). Reads ONLY the carriage
+//Tray grid, NOT State->Status, so it is immune to the per-batch LS_ToRear transient
+//(ReleaseSortOwner sets LS_ToRear, then DoLoader case 3000 flips it back to
+//LS_READY_SORT). Pickable = a cell holding a real IC (data > UNCHECK_IC, i.e.
+//HAS_OK_IC/NG), matching FindPickCells/IsPickableData. Requires fHasTray so a
+//discharged (cleared) side reports false and may be released.
+bool TLoaderModule::HasPickableIC(int LoaderNo)
+{
+    TTrayMotor *TrayMotor=NULL;
+    int XCount=GetTrayXCount();
+    int YCount=GetTrayYCount();
+
+    if(LoaderNo==1)
+        TrayMotor=HSys.VMot.MMLoaderY_1;
+    else if(LoaderNo==2)
+        TrayMotor=HSys.VMot.MMLoaderY_2;
+    if(TrayMotor==NULL || TrayMotor->fHasTray==false)
+        return false;
+
+    for(int YIndex=0; YIndex<YCount; YIndex++)
+        for(int XIndex=0; XIndex<XCount; XIndex++)
+            if(TrayMotor->Tray.Data[XIndex][YIndex]>UNCHECK_IC)
                 return true;
     return false;
 }
@@ -598,7 +1279,7 @@ AnsiString TLoaderModule::ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, b
     //AI(HT160S-Maintainer) 20260608 : simulation path : no real Top CCD hardware.
     //Cycle through the virtual 2D codes that btnLoadSimuDataClick registered, so
     //every scanned cell gets a valid, registry-resolvable code (wraps around).
-    if(tSimuData.bRunSimulation)
+    if(tSimuData.bRunSimulation || HSys.LastSet.iRealDummy!=REALLY || CosFunction.bUseTopCcd==false)
     {
         int Total=LotRegistry.GetItemCount();
         if(Total>0)
@@ -608,6 +1289,23 @@ AnsiString TLoaderModule::ReadTopCcd2DCode(int LoaderNo, int CellX, int CellY, b
             sCode=LotRegistry.GetCode2DByIndex(SimuCcdCycleIndex);
             SimuCcdCycleIndex=(SimuCcdCycleIndex+1)%Total;
             bOk=true;
+            //AI(ht160s-virtual2d) 20260808 : this branch just FABRICATED a die identity. On
+            //2026-08-06 it ran on the REAL machine (the Enable Simulation checkbox was ticked)
+            //and three KYEC lots' customer CSVs were published carrying registry codes in
+            //alphabetical order - indistinguishable from a genuine run, and no log anywhere
+            //recorded the 2D source. Taint the Soter flush window at the moment of fabrication,
+            //naming which arm fired; NoteVirtual2D logs once per window and gates the customer
+            //channels (FTP + pickup), archive is kept.
+            {
+                AnsiString sWhy;
+                if(tSimuData.bRunSimulation)
+                    sWhy="Enable Simulation checkbox";
+                else if(HSys.LastSet.iRealDummy!=REALLY)
+                    sWhy="RealDummy tier is not REALLY";
+                else
+                    sWhy="Top CCD disabled";
+                g_SoterOutput.NoteVirtual2D(sWhy);
+            }
         }
         return sCode;
     }
@@ -640,24 +1338,101 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
     if(TrayMotor==NULL)
         return;
 
-    //AI(HT160S-Maintainer) 20260610 : evaluate CleanOut finish EVERY cycle, not
-    //only at the transient case 10. During CleanOut DoFeedTray is blocked, so a
-    //side that was mid-feed (Task 1000) or waiting on the other side (Task 100)
-    //never loops back to case 10 and the old check could never fire : CleanOut
-    //hung forever (state record 2026-06-10 09_21_52 : Loader1=1000, Loader2=100
-    //both frozen ~2 min). A side with no tray (and not owned by SortArm) has
-    //nothing left to drain : declare it finished regardless of Task. A side still
-    //holding a tray (fHasTray==true) keeps its normal sort/discharge flow and
-    //finishes on a later cycle once the tray has drained. bTrayEmpty sides also
-    //finish here because they have no tray to drain.
+    //AI(ht160s-rearready-p0) 20260705 : rear-leftover watchdog (Loader mirror of Color
+    //MES1426). A rear tray with NO published readiness and NO discharge in flight can
+    //never become pickable -- bRearReadyForPick's only setter is DoDischargeTray case
+    //4000 and a new discharge cannot start while the rear is occupied -- yet the rear
+    //sensor keeps re-latching bRearHasTray, so TAJOB_LOADER_RECOVERY pins the TrayArm
+    //with no alarm (silent starvation). Reached only when InitialFlag could NOT
+    //preserve the rear hold (cold start over a leftover tray / mid-discharge abort) :
+    //the tray's Kind/ID are unknown then, so auto-collecting risks misrouting a
+    //cover/identity tray into the normal pool -- require operator removal (unlike the
+    //RETIRED front MES0922, which has the case-9500 self-collect path). Sensor-aware
+    //overload prints the IO name; fires once per episode (bRearResidualAlarmed),
+    //re-armed on the sensor-empty edge / reset. LoaderNo==1 = evaluate once per cycle.
+    if(LoaderNo==1 &&
+       HSys.LastSet.iRealDummy!=DUMMY &&
+       bRearResidualAlarmed==false &&
+       bRearDischargeInProgress==false &&
+       bRearReadyForPick==false &&
+       IsRearOccupied())
+    {
+        bRearResidualAlarmed=true;
+        ShowMyError("MES0924", LangT("Loader rear has a leftover tray - please remove it"),
+                    &HSys.Sen.SnLoader_OutputBottomHasTray, false, K_RETRY);
+    }
+
+    //AI(cleanout) 20260703 : the MES0922 front-residual manual-removal alarm that lived here is
+    //GONE (user design : the machine collects every tray itself). A front tray stranded after
+    //the supply car went dry is now self-collected by the DoFeedTray case-9000 CleanOut branch
+    //(-> case 9500 confirm-then-mint), and IsAllCleanOutFinish keeps the side unfinished while
+    //SnLoader_InputHasTray still reads a tray, so nothing retires early.
+    //AI(cleanout) 20260701 : phase-aware CleanOut finish. The old guard retired a side the
+    //instant its carriage flag was empty, ignoring the shared front/rear sensors and the supply
+    //car -> CleanOut could finish with trays still in the pipeline and never drained the supply
+    //car. User-confirmed semantics: keep feeding + sorting the remaining supply car until it is
+    //DRY, THEN empty the pipeline. So a side is "finished feeding" only when the shared supply
+    //car is dry (SnLoader_Inputend OFF) AND its carriage is empty AND it does not own the sort Y.
+    //If the car still has stock, fall through to the normal feed/sort/discharge flow so it drains
+    //(source-dry no longer alarms MES0920/MES0921 in CleanOut - see DoFeedTray case 9000).
     if(HSys.Sys.RunMode==Run_CleanOut &&
-       TrayMotor->fHasTray==false &&
        iYOwner[GetSideIndex(LoaderNo)]==LOADER_Y_OWNER_NONE)
     {
-        State->bCleanOutFinish=true;
-        State->Status=LS_IDLE;
-        Task=1;
-        return;
+        bool bSupplyCarDry = IsSupplyCarDry();
+        bool bDestackInFlight;
+        //AI(cleanout) 20260701 : do NOT retire a side while its last tray's rear discharge is still
+        //in flight. DoDischargeTray clears the carriage (fHasTray=false) at case 3000 but only
+        //retreats the carriage + clears bRearDischargeInProgress at case 4000. Retiring here (Task=1;
+        //return) between 3000 and 4000 would abandon the discharge, leaving bRearDischargeInProgress
+        //latched true forever -> IsRearReadyForPick() never true -> TrayArm can never recover the
+        //rear tray -> bRearHasTray never clears -> IsAllCleanOutFinish hangs. Let the discharge finish.
+        //AI(ht160s-cleanout-preempt) 20260731 : the rear-discharge carve-out above had NO front-feed
+        //twin. This guard runs BEFORE switch(Task), so it preempts an in-flight DoFeedTray from any
+        //DoLoader task; tray identity is minted late (FeedTask 9500) so fHasTray is still false all
+        //through a feed AND a destack, and the guard fires believing the side is idle. Two resources
+        //were then abandoned with no owner and no alarm :
+        //  (1) the shared front station, taken at DoFeedTray case 100 and released ONLY at case 10000
+        //      -> the other side blocks forever at AcquireFrontOwner while this side blocks it right
+        //      back at the OtherState->Status==LS_FEEDING gate below. Circular wait, only a HOME
+        //      clears iFrontOwner. Observed on site 20260730 14:48-14:56 (iFrontOwner=2, Side1
+        //      Feed=100 FEEDING, Side2 Task=100 IDLE, both stuck 296 s, survived a Pause + a Start).
+        //  (2) the front destacker, left with rise-1 EXTENDED; its only retract is
+        //      DoFrontDestackDown case 7, reachable only via FeedTask 4100 -> the case-10
+        //      IsInputHasTrayTrustworthy() hold deadlocks. Observed on site 20260730 17:35 (Feed=10
+        //      Destack=5, "P1 Loader: ready=0", MES0925).
+        //So : release the station on the way out, and refuse to retire while the destack window is
+        //open. Do NOT widen the FeedTask list to 9000/9500 - that re-creates the CleanOut wedge the
+        //case-9000 comment records as already fixed once.
+        bDestackInFlight = (State->FeedTask==4000 || State->FeedTask==4100 ||
+                            State->FeedTask==8200 || State->FeedTask==8300);
+        if(TrayMotor->fHasTray==false && bSupplyCarDry &&
+           bRearDischargeInProgress==false && bDestackInFlight==false)
+        {
+            if(State->FeedTask!=1)
+                RecordProcess("CLEANOUT retire preempts feed: Loader"+IntToStr(LoaderNo)+
+                    " FeedTask="+IntToStr(State->FeedTask)+" - releasing the front station");   //AI(ht160s-cleanout-preempt)
+            ReleaseFrontOwner(LoaderNo);
+            State->FeedTask=1;
+            State->bCleanOutFinish=true;
+            State->Status=LS_IDLE;
+            Task=1;
+            return;
+        }
+        //supply car still has stock (or carriage still loaded) : do NOT finish; the switch
+        //below re-runs the normal feed/sort/discharge flow so the car drains first.
+    }
+
+    //AI(ht160s-cleanout-latch) 20260731 : reaching here in CleanOut means this side did NOT retire
+    //on this tick - either the guard above failed a term, or it was skipped entirely because SortArm
+    //owns this side's Y (the RunMode/iYOwner test). bCleanOutFinish is otherwise cleared ONLY by
+    //ResetSide (InitLoader, i.e. a HOME), so a side that un-retires through the iYOwner skip keeps
+    //flying "finished" while it feeds a fresh tray. On site 20260730 17:32 BOTH sides read
+    //fHasTray=1 with CleanOutFin=1 - a CleanOut that would have reported the machine drained with
+    //product still on both carriages. A side back on the ladder is not finished; say so.
+    if(HSys.Sys.RunMode==Run_CleanOut && State->bCleanOutFinish)
+    {
+        State->bCleanOutFinish=false;
+        RecordProcess("CLEANOUT un-retire: Loader"+IntToStr(LoaderNo)+" resumed the ladder");   //AI(ht160s-cleanout-latch)
     }
 
     if(State->bTrayEmpty)
@@ -679,7 +1454,30 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         case 100:
             if(TrayMotor->fHasTray==false)
             {
-                if(OtherState->Status==LS_FEEDING)
+                if(bAmrLocked)   //AI(ht160s-agv) 20260623 : AMR handoff - no new front destack/feed
+                    break;
+                //AI(ht160s-sortarm) 20260624 : pipelined (NOT strict alternation) but hold off STARTING a
+                //feed while the OTHER car is in the FRONT ZONE - either FEEDING (at the feed pos) or
+                //CCD_SCAN (at the CCD pos). Those two front stations sit closer than SafeDist (feed ~1mm
+                //<-> CCD ~131mm = 130mm < 325mm), so feeding into that window would only get blocked by
+                //the IsLoaderYMoveSafe backstop anyway / risk a stall. Waiting until the other car leaves
+                //the front zone (it advances to sort/discharge, >=427mm, clear of SafeDist from feed) lets
+                //this car feed without contention. Mirrors DoFeedTray's own downstream FEEDING/CCD_SCAN
+                //guard. Still pipelined : once the other car is READY_SORT/SORTING/ToRear/IDLE this car
+                //feeds while the other runs its cycle - the gate does NOT block on the other car merely
+                //holding a tray (that was the earlier strict-alternation fHasTray form, since dropped).
+                //IsLoaderYMoveSafe stays the per-move collision backstop for the both-loaded case.
+                //Operator confirmed on-machine 20260624 : the two cars run without interfering.
+                //AI(ht160s-cleanout-preempt) 20260731 : do NOT latch LS_FEEDING unless the shared
+                //front station is actually takeable by this side. Latching first and only finding
+                //out at DoFeedTray case 100 that the other side still owns iFrontOwner closes a
+                //circular wait, because the owner side is itself gated on OtherState->Status right
+                //here. Redundant in every clean flow (the owner holds the lock only between case
+                //100 and case 10000, during which it is already LS_FEEDING) - this is the backstop
+                //for a lock that leaked, and it must ship WITH the release above, never alone.
+                if(OtherState->Status==LS_FEEDING ||
+                   OtherState->Status==LS_CCD_SCAN ||
+                   (iFrontOwner!=0 && iFrontOwner!=LoaderNo))
                 {
                     break;
                 }
@@ -701,6 +1499,8 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         case 1000:
             if(DoFeedTray(LoaderNo, 1))
             {
+                if(IsSoftSimulate() && iSimInfeedCount>0)
+                    iSimInfeedCount--;   //AI(ht160s-agv) sim input drains 1/feed
                 if(OtherState->Status==LS_CCD_SCAN)
                 {
                     break;
@@ -746,7 +1546,31 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
                 Task=1;
             }
             break;
+        default:
+            //AI(ht160s-ladder-guard) 20260703 : a state number with no matching case
+            //(the 'number but no action' trap). Log it so a future dead-jump is a
+            //diagnosable EventLog event, not a silent stall, and restart the ladder.
+            LogLadderFault("Loader.DoLoader", Task);
+            Task=1;
+            break;
     }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-anti-ghost-d) 20260720 : SnLoader_InputHasTray reads TRUE whenever the front
+//rise-1 cylinder is EXTENDED (rise1 lifts the tray stack across the sensor beam), so a
+//"tray present" read is only trustworthy while rise1 is confirmed RETRACTED (its Off-reed
+//reads On). An untrusted read is what let a stuck-up rise1 (interrupted destack across a
+//HOME) mint a ghost tray via case 9500 -> later empty-suck. Enable-gate : a machine whose
+//rise1 Off-reed is not installed cannot confirm the position, so treat as trustworthy
+//(never permanently stall the feed) - matches the "disabled point never blocks" idiom.
+//Sim/DUMMY : no physical rise1 -> always trustworthy (behavior unchanged offline).
+bool TLoaderModule::IsInputHasTrayTrustworthy()
+{
+    if(IsSoftSimulate())
+        return true;
+    if(HSys.Cyn.C_Loader_FrontRiseTray_1.OffSensor.Enable==false)
+        return true;
+    return HSys.Cyn.C_Loader_FrontRiseTray_1.OffSensor.IsOn();
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
@@ -764,13 +1588,26 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
     {
         State->FeedTask=1;
         State->FeedDelay.Clear();
+        State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : fresh feed attempt re-arms AMR deferral
+        State->FeedWaitTimer.Clear();
+        State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) 20260720 : fresh feed must not inherit a stale rise1 wait
+        State->Rise1WaitTimer.Clear();
+        //AI(ht160s-cleanout-preempt) 20260731 : diagnostic hygiene, not a behaviour fix. DestackTask
+        //is only ever set to 1 at case 4000, so an abandoned destack leaves 5/6 latched here and the
+        //FeederDecision dump reports "Destack=5" on a side that is idle - which is exactly how the
+        //07-30 records read. Every consumer re-seeds it at case 4000 before use, so clearing it here
+        //changes nothing functional and makes the state record tell the truth.
+        State->DestackTask=1;
         return true;
     }
     if(OtherState->Status==LS_FEEDING ||
        OtherState->Status==LS_CCD_SCAN)
         return false;
-    if(HSys.Sys.RunMode==Run_CleanOut)
-        return false;
+    //AI(cleanout) 20260701 : feeding is NO LONGER blocked in CleanOut (was: return false
+    //here). User-confirmed semantics: drain the supply car by feeding + sorting the remaining
+    //trays until SnLoader_Inputend is dry, then empty the pipeline. Source-dry is CleanOut-aware
+    //in case 9000 (no MES0920/MES0921 alarm) and the DoLoader finish guard retires the side once
+    //the car is dry + carriage empty.
     if(LoaderNo==1)
     {
         PushCylinder=&HSys.Cyn.C_Loader1_PushTray;
@@ -794,7 +1631,68 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
 
         case 10:
             if(TrayMotor->fHasTray)
+            {
+                State->FeedTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
+                State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) : leaving case 10 clears the wait
+                State->Rise1WaitTimer.Clear();
                 return true;
+            }
+            //AI(ht160s-anti-ghost-d) 20260720 : rise1 MUST be confirmed retracted before this
+            //case acts. rise1 up (a) falsely lights SnLoader_InputHasTray -> the LK-1 branch
+            //below would mint a GHOST tray via 9500, and (b) makes the fall-through destack
+            //(case 100) double-stack onto the stack rise1 is still holding. Owner ruling (Q3) :
+            //never mint, never blind-act - WAIT for rise1 to settle down (drain / posture
+            //re-acquire brings it down), and NAME it on timeout so it is never a silent idle.
+            if(IsInputHasTrayTrustworthy()==false)
+            {
+                if(State->bRise1Waiting==false)
+                {
+                    State->Rise1WaitTimer.SetMS(GeneralSetting.iRise1SettleWaitSec*1000);
+                    State->Rise1WaitTimer.On();
+                    State->bRise1Waiting=true;
+                    RecordProcess("WAIT Loader"+IntToStr(LoaderNo)+": rise1 (C_Loader_FrontRiseTray_1) not retracted - InputHasTray read held, awaiting settle");   //AI(ht160s-anti-ghost-d)
+                    break;
+                }
+                if(State->Rise1WaitTimer.Off())
+                {
+                    State->bRise1Waiting=false;
+                    State->Rise1WaitTimer.Clear();
+                    ShowMyError("MES0925", LangT("Loader front rise cylinder not retracted (C_Loader_FrontRiseTray_1)"), K_RETRY);   //AI(ht160s-anti-ghost-d) : named, K_RETRY -> re-check after operator clears rise1
+                }
+                break;   //hold at case 10 until rise1 confirmed down
+            }
+            State->bRise1Waiting=false;   //AI(ht160s-anti-ghost-d) : rise1 down -> read trustworthy, resume normal decision
+            State->Rise1WaitTimer.Clear();
+            //AI(ht160s-home-resume-lk1) 20260713 : orphan-tray self-collect on resume. A
+            //HOME taken between the destack landing (case 8300 clamps the tray on the
+            //carriage) and the identity mint (case 9500) leaves a tray PHYSICALLY on the
+            //carriage with no fHasTray to match, because the mint at 9500 never ran.
+            //AI(ht160s-cleanout-preempt) 20260731 : the line above used to read "while fHasTray
+            //was reset false by InitialFlag". That is WRONG and was misleading this whole family
+            //of investigations : TLoaderModule::InitialFlag (and the ResetSide it calls) touch
+            //only Side[] cursors, the rear hold, iFrontOwner and iYOwner - never
+            //MMLoaderY_1/2->fHasTray. The ONE writer outside aLoader.cpp is uHome.cpp:923
+            //PV->ClearTray(), on the unparked-carry operator-removal fallback armed at
+            //uHome.cpp:493 (Loader Y disabled / not a servo / in alarm, so the car could not park
+            //its tray). So the carriage flag SURVIVES an ordinary HOME, but NOT a HOME where the
+            //carriage could not park - which is exactly the HOME this branch has to heal after.
+            //uHome's fHasTray-keyed
+            //removal hint cannot see it, and the destack path below (case 100 -> 4000) would
+            //drop a SECOND tray onto it (clamps/cuts it + scatters IC). Route straight to the
+            //confirm-then-mint case 9500 instead, reusing the CleanOut case-9000 self-collect
+            //predicate. REAL + Enable gate only : sim/DUMMY InType=0 phantom-present would
+            //mint ghost trays forever. On-machine verify : SnLoader_InputHasTray must read
+            //the carriage tray at this HOME-Y (the case-9000 mirror proves the read at
+            //feed-Y). A false miss is no worse than today (falls through to destack); a false
+            //hit routes to 9500 = JAM0913 safe stop, never a collision.
+            if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
+               HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn())
+            {
+                RecordProcess("HEAL Loader LK1: orphan tray on carriage at resume (side "+IntToStr(LoaderNo)+
+                    ") - confirm-then-mint via 9500");   //AI(ht160s-obsv-p0)
+                State->FeedTask=9500;
+                break;
+            }
             State->FeedTask=100;
             break;
 
@@ -808,7 +1706,7 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             if(MoveLoaderY(LoaderNo, GetLoaderFeedY(LoaderNo)))
             {
                 if(IsSoftSimulate())
-                    State->FeedTask=4000;
+                    State->FeedTask=3500;   //AI(ht160s-loader) 20260627 : sim also source-dry gated (case 3500)
                 else
                     State->FeedTask=2000;
             }
@@ -821,54 +1719,53 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
 
         case 3000:
             if(LeanCylinder->Pop())
-                State->FeedTask=4000;
+                State->FeedTask=3500;   //AI(ht160s-loader) 20260627 : source-dry pre-gate before destack
+            break;
+
+        case 3500:
+            //AI(ht160s-agv-ruleB) 20260818 : RULE B - do not START a front destack GoDown while
+            //this station is serving an AMR (owner ruling 20260817 : no GoUp/GoDown during an AMR
+            //handoff). 3500 is the ONLY production entry to the destacker (it is what sets
+            //FeedTask=4000 below), and it is a clean stopping point : PushTray/LeanOnTray were
+            //already popped back at case 2000/3000, the car sits at feed Y and the destacker is
+            //fully retracted. A sequence already in flight is deliberately NOT aborted - stopping
+            //a destack mid-stroke drops the stack (see the claw note at DoFrontDestackDown).
+            //Self-clears : CEID274 releases the lock, or the P1 watchdog force-releases it.
+            if(bAmrLocked)
+                break;   //AI(ht160s-agv) front GoDown suspended during AMR handoff
+            //AI(ht160s-loader) 20260627 : source-dry pre-gate BEFORE the front destacker
+            //fires (item 2). Test the supply-car stock sensor SnLoader_Inputend here so a
+            //dry source never wastes a godown cycle. HT160 has no HT172/HT9045 SelectHasTray;
+            //the established source-dry truth source is SnLoader_Inputend (same sensor the
+            //AMR shortage / MES0921 path uses). On 'has stock' proceed to the destack (4000);
+            //on 'dry' route to case 9000 to REUSE the single existing tray-empty handling
+            //(MES0920 + AMR feed-wait deferral) - no duplicated alarm. Enable gate: a disabled
+            //sensor is treated as present/non-blocking; sim/DUMMY uses chkLoadTray, not the
+            //real sensor (same idiom as the case-9000 Inputend gate).
+            if(IsSoftSimulate()
+                   ? IsContinuousFeed()
+                   : (HSys.Sen.SnLoader_Inputend.Enable==false
+                      || HSys.Sen.SnLoader_Inputend.IsOn()))
+            {
+                State->FeedTask=4000;   //source has stock -> destack one tray
+            }
+            else
+            {
+                State->FeedTask=9000;   //source dry -> reuse case 9000 tray-empty handling
+            }
             break;
 
         case 4000:
-            HSys.Cyn.C_Loader_FrontRiseTray_1.On();
-            State->FeedTask=5000;
+            //AI(general) 20260617 : front-destacker separate-one-tray now lives in the
+            //shared DoFrontDestackDown so the Teach Advanced TestGoDownTray exercises the
+            //identical cylinder sequence as this production feed.
+            State->DestackTask=1;
+            State->FeedTask=4100;
             break;
 
-        case 5000:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-            {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.On();
-                State->FeedTask=6000;
-            }
-            break;
-
-        case 6000:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_2.IsOn() || IsSoftSimulate())
-            {
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.On();
-                State->FeedDelay.Set(10);
-                State->FeedDelay.On();
-                State->FeedTask=7000;
-            }
-            break;
-
-        case 7000:
-            if(State->FeedDelay.Off())
-            {
-                HSys.Cyn.C_Loader_FrontRiseTray_2.Off();
-                State->FeedTask=8000;
-            }
-            break;
-
-        case 8000:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
-            {
-                HSys.Cyn.C_Loader_FrontSeparateTray_1.Off();
-                State->FeedTask=8100;
-            }
-            break;
-
-        case 8100:
-            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())
-            {
-                HSys.Cyn.C_Loader_FrontRiseTray_1.Off();
+        case 4100:
+            if(DoFrontDestackDown(State->DestackTask, State->FeedDelay))
                 State->FeedTask=8200;
-            }
             break;
 
         case 8200:
@@ -882,42 +1779,241 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 9000:
+            //AI(ht160s-overcount-tripqueue) 20260721 : the old MES0921 count-vs-Inputend
+            //cross-check (count exhausted + Inputend ON -> full-machine stop, one per tray)
+            //is REMOVED. Over-count is no longer an error : extra physical trays are fed as
+            //Cover (tagged at mint via TripQueue) and recycled to Empty -- logged, not
+            //alarmed. The CleanOut-only "break" that used to wedge here forever (the side
+            //never retires while Inputend ON) is gone too, so CleanOut now drains the extra
+            //trays and finishes. Flow falls straight through to the present-branch below,
+            //which mints the tray (kind decided by the trip FIFO). See docs/plan/
+            //loader-overcount-nostop-cleanout-lotend-plan-20260721.md Part 1.
             //AI(HT160S-Maintainer) 20260609 : in simulate/DUMMY the chkLoadTray
             //checkbox decides : checked = treat the tray as present (feed forever),
-            //unchecked = fall through to the "Loader Tray Empty" alarm. Real mode is
-            //unchanged : the push-cylinder On sensor still governs tray presence.
+            //unchecked = fall through to the "Loader Tray Empty" alarm.
+            //AI(ht160s-agv) 20260627 : real presence now ANDs the supply-car InputEnd
+            //(SnLoader_Inputend ON = car still has stock - the source-dry truth the AGV-call
+            //path already uses) with the push-cylinder On sensor (a tray actually reached the
+            //destacker - kept as the physical-arrival interlock, do NOT lower it). A disabled
+            //sensor is treated as present so an uninstalled point never blocks the feed.
             if(IsSoftSimulate()
                    ? IsContinuousFeed()
-                   : (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn()))
+                   : ((HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOn())
+                      && (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn())))
             {
-                TrayMotor->fHasTray=true;
-                PrepareTrayMap(LoaderNo);
-                State->FeedTask=10000;
+                State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : tray present (incl. AMR refill arriving during the deferral wait) - clear the wait
+                State->FeedWaitTimer.Clear();
+                //AI(ht160s-loader) 20260627 : tray reached the destacker (Inputend + push
+                //sensor). Confirm it actually landed on the LoaderY carriage in case 9500
+                //BEFORE minting the tray identity (HT172/HT9045 confirm-then-mint order) so a
+                //lost tray (SnLoader_InputHasTray OFF) leaves no phantom fHasTray / serial.
+                State->FeedTask=9500;
             }
             else
             {
-                Ret=ShowMyError("Loader Tray Empty", K_RETRY|K_TRAY_END|K_CLEAN_OUT);
-                if(Ret==K_RETRY)
-                    State->FeedTask=1;
-                if(Ret==K_TRAY_END)
+                //AI(cleanout) 20260701 : supply car drained in CleanOut - do NOT raise the
+                //MES0920 "Loader Tray Empty" alarm. Break so DoFeedTray idles at case 9000 and
+                //the DoLoader phase-aware finish guard (car dry + carriage empty) retires the side.
+                //AI(cleanout) 20260703 : self-collect a stranded FRONT tray (user design : the
+                //machine collects every tray itself; the MES0922 manual-removal alarm is gone).
+                //If the real front sensor still sees a tray while the carriage is empty, route
+                //to case 9500 : the confirm-then-mint path gives it an identity so the normal
+                //feed -> CCD -> SortArm suck -> discharge -> TrayArm chain drains it. REAL only :
+                //the sim/DUMMY InType=0 phantom-present read would mint ghost trays forever
+                //(this exact bug lived in the on-site copy's version of this branch).
+                if(HSys.Sys.RunMode==Run_CleanOut)
                 {
-                    State->bTrayEmpty=true;
-                    State->FeedTask=10000;
+                    if(IsSoftSimulate()==false && TrayMotor->fHasTray==false &&
+                       HSys.Sen.SnLoader_InputHasTray.Enable && HSys.Sen.SnLoader_InputHasTray.IsOn() &&
+                       IsInputHasTrayTrustworthy())   //AI(ht160s-anti-ghost-d) 20260720 : rise1 down or the read is a false-light -> do not mint a ghost (skip -> idle -> StuckMs watchdog nets a prolonged stall)
+                    {
+                        RecordProcess("HEAL Loader CleanOut self-collect: stranded front tray (side "+
+                            IntToStr(LoaderNo)+") - mint via 9500");   //AI(ht160s-obsv-p0)
+                        State->FeedTask=9500;
+                    }
+                    break;
                 }
+                //AI(ht160s-agv) 20260626 : AMR-aware feed deferral (port of HT9046
+                //asendic_Loader.cpp:1943 600s wait). When AMR feeds the magazine, do
+                //NOT alarm the operator the instant the push cylinder reads empty :
+                //give the called AGV time to refill, and only fall through to MES0920
+                //on timeout. State is per-side (HT9046's func-static is illegal here -
+                //both Loader sides share this body). Tray arrival is handled by the
+                //if-branch above on a later cycle (real push-cylinder sensor), which is
+                //the ONLY valid cancel : IsInputHandoffFinishedForAmr is sim-true and
+                //would defeat the wait. bUseAMR off keeps today's immediate alarm.
+                if(GeneralSetting.bUseAMR)
+                {
+                    if(State->bWaitingAmrFeed==false)
+                    {
+                        //AI(ht160s-overcount-tripqueue) 20260721 : first source-dry edge for
+                        //this side -> the magazine is empty, so close any open feed trip whose
+                        //declared trays were never delivered (short/jammed/over-declared car).
+                        //Keeps the next car's cover/identity boundary clean. No-op on the V1b
+                        //overlap (queue already empty once both trips fully consumed).
+                        FlushTripsOnDry();
+                        State->FeedWaitTimer.SetMS(GeneralSetting.iAmrFeedWaitSec*1000);
+                        State->FeedWaitTimer.On();
+                        State->bWaitingAmrFeed=true;
+                        break;
+                    }
+                    if(State->FeedWaitTimer.Off()==false)
+                        break;
+                    State->bWaitingAmrFeed=false;
+                    State->FeedWaitTimer.Clear();
+                    //AI(ht160s-overcount-tripqueue S4) 20260721 : selection B (multi-car one
+                    //lot). The AMR car-window (iAmrFeedWaitSec) elapsed with no refill. If the
+                    //source is truly dry and no AGV handoff is in flight, treat it as "this
+                    //lot's last car drained" and auto-enter Clean Out instead of the MES0920
+                    //operator prompt. A new START_AGV DURING the window would have set bAmrLocked
+                    //(freezing the destack at DoLoader case 100) so we would not reach here mid-
+                    //placing; the bAmrLocked==false guard makes that explicit. CleanOut completion
+                    //still runs its existing finish path (auto Lot End is the later S6/D1-D6 step).
+                    //AI(ht160s-cleanout-amr) 20260731 : SOURCE-only test here. IsSupplyCarDry()
+                    //also required SnLoader_InputHasTray clear, so a tray still at the input
+                    //vetoed the automatic decision and dropped through to the MES0920 prompt
+                    //below - the "Clean out?" question the operator hit on site 20260730 in AMR
+                    //mode. A tray at the input is what Clean Out is FOR; it must not veto entry.
+                    if(HSys.Sys.RunMode==Run_Normal
+                       && bAmrLocked==false
+                       && IsSupplySourceDry())
+                    {
+                        RecordProcess("AUTO CleanOut: Loader source dry, AMR car-window elapsed, no new car (side "+
+                            IntToStr(LoaderNo)+")");   //AI(ht160s-obsv)
+                        HSys.Sys.bCleanOut=true;
+                        HSys.Sys.RunMode=Run_CleanOut;
+                        break;
+                    }
+                }
+                Ret=ShowMyError("MES0920", LangT("Loader Tray Empty"), &HSys.Sen.SnLoader_Inputend, true, K_RETRY|K_CLEAN_OUT);
+                if(Ret==K_RETRY)
+                    //AI(ht160s-loader) 20260706 : resume at carriage-confirm (9500), NOT case 1.
+                    //Restarting the feed re-drives DoFrontDestackDown (rise1+rise2) on a tray already
+                    //separated below -> clamps/cuts it + scatters IC. 9500 confirms the existing tray
+                    //(SnLoader_InputHasTray) and carries it on; JAM0913 there is a safe stop.
+                    State->FeedTask=9500;
                 if(Ret==K_CLEAN_OUT)
                 {
                     //AI(HT160S-Maintainer) 20260605 : operator chose CleanOut at the
                     //tray-empty alarm : enter CleanOut run mode + latch so the whole
                     //machine drains (resume CleanOut if OneCycle runs mid-drain).
+                    //AI(ht160s-loader) 20260706 : route to 9500 (confirm + carry the tray physically
+                    //present) instead of dead-ending at 10000, so CleanOut still drains that last tray.
                     HSys.Sys.RunMode=Run_CleanOut;
                     HSys.Sys.bCleanOut=true;
-                    State->FeedTask=10000;
+                    State->FeedTask=9500;
                 }
             }
             break;
 
+        case 9500:
+            //AI(ht160s-loader) 20260627 : post-godown carriage confirm - first use of the
+            //previously-dead SnLoader_InputHasTray (item 3). Mirrors HT9045 DoLoadNewICTray
+            //case 400 (SnLoaderCarHasTray confirm after destack; JAM0913 K_RETRY|K_SKIP on the
+            //tray-to-carriage timeout) and HT172 Empty1 case 420. RealDummy tiers + Enable
+            //gate: sim/DUMMY and a disabled point pass through (never block the feed - same
+            //idiom as the case-9000 Inputend gate); only REAL/HAS_TRAY with Enable==true &&
+            //IsOff() raises the alarm. Tray identity is minted HERE (confirm-then-mint) so
+            //SKIP/RETRY need no rollback.
+            if(IsSoftSimulate()
+               || HSys.Sen.SnLoader_InputHasTray.Enable==false
+               || HSys.Sen.SnLoader_InputHasTray.IsOn())
+            {
+                TrayMotor->fHasTray=true;
+                //AI(secs-ceid-align9045) 20260729 : CEID 66 "Load Tray Finish". HT9045 reports it
+                //from asendic_Loader.cpp:778/802/830, at exactly this instant : the Loader's tray
+                //motor is marked fHasTray=true and the tray's cell data has been initialised. This
+                //is the post-godown carriage confirm, i.e. the tray is physically present and its
+                //identity is minted, so it is the same edge and not merely a similar one.
+                EventReport(SECS_EVENT.LoadTrayFinish);
+                PrepareTrayMap(LoaderNo);
+                //tag this fed tray's kind on the carriage Tray grid (born here, mirrors Color
+                //BirthIdentityTray). Identity trays get a sim TrayID; real machine leaves it
+                //blank (no 2D read at feed, D2) and Color re-reads/re-births the 2D on reuse.
+                //AI(ht160s-overcount-tripqueue) 20260721 : classify against the HEAD trip
+                //(FIFO), not a single scalar, so overlapping cars keep separate boundaries.
+                //  bUseAMR off                     -> Normal (manual production, no header)
+                //  queue head present              -> advance iServed, GetFedTrayKind on that
+                //                                     trip; pop+free when iServed reaches iTotal
+                //  queue empty + a trip was seen   -> over-count -> Cover (recycle Empty; CCD
+                //                                     scan still runs so a real IC is sorted --
+                //                                     physical decides), EventLog once/episode
+                //  queue empty + never seen a trip -> host silent -> Normal
+                {
+                    eTrayKind kFed;
+                    if(GeneralSetting.bUseAMR==false)
+                        kFed=eTrayKindNormal;
+                    else if(TripQueue->Count>0)
+                    {
+                        TTripEntry *h=(TTripEntry*)TripQueue->Items[0];
+                        h->iServed++;
+                        kFed=GetFedTrayKind(h->iServed, h->iTotal);
+                        if(h->iServed>=h->iTotal)
+                        {
+                            delete h;
+                            TripQueue->Delete(0);
+                        }
+                    }
+                    else if(bTripSeen)
+                    {
+                        kFed=eTrayKindCover;
+                        //AI(ht160s-overcount-tripqueue) 20260721 : per-tray detail -> dedicated
+                        //OverTrayRecycle CSV (retention-pruned, off the State-Record ring). Lazy
+                        //InitLog here (LogRootDir is set by now). Columns: Date,Time,Station,
+                        //TrayKind,TrayID_2D,Reason,Destination.
+                        if(bOverTrayLogInited==false)
+                        {
+                            OverTrayLog.InitLog("OverTrayRecycle", "OverTrayRecycle",
+                                "Date,Time,Station,TrayKind,TrayID_2D,Reason,Destination");
+                            OverTrayLog.SetRetentionDays(90);
+                            bOverTrayLogInited=true;
+                        }
+                        {
+                            TDateTime nowOt=Now();
+                            OverTrayLog.AppendLine(
+                                FormatDateTime("yyyy/mm/dd", nowOt)+","+
+                                FormatDateTime("hh:nn:ss.zzz", nowOt)+
+                                ",Loader"+IntToStr(LoaderNo)+",Cover,,over-count,Empty");
+                        }
+                        //latch the RecordProcess + EventLog once per episode (bOverTrayLogged) so a
+                        //long over-count drain does not flood the State-Record ring per tray.
+                        if(bOverTrayLogged==false)
+                        {
+                            RecordProcess("OVERTRAY Loader: over-count tray (side "+IntToStr(LoaderNo)+
+                                ") tagged Cover -> recycle Empty (per-episode, first tray)");
+                            g_EventLog.Log("INF_OVERTRAY",
+                                "Loader over-count tray recycled as Cover (host under-declared LoaderTrayCount)", "");
+                            bOverTrayLogged=true;
+                        }
+                    }
+                    else
+                        kFed=eTrayKindNormal;
+                    TrayMotor->Tray.SetKind(kFed);
+                    if(kFed==eTrayKindIdentity)
+                        TrayMotor->Tray.TrayID = IsSoftSimulate()
+                            ? (AnsiString("LOAD2D_")+Now().FormatString("hhnnsszzz"))
+                            : AnsiString("");
+                    else
+                        TrayMotor->Tray.TrayID = "";
+                }
+                State->FeedTask=10000;
+                break;
+            }
+            //SnLoader_InputHasTray OFF (Enable==true, not sim/dummy) after the godown => the
+            //destacked tray did not land on the carriage : tray lost or sensor fault. JAM0913
+            //mirrors HT9045 (carriage has-tray timeout). SKIP finishes this feed with no tray
+            //(nothing was minted); RETRY re-runs the whole feed (case 10 fHasTray short-circuit
+            //stays false because the mint never ran).
+            Ret=ShowMyError("JAM0913", LangT("Loader Tray Lost On Carriage"), &HSys.Sen.SnLoader_InputHasTray, true, K_SKIP|K_RETRY);
+            if(Ret==K_SKIP)
+                State->FeedTask=10000;
+            if(Ret==K_RETRY)
+                State->FeedTask=1;
+            break;
+
         case 10000:
             ReleaseFrontOwner(LoaderNo);
+            State->FeedTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
             return true;
     }
     return false;
@@ -958,14 +2054,14 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             else
             {
                 if(OtherState->Status==LS_READY_SORT ||
-                   OtherState->Status==LS_SORTING ||
-                   OtherState->Status==LS_ToRear)
+                   OtherState->Status==LS_SORTING)
                 {
                     //dont move
                 }
                 else
                 {
                     State->Status=LS_READY_SORT;
+                    State->CcdTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
                     return true;
                 }
             }
@@ -1001,17 +2097,29 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                 //AI(HT160S-Maintainer) 20260604 : P3 active. Trigger Top CCD shot, then
                 //poll for the 2D code in state 5500. Only when the flag is on AND the Top
                 //CCD socket is connected; otherwise behaviour is unchanged (go idle).
-                if(TopCcdSocket!=NULL && TopCcdSocket->IsTopCcdConnected())
+                //AI(HT160S-Maintainer) 20260612 : GAP A fix - the connect condition was
+                //reversed (it reported "not ready" while actually connected, blocking the
+                //2D scan on real hardware). Only run the 2D path when the bin-map feature
+                //is on and the IC is good; require a connected Top CCD for real hardware,
+                //while still letting the NULL-socket simulation path advance to state 5500.
+                if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)
                 {
-                    ShowMyError("Top CCD Connect not ready", K_RETRY);
-                    break;
-                }
-                else if(CosFunction.bUse2DBinMap && BinData==HAS_OK_IC)
-                {
-                    //AI(HT160S-Maintainer) 20260608 : guard NULL socket so the
-                    //simulation path (no Top CCD hardware) can still advance to the
-                    //2D-code poll state. Real hardware triggers a shot as before.
-                    if(TopCcdSocket!=NULL)
+                    if(HSys.LastSet.iRealDummy==REALLY &&
+                       TopCcdSocket!=NULL &&
+                       TopCcdSocket->IsTopCcdConnected()==false && CosFunction.bUseTopCcd &&
+                       IsSoftSimulate()==false)
+                    {
+                        Ret=ShowSystemError("TopCCD_Connect", K_RETRY|K_SKIP);
+                        if(Ret==K_SKIP)
+                        {
+                            TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_2D_SCAN_FAIL);
+                            State->CcdTask=1;
+                        }
+                        break;
+                    }
+                    //Guard NULL socket so the simulation path (no Top CCD hardware) can
+                    //still advance to the 2D-code poll state. Real hardware triggers a shot.
+                    if(HSys.LastSet.iRealDummy==REALLY && CosFunction.bUseTopCcd && TopCcdSocket!=NULL)
                         TopCcdSocket->TopCcdTriggerShot();
                     State->CcdDelay.SetMS(3000);
                     State->CcdDelay.On();
@@ -1022,7 +2130,7 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             }
             else
             {
-                Ret=ShowMyError("Top CCD API not ready", K_SKIP|K_RETRY|K_TRAY_END);
+                Ret=ShowMyError("WAR0330", LangT("Top CCD API not ready"), K_SKIP|K_RETRY|K_TRAY_END);
                 if(Ret==K_RETRY)
                     State->CcdTask=3000;
                 if(Ret==K_SKIP)
@@ -1059,13 +2167,71 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                     if(LotRegistry.FindByCode2D(sCode, HitLot, Bin, HitLotIndex))
                     {
                         TrayMotor->SetTrayBin(State->CcdX, State->CcdY, Bin);
-                        LotRegistry.OnSorted(HitLotIndex, Bin);
-                        MachineRun.iTotalSorted++;
+                        //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode. Carry owning lot
+                        //and 2D code on the cell. ICs are scanned in physical order, so
+                        //ResolveAuto here binds each new (Lot,Bin) to the next free Auto
+                        //first-come-first-served; placement later just reads the binding.
+                        TrayMotor->SetTrayLot(State->CcdX, State->CcdY, HitLotIndex);
+                        TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
+                        //AI(ht160s-lotpassfail) 20260709 : freeze the PASS/FAIL class at scan
+                        //(mirror SetTrayBin) so routing + the PassFail log read the SAME class.
+                        //Bind on the mode's key : Bin for Lot+Bin, PASS/FAIL(1/2) for Lot+PassFail
+                        //(class 0 = error/off -> no binding; read path routes it to the Error Auto).
+                        {
+                            //AI(ht160s-lotpassfail) 20260730 : class comes from the customer
+                            //per-IC DiePass (keyed by the 2D code), not a machine Pass Bin.
+                            int PassClass=LotRegistry.GetPassFailClass(sCode, Bin);
+                            TrayMotor->SetTrayPassClass(State->CcdX, State->CcdY, PassClass);
+                            if(GeneralSetting.IsLotBinSortMode())
+                                LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+                            else if(GeneralSetting.IsLotPassFailSortMode() && PassClass>0)
+                                LotBinBinding.ResolveAuto(HitLotIndex, PassClass);
+                        }
+                        //AI(ht160s-lotqty-placepoint) 20260807 : LotRegistry.OnSorted() REMOVED from
+                        // here (and from BindManual2D below) - moved to the SortArm place point
+                        // (aSortArm.cpp TransferPlaceDataToAuto), same ruling as SVID 1102 below.
+                        // Counting per-lot SortedQty at CCD-scan time double-counted every re-scan
+                        // of a not-yet-picked cell and counted auto-skipped dies that never left
+                        // the source tray (on-site 2026-08-06 : NQ80031AA1 SortedQty=13, PlanQty=10).
+                        //AI(ht160s-lot-reset) 20260706 : global per-Bin production count
+                        //(HT172 parity: aSortArm/aMagArm bump BinICCnt[Bin] on sort). HT160
+                        //resolves Bin here at scan, so count it here.
+                        if(Bin>=0 && Bin<TEST_MAX_BIN)
+                            tRunData.BinICCnt[Bin]++;
+                        //AI(secs-1102-placepoint) 20260805 : MachineRun.iTotalSorted++ REMOVED from
+                        // here. SVID 1102 Output Total Count now increments at the SortArm place
+                        // point (aSortArm.cpp TransferPlaceDataToAuto), per the customer's ruling to
+                        // match HT9045 / HT172 - "only +1 after the nozzle has put the IC into the
+                        // Auto area". Counting on the 2D reverse-lookup hit made 1102 an
+                        // IDENTIFICATION count, not an output count: an unreadable or unknown 2D was
+                        // still sorted into the Error Auto without being counted, and a lot with no
+                        // 2D table left 1102 at 0 while the machine was producing. BinICCnt stays
+                        // here - it is a per-Bin routing statistic and Bin is only known here.
+                        if(TopCcdSocket!=NULL)
+                            TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
+                        State->CcdTask=1;
+                    }
+                    else if(GeneralSetting.IsWhiteListSortMode() || GeneralSetting.bSkipUnknown2DAlarm)
+                    {
+                        //AI(ht160s-whitelist) 20260727 : entered in WhiteList mode OR when the operator
+                        // armed bSkipUnknown2DAlarm (F1). Both treat "a readable 2D not in any lot" as an
+                        // EXPECTED reject -> route silently to the Error Auto, NO blocking WAR0475 modal.
+                        //AI(ht160s-whitelist) 20260715 : WhiteList mode - a 2D code that reads OK
+                        // but is NOT in the whitelist file is an EXPECTED reject (customer semantic),
+                        // NOT an operator exception, so route it silently to the Error Auto with NO
+                        // modal. Mirrors the K_SKIP body below. The 2D-unreadable (scan-fail) branch
+                        // below is a separate path and stays operator-retry (misread != foreign part).
+                        MachineRun.iUnknown2D++;
+                        TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+                        TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+                        TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
+                        if(TopCcdSocket!=NULL)
+                            TopCcdSocket->TopCcdEndShot();
                         State->CcdTask=1;
                     }
                     else
                     {
-                        Ret=ShowMyError("2D code not found in any lot : "+sCode, K_RETRY|K_SKIP);
+                        Ret=ShowMyError("WAR0475", LangT("2D code not found in any lot : ")+sCode, K_RETRY|K_SKIP|K_MANUAL_2D);
                         if(Ret==K_RETRY)
                         {
                             if(TopCcdSocket!=NULL)
@@ -1073,17 +2239,24 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                             State->CcdDelay.SetMS(3000);
                             State->CcdDelay.On();
                         }
+                        else if(Ret==K_MANUAL_2D)
+                            BindManual2D(State, TrayMotor);
                         else
                         {
                             MachineRun.iUnknown2D++;
                             TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+                            //AI(ht160s-lotbin) 20260615 : no owning lot -> route to Error Auto.
+                            TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+                            TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, sCode);
+                            if(TopCcdSocket!=NULL)
+                                TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                             State->CcdTask=1;
                         }
                     }
                 }
                 else if(State->CcdDelay.Off())
                 {
-                    Ret=ShowMyError("Top CCD 2D no response", K_RETRY|K_SKIP);
+                    Ret=ShowSystemError("TopCCD_2D", K_RETRY|K_SKIP|K_MANUAL_2D);
                     if(Ret==K_RETRY)
                     {
                         if(TopCcdSocket!=NULL)
@@ -1091,9 +2264,16 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
                         State->CcdDelay.SetMS(3000);
                         State->CcdDelay.On();
                     }
+                    else if(Ret==K_MANUAL_2D)
+                        BindManual2D(State, TrayMotor);
                     else
                     {
                         TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+                        //AI(ht160s-lotbin) 20260615 : 2D no-response -> no owning lot -> Error Auto.
+                        TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+                        TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, "");
+                        if(TopCcdSocket!=NULL)
+                            TopCcdSocket->TopCcdEndShot();   //AI(HT160S-Maintainer) 20260612 : align HT172 LOFF (GAP C)
                         State->CcdTask=1;
                     }
                 }
@@ -1101,6 +2281,82 @@ bool TLoaderModule::DoCcdCheck(int LoaderNo, int Flag)
             break;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+void TLoaderModule::BindManual2D(TLoaderSideState *State, TTrayMotor *TrayMotor)
+{
+    //AI(ht160s-ccd-manual2d) : operator-supplied Top CCD 2D for one IC cell. Reuses the
+    //scan-success bind path (Bin/Lot resolve + ResolveAuto + OnSorted + EndShot) so a
+    //hand-entered code is treated like a real read, plus a Manual2D trace flag. On a
+    //still-unknown code the operator keeps getting the prompt (Retry re-scans, Skip
+    //routes the IC to Error) -- never silently dropped. This NEVER resumes the machine;
+    //the operator presses Start to run it (operator boundary). Bounded by iGuard so a
+    //stuck dialog can never spin forever -- every normal branch returns first.
+    int iGuard;
+    for(iGuard=0; iGuard<100; iGuard++)
+    {
+        AnsiString code=fNote->ManualText.Trim();
+        int Bin=0;
+        AnsiString HitLot;
+        int HitLotIndex=-1;
+        if(code!="" && LotRegistry.FindByCode2D(code, HitLot, Bin, HitLotIndex))
+        {
+            TrayMotor->SetTrayBin(State->CcdX, State->CcdY, Bin);
+            TrayMotor->SetTrayLot(State->CcdX, State->CcdY, HitLotIndex);
+            TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, code);
+            TrayMotor->SetTrayManual2D(State->CcdX, State->CcdY, true);
+            //AI(ht160s-lotpassfail) 20260709 : freeze class + bind on the mode key (see scan-success path).
+            {
+                int PassClass=LotRegistry.GetPassFailClass(code, Bin);
+                TrayMotor->SetTrayPassClass(State->CcdX, State->CcdY, PassClass);
+                if(GeneralSetting.IsLotBinSortMode())
+                    LotBinBinding.ResolveAuto(HitLotIndex, Bin);
+                else if(GeneralSetting.IsLotPassFailSortMode() && PassClass>0)
+                    LotBinBinding.ResolveAuto(HitLotIndex, PassClass);
+            }
+            //AI(ht160s-lotqty-placepoint) 20260807 : OnSorted() REMOVED here too - counted at
+            // the SortArm place point now (see the scan-path note above).
+            //AI(ht160s-lot-reset) 20260706 : per-Bin count on manual-2D sort too.
+            if(Bin>=0 && Bin<TEST_MAX_BIN)
+                tRunData.BinICCnt[Bin]++;
+            //AI(secs-1102-placepoint) 20260805 : MachineRun.iTotalSorted++ REMOVED here too - same
+            // ruling as the scan-path site above. The manual-2D entry still resolves the Bin and
+            // still routes the IC; SVID 1102 counts it when SortArm actually places it.
+            if(TopCcdSocket!=NULL)
+                TopCcdSocket->TopCcdEndShot();
+            State->CcdTask=1;
+            return;
+        }
+        int Ret2=ShowMyError("WAR0475", LangT("2D code not found in any lot : ")+code, K_RETRY|K_SKIP|K_MANUAL_2D);
+        if(Ret2==K_RETRY)
+        {
+            if(TopCcdSocket!=NULL)
+                TopCcdSocket->TopCcdTriggerShot();
+            State->CcdDelay.SetMS(3000);
+            State->CcdDelay.On();
+            return;
+        }
+        if(Ret2==K_SKIP)
+        {
+            MachineRun.iUnknown2D++;
+            TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+            TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+            TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, code);
+            if(TopCcdSocket!=NULL)
+                TopCcdSocket->TopCcdEndShot();
+            State->CcdTask=1;
+            return;
+        }
+    }
+    //Safety backstop (operator chose manual >100x without resolving): route to Error so
+    //control always returns -- the loop can never run unbounded.
+    MachineRun.iUnknown2D++;
+    TrayMotor->SetTrayBin(State->CcdX, State->CcdY, HT160_BIN_ERROR_NO_BIN_SETTING);
+    TrayMotor->SetTrayLot(State->CcdX, State->CcdY, -1);
+    TrayMotor->SetTrayCode2D(State->CcdX, State->CcdY, fNote->ManualText.Trim());
+    if(TopCcdSocket!=NULL)
+        TopCcdSocket->TopCcdEndShot();
+    State->CcdTask=1;
 }
 //---------------------------------------------------------------------------
 bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
@@ -1161,6 +2417,18 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 100:
             if(IsRearOccupied())
                 return false;
+            //AI(ht160s-rearready-p0) 20260705 : commit point -- the carriage is about to
+            //move rear-ward with the tray. Arm the in-flight flag and kill any stale
+            //ready latch HERE, not at case 2000 : on a REALLY machine the rear sensor
+            //re-latches bRearHasTray the moment the carriage LANDS at case 1000 --
+            //BEFORE case 2000 runs -- so a latch left TRUE (hand-removed tray, Notify
+            //never ran) would satisfy IsRearReadyForPick through the landing window
+            //(clamps still ON = the on-machine early-pick interference class). Arming
+            //bRearDischargeInProgress here also lets the DoLoader rear-residual check
+            //tell "discharge in flight" from "stranded leftover" without peeking at
+            //DischargeTask step numbers.
+            bRearDischargeInProgress=true;
+            bRearReadyForPick=false;
             Task=1000;
             break;
 
@@ -1171,7 +2439,11 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
                    HSys.Sen.SnLoader_OutputBottomHasTray.Enable==true &&
                    HSys.Sen.SnLoader_OutputBottomHasTray.IsOn()==false)
                 {
-                    int ret=ShowMyError("Loader Tray has IC,please remove", K_RETRY|K_SKIP);
+                    //AI(secs-alid-optiond D2) 20260903 : code-carrying overload. The 1-arg form used
+                    //the TRANSLATED text as the alarm code, so the S5F1 ALID changed with the UI
+                    //language and the alarm never appeared in the S5F6/S5F8 catalog. MES0926 is
+                    //registered in database.cpp CreateSystemAlarmCode; the LangT key is unchanged.
+                    int ret=ShowMyError("MES0926", LangT("Loader Tray has IC,please remove"), K_RETRY|K_SKIP);
                     if(ret==K_RETRY)
                     {
                         break;
@@ -1185,7 +2457,7 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 2000:
             if(PushCylinder->Pop() || IsSoftSimulate())
             {
-                bRearHasTray=true;
+                bRearHasTray=true;   //AI(ht160s-rearready-p0) 20260705 : landing latch for sim/DUMMY (a REALLY machine re-latches this from the rear sensor at case-1000 landing); the in-flight + ready flags are armed earlier, at the case-100 commit
                 Task=3000;
             }
             break;
@@ -1193,6 +2465,12 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 3000:
             if(LeanCylinder->Pop() || IsSoftSimulate())
             {
+                //AI(ht160s-tray-source) 20260625 : Phase 6 A.4 - transfer the tray's
+                //data into the module-level rear hold BEFORE ClearTray releases the
+                //carriage (U3 transfer-chain relay; carriage is reused by the next feed).
+                RearKind       = TrayMotor->Tray.GetKind();
+                RearTrayID     = TrayMotor->Tray.TrayID;
+                RearSourceTray = TrayMotor->Tray;
                 TrayMotor->ClearTray();
                 Task=4000;
             }
@@ -1201,12 +2479,349 @@ bool TLoaderModule::DoDischargeTray(int LoaderNo, int Flag)
         case 4000:
             if(MoveLoaderY(LoaderNo, GetLoaderFeedY(LoaderNo)))
             {
-                Task=5000;
+                bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : carriage retreated to feed Y; rear tray now settled + safe for TrayArm to pick
+                bRearReadyForPick=true;   //AI(ht160s-rearready-state) 20260703 : PUBLISH readiness at the physically-safe instant (carriage retreated + clamps popped) -- the single set point the TrayArm pick gate reads
+                Task=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1) (Task = State->DischargeTask ref)
                 return true;
             }
             break;
     }
     return false;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : shared front-destacker "separate one tray down" sequence.
+//Extracted verbatim from DoFeedTray case 4000-8100 so the Teach Advanced
+//TestGoDownTray drives the IDENTICAL cylinders/steps as the production feed (no
+//drift). Cylinder-only (no Y / push / lean); destacker cylinders are shared by both
+//sides so no LoaderNo. Caller owns the SubTask + settle Delay. Returns true when done.
+bool TLoaderModule::DoFrontDestackDown(int &SubTask, HTimer &Delay)
+{
+    //AI(ht160s-feeder-unify) 20260706 : converted from .On()/.IsOn()||sim + .Off()/.Pop() to the
+    //cylinder's own confirmed .Push()/.Pop() (in-position confirm + alarm-on-timeout) with a
+    //one-shot .Reset() re-arm before each poll - mirrors Empty/Color DoGoDownTray. TLoaderModule
+    //has no PushCylinder wrapper (that name is a local TMyCylinder* here), so .Push()/.Pop() are
+    //called directly (they are sim-safe via #ifdef and Enable-aware internally). SHARED by the
+    //production DoFeedTray (case 3500) AND the Teach TestGoDownTray. Physical order, the single
+    //Delay.Set(10) settle after Separate extend, and the Loader<->Empty interlock are unchanged.
+    switch(SubTask)
+    {
+        case 1:
+            HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+            SubTask=2;
+            break;
+
+        case 2:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Push())   // extend Rise_1 (confirmed)
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
+                SubTask=3;
+            }
+            break;
+
+        case 3:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.Push())   // extend Rise_2 (confirmed)
+            {
+                HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+                SubTask=4;
+            }
+            break;
+
+        case 4:
+            //PRESERVED: Loader<->Empty front-separate interlock.
+            if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
+                break;   // interlock: wait while Empty front-separate is out
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Push())   // extend Separate (confirmed)
+            {
+                Delay.Set(10);
+                Delay.On();
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
+                SubTask=5;
+            }
+            break;
+
+        case 5:
+            if(Delay.Off())
+            {
+                if(HSys.Cyn.C_Loader_FrontRiseTray_2.Pop())   // retract Rise_2 (confirmed)
+                {
+                    HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+                    SubTask=6;
+                }
+            }
+            break;
+
+        case 6:
+            //AI(ht160s-feeder-unify) 20260706 : PRESERVED safety gate from the original case 5 -
+            //do not release the separator claw unless Rise_1 still holds the stack (else the remaining
+            //stack could drop). This Loader-specific gate has no GoDown/GoUp analog; keep it verbatim.
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.IsOn() || IsSoftSimulate())
+            {
+                if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Pop())   // retract Separate (confirmed)
+                {
+                    HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+                    SubTask=7;
+                }
+            }
+            break;
+
+        case 7:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())   // retract Rise_1 (confirmed)
+            {
+                SubTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced GoDown test = the production destacker
+//separate-one-tray sequence (shared DoFrontDestackDown), so test == Auto-run sub-action.
+bool TLoaderModule::TestGoDownTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestDownTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+    return DoFrontDestackDown(TestDownTask, TestDelay);
+}
+//---------------------------------------------------------------------------
+//AI(general) 20260617 : Teach Advanced destacker test. Cylinder-only GoUp
+//(return one tray up into the stack) mirrors Empty DoGoUpTray rise steps 100-600.
+//AI(ht160s-home-resume-drain) 20260711 : W2 drain hook. Pump the pure-cylinder destack
+//segment (FeedTask 4000/4100/8200/8300, incl. the DoFrontDestackDown sub-ladder) to the
+//9000 ENTRY boundary (LK-3 arbitration : drain never executes 9000+ - modal + mint; an
+//interrupted un-minted tray is closed by the resume-side self-adopt instead). Same-scan
+//pumping with the Empty hook resolves the shared front-separate interlock (LK-5).
+bool TLoaderModule::HomeDrainTick()
+{
+    bool bDone=true;
+    for(int LoaderNo=1; LoaderNo<=2; LoaderNo++)
+    {
+        TLoaderSideState *S=GetSide(LoaderNo);
+        if(S==NULL)
+            continue;
+        if(S->FeedTask==4000 || S->FeedTask==4100 || S->FeedTask==8200 || S->FeedTask==8300)
+        {
+            DoFeedTray(LoaderNo, 1);
+            if(S->FeedTask==4000 || S->FeedTask==4100 || S->FeedTask==8200 || S->FeedTask==8300)
+                bDone=false;
+        }
+    }
+    return bDone;
+}
+//---------------------------------------------------------------------------
+bool TLoaderModule::TestGoUpTray(int Flag)
+{
+    if(Flag==0)
+    {
+        TestUpTask=1;
+        TestDelay.Clear();
+        return true;
+    }
+
+    //AI(ht160s-feeder-unify) 20260706 : idiom aligned to DoFrontDestackDown - the cylinder's own
+    //confirmed .Push()/.Pop() (TLoaderModule has no PushCylinder wrapper) + one-shot .Reset()
+    //re-arm; settle profile and the Loader<->Empty interlock unchanged. Teach-only.
+    switch(TestUpTask)
+    {
+        case 1:
+            HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+            TestUpTask=100;
+            break;
+
+        case 100:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Push())
+                TestUpTask=200;
+            break;
+
+        case 200:
+            if(IsFrontSeparateBlockedBy(HSys.Cyn.C_Empty_FrontSeparateTray_1))
+                break;   // interlock: wait while Empty front-separate is out
+            HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+            TestUpTask=210;
+            break;
+
+        case 210:
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Push())
+            {
+                TestDelay.SetMS(GeneralSetting.iLoaderDestackSettleMs);
+                TestDelay.On();
+                TestUpTask=300;
+            }
+            break;
+
+        case 300:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
+                TestUpTask=310;
+            }
+            break;
+
+        case 310:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.Push())
+                TestUpTask=400;
+            break;
+
+        case 400:
+            HSys.Cyn.C_Loader_FrontSeparateTray_1.Reset();
+            TestUpTask=410;
+            break;
+
+        case 410:
+            if(HSys.Cyn.C_Loader_FrontSeparateTray_1.Pop())
+            {
+                TestDelay.SetMS(GeneralSetting.iLoaderDestackSettleMs);
+                TestDelay.On();
+                TestUpTask=500;
+            }
+            break;
+
+        case 500:
+            if(TestDelay.Off())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_2.Reset();
+                TestUpTask=510;
+            }
+            break;
+
+        case 510:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_2.Pop())
+            {
+                HSys.Cyn.C_Loader_FrontRiseTray_1.Reset();
+                TestUpTask=600;
+            }
+            break;
+
+        case 600:
+            if(HSys.Cyn.C_Loader_FrontRiseTray_1.Pop())
+            {
+                TestUpTask=1;
+                return true;
+            }
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-state-record-analysis) 20260622 : eLoaderStatus -> short text for FeederDecision.txt.
+static AnsiString SR_LoaderStatusText(int St)
+{
+    switch(St)
+    {
+        case LS_IDLE:       return "IDLE";
+        case LS_FEEDING:    return "FEEDING";
+        case LS_CCD_SCAN:   return "CCD_SCAN";
+        case LS_READY_SORT: return "READY_SORT";
+        case LS_SORTING:    return "SORTING";
+        case LS_ToRear:     return "ToRear";
+    }
+    return "?" + IntToStr(St);
+}
+//---------------------------------------------------------------------------
+AnsiString TLoaderModule::DescribeState()
+{
+    //AI(ht160s-state-record-analysis) 20260622 : read-only per-side inner-state for
+    //FeederDecision.txt. AllEmpty/HasOK expose the discharge gate : a side stuck at
+    //READY_SORT with HasOK=1 AllEmpty=0 is the stranded-cell pick/discharge deadlock.
+    AnsiString s;
+    s  = "[Loader]\r\n";
+    s += "  bRearHasTray=" + IntToStr(bRearHasTray ? 1 : 0)
+       + "  bRearDischargeInProgress=" + IntToStr(bRearDischargeInProgress ? 1 : 0)
+       + "  bRearReadyForPick=" + IntToStr(bRearReadyForPick ? 1 : 0)
+       + "  bRearResidualAlarmed=" + IntToStr(bRearResidualAlarmed ? 1 : 0)   //AI(ht160s-rearready-p0) 20260705 : MES0924 once-latch
+       //AI(ht160s-rearready-state) 20260703 : verdict now reads the published latch (single source
+       //of truth with IsRearReadyForPick). Do NOT call IsRearReadyForPick() here -- it would refresh
+       //sensors inside the state-record dump path; bRearHasTray && bRearReadyForPick mirrors it.
+       + "  RearPickReady=" + IntToStr((bRearHasTray && bRearReadyForPick) ? 1 : 0)
+       + "  iFrontOwner=" + IntToStr(iFrontOwner)
+       + "  iYOwner=[" + IntToStr(iYOwner[0]) + "," + IntToStr(iYOwner[1]) + "]"
+       + "  iTopCcdCount=" + IntToStr(iTopCcdCount)
+       + "  SoftSim=" + IntToStr(IsSoftSimulate() ? 1 : 0) + "\r\n";
+    //AI(ht160s-overcount-tripqueue) 20260721 : dump the trip FIFO (depth + head served/
+    //total + trays remaining across all trips) in place of the retired iCarTrayTotal/iFeedSerial.
+    {
+        int nTrips = (TripQueue!=NULL) ? TripQueue->Count : 0;
+        int nHeadServed=0, nHeadTotal=0, nRemainAll=0;
+        for(int i=0; i<nTrips; i++)
+        {
+            TTripEntry *e=(TTripEntry*)TripQueue->Items[i];
+            nRemainAll += (e->iTotal - e->iServed);
+            if(i==0) { nHeadServed=e->iServed; nHeadTotal=e->iTotal; }
+        }
+        s += "  RearKind=" + IntToStr((int)RearKind)
+           + "  RearTrayID=" + RearTrayID
+           + "  Trips=" + IntToStr(nTrips)
+           + "  Head=" + IntToStr(nHeadServed) + "/" + IntToStr(nHeadTotal)
+           + "  RemainAll=" + IntToStr(nRemainAll)
+           + "  bTripSeen=" + IntToStr(bTripSeen ? 1 : 0)
+           + "  bOverTrayLogged=" + IntToStr(bOverTrayLogged ? 1 : 0)
+           + "  iSecsCarTrayCount=" + IntToStr(iSecsCarTrayCount) + "\r\n";
+    }
+    for(int n=1; n<=2; n++)
+    {
+        TLoaderSideState *St = GetSide(n);
+        if(St==NULL)
+            continue;
+        TTrayMotor *Tm = (n==1) ? HSys.VMot.MMLoaderY_1 : HSys.VMot.MMLoaderY_2;
+        bool bHas = (Tm!=NULL && Tm->fHasTray);
+        s += "  Side" + IntToStr(n) + ": Status=" + SR_LoaderStatusText(St->Status)
+           + "  Feed=" + IntToStr(St->FeedTask)
+           + "  Ccd=" + IntToStr(St->CcdTask)
+           + "  Disc=" + IntToStr(St->DischargeTask)
+           + "  Destack=" + IntToStr(St->DestackTask) + "\r\n";
+        //AI(ht160s-clampgrip) 20260806 : print the PHYSICAL grip verdict beside the software
+        //flag. On 2026-08-05 a tray jumped out of a Loader-Y clamp while fHasTray stayed 1 -
+        //diagnosing that from a snapshot needed a manual IoDetail.txt cross-reference. Now the
+        //contradiction (fHasTray=1 Grip=0) is one line. 1=gripping 0=tray gone -1=no verdict.
+        s += "         fHasTray=" + IntToStr(bHas ? 1 : 0)
+           + "  Grip=" + IntToStr(GetCarriageGripVerdict(n))
+           + "  TrayEmptyFlag=" + IntToStr(St->bTrayEmpty ? 1 : 0)
+           + "  CleanOutFin=" + IntToStr(St->bCleanOutFinish ? 1 : 0)
+           + "  AllEmpty=" + IntToStr(ActiveTrayAllData(n, EMPTY_IC) ? 1 : 0)
+           + "  HasOK=" + IntToStr(HasActiveTrayData(n, HAS_OK_IC) ? 1 : 0)
+           + "  HasUncheck=" + IntToStr(HasActiveTrayData(n, UNCHECK_IC) ? 1 : 0) + "\r\n";
+    }
+    //AI(ht160s-state-record-analysis) 20260624 : cross-side Loader-Y interlock geometry.
+    //A hang where one side sits LS_ToRear while the other refuses to advance to READY_SORT is
+    //almost always IsLoaderYMoveSafe rejecting a move because the two shared-rail cars are
+    //closer than SafeDist. Record both car encoder positions, the live |gap|, the SafeDist
+    //limit, and a per-side feed/discharge move verdict so the blocked move is visible in the
+    //snapshot directly, instead of being hand-computed from tech.ini + General.ini after the fact.
+    {
+        int p1 = (HSys.Mot.MLoaderY_1!=NULL) ? HSys.Mot.MLoaderY_1->ReadEncoderPos() : 0;
+        int p2 = (HSys.Mot.MLoaderY_2!=NULL) ? HSys.Mot.MLoaderY_2->ReadEncoderPos() : 0;
+        int g = p1-p2;
+        if(g<0)
+            g=-g;
+        s += "[LoaderY interlock]\r\n";
+        s += "  SafeDist=" + IntToStr(GeneralSetting.iLoaderYSafeDistance)
+           + "  Y1enc=" + IntToStr(p1)
+           + "  Y2enc=" + IntToStr(p2)
+           + "  |gap|=" + IntToStr(g) + "\r\n";
+        for(int k=1; k<=2; k++)
+        {
+            int fy = GetLoaderFeedY(k);
+            int dy = GetLoaderDischargeY(k);
+            int sy = (k==1) ? Teach.Loader1CarFirstSortYPosition : Teach.Loader2CarFirstSortYPosition;   //AI(ht160s-state-record-analysis) 20260625 : first sort row Y (diagnostic only)
+            //AI(ht160s-loader) 20260708 : log the computed verdict WITH the refusing rule
+            //(rear-rest / gap:*) -- a bare BLOCK was three-way ambiguous in a hang snapshot.
+            //Same six IsLoaderYMoveSafe calls as before (now side-effect-free via Peek).
+            AnsiString wf="", wd="", ws="";
+            bool okF=IsLoaderYMoveSafe(k, fy, &wf);
+            bool okD=IsLoaderYMoveSafe(k, dy, &wd);
+            bool okS=IsLoaderYMoveSafe(k, sy, &ws);
+            s += "  Side" + IntToStr(k)
+               + " ->feed(" + IntToStr(fy) + ")=" + (okF ? AnsiString("OK") : AnsiString("BLOCK(")+wf+AnsiString(")"))
+               + "  ->disc(" + IntToStr(dy) + ")=" + (okD ? AnsiString("OK") : AnsiString("BLOCK(")+wd+AnsiString(")"))
+               + "  ->sort(" + IntToStr(sy) + ")=" + (okS ? AnsiString("OK") : AnsiString("BLOCK(")+ws+AnsiString(")"))
+               + "\r\n";
+        }
+    }
+    return s;
 }
 //---------------------------------------------------------------------------
 void InitializeLoaderModule()

@@ -1,30 +1,18 @@
 //---------------------------------------------------------------------------
 // cEventLog : daily alarm / event CSV log under D:\HT160S_Log\EventLog
-// Base directory comes from HSys.LogRootDir (set at Init time).
+// Now a thin subclass of cCsvDailyLog (shared infrastructure). Faithful port
+// of the HT172 TFormSysTools::RecordAlarmMessage -> EventLog CSV path.
 //---------------------------------------------------------------------------
 #ifndef cEventLogH
 #define cEventLogH
 //---------------------------------------------------------------------------
 #include <vcl.h>
-#include <SyncObjs.hpp>
+#include "cCsvDailyLog.h"
 //---------------------------------------------------------------------------
 
-class cEventLog
+class cEventLog : public cCsvDailyLog
 {
-private:
-    TCriticalSection* m_pCS;
-    AnsiString m_sBaseDir;      // e.g. "D:\\HT160S_Log\\EventLog"
-    AnsiString m_sLastFilePath; // cached daily path
-    AnsiString m_sLastDate;     // "YYYY_MM_DD" of cached path
-
-    AnsiString GetLogFilePath();
-    void EnsureHeader(const AnsiString& sPath);
-    void AppendLine(const AnsiString& sLine);
-
 public:
-    cEventLog();
-    ~cEventLog();
-
     void Init();
     void Log(const AnsiString& sAlarmCode,
              const AnsiString& sMessage,
@@ -37,5 +25,10 @@ public:
 
 //---------------------------------------------------------------------------
 extern cEventLog g_EventLog;
+//---------------------------------------------------------------------------
+//AI(ht160s-ladder-guard) 20260703 : log a switch(Task) ladder that reached a state
+//number with no matching case (a 'number but no action' dead-jump). Free function so
+//every module's Do* default can call it without a class dependency.
+void LogLadderFault(const AnsiString& sLadder, int iState);
 //---------------------------------------------------------------------------
 #endif

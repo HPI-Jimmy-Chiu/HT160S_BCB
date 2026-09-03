@@ -15,12 +15,19 @@ struct TRunData
     TDateTime PauseTime;
     int BinICCnt[TEST_MAX_BIN];
     int TrayICCnt[eTrayCount];
+    //AI(secs-record-traycount) 20260810 : SVID 38237-38239 (Auto1-3) / 38249-38251 (Auto4-6)
+    // "Record Auto n Tray Count" - FULL TRAYS discharged from that Auto lane this work order.
+    // A different quantity from TrayICCnt[] above, which counts ICs inside the CURRENT tray.
+    // Bumped once per discharge in aAuto1To6 DoDischargeTray, alongside the lane's Unloadtray
+    // CEID; cleared with every other per-lot counter in ResetPerLotProductionCounters.
+    int RecordTrayCnt[eTrayCount];
     int LoaderIC;
     int TotalIC;
     int iPauseTime;
     int JamCount;
     int UPH;
     int iEjectionPinCT; // Ejection pin count
+    int iAutoSkipCount; // AI(ht160s-autoskip) cells auto-skipped on SortArm pick fail (this lot)
     double JamRate;
     int JamRateDenom;
     int iTotalQuantity;
@@ -45,7 +52,9 @@ struct TRunData
         UPH=0;
         ZeroMemory(BinICCnt, sizeof(BinICCnt));
         ZeroMemory(TrayICCnt, sizeof(TrayICCnt));
+        ZeroMemory(RecordTrayCnt, sizeof(RecordTrayCnt));   //AI(secs-record-traycount) 20260810
         iEjectionPinCT=0;
+        iAutoSkipCount=0;
         JamRate=0.0;
         JamRateDenom=10000;
         iTotalQuantity=0;
@@ -58,7 +67,37 @@ struct TRunData
     int GetTotalQuantity(){return iAutoQuantity+iMagQuantity;}
 };
 extern TRunData tRunData;
+
+//AI(ht160s-uph) 20260707 : on-screen rolling per-tray UPH history feed. cprod owns the
+// data (reuses TrayUphLog per-tray detection); main.cpp renders it into UPH_StringGrid.
+// Newest row at index 0. Data/render split keeps cprod free of any fMain coupling.
+#define UPH_ROW_MAX 10
+struct TTrayUphRow
+{
+    AnsiString sStart;
+    AnsiString sEnd;
+    AnsiString sPause;
+    int        iUph;
+};
+extern TTrayUphRow g_UphRecentRows[UPH_ROW_MAX];
+extern int         g_UphRecentCount;
+extern bool        g_UphRowsDirty;
+
 extern int GetJamRateDenom();
+//AI(jamrate) 20260801 : KYEC on-site note 6 "jam rate". The three storage fields
+//(JamCount / JamRate / JamRateDenom) were ported from HT172 but the counter, the formula
+//and the display never were, so JamCount was only ever assigned 0 and JamRate had no
+//producer at all outside the ctor. These are the mechanism: ONE choke point for the
+//numerator, one place that computes the rate, and the existing per-lot reset for the clear.
+//Model is HT172's: jams per JamRateDenom (10000) units placed, NOT HT9045's per-tray MUBF.
+//  jam sources (start set, per customer): SortArm pick-suck failure at the Loader, and a
+//  held-IC fall-down (drop) detected at pick or in transit.
+void AddJamCount(AnsiString Reason);
+//AI(jamrate) 20260801 : recompute tRunData.JamRate from the live counters. Numerator and
+//denominator share one epoch by construction - ResetPerLotProductionCounters zeroes
+//JamCount and TotalIC together - so this needs no separate baseline (unlike UPH, whose
+//denominator epoch is re-stamped independently; see g_iUphBaseIC).
+void RefreshJamRate();
 //---------------------------------------------------------------------------
 class TLatchCycleTime
 {
@@ -74,10 +113,6 @@ extern TLatchCycleTime lctLoader;
 struct TFunction
 {
     bool UseCCD;
-    bool RejectCCDfail;
-    bool UseHitCylinder;
-    int  HitRetry;
-    bool UsePreAlignment;
 };
 extern TFunction tFunction;
 //---------------------------------------------------------------------------
@@ -139,14 +174,9 @@ typedef struct
 }SYSTEM_BIN_SELECT;
 extern SYSTEM_BIN_SELECT BinSelect[2];
 //---------------------------------------------------------------------------
-typedef struct
-{
-    int RecordCT;
-    char ID[30][30];
-    char PassWord[30][30];
-    int  Level[30];
-}PASS_WORD;
-extern PASS_WORD USER;
+//AI(ht160s-password) 20260624 : legacy binary PASS_WORD USER struct removed.
+//User accounts now live in THT160UserRoleManager (UserRoleManager.h),
+//persisted as notepad-openable text in system\login.txt.
 //---------------------------------------------------------------------------
 typedef struct
 {
@@ -186,7 +216,10 @@ typedef struct
     int  iSystemStatus;        // HALT / PAUSE / HOMING / RUNNING ...
     int  iUPH;                 // units per hour
     int  iTotalScanned;        // ICs whose 2D code was read
-    int  iTotalSorted;         // ICs placed into a Bin (reverse-lookup hit)
+    //AI(secs-1102-placepoint) 20260805 : was "ICs placed into a Bin (reverse-lookup hit)" - it was
+    // bumped in aLoader at CCD-scan time, so it counted IDENTIFIED ICs, not output. Moved to the
+    // SortArm place point on the customer's ruling (align to HT9045 / HT172). SVID 1102 reads it.
+    int  iTotalSorted;         // ICs the nozzle has actually PLACED into an Auto output tray
     int  iUnknown2D;           // reverse-lookup miss -> Error Bin
     int  iActiveLotCount;      // Lots still being sorted
     int  iAreaCount[eTrayCount]; // sorted count per output area
@@ -211,5 +244,24 @@ void UpdateAllParameter();
 void CustomerFunctionSelect();
 AnsiString GetTotalQuantityAutoPercent();
 AnsiString GetTotalQuantityMagPercent();
+//AI(ht160s-lot-reset) 20260706 : zero the per-run production counters at the start
+//of a new work order (manual Lot Start button + SECS LOTSTART). Machine-total
+//cumulative fields are left alone; only the per-lot display / throughput counts
+//reset so the Auto Cnt display, UPH and SECS Scanned/Sorted represent THIS lot.
+void ResetPerLotProductionCounters();
+//AI(secs-rcmd-9045) 20260729 : per-destination sort counts only, for SECS CLEAN_AUTO_SORT_COUNT.
+//NOT interchangeable with ResetPerLotProductionCounters (see the comment at the definition).
+void ResetAutoSortCounters();
+AnsiString DescribeAutoSortCounters();
+//AI(ht160s-uph) 20260706 : per-tray + per-lot UPH logging. Non-invasive observer
+//(reads the public TAutoModule station status) + CSV under
+//<LogRoot>\UPHLog\YYYY_MM\<LotID>__<ts>\. Total UPH uses the HT172 aggregate
+//(GetCalculateUPH); per-tray UPH is diagnostic. See
+//docs/plan/uph-suite-persistence-biniccnt-plan-20260706.md.
+void TrayUphLog_OnLotStart(AnsiString LotID);
+void TrayUphLog_EnsureActive(AnsiString LotID);
+void TrayUphLog_Tick();
+void TrayUphLog_OnLotEnd(AnsiString LotID, int TotalIC, int LotUPH);
+void TrayUphLog_PruneOld();
 //---------------------------------------------------------------------------
 #endif

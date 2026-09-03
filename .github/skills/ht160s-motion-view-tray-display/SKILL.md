@@ -107,6 +107,7 @@ SPEC anchors (do not contradict): TrayArm delivers empty trays `EmptyTray -> Bin
 
 - `BindMovingTrayPanel(PosMot, ContentMot, Panel, Tray)` in `main.cpp`: `PosMot->SetSimulateCompoment(Panel, akLeft, softN, softP, 73, 595)` + `ContentMot->SetHTrayPanel(Tray)`.
 - Bound columns: `MAutoY_1..6`/`MMAutoY_1..6` → `plAuto1..6TrayWork`/`mtAuto1..6TrayWork`; `MEmptyY`/`MMEmptyY` → `plEmptyTrayWork`/`mtEmptyTrayWork`; `MLoaderY_1`/`MMLoaderY_1` → `plLoaderLTrayWork`/`mtLoaderLTrayWork`; `MLoaderY_2`/`MMLoaderY_2` → `plLoaderRTrayWork`/`mtLoaderRTrayWork`.
-- `MMTrayArmX` has no dedicated tray-grid panel → not bound. Color column has no Y motor → static, not position-bound.
+- `MMTrayArmX` has no dedicated tray-grid panel → not bound.
+- Color column carrier `plColorTrayWork` IS position-bound to physical `MColorY` (front↔rear; same softN/softP −100..83800 as Empty) via `BindMovingTrayPanel(MColorY, NULL, plColorTrayWork, NULL)`. It has **no virtual content motor** (`MMColorY` does not exist) because Color presents identity/dummy trays, not IC content — so `mtColorTrayWork` is hidden once in code at bind time and the column shows the gray carrier only, mirroring Empty (whose `aEmpty` likewise never fills `MMEmptyY` content). `plColorTrayWork` DFM `Visible` was flipped False→True to expose it. (Earlier note "Color has no Y motor → static" is obsolete: `MColorY` now exists in `Mot_Table` M19.)
 - Tray grid cell counts come from the bound panel's `pHTray->XItem/YItem`, clamped to `MAX_TRAY_X/Y` (50/20).
 ```
