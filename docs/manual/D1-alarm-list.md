@@ -1,6 +1,6 @@
 # 附錄 D　警報碼一覽
 
-資料來源：`system/AlarmList.csv`（開機由 `CreateSystemAlarmCode()` 依警報登錄表 `mapAlarmCodeList`（SSOT）產生，2026-07-16 重生）。共 481 筆＝動態數字碼 420（氣缸/馬達/吸嘴）＋ JAM 14 ＋ MES 33 ＋ WAR 14。
+資料來源：`system/AlarmList.csv`（開機由 `CreateSystemAlarmCode()` 依警報登錄表 `mapAlarmCodeList`（SSOT）產生，2026-09-03 重生）。共 486 筆＝動態數字碼 420（氣缸/馬達/吸嘴）＋ JAM 14 ＋ MES 37 ＋ WAR 15。
 
 > 註（2026-07-16 查核）：中文欄 `C_ErrMessage`/`C_Description` 目前仍為英文（與 E_ 欄相同）；中文化為待辦工作。下表顯示英文訊息與排除說明。操作員排除手冊另見 `docs/alarm-troubleshooting/`。
 
@@ -443,10 +443,12 @@
 | MES0920 | 1 | Loader Tray Empty |  |
 | MES0924 | 1 | Loader rear has a leftover tray |  |
 | MES0925 | 1 | Loader front rise cylinder not retracted (C_Loader_FrontRiseTray_1) |  |
+| MES0926 | 1 | Loader Tray has IC,please remove |  |
 | MES1021 | 1 | Bottom Empty Tray Is Miss Error |  |
 | MES1022 | 1 | Empty supply magazine empty |  |
 | MES1023 | 1 | Empty supply stack full (sensor) |  |
 | MES1024 | 1 | Front Empty Tray Is Miss Error |  |
+| MES1025 | 1 | Empty carriage still holds a tray after clean-out - remove it |  |
 | MES1120 | 1 | Auto1 : Auto output stack full (sensor) |  |
 | MES1123 | 1 | Auto1 : Auto clean-out residual tray after drain |  |
 | MES1125 | 1 | Auto1 : Auto output car full |  |
@@ -464,6 +466,7 @@
 | MES1425 | 1 | Auto4 : Auto output car full |  |
 | MES1426 | 1 | Color rear has a leftover tray |  |
 | MES1427 | 1 | Color supply stack full (sensor) |  |
+| MES1428 | 1 | Color carriage still holds a tray after clean-out - remove it |  |
 | MES1520 | 1 | Auto5 : Auto output stack full (sensor) |  |
 | MES1523 | 1 | Auto5 : Auto clean-out residual tray after drain |  |
 | MES1525 | 1 | Auto5 : Auto output car full |  |
@@ -473,11 +476,13 @@
 | MES1721 | 1 | TrayArm pick blocked - rear source not ready |  |
 | MES1722 | 1 | TrayArm holds an unidentified tray |  |
 | MES1723 | 1 | TrayArm place blocked - destination rear not free |  |
+| MES1921 | 1 | SortArm blocked - waiting for the destination Auto to receive a tray |  |
 | WAR0154 | 8 | Sorting Arm X motor will out of limit |  |
 | WAR0330 | 8 | Top CCD API not ready |  |
 | WAR0462 | 8 | Top CCD 2D no response (2DID communication time out) | [1] check CCD power/cable ；[2] check vision PC program ；[3] check COM/socket |
 | WAR0475 | 8 | 2D code not found in any lot |  |
 | WAR0962 | 1 | AGV/AMR handshake timeout - AGV did not respond |  |
+| WAR0963 | 1 | SECS link lost - AMR handoff still held; clear the station then RETRY |  |
 | WAR0970 | 8 | Color CCD 2D no response (Tray ID communication time out) | [1] check CCD power/cable ；[2] check vision PC program ；[3] check COM/socket |
 | WAR1130 | 8 | Auto1 : Auto feed tray miss |  |
 | WAR1230 | 8 | Auto2 : Auto feed tray miss |  |

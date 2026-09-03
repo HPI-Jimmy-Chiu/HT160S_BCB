@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $SystemDir = Join-Path $RepoRoot "system"
 $ManualDir = Join-Path $RepoRoot "docs\manual"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-$Today = "2026-07-16"
+$Today = (Get-Date -Format "yyyy-MM-dd")   # AI(secs-alid-optiond) 20260903 : was a hard-coded "2026-07-16"
 
 function Escape-MdCell([string]$s) {
     if ($null -eq $s) { return "" }

@@ -1,6 +1,6 @@
 # 附錄 B　全機 I/O 對照表
 
-資料來源：`system/IO_Table.csv`（機台設定檔，2026-07-16 重生）。位址格式 Lane/IP/Port/Bit（IP=W 為寫出型點位）。IO_Table.csv 無中文標籤欄，畫面顯示名稱由程式以「前綴＋Alias」慣例產生。最終位址請以機台 State Record 內 MachineConfig\system 副本核對（repo 工作副本與機台副本可能 drift）。
+資料來源：`system/IO_Table.csv`（機台設定檔，2026-09-03 重生）。位址格式 Lane/IP/Port/Bit（IP=W 為寫出型點位）。IO_Table.csv 無中文標籤欄，畫面顯示名稱由程式以「前綴＋Alias」慣例產生。最終位址請以機台 State Record 內 MachineConfig\system 副本核對（repo 工作副本與機台副本可能 drift）。
 
 ## Cylinder（39 點）
 | Alias | Lane | IP | Port | Bit | InType | 啟用 | OnDelay | OffDelay | Note |
@@ -295,7 +295,7 @@
 | Suck1 | 0 | 0 | 1 | 0 | 1 | 是 | 30 | 10 |  |
 | Suck2 | 0 | 0 | 1 | 1 | 1 | 是 | 30 | 10 |  |
 | Suck3 | 0 | 0 | 1 | 2 | 1 | 是 | 30 | 10 |  |
-| Suck4 | 0 | 0 | 1 | 3 | 0 | 是 | 30 | 10 |  |
+| Suck4 | 0 | 0 | 1 | 3 | 1 | 是 | 30 | 10 |  |
 
 ## Sucker_Off（4 點）
 | Alias | Lane | IP | Port | Bit | InType | 啟用 | OnDelay | OffDelay | Note |

@@ -161,3 +161,29 @@ S8 是 S9 的**硬前置**（B5：否則 `*_manual.xlsx` 舊雜湊說法會一�
   66011 錯句更正、§3.5 全段改寫（486 筆、編碼/解碼/值域/9046LS 零交集/ALTX 語言/號段 9 例外）。
 - 兩本 `.html` 以 `scripts/ops/build-secs-html.py` 重生（先對 `af32607` 自測 byte-exact 再產出；Interface_Spec.html 順帶補上 0901 那次 md 修訂漏重生的內容）。
 - prose guard 現在略過 ``` 圍欄內的逐字 log；Comm_Examples 剩 8 處殘留皆為「本 run 舊值」對照表刻意保留。
+
+### S6 完成（20260903）
+- `gen-alid-catalog.py --emit-sim --in-place`：`secs_host_simulator.py` `ALID_CATALOG` 486 筆、`scenario_runner.py` `ALARM_CATALOG_ROWS=486`；`--check` 兩檔 in sync。
+- 手改：檔頭註解改 Option D 事實；`ALID_OVER_SIGNED` → `ALID_NOT_9_DIGITS/ALID_MIN/ALID_MAX`；`_alid_sign_line` 改檢「恰 9 碼」
+  （8/10 碼＝舊韌體或字典過期）；`_alid_gloss` 未知 ALID 分「號段 9（設計如此）」與「真的不明」；presets `ALARMLIST/ALARMEN` 期望值 486 + 9 碼說明；
+  scenario_runner 手動檢查文字；docs `SECS_MESSAGES.md` / `README.md` 8 處 + `build_html.py` 重生兩本 html。
+- `py_compile` 三檔 OK；`build.ps1` PyInstaller onedir 重打包（`dist\HT160S_SECS_Simulator\*.exe` 2026-09-03 08:49），frozen exe `--help` 正常。
+- 模擬器樹不是 git repo；改前檔案備份於 session scratchpad `sim_backup_20260903\`。
+
+### S7 完成（20260903）
+- `docs/manual/D1-alarm-list.md` 由 `generate-manual-appendices.ps1` 重生 → 486 筆（含 MES1025/MES1428/MES1921/WAR0963/MES0926）；
+  該腳本 `$Today` 原寫死 `2026-07-16`，改為 `Get-Date`；同輪重生的 B1/C1 只差日期行 + B1 一列 Suck4 欄位（IO_Table.csv 現況）。
+- `docs/plan/cleanout-amr-collect-call-plan-20260901.md:552` 就地加註〔20260903 更新〕。
+- 記憶：`secs-alid-hash-encoding`（S1–S9 狀態）、`secs-workbook-single-file-0804`（0903 首次內容 commit）、
+  `secs-comm-examples-doc-maintenance`（html 產生器已入庫 `scripts/ops/build-secs-html.py`）、`ht160s-secs-simulator-capabilities`（目錄改由產生器產生）。
+- `.github` 無 ALID 規則敘述（兩處只是泛稱），不需改。
+
+### S8 完成（20260903）
+- `docs/SECS/history/`：`git mv` 5 本舊工作簿 + 8 個 CSV 鏡像；`mv` 4 本 `*_manual.xlsx` + 3 個舊 7z（皆 untracked）。
+- ⚠ `SECS_GEM功能_Handler_20260831.xlsx` **仍在交付資料夾**：Excel 開啟中（`~$` 鎖檔），無法 rename；請關閉 Excel 後 `git mv` 到 history/。
+- 留在 `docs/SECS/`：0903 工作簿、兩本 md/html、`HostProvisioning_S2F37` md、9045 家族 `SECS_20260804_TransferPDF.xlsx`（SEMI 參考）、`HT-90xx` docx、`_ZipFile.bat`。
+
+### S9 完成（20260903，打包；寄送由使用者決定）
+- `docs/SECS/deliver_20260903/`：0903 工作簿、`Comm_Examples.html`、`Interface_Spec_20260727.html`、`HT160S_ALID_Map_Old_to_New_20260903.csv`（486 列）。
+- `_ZipFile.bat deliver_20260903` → `docs/SECS/deliver_20260903.7z`（密碼同 bat）。資料夾與 7z 不入 git。
+- ⚠ 韌體與字典必須同一 maintenance window 切換；現場 `General.ini` 另有 T6/Linktest 手改項；S3b 上機 round-trip 未做。
