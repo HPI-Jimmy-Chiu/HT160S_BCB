@@ -348,8 +348,8 @@ def selftest():
 # --------------------------------------------------------------------------- #
 # emitters
 # --------------------------------------------------------------------------- #
-SHEET_HEADER = ["ALID", "號段 Class", "號段內碼 Payload", "警報碼 AlarmCode",
-                "ALCD", "類別", "目錄訊息 ALTX"]
+SHEET_HEADER = ["ALID", "警報碼 AlarmCode", "ALCD", "類別", "目錄訊息 ALTX",
+                "號段 Class", "號段內碼 Payload"]   # F/G layout, owner ruling 2026-09-03
 
 
 def emit_sheet_csv(alarms, path):
@@ -358,8 +358,8 @@ def emit_sheet_csv(alarms, path):
         w = csv.writer(fh, lineterminator="\r\n")
         w.writerow(SHEET_HEADER)
         for a in alarms:
-            w.writerow([a["alid"], a["cls"], a["payload"], a["code"], a["alcd"],
-                        a["label"], a["altx"]])
+            w.writerow([a["alid"], a["code"], a["alcd"], a["label"], a["altx"],
+                        a["cls"], a["payload"]])
     return path
 
 
@@ -430,17 +430,31 @@ def emit_runner(alarms, runner_path, in_place):
     return new
 
 
-def emit_xlsx(alarms, base, out, expect_md5=None):
-    """Rebuild the ALID sheet of a COPY of `base`. Touches ONLY that sheet.
+def emit_xlsx(alarms, base, out, expect_md5=None, prose=None):
+    """Rebuild the ALID sheet of a COPY of `base`. Touches ONLY the cells it names.
+
+    LAYOUT (owner ruling 2026-09-03, option F/G): columns A..E keep the 0831 order and
+    meaning byte-for-byte (ALID | 警報碼 | ALCD | 類別 | 目錄訊息 ALTX); the two decode
+    columns are APPENDED as F "號段 Class" and G "號段內碼 Payload". Nothing is inserted,
+    so every host-side reference to "column B = alarm code" written against the 0831
+    sheet stays valid.
+
+    `prose` (optional dict, from --prose JSON):
+        "alid_footnote_1" / "alid_footnote_2"  replace the two footnote paragraphs
+        "cells": {"功能!E16": "...", ...}      overwrite arbitrary cells (value only,
+                                               style untouched) - the customer-facing
+                                               prose that the ALID re-encoding retires.
 
     HAZARDS handled here:
       * base md5 gate  -- the folder holds several same-shaped workbooks, plus a
         worktree copy tree under .claude/worktrees.
       * the two embedded PNGs live on the 功能 sheet (xl/media/image1.png,
-        image2.png via xl/drawings/drawing1.xml). We insert no rows/cols there.
+        image2.png via xl/drawings/drawing1.xml). We insert no rows/cols anywhere.
         VERIFY the two media md5s after saving (--verify-png BASE OUT).
       * an open Excel lock file (~$...xlsx) means the base may still be dirty:
         close Excel before running this.
+      * the footnote rows are FOUND, not assumed: last row whose column A is an int
+        is the last data row; +1 blank spacer; +2 / +3 the two footnotes.
     """
     from copy import copy
     import openpyxl
@@ -452,8 +466,17 @@ def emit_xlsx(alarms, base, out, expect_md5=None):
     print("  base md5 %s (verified)" % got)
     wb = openpyxl.load_workbook(base)
     ws = wb["ALID"]
-    OLD_F1, OLD_F2 = 484, 485            # the two footnote rows of the 0831 sheet
+    last_data = max(r for r in range(2, ws.max_row + 1)
+                    if isinstance(ws.cell(r, 1).value, int))
+    OLD_F1, OLD_F2 = last_data + 2, last_data + 3
     foot1, foot2 = ws.cell(OLD_F1, 1).value, ws.cell(OLD_F2, 1).value
+    if not (isinstance(foot1, str) and isinstance(foot2, str)):
+        raise SystemExit("footnote rows not where expected (A%d / A%d)" % (OLD_F1, OLD_F2))
+    print("  base ALID sheet: %d data rows, footnotes at A%d / A%d"
+          % (last_data - 1, OLD_F1, OLD_F2))
+    if prose:
+        foot1 = prose.get("alid_footnote_1", foot1)
+        foot2 = prose.get("alid_footnote_2", foot2)
     hdr_style = copy(ws.cell(1, 1)._style)
     body_style = [copy(ws.cell(2, c)._style) for c in range(1, 6)]
     for rng in list(ws.merged_cells.ranges):
@@ -461,18 +484,17 @@ def emit_xlsx(alarms, base, out, expect_md5=None):
     for r in range(2, max(OLD_F2, len(alarms) + 6) + 1):
         for c in range(1, 8):
             ws.cell(r, c).value = None
-    ws.insert_cols(2, 2)                 # new decode columns at B and C
-    ws.cell(1, 2).value = SHEET_HEADER[1]
-    ws.cell(1, 3).value = SHEET_HEADER[2]
-    for c in (2, 3):
+    ws.cell(1, 6).value = SHEET_HEADER[5]
+    ws.cell(1, 7).value = SHEET_HEADER[6]
+    for c in (6, 7):
         ws.cell(1, c)._style = hdr_style
-    style_for = {1: body_style[0], 2: body_style[0], 3: body_style[0],
-                 4: body_style[1], 5: body_style[2], 6: body_style[3],
-                 7: body_style[4]}
+    style_for = {1: body_style[0], 2: body_style[1], 3: body_style[2],
+                 4: body_style[3], 5: body_style[4], 6: body_style[0],
+                 7: body_style[0]}
     for i, a in enumerate(alarms):
         r = i + 2
-        vals = [a["alid"], a["cls"], a["payload"], a["code"], a["alcd"],
-                a["label"], a["altx"]]
+        vals = [a["alid"], a["code"], a["alcd"], a["label"], a["altx"],
+                a["cls"], a["payload"]]
         for c, v in enumerate(vals, start=1):
             cell = ws.cell(r, c)
             cell.value = v
@@ -482,17 +504,23 @@ def emit_xlsx(alarms, base, out, expect_md5=None):
     ws.cell(f1, 1).value = foot1
     ws.cell(f2, 1).value = foot2
     for r in (f1, f2):
+        ws.cell(r, 1)._style = copy(body_style[4])
         ws.cell(r, 1).alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=f1, start_column=1, end_row=f1, end_column=7)
-    # insert_cols moves CELLS but not column_dimensions, so restate all 7 widths.
-    for col, wd in (("A", 14), ("B", 9), ("C", 15), ("D", 18), ("E", 8),
-                    ("F", 16), ("G", 86)):
+    ws.merge_cells(start_row=f2, start_column=1, end_row=f2, end_column=7)
+    for col, wd in (("F", 10), ("G", 17)):   # A..E widths untouched
         ws.column_dimensions[col].width = wd
     ws.freeze_panes = "A2"               # the 0831 file carried a stray A269
+    ncell = 0
+    if prose:
+        for ref, text in (prose.get("cells") or {}).items():
+            sheet, coord = ref.split("!", 1)
+            wb[sheet][coord].value = text
+            ncell += 1
     wb.save(out)
-    print("  ALID sheet: %d data rows (2..%d); footnotes A%d / A%d; "
-          "prose cells 功能!E16 / E18 / E31 still need the manual rewrite"
-          % (len(alarms), len(alarms) + 1, f1, f2))
+    print("  ALID sheet: %d data rows (2..%d); footnotes A%d / A%d; F/G decode "
+          "columns; %d prose cell(s) written"
+          % (len(alarms), len(alarms) + 1, f1, f2, ncell))
     return out
 
 
@@ -612,6 +640,8 @@ def main():
     ap.add_argument("--emit-xlsx", metavar="OUT")
     ap.add_argument("--xlsx-base")
     ap.add_argument("--expect-base-md5")
+    ap.add_argument("--prose", metavar="JSON",
+                    help="UTF-8 JSON: alid_footnote_1 / alid_footnote_2 / cells{sheet!A1: text}")
     ap.add_argument("--verify-png", nargs=2, metavar=("BASE", "OUT"))
     ap.add_argument("--check-prose", nargs="+", metavar="FILE")
     ap.add_argument("--verify-table", metavar="CSV")
@@ -652,8 +682,12 @@ def main():
         print("simulator: %d ALID_CATALOG tuples + ALARM_CATALOG_ROWS=%d (%s)"
               % (len(alarms), len(alarms), "written" if a.in_place else "dry run"))
     if a.emit_xlsx:
+        prose = None
+        if a.prose:
+            import json
+            prose = json.loads(io.open(a.prose, encoding="utf-8-sig").read())
         print("wrote " + emit_xlsx(alarms, a.xlsx_base, a.emit_xlsx,
-                                   a.expect_base_md5))
+                                   a.expect_base_md5, prose))
     if a.check_prose:
         hits = check_prose(a.check_prose)
         print("-- PROSE GUARD --")
