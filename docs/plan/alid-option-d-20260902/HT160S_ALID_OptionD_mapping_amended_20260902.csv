@@ -1,0 +1,533 @@
+AlarmCode,AlarmType,Class,Payload,OldALID,NewALID,OldDigits,NewDigits,Changed,Registered,Message
+JAM0913,0,1,913,3184255201,100000913,10,9,YES,YES,Loader Tray Lost On Carriage
+JAM1030,0,1,1030,3184276402,100001030,10,9,YES,YES,Empty Push Tray Miss
+JAM1102,0,1,1102,3184277272,100001102,10,9,YES,YES,Auto1 : Auto push tray miss
+JAM1111,0,1,1111,3184277302,100001111,10,9,YES,YES,Auto1 : Auto rear tray data but no-tray sensor
+JAM1202,0,1,1202,3184278233,100001202,10,9,YES,YES,Auto2 : Auto push tray miss
+JAM1211,0,1,1211,3184278263,100001211,10,9,YES,YES,Auto2 : Auto rear tray data but no-tray sensor
+JAM1302,0,1,1302,3184279194,100001302,10,9,YES,YES,Auto3 : Auto push tray miss
+JAM1311,0,1,1311,3184279224,100001311,10,9,YES,YES,Auto3 : Auto rear tray data but no-tray sensor
+JAM1402,0,1,1402,3184280155,100001402,10,9,YES,YES,Auto4 : Auto push tray miss
+JAM1411,0,1,1411,3184280185,100001411,10,9,YES,YES,Auto4 : Auto rear tray data but no-tray sensor
+JAM1502,0,1,1502,3184281116,100001502,10,9,YES,YES,Auto5 : Auto push tray miss
+JAM1511,0,1,1511,3184281146,100001511,10,9,YES,YES,Auto5 : Auto rear tray data but no-tray sensor
+JAM1602,0,1,1602,3184282077,100001602,10,9,YES,YES,Auto6 : Auto push tray miss
+JAM1611,0,1,1611,3184282107,100001611,10,9,YES,YES,Auto6 : Auto rear tray data but no-tray sensor
+WAR0154,8,2,154,1841511208,200000154,10,9,YES,YES,Sorting Arm X motor will out of limit
+WAR0330,8,2,330,1841513064,200000330,10,9,YES,YES,Top CCD API not ready
+WAR0462,8,2,462,1841514120,200000462,10,9,YES,YES,Top CCD 2D no response (2DID communication time out)
+WAR0475,8,2,475,1841514154,200000475,10,9,YES,YES,2D code not found in any lot
+WAR0962,1,2,962,1841518925,200000962,10,9,YES,YES,AGV/AMR handshake timeout - AGV did not respond
+WAR0963,1,2,963,1841518926,200000963,10,9,YES,YES,SECS link lost - AMR handoff still held; clear the station then RETRY
+WAR0970,8,2,970,1841518954,200000970,10,9,YES,YES,Color CCD 2D no response (Tray ID communication time out)
+WAR1130,8,2,1130,1841540933,200001130,10,9,YES,YES,Auto1 : Auto feed tray miss
+WAR1230,8,2,1230,1841541894,200001230,10,9,YES,YES,Auto2 : Auto feed tray miss
+WAR1330,8,2,1330,1841542855,200001330,10,9,YES,YES,Auto3 : Auto feed tray miss
+WAR1430,8,2,1430,1841543816,200001430,10,9,YES,YES,Auto4 : Auto feed tray miss
+WAR1530,8,2,1530,1841544777,200001530,10,9,YES,YES,Auto5 : Auto feed tray miss
+WAR1630,8,2,1630,1841545738,200001630,10,9,YES,YES,Auto6 : Auto feed tray miss
+WAR16120,8,2,16120,1253341218,200016120,10,9,YES,YES,Top CCD connect not ready (Loader Tray ID no respond)
+WAR16121,8,2,16121,1253341219,200016121,10,9,YES,YES,Color CCD connect not ready (Color Tray ID no respond)
+MES0920,1,3,920,1671856706,300000920,10,9,YES,YES,Loader Tray Empty
+MES0924,1,3,924,1671856710,300000924,10,9,YES,YES,Loader rear has a leftover tray
+MES0925,1,3,925,1671856711,300000925,10,9,YES,YES,Loader front rise cylinder not retracted (C_Loader_FrontRiseTray_1)
+MES1021,1,3,1021,1671877849,300001021,10,9,YES,YES,Bottom Empty Tray Is Miss Error
+MES1022,1,3,1022,1671877850,300001022,10,9,YES,YES,Empty supply magazine empty
+MES1023,1,3,1023,1671877851,300001023,10,9,YES,YES,Empty supply stack full (sensor)
+MES1024,1,3,1024,1671877852,300001024,10,9,YES,YES,Front Empty Tray Is Miss Error
+MES1025,1,3,1025,1671877853,300001025,10,9,YES,YES,Empty carriage still holds a tray after clean-out - remove it
+MES1120,1,3,1120,1671878809,300001120,10,9,YES,YES,Auto1 : Auto output stack full (sensor)
+MES1123,1,3,1123,1671878812,300001123,10,9,YES,YES,Auto1 : Auto clean-out residual tray after drain
+MES1125,1,3,1125,1671878814,300001125,10,9,YES,YES,Auto1 : Auto output car full
+MES1220,1,3,1220,1671879770,300001220,10,9,YES,YES,Auto2 : Auto output stack full (sensor)
+MES1223,1,3,1223,1671879773,300001223,10,9,YES,YES,Auto2 : Auto clean-out residual tray after drain
+MES1225,1,3,1225,1671879775,300001225,10,9,YES,YES,Auto2 : Auto output car full
+MES1320,1,3,1320,1671880731,300001320,10,9,YES,YES,Auto3 : Auto output stack full (sensor)
+MES1323,1,3,1323,1671880734,300001323,10,9,YES,YES,Auto3 : Auto clean-out residual tray after drain
+MES1325,1,3,1325,1671880736,300001325,10,9,YES,YES,Auto3 : Auto output car full
+MES1420,1,3,1420,1671881692,300001420,10,9,YES,YES,Auto4 : Auto output stack full (sensor)
+MES1421,1,3,1421,1671881693,300001421,10,9,YES,YES,Color supply tray is not ready
+MES1422,1,3,1422,1671881694,300001422,10,9,YES,YES,Color Push Tray Miss
+MES1423,1,3,1423,1671881695,300001423,10,9,YES,YES,Auto4 : Auto clean-out residual tray after drain
+MES1424,1,3,1424,1671881696,300001424,10,9,YES,YES,Color front supply tray is missing
+MES1425,1,3,1425,1671881697,300001425,10,9,YES,YES,Auto4 : Auto output car full
+MES1426,1,3,1426,1671881698,300001426,10,9,YES,YES,Color rear has a leftover tray
+MES1427,1,3,1427,1671881699,300001427,10,9,YES,YES,Color supply stack full (sensor)
+MES1428,1,3,1428,1671881700,300001428,10,9,YES,YES,Color carriage still holds a tray after clean-out - remove it
+MES1520,1,3,1520,1671882653,300001520,10,9,YES,YES,Auto5 : Auto output stack full (sensor)
+MES1523,1,3,1523,1671882656,300001523,10,9,YES,YES,Auto5 : Auto clean-out residual tray after drain
+MES1525,1,3,1525,1671882658,300001525,10,9,YES,YES,Auto5 : Auto output car full
+MES1620,1,3,1620,1671883614,300001620,10,9,YES,YES,Auto6 : Auto output stack full (sensor)
+MES1623,1,3,1623,1671883617,300001623,10,9,YES,YES,Auto6 : Auto clean-out residual tray after drain
+MES1625,1,3,1625,1671883619,300001625,10,9,YES,YES,Auto6 : Auto output car full
+MES1721,1,3,1721,1671884576,300001721,10,9,YES,YES,TrayArm pick blocked - rear source not ready
+MES1722,1,3,1722,1671884577,300001722,10,9,YES,YES,TrayArm holds an unidentified tray
+MES1723,1,3,1723,1671884578,300001723,10,9,YES,YES,TrayArm place blocked - destination rear not free
+MES1921,1,3,1921,1671886498,300001921,10,9,YES,YES,SortArm blocked - waiting for the destination Auto to receive a tray
+40000,4,4,40000,49500724,400040000,8,9,YES,YES,The cylinder [C_TrayArmZ_Up_Off] can not off error
+40001,4,4,40001,49500725,400040001,8,9,YES,YES,The cylinder [C_TrayArmZ_Up_Off] can not on error
+40002,4,4,40002,49500726,400040002,8,9,YES,YES,The cylinder [C_TrayArmZ_Up_Off] off sensor is on error
+40003,4,4,40003,49500727,400040003,8,9,YES,YES,The cylinder [C_TrayArmZ_Up_On] can not on error
+40004,4,4,40004,49500728,400040004,8,9,YES,YES,The cylinder [C_TrayArmZ_Up_On] can not off error
+40005,4,4,40005,49500729,400040005,8,9,YES,YES,The cylinder [C_TrayArmZ_Up_On] on sensor is on error
+40010,4,4,40010,49500755,400040010,8,9,YES,YES,The cylinder [C_TrayArmZ_Down_Off] can not off error
+40011,4,4,40011,49500756,400040011,8,9,YES,YES,The cylinder [C_TrayArmZ_Down_Off] can not on error
+40012,4,4,40012,49500757,400040012,8,9,YES,YES,The cylinder [C_TrayArmZ_Down_Off] off sensor is on error
+40013,4,4,40013,49500758,400040013,8,9,YES,YES,The cylinder [C_TrayArmZ_Down_On] can not on error
+40014,4,4,40014,49500759,400040014,8,9,YES,YES,The cylinder [C_TrayArmZ_Down_On] can not off error
+40015,4,4,40015,49500760,400040015,8,9,YES,YES,The cylinder [C_TrayArmZ_Down_On] on sensor is on error
+40020,4,4,40020,49500786,400040020,8,9,YES,YES,The cylinder [C_TrayArm_FrontClamp_Off] can not off error
+40021,4,4,40021,49500787,400040021,8,9,YES,YES,The cylinder [C_TrayArm_FrontClamp_Off] can not on error
+40022,4,4,40022,49500788,400040022,8,9,YES,YES,The cylinder [C_TrayArm_FrontClamp_Off] off sensor is on error
+40023,4,4,40023,49500789,400040023,8,9,YES,YES,The cylinder [C_TrayArm_FrontClamp_On] can not on error
+40024,4,4,40024,49500790,400040024,8,9,YES,YES,The cylinder [C_TrayArm_FrontClamp_On] can not off error
+40025,4,4,40025,49500791,400040025,8,9,YES,YES,The cylinder [C_TrayArm_FrontClamp_On] on sensor is on error
+40030,4,4,40030,49500817,400040030,8,9,YES,YES,The cylinder [C_TrayArm_RearClamp_Off] can not off error
+40031,4,4,40031,49500818,400040031,8,9,YES,YES,The cylinder [C_TrayArm_RearClamp_Off] can not on error
+40032,4,4,40032,49500819,400040032,8,9,YES,YES,The cylinder [C_TrayArm_RearClamp_Off] off sensor is on error
+40033,4,4,40033,49500820,400040033,8,9,YES,YES,The cylinder [C_TrayArm_RearClamp_On] can not on error
+40034,4,4,40034,49500821,400040034,8,9,YES,YES,The cylinder [C_TrayArm_RearClamp_On] can not off error
+40035,4,4,40035,49500822,400040035,8,9,YES,YES,The cylinder [C_TrayArm_RearClamp_On] on sensor is on error
+40040,4,4,40040,49500848,400040040,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_1_Off] can not off error
+40041,4,4,40041,49500849,400040041,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_1_Off] can not on error
+40042,4,4,40042,49500850,400040042,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_1_Off] off sensor is on error
+40043,4,4,40043,49500851,400040043,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_1_On] can not on error
+40044,4,4,40044,49500852,400040044,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_1_On] can not off error
+40045,4,4,40045,49500853,400040045,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_1_On] on sensor is on error
+40050,4,4,40050,49500879,400040050,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_2_Off] can not off error
+40051,4,4,40051,49500880,400040051,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_2_Off] can not on error
+40052,4,4,40052,49500881,400040052,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_2_Off] off sensor is on error
+40053,4,4,40053,49500882,400040053,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_2_On] can not on error
+40054,4,4,40054,49500883,400040054,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_2_On] can not off error
+40055,4,4,40055,49500884,400040055,8,9,YES,YES,The cylinder [C_Empty_FrontRiseTray_2_On] on sensor is on error
+40060,4,4,40060,49500910,400040060,8,9,YES,YES,The cylinder [C_Empty_PushTray_Off] can not off error
+40061,4,4,40061,49500911,400040061,8,9,YES,YES,The cylinder [C_Empty_PushTray_Off] can not on error
+40062,4,4,40062,49500912,400040062,8,9,YES,YES,The cylinder [C_Empty_PushTray_Off] off sensor is on error
+40063,4,4,40063,49500913,400040063,8,9,YES,YES,The cylinder [C_Empty_PushTray_On] can not on error
+40064,4,4,40064,49500914,400040064,8,9,YES,YES,The cylinder [C_Empty_PushTray_On] can not off error
+40065,4,4,40065,49500915,400040065,8,9,YES,YES,The cylinder [C_Empty_PushTray_On] on sensor is on error
+40070,4,4,40070,49500941,400040070,8,9,YES,YES,The cylinder [C_Empty_LeanOnTray_Off] can not off error
+40071,4,4,40071,49500942,400040071,8,9,YES,YES,The cylinder [C_Empty_LeanOnTray_Off] can not on error
+40072,4,4,40072,49500943,400040072,8,9,YES,YES,The cylinder [C_Empty_LeanOnTray_Off] off sensor is on error
+40073,4,4,40073,49500944,400040073,8,9,YES,YES,The cylinder [C_Empty_LeanOnTray_On] can not on error
+40074,4,4,40074,49500945,400040074,8,9,YES,YES,The cylinder [C_Empty_LeanOnTray_On] can not off error
+40075,4,4,40075,49500946,400040075,8,9,YES,YES,The cylinder [C_Empty_LeanOnTray_On] on sensor is on error
+40080,4,4,40080,49500972,400040080,8,9,YES,YES,The cylinder [C_Empty_FrontSeparateTray_1_Off] can not off error
+40081,4,4,40081,49500973,400040081,8,9,YES,YES,The cylinder [C_Empty_FrontSeparateTray_1_Off] can not on error
+40082,4,4,40082,49500974,400040082,8,9,YES,YES,The cylinder [C_Empty_FrontSeparateTray_1_Off] off sensor is on error
+40083,4,4,40083,49500975,400040083,8,9,YES,YES,The cylinder [C_Empty_FrontSeparateTray_1_On] can not on error
+40084,4,4,40084,49500976,400040084,8,9,YES,YES,The cylinder [C_Empty_FrontSeparateTray_1_On] can not off error
+40085,4,4,40085,49500977,400040085,8,9,YES,YES,The cylinder [C_Empty_FrontSeparateTray_1_On] on sensor is on error
+40090,4,4,40090,49501003,400040090,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_1_Off] can not off error
+40091,4,4,40091,49501004,400040091,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_1_Off] can not on error
+40092,4,4,40092,49501005,400040092,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_1_Off] off sensor is on error
+40093,4,4,40093,49501006,400040093,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_1_On] can not on error
+40094,4,4,40094,49501007,400040094,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_1_On] can not off error
+40095,4,4,40095,49501008,400040095,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_1_On] on sensor is on error
+40100,4,4,40100,49501685,400040100,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_2_Off] can not off error
+40101,4,4,40101,49501686,400040101,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_2_Off] can not on error
+40102,4,4,40102,49501687,400040102,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_2_Off] off sensor is on error
+40103,4,4,40103,49501688,400040103,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_2_On] can not on error
+40104,4,4,40104,49501689,400040104,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_2_On] can not off error
+40105,4,4,40105,49501690,400040105,8,9,YES,YES,The cylinder [C_Loader_FrontRiseTray_2_On] on sensor is on error
+40110,4,4,40110,49501716,400040110,8,9,YES,YES,The cylinder [C_Loader1_PushTray_Off] can not off error
+40111,4,4,40111,49501717,400040111,8,9,YES,YES,The cylinder [C_Loader1_PushTray_Off] can not on error
+40112,4,4,40112,49501718,400040112,8,9,YES,YES,The cylinder [C_Loader1_PushTray_Off] off sensor is on error
+40113,4,4,40113,49501719,400040113,8,9,YES,YES,The cylinder [C_Loader1_PushTray_On] can not on error
+40114,4,4,40114,49501720,400040114,8,9,YES,YES,The cylinder [C_Loader1_PushTray_On] can not off error
+40115,4,4,40115,49501721,400040115,8,9,YES,YES,The cylinder [C_Loader1_PushTray_On] on sensor is on error
+40120,4,4,40120,49501747,400040120,8,9,YES,YES,The cylinder [C_Loader2_PushTray_Off] can not off error
+40121,4,4,40121,49501748,400040121,8,9,YES,YES,The cylinder [C_Loader2_PushTray_Off] can not on error
+40122,4,4,40122,49501749,400040122,8,9,YES,YES,The cylinder [C_Loader2_PushTray_Off] off sensor is on error
+40123,4,4,40123,49501750,400040123,8,9,YES,YES,The cylinder [C_Loader2_PushTray_On] can not on error
+40124,4,4,40124,49501751,400040124,8,9,YES,YES,The cylinder [C_Loader2_PushTray_On] can not off error
+40125,4,4,40125,49501752,400040125,8,9,YES,YES,The cylinder [C_Loader2_PushTray_On] on sensor is on error
+40130,4,4,40130,49501778,400040130,8,9,YES,YES,The cylinder [C_Loader1_LeanOnTray_Off] can not off error
+40131,4,4,40131,49501779,400040131,8,9,YES,YES,The cylinder [C_Loader1_LeanOnTray_Off] can not on error
+40132,4,4,40132,49501780,400040132,8,9,YES,YES,The cylinder [C_Loader1_LeanOnTray_Off] off sensor is on error
+40133,4,4,40133,49501781,400040133,8,9,YES,YES,The cylinder [C_Loader1_LeanOnTray_On] can not on error
+40134,4,4,40134,49501782,400040134,8,9,YES,YES,The cylinder [C_Loader1_LeanOnTray_On] can not off error
+40135,4,4,40135,49501783,400040135,8,9,YES,YES,The cylinder [C_Loader1_LeanOnTray_On] on sensor is on error
+40140,4,4,40140,49501809,400040140,8,9,YES,YES,The cylinder [C_Loader2_LeanOnTray_Off] can not off error
+40141,4,4,40141,49501810,400040141,8,9,YES,YES,The cylinder [C_Loader2_LeanOnTray_Off] can not on error
+40142,4,4,40142,49501811,400040142,8,9,YES,YES,The cylinder [C_Loader2_LeanOnTray_Off] off sensor is on error
+40143,4,4,40143,49501812,400040143,8,9,YES,YES,The cylinder [C_Loader2_LeanOnTray_On] can not on error
+40144,4,4,40144,49501813,400040144,8,9,YES,YES,The cylinder [C_Loader2_LeanOnTray_On] can not off error
+40145,4,4,40145,49501814,400040145,8,9,YES,YES,The cylinder [C_Loader2_LeanOnTray_On] on sensor is on error
+40150,4,4,40150,49501840,400040150,8,9,YES,YES,The cylinder [C_Loader_FrontSeparateTray_1_Off] can not off error
+40151,4,4,40151,49501841,400040151,8,9,YES,YES,The cylinder [C_Loader_FrontSeparateTray_1_Off] can not on error
+40152,4,4,40152,49501842,400040152,8,9,YES,YES,The cylinder [C_Loader_FrontSeparateTray_1_Off] off sensor is on error
+40153,4,4,40153,49501843,400040153,8,9,YES,YES,The cylinder [C_Loader_FrontSeparateTray_1_On] can not on error
+40154,4,4,40154,49501844,400040154,8,9,YES,YES,The cylinder [C_Loader_FrontSeparateTray_1_On] can not off error
+40155,4,4,40155,49501845,400040155,8,9,YES,YES,The cylinder [C_Loader_FrontSeparateTray_1_On] on sensor is on error
+40160,4,4,40160,49501871,400040160,8,9,YES,YES,The cylinder [C_Auto1_FrontRiseTray_Off] can not off error
+40161,4,4,40161,49501872,400040161,8,9,YES,YES,The cylinder [C_Auto1_FrontRiseTray_Off] can not on error
+40162,4,4,40162,49501873,400040162,8,9,YES,YES,The cylinder [C_Auto1_FrontRiseTray_Off] off sensor is on error
+40163,4,4,40163,49501874,400040163,8,9,YES,YES,The cylinder [C_Auto1_FrontRiseTray_On] can not on error
+40164,4,4,40164,49501875,400040164,8,9,YES,YES,The cylinder [C_Auto1_FrontRiseTray_On] can not off error
+40165,4,4,40165,49501876,400040165,8,9,YES,YES,The cylinder [C_Auto1_FrontRiseTray_On] on sensor is on error
+40170,4,4,40170,49501902,400040170,8,9,YES,YES,The cylinder [C_Auto1_PushTray_Off] can not off error
+40171,4,4,40171,49501903,400040171,8,9,YES,YES,The cylinder [C_Auto1_PushTray_Off] can not on error
+40172,4,4,40172,49501904,400040172,8,9,YES,YES,The cylinder [C_Auto1_PushTray_Off] off sensor is on error
+40173,4,4,40173,49501905,400040173,8,9,YES,YES,The cylinder [C_Auto1_PushTray_On] can not on error
+40174,4,4,40174,49501906,400040174,8,9,YES,YES,The cylinder [C_Auto1_PushTray_On] can not off error
+40175,4,4,40175,49501907,400040175,8,9,YES,YES,The cylinder [C_Auto1_PushTray_On] on sensor is on error
+40180,4,4,40180,49501933,400040180,8,9,YES,YES,The cylinder [C_Auto1_LeanOnTray_Off] can not off error
+40181,4,4,40181,49501934,400040181,8,9,YES,YES,The cylinder [C_Auto1_LeanOnTray_Off] can not on error
+40182,4,4,40182,49501935,400040182,8,9,YES,YES,The cylinder [C_Auto1_LeanOnTray_Off] off sensor is on error
+40183,4,4,40183,49501936,400040183,8,9,YES,YES,The cylinder [C_Auto1_LeanOnTray_On] can not on error
+40184,4,4,40184,49501937,400040184,8,9,YES,YES,The cylinder [C_Auto1_LeanOnTray_On] can not off error
+40185,4,4,40185,49501938,400040185,8,9,YES,YES,The cylinder [C_Auto1_LeanOnTray_On] on sensor is on error
+40190,4,4,40190,49501964,400040190,8,9,YES,YES,The cylinder [C_Auto2_FrontRiseTray_Off] can not off error
+40191,4,4,40191,49501965,400040191,8,9,YES,YES,The cylinder [C_Auto2_FrontRiseTray_Off] can not on error
+40192,4,4,40192,49501966,400040192,8,9,YES,YES,The cylinder [C_Auto2_FrontRiseTray_Off] off sensor is on error
+40193,4,4,40193,49501967,400040193,8,9,YES,YES,The cylinder [C_Auto2_FrontRiseTray_On] can not on error
+40194,4,4,40194,49501968,400040194,8,9,YES,YES,The cylinder [C_Auto2_FrontRiseTray_On] can not off error
+40195,4,4,40195,49501969,400040195,8,9,YES,YES,The cylinder [C_Auto2_FrontRiseTray_On] on sensor is on error
+40200,4,4,40200,49502646,400040200,8,9,YES,YES,The cylinder [C_Auto2_PushTray_Off] can not off error
+40201,4,4,40201,49502647,400040201,8,9,YES,YES,The cylinder [C_Auto2_PushTray_Off] can not on error
+40202,4,4,40202,49502648,400040202,8,9,YES,YES,The cylinder [C_Auto2_PushTray_Off] off sensor is on error
+40203,4,4,40203,49502649,400040203,8,9,YES,YES,The cylinder [C_Auto2_PushTray_On] can not on error
+40204,4,4,40204,49502650,400040204,8,9,YES,YES,The cylinder [C_Auto2_PushTray_On] can not off error
+40205,4,4,40205,49502651,400040205,8,9,YES,YES,The cylinder [C_Auto2_PushTray_On] on sensor is on error
+40210,4,4,40210,49502677,400040210,8,9,YES,YES,The cylinder [C_Auto2_LeanOnTray_Off] can not off error
+40211,4,4,40211,49502678,400040211,8,9,YES,YES,The cylinder [C_Auto2_LeanOnTray_Off] can not on error
+40212,4,4,40212,49502679,400040212,8,9,YES,YES,The cylinder [C_Auto2_LeanOnTray_Off] off sensor is on error
+40213,4,4,40213,49502680,400040213,8,9,YES,YES,The cylinder [C_Auto2_LeanOnTray_On] can not on error
+40214,4,4,40214,49502681,400040214,8,9,YES,YES,The cylinder [C_Auto2_LeanOnTray_On] can not off error
+40215,4,4,40215,49502682,400040215,8,9,YES,YES,The cylinder [C_Auto2_LeanOnTray_On] on sensor is on error
+40220,4,4,40220,49502708,400040220,8,9,YES,YES,The cylinder [C_Auto3_FrontRiseTray_Off] can not off error
+40221,4,4,40221,49502709,400040221,8,9,YES,YES,The cylinder [C_Auto3_FrontRiseTray_Off] can not on error
+40222,4,4,40222,49502710,400040222,8,9,YES,YES,The cylinder [C_Auto3_FrontRiseTray_Off] off sensor is on error
+40223,4,4,40223,49502711,400040223,8,9,YES,YES,The cylinder [C_Auto3_FrontRiseTray_On] can not on error
+40224,4,4,40224,49502712,400040224,8,9,YES,YES,The cylinder [C_Auto3_FrontRiseTray_On] can not off error
+40225,4,4,40225,49502713,400040225,8,9,YES,YES,The cylinder [C_Auto3_FrontRiseTray_On] on sensor is on error
+40230,4,4,40230,49502739,400040230,8,9,YES,YES,The cylinder [C_Auto3_PushTray_Off] can not off error
+40231,4,4,40231,49502740,400040231,8,9,YES,YES,The cylinder [C_Auto3_PushTray_Off] can not on error
+40232,4,4,40232,49502741,400040232,8,9,YES,YES,The cylinder [C_Auto3_PushTray_Off] off sensor is on error
+40233,4,4,40233,49502742,400040233,8,9,YES,YES,The cylinder [C_Auto3_PushTray_On] can not on error
+40234,4,4,40234,49502743,400040234,8,9,YES,YES,The cylinder [C_Auto3_PushTray_On] can not off error
+40235,4,4,40235,49502744,400040235,8,9,YES,YES,The cylinder [C_Auto3_PushTray_On] on sensor is on error
+40240,4,4,40240,49502770,400040240,8,9,YES,YES,The cylinder [C_Auto3_LeanOnTray_Off] can not off error
+40241,4,4,40241,49502771,400040241,8,9,YES,YES,The cylinder [C_Auto3_LeanOnTray_Off] can not on error
+40242,4,4,40242,49502772,400040242,8,9,YES,YES,The cylinder [C_Auto3_LeanOnTray_Off] off sensor is on error
+40243,4,4,40243,49502773,400040243,8,9,YES,YES,The cylinder [C_Auto3_LeanOnTray_On] can not on error
+40244,4,4,40244,49502774,400040244,8,9,YES,YES,The cylinder [C_Auto3_LeanOnTray_On] can not off error
+40245,4,4,40245,49502775,400040245,8,9,YES,YES,The cylinder [C_Auto3_LeanOnTray_On] on sensor is on error
+40250,4,4,40250,49502801,400040250,8,9,YES,YES,The cylinder [C_Auto4_FrontRiseTray_Off] can not off error
+40251,4,4,40251,49502802,400040251,8,9,YES,YES,The cylinder [C_Auto4_FrontRiseTray_Off] can not on error
+40252,4,4,40252,49502803,400040252,8,9,YES,YES,The cylinder [C_Auto4_FrontRiseTray_Off] off sensor is on error
+40253,4,4,40253,49502804,400040253,8,9,YES,YES,The cylinder [C_Auto4_FrontRiseTray_On] can not on error
+40254,4,4,40254,49502805,400040254,8,9,YES,YES,The cylinder [C_Auto4_FrontRiseTray_On] can not off error
+40255,4,4,40255,49502806,400040255,8,9,YES,YES,The cylinder [C_Auto4_FrontRiseTray_On] on sensor is on error
+40260,4,4,40260,49502832,400040260,8,9,YES,YES,The cylinder [C_Auto4_PushTray_Off] can not off error
+40261,4,4,40261,49502833,400040261,8,9,YES,YES,The cylinder [C_Auto4_PushTray_Off] can not on error
+40262,4,4,40262,49502834,400040262,8,9,YES,YES,The cylinder [C_Auto4_PushTray_Off] off sensor is on error
+40263,4,4,40263,49502835,400040263,8,9,YES,YES,The cylinder [C_Auto4_PushTray_On] can not on error
+40264,4,4,40264,49502836,400040264,8,9,YES,YES,The cylinder [C_Auto4_PushTray_On] can not off error
+40265,4,4,40265,49502837,400040265,8,9,YES,YES,The cylinder [C_Auto4_PushTray_On] on sensor is on error
+40270,4,4,40270,49502863,400040270,8,9,YES,YES,The cylinder [C_Auto4_LeanOnTray_Off] can not off error
+40271,4,4,40271,49502864,400040271,8,9,YES,YES,The cylinder [C_Auto4_LeanOnTray_Off] can not on error
+40272,4,4,40272,49502865,400040272,8,9,YES,YES,The cylinder [C_Auto4_LeanOnTray_Off] off sensor is on error
+40273,4,4,40273,49502866,400040273,8,9,YES,YES,The cylinder [C_Auto4_LeanOnTray_On] can not on error
+40274,4,4,40274,49502867,400040274,8,9,YES,YES,The cylinder [C_Auto4_LeanOnTray_On] can not off error
+40275,4,4,40275,49502868,400040275,8,9,YES,YES,The cylinder [C_Auto4_LeanOnTray_On] on sensor is on error
+40280,4,4,40280,49502894,400040280,8,9,YES,YES,The cylinder [C_Auto5_FrontRiseTray_Off] can not off error
+40281,4,4,40281,49502895,400040281,8,9,YES,YES,The cylinder [C_Auto5_FrontRiseTray_Off] can not on error
+40282,4,4,40282,49502896,400040282,8,9,YES,YES,The cylinder [C_Auto5_FrontRiseTray_Off] off sensor is on error
+40283,4,4,40283,49502897,400040283,8,9,YES,YES,The cylinder [C_Auto5_FrontRiseTray_On] can not on error
+40284,4,4,40284,49502898,400040284,8,9,YES,YES,The cylinder [C_Auto5_FrontRiseTray_On] can not off error
+40285,4,4,40285,49502899,400040285,8,9,YES,YES,The cylinder [C_Auto5_FrontRiseTray_On] on sensor is on error
+40290,4,4,40290,49502925,400040290,8,9,YES,YES,The cylinder [C_Auto5_PushTray_Off] can not off error
+40291,4,4,40291,49502926,400040291,8,9,YES,YES,The cylinder [C_Auto5_PushTray_Off] can not on error
+40292,4,4,40292,49502927,400040292,8,9,YES,YES,The cylinder [C_Auto5_PushTray_Off] off sensor is on error
+40293,4,4,40293,49502928,400040293,8,9,YES,YES,The cylinder [C_Auto5_PushTray_On] can not on error
+40294,4,4,40294,49502929,400040294,8,9,YES,YES,The cylinder [C_Auto5_PushTray_On] can not off error
+40295,4,4,40295,49502930,400040295,8,9,YES,YES,The cylinder [C_Auto5_PushTray_On] on sensor is on error
+40300,4,4,40300,49503607,400040300,8,9,YES,YES,The cylinder [C_Auto5_LeanOnTray_Off] can not off error
+40301,4,4,40301,49503608,400040301,8,9,YES,YES,The cylinder [C_Auto5_LeanOnTray_Off] can not on error
+40302,4,4,40302,49503609,400040302,8,9,YES,YES,The cylinder [C_Auto5_LeanOnTray_Off] off sensor is on error
+40303,4,4,40303,49503610,400040303,8,9,YES,YES,The cylinder [C_Auto5_LeanOnTray_On] can not on error
+40304,4,4,40304,49503611,400040304,8,9,YES,YES,The cylinder [C_Auto5_LeanOnTray_On] can not off error
+40305,4,4,40305,49503612,400040305,8,9,YES,YES,The cylinder [C_Auto5_LeanOnTray_On] on sensor is on error
+40310,4,4,40310,49503638,400040310,8,9,YES,YES,The cylinder [C_Auto6_FrontRiseTray_Off] can not off error
+40311,4,4,40311,49503639,400040311,8,9,YES,YES,The cylinder [C_Auto6_FrontRiseTray_Off] can not on error
+40312,4,4,40312,49503640,400040312,8,9,YES,YES,The cylinder [C_Auto6_FrontRiseTray_Off] off sensor is on error
+40313,4,4,40313,49503641,400040313,8,9,YES,YES,The cylinder [C_Auto6_FrontRiseTray_On] can not on error
+40314,4,4,40314,49503642,400040314,8,9,YES,YES,The cylinder [C_Auto6_FrontRiseTray_On] can not off error
+40315,4,4,40315,49503643,400040315,8,9,YES,YES,The cylinder [C_Auto6_FrontRiseTray_On] on sensor is on error
+40320,4,4,40320,49503669,400040320,8,9,YES,YES,The cylinder [C_Auto6_PushTray_Off] can not off error
+40321,4,4,40321,49503670,400040321,8,9,YES,YES,The cylinder [C_Auto6_PushTray_Off] can not on error
+40322,4,4,40322,49503671,400040322,8,9,YES,YES,The cylinder [C_Auto6_PushTray_Off] off sensor is on error
+40323,4,4,40323,49503672,400040323,8,9,YES,YES,The cylinder [C_Auto6_PushTray_On] can not on error
+40324,4,4,40324,49503673,400040324,8,9,YES,YES,The cylinder [C_Auto6_PushTray_On] can not off error
+40325,4,4,40325,49503674,400040325,8,9,YES,YES,The cylinder [C_Auto6_PushTray_On] on sensor is on error
+40330,4,4,40330,49503700,400040330,8,9,YES,YES,The cylinder [C_Auto6_LeanOnTray_Off] can not off error
+40331,4,4,40331,49503701,400040331,8,9,YES,YES,The cylinder [C_Auto6_LeanOnTray_Off] can not on error
+40332,4,4,40332,49503702,400040332,8,9,YES,YES,The cylinder [C_Auto6_LeanOnTray_Off] off sensor is on error
+40333,4,4,40333,49503703,400040333,8,9,YES,YES,The cylinder [C_Auto6_LeanOnTray_On] can not on error
+40334,4,4,40334,49503704,400040334,8,9,YES,YES,The cylinder [C_Auto6_LeanOnTray_On] can not off error
+40335,4,4,40335,49503705,400040335,8,9,YES,YES,The cylinder [C_Auto6_LeanOnTray_On] on sensor is on error
+40340,4,4,40340,49503731,400040340,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_1_Off] can not off error
+40341,4,4,40341,49503732,400040341,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_1_Off] can not on error
+40342,4,4,40342,49503733,400040342,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_1_Off] off sensor is on error
+40343,4,4,40343,49503734,400040343,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_1_On] can not on error
+40344,4,4,40344,49503735,400040344,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_1_On] can not off error
+40345,4,4,40345,49503736,400040345,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_1_On] on sensor is on error
+40350,4,4,40350,49503762,400040350,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_2_Off] can not off error
+40351,4,4,40351,49503763,400040351,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_2_Off] can not on error
+40352,4,4,40352,49503764,400040352,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_2_Off] off sensor is on error
+40353,4,4,40353,49503765,400040353,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_2_On] can not on error
+40354,4,4,40354,49503766,400040354,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_2_On] can not off error
+40355,4,4,40355,49503767,400040355,8,9,YES,YES,The cylinder [C_Color_FrontRiseTray_2_On] on sensor is on error
+40360,4,4,40360,49503793,400040360,8,9,YES,YES,The cylinder [C_Color_PushTray_Off] can not off error
+40361,4,4,40361,49503794,400040361,8,9,YES,YES,The cylinder [C_Color_PushTray_Off] can not on error
+40362,4,4,40362,49503795,400040362,8,9,YES,YES,The cylinder [C_Color_PushTray_Off] off sensor is on error
+40363,4,4,40363,49503796,400040363,8,9,YES,YES,The cylinder [C_Color_PushTray_On] can not on error
+40364,4,4,40364,49503797,400040364,8,9,YES,YES,The cylinder [C_Color_PushTray_On] can not off error
+40365,4,4,40365,49503798,400040365,8,9,YES,YES,The cylinder [C_Color_PushTray_On] on sensor is on error
+40370,4,4,40370,49503824,400040370,8,9,YES,YES,The cylinder [C_Color_LeanOnTray_Off] can not off error
+40371,4,4,40371,49503825,400040371,8,9,YES,YES,The cylinder [C_Color_LeanOnTray_Off] can not on error
+40372,4,4,40372,49503826,400040372,8,9,YES,YES,The cylinder [C_Color_LeanOnTray_Off] off sensor is on error
+40373,4,4,40373,49503827,400040373,8,9,YES,YES,The cylinder [C_Color_LeanOnTray_On] can not on error
+40374,4,4,40374,49503828,400040374,8,9,YES,YES,The cylinder [C_Color_LeanOnTray_On] can not off error
+40375,4,4,40375,49503829,400040375,8,9,YES,YES,The cylinder [C_Color_LeanOnTray_On] on sensor is on error
+40380,4,4,40380,49503855,400040380,8,9,YES,YES,The cylinder [C_Color_FrontSeparateTray_1_Off] can not off error
+40381,4,4,40381,49503856,400040381,8,9,YES,YES,The cylinder [C_Color_FrontSeparateTray_1_Off] can not on error
+40382,4,4,40382,49503857,400040382,8,9,YES,YES,The cylinder [C_Color_FrontSeparateTray_1_Off] off sensor is on error
+40383,4,4,40383,49503858,400040383,8,9,YES,YES,The cylinder [C_Color_FrontSeparateTray_1_On] can not on error
+40384,4,4,40384,49503859,400040384,8,9,YES,YES,The cylinder [C_Color_FrontSeparateTray_1_On] can not off error
+40385,4,4,40385,49503860,400040385,8,9,YES,YES,The cylinder [C_Color_FrontSeparateTray_1_On] on sensor is on error
+50000,5,5,50000,50424245,500050000,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor Power Off Error
+50001,5,5,50001,50424246,500050001,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor Out Of Torque Error
+50002,5,5,50002,50424247,500050002,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor CW sensor ON Error
+50003,5,5,50003,50424248,500050003,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor CCW sensor ON Error
+50004,5,5,50004,50424249,500050004,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor Soft P position Error
+50005,5,5,50005,50424250,500050005,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor Soft N position Error
+50006,5,5,50006,50424251,500050006,8,9,YES,YES,"[M01 - MSortingArmX] Motor --Motor position Error,Home and restart"
+50007,5,5,50007,50424252,500050007,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor Undefine Error
+50008,5,5,50008,50424253,500050008,8,9,YES,YES,[M01 - MSortingArmX] Motor --Motor Target will Out Of Limit Position Error
+50010,5,5,50010,50424276,500050010,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor Power Off Error
+50011,5,5,50011,50424277,500050011,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor Out Of Torque Error
+50012,5,5,50012,50424278,500050012,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor CW sensor ON Error
+50013,5,5,50013,50424279,500050013,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor CCW sensor ON Error
+50014,5,5,50014,50424280,500050014,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor Soft P position Error
+50015,5,5,50015,50424281,500050015,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor Soft N position Error
+50016,5,5,50016,50424282,500050016,8,9,YES,YES,"[M02 - MTrayArmX] Motor --Motor position Error,Home and restart"
+50017,5,5,50017,50424283,500050017,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor Undefine Error
+50018,5,5,50018,50424284,500050018,8,9,YES,YES,[M02 - MTrayArmX] Motor --Motor Target will Out Of Limit Position Error
+50020,5,5,50020,50424307,500050020,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor Power Off Error
+50021,5,5,50021,50424308,500050021,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor Out Of Torque Error
+50022,5,5,50022,50424309,500050022,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor CW sensor ON Error
+50023,5,5,50023,50424310,500050023,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor CCW sensor ON Error
+50024,5,5,50024,50424311,500050024,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor Soft P position Error
+50025,5,5,50025,50424312,500050025,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor Soft N position Error
+50026,5,5,50026,50424313,500050026,8,9,YES,YES,"[M03 - MEmptyY] Motor --Motor position Error,Home and restart"
+50027,5,5,50027,50424314,500050027,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor Undefine Error
+50028,5,5,50028,50424315,500050028,8,9,YES,YES,[M03 - MEmptyY] Motor --Motor Target will Out Of Limit Position Error
+50030,5,5,50030,50424338,500050030,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor Power Off Error
+50031,5,5,50031,50424339,500050031,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor Out Of Torque Error
+50032,5,5,50032,50424340,500050032,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor CW sensor ON Error
+50033,5,5,50033,50424341,500050033,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor CCW sensor ON Error
+50034,5,5,50034,50424342,500050034,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor Soft P position Error
+50035,5,5,50035,50424343,500050035,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor Soft N position Error
+50036,5,5,50036,50424344,500050036,8,9,YES,YES,"[M04 - MLoaderY_1] Motor --Motor position Error,Home and restart"
+50037,5,5,50037,50424345,500050037,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor Undefine Error
+50038,5,5,50038,50424346,500050038,8,9,YES,YES,[M04 - MLoaderY_1] Motor --Motor Target will Out Of Limit Position Error
+50040,5,5,50040,50424369,500050040,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor Power Off Error
+50041,5,5,50041,50424370,500050041,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor Out Of Torque Error
+50042,5,5,50042,50424371,500050042,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor CW sensor ON Error
+50043,5,5,50043,50424372,500050043,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor CCW sensor ON Error
+50044,5,5,50044,50424373,500050044,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor Soft P position Error
+50045,5,5,50045,50424374,500050045,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor Soft N position Error
+50046,5,5,50046,50424375,500050046,8,9,YES,YES,"[M05 - MLoaderY_2] Motor --Motor position Error,Home and restart"
+50047,5,5,50047,50424376,500050047,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor Undefine Error
+50048,5,5,50048,50424377,500050048,8,9,YES,YES,[M05 - MLoaderY_2] Motor --Motor Target will Out Of Limit Position Error
+50050,5,5,50050,50424400,500050050,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor Power Off Error
+50051,5,5,50051,50424401,500050051,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor Out Of Torque Error
+50052,5,5,50052,50424402,500050052,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor CW sensor ON Error
+50053,5,5,50053,50424403,500050053,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor CCW sensor ON Error
+50054,5,5,50054,50424404,500050054,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor Soft P position Error
+50055,5,5,50055,50424405,500050055,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor Soft N position Error
+50056,5,5,50056,50424406,500050056,8,9,YES,YES,"[M06 - MAutoY_1] Motor --Motor position Error,Home and restart"
+50057,5,5,50057,50424407,500050057,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor Undefine Error
+50058,5,5,50058,50424408,500050058,8,9,YES,YES,[M06 - MAutoY_1] Motor --Motor Target will Out Of Limit Position Error
+50060,5,5,50060,50424431,500050060,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor Power Off Error
+50061,5,5,50061,50424432,500050061,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor Out Of Torque Error
+50062,5,5,50062,50424433,500050062,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor CW sensor ON Error
+50063,5,5,50063,50424434,500050063,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor CCW sensor ON Error
+50064,5,5,50064,50424435,500050064,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor Soft P position Error
+50065,5,5,50065,50424436,500050065,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor Soft N position Error
+50066,5,5,50066,50424437,500050066,8,9,YES,YES,"[M07 - MAutoY_2] Motor --Motor position Error,Home and restart"
+50067,5,5,50067,50424438,500050067,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor Undefine Error
+50068,5,5,50068,50424439,500050068,8,9,YES,YES,[M07 - MAutoY_2] Motor --Motor Target will Out Of Limit Position Error
+50070,5,5,50070,50424462,500050070,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor Power Off Error
+50071,5,5,50071,50424463,500050071,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor Out Of Torque Error
+50072,5,5,50072,50424464,500050072,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor CW sensor ON Error
+50073,5,5,50073,50424465,500050073,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor CCW sensor ON Error
+50074,5,5,50074,50424466,500050074,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor Soft P position Error
+50075,5,5,50075,50424467,500050075,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor Soft N position Error
+50076,5,5,50076,50424468,500050076,8,9,YES,YES,"[M08 - MAutoY_3] Motor --Motor position Error,Home and restart"
+50077,5,5,50077,50424469,500050077,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor Undefine Error
+50078,5,5,50078,50424470,500050078,8,9,YES,YES,[M08 - MAutoY_3] Motor --Motor Target will Out Of Limit Position Error
+50080,5,5,50080,50424493,500050080,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor Power Off Error
+50081,5,5,50081,50424494,500050081,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor Out Of Torque Error
+50082,5,5,50082,50424495,500050082,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor CW sensor ON Error
+50083,5,5,50083,50424496,500050083,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor CCW sensor ON Error
+50084,5,5,50084,50424497,500050084,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor Soft P position Error
+50085,5,5,50085,50424498,500050085,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor Soft N position Error
+50086,5,5,50086,50424499,500050086,8,9,YES,YES,"[M09 - MAutoY_4] Motor --Motor position Error,Home and restart"
+50087,5,5,50087,50424500,500050087,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor Undefine Error
+50088,5,5,50088,50424501,500050088,8,9,YES,YES,[M09 - MAutoY_4] Motor --Motor Target will Out Of Limit Position Error
+50090,5,5,50090,50424524,500050090,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor Power Off Error
+50091,5,5,50091,50424525,500050091,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor Out Of Torque Error
+50092,5,5,50092,50424526,500050092,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor CW sensor ON Error
+50093,5,5,50093,50424527,500050093,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor CCW sensor ON Error
+50094,5,5,50094,50424528,500050094,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor Soft P position Error
+50095,5,5,50095,50424529,500050095,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor Soft N position Error
+50096,5,5,50096,50424530,500050096,8,9,YES,YES,"[M10 - MAutoY_5] Motor --Motor position Error,Home and restart"
+50097,5,5,50097,50424531,500050097,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor Undefine Error
+50098,5,5,50098,50424532,500050098,8,9,YES,YES,[M10 - MAutoY_5] Motor --Motor Target will Out Of Limit Position Error
+50100,5,5,50100,50425206,500050100,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor Power Off Error
+50101,5,5,50101,50425207,500050101,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor Out Of Torque Error
+50102,5,5,50102,50425208,500050102,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor CW sensor ON Error
+50103,5,5,50103,50425209,500050103,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor CCW sensor ON Error
+50104,5,5,50104,50425210,500050104,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor Soft P position Error
+50105,5,5,50105,50425211,500050105,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor Soft N position Error
+50106,5,5,50106,50425212,500050106,8,9,YES,YES,"[M11 - MAutoY_6] Motor --Motor position Error,Home and restart"
+50107,5,5,50107,50425213,500050107,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor Undefine Error
+50108,5,5,50108,50425214,500050108,8,9,YES,YES,[M11 - MAutoY_6] Motor --Motor Target will Out Of Limit Position Error
+50110,5,5,50110,50425237,500050110,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor Power Off Error
+50111,5,5,50111,50425238,500050111,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor Out Of Torque Error
+50112,5,5,50112,50425239,500050112,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor CW sensor ON Error
+50113,5,5,50113,50425240,500050113,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor CCW sensor ON Error
+50114,5,5,50114,50425241,500050114,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor Soft P position Error
+50115,5,5,50115,50425242,500050115,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor Soft N position Error
+50116,5,5,50116,50425243,500050116,8,9,YES,YES,"[M12 - MTopCCDX] Motor --Motor position Error,Home and restart"
+50117,5,5,50117,50425244,500050117,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor Undefine Error
+50118,5,5,50118,50425245,500050118,8,9,YES,YES,[M12 - MTopCCDX] Motor --Motor Target will Out Of Limit Position Error
+50120,5,5,50120,50425268,500050120,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor Power Off Error
+50121,5,5,50121,50425269,500050121,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor Out Of Torque Error
+50122,5,5,50122,50425270,500050122,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor CW sensor ON Error
+50123,5,5,50123,50425271,500050123,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor CCW sensor ON Error
+50124,5,5,50124,50425272,500050124,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor Soft P position Error
+50125,5,5,50125,50425273,500050125,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor Soft N position Error
+50126,5,5,50126,50425274,500050126,8,9,YES,YES,"[M13 - MBottomCCDY] Motor --Motor position Error,Home and restart"
+50127,5,5,50127,50425275,500050127,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor Undefine Error
+50128,5,5,50128,50425276,500050128,8,9,YES,YES,[M13 - MBottomCCDY] Motor --Motor Target will Out Of Limit Position Error
+50130,5,5,50130,50425299,500050130,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor Power Off Error
+50131,5,5,50131,50425300,500050131,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor Out Of Torque Error
+50132,5,5,50132,50425301,500050132,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor CW sensor ON Error
+50133,5,5,50133,50425302,500050133,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor CCW sensor ON Error
+50134,5,5,50134,50425303,500050134,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor Soft P position Error
+50135,5,5,50135,50425304,500050135,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor Soft N position Error
+50136,5,5,50136,50425305,500050136,8,9,YES,YES,"[M14 - MSuckZ_1] Motor --Motor position Error,Home and restart"
+50137,5,5,50137,50425306,500050137,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor Undefine Error
+50138,5,5,50138,50425307,500050138,8,9,YES,YES,[M14 - MSuckZ_1] Motor --Motor Target will Out Of Limit Position Error
+50140,5,5,50140,50425330,500050140,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor Power Off Error
+50141,5,5,50141,50425331,500050141,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor Out Of Torque Error
+50142,5,5,50142,50425332,500050142,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor CW sensor ON Error
+50143,5,5,50143,50425333,500050143,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor CCW sensor ON Error
+50144,5,5,50144,50425334,500050144,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor Soft P position Error
+50145,5,5,50145,50425335,500050145,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor Soft N position Error
+50146,5,5,50146,50425336,500050146,8,9,YES,YES,"[M15 - MSuckZ_2] Motor --Motor position Error,Home and restart"
+50147,5,5,50147,50425337,500050147,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor Undefine Error
+50148,5,5,50148,50425338,500050148,8,9,YES,YES,[M15 - MSuckZ_2] Motor --Motor Target will Out Of Limit Position Error
+50150,5,5,50150,50425361,500050150,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor Power Off Error
+50151,5,5,50151,50425362,500050151,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor Out Of Torque Error
+50152,5,5,50152,50425363,500050152,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor CW sensor ON Error
+50153,5,5,50153,50425364,500050153,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor CCW sensor ON Error
+50154,5,5,50154,50425365,500050154,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor Soft P position Error
+50155,5,5,50155,50425366,500050155,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor Soft N position Error
+50156,5,5,50156,50425367,500050156,8,9,YES,YES,"[M16 - MSuckZ_3] Motor --Motor position Error,Home and restart"
+50157,5,5,50157,50425368,500050157,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor Undefine Error
+50158,5,5,50158,50425369,500050158,8,9,YES,YES,[M16 - MSuckZ_3] Motor --Motor Target will Out Of Limit Position Error
+50160,5,5,50160,50425392,500050160,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor Power Off Error
+50161,5,5,50161,50425393,500050161,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor Out Of Torque Error
+50162,5,5,50162,50425394,500050162,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor CW sensor ON Error
+50163,5,5,50163,50425395,500050163,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor CCW sensor ON Error
+50164,5,5,50164,50425396,500050164,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor Soft P position Error
+50165,5,5,50165,50425397,500050165,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor Soft N position Error
+50166,5,5,50166,50425398,500050166,8,9,YES,YES,"[M17 - MSuckZ_4] Motor --Motor position Error,Home and restart"
+50167,5,5,50167,50425399,500050167,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor Undefine Error
+50168,5,5,50168,50425400,500050168,8,9,YES,YES,[M17 - MSuckZ_4] Motor --Motor Target will Out Of Limit Position Error
+50170,5,5,50170,50425423,500050170,8,9,YES,YES,[M18 - MPitchX] Motor --Motor Power Off Error
+50171,5,5,50171,50425424,500050171,8,9,YES,YES,[M18 - MPitchX] Motor --Motor Out Of Torque Error
+50172,5,5,50172,50425425,500050172,8,9,YES,YES,[M18 - MPitchX] Motor --Motor CW sensor ON Error
+50173,5,5,50173,50425426,500050173,8,9,YES,YES,[M18 - MPitchX] Motor --Motor CCW sensor ON Error
+50174,5,5,50174,50425427,500050174,8,9,YES,YES,[M18 - MPitchX] Motor --Motor Soft P position Error
+50175,5,5,50175,50425428,500050175,8,9,YES,YES,[M18 - MPitchX] Motor --Motor Soft N position Error
+50176,5,5,50176,50425429,500050176,8,9,YES,YES,"[M18 - MPitchX] Motor --Motor position Error,Home and restart"
+50177,5,5,50177,50425430,500050177,8,9,YES,YES,[M18 - MPitchX] Motor --Motor Undefine Error
+50178,5,5,50178,50425431,500050178,8,9,YES,YES,[M18 - MPitchX] Motor --Motor Target will Out Of Limit Position Error
+50180,5,5,50180,50425454,500050180,8,9,YES,YES,[M19 - MColorY] Motor --Motor Power Off Error
+50181,5,5,50181,50425455,500050181,8,9,YES,YES,[M19 - MColorY] Motor --Motor Out Of Torque Error
+50182,5,5,50182,50425456,500050182,8,9,YES,YES,[M19 - MColorY] Motor --Motor CW sensor ON Error
+50183,5,5,50183,50425457,500050183,8,9,YES,YES,[M19 - MColorY] Motor --Motor CCW sensor ON Error
+50184,5,5,50184,50425458,500050184,8,9,YES,YES,[M19 - MColorY] Motor --Motor Soft P position Error
+50185,5,5,50185,50425459,500050185,8,9,YES,YES,[M19 - MColorY] Motor --Motor Soft N position Error
+50186,5,5,50186,50425460,500050186,8,9,YES,YES,"[M19 - MColorY] Motor --Motor position Error,Home and restart"
+50187,5,5,50187,50425461,500050187,8,9,YES,YES,[M19 - MColorY] Motor --Motor Undefine Error
+50188,5,5,50188,50425462,500050188,8,9,YES,YES,[M19 - MColorY] Motor --Motor Target will Out Of Limit Position Error
+50190,5,5,50190,50425485,500050190,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor Power Off Error
+50191,5,5,50191,50425486,500050191,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor Out Of Torque Error
+50192,5,5,50192,50425487,500050192,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor CW sensor ON Error
+50193,5,5,50193,50425488,500050193,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor CCW sensor ON Error
+50194,5,5,50194,50425489,500050194,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor Soft P position Error
+50195,5,5,50195,50425490,500050195,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor Soft N position Error
+50196,5,5,50196,50425491,500050196,8,9,YES,YES,"[M20 - MTopCCDX_Color] Motor --Motor position Error,Home and restart"
+50197,5,5,50197,50425492,500050197,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor Undefine Error
+50198,5,5,50198,50425493,500050198,8,9,YES,YES,[M20 - MTopCCDX_Color] Motor --Motor Target will Out Of Limit Position Error
+60000,6,6,60000,51347766,600060000,8,9,YES,YES,Suck--Pick Up Error
+60001,6,6,60001,51347767,600060001,8,9,YES,YES,Suck--Destory Error
+60002,6,6,60002,51347768,600060002,8,9,YES,YES,Suck--Vacuum Sensor Off Error
+60003,6,6,60003,51347769,600060003,8,9,YES,YES,Suck--Device Be Droped Error
+60004,6,6,60004,51347770,600060004,8,9,YES,YES,Suck--Initial Sensor Off Error
+60005,6,6,60005,51347771,600060005,8,9,YES,YES,Suck--Initial Sensor On Error
+MSuckZ_2_MotOverLimitErr,,9,1441895,2001441895,901441895,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MEmptyY_MotOverLimitErr,,9,3145418,3703145418,903145418,10,9,YES,NO,(free string - not in the S5F6 catalog)
+Air Pressure Low,,9,3364399,3603364399,903364399,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MTrayArmX_MotOverLimitErr,,9,5541040,2905541040,905541040,10,9,YES,NO,(free string - not in the S5F6 catalog)
+Ion Fan Alarm,,9,6795660,3106795660,906795660,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MSuckZ_4_MotOverLimitErr,,9,13093993,413093993,913093993,9,9,YES,NO,(free string - not in the S5F6 catalog)
+MAutoY_1_MotOverLimitErr,,9,19348512,2519348512,919348512,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MBottomCCDY_MotOverLimitErr,,9,19554622,2919554622,919554622,10,9,YES,NO,(free string - not in the S5F6 catalog)
+Loader ½L¦³ IC¡A½Ð²¾°£,,9,23646915,3223646915,923646915,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SortArm SuckZ 1 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,,9,23654317,1123654317,923654317,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MAutoY_3_MotOverLimitErr,,9,31000610,931000610,931000610,9,9,NO,NO,(free string - not in the S5F6 catalog)
+SortArm SuckZ 4 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,,9,33524810,3833524810,933524810,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MAutoY_5_MotOverLimitErr,,9,37620004,3637620004,937620004,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MLoaderY_1_MotOverLimitErr,,9,43763836,743763836,943763836,9,9,YES,NO,(free string - not in the S5F6 catalog)
+Safety Door Open,,9,45115854,3445115854,945115854,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0001,,9,45192866,3145192866,945192866,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0002,,9,45192867,3145192867,945192867,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0003,,9,45192868,3145192868,945192868,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0011,,9,45192897,3145192897,945192897,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0012,,9,45192898,3145192898,945192898,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0013,,9,45192899,3145192899,945192899,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0021,,9,45192928,3145192928,945192928,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0022,,9,45192929,3145192929,945192929,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0023,,9,45192930,3145192930,945192930,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0031,,9,45192959,3145192959,945192959,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0032,,9,45192960,3145192960,945192960,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SUC0033,,9,45192961,3145192961,945192961,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MSuckZ_1_MotOverLimitErr,,9,48132198,648132198,948132198,9,9,YES,NO,(free string - not in the S5F6 catalog)
+MSuckZ_3_MotOverLimitErr,,9,54751592,3354751592,954751592,10,9,YES,NO,(free string - not in the S5F6 catalog)
+"Loader Tray has IC,please remove",,9,54803979,2054803979,954803979,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MColorY_MotOverLimitErr,,9,59253364,3859253364,959253364,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MTopCCDX_Color_MotOverLimitErr,,9,63157617,3363157617,963157617,10,9,YES,NO,(free string - not in the S5F6 catalog)
+Motor Power Off,,9,63283337,3763283337,963283337,10,9,YES,NO,(free string - not in the S5F6 catalog)
+TrayArm move blocked : the Z lift left its UP sensor. Check the TrayArmZ up cylinder / air pressure.,,9,66462601,966462601,966462601,9,9,NO,NO,(free string - not in the S5F6 catalog)
+MPitchX_MotOverLimitErr,,9,66833206,166833206,966833206,9,9,YES,NO,(free string - not in the S5F6 catalog)
+SortArm SuckZ 3 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,,9,66923115,66923115,966923115,8,9,YES,NO,(free string - not in the S5F6 catalog)
+MAutoY_2_MotOverLimitErr,,9,72658209,3872658209,972658209,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MSortingArmX_MotOverLimitErr,,9,79673604,1879673604,979673604,10,9,YES,NO,(free string - not in the S5F6 catalog)
+Emergency Stop,,9,83530353,1983530353,983530353,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MAutoY_4_MotOverLimitErr,,9,84310307,2284310307,984310307,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SnFKCleanOut,,9,91410149,3891410149,991410149,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SortArm SuckZ down did not complete within timeout. Check the suck-Z axis and MC88X1 card.,,9,92930430,3992930430,992930430,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SortArm SuckZ 2 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,,9,95288716,595288716,995288716,9,9,YES,NO,(free string - not in the S5F6 catalog)
+MTopCCDX_MotOverLimitErr,,9,95631149,3495631149,995631149,10,9,YES,NO,(free string - not in the S5F6 catalog)
+MAutoY_6_MotOverLimitErr,,9,95962405,695962405,995962405,9,9,YES,NO,(free string - not in the S5F6 catalog)
+MLoaderY_2_MotOverLimitErr,,9,97073533,2097073533,997073533,10,9,YES,NO,(free string - not in the S5F6 catalog)
+SortArm move blocked : a suck nozzle left its Home sensor (lost steps). Re-home the suckers.,,9,99752848,2599752848,999752848,10,9,YES,NO,(free string - not in the S5F6 catalog)

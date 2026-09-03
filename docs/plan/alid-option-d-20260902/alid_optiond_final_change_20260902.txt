@@ -1,0 +1,627 @@
+================================================================================
+HT160S  S5 ALID  Option D - FINAL BCB6 CHANGE  (Amendments 1, 1b, A5, 2)
+Authority : D:\HT160S_BCB\docs\plan\alid-option-d-ratified-spec-20260902.md
+Date      : 2026-09-02        DESIGN ONLY - nothing in this file has been applied.
+================================================================================
+
+EDIT LIST (9 edits, 5 files).  The prior run's E10 (aLoader.cpp:2442) is DELETED from
+the package: the ratified spec section 6 excludes it explicitly ("Option D does not fix
+this one, it needs a separate ruling").
+
+  E1  SecsGem\UsecegemMainFrom.cpp  :167-177   replace ComputeAlarmAlid + add LegacyAlarmHash
+  E2  SecsGem\UsecegemMainFrom.cpp  :183-186   refresh the stale AlarmReport comment
+  E3  SecsGem\UsecegemMainFrom.h    :36        refresh the stale declaration comment
+  E4  database.cpp                 after :24  two includes
+  E5  database.cpp                 after :33  Amendment 2 latch globals
+  E6  database.cpp                 :1119/1120 Amendment 2 self-check, end of CreateSystemAlarmCode()
+  E6b database.cpp                 :816/:1100 OPTIONAL - fold the 20260626 guard into the same report
+  E7  database.cpp                 after :1121 ReportAlarmAlidAudit()
+  E8  database.h                   after :609 externs + prototype
+  E9  ht160s.cpp                   after :219 the one flush call
+
+Line numbers are against the working tree as read 2026-09-02. E2's anchor text moves
+once E1 is applied, so anchor on the TEXT, not the number.
+
+================================================================================
+E1 - THE ENCODER
+File   : D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\SecsGem\UsecegemMainFrom.cpp
+Anchor : lines 167-177 inclusive - the whole current
+         `unsigned ComputeAlarmAlid(AnsiString Code)` function, from that signature
+         line down to and including its closing `}` on :177.
+         Leave the `//----` separators on :166 and :178 alone; the replacement supplies
+         its own separator between the two functions.
+Note   : the signature is UNCHANGED and the function stays a pure function of the code
+         string, so SecsGem\uHGemHT160.cpp:3499 needs NO edit.
+--------------------------------------------------------------------------------
+REPLACEMENT TEXT (column 0, no tabs, CRLF line ends):
+
+//AI(secs-alid-optiond) 20260902 : the legacy 31-polynomial ALID hash. Retained on
+// purpose, for three jobs :
+//  (1) it is the class-9 payload source in ComputeAlarmAlid() below,
+//  (2) every SECS log written BEFORE the Option D cutover recorded the value it
+//      returns, so a post-mortem on a D:\HT160S_Log\SECS_GEM\ file older than the
+//      cutover still needs this exact arithmetic, and
+//  (3) it is the one-line rollback switch (see ROLLBACK in ComputeAlarmAlid).
+// Byte-for-byte the pre-Option-D loop - do NOT "tidy" the (unsigned char) cast or the
+// 32-bit wrap; both are part of the historical values.
+// File-static on purpose : nothing outside this translation unit may mint an ALID.
+static unsigned LegacyAlarmHash(AnsiString Code)
+{
+    unsigned h = 0;
+    for(int i=1; i<=Code.Length(); i++)
+        h = h*31u + (unsigned char)Code[i];
+    return h;
+}
+//---------------------------------------------------------------------------
+unsigned ComputeAlarmAlid(AnsiString Code)
+{
+    //AI(secs-alid-optiond) 20260902 : SSOT for the S5 ALID. Class-banded 9-digit
+    // encoding, owner-ratified 20260902 (docs\plan\alid-option-d-ratified-spec-20260902.md).
+    // Replaces the raw 31-polynomial hash, which could reach 10 digits and so broke the
+    // KYEC "alarm code is at most 9 digits" requirement.
+    //
+    //   ALID = Class * 100000000 + Payload            ALWAYS exactly 9 digits
+    //
+    //   Class 1  "JAM" + canonical digit tail   Payload = tail value   JAM0913  ->100000913
+    //   Class 2  "WAR" + canonical digit tail   Payload = tail value   WAR16120 ->200016120
+    //   Class 3  "MES" + canonical digit tail   Payload = tail value   MES1421  ->300001421
+    //   Class 4  exactly 5 digits, 1st digit 4  Payload = whole code   40000    ->400040000
+    //   Class 5  exactly 5 digits, 1st digit 5  Payload = whole code   50000    ->500050000
+    //   Class 6  exactly 5 digits, 1st digit 6  Payload = whole code   60000    ->600060000
+    //   Class 7  exactly 5 digits, 1st digit 7  Payload = whole code   70000    ->700070000
+    //   Class 8  exactly 5 digits, 1st digit 8  Payload = whole code   80000    ->800080000
+    //   Class 9  anything else                  Payload = legacy hash mod 100000000
+    //   Class 0  NEVER produced (it would emit fewer than 9 digits).
+    //
+    // Classes 4..8 mirror eAlarmType (database.h) : 4=eCynAlarm 5=eMotorAlarm
+    // 6=eSuckAlarm 7=eRecordProcess 8=eOther. note.cpp ShowSystemError already reads the
+    // FIRST CHARACTER of a code as that type digit and has branches for 7 and 8, so a
+    // 7xxxx / 8xxxx code is a first-class citizen of the alarm machinery, not a
+    // hypothetical - which is why 7 and 8 are LIVE numeric classes here and NOT
+    // "reserved for two future 3-letter prefixes".
+    //
+    // Class 9 is the HOST SIGNAL : "this ALID is NOT in the S5F6/S5F8 catalog - read the
+    // alarm code from the leading token of ALTX". It is where the ~47 unregistered
+    // free-string alarms land (sensor names, "<alias>_MotOverLimitErr", SUC%03d%d codes,
+    // and whole English sentences passed straight through by note.cpp ShowSystemError).
+    //
+    // HOST DECODE :  class = ALID/100000000 ; payload = ALID%100000000
+    //   class 1/2/3 -> prefix + (payload<10000 ? "%04u" : "%u")   exact, see AMENDMENT 1b
+    //   class 4..8  -> "%05u"                                     exact by construction
+    //   class 9     -> not in the catalog
+    //
+    // WHY NOT the HT9046LS "%d%02d%06d" scheme : it puts 47 HT160S codes onto ALIDs the
+    // customer's own HT9046LS machines already use, 22 of them for a DIFFERENT alarm
+    // (HT160S MES1421 -> 314001421 = HT9046LS MES1421 "No tray on Color tray"). Their EAP
+    // resolves ALIDs from an out-of-band dictionary, so one shared dictionary would render
+    // HT160S alarms as 9046LS ones.
+    //
+    // PURE function of the code string ONLY - no map lookup, no language, no machine
+    // state, no clock. That is what makes the S5F1 report ALID equal the S5F6/S5F8
+    // catalog ALID (uHGemHT160.cpp EmitAlarmCatalog calls this same function).
+    //
+    // ROLLBACK : insert  return LegacyAlarmHash(Code);  as the first statement below.
+    unsigned uClass   = 0;
+    unsigned uPayload = 0;
+    int      iLen     = Code.Length();
+
+    //Classes 1/2/3 : a 3-letter family prefix plus a CANONICAL numeric tail of exactly
+    //4 or 5 digits - so the whole code string is exactly 7 or 8 characters. Any other
+    //length falls straight through to class 9. AnsiString is 1-BASED : Code[1]..Code[iLen].
+    if(iLen==7 || iLen==8)
+    {
+        if     (Code[1]=='J' && Code[2]=='A' && Code[3]=='M') uClass = 1;
+        else if(Code[1]=='W' && Code[2]=='A' && Code[3]=='R') uClass = 2;
+        else if(Code[1]=='M' && Code[2]=='E' && Code[3]=='S') uClass = 3;
+    }
+    if(uClass!=0)
+    {
+        int      iTailLen = iLen-3;               //4 or 5, guaranteed by the gate above
+        unsigned uTail    = 0;
+        bool     bOk      = true;
+        //Parse the tail BY HAND, digit by digit - deliberately NOT atoi() / ToIntDef().
+        //atoi would accept "+1", " 12" and "12x", and it would silently equate "01421"
+        //with "1421" - exactly the non-injectivity AMENDMENT 1b exists to remove. At most
+        //5 digits are read, so uTail can never exceed 99999 and cannot overflow; the
+        //length gate above is what makes that true.
+        for(int i=4; i<=iLen; i++)
+        {
+            if(Code[i]<'0' || Code[i]>'9')
+            {
+                bOk = false;
+                break;
+            }
+            uTail = uTail*10u + (unsigned)(Code[i]-'0');
+        }
+        //AMENDMENT 1b - TAIL CANONICALISATION. Exactly one string per payload value :
+        //    4 digits AND value <  10000     "0913" "1421" "0920"   (100 per unit 01..99)
+        //    5 digits AND value >= 10000     "16120"                (1000 per unit 10..99)
+        //Anything else falls to class 9. Needed because payload = int(tail) discards
+        //leading zeros, so MES1421 / MES01421 / MES001421 would all compose 300001421 -
+        //three different strings, ONE ALID, and the host cannot render the right one back.
+        //NOT "reject any leading zero" : that naive rule kills 11 IN-SERVICE codes, all of
+        //them unit 01..09 four-digit tails (JAM0913, MES0920, MES0924, MES0925, WAR0154,
+        //WAR0330, WAR0462, WAR0475, WAR0962, WAR0963, WAR0970).
+        //MEASURED 20260902 over system\AlarmList.csv : of the 65 prefixed codes the tail
+        //lengths are {4:63, 5:2}, none has a 5-digit tail starting with '0', and this rule
+        //rejects ZERO of them - all 65 survive.
+        //CONSEQUENCE for future numbering : units 01..09 are capped at 100 alarms each
+        //("0UNN"); a 5-digit "0UNNN" tail is ILLEGAL, so a future WAR09120 is NOT allowed -
+        //renumber that unit to >=10 instead. Units 10..99 may use "UUNN" or "UUNNN".
+        if(bOk && iTailLen==4 && uTail>=10000u)
+            bOk = false;                          //structurally unreachable, kept explicit
+        if(bOk && iTailLen==5 && uTail< 10000u)
+            bOk = false;                          //"MES01421", "WAR09120", ...
+        //AMENDMENT 1 - the disjointness guard, payload ceiling 999999. Subsumed by 1b
+        //today (a tail of at most 5 digits can never exceed 99999) and retained on
+        //purpose : it is the RATIFIED invariant that keeps Option D disjoint from the
+        //customer's own HT9046LS ALID space. All 2737 of their ALIDs are 9 digits with a
+        //NON-ZERO unit in digits 2-3 (min 101000109, max 330003021); a class 1/2/3 value
+        //reads "00" there only while the payload stays below 1000000. Without this ceiling
+        //a code string "MES14001421" would compose 314001421 - exactly the 9046LS MES1421.
+        //If 1b is ever relaxed to allow longer tails, THIS is the line that still holds.
+        if(bOk && uTail>999999u)
+            bOk = false;
+        if(bOk)
+            uPayload = uTail;
+        else
+            uClass = 0;                           //fall through to class 9
+    }
+
+    //AMENDMENT A5 - classes 4..8 : exactly 5 characters, all digits, first digit 4..8
+    //(4=cylinder 5=motor 6=sucker 7=eRecordProcess 8=eOther). The WHOLE code IS the
+    //payload, so it is capped at 89999 and AMENDMENT 1's ceiling is satisfied by the code
+    //format itself. Band [700000000,899999999] is unused by the 9046LS space - their
+    //leading digit is only 1, 2 or 3, measured over all 2738 rows - so opening classes 7
+    //and 8 does not touch disjointness.
+    if(uClass==0 && iLen==5 && Code[1]>='4' && Code[1]<='8')
+    {
+        unsigned uWhole = 0;
+        bool     bOk    = true;
+        for(int i=1; i<=5; i++)
+        {
+            if(Code[i]<'0' || Code[i]>'9')
+            {
+                bOk = false;
+                break;
+            }
+            uWhole = uWhole*10u + (unsigned)(Code[i]-'0');
+        }
+        if(bOk)
+        {
+            uClass   = (unsigned)(Code[1]-'0');   //'4'..'8' -> 4..8
+            uPayload = uWhole;
+        }
+    }
+
+    //Class 9 : an unregistered free-string alarm. The legacy hash folded to 8 digits keeps
+    //the value stable for a given string; the class digit tells the host not to look it up.
+    //AMENDMENT 2 (database.cpp CreateSystemAlarmCode) asserts at every startup that no
+    //REGISTERED code ever lands here.
+    if(uClass==0)
+    {
+        uClass   = 9;
+        uPayload = LegacyAlarmHash(Code) % 100000000u;
+    }
+
+    //uClass is now 1..9 and uPayload <= 99999999, so the result lies in
+    //[100000000..999999999] : never 0, never fewer than 9 digits, never more, and well
+    //inside SIGNED 32-bit too (max 999999999 < 2147483647) - the old "the host must parse
+    //this as unsigned 32-bit" warning is void.
+    return uClass*100000000u + uPayload;
+}
+
+--------------------------------------------------------------------------------
+INTEGER TYPES, stated explicitly (the brief asked for this)
+  iLen, iTailLen           int        AnsiString::Length() returns int
+  uTail, uWhole, uPayload  unsigned   accumulators; bounded to 99999 by the length gates
+  uClass                   unsigned   1..9 after the fall-through chain
+  return value             unsigned   the declared type, unchanged
+  Code[i]                  char       compared against '0'/'9', never atoi'd
+  LegacyAlarmHash h        unsigned   the 32-bit wrap is intentional and historical
+No 64-bit type, no C++11 (no auto / nullptr / lambda / range-for / enum class).
+
+TAIL PARSING - the decision the brief demanded be explicit
+  The tail is parsed CHARACTER BY CHARACTER. atoi() / StrToInt() / ToIntDef() appear
+  nowhere in the encoder. A leading zero is therefore NOT "ignored" - it is a fact about
+  the STRING, and Amendment 1b turns that fact into an accept/reject decision by pairing
+  the string length against the parsed value. "1421" (len 4, value 1421 < 10000) is
+  accepted; "01421" (len 5, value 1421 < 10000) is REJECTED and becomes class 9.
+
+================================================================================
+E2 - refresh the stale AlarmReport comment
+File   : ...\SecsGem\UsecegemMainFrom.cpp
+Anchor : the 4 comment lines currently at :183-186, inside AlarmReport(), beginning
+         "//AI(ht160s-secsgem) 20260625 : HT160 self-defined standard S5F1. ALID = stable"
+         and ending "// category bits 0 (unspecified). Mirrors the global EventReport glue above."
+         Do NOT touch the code on :187-192.
+--------------------------------------------------------------------------------
+REPLACEMENT TEXT (4 spaces of leading indent, as the original):
+
+    //AI(secs-alid-optiond) 20260902 : HT160 self-defined standard S5F1. ALID =
+    // ComputeAlarmAlid(Code) = the class-banded 9-digit encoding (Class*100000000 +
+    // Payload; 1=JAM 2=WAR 3=MES 4=cylinder 5=motor 6=sucker 7=eRecordProcess 8=eOther,
+    // 9=unregistered free string). The host gets a decodable numeric key, and the SAME
+    // value appears in the S5F6/S5F8 catalog because that path calls this same pure
+    // function - S5F1 ALID == catalog ALID by construction, not by convention.
+    // ALTX = "<code> <message>", so the alarm code is always recoverable as the LEADING
+    // TOKEN of ALTX - that is the documented recovery for a class-9 (not-in-catalog)
+    // ALID. ALCD bit7 = alarm set(1)/clear(0), category bits 0 (unspecified); the ALCD
+    // encoding is UNCHANGED by the Option D re-encoding. Mirrors the EventReport glue.
+
+================================================================================
+E3 - refresh the stale header comment
+File   : D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\SecsGem\UsecegemMainFrom.h
+Anchor : line 36, the single comment line
+         "//AI(ht160s-secsgem) 20260715 : SSOT ALID hash shared by S5F1 + the S5F6/S5F8 alarm catalog."
+         Line 37, `unsigned ComputeAlarmAlid(AnsiString Code);`, stays BYTE-IDENTICAL.
+--------------------------------------------------------------------------------
+REPLACEMENT TEXT for :36 (column 0):
+
+//AI(secs-alid-optiond) 20260902 : SSOT ALID shared by S5F1 and the S5F6/S5F8 alarm
+//  catalog - a PURE function of the alarm code string (no map, no language, no machine
+//  state), which is what makes the reported ALID equal the catalog ALID. Returns the
+//  class-banded encoding Class*100000000 + Payload : 1=JAM 2=WAR 3=MES (payload = the
+//  canonical 4- or 5-digit tail), 4=cylinder 5=motor 6=sucker 7=eRecordProcess 8=eOther
+//  (payload = the whole 5-digit code), 9=unregistered free string (host: "not in the
+//  catalog, read the code from the leading token of ALTX"). ALWAYS exactly 9 digits:
+//  never 0, never above 999999999, so even a signed 32-bit host parse is safe. Amendment
+//  2 in database.cpp CreateSystemAlarmCode() self-checks every registered code at startup.
+
+================================================================================
+E4 - includes for the Amendment 2 self-check
+File   : D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\database.cpp
+Anchor : line 24, `#include "SecsGem\uHGemClass.h"`. INSERT the two lines AFTER it.
+Why    : verified 2026-09-02 - database.cpp does NOT currently see ComputeAlarmAlid.
+         uHGemClass.h pulls only uHGemEquipment.h, which is also UsecegemMainFrom.h's
+         only dependency, so there is no new include weight and no cycle
+         (UsecegemMainFrom.h and uHGemEquipment.h never mention database.h).
+         cEventLog.h pulls cCsvDailyLog.h, which includes only <vcl.h> + <SyncObjs.hpp>.
+--------------------------------------------------------------------------------
+INSERT AFTER :24
+
+#include "SecsGem\UsecegemMainFrom.h"   //AI(secs-alid-optiond) 20260902 : ComputeAlarmAlid for the ALID self-check
+#include "cEventLog.h"                  //AI(secs-alid-optiond) 20260902 : g_EventLog, the ratified report channel
+
+================================================================================
+E5 - Amendment 2 latch globals
+File   : database.cpp
+Anchor : line 33, `TDataModule1 *DataModule1;`. INSERT AFTER it.
+Why    : CreateSystemAlarmCode() runs inside HSys.Initial() (ht160s.cpp:189 ->
+         database.cpp:802, init progress 46) but g_EventLog.Init() only runs at
+         ht160s.cpp:215 (progress 86), and cCsvDailyLog::AppendLine() returns immediately
+         while m_pCS is NULL (cCsvDailyLog.cpp:114-117). VERIFIED. A direct EventLog write
+         at self-check time is therefore a SILENT NO-OP at power-on - exactly the failure
+         the silent-stop-must-notify convention forbids. The verdict is latched here and
+         flushed once the log is open.
+--------------------------------------------------------------------------------
+INSERT AFTER :33
+
+//AI(secs-alid-optiond) 20260902 : AMENDMENT 2 verdict latch. CreateSystemAlarmCode()
+//runs inside HSys.Initial() at init progress 46; g_EventLog.Init() only runs at
+//ht160s.cpp progress 86, and cCsvDailyLog::AppendLine returns early while m_pCS is NULL,
+//so an EventLog write at self-check time is a silent no-op at power-on. The verdict is
+//latched here and flushed by ReportAlarmAlidAudit() from ht160s.cpp once the log is open.
+//gAlidAuditDetail is a program-lifetime singleton, bounded to K_ALID_AUDIT_MAX_LINES
+//strings, deliberately never freed (the iosetview re-run of CreateSystemAlarmCode reuses
+//it). 0 faults = clean.
+static const int K_ALID_AUDIT_MAX_LINES = 40;   //bound the EventLog burst; a rollback would otherwise log every row
+int          gAlidAuditRows       = 0;
+int          gAlidAuditFaults     = 0;
+int          gAlidAuditSuppressed = 0;
+TStringList *gAlidAuditDetail     = NULL;
+
+================================================================================
+E6 - AMENDMENT 2, the startup self-check
+File   : database.cpp
+Anchor : inside SYSTEM_MODULAR::CreateSystemAlarmCode(), AFTER the AlarmList.csv dump's
+         `catch(...) { }` that ends on :1119, and BEFORE the function's closing `}` on
+         :1120. Insert the whole block between that `    }` and that `}`.
+Placed after the dump on purpose: AlarmList.csv is still written even if this throws.
+--------------------------------------------------------------------------------
+INSERT (4 spaces of leading indent, matching the function body)
+
+    //AI(secs-alid-optiond) 20260902 : AMENDMENT 2 - the S5 ALID startup self-check
+    //(ratified spec section 2). Option D's "9 digits AND decodable" promise degrades
+    //SILENTLY the moment a code that does not fit the grammar is registered - a 6-digit
+    //family code, a 5-letter prefix, a non-canonical leading-zero tail ("MES01421"), a
+    //bare "30000" - each just becomes class 9 with no complaint, and the host is then
+    //told "not in the catalog" for a code that IS in the catalog. There is no ALID
+    //auditor anywhere else in the toolchain, so this is it.
+    //
+    //THE THREE RATIFIED CHECKS, per row of the FINAL mapAlarmCodeList :
+    //  NOT_9_DIGITS            ComputeAlarmAlid() is outside [100000000..999999999]
+    //  CLASS9_NOT_IN_CATALOG   a REGISTERED code encoded to class 9
+    //  DUPLICATE_OF_<code>     two codes share one ALID (the host cannot tell them apart)
+    //A host-decode round-trip check is deliberately NOT included : AMENDMENT 1b makes the
+    //round trip a THEOREM (one canonical string per payload for classes 1/2/3, payload ==
+    //the code for classes 4..8), verified exhaustively over all 350000 strings the
+    //classes 1..8 grammar accepts - 0 failures. It would be a permanently dead branch.
+    //Measured on the 20260902 map : 485 rows, 0 faults.
+    //
+    //RELATION TO THE 20260626 [ALARM-COLLISION] GUARD ~40 lines above : that guard flags
+    //an all-digit key beginning 4/5/6 whose length is not 5. Every such key now also
+    //fails CLASS9_NOT_IN_CATALOG here (a length other than 5 cannot be class 4..8), so
+    //this check STRICTLY SUBSUMES it for detection. The old guard is kept because it
+    //names the specific cause ("non-canonical structured key") and because it scans
+    //mapNameToAlarm, which this pass does not. Nothing is re-implemented.
+    //
+    //REPORT CHANNEL (ratified) : g_EventLog.Log() - one line per violation plus one
+    //summary line, into the daily EventLog CSV, which the State Record zip already
+    //carries. NEVER ShowMyMessage (it stops the machine), never a modal, and never a
+    //note.cpp alarm (ShowNoteAlarm calls DecStopAllMotor() and clears Sys.SystemStart -
+    //it would physically stop the machine at power-on over a catalog cosmetic, and it is
+    //self-defeating: the map is what feeds the alarm system being used to complain about
+    //the map). This self-check can NEVER block a production start.
+    gAlidAuditRows       = 0;
+    gAlidAuditFaults     = 0;
+    gAlidAuditSuppressed = 0;
+    if(gAlidAuditDetail==NULL)
+        gAlidAuditDetail = new TStringList();
+    gAlidAuditDetail->Clear();
+    try
+    {
+        std::map<unsigned, AnsiString> mapAlidSeen;
+        //LOCAL iterator on purpose : the member IterAlarmCodeList is shared mutable state
+        //(note.cpp ShowSystemError assigns it too), so this pass does not touch it.
+        std::map<AnsiString, MyAlarmCodeStruct>::iterator itAudit;
+        for(itAudit=mapAlarmCodeList.begin(); itAudit!=mapAlarmCodeList.end(); ++itAudit)
+        {
+            AnsiString sCode = itAudit->second.AlarmCode;
+            unsigned   uAlid = ComputeAlarmAlid(sCode);
+            unsigned   uCls  = uAlid/100000000u;
+            AnsiString sBad  = "";
+            gAlidAuditRows++;
+
+            if(uAlid<100000000u || uAlid>999999999u)
+                sBad = "NOT_9_DIGITS";
+            else if(uCls==9u)
+                sBad = "CLASS9_NOT_IN_CATALOG";
+            else if(mapAlidSeen.find(uAlid)!=mapAlidSeen.end())
+                sBad = AnsiString("DUPLICATE_OF_")+mapAlidSeen[uAlid];
+
+            if(mapAlidSeen.find(uAlid)==mapAlidSeen.end())
+                mapAlidSeen[uAlid] = sCode;
+
+            if(sBad!="")
+            {
+                gAlidAuditFaults++;
+                if(gAlidAuditDetail->Count<K_ALID_AUDIT_MAX_LINES)
+                    gAlidAuditDetail->Add(AnsiString().sprintf("%s ALID=%u %s",
+                                          sCode.c_str(), uAlid, sBad.c_str()));
+                else
+                    gAlidAuditSuppressed++;
+            }
+        }
+    }
+    catch(...)
+    {
+    }
+    //Free second channel, and the only one that works before the EventLog opens. Same
+    //idiom and spirit as the [ALARM-COLLISION] guard above.
+    OutputDebugString(AnsiString().sprintf("[ALID-AUDIT] rows=%d faults=%d\r\n",
+                      gAlidAuditRows, gAlidAuditFaults).c_str());
+    //A no-op at power-on (the log is not open yet - see the latch note at the top of this
+    //file); this call is what covers the RUNTIME re-run from iosetview.cpp:942, where the
+    //log IS open. Power-on is covered by the single call from ht160s.cpp.
+    ReportAlarmAlidAudit();
+
+================================================================================
+E6b - OPTIONAL : fold the 20260626 guard into the same report
+Take this only if the owner wants the existing [ALARM-COLLISION] guard to become visible
+in the field. Today it is OutputDebugString-only, i.e. invisible on a shipped machine.
+Two parts:
+  (a) MOVE the five reset lines
+          gAlidAuditRows = 0; gAlidAuditFaults = 0; gAlidAuditSuppressed = 0;
+          if(gAlidAuditDetail==NULL) gAlidAuditDetail = new TStringList();
+          gAlidAuditDetail->Clear();
+      out of E6 and put them at the TOP of CreateSystemAlarmCode(), immediately after
+      `mapAlarmCodeList.clear();` on :816 - so the latch is live before the guard runs.
+  (b) At database.cpp:1100, after the existing OutputDebugString, add:
+
+            if(gAlidAuditDetail!=NULL && gAlidAuditDetail->Count<K_ALID_AUDIT_MAX_LINES)
+                gAlidAuditDetail->Add(AnsiString("non-canonical structured key ")+kk);
+
+Nothing is removed; the guard's verdict simply also reaches the EventLog. The base plan
+(E6 alone) leaves :1077-1102 BYTE-UNTOUCHED, which the ratified spec permits ("coexist
+or integrate"). Recommended default: base plan now, E6b as a follow-up commit.
+
+================================================================================
+E7 - the report flush
+File   : database.cpp
+Anchor : immediately after the closing `}` of SYSTEM_MODULAR::CreateSystemAlarmCode()
+         (:1120) and its `//----` separator (:1121), i.e. INSERT BEFORE
+         `void SYSTEM_MODULAR::InitialSensorName()` on :1122.
+A free function, not a SYSTEM_MODULAR member, so ht160s.cpp needs no object and it cannot
+be mistaken for part of the map build.
+--------------------------------------------------------------------------------
+INSERT (column 0)
+
+void ReportAlarmAlidAudit()
+{
+    //AI(secs-alid-optiond) 20260902 : AMENDMENT 2's ratified report channel - one
+    //g_EventLog line per violation plus one summary line. Called from TWO places by
+    //design, and that is not a duplicate:
+    //  - from the tail of CreateSystemAlarmCode(), which is a silent no-op at power-on
+    //    (cCsvDailyLog::AppendLine early-returns while m_pCS is NULL) and is what covers
+    //    the RUNTIME re-run from iosetview.cpp:942, where the log IS open;
+    //  - once from ht160s.cpp, right after g_EventLog.Init(), which covers power-on.
+    //Exactly one set of lines lands on each path: WinMain is single-threaded and the
+    //ht160s.cpp call runs before the UI exists, so no iosetview re-run can precede it.
+    //Do NOT add a "already reported" static flag - the power-on no-op would consume it.
+    //Writes at most K_ALID_AUDIT_MAX_LINES+2 lines and returns. No modal, no machine
+    //stop, nothing that can block a production start.
+    int i;
+    if(gAlidAuditDetail!=NULL)
+        for(i=0; i<gAlidAuditDetail->Count; i++)
+            g_EventLog.Log("WRN_ALID_AUDIT", gAlidAuditDetail->Strings[i]);
+    if(gAlidAuditSuppressed>0)
+        g_EventLog.Log("WRN_ALID_AUDIT",
+                       AnsiString().sprintf("and %d further violation(s) not listed",
+                                            gAlidAuditSuppressed));
+    //The summary is written EVERY boot, clean or not. One line a day is nothing, and a
+    //report that only appears on failure cannot be diffed to prove nothing changed - a
+    //KYEC "your ALID is wrong" claim is then settled from the shipped EventLog.
+    g_EventLog.Log((gAlidAuditFaults>0) ? "WRN_ALID_AUDIT" : "INF_ALID_AUDIT",
+                   AnsiString().sprintf("S5 ALID self-check : %d alarm code(s), %d violation(s)",
+                                        gAlidAuditRows, gAlidAuditFaults));
+}
+//---------------------------------------------------------------------------
+
+================================================================================
+E8 - declarations
+File   : D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\database.h
+Anchor : line 609, `extern SYSTEM_MODULAR HSys;`. INSERT AFTER it, before the `//----`
+         on :610.
+This is a HEADER edit - that is why the build gate below prescribes -Full.
+--------------------------------------------------------------------------------
+INSERT AFTER :609
+
+//---------------------------------------------------------------------------
+//AI(secs-alid-optiond) 20260902 : AMENDMENT 2 S5-ALID self-check verdict, filled by
+//SYSTEM_MODULAR::CreateSystemAlarmCode() (0 faults = clean). The check runs inside
+//HSys.Initial(), long before g_EventLog.Init(), so ReportAlarmAlidAudit() flushes the
+//verdict to the EventLog from ht160s.cpp once the log is open. Detail lines are bounded;
+//gAlidAuditSuppressed counts what did not fit.
+extern int          gAlidAuditRows;
+extern int          gAlidAuditFaults;
+extern int          gAlidAuditSuppressed;
+extern TStringList *gAlidAuditDetail;
+void ReportAlarmAlidAudit();
+
+================================================================================
+E9 - the power-on flush call
+File   : D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\ht160s.cpp
+Anchor : line 219,
+         `         RecordProcess(AnsiString("Program Start with version ")+MainVersion);`
+         INSERT AFTER it, before the `//AI(general) 20260617 : log retention` comment on
+         :220. Note the 9-space indentation used in this block.
+No include edit needed: ht160s.cpp already includes database.h (:33) and cEventLog.h (:35).
+--------------------------------------------------------------------------------
+INSERT AFTER :219
+
+         //AI(secs-alid-optiond) 20260902 : flush the AMENDMENT 2 S5-ALID self-check
+         //verdict now that the EventLog is open. HSys.Initial() ran the check at progress
+         //46 while the log was still shut (its own call there is a no-op), so this is the
+         //loud operator-facing channel. One summary line when clean, plus one line per
+         //violation when not; it can never block the production start.
+         ReportAlarmAlidAudit();
+
+================================================================================
+EXPECTED EVENTLOG OUTPUT
+  clean machine, every boot, one line :
+    ...,INF_ALID_AUDIT,"S5 ALID self-check : 485 alarm code(s), 0 violation(s)",
+  someone registers "MES01421" (a non-canonical tail) :
+    ...,WRN_ALID_AUDIT,"MES01421 ALID=987714039 CLASS9_NOT_IN_CATALOG",
+    ...,WRN_ALID_AUDIT,"S5 ALID self-check : 486 alarm code(s), 1 violation(s)",
+  after a one-line rollback (every row off-contract) - bounded, not 485 lines :
+    40 x WRN_ALID_AUDIT detail lines
+    ...,WRN_ALID_AUDIT,"and 445 further violation(s) not listed",
+    ...,WRN_ALID_AUDIT,"S5 ALID self-check : 485 alarm code(s), 485 violation(s)",
+
+================================================================================
+BUILD GATE - exact sequence
+  0. Encoding check first (the new comments are ASCII English only; no legacy Big5 line in
+     these files is touched):
+       powershell -File D:\HT160S_BCB\scripts\ops\check-ht160s-source-encoding.ps1
+     Then confirm CRLF survived every edit (the BCB6 Edit-tool LF trap):
+       git diff --stat      -- a "LF will be replaced by CRLF" warning means redo that file
+  1. WARNING, read before touching MachineType.h : the working tree currently has
+     `//#define SOFT_SIMULATE` on line 7 - it is ALREADY in real-machine mode, as an
+     UNCOMMITTED edit against the committed `#define SOFT_SIMULATE`. Record the state you
+     found and restore exactly that; do NOT commit a flip of this define.
+  2. Header edits (database.h, UsecegemMainFrom.h) mean a curated -Clean is not enough:
+       powershell -File D:\HT160S_BCB\scripts\ops\build-ht160s.ps1 -Full
+     Expect exit 0. In the current tree state this IS the real-machine build, so the
+     `#ifndef SOFT_SIMULATE` branches do get compiled.
+  3. Re-enable the define (line 7 -> `#define SOFT_SIMULATE`) and:
+       powershell -File D:\HT160S_BCB\scripts\ops\build-ht160s.ps1 -Full
+     Expect exit 0. This is the sim build used for the headless checks.
+  4. Restore MachineType.h line 7 to the state found in step 1 and rebuild.
+  5. Sim smoke test - it exercises CreateSystemAlarmCode and therefore the self-check:
+       powershell -File D:\HT160S_BCB\scripts\ops\test-ht160s-startup.ps1
+     Then confirm the EventLog carries exactly one INF_ALID_AUDIT line reading
+     "485 alarm code(s), 0 violation(s)", and that D:\HT160S_BCB\system\AlarmList.csv is
+     byte-identical to before (486 lines, same header, same rows - the self-check must
+     not touch it).
+  6. Registry cross-check, already in the repo:
+       powershell -File D:\HT160S_BCB\scripts\ops\check-ht160s-alarm-registry.ps1
+  7. Wire check against the real firmware, from the laptop (memory
+     secs-headless-roundtrip-verify): request S5F5/S5F7, confirm every ALID in the
+     S5F6/S5F8 body is 9 digits and matches the reference table, then raise one alarm and
+     confirm the S5F1 ALID equals its catalog entry.
+  Never claim build-clean if the BCB6 tools could not run.
+
+================================================================================
+ROLLBACK - one line, exactly where
+  File D:\HT160S_BCB\HT160S_Program_BCB_V1.0.0.0\SecsGem\UsecegemMainFrom.cpp,
+  ComputeAlarmAlid(), as the FIRST executable statement - immediately after the doc
+  comment block and immediately BEFORE `unsigned uClass   = 0;` - insert:
+
+      return LegacyAlarmHash(Code);   //AI(secs-alid-optiond) 20260902 : ROLLBACK to the pre-Option-D 31-poly ALID
+
+  That single line restores every pre-cutover ALID bit-for-bit on BOTH wire paths at once
+  (S5F1 and the S5F6/S5F8 catalog), because both go through this one function. The
+  class-banded code below becomes dead but still compiles; the signature is unchanged so
+  uHGemHT160.cpp is unaffected; ALCD is untouched; AlarmList.csv never carried an ALID.
+  This is why LegacyAlarmHash is retained - do not "clean it up".
+  Expected side effect, benign: the Amendment 2 self-check then reports every registered
+  row as NOT_9_DIGITS or CLASS9_NOT_IN_CATALOG. That is the check telling the truth. It is
+  bounded to 40 detail lines + 2, and it still cannot block a start. For a long-lived
+  rollback, guard the report with the same switch so the log is not filled every boot.
+  Partial retreats: numbers rejected by KYEC -> the one line above (E5-E9 stay valid and
+  useful); the report judged noisy -> drop E5/E7/E8/E9 and keep only the OutputDebugString
+  in E6; full revert -> `git revert` the single commit (all 9 edits are additive or
+  in-place, no file renamed or deleted, no data format changed, no new on-disk artifact
+  at all).
+  CANNOT be rolled back by code: whatever the customer's EAP has already ingested. The
+  firmware and the dictionary must move together.
+
+================================================================================
+VERIFICATION ARTIFACTS (this run, re-measured - nothing taken on trust)
+  Reference model of the FINAL encoder, mirroring the BCB6 above line for line:
+    ...\scratchpad\p3\verify_final.py    (also re-derives the 532-row phase-2 table)
+    ...\scratchpad\p3\verify_inv2.py     (the invariant proofs)
+  Results:
+    532-row phase-2 table re-derived with the FINAL encoder : 0 mismatches - Amendments 1b
+      and A5 change NOTHING about today's numbers (no live code has a 5-digit tail with a
+      leading zero; no live code is a 5-char numeric starting 7 or 8), so the phase-2 CSV
+      and the 9046LS disjointness proof stand as-is.
+    class histogram 1:14 2:15 3:36 4:234 5:180 6:6 9:47 ; 532/532 distinct ; 0 collisions
+    min 100000913 (JAM0913) / max 999752848 ; all exactly 9 digits
+    host-decode round trip over the 532-code universe : 0 failures
+    round trip + value check over ALL 350000 strings classes 1..8 accept : 0 failures
+    injectivity of classes 1..8 over the same 350000 strings : 0 collisions
+    non-canonical forms all fall to class 9 : MES01421, MES001421, MES0001421, WAR09120,
+      WAR010000, JAM00913, MES14001421
+    9046LS space re-derived from D:\HT9045\Error\AlarmCodeList.txt : 2737 ALIDs, leading
+      digits {1:596, 2:1846, 3:295} only, min 101000109, max 330003021, ZERO with "00" in
+      digits 2-3. Intersection with the 532 Option D values : 0. Intersection with EVERY
+      value classes 1..8 can EVER emit (all 350000) : 0 - a structural result, not a sample.
+    random sweep, 400000 arbitrary strings up to 24 chars : all exactly 9 digits, zero
+      0-values, max 999999993.
+  system\AlarmList.csv re-measured independently: 485 rows; 4xxxx 234, 5xxxx 180, 6xxxx 6,
+    JAM 14, WAR 15, MES 36; 65 prefixed codes, tail lengths {4:63, 5:2}; 0 codes with a
+    5+ digit tail starting '0'; 0 five-char numeric codes starting 7 or 8.
+
+================================================================================
+OUT OF SCOPE - reported, deliberately NOT fixed here
+  1. aLoader.cpp:2442 - ShowMyError(LangT("Loader Tray has IC,please remove"), K_RETRY|K_SKIP)
+     uses the TRANSLATED string as the alarm code, so its class-9 payload changes with the
+     UI language. The ratified spec section 6 excludes it; the prior draft's fix (switch to
+     the 3-arg ShowMyError overload at note.cpp:1073, pinning the code to the untranslated
+     ASCII literal) is READY but withheld pending a separate ruling.
+  2. ALTX over 40 chars - 447 of 485 registered rows (92.2%) build an
+     `AlarmCode + " " + E_ErrMessage` longer than the 40-char ALTX limit in
+     docs\SECS\SECS_20260804_TransferPDF.xlsx sheet "Data Item"; measured max 82 chars.
+     Seven times the scale of the ALID problem. Separate case.
+  3. The 47 unregistered free strings stay in class 9 and out of the S5F6 catalog. If any
+     is later registered as a real MES/WAR code its ALID CHANGES AGAIN - the customer must
+     be told, or they will have to swap dictionaries twice.
+  4. note.cpp:1005 prepends "-" to the code when mapNameToAlarm holds a name whose value
+     is missing from mapAlarmCodeList; the S5F1 ALID would then be class 9 while the
+     catalog carries the un-prefixed code. Only reachable on an internal map
+     inconsistency, and neither the 20260626 guard nor Amendment 2 cross-checks the two
+     maps against each other. Noted, not fixed.
+  5. Classes 4..8 have only 10000 reachable payloads each (the payload IS the 5-digit
+     code); a family exceeding that overflows into class 9, where Amendment 2 catches it.
