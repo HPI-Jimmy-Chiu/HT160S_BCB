@@ -111,6 +111,18 @@ public:
     //NOTHING that stops working while disconnected, so a held lock is always bounded.
     int           LinkLostAge[AGV_STATION_COUNT];
     unsigned char LinkLostPending[AGV_STATION_COUNT];
+    //AI(amr-car-ledger-retain) 20260907 : per-station release flag for the Lot-End HOLD on the
+    //published car ledger (CarrierID / TrayCount / DeviceCount). Owner ruling R8 20260907 : the
+    //information handed to the AMR after Lot End must not be a pile of "" and 0. The AMR Lot End
+    //branch runs InitialAllTask -> Car[].Clear() on all six, and the next PollAndCall tick used to
+    //copy those zeros straight onto the wire. So while IsLotIdentityFrozen() is true the ledger is
+    //HELD at its last pre-wipe values.
+    //WHY a per-station flag and NOT the sticky-when-empty rule RefreshBinSettings uses : the CEID274
+    //path deliberately zeroes TrayCount/DeviceCount once the AMR has the car ("keep the SVID
+    //snapshot honest"), and a sticky rule would let the very next tick resurrect the pre-274
+    //numbers. 1 = this station was collected inside the window, so it publishes LIVE again even
+    //while the window is still open. Re-armed to 0 by PollAndCall once the window closes.
+    unsigned char CarLedgerReleased[AGV_STATION_COUNT];
 
     TAgvCoordinator();
     void Reset();

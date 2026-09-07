@@ -193,6 +193,7 @@ void TAgvCoordinator::Reset()
         TimeoutPending[i]   = 0;   //AI(amr-unmanned W3) 20260721
         LinkLostAge[i]      = 0;   //AI(agv-linklost-hold) 20260819
         LinkLostPending[i]  = 0;
+        CarLedgerReleased[i] = 0;  //AI(amr-car-ledger-retain) 20260907
     }
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
@@ -496,6 +497,8 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
     // to AGVSupplement so a 9045-style host gets the discrete Full signal before it
     // decides and sends START_AGV. DataID=1 matches the sibling Unloadtray event.
     int AutoFullCeid[6] = {35, 36, 37, 148, 149, 150};
+    //AI(amr-car-ledger-retain) 20260907 : one read per tick for the whole Auto loop.
+    bool bLotFrozen = IsLotIdentityFrozen();
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
     {
         int si = a + 3;                 // station index : Auto1->P4(idx3) .. Auto6->P9(idx8)
@@ -522,9 +525,22 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             int iWork = Car->iTrayCount - iHdr;
             if(iWork < 0)
                 iWork = 0;
-            TrayCount[si] = iWork;
-            DeviceCount[si] = AutoModule->GetAmrDeviceCount(a);
-            CarrierID[si] = Car->CarID;
+            //AI(amr-car-ledger-retain) 20260907 : HOLD the ledger across the Lot End -> next Lot
+            //Start window (owner ruling R8). Car[] is deliberately NOT touched : it must keep being
+            //wiped, or the next lot's cars would never ask for an identity tray (GetNextTrayKindForAuto
+            //returns Identity only at iTrayCount==0) and would inherit the previous lot's CarID -
+            //cross-lot contamination of the very field 49a0ff0 just made trustworthy. The coordinator
+            //keeps its OWN copy of the ledger, so freezing that copy is enough. Released per station
+            //at CEID274; re-armed when the window closes. See the header for why this is a latch and
+            //not the sticky-when-empty rule RefreshBinSettings uses.
+            if(bLotFrozen==false)
+                CarLedgerReleased[si] = 0;     // window closed : re-arm for the next Lot End
+            if(bLotFrozen==false || CarLedgerReleased[si]!=0)
+            {
+                TrayCount[si] = iWork;
+                DeviceCount[si] = AutoModule->GetAmrDeviceCount(a);
+                CarrierID[si] = Car->CarID;
+            }
         }
 
         bool bTrueFull = AutoModule->IsOutputCarFullForAmr(a) || AmrInject.AutoFull(a);   //AI(ht160s-agv) 20260708 : test-mode inject (handshake-only)
@@ -699,6 +715,11 @@ void TAgvCoordinator::ServiceHandshake(THGem *Gem)
                 AutoModule->ClearAmrCar(a);
                 TrayCount[si]   = 0;        //AI(ht160s-agv-devicecount) : car is now empty, keep the SVID snapshot honest
                 DeviceCount[si] = 0;
+                //AI(amr-car-ledger-retain) 20260907 : the AMR really took this car, so the Lot-End
+                //HOLD must stop applying HERE - otherwise the next tick would see the frozen window
+                //still open, skip the refresh, and put the pre-274 tray/IC counts back on the wire.
+                //Only THIS station is released; the other five keep their held ledger.
+                CarLedgerReleased[si] = 1;
                 Handshake[si] = AGV_IDLE;
                 AmrInject.ClearAutoCycle(a);   //AI(ht160s-agv) 20260720 : sim one-inject = one cycle (clear stuck level latch)
             }
