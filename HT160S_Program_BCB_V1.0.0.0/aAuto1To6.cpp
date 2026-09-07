@@ -1288,6 +1288,13 @@ bool TAutoModule::IsAllCleanOutFinish()
                 return false;   //residual tray at this Auto rear staging
             if(IsOutputCarFullForAmr(Index))
                 return false;   //Full gate (mirrors Empty/Color) : a drain GoUp is still owed
+            //AI(amr-cleanout-collect-inputend) 20260907 : the "output car still holds a stack"
+            //(SnAutoX_InputEnd) term does NOT belong here. This predicate is the CASCADE HINGE -
+            //TTrayArmModule::IsCleanOutFinish consults it, and Empty/Color gate their own drain on
+            //TrayArm - so blocking here would postpone the whole downstream tray recovery until an
+            //AMR physically arrived. The Auto DRAIN really is finished at that point (the trays are
+            //stacked on the car); what is outstanding is the HANDOVER, which is a lot-boundary
+            //concern. So the term lives in csystem CheckCleanOutFinish instead - see it there.
         }
     }
     return true;
@@ -1620,6 +1627,19 @@ bool TAutoModule::IsFrontHasTrayForAmr(int Index)
         return false;
     TMySensor *Front=GetInputHasTray(Index);
     return (Front!=NULL && Front->Enable==true && Front->IsOn());
+}
+//---------------------------------------------------------------------------
+//AI(amr-cleanout-collect-inputend) 20260907 : "this Auto output car still holds a stack".
+//See the header for the contract and for why the fail-safe direction is the opposite of the one
+//in IsAmrTaken (this predicate BLOCKS, so a disabled sensor must not block). Read-only.
+bool TAutoModule::IsCarStackPresentForAmr(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return false;
+    if(IsSoftSimulate())
+        return false;
+    TMySensor *EndSensor=GetInputEndSensor(Index);
+    return (EndSensor!=NULL && EndSensor->Enable==true && EndSensor->IsOn());
 }
 //---------------------------------------------------------------------------
 //AI(auto-lane-label) 20260901 : the operator-facing "which lot is this stack" label, shared by the

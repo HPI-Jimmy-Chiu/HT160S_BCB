@@ -2051,6 +2051,31 @@ bool CheckCleanOutFinish()
 		return false;
 	if(HasICUnderMachineForCleanOut())
 		return false;
+	//AI(amr-cleanout-collect-inputend) 20260907 : OWNER RULING - "Lot End means the machine has
+	//finished working; ending a lot with the Auto area not cleared is itself the defect". Every
+	//module term above reports its own DRAIN done; none of them sees "an Auto output car holds N
+	//stacked trays but is not full". The Auto sensor terms cover a residual at the FRONT position, a
+	//FULL stack and a residual at the REAR - and a normally stacked car trips none of the three.
+	//That is the state the 2026-09-04 lot ended in : Auto1/2/3 held 5/7/3 units with all six
+	//SnAutoX_InputHasTray reading 0, clean-out reported finished, CEID 42 and Lot End both fired,
+	//and the product crossed the lot boundary sitting on the cars.
+	//SnAutoX_InputEnd DOES see it, so hold the LOT BOUNDARY here until either the AMR takes the car
+	//(CEID274 -> ClearAmrCar -> InputEnd OFF) or an operator physically removes the stack - both
+	//clear this term. The call that ASKS for the car is TAgvCoordinator::IsCleanOutCollectDueForAmr
+	//and the AGV handshake timeout raises WAR0962 BEFORE Lot End, which is the whole point of the
+	//ruling. Deliberately NOT inside TAutoModule::IsAllCleanOutFinish : that one is the cascade
+	//hinge (TrayArm consults it, Empty/Color gate their drain on TrayArm), so blocking there would
+	//postpone all downstream tray recovery until an AMR arrived. The Auto DRAIN is genuinely done;
+	//only the HANDOVER is outstanding, and that is a lot-boundary concern.
+	//bUseAMR-GATED : with AMR off there is no CEID274 path at all, so blocking would park a normal
+	//production line in Run_CleanOut for ever. No ini escape hatch (owner ruling 20260907) - the
+	//physical escape, removing the stack, is always available.
+	if(GeneralSetting.bUseAMR && AutoModule!=NULL)
+	{
+		for(int iAuto=0; iAuto<AutoModule->GetStationCount(); iAuto++)
+			if(AutoModule->IsCarStackPresentForAmr(iAuto))
+				return false;   //output car still holds a stack : it must leave before Lot End
+	}
 	return true;
 }
 //---------------------------------------------------------------------------

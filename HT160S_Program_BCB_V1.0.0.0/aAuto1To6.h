@@ -136,7 +136,6 @@ private:
     //waits on. bNoNewJobs starts nothing new and only drains what is already running.
     bool ServiceStations(bool bNoNewJobs);
     bool DoAllAutoCleanOut(int Flag);
-    bool AllStationsDrainLatched();                 //AI(cleanout) 20260706 : pure per-station drain latch (DoAuto stop-gate)
     void ServiceCleanOutResidualWatchdog();         //AI(cleanout) 20260706 : EventLog-only residual notice (log-once per episode)
     bool DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared single-cylinder FrontRise On->settle->Off
     //AI(HT160S-Maintainer) 20260612 : AMR output-car full service. Sim auto-clears
@@ -172,6 +171,21 @@ public:
     //  it to refuse trays (see the block comment on IsCleanOutCollectDueForAmr).
     bool IsStationCleanOutFinish(int Index);  // THIS station's drain latch (not the module-wide one)
     bool IsFrontHasTrayForAmr(int Index);     // SnAutoX_InputHasTray live read; false in simulation
+    //AI(amr-cleanout-collect-inputend) 20260907 : "this Auto OUTPUT CAR still holds a stack".
+    // THE sensor that sees stacked product is SnAutoX_InputEnd (ON = has tray - see IsAmrTaken).
+    // IsFrontHasTrayForAmr just above reads SnAutoX_InputHasTray, the FRONT HANDOFF position,
+    // which is dark on a normally stacked car : that is why the 20260901 clean-out collect call
+    // never fired once on site (2026-09-04 - six cars holding trays, six InputHasTray at 0).
+    // THE FAIL-SAFE DIRECTION IS THE OPPOSITE OF THE ONE IN IsAmrTaken, DELIBERATELY : this
+    // predicate BLOCKS clean-out finish, so a disabled/unwired sensor must answer "no stack" and
+    // NOT block. IsAmrTaken answers "not taken" in that same situation, which HOLDS its handshake.
+    // That is also why this cannot be written as !IsAmrTaken(Index). Simulation answers false so a
+    // laptop clean-out still completes (mirrors IsFrontHasTrayForAmr).
+    bool IsCarStackPresentForAmr(int Index);
+    //AI(amr-cleanout-collect-inputend) 20260907 : moved up out of the private block - the AGV
+    // coordinator needs it for the collect-call gate (owner ruling 20260907 : raise the call only
+    // once ALL six stations have latched, never per-station; see IsCleanOutCollectDueForAmr).
+    bool AllStationsDrainLatched();           //AI(cleanout) 20260706 : pure per-station drain latch (DoAuto stop-gate)
     //AI(auto-lane-label) 20260901 : operator-facing "which lot is this stack" label for the
     //  Full alarm and the clean-out residual log. "" = nothing true to say, caller omits the field.
     AnsiString DescribeLaneLotForOperator(int Index);

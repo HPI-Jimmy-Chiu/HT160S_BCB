@@ -390,24 +390,40 @@ void TAgvCoordinator::ReportLoaderIdentity(THGem *Gem, int stationIndex, AnsiStr
 // into that Auto's output car. So by the time this returns true the trays are already ON the car;
 // we are asking for the car to be taken away, never for a mid-transfer pickup.
 //
+// ALL SIX STATIONS, NOT PER-STATION (owner ruling 20260907, REVERSING the 20260901 per-station
+// ruling). The reason is a hard interaction, not a preference : the drain raise SKIPS a locked
+// station (aAuto1To6.cpp - "if(bAmrLocked[Index]) continue;") so that station never sets
+// bCleanOutCheck, and bCleanOutCheck is a SIX-STATION LOCKSTEP BARRIER (AreAllFlagsOn). Calling
+// per-station would lock an early finisher while another station still owes GoUp cycles, and the
+// barrier would stall the WHOLE drain until the AMR arrived. Gating on AllStationsDrainLatched()
+// means no station is ever locked while the ladder still needs it. The 20260901 rationale ("do
+// not make an early finisher wait for the slowest") costs nothing here : the AMR is dispatched
+// one station at a time anyway (the single-station rule in BuildBitmap), so the calls only leave
+// a little later.
+//
 // WHY A SEPARATE FUNCTION AND NOT AN EXTRA TERM INSIDE IsOutputCarFullForAmr() : that predicate
 // has five callers and one of them (aAuto1To6.cpp GetTrayRequest) uses it to REFUSE new trays.
 // Widening it there would make an Auto stop asking for trays the moment it latched drain-done -
 // a different behaviour entirely, and one that would bite outside CleanOut too. Owner ruling.
 //
-// THE HOLD SIDE ALREADY EXISTED and is deliberately untouched : TAutoModule::IsAllCleanOutFinish
-// already returns false while SnAutoX_InputHasTray is ON, so CheckCleanOutFinish already parks the
-// machine in Run_CleanOut until the car leaves. What was missing was any code that ASKS for it to
-// leave : the only notice was the EventLog line from ServiceCleanOutResidualWatchdog, i.e. the
-// machine waited for an OPERATOR. On-site 2026-08-31 17:19:08 that is exactly what Auto6 did
-// (MES1623, front=1 full=0 - trays on the car, car not full, clean-out held, nobody called).
+// THE HOLD SIDE WAS ONLY PARTIAL, and 20260907 completed it. The 20260901 note here claimed
+// CheckCleanOutFinish "already parks the machine in Run_CleanOut until the car leaves" because it
+// blocks on SnAutoX_InputHasTray. That is TRUE ONLY for a tray left at the FRONT HANDOFF position
+// (the 2026-08-31 17:19:08 Auto6 case : MES1623, front=1 full=0 - and the only notice then was the
+// EventLog line from ServiceCleanOutResidualWatchdog, i.e. the machine silently waited for an
+// OPERATOR). A normally stacked car has InputHasTray DARK, so nothing held it : on 2026-09-04
+// Auto1/2/3 ended the lot holding 5/7/3 units with all six InputHasTray at 0 - clean-out reported
+// finished, CEID 42 and Lot End both fired, and the product crossed the lot boundary sitting on the
+// cars. CheckCleanOutFinish now carries an IsCarStackPresentForAmr (SnAutoX_InputEnd) term too, so
+// the hold side and this call finally read the same physical fact. Both sides are bUseAMR-gated;
+// with AMR off the operator handles it exactly as before.
 //
 // NO "IS A LOT STILL OPEN" TEST, ON PURPOSE - DO NOT ADD ONE. It was specified and then removed
 // on review : Lot End is pressed about a minute after Clean Out starts (2026-08-31 : 17:18:16 ->
 // 17:19:16, 17:35:48 -> 17:36:39) while an AMR takes minutes to arrive, so a lot-open term would
 // go false mid-handshake, drop bFull, and let the release branch in PollAndCall hand the lock back
 // with the trays still on the car - switching the feature off in its most common case. Run_CleanOut
-// plus the three drain-finish terms plus InputHasTray are necessary and sufficient.
+// plus the three drain-finish terms plus the output-car stack term are necessary and sufficient.
 //
 // NO SORT-MODE GATE either : a Normal-mode run finishes Clean Out with trays on the car just as a
 // By-Lot run does. Only the OPERATOR-FACING LOT LABEL is mode-limited, not the call.
@@ -423,9 +439,9 @@ bool TAgvCoordinator::IsCleanOutCollectDueForAmr(int AutoIndex)
         return false;
     if(SortArmModule->IsCleanOutFinish()==false)
         return false;
-    if(AutoModule->IsStationCleanOutFinish(AutoIndex)==false)   // owner ruling : this station only
-        return false;
-    return AutoModule->IsFrontHasTrayForAmr(AutoIndex);
+    if(AutoModule->AllStationsDrainLatched()==false)            // owner ruling 20260907 : ALL six
+        return false;                                           // (lockstep barrier - see above)
+    return AutoModule->IsCarStackPresentForAmr(AutoIndex);      // SnAutoX_InputEnd : stack ON the car
 }
 //---------------------------------------------------------------------------
 // Phase B/B-2 : raise AGVSupplement (CEID272). P4-P9 = AMR Auto output-car full
