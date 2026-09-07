@@ -1197,7 +1197,50 @@ list item <code>&lt;L[0]&gt;</code></strong> (bytes <code>01 00</code>), disting
 </tbody>
 </table>
 <p>Carrier ID = A;Tray/Device Count = I4;Bin Setting = A。</p>
+<p><strong>Bin Setting(38234–38236 / 38243–38245)的字串內容</strong>,隨分選模式而變:</p>
+<table>
+<thead>
+<tr>
+<th>分選模式 Sort mode</th>
+<th>值 Value</th>
+<th>例 Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一般 Bin→Auto 靜態(Normal)</td>
+<td>該站對應的 Bin 號;若該站同時是錯誤/溢出目標則附加 <code>,ERR</code>(僅為錯誤目標時為 <code>ERR</code>)</td>
+<td><code>3</code> / <code>3,ERR</code> / <code>ERR</code></td>
+</tr>
+<tr>
+<td>By Lot + Bin</td>
+<td><code>&lt;批號&gt;:&lt;Bin 號&gt;</code>,多筆以半角逗號串接</td>
+<td><code>NQ8002ZAA1:3</code></td>
+</tr>
+<tr>
+<td>By Lot + Pass/Fail</td>
+<td><strong>分類碼本身</strong>:<code>1</code> = PASS、<code>2</code> = FAIL(無批號前綴)</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>該站無任何綁定</td>
+<td>零長度</td>
+<td>(空字串)</td>
+</tr>
+</tbody>
+</table>
 <blockquote>
+<p>⚠ <strong>變更(2026-09-04,breaking change):By Lot + Pass/Fail 模式的值由 <code>&lt;批號&gt;:PASS</code> / <code>&lt;批號&gt;:FAIL</code>
+改為裸分類碼 <code>1</code> / <code>2</code>。</strong>
+依貴端 2026-09-03 裁定:本欄在 SECS 上只帶分類碼,批號另由 SVID <strong>66040–66045</strong>
+(AMR AUTO1–6 Lot Number)提供,避免同一個 ASCII 欄位承載兩種資訊。
+對應關係為 <strong><code>1</code> = PASS、<code>2</code> = FAIL</strong>。本機內部分類碼另有 <code>0</code> = 錯誤 Bin,
+但錯誤/溢出流道永不進入 (Lot,分類)→Auto 綁定表,<strong>故本欄不會出現 <code>0</code></strong>。
+<strong>By Lot + Bin 模式不變</strong>,仍為 <code>&lt;批號&gt;:&lt;Bin 號&gt;</code>;Normal 模式亦不變。</p>
+<p>⚠ <strong>兩欄連動請注意</strong>:本欄不再帶批號後,該流道的批號<strong>只剩</strong> 66040–66045 一個來源。
+而 66040–66045 取自同一張 (Lot,分類)→Auto 綁定表,該表在 <strong>Lot End 時清空</strong>,
+因此貨批結束後兩欄會同時變成零長度。<strong>請於貨批進行中讀取批號</strong>,
+或改由 CEID 8 Lot End 當下的報表留存。</p>
 <p>⚠ <strong>更正(2026-09-01),本表兩處</strong>:
 1. <strong>P2 Empty / P3 Color 的 Carrier ID 欄</strong>原列 38203 / 38204。<strong>自 2026-08-17 韌體起這兩個號碼已取消註冊</strong>
    (對齊 HT-9046LS V3.32.810_B01:該樹只註冊 38202 與 38205–38207 四個 carrier id,並無 38203 / 38204)。
