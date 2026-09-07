@@ -249,6 +249,22 @@ AnsiString GetTotalQuantityMagPercent();
 //cumulative fields are left alone; only the per-lot display / throughput counts
 //reset so the Auto Cnt display, UPH and SECS Scanned/Sorted represent THIS lot.
 void ResetPerLotProductionCounters();
+//AI(lot-identity-retention) 20260907 : the Lot-End -> next-Lot-Start "frozen identity" window.
+// Owner ruling 20260907, variant B of three, answering the customer request of the same day
+// ("after Lot End we can no longer pull the data"). While frozen, the host-facing SVID
+// SNAPSHOT variables - 1006
+// Lot ID, 1009 Lot Start Time, 66040-66045 lane lot number, 38234-38236 / 38243-38245 lane bin
+// setting - keep the ENDED lot's values instead of going empty, so the host can still pull them
+// between lots. Lives here, next to ResetPerLotProductionCounters, because that function is
+// already the "per-lot epoch" reset and cprod.h is already visible to main, the SECS layer and
+// the AGV coordinator (no new include anywhere).
+// WHAT THIS IS NOT : the LIVE tables (LotRegistry / LotBinBinding) are still cleared at Lot End,
+// byte-for-byte as before. Nothing that ROUTES material reads the frozen snapshot, so a stale
+// lot can never send product to a lane. The freeze is also STICKY-WHEN-EMPTY only : each refresh
+// still overwrites the snapshot whenever it computes a non-empty value, so the host can never be
+// shown stale data in preference to fresh data.
+void SetLotIdentityFrozen(bool bFrozen);
+bool IsLotIdentityFrozen();
 //AI(secs-rcmd-9045) 20260729 : per-destination sort counts only, for SECS CLEAN_AUTO_SORT_COUNT.
 //NOT interchangeable with ResetPerLotProductionCounters (see the comment at the definition).
 void ResetAutoSortCounters();

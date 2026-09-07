@@ -2709,6 +2709,11 @@ void __fastcall TfMain::LotStartCore(AnsiString FirstLot, AnsiString Origin)
     //THIS work order instead of accumulating across lots. Machine-total cumulative
     //fields are untouched. Must run before bRunning/iActiveLotCount are set below.
     ResetPerLotProductionCounters();
+    //AI(lot-identity-retention) 20260907 : a new lot owns the host-facing identity from here on,
+    // so drop the previous lot's frozen snapshot. Placed with the other per-lot epoch resets and
+    // BEFORE the registry-derived SVIDs are refreshed again, so there is no tick in which the new
+    // lot is open while the old lot's id is still being published.
+    SetLotIdentityFrozen(false);
     //AI(ht160s-uph) 20260706 : open this work order's per-tray/lot UPH log folder.
     TrayUphLog_OnLotStart(FirstLot);
     g_SoterOutput.OnLotStart(FirstLot);
@@ -3352,6 +3357,11 @@ void __fastcall TfMain::DoLotEndProcess(const char *pSource)
     // (RefreshLotListFromRegistry blanks every row when the registry is empty),
     // and overwrite system\LastLotList.ini with the now-empty list so a restart
     // does NOT restore the finished lots.
+    //AI(lot-identity-retention) 20260907 : arm the frozen-identity window BEFORE the live tables
+    // go, so the very next RefreshSVData / RefreshLotNumbers / RefreshBinSettings tick already
+    // knows to keep the ended lot's snapshot instead of blanking it. Disarmed at the next Lot
+    // Start (next to ResetPerLotProductionCounters). The clears below are unchanged.
+    SetLotIdentityFrozen(true);
     ArchiveWorkOrderToLotStory();
     LotRegistry.Clear();
     //AI(ht160s-lotbin) 20260615 : drop all (Lot,Bin)->Auto bindings on Lot End so the

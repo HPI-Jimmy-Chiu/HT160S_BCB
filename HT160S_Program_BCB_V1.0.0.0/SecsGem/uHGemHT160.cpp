@@ -799,7 +799,9 @@ void HT160Gem::RefreshSVData()
     //AI(secs-66xxx-retire) 20260804 : SVID 1006 starts as the single latched active lot - the answer
     // this SV has always given, and the fallback for a machine with nothing registered - and is
     // REPLACED by the comma-joined registry list further down whenever at least one lot is registered.
-    svActiveLot     = (fMain!=NULL) ? fMain->ActiveLotID() : AnsiString("");
+    //AI(lot-identity-retention) 20260907 : computed into a LOCAL first, then committed to
+    // svActiveLot at the end of the registry block below under the sticky-when-empty rule.
+    AnsiString sNewActiveLot = (fMain!=NULL) ? fMain->ActiveLotID() : AnsiString("");
 
     //AI(secs-startmode) 20260802 : SVID 1517 Start Mode, translated into HT9045's numbering.
     // HT160S : HSys.LastSet.iStartMode 0=Initial Start, 1=Continue (pnStartModeClick toggles
@@ -847,8 +849,15 @@ void HT160Gem::RefreshSVData()
             }
         }
         if(sLotList!="")
-            svActiveLot = sLotList;
+            sNewActiveLot = sLotList;
     }
+    //AI(lot-identity-retention) 20260907 : STICKY-WHEN-EMPTY. A non-empty answer always wins, so
+    // the host is never shown a stale lot in preference to a live one. Only the empty case is
+    // held back, and only inside the frozen window (Lot End -> next Lot Start), which is exactly
+    // the window the customer asked to keep readable. Outside the window this is byte-equivalent
+    // to the previous unconditional assignment.
+    if(sNewActiveLot!="" || IsLotIdentityFrozen()==false)
+        svActiveLot = sNewActiveLot;
 
     //AI(secs-bclass-0803) 20260803 : SVID 1009 Lot Start Time in HT9045's wire format. Derived
     // from the NoteLotStartTime latch, never from Now() and never from tRunData.StartTime - the
@@ -862,18 +871,26 @@ void HT160Gem::RefreshSVData()
     // separator characters are not. Deliberately OUTSIDE the registry guard above (the block that
     // builds 1006's lot list) : Lot End empties the registry, and freezing this inside that guard
     // would leave 1009 reporting the closed lot's timestamp forever.
-    svLotStartTime9045 = "";
+    //AI(lot-identity-retention) 20260907 : the paragraph above ends with "freezing this inside
+    // that guard would leave 1009 reporting the closed lot's timestamp FOREVER". That objection
+    // is what the frozen window answers : the hold is bounded by the next Lot Start, which calls
+    // SetLotIdentityFrozen(false) before any new-lot SVID is refreshed, and it is sticky-when-
+    // empty so a live lot's timestamp always overwrites the held one. The block therefore stays
+    // OUTSIDE the registry guard exactly as before; only the final commit is conditional.
+    AnsiString sNew1009 = "";
     if(svLotStartTime.Length()==19)
     {
-        svLotStartTime9045 = svLotStartTime.SubString(1,4) + "-"
-                           + svLotStartTime.SubString(6,2) + "-"
-                           + svLotStartTime.SubString(9,2) + " "
-                           + svLotStartTime.SubString(12,2) + ":"
-                           + svLotStartTime.SubString(15,2) + ":"
-                           + svLotStartTime.SubString(18,2);
+        sNew1009 = svLotStartTime.SubString(1,4) + "-"
+                 + svLotStartTime.SubString(6,2) + "-"
+                 + svLotStartTime.SubString(9,2) + " "
+                 + svLotStartTime.SubString(12,2) + ":"
+                 + svLotStartTime.SubString(15,2) + ":"
+                 + svLotStartTime.SubString(18,2);
     }
     else if(svLotStartTime.Trim()!="")
-        svLotStartTime9045 = svLotStartTime;   // unexpected shape - pass through, never fabricate
+        sNew1009 = svLotStartTime;   // unexpected shape - pass through, never fabricate
+    if(sNew1009!="" || IsLotIdentityFrozen()==false)
+        svLotStartTime9045 = sNew1009;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260612 : 1s tick from THGem::Timer1Timer. Sync the main-

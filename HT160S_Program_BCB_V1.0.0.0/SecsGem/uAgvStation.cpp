@@ -27,6 +27,7 @@
 #include "aColor.h"           // ColorModule  (P3 infeed handoff)
 #include "uAmrInject.h"      // AI(ht160s-agv) 20260708 : AMR manual-inject test facility
 #include "CosFunction.h"     // AI(ht160s-agv-binsetting) 20260713 : BinAreaMap / LotBinBinding routing model (bin setting source)
+#include "cprod.h"          //AI(lot-identity-retention) 20260907 : IsLotIdentityFrozen() - the Lot End -> next Lot Start frozen-identity window
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
 TAgvCoordinator AgvCoord;
@@ -1021,7 +1022,18 @@ void TAgvCoordinator::RefreshBinSettings()
     if(GeneralSetting.bUseAMR == false)
         return;
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
-        BinSetting[a] = DescribeAutoBins(a);
+    {
+        //AI(lot-identity-retention) 20260907 : STICKY-WHEN-EMPTY inside the frozen window (Lot End
+        // -> next Lot Start). Lot End clears LotBinBinding, so in the By Lot modes DescribeAutoBins
+        // starts answering "" the instant the lot closes and the host loses the lane's class. Hold
+        // the last non-empty answer instead. A real value still overwrites on any later tick, and
+        // smNormal is unaffected (its answer comes from BinAreaMap and is never empty for a mapped
+        // lane), so a recipe change between lots is still published.
+        AnsiString sNew = DescribeAutoBins(a);
+        if(sNew == "" && IsLotIdentityFrozen())
+            continue;
+        BinSetting[a] = sNew;
+    }
 }
 //---------------------------------------------------------------------------
 // AI(amr-lane-lotno) 20260831 : the lot number THIS Auto lane is sorting for, published on
@@ -1062,6 +1074,15 @@ AnsiString TAgvCoordinator::DescribeAutoLot(int AutoIndex)
 void TAgvCoordinator::RefreshLotNumbers()
 {
     for(int a = 0; a < AGV_AUTO_COUNT; a++)
-        LotNumber[a] = DescribeAutoLot(a);
+    {
+        //AI(lot-identity-retention) 20260907 : same sticky-when-empty rule as RefreshBinSettings.
+        // This is the SVID the customer asked about most directly (66040-66045) : DescribeAutoLot
+        // walks LotBinBinding, which Lot End clears, so every lane went to "" 35 ms after Lot End
+        // (2026-09-04 15:29:19.921 "Lot data cleared"). Held until the next Lot Start.
+        AnsiString sNew = DescribeAutoLot(a);
+        if(sNew == "" && IsLotIdentityFrozen())
+            continue;
+        LotNumber[a] = sNew;
+    }
 }
 //---------------------------------------------------------------------------

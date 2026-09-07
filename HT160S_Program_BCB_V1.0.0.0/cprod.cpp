@@ -165,6 +165,20 @@ void ClearLastSet()
 //ejection-pin counter and run-state fields (bRunning/iActiveLotCount) to callers.
 //bFirstRun is re-armed so the next production cycle re-stamps StartTime and clears
 //the UPH pause accumulator (see csystem DoAllProcess bFirstRun block).
+//AI(lot-identity-retention) 20260907 : see cprod.h for the full contract. File-static so the
+// only way to move it is through the two accessors below - Lot End arms it, Lot Start disarms it.
+static bool g_bLotIdentityFrozen=false;
+//---------------------------------------------------------------------------
+void SetLotIdentityFrozen(bool bFrozen)
+{
+    g_bLotIdentityFrozen=bFrozen;
+}
+//---------------------------------------------------------------------------
+bool IsLotIdentityFrozen()
+{
+    return g_bLotIdentityFrozen;
+}
+//---------------------------------------------------------------------------
 void ResetPerLotProductionCounters()
 {
     MachineRun.iTotalScanned=0;
