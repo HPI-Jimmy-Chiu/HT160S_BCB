@@ -101,9 +101,42 @@ bool bFull     = bTrueFull || bCollect;
 
 → **目前 Lot End 之後一筆 CEID 272 都不會發。** 這是 R7 要的行為，尚未實作。
 
-現成可用：`TAutoModule::IsAmrTaken`（`aAuto1To6.cpp:1697-1707`）已經讀 `SnAutoX_InputEnd`，註解明載 **ON = has tray**，而且它**已經是 CEID 274 的釋放條件**。所以一顆 sensor 就能閉合「叫車 → 收走 → 停止叫車」整個迴圈。
+現成可用：`TAutoModule::IsAmrTaken`（`aAuto1To6.cpp:1697-1707`）已經讀 `SnAutoX_InputEnd`，註解明載 **ON = has tray**，而且它**已經是 CEID 274 的釋放條件**。
 
-⚠ 該 sensor **現場未經量測**：2026-09-04 六顆 `SnAutoX_InputEnd` 在機構完全靜止期間（RunGate 15:29:19.955 落下）從 Live=0 變 Live=1，而 Auto4/5/6 整批沒收過一顆料。六顆同在一個 MotionNet byte（`Lane0 IP2 P1 B0..B5`）。**上機量測是實作前提**。
+> ### ⚠ 更正（探查結果，推翻先前的說法）
+>
+> 我先前說「一顆 sensor 就能閉合整個迴圈」—— **錯的**。叫車側與停止側是**兩顆不同的實體 sensor、
+> 在不同的 MotionNet 模組上**：
+>
+> | 用途 | sensor | getter |
+> |---|---|---|
+> | 叫車側（現有） | `SnAutoX_InputHasTray` / `_InputFullTray` | `GetInputHasTray` `aAuto1To6.cpp:328-340` |
+> | 停止側（CEID 274 釋放） | **`SnAutoX_InputEnd`** | `GetInputEndSensor` `aAuto1To6.cpp:356-368` |
+>
+> 而 2026-09-04 這兩組**在六個站同時互相矛盾**：六顆 `InputEnd` 讀 1，六顆 `InputHasTray` 讀 0。
+>
+> **`SnAutoX_InputEnd` 全樹只有一個功能性消費者** —— `IsAmrTaken`。它不在任何 ladder、不在 State
+> Record 的具名 Auto 傾印裡、沒有任何地方把它當「車在位」讀。而 P1/P2/P3 的同名點雖然極性相同
+> （ON=有盤），指的卻是**機台另一側的供料匣**，不是出料車 —— 同一個名字兩種指涉。
+>
+> **若它誤亮或黏住 ON**：今天損害有界（274 不發、站停在 READY、車帳不清、300 秒後 `WAR0962`
+> 給操作員一個 `K_RETRY`）。**把叫車也綁到同一個點，會把這個有界、操作員看得見的停滯，
+> 變成無界的 S6F11 發送** —— 因為 `WAR0962` 的答覆路徑刻意不會停止叫車。
+>
+> **`TMySensor` 完全沒有 debounce**（`mysensor.cpp:35-76`；`IO_Table.csv` 裡 sensor 列的
+> `OnDelayTime`/`OffDelayTime` 全空，只有汽缸帶延時）。`Enable==false` 時 `IsOn()` 與 `IsOff()`
+> **都回 false** —— 所以停用的 sensor 既不是亮也不是滅，方向由各消費者的守衛決定：
+> 叫車側全部 fail-safe（不叫），而 `IsAmrTaken` fail 成「未取走」→ 站永遠停在 `AGV_READY`。
+>
+> ### 2026-09-04 那次六 bit 同時翻轉，最可能是 MotionNet 埠讀取失敗
+>
+> 六顆同在 `Lane0 IP2 P1 B0..B5`（同一個 byte）**一起**從 0 變 1，而鄰近埠**各自獨立**變動
+> （`IP2 P0`：`SnEmpty_InputEnd` 維持 1、`SnLoader_Inputend` 由 1→0），且每個 Auto 卡
+> （IP3/IP4/IP5/IP6）上的 InType=0 點全部維持 0。**一個埠的所有 bit 一起跑到 fallback 值、
+> 而鄰埠照常變動，這是埠粒度的失效特徵。** 加上物理上不可能：Auto4/5/6 整批沒收過一顆料，
+> 而它們的 `InputHasTray` / `InputFullTray` / `OutputBottomHasTray` 在同一瞬間全讀 0。
+>
+> → **上機量測這六顆的極性與穩定性是實作前提，且要一併確認該埠沒有讀取失效。**
 
 ### ② R8 的「不是一堆 `""` 和 0」尚未達成
 
@@ -122,6 +155,51 @@ bool bFull     = bTrueFull || bCollect;
 **⚠ 但不能是單純的 sticky**：CEID 274 那條路在 AMR 真的收走車之後會**故意**把盤數歸零（`uAgvStation.cpp:684-685`，註解「car is now empty, keep the SVID snapshot honest`」）。單純 sticky 會讓下一個 tick 把舊值撈回來。
 
 **正確做法（已定，不需再裁定）**：每站一個保留閂，在 CEID 274 那裡釋放。凍結窗邊緣可由協調器自己偵測（`IsLotIdentityFrozen()` 的 0→1 邊緣），不需要跨模組 hook。
+
+探查另外確認了三件事：
+
+- **實作只要 3-6 行。** `TAgvCoordinator::Reset()`（唯一會清空這五個快照陣列的東西）**全樹沒有
+  runtime 呼叫者**（只有建構子），所以這些陣列本來就對 Lot End 免疫 —— 它們變空的**唯一原因**
+  是 `PollAndCall` 下一個 1 秒 tick 無條件從已被清空的 `Car[]` 重抄。把 `f799d88` 既有的
+  sticky-when-empty 規則套到那三行就夠：不需新狀態、不需新呼叫點、不需動 `csystem`、
+  不需新 include（`cprod.h` 已由 `f799d88` 引入該檔）。
+- **不要用 `InitialAllTask(true)`（keep-material）。** 呼叫點只有一行，但影響擴散到六個模組，
+  且會把上一批的物料帳帶過批界。
+- **也不要「在 `InitialAllTask` 之前快照 `Car[]`」。** 更多程式碼、同樣結果，而且**不完整** ——
+  **手動 Lot End 按鈕從來不呼叫 `InitialAllTask`**（`btnLotEndClick` → `DoLotEndProcess`，
+  全函式內沒有 `InitialAllTask` 也沒有 `ChangeRunMode`），所以快照法還得額外避免遮蔽該路徑上仍然
+  活著的值。
+
+### ③ 範圍修正：host 叫車**不需要** carrier ID 與盤數
+
+探查證實：**站別 bitmap（SVID 38219）＋ 站名就是派車的全部契約**，而且在現場端到端證明過 ——
+全部 carrier ID 空、全部盤數 0 的情況下，`START_AGV` 照樣以站名 + `Action`/`NA` 派車成功
+（9/4 15:22:33 那筆 `START_AGV` 的 `L[11]` 就是九個站名各帶 Action/NA ＋ 兩個 Loader 計數）。
+
+→ 所以 ② 要修的不是「讓 AMR 能來收車」（那個本來就能動），而是 **下貨的 IC 件數／盤數對帳交付品**。
+把這件事講清楚可以避免下一個人以為不修就叫不到車。
+
+### ④ 另一個要留意的既有缺陷（不在 D4 範圍，但會被 D4 放大）
+
+每一次重新叫車都會**重發**離散的「Auto N Full」CEID（35/36/37/148/149/150），因為那個 emit
+在同一個 `IDLE→CALLED` 分支裡、只 gate 在 `bTrueFull` 而**不是滿盤的邊緣**。文件說它是一次性的
+「pre-notification」，實際行為是每次叫車都重發 —— 現場 9/4 同一台 Auto2 就發了七次 CEID 36。
+R8 已取消自動重送，所以 D4 不會放大它，但這個缺陷本身還在。
+
+### ⑤ CALLED 站的鎖會活過 Lot End、HOME、下一次 Machine Start
+
+`TAgvCoordinator::Reset()` 沒有 runtime 呼叫者；Lot End 的 `InitialAllTask` 會清 `bAmrLocked`，
+但緊接著 `database.cpp` 的 `AgvCoord.ReassertLocks()` **又把它加回去**（對每個 handshake 非 IDLE
+的 Auto 重新 `SetAmrLock(a,true)`）；`MachineStart` 完全不碰協調器。
+
+而**被鎖住的 Auto 對下一批完全停役**：拒收新盤（`GetTrayRequest` 回 `eTrayReqNone`）、
+出料被跳過（`FindDischargeAuto` `continue`）、discharge-tail latch 被凍住，
+而且在 Clean Out 會**卡住六站連鎖閘、拖住全部六站**（`aAuto1To6.cpp:1147-1159`，
+其註解自述 "bCleanOutCheck is a six-station lockstep barrier, so one AMR-locked station holds the
+whole drain until CEID274 releases it"）。
+
+→ **這是 R7「Lot End 後叫車」的真實風險**：叫了、沒人來、批次結束，那一站帶著鎖進到下一批。
+實作 ① 時必須一併決定這個鎖怎麼收。
 
 ---
 
