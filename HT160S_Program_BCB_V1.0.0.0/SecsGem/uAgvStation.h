@@ -144,6 +144,16 @@ public:
     // RefreshBinSettings() repopulates all six from the live routing config each tick.
     AnsiString DescribeAutoBins(int AutoIndex);
     void       RefreshBinSettings();
+    //AI(amr-binsetting-code) 20260904 : DescribeAutoBins IS the SECS value of SVID 38234-38236 /
+    // 38243-38245. Customer ruling 2026-09-03 : in By Lot+PassFail mode it now carries the CLASS
+    // CODE ONLY - "1" = PASS, "2" = FAIL - with no lot prefix; the lane lot number is published
+    // separately on SVID 66040-66045. By Lot+Bin keeps the 20260713 "LotID:Bin" form (owner ruling
+    // 20260904 : not part of the request, left alone) and smNormal is unchanged. An unbound lane,
+    // the Error lane included, still answers "" (owner ruling 20260904).
+    // DescribeAutoLaneLabel is the OLD human-readable "LotID:PASS" / "LotID:FAIL" / "LotID:Bin"
+    // form, kept for the operator alarm label (aAuto1To6 DescribeLaneLotForOperator) and the
+    // State Record dump only - it is NEVER published on SECS.
+    AnsiString DescribeAutoLaneLabel(int AutoIndex);
     //AI(amr-lane-lotno) 20260831 : per-Auto lane lot number for SVID 66040-66045 (host S1F3).
     AnsiString DescribeAutoLot(int AutoIndex);
     void       RefreshLotNumbers();

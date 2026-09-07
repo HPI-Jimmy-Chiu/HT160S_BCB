@@ -893,6 +893,7 @@ AnsiString TAgvCoordinator::DescribeAgvState()
         AnsiString sBins = "";   //AI(ht160s-agv-binsetting) 20260713 : live SVID 38234-45 value per Auto
         if(AgvStation[i].Kind==ASK_AUTO && AgvStation[i].AutoIndex>=0)
             sBins = " bins=[" + DescribeAutoBins(AgvStation[i].AutoIndex) + "]"
+                  + " label=[" + DescribeAutoLaneLabel(AgvStation[i].AutoIndex) + "]"   //AI(amr-binsetting-code) 20260904 : bins=[] is the SECS value ("1"/"2" in Lot+PassFail since the 20260903 customer ruling); this is the readable LotID:PASS form for post-mortems
                   + " lot=[" + DescribeAutoLot(AgvStation[i].AutoIndex) + "]";   //AI(amr-lane-lotno) 20260831
         //AI(agv-linklost-hold) 20260819 : surface a lock that outlived the HSMS link so a
         //State Record post-mortem can tell "held across a link drop" from "handoff running".
@@ -921,9 +922,18 @@ AnsiString TAgvCoordinator::DescribeAgvState()
 //                   overflow area, append an "ERR" marker (it additionally collects
 //                   2D-scan-fail / no-bin-setting ICs plus any overflow).
 //   smLotBin      : dynamic (LotID,Bin)->Auto bindings; emit "LotID:Bin" tokens.
-//   smLotPassFail : dynamic (LotID,PASS/FAIL)->Auto bindings; emit "LotID:PASS"/":FAIL".
+//   smLotPassFail : dynamic (LotID,PASS/FAIL)->Auto bindings; emit the bare CLASS CODE
+//                   "1" = PASS / "2" = FAIL (customer ruling 20260903 - see below).
 // A bin number alone is meaningless in the dynamic modes (the same Auto means a
 // different grade per lot), hence the LotID prefix (user-confirmed 20260713). Read-only.
+//AI(amr-binsetting-code) 20260904 : the By Lot+PassFail token DROPPED its "LotID:" prefix and its
+// PASS/FAIL words. Customer ruling 2026-09-03 : on SECS this SVID carries the CLASS CODE ONLY,
+// because the lane lot number already ships separately on SVID 66040-66045 (DescribeAutoLot) and
+// the host was parsing one field for two things. Key already IS that code - LotRegistry
+// GetPassFailClass returns 1=PASS / 2=FAIL (CosFunction.cpp:1405-1424; 0=Error never reaches a
+// binding because aLoader.cpp:2187 only calls ResolveAuto when PassClass>0) - so the bare number
+// goes out. By Lot+Bin is untouched. The human-readable "LotID:PASS" form people still need lives
+// in DescribeAutoLaneLabel below and is no longer on any SVID.
 AnsiString TAgvCoordinator::DescribeAutoBins(int AutoIndex)
 {
     if(AutoIndex < 0 || AutoIndex >= AGV_AUTO_COUNT)
@@ -944,15 +954,9 @@ AnsiString TAgvCoordinator::DescribeAutoBins(int AutoIndex)
                 continue;
             AnsiString token;
             if(GeneralSetting.IsLotPassFailSortMode())
-            {
-                AnsiString kt;   //AI(bcb6-ternary) 20260723 : nested ?: -> AnsiString miscompiles in BCB6; use if/else
-                if(Key == 1) kt = AnsiString("PASS");
-                else if(Key == 2) kt = AnsiString("FAIL");
-                else kt = IntToStr(Key);
-                token = LotID + ":" + kt;
-            }
+                token = IntToStr(Key);                 //AI(amr-binsetting-code) 20260904 : class code only, "1"=PASS "2"=FAIL (no lot prefix)
             else
-                token = LotID + ":" + IntToStr(Key);
+                token = LotID + ":" + IntToStr(Key);   //AI(amr-binsetting-code) 20260904 : By Lot+Bin keeps "LotID:Bin" on purpose
             s = (s == "") ? token : (s + "," + token);
         }
         return s;
@@ -967,6 +971,44 @@ AnsiString TAgvCoordinator::DescribeAutoBins(int AutoIndex)
         s = IntToStr(Bin);
     if(BinAreaMap.GetErrorBinArea() == Area)
         s = (s == "") ? AnsiString("ERR") : (s + ",ERR");
+    return s;
+}
+//---------------------------------------------------------------------------
+//AI(amr-binsetting-code) 20260904 : the OLD human-readable per-lane form, "LotID:PASS" /
+// "LotID:FAIL" (By Lot+PassFail) or "LotID:Bin" (By Lot+Bin) - exactly what DescribeAutoBins
+// returned from 20260713 until the customer ruling of 2026-09-03 turned its Lot+PassFail value
+// into the bare class code. Consumers : the operator Full-alarm / clean-out-residual label
+// (aAuto1To6 DescribeLaneLotForOperator) and the State Record "label=[...]" column. NEVER bound
+// to a SVID - host-facing text is DescribeAutoBins. Dynamic (By Lot) modes only : smNormal has no
+// lane lot, so it answers "" and the caller omits the field. Same binding-table walk, same
+// PASS/FAIL words and the same BCB6 if/else (no nested ?: on AnsiString) as the original.
+// Read-only, no state change.
+AnsiString TAgvCoordinator::DescribeAutoLaneLabel(int AutoIndex)
+{
+    if(AutoIndex < 0 || AutoIndex >= AGV_AUTO_COUNT)
+        return "";
+    if(GeneralSetting.IsDynamicBindingMode() == false)
+        return "";
+
+    AnsiString s = "";
+    int n = LotBinBinding.GetBindingCount();
+    for(int i = 0; i < n; i++)
+    {
+        AnsiString LotID;
+        int Key;
+        int BoundAuto;
+        if(LotBinBinding.GetBindingByIndex(i, LotID, Key, BoundAuto) == false)
+            continue;
+        if(BoundAuto != AutoIndex)
+            continue;
+        AnsiString kt;   //AI(bcb6-ternary) 20260723 : nested ?: -> AnsiString miscompiles in BCB6; use if/else
+        if(GeneralSetting.IsLotPassFailSortMode() == false) kt = IntToStr(Key);
+        else if(Key == 1) kt = AnsiString("PASS");
+        else if(Key == 2) kt = AnsiString("FAIL");
+        else kt = IntToStr(Key);
+        AnsiString token = LotID + ":" + kt;
+        s = (s == "") ? token : (s + "," + token);
+    }
     return s;
 }
 //---------------------------------------------------------------------------

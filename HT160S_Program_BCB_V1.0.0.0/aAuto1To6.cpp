@@ -1625,7 +1625,12 @@ AnsiString TAutoModule::DescribeLaneLotForOperator(int Index)
         return "";
     if(GeneralSetting.IsDynamicBindingMode()==false)
         return "";                                    // smNormal / WhiteList : no lane lot exists
-    AnsiString s=AgvCoord.DescribeAutoBins(Index);     // "LOT:PASS" / "LOT:FAIL" / "LOT:<bin>"
+    //AI(amr-binsetting-code) 20260904 : DescribeAutoBins now returns the SECS class code ("1"/"2")
+    //in By Lot+PassFail mode (customer ruling 2026-09-03), which would read "Lot=2" on the operator
+    //alarm. The readable form moved to DescribeAutoLaneLabel - the unchanged 20260713 "LotID:kt"
+    //builder, lifted out of the SECS path. The comment block above still holds : the mode gate stays
+    //here, and the new function also answers "" outside the By Lot modes.
+    AnsiString s=AgvCoord.DescribeAutoLaneLabel(Index); // "LOT:PASS" / "LOT:FAIL" / "LOT:<bin>"
     if(s!="")
         return s;
     //AI(auto-lane-label) 20260901 : the Error / overflow lane is NEVER bound - ResolveAuto skips it -
