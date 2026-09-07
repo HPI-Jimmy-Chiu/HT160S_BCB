@@ -322,8 +322,17 @@ whole drain until CEID274 releases it"）。
 
 ## 7. 接手時的最短路徑
 
-1. `git push origin feat/amr-lot-identity-d4`（三個 commit 未推）
-2. 讀本文 §2（裁定，不要再問）＋ §3（剩下要做的兩件）
-3. 實作 §3 ①（InputEnd 觸發）與 ②（三個 payload SVID 的保留＋274 釋放閂）
-4. 更新文件（D10：38225-38227 / 38246-38248 數字變小）並重出 `docs/SECS/deliver_YYYYMMDD/`
-5. 上機前提：量測 `SnAutoX_InputEnd` 六顆的極性與穩定性（§3 ①的 ⚠）
+1. `git push origin feat/amr-lot-identity-d4`
+2. 讀 **§1.5**（`49a0ff0` 的回歸風險，第一優先）→ **§3.0**（最重要的結論，推翻兩個假設）
+   → §2（裁定，不要再問）
+3. **上機兩件事，都在寫任何程式碼之前**：
+   - 開一個批、**批次進行中**讀 SVID 38205-38207 或抓 State Record 看 `Car[].CarID`
+     → 收斂 §1.5
+   - 量測六顆 `SnAutoX_InputEnd` 的極性與穩定性，並確認 `Lane0 IP2 P1` 那個埠沒有讀取失效
+     → §3 的 ⚠
+4. **實作順序已被 §3.0 反轉：先 ②（讓 `Car[].iTrayCount` / `CarID` / device count 活過 Lot End），
+   ① 才有可能成立。** ② 的做法已定：每站一個保留閂、在 CEID 274 那裡釋放，
+   sticky-when-empty 套用在 `uAgvStation.cpp` 那三行（3-6 行）
+5. ① 的觸發**不能建在 sensor 上**（§3.0 (b)(c)(d)）—— 只能用車帳。實作前要一併決定
+   §3⑤ 那個「CALLED 站的鎖活過 Lot End、鎖住下一批」怎麼收
+6. 更新文件（D10：38225-38227 / 38246-38248 數字變小）並重出 `docs/SECS/deliver_YYYYMMDD/`
