@@ -26,6 +26,40 @@
 
 ---
 
+## 1.5 🚨 接手第一優先：`49a0ff0` 有一個未證實的回歸風險
+
+**風險**：`49a0ff0` 把客戶 CSV 第 9 欄改讀 `Car[].CarID`。若這台機器的 Auto 出料車**從來沒收到過
+身分盤**，`Car[].CarID` 就永遠是空字串 → 第 9 欄會從「錯值」變成「**永遠空白**」。
+客戶會看到一個原本有資料的欄位變空。
+
+**支持這個風險的證據**（`eTrayKind`：`Normal=0 / Identity=1 / Cover=2`，`MotorAndIO/MyMotor.h:51-53`）：
+
+```
+9/4 EventLog TA_DIVERT :  3× kind=0 (Normal)、1× kind=2 (Cover)   → 零筆 kind=1 (Identity)
+9/3 EventLog TA_DIVERT : 12× kind=0 (Normal)                      → 零筆 Identity、零筆 Cover
+```
+
+且第 9 欄的舊值（`...012` / `...027` / `...017`）正是「`CarID` 為空、`WorkingTrayID` 帶著別盤洩漏碼」
+會呈現的樣子。
+
+**但尚未證實**，原因要說清楚：全天七筆 RPTID 2000（帶 carrier ID 的報表）**全部在 Lot End 之後**
+（15:44:13 起），而 Lot End 已經 `Car[].Clear()` —— 所以那七筆的 carrier ID 全空是**被清掉**造成的，
+**不能**當成「生產期間也沒值」的證明。生產視窗（15:24:22–15:29:19）內**沒有任何 RPTID 2000 事件**，
+所以線上沒有取樣。TA_DIVERT 也只是**改道**那一條交付路徑，正常 AMR_SUPPLY 派工不走這行 log。
+
+**收斂方法（一次上機即可）**：開一個批、在**批次進行中**用 S1F3 讀 SVID 38205-38207
+（Auto1-3 Carrier ID），或抓一份 State Record 看 `Car[].CarID`。
+
+- 讀到有值 → `49a0ff0` 正確，直接推送
+- 讀到空 → **先不要推 `49a0ff0`**（或推了但要知道第 9 欄會變空），真正的問題在上游：
+  身分盤沒有進到 Auto 出料車，而 `[AMR] IdentityTray3..8=1` 的設定說每台車應該有一片。
+  這是機構/流程問題，不是這一欄的問題
+
+⚠ 不要用「`CarID` 空就退回 `WorkingTrayID`」當 fallback —— 舊值是**別台車的洩漏碼**，
+非空的錯值比空白更危險（稽核裁定）。
+
+---
+
 ## 2. 使用者裁定（**已定案，不要再問**）
 
 | # | 事項 | 裁定 |
