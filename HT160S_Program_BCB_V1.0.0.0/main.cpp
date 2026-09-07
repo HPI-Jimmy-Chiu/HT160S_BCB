@@ -2353,6 +2353,15 @@ void TfMain::DoStartArm()
 //        {
             HSys.Sys.SystemStart=true;                                              //20140411 wei
             SoftStart=true;
+            //AI(lot-identity-retention) 20260907 : a bare START does NOT go through LotStartCore,
+            // so the Lot-Start disarm there never runs on this path. Without this line a START
+            // after a Lot End would keep the previous lot's frozen snapshot armed while a NEW lot
+            // produces: SVID 1006 self-heals (the registry list is non-empty, so sticky overwrites)
+            // but 1009 does NOT - NoteLotStartTime(true) is only called from LotStartCore, so the
+            // live value stays empty and the sticky rule would keep publishing the OLD lot's start
+            // time, and the same for the lane SVIDs until the first IC binds a lane. That is
+            // stale-as-current, which the retention design forbids. Disarm on every Start.
+            SetLotIdentityFrozen(false);
             //AI(secs-lot-multilot) 20260730 : label with the LATCHED active lot, not the live
             //edLotNo TEdit. These four run on EVERY Start including a pause/resume, and
             //g_DeviceInfo.OnLotStart is NOT idempotent (it re-derives the Production_Log file
@@ -3272,6 +3281,14 @@ void __fastcall TfMain::DoLotEndProcess(const char *pSource)
     if(pSource==NULL)
         pSource="pressed";
     RecordProcess(AnsiString("LOT END ")+pSource);
+    //AI(lot-identity-retention) 20260907 : ARM HERE, not next to the clears further down. The
+    // frozen window must open BEFORE any snapshot SOURCE is blanked - NoteLotStartTime(false)
+    // below clears svLotStartTime (behind SVID 1009), and any RefreshSVData between that and a
+    // later arm (S1F3 arrives on the HSMS receive path) would commit 1009 as "" and then the
+    // sticky-when-empty rule would hold that EMPTY value for the whole window, i.e. the retention
+    // would silently do nothing. Arming early is free: sticky-when-empty only ever holds back an
+    // empty computed value, so a still-live lot keeps overwriting normally right up to the clears.
+    SetLotIdentityFrozen(true);
     //AI(HT160S-Maintainer) 20260604 : P1 stop the sort run (HT172 LotEnd analog).
     if(HSys.Sys.SystemStart==true)
         HSys.Sys.SystemStart=false;
@@ -3357,11 +3374,8 @@ void __fastcall TfMain::DoLotEndProcess(const char *pSource)
     // (RefreshLotListFromRegistry blanks every row when the registry is empty),
     // and overwrite system\LastLotList.ini with the now-empty list so a restart
     // does NOT restore the finished lots.
-    //AI(lot-identity-retention) 20260907 : arm the frozen-identity window BEFORE the live tables
-    // go, so the very next RefreshSVData / RefreshLotNumbers / RefreshBinSettings tick already
-    // knows to keep the ended lot's snapshot instead of blanking it. Disarmed at the next Lot
-    // Start (next to ResetPerLotProductionCounters). The clears below are unchanged.
-    SetLotIdentityFrozen(true);
+    //AI(lot-identity-retention) 20260907 : the window was already armed at the top of this
+    // function (see the note next to the "LOT END" RecordProcess). The clears below are unchanged.
     ArchiveWorkOrderToLotStory();
     LotRegistry.Clear();
     //AI(ht160s-lotbin) 20260615 : drop all (Lot,Bin)->Auto bindings on Lot End so the
