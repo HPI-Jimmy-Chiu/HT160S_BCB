@@ -1,0 +1,276 @@
+﻿CEID,事件名稱 (HT9045 原文),本機發射,Report,備註
+1,Start Pressed,★ 會發射,Report 1,Start 且機內無 IC；警報畫面的面板 START 鍵
+2,Pause Pressed,★ 會發射,Report 1,Pause(畫面鍵或面板鍵)
+3,OneCycle Pressed,★ 會發射,Report 1,One Cycle 受理
+4,CleanOut Pressed,★ 會發射,Report 1,Clean Out 受理
+5,ClearCount Pressed,★ 會發射,Report 1,Clear Count，操作員確認對話框之後
+6,Lot Start,★ 會發射,Report 1,手動 Lot Start
+7,Lot,—,,HT9045 語意未定義，無對應動作
+8,Lot End,★ 會發射,Report 1,手動 Lot End / Clean Out 完成後自動 Lot End
+9,Switch Real Dummy Mode,★ 會發射,Report 1,Real / Dummy 切換
+10,Switch Tester Online,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+11,Switch Production Mode,—,,HT-160S 無「生產/調機」模式切換(僅有 User Level = CEID 16)
+12,Switch Engineer Mode,—,,HT-160S 無「一般/工程」模式切換
+13,Switch Temperature Mode,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+14,Switch StartMode,★ 會發射,Report 1,Start Mode(Initial / Continue)切換
+15,Switch Setup File,★ 會發射,Report 1,工作檔(recipe)切換
+16,Switch UserLevel,★ 會發射,Report 1,使用者權限層級切換
+17,Enter Tool Page,★ 會發射,Report 1,進入 Tool 頁
+18,Enter Maintenance Page,★ 會發射,Report 1,進入 Maintenance 頁
+19,Enter Offset Page,★ 會發射,Report 1,進入 Offset 頁
+20,Enter Speed Page,★ 會發射,Report 1,進入 Speed 頁
+21,Enter IO Page,★ 會發射,Report 1,進入 I/O 頁，權限檢查通過後
+22,Enter Message Page,★ 會發射,Report 1,進入 Message 頁
+23,Enter Debug Page,—,,HT-160S 無 Debug 頁
+24,Exit Pressed,★ 會發射,Report 1,按下 Exit(於連線拆除前送出)
+25,Home Pressed,★ 會發射,Report 1,Home 受理
+26,Get Test Result,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+27,Change Machine State,★ 會發射,Report 1,機台狀態文字變更(本機流量最高的事件)
+28,Retry Pressed,★ 會發射,Report 1,面板或畫面 Retry
+29,Skip Pressed,★ 會發射,Report 1,面板或畫面 Skip
+30,Alarm Reset Pressed,★ 會發射,Report 1,面板或畫面 Alarm Reset
+31,Tray End Pressed,★ 會發射,Report 1,面板 TRAY END 鍵
+32,Tray Feed Pressed,★ 會發射,Report 1,面板 TRAY FEED 鍵
+33,Reset Pressed,—,,面板僅有 ALARM RESET(= CEID 30)，無獨立 Reset 鍵
+34,Auto Clean Start,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+35,Auto1 Full,★ 會發射,Report 1,Auto1 車滿(需 AMR 開啟)
+36,Auto2 Full,★ 會發射,Report 1,Auto2 車滿(需 AMR 開啟)
+37,Auto3 Full,★ 會發射,Report 1,Auto3 車滿(需 AMR 開啟)
+38,Fix1 Full,—,,Fix 固定站滿盤；HT-160S 無 Fix 固定站
+39,Fix2 Full,—,,Fix 固定站滿盤；HT-160S 無 Fix 固定站
+40,Fix3 Full,—,,Fix 固定站滿盤；HT-160S 無 Fix 固定站
+41,One Cycle Finish,★ 會發射,Report 1,One Cycle 走完
+42,Clean Out Finish,★ 會發射,Report 1,Clean Out 排空完成(送在 Lot End 之前)
+43,DownLoadRecipe,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+44,Site On Off,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+45,Arm On Off,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+46,Change Temp Defaultand Soak Time,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+47,Change HandlerSpeed,★ 會發射,Report 1,離開 Speed 頁且百分比確實有變更
+48,Change EC,★ 會發射,Report 1,S2F15/F16 實際寫入成功(EAC=0 且有值變更)
+49,Tray Feed Finish,—,,HT-160S 尚未實作 Tray Feed 結束判定(無 live 進入點)
+50,Auto Clean Finish,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+51,Site Mapping Start,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+52,Site Mapping End,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+53,UPH Record Start,★ 會發射,Report 1,某 Auto 站進入 SORTING，一筆 UPH 記錄視窗開啟(6 站各自計)
+54,UPH Record End,★ 會發射,Report 1,該盤 UPH 記錄完成並寫入報表清單
+55,Initial ART Start,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+56,Change Tester Program to FT,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+57,Change Tester Program to RT,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+58,Ready for ART,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+59,ART Receive Tray OK,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+60,ART Receive Tray START,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+61,RT Finish,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+62,ART Finish,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+63,FT Finish,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+64,DownLoad Recipe by FTP OK,—,,HT-160S 的 FTP 為生產資料上傳，不下載 recipe
+65,DownLoad Recipe by FTP NG,—,,同 64
+66,Load Tray Finish,★ 會發射,Report 1,Loader 盤到位確認 + 盤身分產生
+67,Tray Test Finish,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+68,Auto Clean Clear Count,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+69,Site Mapping Stop,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+70,Barcode Reader Enter,—,,HT-160S 無對應機構
+71,OTD Lock,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+72,OTD UnLock,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+73,Mymessbox OK,★ 會發射,Report 1,訊息框關閉(Yes / No / Pause / Esc 任一路徑)
+74,74,—,,"HT9045 對此號的 EventDescription 只指派了號碼本身(""74"")，無別名文字，識別字為 RemoteProgramClose。本機逐字照抄。無發射點。"
+75,75,—,,"HT9045 對此號的 EventDescription 只指派了號碼本身(""75"")，無別名文字，識別字為 ChangeTesterPrgToEQC。本機逐字照抄。無發射點。"
+76,Start Pressed HasIC,★ 會發射,Report 1,Start 且機內有 IC
+77,Read Current ESD Data,—,,HT-160S 無 ESD 子系統
+78,Jam Skip IC Count,—,,HT9045 於操作員輸入 Skip IC 數量後送出；HT-160S 的 SKIP 無數量輸入流程
+79,(HT9045 未具名 / no alias),—,,"HT9045 對此號的 EventDescription 只指派了號碼本身(""79 "")，無別名文字，識別字為 REVERSED79(保留位)。本機逐字照抄，故上線時 alias 亦為 ""79 ""。無發射點。"
+80,Read Now Handler Data,—,,HT-160S 無對應機構
+81,Read ATC Temperature,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+82,Read ATC Ref Temperature,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+83,Read Now EP Penconder,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+84,Run Status FT,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+85,Run Status RT,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+86,Map No Device Arm Has Device,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+87,Map Has Device Arm Error Retry,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+88,Map Has Device Arm Error Skip,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+89,Pre Alarm Message,—,,HT9045 為特定客戶碼 + 8 unloader 的良率監控掛勾，HT-160S 無此機制
+90,Get TestResult And Barcode,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+91,SECS/GEM Offline,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+92,SECS/GEM Online,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+93,SECS/GEM Online Remote,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+94,Transfer Blocked,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+95,Cassette Load Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+96,Cassette ID Read Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+97,Ready To Process Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+98,Ready To Carrier Out Lot,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+99,Cassette Out Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+100,Cassette Unclamped,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+101,Ready To Unload,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+102,Unload Complete,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+103,Ready To Carrier Out Tray,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+104,Ready To Combine Pass,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+105,Ready To Combine Fail,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+106,Machine No Start,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+107,Ready To Combine Pass Lot End,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+108,Cassette Lot Start,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+109,Die Count Fail Message Close,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+110,Clean Out Tray Feed Finish,—,,HT-160S 的 Clean Out 與 Tray Feed 為獨立模式，無合併事件
+111,Map No Device Arm Auto Skip,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+112,MR Run Mode Change,—,,HT-160S 無 MR mode
+113,Access Mode Change,—,,HT-160S 無 access mode
+114,Software Bin,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+115,Tray ID Change,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+116,Ready To Load No Lot,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+117,Ready To Load No Tray,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+118,Ready To Load No Cassette,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+119,ART SRQKIND2 FT LOTSTART,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+120,ART SRQKIND4 RT LOTSTART,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+121,ART SRQKIND6 LOTEND,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+122,FINAL LOTEND,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+123,Safe Door On Off,★ 會發射,Report 1,安全門開↔關任一方向邊緣(運轉中與停機中皆送)
+124,Save Recipe,★ 會發射,Report 1,Setup 頁 Save 或 Save As 成功
+125,EESUG Offest Select,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+126,EESUG Offest Modify,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+127,Back To Normal,—,,HT9045 語意未定義
+128,Test Start,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+129,Test Finish,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+130,Material Receive,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+131,Slot Map Count OK,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+132,CHECK IN,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+133,CHECK OUT,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+134,Ready To Combine Fail Lot End,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+135,Ready To OHT Lot End,—,,E87 Cassette / OHT 載具流程；HT-160S 的 AMR 交握走 272-275 自有模型
+136,Auto 1 Unloading tray,★ 會發射,Report 1,Auto1 出盤
+137,Auto 2 Unloading tray,★ 會發射,Report 1,Auto2 出盤
+138,Auto 3 Unloading tray,★ 會發射,Report 1,Auto3 出盤
+139,Click lot start button for visual sort mode,—,,HT9045 為特定客戶視覺分選專案
+140,Prepare Load Tray,—,,HT9045 為 Tray Map Throw IC 功能前置，HT-160S 無此功能
+141,GEM Control State Change,—,,HT9045 韌體同樣只宣告不發射(115 的唯一站點在 9045 被註解)，無可對照的觸發時機
+142,(HT9045 未具名 / no alias),—,,HT9045 完全未指派 EventDescription(空字串)，識別字為 PickerCountWasCleared。本機逐字照抄，故 alias 為空。無發射點。
+143,(HT9045 未具名 / no alias),—,,HT9045 完全未指派 EventDescription(空字串)，識別字為 UploadPickerCount。本機逐字照抄，故 alias 為空。無發射點。
+144,(HT9045 未具名 / no alias),—,,HT9045 完全未指派 EventDescription(空字串)，識別字為 RequestPickerCount。本機逐字照抄，故 alias 為空。無發射點。
+145,Auto 4 Unloading tray,★ 會發射,Report 1,Auto4 出盤
+146,Auto 5 Unloading tray,★ 會發射,Report 1,Auto5 出盤
+147,Auto 6 Unloading tray,★ 會發射,Report 1,Auto6 出盤
+148,Auto 4 Full,★ 會發射,Report 1,Auto4 車滿(需 AMR 開啟)
+149,Auto 5 Full,★ 會發射,Report 1,Auto5 車滿(需 AMR 開啟)
+150,Auto 6 Full,★ 會發射,Report 1,Auto6 車滿(需 AMR 開啟)
+151,Fix 4 Full,—,,Fix 固定站滿盤；HT-160S 無 Fix 固定站
+152,Fix 5 Full,—,,Fix 固定站滿盤；HT-160S 無 Fix 固定站
+153,Fix 6 Full,—,,Fix 固定站滿盤；HT-160S 無 Fix 固定站
+154,Loader hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+155,Loader full of tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+156,Loader only one tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+157,Loader ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+158,Loader finish unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+159,Empty Prepare Load Tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+160,Empty only one tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+161,Empty hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+162,Empty full of tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+163,Color Prepare Load Tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+164,Color only one tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+165,Color hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+166,Empty put tray to Auto1,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+167,Empty put tray to Auto2,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+168,Empty put tray to Auto3,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+169,Empty put tray to Auto4,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+170,Empty put tray to Auto5,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+171,Empty put tray to Auto6,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+172,Empty put cover to Auto1,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+173,Empty put cover to Auto2,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+174,Empty put cover to Auto3,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+175,Empty put cover to Auto4,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+176,Empty put cover to Auto5,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+177,Empty put cover to Auto6,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+178,Color put tray to Auto1,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+179,Color put tray to Auto2,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+180,Color put tray to Auto3,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+181,Color put tray to Auto4,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+182,Color put tray to Auto5,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+183,Color put tray to Auto6,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+184,Color put cover to Auto1,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+185,Color put cover to Auto2,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+186,Color put cover to Auto3,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+187,Color put cover to Auto4,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+188,Color put cover to Auto5,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+189,Color put cover to Auto6,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+190,Auto1 load tray finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+191,Auto2 load tray finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+192,Auto3 load tray finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+193,Auto4 load tray finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+194,Auto5 load tray finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+195,Auto6 load tray finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+196,Auto1 ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+197,Auto2 ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+198,Auto3 ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+199,Auto4 ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+200,Auto5 ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+201,Auto6 ready to unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+202,Auto1 hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+203,Auto2 hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+204,Auto3 hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+205,Auto4 hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+206,Auto5 hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+207,Auto6 hasn't tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+208,Color full of tray,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+209,Tray End Finish,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+210,Empty finish unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+211,Color finish unload,—,,站別細粒度事件；HT9045 韌體自身亦僅宣告未發射(全 12 個版本樹皆查無發射點)，HT-160S 以 272 / 274 / 136-147 粗粒度表達同一資訊
+212,Energy Saving Start,—,,節能子系統；HT-160S 無(ENERGY_SAVING 遠端命令刻意回 HCACK=2)
+213,Energy Saving End,—,,節能子系統；HT-160S 無(ENERGY_SAVING 遠端命令刻意回 HCACK=2)
+214,Reserved_03,—,,HT9045 韌體保留位，無語意
+215,Reserved_04,—,,HT9045 韌體保留位，無語意
+216,Reserved_05,—,,HT9045 韌體保留位，無語意
+217,Reserved_06,—,,HT9045 韌體保留位，無語意
+218,Reserved_07,—,,HT9045 韌體保留位，無語意
+219,Reserved_08,—,,HT9045 韌體保留位，無語意
+220,Reserved_09,—,,HT9045 韌體保留位，無語意
+221,Reserved_10,—,,HT9045 韌體保留位，無語意
+222,Reserved_11,—,,HT9045 韌體保留位，無語意
+223,Reserved_12,—,,HT9045 韌體保留位，無語意
+224,Reserved_13,—,,HT9045 韌體保留位，無語意
+225,Reserved_14,—,,HT9045 韌體保留位，無語意
+226,Reserved_15,—,,HT9045 韌體保留位，無語意
+227,Reserved_16,—,,HT9045 韌體保留位，無語意
+228,Reserved_17,—,,HT9045 韌體保留位，無語意
+229,Reserved_18,—,,HT9045 韌體保留位，無語意
+230,Reserved_19,—,,HT9045 韌體保留位，無語意
+231,Reserved_20,—,,HT9045 韌體保留位，無語意
+232,Reserved_21,—,,HT9045 韌體保留位，無語意
+233,Reserved_22,—,,HT9045 韌體保留位，無語意
+234,Reserved_23,—,,HT9045 韌體保留位，無語意
+235,Reserved_24,—,,HT9045 韌體保留位，無語意
+236,Reserved_25,—,,HT9045 韌體保留位，無語意
+237,Reserved_26,—,,HT9045 韌體保留位，無語意
+238,Reserved_27,—,,HT9045 韌體保留位，無語意
+239,Reserved_28,—,,HT9045 韌體保留位，無語意
+240,Reserved_29,—,,HT9045 韌體保留位，無語意
+241,Reserved_30,—,,HT9045 韌體保留位，無語意
+242,Reserved_31,—,,HT9045 韌體保留位，無語意
+243,Reserved_32,—,,HT9045 韌體保留位，無語意
+244,Reserved_33,—,,HT9045 韌體保留位，無語意
+245,Reserved_34,—,,HT9045 韌體保留位，無語意
+246,Reserved_35,—,,HT9045 韌體保留位，無語意
+247,Reserved_36,—,,HT9045 韌體保留位，無語意
+248,Reserved_37,—,,HT9045 韌體保留位，無語意
+249,Reserved_38,—,,HT9045 韌體保留位，無語意
+250,START Auto contact height,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+251,SECS GEM consecutive failure,—,,測試機專屬(tester / ART / site / 溫控 / 清針 / OTD)，HT-160S 為 sorter，無此機構
+252,Reserved_39,—,,HT9045 韌體保留位，無語意
+253,Reserved_40,—,,HT9045 韌體保留位，無語意
+254,Reserved_41,—,,HT9045 韌體保留位，無語意
+255,Reserved_42,—,,HT9045 韌體保留位，無語意
+256,Reserved_43,—,,HT9045 韌體保留位，無語意
+257,Reserved_44,—,,HT9045 韌體保留位，無語意
+258,Reserved_45,—,,HT9045 韌體保留位，無語意
+259,Reserved_46,—,,HT9045 韌體保留位，無語意
+260,Reserved_47,—,,HT9045 韌體保留位，無語意
+261,Reserved_48,—,,HT9045 韌體保留位，無語意
+262,Reserved_49,—,,HT9045 韌體保留位，無語意
+263,Reserved_50,—,,HT9045 韌體保留位，無語意
+264,Reserved_51,—,,HT9045 韌體保留位，無語意
+265,Reserved_52,—,,HT9045 韌體保留位，無語意
+266,Reserved_53,—,,HT9045 韌體保留位，無語意
+267,Reserved_54,—,,HT9045 韌體保留位，無語意
+268,Reserved_55,—,,HT9045 韌體保留位，無語意
+269,Reserved_56,—,,HT9045 韌體保留位，無語意
+270,Reserved_57,—,,HT9045 韌體保留位，無語意
+271,Reserved_58,—,,HT9045 韌體保留位，無語意
+272,AMR Supplement,★ 會發射,Report 2(SVID 38219 bitmap)+ Report 6,AMR 要料
+273,AMR LDUnLD Status,★ 會發射,Report 3(SVID 38220 bitmap),AMR 交握中(Ready)
+274,AMR LDUnLD Finish,★ 會發射,Report 4(SVID 38221 bitmap)+ Report 6,AMR 上/下料完成
+275,AMR LD ID,★ 會發射,Report 7(SVID 38204),Color CCD 讀到身分盤 2D 後立即上傳

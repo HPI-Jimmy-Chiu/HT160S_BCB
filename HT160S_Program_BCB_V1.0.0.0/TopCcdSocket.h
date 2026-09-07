@@ -46,12 +46,15 @@ private:
     AnsiString sLastError;
     AnsiString sCcdAddress;     // camera IP
     int iCcdPort;               // camera port
+    bool bWantConnected;        // true while a connection is desired (drives auto-reconnect)
+    unsigned long iLastReconnectTick; // throttle auto-reconnect attempts (GetTickCount)
 
     bool __fastcall StartWinsock();
     void __fastcall CloseSocket();
     void __fastcall PollConnecting();
     void __fastcall PollReceive();
     void __fastcall SendTopCcdCmd(AnsiString sData);
+    void __fastcall DrainSocketInput();   // discard stale bytes before a shot
     void __fastcall SaveTopCcd2DLog(AnsiString sMessage);
 
 public:
@@ -71,6 +74,7 @@ public:
 
     // Shot / result (non-blocking).
     void __fastcall TopCcdTriggerShot();                 // send "LON", clear read flag
+    void __fastcall TopCcdEndShot();                     // send "LOFF" (end the shot)
     bool __fastcall TopCcdGetResult(AnsiString &sCode);  // true + code once received
 
     // Drive socket state machine (call from a periodic loop, or implicitly via

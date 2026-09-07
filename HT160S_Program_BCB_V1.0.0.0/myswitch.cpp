@@ -3,6 +3,7 @@
 #pragma hdrstop
 
 #include "myswitch.h"
+#include "uPadInterface.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -28,6 +29,15 @@ __fastcall TMySwitch::TMySwitch()
 void TMySwitch::On()
 {
     OutValue=true;
+    //AI(ht160s-maintainer) 20260616 : if this switch drives a physical Pad button
+    //LED, push the state to the Pad instead of a (usually unbound) IO output, so
+    //machine state lights the panel LEDs. Mirrors HT172 myswitch.cpp On() (the
+    //iControlPanelMode==1 gate there is an always-on #define, so it is dropped).
+    if(fPadInterface!=NULL && fPadInterface->IsPadButton(Name))
+    {
+        fPadInterface->SendSwitchStatus(Name, true);
+        return;
+    }
     if(Enable==false || Output==NULL)
         return;
     Output->On();
@@ -36,6 +46,11 @@ void TMySwitch::On()
 void TMySwitch::Off()
 {
     OutValue=false;
+    if(fPadInterface!=NULL && fPadInterface->IsPadButton(Name))
+    {
+        fPadInterface->SendSwitchStatus(Name, false);
+        return;
+    }
     if(Enable==false || Output==NULL)
         return;
     Output->Off();

@@ -1,0 +1,325 @@
+; HT160S runtime phrase dictionary (Big5/CP950)
+; format:  English <TAB> Traditional-Chinese   ; read by LangT() ; \n=newline
+. 	。 
+2D Code	2D 碼
+2D code not found in any lot : 	2D 碼於任一 Lot 找不到：
+?	？
+Abort: EMG	中止：緊急停止
+Abort: Suck Z not home	中止：吸取 Z 未復歸
+Abort: motor alarm	中止：馬達警報
+Abort: motor disabled	中止：馬達停用
+Abort: motor missing	中止：馬達遺失
+Abort: not home	中止：未復歸
+Abort: not ready	中止：未就緒
+Abort: system start	中止：系統啟動
+Account ID	帳號 ID
+Account saved in memory. Press 'Save to File' to keep it.	帳號已儲存於記憶體中。請按「Save to File」以保留。
+Account table is full (max 30).	帳號表已滿（最多 30）。
+Accounts: ID / password / level 0-3. Stored in system\login.txt.	帳號：ID / 密碼 / 層級 0-3。儲存於 system\login.txt。
+Active motor is disabled.	作用中的馬達已停用。
+Add / Update	新增 / 更新
+Address	位址
+Alarm	警報
+Alarm Reset	警報重置
+Alias	別名
+All Off	全部關閉
+All Suck Z must be home before X move.	X 移動前所有 Suck Z 必須復歸。
+All offsets cleared. Press Apply to save and take effect, or Exit to discard.	所有偏移已清除。按套用以儲存並生效，或按結束以捨棄。
+Area	區域
+At least one nozzle must stay enabled.	至少一個吸嘴必須維持啟用。
+Auto	自動
+Auto GoUp once finish	Auto 單次上升完成
+Auto GoUp once start	Auto 單次上升啟動
+Auto Y motor will out of limit	Auto Y 馬達將超出限位
+Auto carriage first-sort Y fine-tune	自動載台首次分類 Y 微調
+Bin map saved.	Bin map 已儲存。
+Bin map setting has invalid rows.	Bin map 設定有無效的列。
+Bin map setting is OK.	Bin map 設定正常。
+Bin map setting is invalid.	Bin map 設定無效。
+Bin must be 0-999. Error code starts from 1000.	Bin 必須為 0-999。錯誤碼從 1000 開始。
+Bit	位元
+Blink LED	LED 閃爍
+Board	板卡
+Bottom Empty Tray Is Miss Error	底部空盤遺失錯誤
+By Lot+Bin mode is ON but no binding is set. Set bindings first !	By Lot+Bin 模式已開啟，但未設定綁定。請先設定綁定 ！
+CCW	反轉
+CCW (-) limit is triggered. Jog - is blocked; use Jog + to move away.	CCW (-) 極限已觸發。Jog - 已阻擋；請用 Jog + 移開。
+CONNECT	連線
+CW	正轉
+CW (+) limit is triggered. Jog + is blocked; use Jog - to move away.	CW (+) 極限已觸發。Jog + 已阻擋；請用 Jog - 移開。
+Can not change recipe while machine is running.	機台執行中不可變更配方。
+Can not delete current recipe.	不可刪除目前配方。
+Can not delete recipe while machine is running.	機台執行中不可刪除配方。
+Card	卡片
+Clean Out	清機
+Clear All	全部清除
+Clear Log	清除紀錄
+Color	色盤
+Color CCD X motor will out of limit	色盤 CCD X 馬達將超出限位
+Color Y motor will out of limit	色盤 Y 馬達將超出限位
+Color supply tray is not ready	Color 供盤未就緒
+Command	命令
+Confirm Clean Out?	確認清機？
+Confirm home?	確認復歸?
+Connected: -	已連線：-
+Continue	繼續
+Create recipe failed or recipe already exists.	建立配方失敗或配方已存在。
+Default 1-%d	預設 1-%d
+Delay	延遲
+Delete	刪除
+Delete account: %s ?	刪除帳號：%s ？
+Delete recipe 	刪除配方 
+Delete recipe failed.	刪除配方失敗。
+Destroy	破真空
+Devices	裝置數
+DiePass	晶粒良品
+Discard unsaved motor parameter changes?	捨棄未儲存的馬達參數變更？
+Dummy	模擬
+Duplicate	重複
+EMG	緊急停止
+EMG is pressed.	EMG 已按下。
+Emg	急停
+Empty	空
+Empty Push Tray Miss	空盤推盤遺失
+Empty Y motor will out of limit	空盤 Y 馬達將超出限位
+Enable	啟用
+Encoder	編碼器
+Error	錯誤
+Error close com port	關閉 com 連接埠錯誤
+Error open com port	開啟 com 連接埠錯誤
+ErrorCode	錯誤碼
+Exit	離開
+File %s data is lose!	檔案 %s 資料遺失！
+File %s data is mistake! (%d)	檔案 %s 資料錯誤！(%d)
+File %s is not exist!	檔案 %s 不存在！
+File %s is opened by other software!	檔案 %s 已被其他軟體開啟！
+Flush Panel	刷新面板
+Front Empty Tray Is Miss Error	前空盤遺失錯誤
+Front Enable	前側啟用
+Front Pad	前 Pad
+HOME	復歸
+HOMING..	復歸中..
+HOME re-clamped a tray but its grip sensor went dark afterwards : %s. Please CHECK that carriage before starting production, then press OK.	HOME 已重新夾持盤，但之後夾持感測器熄滅：%s。請在開始生產前檢查該載台，然後按 OK。
+Hardware install setup	硬體安裝設定
+Hardware install setup (locked - lot running, end lot to edit)	硬體安裝設定 (鎖定 - Lot 執行中，結束 Lot 後可編輯)
+HasTray	有盤
+Home	復歸
+Home start	復歸開始
+IO %s alias is duplicated!	IO %s 別名重複！
+IO already change, want to restore?	IO 已變更，是否要還原？
+IO already change, will restore IO!!	IO 已變更，將復原 IO！！
+IO map grid not found.	找不到 IO 對應表格。
+IO table data invalid:	IO 表資料無效：
+IO_Table.csv backup failed. Save aborted.	IO_Table.csv 備份失敗。已中止儲存。
+IO_Table.csv save failed.	IO_Table.csv 儲存失敗。
+IO_Table.csv saved.	IO_Table.csv 已儲存。
+IO_Table.csv saved.\r\nBackup: %s	IO_Table.csv 已儲存。\r\n備份：%s
+ISA Base	ISA 基底
+InPos	到位
+InType	輸入類型
+Inherit last work order ? (%d lots, %d bindings)   Yes = resume,  No = start fresh	是否繼承上次工單 ? (%d 個 lot,%d 個綁定)   是 = 接續,  否 = 重新開始
+Initial	初始
+Input an even hex register offset, for example 0x08.	請輸入偶數的十六進位暫存器偏移，例如 0x08。
+Input value is invalid.	輸入值無效。
+Installed	已安裝
+Invalid	無效
+IsServo	是否伺服
+Item	項目
+Jog+ abort: CW limit	寸動+ 中止：正轉極限
+Jog- abort: CCW limit	寸動- 中止：反轉極限
+Kind	類型
+Lane	通道
+Last Error: not started	最後錯誤：未啟動
+Legacy MC88X1 read-only offset	舊版 MC88X1 唯讀偏移
+Level	層級
+Loader	上料機構
+Loader Safe Distance (mm)	上料機構安全距離 (mm)
+Loader Tray Empty	Loader 盤空
+Loader Tray has IC,please remove	Loader 盤有 IC，請移除
+Loader Y motor will out of limit	上料機構 Y 馬達將超出限位
+Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK.	Loader 仍夾持著盤。請手動移除 Loader L 與 R 上的所有盤，然後按 OK。
+Loader top-CCD X capture fine-tune	上料機構上視 CCD X 取像微調
+Loop	循環
+Lot "%s" has no 2D data loaded yet.\n(Work-order JSON not downloaded for this Lot.)	Lot "%s" 尚未載入 2D 資料。\n(此 Lot 的工單 JSON 尚未下載。)
+Lot No.	Lot 編號
+Lot WebAPI auto-pull is OFF : enable it in Maintenance -> Lot WebAPI.	Lot WebAPI 自動抓取未啟用：請於 維護 -> Lot WebAPI 開啟。
+Lot WebAPI update is already running, please wait.	Lot WebAPI 更新進行中，請稍候。
+Lot list is full !	Lot 清單已滿 !
+Machine is running.	機台執行中。
+Main status badges exceed the grid (max 3 cols x 2 rows = 6). The extra badges are hidden.\nIncrease MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS in main.h and widen pnlFeatureStatus to make room.	主畫面狀態標章超過格線數量 (最多 3 欄 x 2 列 = 6)。多出的標章已隱藏。\n請在 main.h 增加 MAIN_FEATURE_BADGE_COLS / MAIN_FEATURE_BADGE_ROWS 並加寬 pnlFeatureStatus 以挪出空間。
+Manual Send	手動傳送
+Max(mm)	最大(mm)
+MaxTray	最大盤數
+Min(mm)	最小(mm)
+Modify IO Table	修改 IO 表
+ModuleType	模組類型
+Motor	馬達
+Motor %s alias is duplicated!	馬達 %s 別名重複！
+Motor %s home flag reset (servo alarm).	馬達 %s 復歸旗標已重置（伺服錯誤）。
+Motor Name	馬達名稱
+Motor Test is busy (home or loop running).	Motor Test 忙碌中（復歸或迴圈執行中）。
+Motor alarm is active.	馬達警報作用中。
+Motor is busy.	馬達忙碌。
+Motor is disabled.	馬達已停用。
+Motor is not home.	馬達未復歸。
+Motor parameter saved, but log failed: 	馬達參數已儲存，但記錄失敗：
+MotorRelay	馬達繼電器
+Move abort: Sort Z not home	移動中止：分類臂 Z 未復歸
+Move abort: Tray Z not up	移動中止：載盤 Z 未上升
+Move abort: motor alarm	移動中止：馬達警報
+Move abort: motor disable	移動中止：馬達停用
+Move abort: motor not home	移動中止：馬達未復歸
+Move abort: no motor	移動中止：無馬達
+Move abort: soft limit	移動中止：軟體極限
+Move abort: system start	移動中止：系統啟動中
+NORMAL	正常
+No	否
+No 2D data : load lot 2D/Bin data before Start !	無 2D 資料：啟動前請載入 lot 2D/Bin 資料 ！
+No Lot data : add at least one Lot before Start !	無 Lot 資料：啟動前請至少新增一個 Lot ！
+No Lot in the work order !	工單內沒有 Lot !
+No Lot is started : press Lot Start before updating WebAPI data !	尚未啟動 Lot：更新 WebAPI 資料前請先按 Lot Start !
+Not Created	未建立
+Not Created 	未建立 
+Not Installed	未安裝
+Not assigned.	未指派。
+Note	備註
+Now(mm)	目前(mm)
+OFF	關
+OK/Error	OK/錯誤
+ON	開
+ONLINE	連線
+OffAlarmTime	關閉警報時間
+OffDelayTime	關閉延遲時間
+Offset	偏移
+Offset - per-workfile position fine-tune (mm)	偏移 - 各配方位置微調 (mm)
+Offset Item	偏移項目
+Offset saved and applied.	偏移已儲存並套用。
+Offset(mm)	偏移(mm)
+OnAlarmTime	啟動警報時間
+OnDelayTime	啟動延遲時間
+One Cycle	單次循環
+One Cycle is only allowed in Normal / Clean Out mode.	單循環僅允許於正常 / 清機模式。
+One Cycle is already armed.	已有單循環待命中。
+One Cycle from host requires the machine to be running.	主機端單循環需機台運轉中。
+Output is not bound or disabled.	輸出未綁定或已停用。
+Pad COM %s connect failed	Pad COM %s 連線失敗
+Pad Interface	Pad 介面
+Password	密碼
+Pause	暫停
+Pitch X motor will out of limit	間距 X 馬達將超出限位
+Please Enter LotID !	請輸入 LotID !
+Please add at least one Lot to the list !	請至少新增一個 Lot 至清單 !
+Please enter a password.	請輸入密碼。
+Please enter an account ID.	請輸入帳號 ID。
+Please input new recipe name.	請輸入新配方名稱。
+Please select a level (0-3).	請選擇層級 (0-3)。
+Please select an account to delete.	請選擇要刪除的帳號。
+Port	埠
+Position	位置
+Power Off	關閉電源
+Power On	開啟電源
+PowerState	電源狀態
+Re-alignment (bake)	重新對位 (寫入)
+Re-alignment done: offset folded into base teach.	重新校正完成：偏移已併入基準教導。
+Ready	就緒
+Ready 	就緒 
+Real	實機
+Rear Enable	後側啟用
+Rear Pad	後 Pad
+Recipe already exists.	配方已存在。
+Recipe does not exist.	配方不存在。
+Recipe name cannot be empty.	配方名稱不可為空。
+Recipe saved as 	配方已儲存為 
+Register	暫存器
+Register read is enabled only for MC88X1 motors.	暫存器讀取僅 MC88X1 馬達允許。
+Reload	重新載入
+Reset	重置
+Reset COM	重置 COM
+Result	結果
+RetestCode	複測碼
+Retry	重試
+Ring	環號
+Safe Lock	安全鎖
+Same bin as %s.	與 %s 相同的 Bin。
+Save As recipe failed.	另存配方失敗。
+Save Loader safe distance?	是否要儲存上料機構安全距離？
+Save or reload Mot_Table first before %s.	請先儲存或重新載入 Mot_Table 再 %s。
+Save or reload Mot_Table first.	請先儲存或重新載入 Mot_Table。
+Save or reload motor parameter first before %s.	請先儲存或重新載入馬達參數再 %s。
+Save or reload motor parameter first.	請先儲存或重新載入馬達參數。
+Save to File	儲存至檔案
+Saved %s	已儲存 %s
+Select a car area	請選擇車區
+Select a sucker	請選擇吸嘴
+Select a target area	請選擇目標區
+Select an Auto	請選擇 Auto
+Select at least two motors in Motor List for multi loop.	請在馬達清單中至少選擇兩個馬達以進行多重迴圈。
+Send	傳送
+ServerON	伺服開
+Servo	伺服
+Servo %s blocked: %s	伺服 %s 已阻擋：%s
+Servo Guard log failed: 	Servo Guard 記錄失敗：
+Servo alarm not cleared by motor power-cycle : %s. The motor relay does not cut the drive control power, so HOME cannot clear it. Please cycle the machine MAIN power (breaker) to reset the drive, or remove the drive fault, then HOME again.	Servo 警報無法藉由馬達電源重啟清除：%s。馬達繼電器並未切斷驅動器控制電源，因此 HOME 無法清除它。請重啟機台 MAIN 電源（斷路器）以重置驅動器，或排除驅動器故障，然後再次 HOME。
+Servo apply executed. Servo command count: 	Servo 套用已執行。Servo 命令數：
+Servo guard passed. Actual servo control is still locked.	伺服防護通過。實際伺服控制仍為鎖定。
+ServoAlarm	伺服警報
+ServoCfg	伺服設定
+ServoOn	伺服開啟
+Skip	跳過
+SnMotorPower	馬達電源感測
+Soft Limit	軟體極限
+Soft Limit(mm)	軟體極限(mm)
+SoftCCW	軟體反轉
+SoftCW	軟體正轉
+Sort arm Z must be home before X jog.	分料臂 Z 須先復歸才能進行 X 寸動。
+Sort arm Z must be home before X move.	分料臂 Z 須先復歸才能進行 X 移動。
+Sort arm test finish	分類臂測試完成
+Sort arm test start	分類臂測試啟動
+SortArm	分類臂
+SortArm X / target Y / Suck Z must be enabled.	SortArm X / 目標 Y / Suck Z 必須啟用。
+SortArm X and target Y must be home.	SortArm X 與目標 Y 必須復歸。
+SortArm X stop at Bottom-CCD first column	分類臂 X 停於下視 CCD 第一行
+SortArm X stop fine-tune at this station	分類臂於此站點 X 停止微調
+SortArm module not ready	分類臂模組未就緒
+Sorted	已分類
+Src	來源
+Start	啟動
+Started	已啟動
+State Record snapshot failed (check 7-Zip / disk).	State Record 快照失敗 (請檢查 7-Zip / 磁碟)。
+State: idle	狀態：閒置
+State: not started	狀態：未啟動
+Status	狀態
+Step	步距
+Suck	吸取
+Sure to Save ?	確定要儲存？
+Svr Alm	伺服警報
+T Start	教導啟動
+Target	目標
+Target over soft limit.	目標超過軟體極限。
+Teach Position	教導位置
+Teach(mm)	教導(mm)
+Test already running	測試執行中
+Top CCD API not ready	頂部 CCD API 未就緒
+Top CCD X motor will out of limit	頂部 CCD X 馬達將超出限位
+Tray Arm X motor will out of limit	載盤臂 X 馬達將超出限位
+Tray End	收盤
+Tray Feed	送盤
+Tray arm Z must be up before X jog.	X 寸動前 Tray arm Z 必須在上方。
+Tray arm Z must be up before X move.	托盤臂 Z 須先上升才能進行 X 移動。
+Tray division exceeds machine limit (X max=%d, Y max=%d). Value clamped.	盤分割超過機台極限 (X 最大=%d,Y 最大=%d)。數值已限制。
+Type	類型
+Unsaved MotorTest edits are not included in file validation. Continue?	未儲存的 MotorTest 編輯不會納入檔案驗證。是否繼續？
+Update WebAPI	更新 WebAPI 資料
+Updating ...	更新中 ...
+User ID or password is incorrect.	使用者帳號或密碼不正確。
+User accounts reloaded from system\login.txt.	已從 system\login.txt 重新載入使用者帳號。
+User accounts saved to system\login.txt.	使用者帳號已儲存至 system\login.txt。
+Value	數值
+View only. Engineer level (2) or above is required to edit.	僅供檢視。需工程師層級 (2) 以上才能編輯。
+WhiteList mode : the 2D list cannot be re-loaded while a Lot is open.	WhiteList 模式：Lot 開啟中無法重新載入 2D 清單。
+Z Phase	Z 相
+Zone	區域
+\n\nSave motor parameter changes?	\n\n儲存馬達參數變更？
+apply	套用
+guard	防護
+Operator ID	操作員 ID

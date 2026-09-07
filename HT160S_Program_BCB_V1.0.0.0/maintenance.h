@@ -14,7 +14,7 @@
 //---------------------------------------------------------------------------
 enum
 {
-    MAX_MAINTENANCE_MENU_COUNT = 16
+    MAX_MAINTENANCE_MENU_COUNT = 18
 };
 //---------------------------------------------------------------------------
 enum TMaintenanceMenuAction
@@ -47,13 +47,26 @@ enum TTowerLightRunState
     LED_Homeing = 5
 };
 //---------------------------------------------------------------------------
+// AI(ht160s-maintainer) 20260613 : Bin Display(MCU), Top CCD, Color CCD and Lot
+// WebAPI pages were moved from runtime Build*Page() builders into the DFM, so they
+// now stream from the __published section below (member names preserved; the
+// Load/Save/Refresh code is unchanged).
+// IMPORTANT: the BCB6 form designer parses this header when you click a component
+// event in the Object Inspector. Its simplified parser raises a whole-class modal
+// "Incorrect method declaration in class TfMaintenance" (breaking EVERY event on
+// the form) if the __published section either (a) contains any // comment among
+// the members, or (b) declares a component FIELD after an event-handler METHOD.
+// So keep __published in this exact order: ALL component fields first, THEN all
+// "void __fastcall ...Click(...)" handlers, and put explanatory notes out here.
+// When adding a new tab's controls, insert its fields into the field block above
+// the handlers - do NOT append field+handler pairs per tab.
 class TfMaintenance : public TForm
 {
 __published:
     TPanel *pnlMenu;
     TSpeedButton *spbMaintTowerLight;
     TSpeedButton *spbMaintPassword;
-    TSpeedButton *spbMaintSoftSimu;
+    TSpeedButton *spbMaintAmr;
     TSpeedButton *spbMaintFunctionDef;
     TSpeedButton *spbMaintHardware;
     TSpeedButton *spbMaintExit;
@@ -114,7 +127,12 @@ __published:
     TSpeedButton *sbMusic3;
     TSpeedButton *sbMusic4;
     TTabSheet *tsMaintPassword;
-    TTabSheet *tsMaintSoftSimu;
+    TTabSheet *tsMaintAmr;
+    TMemo *memAmrStatus;
+    TCheckBox *chkAmrTestMode;
+    TPanel *pnlAmrTestBanner;
+    TPanel *pnlAmrInject;
+    TMemo *memAmrTx;
     TTabSheet *tsMaintFunctionDef;
     TTabSheet *tsMaintHardware;
     TPanel *pnlHardwareHeader;
@@ -123,12 +141,21 @@ __published:
     TPanel *pnlFunctionDefBody;
     TPageControl *pgcFunctionDef;
     TTabSheet *tsFunctionGeneral;
+    TPanel *pnlPredictiveSupplyBox;
+    TCheckBox *chkUsePredictiveAutoSupply;
+    TLabel *lblPredictiveSupplyHint;
+    TPanel *pnlAmrDivertBox;
+    TCheckBox *chkUseAmrRecoveryDivert;
+    TLabel *lblAmrDivertHint;
+    TPanel *pnlSkip2DBox;
+    TCheckBox *chkSkipUnknown2DAlarm;
+    TLabel *lblSkip2DHint;
     TTabSheet *tsMaintTeach;
     TTabSheet *tsMaintMotor;
     TTabSheet *tsMaintIO;
     TTabSheet *tsMaintSECS;
     TTabSheet *tsMaintCOM;
-    TPageControl *PageControl1;
+    TPageControl *pgcMaintHardware;
     TTabSheet *tsLoaderUnloader;
     TPanel *pnlHardwareOptionBox;
     TLabel *lblHardwareColorHint;
@@ -144,14 +171,304 @@ __published:
     TLabel *lblHardwareErrorHint;
     TPanel *Panel3;
     TCheckBox *chkUseAMR;
+    TPanel *pnlAutoEnableBox;
+    TLabel *lblAutoEnableHint;
+    TCheckBox *chkAutoEnable1;
+    TCheckBox *chkAutoEnable2;
+    TCheckBox *chkAutoEnable3;
+    TCheckBox *chkAutoEnable4;
+    TCheckBox *chkAutoEnable5;
+    TCheckBox *chkAutoEnable6;
+    TTabSheet *tsNetwork;
+    TPanel *pnlNetworkBody;
+    TEdit *edWebapiPath;
+    TLabel *Label1;
+    TTimer *tmrTowerLightBlink;
+    TPanel *pnlSecsOverride;
+    TLabel *lblSecsOverrideTitle;
+    TLabel *lblSecsOverrideState;
+    TButton *btnSecsOverrideRelease;
+    TPanel *pnlSecsControlState;
+    TLabel *lblSecsCtlTitle;
+    TLabel *lblSecsCtlState;
+    TLabel *lblSecsCtlHint;
+    TButton *btnSecsCtlOffline;
+    TButton *btnSecsCtlLocal;
+    TButton *btnSecsCtlRemote;
+    TCheckBox *chkSecsAcceptHostOnline;
+    TSpeedButton *spbMaintMCUDisplay;
+    TTabSheet *tsMaintMCUDisplay;
+    TPanel *pnlMCUSetup;
+    TPanel *pnlMCUStatus;
+    TPanel *pnlMCUTest;
+    TLabel *lblMCUSetupTitle;
+    TCheckBox *chkMCUEnabled;
+    TLabel *lblMCUIPCap;
+    TEdit *edMCUIP;
+    TLabel *lblMCUPortCap;
+    TComboBox *edMCUPort;
+    TLabel *lblMCUReconnectCap;
+    TEdit *edMCUReconnect;
+    TButton *btnMCUSave;
+    TButton *btnMCUReload;
+    TButton *btnMCURefresh;
+    TLabel *lblMCUStatusEnabled;
+    TLabel *lblMCUStatusConnected;
+    TLabel *lblMCUStatusQueue;
+    TLabel *lblMCUStatusError;
+    TLabel *lblMCUTestTitle;
+    TLabel *lblMCUAddressCap;
+    TEdit *edMCUAddress;
+    TLabel *lblMCUTextCap;
+    TEdit *edMCUText;
+    TLabel *lblMCUColorCap;
+    TComboBox *cbbMCUColor;
+    TCheckBox *chkMCUCodeSymbol;
+    TLabel *lblMCULightValueCap;
+    TEdit *edMCULightValue;
+    TButton *btnMCUSendDisplay;
+    TButton *btnMCUSendCode;
+    TButton *btnMCUSendLight;
+    TMemo *memMCULog;
+    TSpeedButton *spbMaintTopCcd;
+    TTabSheet *tsMaintTopCcd;
+    TPanel *pnlTopCcdSetup;
+    TPanel *pnlTopCcdStatus;
+    TPanel *pnlTopCcdTest;
+    TLabel *lblTopCcdSetupTitle;
+    TLabel *lblTopCcdIPCap;
+    TEdit *edTopCcdIP;
+    TLabel *lblTopCcdPortCap;
+    TEdit *edTopCcdPort;
+    TCheckBox *chkTopCcdBottomReserved;
+    TCheckBox *chkTopCcdEnable;
+    TButton *btnTopCcdSave;
+    TButton *btnTopCcdReload;
+    TButton *btnTopCcdConnect;
+    TButton *btnTopCcdDisconnect;
+    TLabel *lblTopCcdStatusConn;
+    TLabel *lblTopCcdStatusError;
+    TLabel *lblTopCcdTestTitle;
+    TButton *btnTopCcdShot;
+    TButton *btnTopCcdEndShot;
+    TLabel *lblTopCcdResultCap;
+    TEdit *edTopCcdResult;
+    TMemo *memTopCcdLog;
+    TSpeedButton *spbMaintColorCcd;
+    TTabSheet *tsMaintColorCcd;
+    TPanel *pnlColorCcdSetup;
+    TPanel *pnlColorCcdStatus;
+    TPanel *pnlColorCcdTest;
+    TLabel *lblColorCcdSetupTitle;
+    TLabel *lblColorCcdIPCap;
+    TEdit *edColorCcdIP;
+    TLabel *lblColorCcdPortCap;
+    TEdit *edColorCcdPort;
+    TCheckBox *chkColorCcdEnable;
+    TButton *btnColorCcdSave;
+    TButton *btnColorCcdReload;
+    TButton *btnColorCcdConnect;
+    TButton *btnColorCcdDisconnect;
+    TLabel *lblColorCcdStatusConn;
+    TLabel *lblColorCcdStatusError;
+    TLabel *lblColorCcdTestTitle;
+    TButton *btnColorCcdShot;
+    TButton *btnColorCcdEndShot;
+    TLabel *lblColorCcdResultCap;
+    TEdit *edColorCcdResult;
+    TMemo *memColorCcdLog;
+    TSpeedButton *spbMaintLotApi;
+    TTabSheet *tsMaintLotApi;
+    TPanel *pnlLotApiSetup;
+    TPanel *pnlLotApiStatus;
+    TPanel *pnlLotApiTest;
+    TLabel *lblLotApiUrl;
+    TButton *btnLotApiSave;
+    TButton *btnLotApiReload;
+    TLabel *lblLotApiSaveHint;
+    TCheckBox *chkLotApiUsePull;
+    TLabel *lblLotApiStatus;
+    TLabel *lblLotApiError;
+    TLabel *lblLotApiTestTitle;
+    TLabel *lblLotApiTestLotCap;
+    TEdit *edLotApiTestLot;
+    TButton *btnLotApiFetch;
+    TMemo *memLotApiResult;
+    TMemo *memLotApiLog;
+    TSpeedButton *spbMaintFtp;
+    TTabSheet *tsMaintFtp;
+    TPanel *pnlFtpSetup;
+    TPanel *pnlFtpStatus;
+    TPanel *pnlFtpTest;
+    TLabel *lblFtpHost;
+    TLabel *lblFtpPort;
+    TLabel *lblFtpUser;
+    TLabel *lblFtpPwd;
+    TLabel *lblFtpRemoteDir;
+    TLabel *lblFtpSaveHint;
+    TEdit *edFtpHost;
+    TEdit *edFtpPort;
+    TEdit *edFtpUser;
+    TEdit *edFtpPwd;
+    TEdit *edFtpRemoteDir;
+    TCheckBox *chkFtpEnable;
+    TCheckBox *chkFtpUploadReport;
+    TButton *btnFtpSave;
+    TButton *btnFtpReload;
+    TLabel *lblFtpState;
+    TLabel *lblFtpLastError;
+    TLabel *lblFtpTestTitle;
+    TButton *btnFtpTestConn;
+    TButton *btnFtpTestUpload;
+    TMemo *memFtpResult;
+    TMemo *memFtpLog;
+    TTabSheet *tsSortArm;
+    TPanel *pnlSuckerEnableBox;
+    TLabel *lblSuckerEnableHint;
+    TCheckBox *chkSuckEnable1;
+    TCheckBox *chkSuckEnable2;
+    TCheckBox *chkSuckEnable3;
+    TCheckBox *chkSuckEnable4;
+    TPanel *pnlAutoSkipBox;
+    TLabel *lblAutoSkipHint;
+    TCheckBox *chkSortArmAutoSkip;
+    TTabSheet *tsOption;
+    TPanel *pnlBinDisplayBox;
+    TLabel *lblBinPanelType;
+    TComboBox *cbBinPanelType;
+    TTabSheet *tsLotInfo;
+    TPanel *pnlSortModeBox;
+    TLabel *lblLotBinModeHint;
+    TRadioGroup *rgSortMode;
+    TPanel *pnlWhiteListModeBox;
+    TCheckBox *chkWhiteListActive;
+    TLabel *lblWhiteListModeHint;
+    TTabSheet *tsCcd;
+    TPanel *pnlCcd2DSanitizeBox;
+    TLabel *lblCcd2DSanitizeHint;
+    TCheckBox *chkCcd2DCommaToUnderscore;
+    TCheckBox *cbCommType;
+    TPanel *pnlSuck2QuadBox;
+    TLabel *lblSuck2QuadHint;
+    TCheckBox *chkSuck2QuadVacuum;
+    TPanel *plLoaderSafeDistanceSet;
+    TLabel *lblLoaderSafeDistance;
+    TEdit *edLoaderSafeDistance;
+    TLabel *lbmm;
+    TLabel *lblLoaderSafeHint;
+    TPanel *pnlMachineIdentity;
+    TLabel *lblMachineModel;
+    TEdit *edMachineModel;
+    TLabel *lblHandlerID;
+    TEdit *edHandlerID;
+    TLabel *lblSerialNo;
+    TEdit *edSerialNo;
+    TPanel *pnlSettleDelay;
+    TLabel *lblSettleDelayTitle;
+    TLabel *lblSettle0;
+    TEdit *edSettle0;
+    TLabel *lblSettle1;
+    TEdit *edSettle1;
+    TLabel *lblSettle2;
+    TEdit *edSettle2;
+    TLabel *lblSettle3;
+    TEdit *edSettle3;
+    TLabel *lblSettle4;
+    TEdit *edSettle4;
+    TLabel *lblSettle5;
+    TEdit *edSettle5;
+    TLabel *lblSettle6;
+    TEdit *edSettle6;
+    TLabel *lblSettle7;
+    TEdit *edSettle7;
+    TLabel *lblSettle8;
+    TEdit *edSettle8;
+    TLabel *lblSettle9;
+    TEdit *edSettle9;
+    TPanel *pnlUphSampleBox;
+    TLabel *lblUphMinSample;
+    TLabel *lblUphMinSampleHint;
+    TEdit *edUphMinSampleIC;
+    TPanel *pnlPrePickWaitBox;
+    TLabel *lblPrePickWaitHint;
+    TLabel *lblPrePickWait;
+    TEdit *edPrePickWaitSec;
+    TLabel *labPwHint;
+    TLabel *labPwIdCaption;
+    TLabel *labPwPassCaption;
+    TLabel *labPwLevelCaption;
+    TListBox *lbPwUsers;
+    TEdit *edPwId;
+    TEdit *edPwPass;
+    TComboBox *cbbPwLevel;
+    TButton *btnPwAddUpdate;
+    TButton *btnPwDelete;
+    TButton *btnPwSave;
+    TButton *btnPwReload;
+    void __fastcall btnMCUSaveClick(TObject *Sender);
+    void __fastcall btnMCUReloadClick(TObject *Sender);
+    void __fastcall btnMCURefreshClick(TObject *Sender);
+    void __fastcall btnMCUSendDisplayClick(TObject *Sender);
+    void __fastcall btnMCUSendCodeClick(TObject *Sender);
+    void __fastcall btnMCUSendLightClick(TObject *Sender);
+    void __fastcall btnTopCcdConnectClick(TObject *Sender);
+    void __fastcall btnTopCcdDisconnectClick(TObject *Sender);
+    void __fastcall btnTopCcdSaveClick(TObject *Sender);
+    void __fastcall btnTopCcdReloadClick(TObject *Sender);
+    void __fastcall btnTopCcdShotClick(TObject *Sender);
+    void __fastcall btnTopCcdEndShotClick(TObject *Sender);
+    void __fastcall btnColorCcdConnectClick(TObject *Sender);
+    void __fastcall btnColorCcdDisconnectClick(TObject *Sender);
+    void __fastcall btnColorCcdSaveClick(TObject *Sender);
+    void __fastcall btnColorCcdReloadClick(TObject *Sender);
+    void __fastcall btnColorCcdShotClick(TObject *Sender);
+    void __fastcall btnColorCcdEndShotClick(TObject *Sender);
+    void __fastcall chkTopCcdEnableClick(TObject *Sender);
+    void __fastcall chkColorCcdEnableClick(TObject *Sender);
+    void __fastcall btnLotApiSaveClick(TObject *Sender);
+    void __fastcall btnLotApiReloadClick(TObject *Sender);
+    void __fastcall btnLotApiFetchClick(TObject *Sender);
+    void __fastcall btnFtpSaveClick(TObject *Sender);
+    void __fastcall btnFtpReloadClick(TObject *Sender);
+    void __fastcall btnFtpTestConnClick(TObject *Sender);
+    void __fastcall btnFtpTestUploadClick(TObject *Sender);
     void __fastcall spbMaintenanceMenuClick(TObject *Sender);
     void __fastcall RGB00Click(TObject *Sender);
     void __fastcall sbMusic1Click(TObject *Sender);
     void __fastcall tmrTowerLightBlinkTimer(TObject *Sender);
+    void __fastcall btnSecsOverrideReleaseClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
     void __fastcall chkHardwareColorBinAreaClick(TObject *Sender);
     void __fastcall chkUseAMRClick(TObject *Sender);
+    void __fastcall chkAmrTestModeClick(TObject *Sender);
+    void __fastcall AmrInjectButtonClick(TObject *Sender);
+    void __fastcall btnAgvTimeoutSaveClick(TObject *Sender);
+    void __fastcall rgSortModeClick(TObject *Sender);
+    void __fastcall chkWhiteListActiveClick(TObject *Sender);
+    void __fastcall chkUsePredictiveAutoSupplyClick(TObject *Sender);
+    void __fastcall chkUseAmrRecoveryDivertClick(TObject *Sender);
+    void __fastcall chkSkipUnknown2DAlarmClick(TObject *Sender);
+    void __fastcall chkCcd2DCommaToUnderscoreClick(TObject *Sender);
+    void __fastcall chkAutoEnableClick(TObject *Sender);
+    void __fastcall chkSuckEnableClick(TObject *Sender);
+    void __fastcall chkSuck2QuadVacuumClick(TObject *Sender);
+    void __fastcall chkSortArmAutoSkipClick(TObject *Sender);
+    void __fastcall edLoaderSafeDistanceClick(TObject *Sender);
+    void __fastcall edSettleDelayClick(TObject *Sender);
+    void __fastcall edUphMinSampleICClick(TObject *Sender);
+    void __fastcall edPrePickWaitSecClick(TObject *Sender);
+    void __fastcall PwListClick(TObject *Sender);
+    void __fastcall PwIdClick(TObject *Sender);
+    void __fastcall PwPassClick(TObject *Sender);
+    void __fastcall PwAddUpdateClick(TObject *Sender);
+    void __fastcall PwDeleteClick(TObject *Sender);
+    void __fastcall PwSaveClick(TObject *Sender);
+    void __fastcall PwReloadClick(TObject *Sender);
+    void __fastcall btnSecsCtlOfflineClick(TObject *Sender);
+    void __fastcall btnSecsCtlLocalClick(TObject *Sender);
+    void __fastcall btnSecsCtlRemoteClick(TObject *Sender);
+    void __fastcall chkSecsAcceptHostOnlineClick(TObject *Sender);
 private:
     int iMaintenanceMenuCount;
     TSpeedButton *MenuButtons[MAX_MAINTENANCE_MENU_COUNT];
@@ -160,37 +477,16 @@ private:
     bool MenuBottomPins[MAX_MAINTENANCE_MENU_COUNT];
     TSpeedButton *LastClickButton;
     TALed *TowerLightLeds[TOWER_LIGHT_ROW_COUNT][TOWER_LIGHT_COLOR_COUNT];
-    TTimer *tmrTowerLightBlink;
     bool bTowerLightBlinkPhase;
-    TSpeedButton *spbMaintMCUDisplay;
-    TTabSheet *tsMaintMCUDisplay;
-    TCheckBox *chkMCUEnabled;
-    TEdit *edMCUIP;
-    TEdit *edMCUPort;
-    TEdit *edMCUMaxQueue;
-    TEdit *edMCUReconnect;
-    TEdit *edMCUAddress;
-    TEdit *edMCUText;
-    TComboBox *cbbMCUColor;
-    TCheckBox *chkMCUCodeSymbol;
-    TEdit *edMCULightValue;
-    TLabel *lblMCUStatusEnabled;
-    TLabel *lblMCUStatusConnected;
-    TLabel *lblMCUStatusQueue;
-    TLabel *lblMCUStatusError;
-    TMemo *memMCULog;
+    bool bLoadingHardwareSettings;   // guard: suppress save-on-click handlers during programmatic LoadHardwareSettings
+    TEdit *edAgvTimeoutSec;   //AI(amr-unmanned W5) 20260722 : dynamically-built AGV handshake timeout (s) editor on the AMR page (NULL until BuildAgvTimeoutField)
+    //AI(ht160s-maintainer) 20260804 : latch "a manual shot is open" (LON sent from the
+    //maintenance page, LOFF not sent yet) so the auto-close in Refresh*CcdStatus fires
+    //exactly once per shot. Manual-page only : the aLoader / aColor production paths
+    //open and close their own shots.
+    bool bTopCcdShotOpen;
+    bool bColorCcdShotOpen;
 
-    TSpeedButton *spbMaintTopCcd;
-    TTabSheet *tsMaintTopCcd;
-    TEdit *edTopCcdIP;
-    TEdit *edTopCcdPort;
-    TCheckBox *chkTopCcdBottomReserved;
-    TLabel *lblTopCcdStatusConn;
-    TLabel *lblTopCcdStatusError;
-    TEdit *edTopCcdResult;
-    TMemo *memTopCcdLog;
-
-    void __fastcall BuildMCUDisplayPage();
     void __fastcall RegisterMaintenancePages();
     void __fastcall LayoutMaintenanceButtons();
     void __fastcall SelectMaintenancePage(int PageIndex);
@@ -198,13 +494,14 @@ private:
     void __fastcall OpenTeach(TSpeedButton *Button);
     void __fastcall OpenMotorTest(TSpeedButton *Button);
     void __fastcall OpenComPort(TSpeedButton *Button);
-    void __fastcall OpenSecsGemLog(TSpeedButton *Button);   //AI(ht160s-secsgem) 20260611 : spbMaintSECS -> open GEM monitor
+    void __fastcall OpenSecsGemLog(TSpeedButton *Button);
     void __fastcall InitializeTowerLightPanels();
     void __fastcall LoadMaintenanceSettings();
     void __fastcall SaveMaintenanceSettings();
     void __fastcall LoadHardwareSettings();
     void __fastcall SaveHardwareSettings();
     void __fastcall RefreshHardwareSettingsStatus();
+    void __fastcall ApplyHardwareEditLock();
     void __fastcall LoadMCUDisplaySettings();
     void __fastcall SaveMCUDisplaySettings();
     void __fastcall RestartMCUDisplay();
@@ -214,27 +511,38 @@ private:
     void __fastcall SetTowerLightState(int RowIndex, int ColorIndex, int State);
     void __fastcall RefreshTowerLightPanel(int RowIndex, int ColorIndex);
     void __fastcall RefreshTowerLightPanels();
-    void __fastcall btnMCUSaveClick(TObject *Sender);
-    void __fastcall btnMCUReloadClick(TObject *Sender);
-    void __fastcall btnMCUSendDisplayClick(TObject *Sender);
-    void __fastcall btnMCUSendCodeClick(TObject *Sender);
-    void __fastcall btnMCUSendLightClick(TObject *Sender);
-    void __fastcall btnMCURefreshClick(TObject *Sender);
 
-    void __fastcall BuildTopCcdPage();
     void __fastcall LoadTopCcdSettings();
     void __fastcall SaveTopCcdSettings();
     void __fastcall RefreshTopCcdStatus();
     void __fastcall AddTopCcdLog(AnsiString Text);
-    void __fastcall btnTopCcdConnectClick(TObject *Sender);
-    void __fastcall btnTopCcdDisconnectClick(TObject *Sender);
-    void __fastcall btnTopCcdSaveClick(TObject *Sender);
-    void __fastcall btnTopCcdReloadClick(TObject *Sender);
-    void __fastcall btnTopCcdShotClick(TObject *Sender);
+
+    void __fastcall LoadColorCcdSettings();
+    void __fastcall SaveColorCcdSettings();
+    void __fastcall RefreshColorCcdStatus();
+    void __fastcall AddColorCcdLog(AnsiString Text);
+
+    void __fastcall LoadLotWebApiSettings();
+    void __fastcall SaveLotWebApiSettings();
+    void __fastcall RefreshLotWebApiStatus();
+    void __fastcall AddLotWebApiLog(AnsiString Text);
+    void __fastcall LoadFtpConfigToUi();
+    void __fastcall SaveFtpConfigFromUi();
+    void __fastcall RefreshFtpStatus();
+    void __fastcall AddFtpLog(AnsiString Text);
+    void __fastcall RefreshAmrStatus();
+    void __fastcall RefreshSecsOverrideStatus();
+    void __fastcall RefreshSecsControlState();   //AI(secs-e30-gate) 20260803 : SECS tab control-state label + button enables
+    void __fastcall BuildAmrInjectPanel();
+    void __fastcall BuildAgvTimeoutField();
+    void __fastcall ShowPasswordPage();
+    void __fastcall RefreshPasswordGrid();
 public:
     __fastcall TfMaintenance(TComponent* Owner);
     void __fastcall OpenWorkFile();
     void __fastcall SaveWorkFile(AnsiString S);
+    void __fastcall UpdateRunStateLock();
+    void __fastcall SyncSortModeSelectorFromSetting();
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfMaintenance *fMaintenance;

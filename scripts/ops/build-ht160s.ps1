@@ -3,8 +3,14 @@
 
 param(
     [switch]$Clean,
+    [switch]$Full,
     [string]$BCBRoot = "D:\ProgramFiles\Borland\CBuilder6"
 )
+# -Clean : delete a curated obj set, then build (fast; fine for source-only edits).
+# -Full  : delete EVERY *.obj/*.d/*.tds under the project, then build. Use after a
+#          shared-header STRUCT change (e.g. adding a member to TMyMotor) where the
+#          curated -Clean list is insufficient -- every TU embedding the struct must
+#          recompile. Implies the -Clean stale-output checks.
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
@@ -14,6 +20,9 @@ $projectRoot = Join-Path $repoRoot "HT160S_Program_BCB_V1.0.0.0"
 $projectFile = Join-Path $projectRoot "ht160s.bpr"
 $makeFile = Join-Path $projectRoot "ht160s.mak"
 $encodingCheck = Join-Path $PSScriptRoot "check-ht160s-source-encoding.ps1"
+$formLint = Join-Path $PSScriptRoot "check-bcb-form-published.ps1"
+$alarmCheck = Join-Path $PSScriptRoot "check-ht160s-alarm-registry.ps1"
+$ladderCheck = Join-Path $PSScriptRoot "check-ladder-consistency.py"
 $bpr2mak = Join-Path $BCBRoot "Bin\bpr2mak.exe"
 $make = Join-Path $BCBRoot "Bin\make.exe"
 $brcc32 = Join-Path $BCBRoot "Bin\brcc32.exe"
@@ -36,6 +45,14 @@ if (-not (Test-Path -LiteralPath $brcc32)) {
 
 if (-not (Test-Path -LiteralPath $encodingCheck)) {
     throw "Encoding check script not found: $encodingCheck"
+}
+
+if (-not (Test-Path -LiteralPath $formLint)) {
+    throw "Form __published lint script not found: $formLint"
+}
+
+if (-not (Test-Path -LiteralPath $alarmCheck)) {
+    throw "Alarm-registry check script not found: $alarmCheck"
 }
 
 $projectText = Get-Content -LiteralPath $projectFile -Raw
@@ -87,13 +104,47 @@ Push-Location $projectRoot
 try {
     & $encodingCheck -ProjectRoot $projectRoot
 
+    & $formLint -Path $projectRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "BCB form __published lint failed (fix the V1-V4 violations listed above)."
+    }
+
+    & $alarmCheck -ProjectRoot $projectRoot -FailOnViolation
+    if ($LASTEXITCODE -ne 0) {
+        throw "HT160S alarm-registry check failed (register the codes listed above in database.cpp CreateSystemAlarmCode)."
+    }
+
+    # AI(ht160s-ladder-guard) 20260703 : static "number but no action" gate. Fails the build
+    # on a switch(Task) state cursor jumping to a value with no matching case AND no default:
+    # (a silent dead-jump). python-based; if python is absent (some on-machine build boxes)
+    # the gate is skipped with a warning so it never blocks a build that could otherwise run.
+    $python = (Get-Command python -ErrorAction SilentlyContinue)
+    if ($null -eq $python) { $python = (Get-Command py -ErrorAction SilentlyContinue) }
+    if ($null -ne $python) {
+        & $python.Source $ladderCheck
+        if ($LASTEXITCODE -ne 0) {
+            throw "HT160S ladder-consistency check failed (a state number with no matching case + no default; fix or add a default: LogLadderFault guard)."
+        }
+    } else {
+        Write-Warning "python not found - skipping ladder-consistency gate (run scripts/ops/check-ladder-consistency.py manually)."
+    }
+
     $objRoot = Join-Path $repoRoot "Obj"
     if (-not (Test-Path -LiteralPath $objRoot)) {
         New-Item -ItemType Directory -Path $objRoot | Out-Null
     }
 
-    if ($Clean) {
+    if ($Clean -or $Full) {
         Assert-StaleOutputsNotRunning
+
+        if ($Full) {
+            $fullObjs = Get-ChildItem -LiteralPath $projectRoot -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { @(".obj", ".d", ".tds") -contains $_.Extension.ToLowerInvariant() }
+            if ($fullObjs) {
+                Remove-Item -LiteralPath ($fullObjs | ForEach-Object { $_.FullName }) -ErrorAction SilentlyContinue
+                Write-Output ("Full clean: removed {0} obj/d/tds file(s)." -f $fullObjs.Count)
+            }
+        }
 
         $cleanFiles = @(
             "ht160s.obj", "main.obj", "database.obj", "uruncontrol.obj",

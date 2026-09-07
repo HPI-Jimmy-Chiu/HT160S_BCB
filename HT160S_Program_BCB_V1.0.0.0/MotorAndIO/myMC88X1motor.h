@@ -11,12 +11,16 @@ private:
     unsigned char bMotorStatus;
     unsigned char bLineAxisID;
     unsigned char bDoPort;
+    int  iServoOnDoPort;       // OUT pin 4..7 wired to A6 SRV-ON; -1 = not wired (SetServoOn no-op)
+    bool bServoOnActiveHigh;   // true: DO bit HIGH asserts SRV-ON; false: LOW asserts
     bool bAxisIpBusy;
     bool bCardOpened;
     int OldSpeed;
     double dMC88X1Acc;
     int OldInitSpeed;
     int OldRate;
+    unsigned long dwHomePhaseStart;   // GetTickCount stamp for HomeType90 phase-B timeout
+    DWORD LastParaError;   // last MC88X1PMotAxisParaSet return code (0=ok)
 
     bool Open_MC88X1Card();
     void Close_MC88X1Card();
@@ -37,28 +41,31 @@ protected:
     int iServoType;
     int iSetpType;
     bool HomeType90();
-    void LevalHomeSensorConstDistance(int iPulse);
     int iTempPos;
     int iSearchHome;
     int iDelayReadCount;
-    void TouchHomeSensorConstDistance(int Pulse);
 
 public:
     __fastcall TMyMC88X1Motor(int Addr);
     virtual ~TMyMC88X1Motor();
 
     virtual void    Stop();
+    virtual void    DecStop();
     virtual bool    JogP();
     virtual bool    JogN();
     virtual int     ReadPos();
     virtual bool    MoveTo(int Tar);
     virtual bool    HomeObject();
     virtual bool    HomeFlag(void);
+    virtual DWORD   GetLastParaError(void);
+    virtual DWORD   VerifyHomeParaRange(void);
     virtual bool    GetAlarm(void);
     virtual void    SetSpeed(unsigned int x);
     virtual void    SetInitSpeed(unsigned int x);
     virtual void    ScanMotorStatus(bool *Led);
     virtual void    SetServoAlarmOn(bool Value);
+    virtual void    SetServoOn(bool IsOn);
+    void            SetServoOnDoConfig(int iOutPort, bool bActiveHigh);
     virtual int     InitMotor(int IoAddress);
     virtual void    SetRange(unsigned int a);
     virtual void    SetAcc(double a);

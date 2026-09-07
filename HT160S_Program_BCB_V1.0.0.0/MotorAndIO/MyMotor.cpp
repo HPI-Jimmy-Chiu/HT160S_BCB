@@ -10,9 +10,13 @@
 #include "myMC88X1motor.h"
 #include "HTray.h"
 #include "CosFunction.h"   //AI(general) 20260609 : recipe TrayForm geometry (real tray Col/Row)
+#include "cStepTrace.h"    //AI(general) 20260617 : MotorTaskLog home/limit diagnosis trace
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #define DEFAULT_SIMULATE_SPEED 1000
+// Bounded wait (ms) for the home sensor (HomeFlag) to confirm after the card
+// reports home complete; on timeout HOME commits best-effort so it cannot stick.
+#define HOME_SENSOR_CONFIRM_MS 5000
 //---------------------------------------------------------------------------
 //AI(general) 20260609 : The real tray region comes from the active recipe
 //geometry (TrayForm.XDivision/YDivision), NOT the MAX_TRAY_* array bounds.
@@ -47,6 +51,10 @@ void TMyTray::Clear()
         {
             Data[x][y]=0;
             iBin[x][y]=0;   //AI(HT160S-Maintainer) 20260601 : 0 = bin not assigned yet
+            iLot[x][y]=-1;  //AI(ht160s-lotbin) 20260615 : -1 = no owning lot yet
+            sCode2D[x][y]="";
+            bManual2D[x][y]=false;
+            iPassClass[x][y]=0;  //AI(ht160s-lotpassfail) 20260709 : 0 = no PASS/FAIL class yet
         }
     TrayID="";
     Kind=eTrayKindNormal;   //AI(HT160S-Maintainer) 20260604 : default role = normal work tray
@@ -57,6 +65,29 @@ void TMyTray::SetAll(int data)
     for(int y=0; y<MAX_TRAY_Y; y++)
         for(int x=0; x<MAX_TRAY_X; x++)
             Data[x][y]=data;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : unified grid birth. Clear() resets all grids + TrayID + Kind=Normal;
+//then stamp fill/kind/id. Birth(EMPTY_IC, Normal, empty) equals Clear(). Used by Empty/Color births.
+void TMyTray::Birth(int data, eTrayKind kind, AnsiString id)
+{
+    Clear();
+    SetAll(data);
+    Kind=kind;
+    TrayID=id;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : deep copy (default member-wise; arrays element-wise, AnsiString refcount).
+void TMyTray::CopyFrom(const TMyTray &src)
+{
+    *this = src;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-tray-source) : move = copy then clear the source (mirrors HT172 MoveTrayFrom).
+void TMyTray::MoveFrom(TMyTray &src)
+{
+    *this = src;
+    src.Clear();
 }
 //---------------------------------------------------------------------------
 bool TMyTray::HasIC()
@@ -103,6 +134,20 @@ bool TMyTray::FullThisIC(int data)
     return true;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv-devicecount) 20260713 : total IC in this tray, any bin (pass or fail
+//alike, since routing already grouped same-kind IC onto the same Auto before arrival).
+int TMyTray::CountIC()
+{
+    int xEnd=GetTrayRealXCount();
+    int yEnd=GetTrayRealYCount();
+    int n=0;
+    for(int y=0; y<yEnd; y++)
+        for(int x=0; x<xEnd; x++)
+            if(Data[x][y]!=0)
+                n++;
+    return n;
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260601 : iBin sorting-bin grid helpers (mirror Data helpers)
 void TMyTray::ClearBin()
 {
@@ -130,6 +175,76 @@ int TMyTray::GetBin(int x, int y)
     if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
         return 0;
     return iBin[x][y];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotbin) 20260615 : LotIndex + 2D-code grid helpers (mirror iBin helpers)
+void TMyTray::ClearLotCode()
+{
+    for(int y=0; y<MAX_TRAY_Y; y++)
+        for(int x=0; x<MAX_TRAY_X; x++)
+        {
+            iLot[x][y]=-1;
+            sCode2D[x][y]="";
+            bManual2D[x][y]=false;
+            iPassClass[x][y]=0;  //AI(ht160s-lotpassfail) 20260709 : clear frozen PASS/FAIL class
+        }
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetLot(int x, int y, int lot)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    iLot[x][y]=lot;
+}
+//---------------------------------------------------------------------------
+int TMyTray::GetLot(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return -1;
+    return iLot[x][y];
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetCode2D(int x, int y, AnsiString code)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    sCode2D[x][y]=code;
+}
+//---------------------------------------------------------------------------
+AnsiString TMyTray::GetCode2D(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return "";
+    return sCode2D[x][y];
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotpassfail) 20260709 : per-cell PASS/FAIL class accessors (mirror SetBin/GetBin)
+void TMyTray::SetPassClass(int x, int y, int c)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    iPassClass[x][y]=c;
+}
+//---------------------------------------------------------------------------
+int TMyTray::GetPassClass(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return 0;
+    return iPassClass[x][y];
+}
+//---------------------------------------------------------------------------
+void TMyTray::SetManual2D(int x, int y, bool b)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return;
+    bManual2D[x][y]=b;
+}
+//---------------------------------------------------------------------------
+bool TMyTray::GetManual2D(int x, int y)
+{
+    if(x<0 || x>=MAX_TRAY_X || y<0 || y>=MAX_TRAY_Y)
+        return false;
+    return bManual2D[x][y];
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : tray-kind helpers
@@ -187,6 +302,10 @@ bool TMyCar::IsFull()
     return (iTrayCount>=MAX_TRAY_PER_CAR);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-agv-devicecount) 20260713 : TMyCar::GetTotalDeviceCount() removed - it summed
+//CountIC() over Car.Tray[], but the car's Tray[] grids are never populated with placed-IC
+//data (ICs live in the working TTrayMotor tray), so it always returned 0. The AMR IC total
+//is now a per-Auto running counter tallied at discharge: TAutoModule::GetAmrDeviceCount().
 void TMyCar::PackForAmrUpload()
 {
     //AI(HT160S-Maintainer) 20260604 : AMR upload payload not designed yet; stub.
@@ -207,8 +326,6 @@ __fastcall TMyMotor::TMyMotor()
     Position=0;
     EncoderPosition=0;
     bErrorMove=false;
-    OriginRate=0;
-    OriginRange=0;
     bIsServoMotor=false;
     MoveCheckCallBack=NULL;
     Tag=-1;
@@ -326,6 +443,12 @@ void TMyMotor::SetSensorType(bool Value) { Motor->bSensorType=Value; }
 void TMyMotor::SetEnable(bool Value) { Motor->Enable=Value; }
 void TMyMotor::SetLimitLogic(bool logic) { Motor->bLimitLogic=logic; }
 void TMyMotor::SetIn1Logic(bool logic) { Motor->bIn1Logic=logic; }
+// MC88X1 home mode is fixed in code (TMyMC88X1Motor MC88X1_DEFAULT_HOME_TYPE = 90);
+// the former per-motor Mot_Table HomeType column was removed. This setter is retained
+// for completeness but is no longer called from the table-load path.
+void TMyMotor::SetHomeType(int Type) { if(Motor!=NULL) Motor->iHomeType=Type; }
+void TMyMotor::SetEncodeMultiple(int m) { if(Motor!=NULL) Motor->iEncodeMultiple=m; }
+void TMyMotor::SetEncodeDir(int d) { if(Motor!=NULL) Motor->iEncodeDir=d; }
 void TMyMotor::SetMotorKind(eMotorKind Kind) { Motor->SetMotorKind(Kind); }
 eMotorKind TMyMotor::GetMotorKind() { return Motor->GetMotorKind(); }
 void TMyMotor::SetMotionCardType(eMotionCardType Type) { Motor->SetMotionCardType(Type); }
@@ -383,6 +506,15 @@ bool TMyMotor::CheckSoftLimit(int p, bool bAlarm)
     return (p<=Motor->SoftLimitP && p>=Motor->SoftLimitN);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-maintainer) 20260625 : build the explicit numeric detail line for an
+//out-of-limit popup. Units are 1/100mm (same as teach / encoder), so an engineer can
+//read the requested target against the configured soft-limit band directly.
+AnsiString TMyMotor::SoftLimitDetail(int p)
+{
+    return AnsiString().sprintf("target=%d  now=%d  soft limit N=%d ~ P=%d  (unit:1/100mm)",
+        p, Position, GetSoftLimitN(), GetSoftLimitP());
+}
+//---------------------------------------------------------------------------
 bool TMyMotor::MotorMoveSub(int p, bool bCheckLed)
 {
     (void)bCheckLed;
@@ -425,9 +557,30 @@ bool TMyMotor::MoveTo(int Tar) { return Motor->MoveTo(Tar); }
 bool TMyMotor::MoveToPosShortDistance(int Tar) { return Motor->MoveToPosShortDistance(Tar); }
 bool TMyMotor::HomeObject(void) { return Motor->HomeObject(); }
 bool TMyMotor::GetAlarm(void) { return Motor->GetAlarm(); }
-bool TMyMotor::JogP() { return Motor->JogP(); }
-bool TMyMotor::JogN() { return Motor->JogN(); }
+bool TMyMotor::JogP()
+{
+    MotorTaskLog("Motor", Alias, "JOG+",
+        AnsiString("alarm=")+(Led[iAlarmLed]?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")+AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0"));
+    return Motor->JogP();
+}
+bool TMyMotor::JogN()
+{
+    MotorTaskLog("Motor", Alias, "JOG-",
+        AnsiString("alarm=")+(Led[iAlarmLed]?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")+AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0"));
+    return Motor->JogN();
+}
 void TMyMotor::Stop() { Motor->Stop(); }
+//---------------------------------------------------------------------------
+// AI(general) 20260617 : delegate MC88X1 speed/accel range diagnostics to the inner
+// card object (private member), so the Motor Test screen can report the card's verdict.
+DWORD TMyMotor::GetLastParaError(void)
+{
+    return (Motor!=NULL)?Motor->GetLastParaError():0;
+}
+DWORD TMyMotor::VerifyHomeParaRange(void)
+{
+    return (Motor!=NULL)?Motor->VerifyHomeParaRange():0;
+}
 void TMyMotor::DecStop() { Motor->DecStop(); }
 //---------------------------------------------------------------------------
 void TMyMotor::InitHomeTask()
@@ -439,36 +592,135 @@ void TMyMotor::InitHomeTask()
 //---------------------------------------------------------------------------
 bool TMyMotor::Home(AnsiString &sErr)
 {
+    // 172-style 3-state latched home. The old single-line form
+    //   if(Motor->HomeObject() && Motor->HomeFlag()) ...
+    // required BOTH true in the SAME tick. The inner card HomeObject() returns
+    // true exactly once on completion and then re-arms its own task to step 1,
+    // so if the home sensor (HomeFlag) was not on at that instant the completion
+    // was lost and the next tick re-ran the whole home -> "HOME never stops /
+    // keeps repeating". Here we LATCH the card completion (case 100), then confirm
+    // the sensor separately with a bounded wait (case 200), matching HT172.
     sErr="";
-    if(Motor->Enable==false)
+    int &Task=iHomeTask;
+    switch(Task)
     {
-        ResetPos(0);
-        bHomeFlag=true;
-        bHomeFinish=true;
-        return true;
-    }
-    if(Motor->HomeObject() && Motor->HomeFlag())
-    {
-        bHomeFlag=true;
-        bHomeFinish=true;
-        Position=Motor->ReadPos();
-        EncoderPosition=Motor->ReadEncoderPos();
-        return true;
+        case 1:
+            if(Motor->Enable==false)
+            {
+                ResetPos(0);
+                bHomeFlag=true;
+                bHomeFinish=true;
+                MotorTaskLog("Motor", Alias, "HOME_DONE", "disabled axis -> pos reset 0");
+                return true;
+            }
+            // AI(general) 20260617 : log the REAL servo-alarm bit (GetAlarm, MotDI 0x80) plus
+            // limit/encoder at HOME start. Note Led[iAlarmLed] is force-set true on a limit by
+            // ScanMotorStatus, so it is NOT a reliable alarm indicator here -- GetAlarm() is.
+            // A latched servo alarm (set when an OT trips the amp) cannot be cleared in software
+            // (MC88X1 SetServoOn is a no-op) -> Cmove is accepted but the axis does NOT move
+            // (encoder stays put). Recovery needs a SwMotorRelay Off->On power-cycle.
+            Motor->ScanMotorStatus(Led);
+            MotorTaskLog("Motor", Alias, "HOME_START",
+                AnsiString("alarm=")+(Motor->GetAlarm()?"1":"0")+AnsiString(" cw=")+(Led[iCwLed]?"1":"0")
+                +AnsiString(" ccw=")+(Led[iCcwLed]?"1":"0")+AnsiString(" enc=")+IntToStr(Motor->ReadEncoderPos())
+                +AnsiString(" -> drive card home"));
+            // AI(HT160S-Maintainer) 20260622 : re-init the INNER motion-card home state
+            // machine (iHomeObjectTask) on every home entry, HT172-aligned. A full-machine
+            // HOME cancelled mid-sequence leaves the card-home Task frozen at a polling step;
+            // the re-arm path resets only the wrapper (InitHomeTask), so HomeObject() would
+            // resume that stale step, never re-issue MC88X1PMotHome, and the batch never
+            // converges (fHome hangs, no motion). HomeReset() also issues MC88X1PMotHomeReset
+            // to clear any aborted card home. Single-axis paths already do this via
+            // InitHomeTask_forSingleAxis; this covers the full-machine batch too.
+            Motor->HomeReset();
+            Task=100;
+            break;
+        case 100:
+            // Poll the inner card home state machine to completion. Do NOT also test
+            // HomeFlag here, and do NOT keep calling HomeObject() after it reports
+            // done (it would restart the sequence). Latch by advancing to case 200.
+            if(Motor->HomeObject())
+            {
+                dwHomeSensorWaitStart=GetTickCount();
+                MotorTaskLog("Motor", Alias, "HOME_CARD_DONE",
+                    AnsiString("HomeFlag=")+(Motor->HomeFlag()?"1":"0")+AnsiString(" -> confirm sensor"));
+                Task=200;
+            }
+            else if(Motor->bHomePhaseTimeout)
+            {
+                // HomeType90 phase-B could not change the home-sensor state within the
+                // per-leg timeout; the inner routine reset itself and will re-seek. Log
+                // once per timeout so a misdirected/faulty home sensor is visible instead
+                // of a silent retry loop.
+                Motor->bHomePhaseTimeout=false;
+                MotorTaskLog("Motor", Alias, "HOME_PHASEB_TIMEOUT",
+                    "home sensor did not change within phase-B timeout; re-seeking");
+            }
+            break;
+        case 200:
+            // Confirm the home sensor like HT172, but bounded: a sensor that never
+            // reports on must not leave HOME stuck. On timeout commit best-effort
+            // (the card already confirmed home in case 100) and log the warning.
+            if(Motor->HomeFlag())
+            {
+                bHomeFlag=true;
+                bHomeFinish=true;
+                Position=Motor->ReadPos();
+                EncoderPosition=Motor->ReadEncoderPos();
+                MotorTaskLog("Motor", Alias, "HOME_DONE",
+                    AnsiString("pos=")+IntToStr(Position)+AnsiString(" enc=")+IntToStr(EncoderPosition));
+                Task=1;
+                return true;
+            }
+            else if((int)(GetTickCount()-dwHomeSensorWaitStart)>=HOME_SENSOR_CONFIRM_MS)
+            {
+                bHomeFlag=true;
+                bHomeFinish=true;
+                Position=Motor->ReadPos();
+                EncoderPosition=Motor->ReadEncoderPos();
+                MotorTaskLog("Motor", Alias, "HOME_DONE_TIMEOUT",
+                    AnsiString("HomeFlag not on within timeout; committed pos=")+IntToStr(Position));
+                Task=1;
+                return true;
+            }
+            break;
+        default:
+            Task=1;
+            break;
     }
     return false;
 }
 //---------------------------------------------------------------------------
 int TMyMotor::ReadPos()
 {
+    // Match HT172: read command AND encoder together when enabled; when the axis is
+    // disabled, mirror the command onto the encoder so a powered-off motor shows a
+    // consistent Now Position / Encoder pair instead of a stale feedback value.
+    // (For an ENABLED servo the two legitimately differ by the following error --
+    // HT172 shows the same gap; this does not force them equal while powered.)
     if(Motor->Enable)
+    {
         Position=Motor->ReadPos();
+        EncoderPosition=Motor->ReadEncoderPos();
+    }
+    else
+        EncoderPosition=Position;
     UpdateSimulateCompomentPosition();
     return Position;
 }
 //---------------------------------------------------------------------------
 int TMyMotor::ReadEncoderPos()
 {
-    EncoderPosition=Motor->ReadEncoderPos();
+    // Align to HT172: refresh command AND encoder together from one driver transaction,
+    // so a paired (Position,EncoderPosition) snapshot is consistent no matter which
+    // accessor the caller used last.
+    if(Motor->Enable)
+    {
+        Position=Motor->ReadPos();
+        EncoderPosition=Motor->ReadEncoderPos();
+    }
+    else
+        EncoderPosition=Position;
     return EncoderPosition;
 }
 //---------------------------------------------------------------------------
@@ -564,9 +816,23 @@ void TMyMotor::MotOutputOn(int iOutPort) { Motor->MotOutputOn(iOutPort); }
 void TMyMotor::MotOutputOff(int iOutPort) { Motor->MotOutputOff(iOutPort); }
 void TMyMotor::MotInputStatus(bool *bInputPort) { Motor->MotInputStatus(bInputPort); }
 void TMyMotor::SetEncoderType(int a) { Motor->EncoderType=a; }
-void TMyMotor::InitHomeTask_forSingleAxis() { InitHomeTask(); }
+void TMyMotor::InitHomeTask_forSingleAxis()
+{
+    // Single-axis (Teach / MotorTest) re-arm. Beyond clearing the wrapper home
+    // flags, reset the inner motion-card home state machine (iHomeObjectTask)
+    // back to step 1. Without this, a previously interrupted home (e.g. STOP
+    // pressed mid-sequence) leaves the inner Task stuck at a polling step, so the
+    // next HOME press issues no new home command and the axis appears dead.
+    InitHomeTask();
+    if(Motor!=NULL)
+        Motor->HomeReset();
+}
 void TMyMotor::ServoOnOff(bool IsOn) { Motor->SetServoOn(IsOn); }
-void TMyMotor::ServoOnResetPos() { ResetPos(Position); }
+// AI 20260622 : snap command(NowPos) to the encoder(feedback), HT172-aligned. After a
+// servo-off (EMG) hand-move the practical/encoder register tracked the motion but the
+// command register stayed frozen; ResetPos(ReadEncoderPos()) re-aligns both to the real
+// position. Was ResetPos(Position) (snapped to the STALE command -> effectively a no-op).
+void TMyMotor::ServoOnResetPos() { ResetPos(ReadEncoderPos()); }
 void TMyMotor::ClearPosition(int cmd) { ResetPos(cmd); }
 void TMyMotor::EnableTrigger(int iFlag, int iMode, long lValue) { Motor->EnableTrigger(iFlag, iMode, lValue); }
 void TMyMotor::ManualTestTrigger(bool bOn) { Motor->ManualTestTrigger(bOn); }
@@ -751,8 +1017,23 @@ void TTrayMotor::SetIDPanel(TPanel *ptr) { fPanelID=(ptr!=NULL); pPalTrayID=ptr;
 void TTrayMotor::SetTrayPanel(TPanel *ptr) { fPanel=(ptr!=NULL); pPanel=ptr; }
 void TTrayMotor::SetHTrayPanel(TTMyTray *ptr) { fHTary=(ptr!=NULL); pHTray=ptr; InitTrayColorMap(ptr); UpdateTrayVisibleByHasTray(); }
 void TTrayMotor::SetSubHTrayPanel(TTMyTray *ptr) { fSubHTary=(ptr!=NULL); pSubHTray=ptr; InitTrayColorMap(ptr); UpdateTrayVisibleByHasTray(); }
-void TTrayMotor::CopyTrayFrom(int Index) { (void)Index; }
+void TTrayMotor::CopyTrayFrom(int Index) { (void)Index; }   //AI(ht160s-tray-source) : index form unused (no VMotPtr map here); use the pointer overload
 void TTrayMotor::MoveTrayFrom(int Index) { (void)Index; }
+//AI(ht160s-tray-source) : motor-level copy (mirrors HT172): receive a grid + own occupancy/display.
+void TTrayMotor::CopyTrayFrom(TTrayMotor *MotPtr)
+{
+    if(MotPtr==NULL) return;
+    Tray.CopyFrom(MotPtr->Tray);
+    fHasTray=true;
+    Refresh();
+}
+//AI(ht160s-tray-source) : motor-level move = copy + clear source.
+void TTrayMotor::MoveTrayFrom(TTrayMotor *MotPtr)
+{
+    if(MotPtr==NULL) return;
+    CopyTrayFrom(MotPtr);
+    MotPtr->ClearTray();
+}
 void TTrayMotor::SetTrayVisible(bool bVisible)
 {
     if(fHTary    && pHTray    !=NULL) pHTray->Visible=bVisible;
@@ -791,10 +1072,51 @@ int TTrayMotor::GetTrayBin(int x, int y)
     return Tray.GetBin(x, y);
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-lotbin) 20260615 : LotIndex + 2D-code cell accessors (By Lot+Bin mode)
+void TTrayMotor::SetTrayLot(int x, int y, int lot)
+{
+    Tray.SetLot(x, y, lot);
+}
+//---------------------------------------------------------------------------
+int TTrayMotor::GetTrayLot(int x, int y)
+{
+    return Tray.GetLot(x, y);
+}
+//---------------------------------------------------------------------------
+void TTrayMotor::SetTrayCode2D(int x, int y, AnsiString code)
+{
+    Tray.SetCode2D(x, y, code);
+}
+//---------------------------------------------------------------------------
+AnsiString TTrayMotor::GetTrayCode2D(int x, int y)
+{
+    return Tray.GetCode2D(x, y);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-lotpassfail) 20260709 : frozen PASS/FAIL class cell accessors (By Lot+PassFail mode)
+void TTrayMotor::SetTrayPassClass(int x, int y, int c)
+{
+    Tray.SetPassClass(x, y, c);
+}
+//---------------------------------------------------------------------------
+int TTrayMotor::GetTrayPassClass(int x, int y)
+{
+    return Tray.GetPassClass(x, y);
+}
+//---------------------------------------------------------------------------
+void TTrayMotor::SetTrayManual2D(int x, int y, bool b)
+{
+    Tray.SetManual2D(x, y, b);
+}
+//---------------------------------------------------------------------------
+bool TTrayMotor::GetTrayManual2D(int x, int y)
+{
+    return Tray.GetManual2D(x, y);
+}
+//---------------------------------------------------------------------------
 void TTrayMotor::InitNewTray(int data)
 {
-    Tray.SetAll(data);
-    Tray.ClearBin();   //AI(HT160S-Maintainer) 20260601 : new tray starts with no bin assignment
+    Tray.Birth(data, eTrayKindNormal, "");   //AI(ht160s-tray-source) : unified birth (callers re-tag Kind/TrayID, e.g. Loader)
     fHasTray=true;
     Refresh();
 }

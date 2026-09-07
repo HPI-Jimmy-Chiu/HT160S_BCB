@@ -1,0 +1,14 @@
+{
+  "Maps": [
+    {
+      "LotNumber": "SIMU_HOSTILE",
+      "Items": [
+        { "Code2D": "AB,12 X9", "Bin": 1 },
+        { "Code2D": "Q \"quoted\" ID", "Bin": 2 },
+        { "Code2D": "A B C", "Bin": 3 },
+        { "Code2D": "D,E,F", "Bin": 1000 },
+        { "Code2D": "X \"Y\",Z", "Bin": 1001 }
+      ]
+    }
+  ]
+}

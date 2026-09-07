@@ -1,0 +1,140 @@
+﻿[
+    {
+        "name":  "main-overview",
+        "file":  "main-overview.png",
+        "ok":  true,
+        "fgTitle":  "HT160S"
+    },
+    {
+        "name":  "main-traystatus",
+        "file":  "main-traystatus.png",
+        "ok":  true,
+        "fgTitle":  "HT160S"
+    },
+    {
+        "name":  "main-logs",
+        "file":  "main-logs.png",
+        "ok":  true,
+        "fgTitle":  "HT160S"
+    },
+    {
+        "name":  "main-timedata",
+        "file":  "main-timedata.png",
+        "ok":  true,
+        "fgTitle":  "HT160S"
+    },
+    {
+        "name":  "main-maptray",
+        "file":  "main-maptray.png",
+        "ok":  true,
+        "fgTitle":  "HT160S"
+    },
+    {
+        "name":  "screen-product",
+        "file":  "screen-product.png",
+        "ok":  true,
+        "fgTitle":  "Product Setup"
+    },
+    {
+        "name":  "screen-offset",
+        "file":  "screen-offset.png",
+        "ok":  true,
+        "fgTitle":  "Offset"
+    },
+    {
+        "name":  "screen-speed",
+        "file":  "screen-speed.png",
+        "ok":  true,
+        "fgTitle":  "Speed Setup"
+    },
+    {
+        "name":  "screen-tools",
+        "file":  "screen-tools.png",
+        "ok":  true,
+        "fgTitle":  "Tools"
+    },
+    {
+        "name":  "screen-message",
+        "file":  "screen-message.png",
+        "ok":  true,
+        "fgTitle":  "Note"
+    },
+    {
+        "name":  "screen-maintenance",
+        "file":  "screen-maintenance.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-password",
+        "file":  "screen-password.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-funcdef",
+        "file":  "screen-funcdef.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-hardware",
+        "file":  "screen-hardware.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-iosetview",
+        "file":  "screen-iosetview.png",
+        "ok":  true,
+        "fgTitle":  "IO check and verify"
+    },
+    {
+        "name":  "screen-teach",
+        "file":  "screen-teach.png",
+        "ok":  true,
+        "fgTitle":  "Teach"
+    },
+    {
+        "name":  "screen-motortest",
+        "file":  "screen-motortest.png",
+        "ok":  true,
+        "fgTitle":  "Motor Test"
+    },
+    {
+        "name":  "screen-padcom",
+        "file":  "screen-padcom.png",
+        "ok":  true,
+        "fgTitle":  "COM Port"
+    },
+    {
+        "name":  "screen-bindisplay",
+        "file":  "screen-bindisplay.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-topccd",
+        "file":  "screen-topccd.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-colorccd",
+        "file":  "screen-colorccd.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "screen-lotapi",
+        "file":  "screen-lotapi.png",
+        "ok":  true,
+        "fgTitle":  "Maintance"
+    },
+    {
+        "name":  "secs-main",
+        "file":  "secs-main.png",
+        "ok":  true,
+        "fgTitle":  "SECS/GEM Monitor"
+    }
+]

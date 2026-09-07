@@ -154,6 +154,7 @@ typedef struct TMOTDATA
     int iLimitLogic;
     int iIn1Logic;
     int iSimulateSpeed;
+    int iEncoderDir;   // OPTIONAL Mot_Table EncoderDir column; default 1=inverse when absent
 
     TMOTDATA(AnsiString Str=AnsiString(""));
 }TMOTDATA;
@@ -189,6 +190,7 @@ typedef struct TMOTNO
     int emotHomeOrder;
     int emotLimitLogic;
     int emotIn1Logic;
+    int emotEncoderDir;   // OPTIONAL trailing column index (-1 when CSV has no EncoderDir)
     int emotTotal;
 
     TMOTNO();
@@ -239,6 +241,8 @@ typedef struct VIRTUAL_MOTOR_MODULAR_STRUCT
     TTrayMotor *MMSuck_2;
     TTrayMotor *MMSuck_3;
     TTrayMotor *MMSuck_4;
+
+    TTrayMotor *MMColorY;   //AI(ht160s-tray-source) : Color identity-tray content motor (drives MotionView Color grid)
 }VIRTUAL_MOTOR_MODULAR;
 //---------------------------------------------------------------------------
 enum RunModeEnum
@@ -281,51 +285,47 @@ typedef struct SENSOR_MODULAR_STRUCT
     TMySensor SnSafeAuto6;
     TMySensor SnEmpty_InputHasTray;
     TMySensor SnEmpty_InputFullTray;
-    TMySensor SnEmpty_TrayPos1;
-    TMySensor SnEmpty_TrayPos2;
-    TMySensor SnEmpty_OutputHasTray;
     TMySensor SnEmpty_OutputBottomHasTray;
     TMySensor SnEmpty_InputEnd;
     TMySensor SnLoader_InputHasTray;
     TMySensor SnLoader_InputFullTray;
     TMySensor SnLoader_TrayPos1;
     TMySensor SnLoader_TrayPos2;
-    TMySensor SnLoader_OutputHasTray;
     TMySensor SnLoader_OutputBottomHasTray;
     TMySensor SnLoader_Inputend;
     TMySensor SnAuto1_InputHasTray;
     TMySensor SnAuto1_InputFullTray;
-    TMySensor SnAuto1_OutputHasTray;
+    TMySensor SnAuto1_InputEnd;
     TMySensor SnAuto1_OutputBottomHasTray;
     TMySensor SnAuto1_TrayPos1;
     TMySensor SnAuto1_TrayPos2;
     TMySensor SnAuto2_InputHasTray;
     TMySensor SnAuto2_InputFullTray;
-    TMySensor SnAuto2_OutputHasTray;
+    TMySensor SnAuto2_InputEnd;
     TMySensor SnAuto2_OutputBottomHasTray;
     TMySensor SnAuto2_TrayPos1;
     TMySensor SnAuto2_TrayPos2;
     TMySensor SnAuto3_InputHasTray;
     TMySensor SnAuto3_InputFullTray;
-    TMySensor SnAuto3_OutputHasTray;
+    TMySensor SnAuto3_InputEnd;
     TMySensor SnAuto3_OutputBottomHasTray;
     TMySensor SnAuto3_TrayPos1;
     TMySensor SnAuto3_TrayPos2;
     TMySensor SnAuto4_InputHasTray;
     TMySensor SnAuto4_InputFullTray;
-    TMySensor SnAuto4_OutputHasTray;
+    TMySensor SnAuto4_InputEnd;
     TMySensor SnAuto4_OutputBottomHasTray;
     TMySensor SnAuto4_TrayPos1;
     TMySensor SnAuto4_TrayPos2;
     TMySensor SnAuto5_InputHasTray;
     TMySensor SnAuto5_InputFullTray;
-    TMySensor SnAuto5_OutputHasTray;
+    TMySensor SnAuto5_InputEnd;
     TMySensor SnAuto5_OutputBottomHasTray;
     TMySensor SnAuto5_TrayPos1;
     TMySensor SnAuto5_TrayPos2;
     TMySensor SnAuto6_InputHasTray;
     TMySensor SnAuto6_InputFullTray;
-    TMySensor SnAuto6_OutputHasTray;
+    TMySensor SnAuto6_InputEnd;
     TMySensor SnAuto6_OutputBottomHasTray;
     TMySensor SnAuto6_TrayPos1;
     TMySensor SnAuto6_TrayPos2;
@@ -376,8 +376,6 @@ typedef struct CYLINDER_MODULAR_STRUCR
     TMyCylinder C_Empty_PushTray;
     TMyCylinder C_Empty_LeanOnTray;
     TMyCylinder C_Empty_FrontSeparateTray_1;
-    TMyCylinder C_Empty_RearRiseTray;
-    TMyCylinder C_Empty_RearSeparateTray_1;
 
     TMyCylinder C_Loader_FrontRiseTray_1;
     TMyCylinder C_Loader_FrontRiseTray_2;
@@ -386,49 +384,35 @@ typedef struct CYLINDER_MODULAR_STRUCR
     TMyCylinder C_Loader1_LeanOnTray;
     TMyCylinder C_Loader2_LeanOnTray;
     TMyCylinder C_Loader_FrontSeparateTray_1;
-    TMyCylinder C_Loader_RearRiseTray;
 
     TMyCylinder C_Auto1_FrontRiseTray;
     TMyCylinder C_Auto1_PushTray;
     TMyCylinder C_Auto1_LeanOnTray;
-    TMyCylinder C_Auto1_RearRiseTray;
-    TMyCylinder C_Auto1_FrontSeparateTray_1;
 
     TMyCylinder C_Auto2_FrontRiseTray;
     TMyCylinder C_Auto2_PushTray;
     TMyCylinder C_Auto2_LeanOnTray;
-    TMyCylinder C_Auto2_RearRiseTray;
-    TMyCylinder C_Auto2_FrontSeparateTray_1;
 
     TMyCylinder C_Auto3_FrontRiseTray;
     TMyCylinder C_Auto3_PushTray;
     TMyCylinder C_Auto3_LeanOnTray;
-    TMyCylinder C_Auto3_RearRiseTray;
-    TMyCylinder C_Auto3_FrontSeparateTray_1;
 
     TMyCylinder C_Auto4_FrontRiseTray;
     TMyCylinder C_Auto4_PushTray;
     TMyCylinder C_Auto4_LeanOnTray;
-    TMyCylinder C_Auto4_RearRiseTray;
-    TMyCylinder C_Auto4_FrontSeparateTray_1;
 
     TMyCylinder C_Auto5_FrontRiseTray;
     TMyCylinder C_Auto5_PushTray;
     TMyCylinder C_Auto5_LeanOnTray;
-    TMyCylinder C_Auto5_RearRiseTray;
-    TMyCylinder C_Auto5_FrontSeparateTray_1;
 
     TMyCylinder C_Auto6_FrontRiseTray;
     TMyCylinder C_Auto6_PushTray;
     TMyCylinder C_Auto6_LeanOnTray;
-    TMyCylinder C_Auto6_RearRiseTray;
-    TMyCylinder C_Auto6_FrontSeparateTray_1;
 
     TMyCylinder C_Color_FrontRiseTray_1;
     TMyCylinder C_Color_FrontRiseTray_2;
     TMyCylinder C_Color_PushTray;
     TMyCylinder C_Color_LeanOnTray;
-    TMyCylinder C_Color_RearRiseTray;
     TMyCylinder C_Color_FrontSeparateTray_1;
 }CYLINDER_MODULAR;
 //---------------------------------------------------------------------------
@@ -523,7 +507,7 @@ __published:
 
 public:
     __fastcall TDataModule1(TComponent* Owner);
-    void InitialAllTask();
+    void InitialAllTask(bool bKeepMaterial=false);
     void DoAllProcess();
 };
 //---------------------------------------------------------------------------
@@ -549,6 +533,8 @@ typedef struct
     bool bSwStatus[100];
     int iMaxContactCount;
 } LAST_GENERAL_SET;
+//-------------------------------------------------------------------------
+class TMyBinDispCtrl;   //AI(ht160s-maintainer) 20260615 : Bin display controller (MyBinDisp.h)
 //-------------------------------------------------------------------------
 class SYSTEM_MODULAR
 {
@@ -577,6 +563,7 @@ public:
     TList *MotTable;
     TList *IOTable;
     HTGem *MyGem;
+    TMyBinDispCtrl *BinDisCtrl;   //AI(ht160s-maintainer) 20260615 : LED bin display (HSys-owned, created in database.cpp)
     int iTotalMotor;
     int iTotalVMotor;
     int iTotalSensor;
@@ -621,4 +608,14 @@ public:
 //---------------------------------------------------------------------------
 extern SYSTEM_MODULAR HSys;
 //---------------------------------------------------------------------------
+//AI(secs-alid-optiond) 20260902 : AMENDMENT 2 S5-ALID self-check verdict, filled by
+//SYSTEM_MODULAR::CreateSystemAlarmCode() (0 faults = clean). The check runs inside
+//HSys.Initial(), long before g_EventLog.Init(), so ReportAlarmAlidAudit() flushes the
+//verdict to the EventLog from ht160s.cpp once the log is open. Detail lines are bounded;
+//gAlidAuditSuppressed counts what did not fit.
+extern int          gAlidAuditRows;
+extern int          gAlidAuditFaults;
+extern int          gAlidAuditSuppressed;
+extern TStringList *gAlidAuditDetail;
+void ReportAlarmAlidAudit();
 #endif

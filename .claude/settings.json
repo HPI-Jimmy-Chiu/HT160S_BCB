@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ops/check-ht160s-writeboundary.ps1 -AllowedRoots 'D:\\AI_Area\\Tool\\HT160S_SECS_Simulator','D:\\HT160S_Updater_NSIS','D:\\AI_Area\\ClassTool\\HT160S_Installer','D:\\Work-jimmychiu\\document\\WeeklyReport\\Weekly_AI'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__codegraph__*"
+    ]
+  }
+}

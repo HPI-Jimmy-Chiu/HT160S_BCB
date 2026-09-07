@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HT160S E87 / AGV SECS 對接操作手冊</title>
+<style>
+  :root{ --red:#b00020; --ink:#2c3e50; --muted:#626262; --line:#d9d9d9; --bg:#fff; --code:#f5f5f7; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Segoe UI","Microsoft JhengHei",Arial,sans-serif; color:var(--ink);
+        max-width:1000px; margin:0 auto; padding:24px; line-height:1.65; background:var(--bg); }
+  header{ border-top:10px solid var(--red); border-bottom:1px solid var(--line); padding:16px 0 12px; margin-bottom:22px; }
+  .brand{ color:var(--red); font-weight:700; }
+  h1{ margin:6px 0 4px; }
+  .meta{ color:var(--muted); font-size:.9em; }
+  h2{ color:var(--ink); border-bottom:2px solid var(--red); padding-bottom:4px; margin-top:34px; }
+  h3{ color:var(--red); margin-top:24px; }
+  table{ border-collapse:collapse; width:100%; margin:12px 0; font-size:.93em; }
+  th,td{ border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th{ background:#f7eef0; }
+  code{ background:var(--code); padding:1px 5px; border-radius:4px; font-family:Consolas,"Courier New",monospace; font-size:.9em; }
+  pre{ background:var(--code); padding:12px 14px; border-radius:8px; overflow:auto; border:1px solid var(--line); }
+  pre code{ background:none; padding:0; }
+  .note{ background:#fff8e1; border-left:4px solid #e0a800; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0; }
+  .ok{ background:#e9f7ec; border-left:4px solid #2e7d32; padding:10px 14px; margin:14px 0; border-radius:0 6px 6px 0; }
+  .mermaid{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; margin:16px 0; text-align:center; }
+  ul.check{ list-style:none; padding-left:4px; }
+  ul.check li::before{ content:"\2610  "; color:var(--red); font-weight:bold; }
+  footer{ margin-top:40px; border-top:1px solid var(--line); padding-top:12px; color:var(--muted); font-size:.85em; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad:true, theme:"neutral", sequence:{ showSequenceNumbers:true } });</script>
+</head>
+<body>
+<header>
+  <div class="brand">鴻勁精密 Hon Precision</div>
+  <h1>HT160S E87 / AGV SECS 對接操作手冊</h1>
+  <div class="meta">操作手冊 v1｜2026/06/15｜HT160S（Equipment）↔ host/EAP（SECS 模擬器或客戶雲端）<br>
+  適用版本 <code>HT160S_Program_BCB_V1.0.0.0</code>｜對應規格 <code>HT160S_E87_AGV_Communication_Draft_20260527.md</code></div>
+</header>
+
+<h2>0. 這份手冊能做到什麼</h2>
+<p>帶你把 <b>模擬中的 HT160S</b> 接上一個 SECS host（本地 <code>HT160S_SECS_Simulator</code>，或客戶雲端 SECS），
+跑完整條 <b>E87/AGV 滿盤/缺料 → 叫車 → Ready → Finish</b> 的 SECS 對話並驗證。</p>
+<div class="ok"><b>可閉環範圍（模擬 DUMMY）：</b>叫車（CEID272）→ <code>START_AGV</code> → Ready（CEID273）→ Finish（CEID274）全程自動完成。</div>
+<div class="note"><b>真機限制：</b>實機 Finish 需「車輛取走」IO 感測點（尚未配點）；配點前真機握手會停在 Ready。模擬模式不受此限。</div>
+
+<h2>1. 前置條件（缺一不可）</h2>
+<table>
+<tr><th>#</th><th>條件</th><th>如何確認 / 設定</th></tr>
+<tr><td>1</td><td><b>SECS/GEM 付費功能已啟用</b>（<code>CosFunction.bUseSecsGem</code>，由 build CUSTOMER_CODE 決定）</td><td>主畫面出現 <b>SECS</b> badge</td></tr>
+<tr><td>2</td><td><b>AMR/AGV 模式開啟</b>（<code>GeneralSetting.bUseAMR</code>）</td><td>主畫面 <b>AMR</b> badge 顯示綠色 <b>ON</b>（見 §2）</td></tr>
+<tr><td>3</td><td><b>機台為 Dummy（模擬）模式</b></td><td>主畫面 Real/Dummy 切到 <b>Dummy</b>（<code>system\lastset.ini [System] RealDummy</code>）。模擬下滿盤門檻=10 盤、Finish 自動完成</td></tr>
+<tr><td>4</td><td><b>SECS 連線設定正確</b></td><td><code>system\General.ini [SECS]</code>，見 §2</td></tr>
+<tr><td>5</td><td><b>一個 SECS host</b></td><td>本地：<code>D:\AI_Area\Tool\HT160S_SECS_Simulator</code>；或客戶雲端 endpoint</td></tr>
+</table>
+
+<h2>2. 設定（<code>system\General.ini</code>）</h2>
+<h3>2.1 <code>[SECS]</code> — SECS/HSMS 連線</h3>
+<table>
+<tr><th>鍵</th><th>預設</th><th>說明</th></tr>
+<tr><td><code>Enable</code></td><td><code>0</code></td><td><b>1 = 啟用</b> GEM 堆疊（0 則不啟動）</td></tr>
+<tr><td><code>Address</code></td><td><code>127.0.0.1</code></td><td>對端 IP。Active 模式 = host/雲端 IP</td></tr>
+<tr><td><code>Port</code></td><td><code>5098</code></td><td>HSMS 埠</td></tr>
+<tr><td><code>DeviceID</code></td><td>（依客戶指定）</td><td>HSMS Device ID</td></tr>
+<tr><td><code>ActiveMode</code></td><td><code>0</code></td><td><b>0 = passive</b>（設備監聽）；<b>1 = active</b>（主動撥號到 host/雲端）</td></tr>
+<tr><td><code>ReconnectInterval</code></td><td>（秒）</td><td>斷線自動重連間隔，0=關</td></tr>
+<tr><td><code>LinktestInterval</code></td><td>（秒）</td><td>SELECTED 後心跳間隔，0=關</td></tr>
+<tr><td><code>T6Timeout</code></td><td>（秒）</td><td>等 Linktest.rsp 逾時</td></tr>
+<tr><td><code>LogToFile</code></td><td><code>0</code></td><td>1 = SECS 訊息寫檔（<code>D:\HT160S_Log\SECS_GEM\</code>）</td></tr>
+<tr><td><code>LogLinktest</code></td><td><code>0</code></td><td>1 = 連心跳都記錄（預設關）</td></tr>
+</table>
+<h3>2.2 <code>[HardwareInstall]</code> — AMR/AGV 開關</h3>
+<pre><code>[HardwareInstall]
+UseAMR=1</code></pre>
+<p>也可由維修頁設定後存檔；重開程式後主畫面 AMR badge 應顯示 <b>ON</b>。</p>
+
+<h2>3. 連線拓撲（兩種情境）</h2>
+<h3>3.1 本地模擬器對測（建議先做）</h3>
+<p>HT160S 當 <b>設備（passive，監聽）</b>，模擬器當 <b>host（active，連入）</b>：</p>
+<pre><code>[General.ini] Enable=1  ActiveMode=0  Address=127.0.0.1  Port=5098
+        HT160S (Equipment, passive listen :5098)
+                         ^  HSMS-SS / SECS-II
+                         |  (simulator Active connect + Select.req)
+        HT160S_SECS_Simulator (Host, Active)  Host=127.0.0.1 Port=5098</code></pre>
+<h3>3.2 客戶雲端 SECS</h3>
+<p>雲端是 host（公開 endpoint），HT160S 改 <b>active 主動撥號</b>：</p>
+<pre><code>[General.ini] Enable=1  ActiveMode=1  Address=&lt;雲端IP&gt;  Port=&lt;雲端Port&gt;  DeviceID=&lt;客戶指定&gt;
+        HT160S (Equipment, active dial-out) ---> 客戶雲端 SECS Host (passive server)</code></pre>
+<div class="note">協議與訊息<b>完全相同</b>；雲端與本地差別只在「連線方向（ActiveMode）+ Address/Port」。先用 §3.1 驗到綠燈，再換 §3.2 雲端參數。</div>
+
+<h2>4. 啟動步驟</h2>
+<h3>4.1 HT160S（設備端）</h3>
+<ol>
+<li>確認 §1 前置條件、§2 設定。</li>
+<li>啟動 <code>EXE\ht160s.exe</code>，切到 <b>Dummy</b> 模式。</li>
+<li>看主畫面 badge：<b>AMR = ON</b>、<b>SECS</b> 由 <code>OFF</code> → <code>CONNECT</code> → <b><code>ONLINE</code></b>（HSMS SELECTED）。</li>
+<li>點 <b>SECS</b> badge 開啟 SECS/GEM Log 視窗（看 <code>[TX]/[RX]</code> 訊息）。</li>
+</ol>
+<h3>4.2 模擬器（host 端，本地情境）</h3>
+<pre><code>cd D:\AI_Area\Tool\HT160S_SECS_Simulator\code
+start.bat          (或 python secs_host_simulator.py)</code></pre>
+<ol>
+<li>填 <code>Host=127.0.0.1</code>、<code>Port=5098</code>、<code>Device=&lt;同 160 DeviceID&gt;</code>。</li>
+<li>按 <b>Connect</b>（自動送 Select.req）。</li>
+<li>勾 <b>Auto-AGV</b>：host 自動扮演 EAP 跑完泳道（見 §5）；不勾則用 <code>START_AGV</code> / <code>START</code> 按鈕手動逐步驗。</li>
+</ol>
+
+<h2>5. 泳道圖（Swimlane）— AutoBin 滿盤交接（主流程）</h2>
+<p>Handler = HT160S（設備）；EAP = host/雲端（模擬器）；AGV = 搬運車（模擬下由 host 邏輯/機台代理）。</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant H as Handler (HT160S)
+    participant E as EAP / Host (Cloud / Simulator)
+    participant A as AGV
+    Note over H: AutoX 輸出車滿 (真機 SnAutoX_InputFullTray / 模擬 >=10 盤)
+    H->>E: S6F11 CEID272 AGVSupplement (SVID38219 P(AutoX)=1)
+    E-->>H: S6F12 ACK
+    Note over H: 鎖定該 Auto，TrayArm 停止送盤
+    E->>A: 派車到 AutoX
+    A-->>E: 抵達
+    E->>H: S2F41 START_AGV(AUTOx, Action)
+    H-->>E: S2F42 HCACK=0
+    Note over H: Auto 排空，所有盤 GoUp 進 Car
+    H->>E: S6F11 CEID273 AGVLDUnLDStatus (SVID38220 Ready)
+    E-->>H: S6F12 ACK
+    E->>A: 通知可取走
+    A-->>H: 取走滿車 (模擬 IsAmrTaken=true)
+    H->>E: S6F11 CEID274 AGVLDUnLDFinish (SVID38221)
+    E-->>H: S6F12 ACK
+    Note over H: 清空 Car + 解鎖 (ClearAmrCar)，生產可續
+    E->>H: S2F41 START
+    H-->>E: S2F42 HCACK=0
+    Note over H,E: START 與 START_AGV 刻意分離
+</pre>
+
+<h3>5.1 缺料補料泳道（P1–P3，Loader/Empty/Color）</h3>
+<pre class="mermaid">
+sequenceDiagram
+    participant H as Handler (HT160S)
+    participant E as EAP / Host
+    participant A as AGV
+    Note over H: 輸入缺料 (SnLoader_Inputend / SnEmpty_InputEnd / SnColor_InputEnd = OFF; ON=有盤)
+    H->>E: S6F11 CEID272 AGVSupplement (SVID38219 P1/P2/P3=1)
+    E-->>H: S6F12 ACK
+    E->>A: 派車補料
+    E->>H: S2F41 START_AGV(Loader/Empty/Color, Action)
+    H-->>E: S2F42 HCACK=0
+    A-->>H: 補料 (實機 sensor 確認)
+    Note over H: Finish/解鎖同主流程 (P1-P3 實體前置機構待硬體定義)
+</pre>
+
+<h2>6. 訊息 / 代碼對照</h2>
+<h3>6.1 事件（Handler → Host，S6F11）</h3>
+<table>
+<tr><th>CEID</th><th>事件</th><th>載 SVID</th><th>意義</th></tr>
+<tr><td>272</td><td>AGVSupplement</td><td>38219</td><td>叫車：缺料(P1–P3) 或 Auto 滿盤(P4–P9)</td></tr>
+<tr><td>273</td><td>AGVLDUnLDStatus</td><td>38220</td><td>Ready：機構到位 / Auto 已排空</td></tr>
+<tr><td>274</td><td>AGVLDUnLDFinish</td><td>38221</td><td>Finish：上/下料完成（模擬自動；真機待 IO 點）</td></tr>
+<tr><td>275</td><td>AGVLdID</td><td>38202–38207 + 38199–38201</td><td>Carrier ID（不自動上報；host 用 S1F3 讀）</td></tr>
+</table>
+<h3>6.2 站點 P mapping（<code>PIndex = AutoNo + 3</code>）</h3>
+<table>
+<tr><th>P</th><th>站點</th><th>P</th><th>站點</th><th>P</th><th>站點</th></tr>
+<tr><td>P1</td><td>Loader</td><td>P4</td><td>AUTO1</td><td>P7</td><td>AUTO4</td></tr>
+<tr><td>P2</td><td>EmptyTray</td><td>P5</td><td>AUTO2</td><td>P8</td><td>AUTO5</td></tr>
+<tr><td>P3</td><td>ColorTray</td><td>P6</td><td>AUTO3</td><td>P9</td><td>AUTO6</td></tr>
+</table>
+<p>bitmap payload（ASCII）：<code>P1:0,P2:0,...,Px:1,...,P9:0</code>（單站 P=1）。</p>
+<h3>6.3 遠端命令（Host → Handler，S2F41 → S2F42）</h3>
+<table>
+<tr><th>RCMD</th><th>CP</th><th>HCACK=0 行為</th></tr>
+<tr><td><code>START_AGV</code></td><td><code>Loader/Empty/Color/AUTO1..6</code>=<code>Action</code>；<code>LoaderTrayCount</code>=整數</td><td>記錄該站交接 prep + 鎖 Auto</td></tr>
+<tr><td><code>START</code></td><td>—</td><td>開始/續跑生產（與 START_AGV 分離）</td></tr>
+</table>
+<p>HCACK：<code>0</code>=OK；<code>1</code>=命令不存在/格式錯；<code>2</code>=參數錯；<code>4</code>=生產中/有料拒絕。</p>
+
+<h2>7. 驗證檢查表（看到這些 = 對接成功）</h2>
+<ul class="check">
+<li>主畫面 <b>SECS=ONLINE</b>、<b>AMR=ON</b>。</li>
+<li>跑料讓某 Auto 達 10 盤後，SECS Log 出現 <code>[TX] S6F11 ... CEID=272</code>。</li>
+<li>模擬器收到 <b>CEID272</b> 並可讀化 P-bitmap（目標站正確）。</li>
+<li>模擬器送 <code>START_AGV</code> → HT160S Log 出現 <code>[RX] S2F42 ... HCACK=0</code>。</li>
+<li>該 Auto <b>不再被 TrayArm 送盤</b>（鎖定生效）。</li>
+<li>Auto 排空後出現 <code>[TX] S6F11 ... CEID=273</code>（Ready）。</li>
+<li>（模擬）隨即 <code>[TX] S6F11 ... CEID=274</code>（Finish），該 Auto 車被清空、恢復收盤。</li>
+<li>勾 Auto-AGV 時，模擬器收到 274 後自動送 <code>START</code>，生產續跑。</li>
+<li>斷開 host → 滿車 fallback 回操作員 modal（離線安全網）。</li>
+</ul>
+
+<h2>8. 限制與已知事項</h2>
+<ol>
+<li><b>真機 Finish 需 IO 點</b>：模擬 <code>IsAmrTaken=true</code> 自動完成；真機回 false，握手停在 <b>Ready</b>，待「車輛取走」IO 點配上（<code>aAuto1To6.cpp::IsAmrTaken</code>）。</li>
+<li><b>Device Count SVID = 0</b>（38231 等）：目前不報真實顆數（備用）。</li>
+<li><b>P1–P3 實體前置機構</b>：目前只做缺料通知 + 命令受理；實體補料前置動作待硬體定義。</li>
+<li><b>CEID275 AGVLdID</b> 不自動上報；host 以 S1F3 讀 carrier id SVID（38202–38207 + Auto4–6 的 38199–38201）。</li>
+<li><b>AGV 接管條件 = SECS 連線</b>：<code>bUseAMR</code> 且 HSMS <b>SELECTED</b> 時滿車交由 AGV 握手；斷線即 fallback 回 modal + 手動換車。</li>
+</ol>
+
+<h2>9. 疑難排解</h2>
+<table>
+<tr><th>症狀</th><th>可能原因 / 處理</th></tr>
+<tr><td>沒有 SECS badge</td><td><code>bUseSecsGem</code> 未啟用（build/CUSTOMER_CODE）</td></tr>
+<tr><td>SECS 停在 OFF/CONNECT 不到 ONLINE</td><td>連線/Select 未完成：檢查 <code>Enable=1</code>、Address/Port、ActiveMode 與 host 相對（一 active 一 passive）、防火牆</td></tr>
+<tr><td>跑料但不送 CEID272</td><td>AMR 未開、非 Dummy 但未達真機 full sensor、非 Run_Normal、或未 SELECTED</td></tr>
+<tr><td><code>START_AGV</code> 回 HCACK=1</td><td>命令字串/格式不符；確認站名 Loader/Empty/Color/AUTO1..6</td></tr>
+<tr><td>不出 CEID273</td><td>Auto 尚未排空（仍有工作/後位/滿盤）；或未先收 <code>START_AGV</code></td></tr>
+<tr><td>真機卡在 273 不出 274</td><td>預期：真機「車輛取走」IO 點未配（§8.1）；模擬不會卡</td></tr>
+<tr><td>AMR badge 改設定沒更新</td><td><code>UseAMR</code> 於啟動讀取；重開程式或呼叫 <code>UpdateAmrFeatureBadge()</code></td></tr>
+</table>
+
+<h2>附錄 A：相關程式位置（維護參考）</h2>
+<table>
+<tr><th>功能</th><th>檔案</th></tr>
+<tr><td>AGV 協調器（站點表/握手/叫車）</td><td><code>SecsGem/uAgvStation.cpp/.h</code></td></tr>
+<tr><td>SVID/CEID 註冊、S2F41 START_AGV</td><td><code>SecsGem/uHGemHT160.cpp</code></td></tr>
+<tr><td>HSMS 傳輸 / EventReport / 1s tick</td><td><code>SecsGem/uHGemEquipment.cpp</code></td></tr>
+<tr><td>AMR 鎖/滿盤/排空/清車</td><td><code>aAuto1To6.cpp</code>（SetAmrLock/IsOutputCarFullForAmr/IsDrainedForAmr/IsAmrTaken/ClearAmrCar）</td></tr>
+<tr><td>SECS 啟動設定讀取</td><td><code>SecsGem/UsecegemMainFrom.cpp::GemInitial</code>（General.ini [SECS]）</td></tr>
+<tr><td>AMR 開關</td><td><code>GeneralSetting.cpp</code>（General.ini [HardwareInstall] UseAMR）</td></tr>
+<tr><td>主畫面 AMR/SECS badge</td><td><code>main.cpp</code>（UpdateAmrFeatureBadge / UpdateSecsFeatureBadge）</td></tr>
+<tr><td>Host 模擬器</td><td><code>D:\AI_Area\Tool\HT160S_SECS_Simulator</code></td></tr>
+</table>
+
+<footer>HT160S E87 / AGV SECS 對接操作手冊 v1 · 2026/06/15 · 鴻勁精密 Hon Precision</footer>
+</body>
+</html>

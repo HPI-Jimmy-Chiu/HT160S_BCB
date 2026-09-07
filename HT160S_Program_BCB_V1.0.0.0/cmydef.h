@@ -7,12 +7,48 @@
 //---------------------------------------------------------------------------
 #define SERVER_MOTOR_POWER_ON_DELAY 10
 #define TEST_MAX_BIN 999
+//AI(ht160s-version-ssot) 20260805 : THE application version number - single source of truth.
+// Bump it HERE and nowhere else. Consumers: cmydef.cpp MainVersion (status-bar panel 0),
+// ht160s.cpp GemInitial, SecsGem/uHGemHT160.cpp svSoftwareVersion (SVID 1003 Software Version)
+// and the S1F2 / S1F14 SOFTREV items. Before this constant the number lived as four separate
+// literals kept in step by a comment, so a bump that missed one left SVID 1003 and SOFTREV
+// silently behind the status bar.
+// A #define of a string LITERAL on purpose: it needs no header ordering, introduces no
+// static-initialisation-order dependency, and lets "HT160S " HT160S_VERSION concatenate at
+// compile time. Do NOT turn it into a global AnsiString.
+#define HT160S_VERSION "1.0.0.0"
 //---------------------------------------------------------------------------
 extern int CUSTOMER_CODE;
+//AI(ht160s-statusbar) 20260624 : version + machine-identity globals (HT172 parity).
+//MainVersion is the single source for the status-bar version panel; asModel/
+//asHandlerID/asSerialNo mirror HT172 cmydef and are copied from GeneralSetting by
+//UpdateMachineIdentity(). asModel is seeded "HT160S" (NOT "HT172").
+extern AnsiString MainVersion;
+extern AnsiString asModel;
+extern AnsiString asHandlerID;
+extern AnsiString asSerialNo;
+//AI(ht160s-statusbar) 20260624 : copy GeneralSetting identity into the as* globals
+//and write stbMain panels 1-3 (HT172 MyFunctionB::Update analog). Safe to call any
+//time after GeneralSetting.Load() and fMain creation; NULL-guards the form/panels.
+void UpdateMachineIdentity();
 extern int MotorPowerOnDelay;
 extern bool bMotorPowerState;
+//AI(ht160s-maintainer) 20260617 : panel-LED run-state flags (DoPanelLamp);
+//front-panel only port of HT172 bLamp* set.
+extern bool bLampPowerOff;
+extern bool bLampPowerOn;
+extern bool bLampPause;
+extern bool bLampStart;
+extern bool bLampRetry;
+extern bool bLampSkip;
+extern bool bLampTrayEnd;
+extern bool bLampTrayFeed;
+extern bool bLampCleanOut;
+extern bool bLampOneCycle;
 extern bool bMotorHomePowerOn;
 extern bool fAllMotorHome;
+extern bool InitialOK;                 //AI(ht160s-initflow) 20260624 : whole-machine init-complete (ref HT9045)
+void UpdateInitProgress(int iPercent);  //AI(ht160s-initflow) 20260624 : startup splash progress (def ht160s.cpp; called from HSys.Initial)
 extern bool SoftStart;
 extern bool SoftStop;
 extern const int REALLY;
@@ -25,9 +61,27 @@ extern bool bHomeByStart;
 //AI(HT160S-Maintainer) 20260602 : HT172 0420 ProcessMotion lifecycle globals
 extern bool bFirstRun;
 extern bool bSortArmNeedHome;
+//AI(HT160S-Maintainer) 20260616 : true while uHome ProcessMotorHome runs a
+//motor-power Off->On recovery (clears latched servo-amp alarms). Suppresses
+//CheckMotorPowerShutDown relay control + ScanAllMotorStatus alarm-forcing +
+//Home-monitor auto-close so the power-cycle owns SwMotorRelay until done.
+extern bool bHomePowerCycling;
+//AI(HT160S-Maintainer) 20260616 : set true once the RS232 Pad panel has sent a
+//valid status frame. Until then the panel Power On/Off sensors are stale
+//defaults; CheckMotorPowerShutDown auto-energizes the motor relay (no interlock,
+//per request) and only defers to the panel signals after the Pad has talked.
+extern bool bPadEverCommunicated;
 extern bool bCalculatePauseTime;
 extern TDateTime tUPH_PauseTime;
 extern TDateTime tUPH_PauseStartTime;
+//AI(secs-onsite0731) 20260801 : UPH numerator baseline (def cmydef.cpp). Snapshot of
+//tRunData.TotalIC taken in the SAME bFirstRun block that re-stamps tRunData.StartTime, so
+//GetCalculateUPH divides a per-window count by a per-window clock instead of a cumulative
+//count by a per-session clock.
+extern int g_iUphBaseIC;
+//AI(secs-onsite0731) 20260801 : main-screen status caption mirror, published as SVID 1011
+//"Machine State" (9045-aligned). Written only by SetMainStatus() in csystem.cpp.
+extern AnsiString g_sMachineStateText;
 //---------------------------------------------------------------------------
 enum eTrayName                  //使用的Harware Bin數量與名稱
 {

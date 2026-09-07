@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HT160S AMR 現場驗證 SOP（真機 / 非 SOFT_SIMULATE）</title>
+<style>
+:root{--fg:#1f2328;--muted:#656d76;--border:#d0d7de;--bg:#fff;--code-bg:#f6f8fa;--accent:#0969da;--th:#f2f5f8;}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;color:var(--fg);background:#fafbfc;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei","PingFang TC","Noto Sans CJK TC",sans-serif;
+ line-height:1.7;font-size:16px;}
+.wrap{max-width:980px;margin:0 auto;padding:40px 28px 96px;background:var(--bg);
+ box-shadow:0 0 0 1px var(--border);min-height:100vh;}
+h1,h2,h3,h4{line-height:1.3;font-weight:600;}
+h1{font-size:1.9em;border-bottom:2px solid var(--border);padding-bottom:.3em;margin-top:0;}
+h2{font-size:1.45em;border-bottom:1px solid var(--border);padding-bottom:.3em;margin-top:2.2em;}
+h3{font-size:1.2em;margin-top:1.8em;}
+h4{font-size:1.05em;color:var(--muted);}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.92em;display:block;overflow-x:auto;}
+th,td{border:1px solid var(--border);padding:7px 11px;text-align:left;vertical-align:top;}
+th{background:var(--th);font-weight:600;white-space:nowrap;}
+tr:nth-child(even) td{background:#fbfcfd;}
+code{background:var(--code-bg);padding:.15em .4em;border-radius:5px;font-size:.88em;
+ font-family:"Cascadia Code",Consolas,"SFMono-Regular",Menlo,monospace;}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+ overflow-x:auto;line-height:1.5;}
+pre code{background:none;padding:0;font-size:.86em;white-space:pre;}
+blockquote{margin:1em 0;padding:.4em 1em;color:var(--muted);border-left:4px solid var(--border);background:#f8fafc;}
+hr{border:0;border-top:1px solid var(--border);margin:2.4em 0;}
+.toc{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;margin:1.5em 0;font-size:.94em;}
+.toc>ul{margin:.4em 0;}
+.meta{color:var(--muted);font-size:.85em;margin-top:3em;border-top:1px solid var(--border);padding-top:1em;}
+@media print{body{background:#fff;}.wrap{box-shadow:none;max-width:100%;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1 id="ht160s-amr-sop-soft_simulate">HT160S AMR 現場驗證 SOP（真機 / 非 SOFT_SIMULATE）</h1>
+<p>文件狀態：操作手冊（v1）｜日期：2026/07/20｜適用版本：<code>HT160S_Program_BCB_V1.0.0.0</code>
+範圍：在<strong>真機（<code>SOFT_SIMULATE</code> 關閉）</strong>現場，驗證 E87/AGV SECS 握手（叫車 CEID272 → START_AGV → Ready CEID273 → Finish CEID274 → START）。
+姊妹文件：<code>HT160S_AMR_ManualInject_Test_SOP_20260720.md</code>（<strong>sim / 筆電</strong>單動測試）、<code>HT160S_E87_AGV_Operation_Manual.md</code>、<code>HT160S_E87_AGV_Communication_Draft_20260527.md</code>。</p>
+<hr />
+<h2 id="0">0. 先回答你的三個問題</h2>
+<table>
+<thead>
+<tr>
+<th>問</th>
+<th>答</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1. 那個「不斷跑」的循環只有 SOFT_SIMULATE 才會發生？</strong></td>
+<td><strong>是。</strong> 循環的成因是 sim 下 273/274 的判斷式「硬回 true」，短路掉注入 latch 的清除。真機的判斷式是<strong>讀真實 sensor</strong>、不是硬 true，所以不會這樣循環。（且已修 <code>40a343d</code>，兩邊都穩。）</td>
+</tr>
+<tr>
+<td><strong>2. 現場真機測試（不啟用 SOFT_SIMULATE）也會有問題嗎？</strong></td>
+<td><strong>不會有那個 sim 循環。</strong> 真機是 sensor 驅動：缺料/滿盤/取車都要 sensor 真的變化，握手才前進。若料一直沒補，機台會「停在等補料」而非 1 秒狂叫。若你在真機用注入測、且有按 Finish/Take，latch 會被正常消費清掉；<code>40a343d</code> 的修正讓混用（注入+真sensor）也不會殘留。</td>
+</tr>
+<tr>
+<td><strong>3. 現場流程一樣嗎？要碰 sensor 嗎？</strong></td>
+<td><strong>流程骨架一樣（272→273→274→START），但驅動來源不同</strong>。真機有 <strong>3 種驗證途徑</strong>（§2）：跑真料/真AMR、<strong>手動觸發 sensor</strong>、或<strong>用注入不碰 sensor</strong>。要不要碰 sensor 由你選的途徑決定（見 §2、§7）。</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-vs-sim">1. 真機 vs sim 的關鍵差異（最重要，先讀）</h2>
+<p>同一套程式，<code>SOFT_SIMULATE</code> 開/關時，AMR 判斷式行為完全不同：</p>
+<table>
+<thead>
+<tr>
+<th>邊緣（事件）</th>
+<th>sim（SOFT_SIMULATE ON）</th>
+<th><strong>真機（SOFT_SIMULATE OFF）</strong></th>
+<th>真機讀哪個 sensor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>272 叫車</strong>（Auto 滿盤）</td>
+<td>比模擬盤數 <code>iSimAmrMaxTray</code></td>
+<td>讀 <strong><code>SnAutoX_InputFullTray</code></strong>（Enable&amp;&amp;IsOn）</td>
+<td>滿盤 sensor，<strong>ON=滿</strong></td>
+</tr>
+<tr>
+<td><strong>272 叫車</strong>（Loader/Empty/Color 缺料）</td>
+<td><code>iSimInfeedCount&lt;=0</code></td>
+<td>讀 <strong><code>SnX_Inputend</code></strong>（Enable&amp;&amp;IsOff）</td>
+<td>進料 sensor，<strong>OFF=空(缺料)</strong></td>
+</tr>
+<tr>
+<td><strong>273 Ready</strong>（Auto 排空）</td>
+<td><strong>硬回 true</strong></td>
+<td>真排空狀態：無 working/rear/pending 盤 + 殘料清 + 前缸 home</td>
+<td>（非單一 sensor，機構狀態）</td>
+</tr>
+<tr>
+<td><strong>273 Ready</strong>（Loader 就緒）</td>
+<td><strong>硬回 true</strong></td>
+<td>前堆疊汽缸 home</td>
+<td>（汽缸 out-bit）</td>
+</tr>
+<tr>
+<td><strong>274 Finish</strong>（Auto 取車）</td>
+<td><strong>硬回 true</strong></td>
+<td>讀 <strong><code>SnAutoX_InputEnd</code></strong>（Enable&amp;&amp;IsOff）</td>
+<td>取車 sensor，<strong>ON=有盤；取走=OFF</strong></td>
+</tr>
+<tr>
+<td><strong>274 Finish</strong>（Loader 補料完成）</td>
+<td><strong>硬回 true</strong></td>
+<td>讀 <strong><code>SnLoader_Inputend</code></strong>（Enable&amp;&amp;IsOn）</td>
+<td>同進料 sensor，<strong>ON=有盤(補到了)</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>一句話</strong>：sim 下 273/274 自動完成（所以只按第一顆就自跑，也因此會循環）；<strong>真機下 273/274 必須「真的發生」</strong>——不是機構真的排空/取車，就是你用注入去 override。</p>
+</blockquote>
+<p><strong>這就是為什麼 sim 的循環在真機不會出現</strong>：真機 274 之後，缺料 sensor 已變「有盤(ON)」→ 缺料解除 → 不再叫車。除非料真的又被抽走。</p>
+<hr />
+<h2 id="2">2. 現場三種驗證途徑（依你手上有什麼選）</h2>
+<table>
+<thead>
+<tr>
+<th>途徑</th>
+<th>需要</th>
+<th>碰 sensor？</th>
+<th>驗證到什麼</th>
+<th>何時用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R. 真 sensor / 真料驅動</strong></td>
+<td>料盤/料匣，手動搬動</td>
+<td><strong>要</strong>（手動放/取料匣、放/取滿車）</td>
+<td>真實 sensor 接線 + 極性 + 完整協定</td>
+<td>想連 sensor 一起驗（建議至少做一輪）</td>
+</tr>
+<tr>
+<td><strong>I. 注入驅動（AMR 測試模式）</strong></td>
+<td>只要面板</td>
+<td><strong>不用</strong>（按鈕 bypass sensor）</td>
+<td>SECS 協定 + host round-trip（<strong>不</strong>驗 sensor）</td>
+<td>沒真料/沒 AMR，或只想驗協定</td>
+</tr>
+<tr>
+<td><strong>A. 真 AMR 車</strong></td>
+<td>真實 AMR + host</td>
+<td>不用（AMR 動作 + sensor 自然變化）</td>
+<td>端到端全部（含車）</td>
+<td>最終整合驗證</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>完整現場驗收 = R（至少每站一輪，驗 sensor）＋ I（驗協定不受 sensor 影響）＋ 有車時做 A。</strong></p>
+</blockquote>
+<h3 id="21">2.1 這三種途徑用哪些設定切換？（都是現成功能，無需新開發）</h3>
+<p><strong>沒有單一「R/I/A 模式鍵」</strong>。行為由下列<strong>現成開關組合</strong>決定：</p>
+<table>
+<thead>
+<tr>
+<th>層</th>
+<th>開關</th>
+<th>位置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 編譯</td>
+<td><code>SOFT_SIMULATE</code></td>
+<td><code>MachineType.h</code>（build 時）</td>
+<td>有 define＝<strong>恆 sim</strong>（筆電 dev）；註解掉＝真機 build，才啟用第 ② 層</td>
+</tr>
+<tr>
+<td>② 執行期 Real/Dummy</td>
+<td>主畫面 <strong>Real/Dummy 面板</strong>（點一下循環 Dummy→HasTray→Real）</td>
+<td>主畫面 <code>pnRealDummy</code>；存 <code>lastset.ini [System] RealDummy</code></td>
+<td><strong>Real</strong>＝真 sensor 驅動；<strong>Dummy</strong>＝sim 行為（273/274 自動完成）。<strong>只在真機 build 有效</strong>（筆電 build 恆 sim，切了沒用）</td>
+</tr>
+<tr>
+<td>③ 注入</td>
+<td><strong>Enable AMR manual-inject test mode</strong> 勾選</td>
+<td>維護 → AMR 頁 <code>chkAmrTestMode</code></td>
+<td>勾＝注入按鈕生效（bypass sensor）；不勾＝靠 sensor / 實際</td>
+</tr>
+<tr>
+<td>④ AMR 總開關</td>
+<td><code>UseAMR=1</code></td>
+<td><code>General.ini [HardwareInstall]</code> / 維護</td>
+<td>沒開整個握手不啟動</td>
+</tr>
+<tr>
+<td>⑤ Host</td>
+<td>Auto-AGV / Automation</td>
+<td>模擬器連線列</td>
+<td>自動回 <code>START_AGV</code>/<code>START</code>、自動 ACK</td>
+</tr>
+</tbody>
+</table>
+<p>途徑 → 設定對應：</p>
+<table>
+<thead>
+<tr>
+<th>途徑</th>
+<th>① 編譯</th>
+<th>② Real/Dummy</th>
+<th>③ 測試模式勾選</th>
+<th>碰 sensor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>I 注入</strong></td>
+<td>任意</td>
+<td>任意</td>
+<td><strong>勾 ON</strong></td>
+<td>不碰</td>
+</tr>
+<tr>
+<td><strong>R 真 sensor</strong></td>
+<td>真機 build（off）</td>
+<td><strong>Real</strong></td>
+<td>不勾</td>
+<td>要碰</td>
+</tr>
+<tr>
+<td><strong>A 真 AMR</strong></td>
+<td>真機 build（off）</td>
+<td>Real</td>
+<td>不勾</td>
+<td>不碰（車動）</td>
+</tr>
+<tr>
+<td>（附）真機上跑 sim 行為</td>
+<td>真機 build（off）</td>
+<td><strong>Dummy</strong></td>
+<td>任意</td>
+<td>不碰（273/274 自動）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>重點</strong>：
+- <strong>全部是現成功能</strong>，不用新開發。
+- 你<strong>現在筆電跑的是 ① 有 define 的 dev build → 恆 sim</strong>；主畫面把 Real/Dummy 切成 Real <strong>也沒用</strong>（<code>IsSoftSimulate()</code> 恆 true）。要驗真 sensor，必須用<strong>真機 build（<code>SOFT_SIMULATE</code> 註解掉）</strong>，再把主畫面切 <strong>Real</strong>。
+- ②③ 獨立可組合：真機+Real+不勾＝純真 sensor（R）；真機+Real+勾＝可用注入 override 真機當下補不到的邊緣（例如沒車時的 Take）。</p>
+<hr />
+<h2 id="3">3. 前置條件（真機版，缺一不可）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>條件</th>
+<th>現場如何確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>SECS/GEM 已啟用</td>
+<td>主畫面出現 <strong>SECS</strong> badge</td>
+</tr>
+<tr>
+<td>2</td>
+<td>AMR 模式開啟（<code>bUseAMR=1</code>）</td>
+<td>主畫面 <strong>AMR</strong> badge 綠 ON；AMR 面板 <code>bUseAMR=1</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>HSMS <strong>SELECTED</strong></td>
+<td>AMR 面板 <code>Selected=1</code>；host/模擬器 ● selected</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>機台在 Normal 模式</strong></td>
+<td>送 272 的 <code>PollAndCall</code> 要 <code>RunMode==Run_Normal</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>★ 機台已 HOME 完成</strong>（<code>fAllMotorHome==true</code>）</td>
+<td>非 HOMING；送 273/274 的 <code>ServiceHandshake</code> 閘門需 homed（與 sim 同）</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>★ 確認相關 sensor 已 Enable 且極性正確</strong></td>
+<td><strong>在維護 → IO Monitor / IOsetview 逐一確認</strong>（見 §4）。<strong>Enable 狀態是「每台機」config，勿假設；一定要在現場那台確認</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>注意</strong>：本 repo 的 <code>system/IO_Table.csv</code> 目前把 <code>SnAutoX_InputEnd</code>、<code>SnX_Inputend</code>、<code>SnX_InputFullTray</code> 都設 <strong>Enable=1</strong> 並給了實體位址。但現場機台的 <code>IO_Table.csv</code> 可能不同——<strong>務必在現場那台用 IO Monitor 實測</strong>，不要照抄本文件。</p>
+</blockquote>
+<hr />
+<h2 id="4-sensor">4. Sensor 對照表（真機驗證的核心）</h2>
+<table>
+<thead>
+<tr>
+<th>站/邊緣</th>
+<th>Sensor（Alias）</th>
+<th>觸發 predicate</th>
+<th>極性（真機）</th>
+<th>現場怎麼讓它成立</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto 滿盤（272）</td>
+<td><code>SnAuto1..6_InputFullTray</code></td>
+<td><code>IsOutputCarFullForAmr</code></td>
+<td><strong>ON=滿</strong></td>
+<td>把該 Auto 輸出車裝滿 / 遮住滿盤 sensor</td>
+</tr>
+<tr>
+<td>Auto 取車（274）</td>
+<td><code>SnAuto1..6_InputEnd</code></td>
+<td><code>IsAmrTaken</code></td>
+<td><strong>ON=有盤；OFF=取走</strong></td>
+<td>把滿車移走（sensor 由 ON→OFF）</td>
+</tr>
+<tr>
+<td>Loader 缺料（272）</td>
+<td><code>SnLoader_Inputend</code></td>
+<td><code>IsInputShortageForAmr</code></td>
+<td><strong>OFF=空(缺料)</strong></td>
+<td>抽走 Loader 進料匣（sensor→OFF）</td>
+</tr>
+<tr>
+<td>Loader 補料完成（274）</td>
+<td><code>SnLoader_Inputend</code></td>
+<td><code>IsInputHandoffFinishedForAmr</code></td>
+<td><strong>ON=有盤</strong></td>
+<td>放回/放上料匣（sensor→ON）</td>
+</tr>
+<tr>
+<td>Empty 缺料/補料</td>
+<td><code>SnEmpty_InputEnd</code></td>
+<td>同 Loader</td>
+<td>同上</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>Color 缺料/補料</td>
+<td><code>SnColor_InputEnd</code></td>
+<td>同 Loader</td>
+<td>同上</td>
+<td>同上</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Auto 的 <strong>273（排空）不是單一 sensor</strong>：要該 Auto 真的把盤都堆進車、殘料清、前缸 home。真機若該 Auto 本來就空，273 會很快成立。</li>
+<li>Loader/Empty/Color 的 <strong>273（就緒）</strong> 看前堆疊汽缸 home（不是 sensor）。</li>
+<li><strong>同一顆 <code>SnLoader_Inputend</code> 同時扮演「缺料(OFF)」與「補料完成(ON)」</strong>——這是 Loader 真機驗證能用「抽走→放回」單顆 sensor 走完全程的關鍵。</li>
+</ul>
+<hr />
+<h2 id="5-r-1-loader-sensor">5. 驗證 R-1 — Loader 上料（真 sensor 驅動）｜泳道</h2>
+<p>前置：§3 全滿足；<strong>不要</strong>勾測試模式（這是真 sensor 途徑）。host/模擬器建議勾 Auto-AGV（自動回 START_AGV/START）。</p>
+<pre><code> 操作員(手動)        機台 HT160S                         Host / 模擬器
+ ───────────        ─────────────────────────           ─────────────────
+ 抽走 Loader 料匣 ─► SnLoader_Inputend: ON→OFF(空)
+                    IsInputShortageForAmr=true
+                    ├─► TX S6F11 CEID272 (P1) ──────────► 收叫車
+                    │                          ◄────────── TX S2F41 START_AGV(Loader)
+                    └─◄ RX, TX S2F42 HCACK=0 ───────────► 收 ACK
+                    hs=PREP；前缸 home
+                    ├─► TX S6F11 CEID273 (P1 Ready) ─────► 收 Ready
+ 放上新料匣 ───────► SnLoader_Inputend: OFF→ON(有盤)
+                    IsInputHandoffFinishedForAmr=true
+                    ├─► TX S6F11 CEID274 (P1 Finish) ────► 收 Finish
+                    │   解鎖 + 恢復進料              ◄──── TX S2F41 START
+                    └─◄ RX START → HCACK=0(有Lot)/2(無Lot)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">步</th>
+<th>操作員做</th>
+<th>機台 SECS log 應出現</th>
+<th>判讀</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td><strong>抽走</strong> Loader 料匣（sensor→OFF）</td>
+<td><code>TX S6F11 CEID=272</code> bitmap <code>P1:1</code></td>
+<td>缺料叫車</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>（host 自動）</td>
+<td><code>RX S2F41 START_AGV(Loader)</code> → <code>TX S2F42 HCACK=0</code></td>
+<td>派車受理</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>（前缸 home）</td>
+<td><code>TX S6F11 CEID=273</code>（P1）</td>
+<td>Ready</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><strong>放上</strong>料匣（sensor→ON）</td>
+<td><code>TX S6F11 CEID=274</code>（P1）</td>
+<td>補料完成、解鎖</td>
+</tr>
+</tbody>
+</table>
+<p><strong>通過準則</strong>：抽走→272；放回→274；bitmap 全 P1；不再重覆叫（因為 sensor 已 ON）。Empty/Color 換對應 sensor（P2/P3）。</p>
+<blockquote>
+<p><strong>這一輪就驗證了：真實 sensor 接線 + 極性 + 完整 SECS 協定。</strong> 要碰 sensor（手動抽/放料匣）。</p>
+</blockquote>
+<hr />
+<h2 id="6-r-2-auto-amr">6. 驗證 R-2 — Auto 下料（真料/真 AMR 驅動）｜泳道</h2>
+<p>Auto 下料要「先滿車、再取走」，比 Loader 多一個「排空」條件。真機要嘛跑真料填滿，要嘛用注入（§7）。</p>
+<pre><code> 操作員/生產         機台 HT160S                          Host / 模擬器
+ ───────────        ─────────────────────────            ────────────────
+ (Auto 輸出車裝滿) ─► SnAutoX_InputFullTray: OFF→ON(滿)
+                    IsOutputCarFullForAmr=true
+                    ├─► TX S6F11 CEID272 (P4) + CEID35 ──► 收叫車(+離散滿盤碼)
+                    │                            ◄──────── TX S2F41 START_AGV(AUTO1)
+                    └─◄ HCACK=0；鎖 Auto，TrayArm 停送
+                    (該 Auto 盤全堆進車、殘料清、前缸home)
+                    ├─► TX S6F11 CEID273 (P4 Ready) ─────► 收 Ready
+ 移走滿車 ─────────► SnAutoX_InputEnd: ON→OFF(取走)
+                    IsAmrTaken=true
+                    ├─► TX S6F11 CEID274 (P4 Finish) ────► 收 Finish
+                    │   清車 + 解鎖 + 恢復收盤        ◄─── TX S2F41 START
+                    └─◄ RX START → HCACK
+</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">步</th>
+<th>動作</th>
+<th>機台 log</th>
+<th>判讀</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td>Auto1 輸出車滿（<code>SnAuto1_InputFullTray</code> ON）</td>
+<td><code>TX CEID=272</code> <code>P4:1</code> + <code>CEID=35</code></td>
+<td>滿盤叫車</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>（host）</td>
+<td><code>RX START_AGV(AUTO1)</code> → <code>HCACK=0</code></td>
+<td>鎖車、派車</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>該 Auto 排空（盤堆進車）</td>
+<td><code>TX CEID=273</code>（P4）</td>
+<td>Ready</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><strong>移走滿車</strong>（<code>SnAuto1_InputEnd</code> ON→OFF）</td>
+<td><code>TX CEID=274</code>（P4）</td>
+<td>取車完成、清車解鎖</td>
+</tr>
+</tbody>
+</table>
+<p><strong>通過準則</strong>：滿→272；排空→273；車移走→274；bitmap 全 P4。Auto2..6＝P5..P9。</p>
+<hr />
+<h2 id="7-i-sensor">7. 驗證 I — 注入驅動（真機，不碰 sensor）｜泳道</h2>
+<p>沒真料/沒 AMR，只想驗協定時用。<strong>真機的注入要按「每一個」邊緣</strong>（不像 sim 會自動完成 273/274）。順序鐵律同 sim：<strong>先 HOME → 再勾測試模式 → 再注入</strong>。</p>
+<pre><code> 面板注入            機台 HT160S                          Host / 模擬器
+ ────────           ─────────────────────────            ────────────────
+ 按 Loader Short ─► InputShort 注入=true
+                   ├─► TX CEID272 (P1) ─────────────────► 收叫車
+                   └─◄ RX START_AGV(Loader) → HCACK=0 ◄── (自動)
+                   hs=PREP
+ 按 Loader Ready ─► InputReady 注入=true(或前缸本就home)
+                   ├─► TX CEID273 (P1) ─────────────────► 收 Ready
+ 按 Loader Finish► InputFinish 注入(one-shot)
+                   ├─► TX CEID274 (P1) ─────────────────► 收 Finish
+                   │   ClearInputCycle 清 latch(40a343d) ◄─ RX START
+                   └─◄ 按一次跑一輪就停（不循環）
+</code></pre>
+<ul>
+<li><strong>真機注入必須三顆都按</strong>（Short→Ready→Finish；Auto 為 Full→Drain→Take），因為真機 273/274 不會自動成立。</li>
+<li>Auto 的 <strong>Take</strong> 若現場 <code>SnAutoX_InputEnd</code> 已 Enable，可改用「真的移走車」讓 274 由真 sensor 成立（R-2）；沒車就用注入 Take。</li>
+<li><strong>不碰任何 sensor</strong>，純驗 SECS 協定 + host 回覆。</li>
+</ul>
+<hr />
+<h2 id="8-sensor">8. 「現場到底要不要碰 sensor？」明確結論</h2>
+<ul>
+<li><strong>要驗 sensor 接線/極性</strong> → 用途徑 <strong>R</strong>（§5/§6）：<strong>要</strong>手動搬料匣/移車去觸發真 sensor。至少每站跑一輪。</li>
+<li><strong>只驗 SECS 協定、不想碰硬體</strong> → 用途徑 <strong>I</strong>（§7）：<strong>不用</strong>碰 sensor，面板注入 bypass。但這樣<strong>不會驗到 sensor</strong>。</li>
+<li><strong>最終整合</strong> → 途徑 <strong>A</strong>：真 AMR + 真 sensor，全自動。</li>
+<li>不論哪種，<strong>HOME 一定要先做</strong>（HOME 是 motion 閘門，不是 sensor；§3 第 5 條）。</li>
+</ul>
+<hr />
+<h2 id="8a-tsmaintamr-host-it">8A. tsMaintAmr 面板：收到的 host 命令即時回饋（對客戶 IT）</h2>
+<p>前面幾節看的是<strong>機台送出</strong>（272/273/274）與<strong>模擬器</strong>端。反過來，<strong>機台收到 host 的每一筆 <code>S2F41</code> 命令</strong>（客戶 IT 送的 <code>START_AGV</code> / <code>START</code> / <code>SET_LOT_INFO</code> / <code>LOTSTART</code>…）都會即時顯示在 <strong>維護 → AMR 頁（tsMaintAmr）下方 log</strong>，含<strong>接受/拒絕 + 人類可讀原因 + 收到內容</strong>。現場和客戶 IT 對測時，直接看這裡就能當場反饋「你送的命令機台收到沒、對不對」。</p>
+<p>面板顯示格式（<code>RX S2F41 &lt;命令&gt;  &lt;收到內容&gt;  [OK] / [REJECT HCACK=n: 原因]</code>）：</p>
+<pre><code>RX S2F41 START_AGV  Loader=Action  [OK]
+RX S2F41 START_AGV  AUTO1=Action   [OK]
+RX S2F41 SET_LOT_INFO  lots=3       [OK]
+RX S2F41 START_AGV  AUTO7=Action   [REJECT HCACK=2: parameter invalid (empty list / unknown station / type / capacity / no lot data)]
+RX S2F41 START      [REJECT HCACK=2: parameter invalid (... / no lot data)]
+</code></pre>
+<p>HCACK 對照：<code>0</code>=接受；<code>1</code>=命令不認得/格式錯；<code>2</code>=參數無效（空清單/站名不存在/型別錯/超容量/無 Lot 資料）；<code>4</code>=busy（生產中/機台內有 IC）。</p>
+<p><strong>現場對客戶 IT 的用法</strong>：
+- 客戶送命令 → 面板出現 <code>[OK]</code> = 機台正確收到並接受；出現 <code>[REJECT ...]</code> = 當場把該行截圖回饋，原因已寫在行內。
+- <code>START_AGV</code> 那行的 <code>站名=值</code>（如 <code>Loader=Action</code> / <code>AUTO1=Action</code>）可讓 IT 核對「機台有沒有正確解讀我送的站點」；站名打錯（如 <code>AUTO7</code>）會直接 <code>[REJECT ... unknown station]</code>。
+- 不限測試模式：<strong>正式對測（測試模式關）也會顯示</strong>，log 自動截斷不爆量。
+- 這是「接收端」回饋，和模擬器端的「送出端」判讀（§ 模擬器 log：272→273→274→cycle complete）互補，一次對齊雙向。</p>
+<blockquote>
+<p>相關：機台端實作見 <code>SecsGem/uHGemHT160.cpp</code>（S2F42 handler）+ <code>SecsGem/uAmrInject.h</code>（<code>NoteHostCommand</code>/<code>HcackReason</code>），commit <code>2ad9a5c</code>。</p>
+</blockquote>
+<hr />
+<h2 id="9">9. 驗收檢查表（真機）</h2>
+<ul>
+<li>[ ] SECS badge、AMR badge = ON；<code>Selected=1</code>、<code>fAllMotorHome=true</code>、RunMode=Normal。</li>
+<li>[ ] （R）逐站確認 sensor Enable + 極性（IO Monitor）：<code>SnX_Inputend</code> OFF=空、<code>SnAutoX_InputFullTray</code> ON=滿、<code>SnAutoX_InputEnd</code> ON=有盤。</li>
+<li>[ ] （R）抽料匣→272；放料匣→274；移滿車→274；bitmap 站點正確。</li>
+<li>[ ] （I）注入三顆邊緣，每按一輪 272→273→274 完成後<strong>自動停</strong>（不循環）；面板 log 見 <code>... cycle cleared (274)</code>。</li>
+<li>[ ] START 回 HCACK=0（有載 Lot）或 HCACK=2（bench 無 Lot，正常）。</li>
+<li>[ ] host 端收到的 CEID/bitmap/SVID 與規格一致。</li>
+<li>[ ] <strong>（接收端，§8A）</strong> tsMaintAmr 面板每筆收到的 host 命令都顯示 <code>[OK]</code>；客戶送錯時顯示 <code>[REJECT HCACK=n: 原因]</code>，站名/內容 echo 正確。</li>
+</ul>
+<hr />
+<h2 id="10">10. 疑難排解（真機）</h2>
+<table>
+<thead>
+<tr>
+<th>症狀</th>
+<th>原因 / 處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>抽走料匣沒送 272</td>
+<td>sensor 未 Enable 或極性反（IO Monitor 確認 <code>SnX_Inputend</code>）；或非 Normal / 未 SELECTED / 未 HOME</td>
+</tr>
+<tr>
+<td>送了 272，但放回料匣不出 274</td>
+<td>補料 sensor 沒到 ON（<code>SnLoader_Inputend</code>）；或未先收 START_AGV（未進 PREP）；或未 HOME（273/274 閘門）</td>
+</tr>
+<tr>
+<td>Auto 滿了不送 272</td>
+<td><code>SnAutoX_InputFullTray</code> 未 Enable/未 ON；或非 Normal</td>
+</tr>
+<tr>
+<td>Auto 到 273 卡住不出 274</td>
+<td>車還沒真的移走（<code>SnAutoX_InputEnd</code> 仍 ON）；或該 sensor 未 Enable → 需改用注入 Take</td>
+</tr>
+<tr>
+<td>注入按了沒反應</td>
+<td>沒勾測試模式，或勾了之後又 HOME/Start 被清（先 HOME 再勾）</td>
+</tr>
+<tr>
+<td>真機也一直重覆叫車</td>
+<td><strong>不是 sim 那個 bug</strong>：多半是料真的一直缺（sensor 一直 OFF）→ 補料即停；或注入 Short 開著沒關（再按一次關掉）</td>
+</tr>
+<tr>
+<td><code>START</code> HCACK=2</td>
+<td>bench 沒載 Lot（正常）；要 HCACK=0 需先 <code>SET_LOT_INFO</code>/<code>LOTSTART</code>+WebAPI 載入</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11">11. 附錄</h2>
+<h3 id="111-p-mapping">11.1 站點 P mapping</h3>
+<p>P1 Loader / P2 Empty / P3 Color / P4-P9 = Auto1-6。</p>
+<h3 id="112-ceid">11.2 CEID</h3>
+<p>272 叫車(SVID38219) / 273 Ready(38220) / 274 Finish(38221) / 275 CarrierID。Auto Full 附帶離散碼 35/36/37、148/149/150。</p>
+<h3 id="113-sensor-repo-config">11.3 Sensor 位址（本 repo config，現場請以實機為準）</h3>
+<table>
+<thead>
+<tr>
+<th>Sensor</th>
+<th>IP</th>
+<th>Port</th>
+<th>Bit</th>
+<th>Enable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SnAuto1..6_InputEnd</td>
+<td>2</td>
+<td>1</td>
+<td>0..5</td>
+<td>1</td>
+</tr>
+<tr>
+<td>SnLoader_Inputend</td>
+<td>2</td>
+<td>0</td>
+<td>3</td>
+<td>1</td>
+</tr>
+<tr>
+<td>SnEmpty_InputEnd</td>
+<td>2</td>
+<td>0</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>SnColor_InputEnd</td>
+<td>6</td>
+<td>2</td>
+<td>4</td>
+<td>1</td>
+</tr>
+<tr>
+<td>SnAuto1..6_InputFullTray</td>
+<td>3-6</td>
+<td>0-2</td>
+<td>—</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<h3 id="114-predicate">11.4 Predicate 程式位置</h3>
+<table>
+<thead>
+<tr>
+<th>邊緣</th>
+<th>函式</th>
+<th>檔案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto 272</td>
+<td><code>IsOutputCarFullForAmr</code></td>
+<td>aAuto1To6.cpp:1331</td>
+</tr>
+<tr>
+<td>Auto 273</td>
+<td><code>IsDrainedForAmr</code></td>
+<td>aAuto1To6.cpp:1375</td>
+</tr>
+<tr>
+<td>Auto 274</td>
+<td><code>IsAmrTaken</code></td>
+<td>aAuto1To6.cpp:1403</td>
+</tr>
+<tr>
+<td>Loader 272</td>
+<td><code>IsInputShortageForAmr</code></td>
+<td>aLoader.cpp:539</td>
+</tr>
+<tr>
+<td>Loader 273</td>
+<td><code>IsReadyForAmrHandoff</code></td>
+<td>aLoader.cpp:525</td>
+</tr>
+<tr>
+<td>Loader 274</td>
+<td><code>IsInputHandoffFinishedForAmr</code></td>
+<td>aLoader.cpp:548</td>
+</tr>
+<tr>
+<td>握手/閘門/latch清</td>
+<td><code>ServiceHandshake</code>（gate:324、清latch:360/405）</td>
+<td>SecsGem/uAgvStation.cpp</td>
+</tr>
+</tbody>
+</table>
+<h3 id="115-sim-sop">11.5 與 sim SOP 的關係</h3>
+<p>sim 版（<code>HT160S_AMR_ManualInject_Test_SOP_20260720.md</code>）用於筆電無硬體時驗協定；本現場版用於真機。兩者協定相同，差別在 273/274 由真 sensor（真機）還是硬回 true（sim）驅動。sim 的無限循環（注入 level latch 不自清）已於 <code>40a343d</code> 修正，真機本無此問題。</p>
+<hr />
+<p><em>本 SOP 對齊 IO_Table.csv（Enable 欄）與程式碼（aAuto1To6.cpp / aLoader.cpp / uAgvStation.cpp）撰寫；行為若與程式衝突以程式為準，Enable 狀態以現場實機為準。</em></p>
+</div>
+</body>
+</html>

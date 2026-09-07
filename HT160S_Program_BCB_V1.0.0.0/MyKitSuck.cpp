@@ -3,6 +3,7 @@
 #include <stdio.h>
 #pragma hdrstop
 
+#include "IncludeAllHeader.h"
 #include "MyKitSuck.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -41,6 +42,9 @@ __fastcall TMySucker::TMySucker()
     RealTimeRefreshVacuumOnOffTime=false;
     Item=SuckNullIC;
     pLed=NULL;
+    iGangCount=0;
+    for(int GangIndex=0; GangIndex<MAX_SUB_SUCKER_ITEM; GangIndex++)
+        pGang[GangIndex]=NULL;
     for(int Index=0; Index<20; Index++)
     {
         VacuumOnTimeBuffer[Index]=(DWORD)-1;
@@ -67,26 +71,93 @@ bool TMySucker::GetOffBit()
 //---------------------------------------------------------------------------
 bool TMySucker::GetStatus()
 {
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return true;
     return Sensor.IsOn();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-suck2-quad) 20260712 : gang sensor judgments. A member whose sensor row
+//is disabled is skipped, so a deliberately disabled circuit degrades the gang to the
+//remaining sensors instead of wedging pick/place.
+bool TMySucker::SensorAllOn()
+{
+    if(iGangCount>0)
+    {
+        for(int GangIndex=0; GangIndex<iGangCount; GangIndex++)
+            if(pGang[GangIndex]->Sensor.Enable==true && pGang[GangIndex]->Sensor.IsOn()==false)
+                return false;
+        return true;
+    }
+    return Sensor.IsOn();
+}
+//---------------------------------------------------------------------------
+bool TMySucker::SensorAnyOn()
+{
+    if(iGangCount>0)
+    {
+        for(int GangIndex=0; GangIndex<iGangCount; GangIndex++)
+            if(pGang[GangIndex]->Sensor.Enable==true && pGang[GangIndex]->Sensor.IsOn()==true)
+                return true;
+        return false;
+    }
+    return Sensor.IsOn();
+}
+//---------------------------------------------------------------------------
+bool TMySucker::GetStatusAllOn()
+{
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return true;
+    return SensorAllOn();
+}
+//---------------------------------------------------------------------------
+bool TMySucker::GetStatusAnyOn()
+{
+    if(HSys.LastSet.iRealDummy!=REALLY)
+        return true;
+    return SensorAnyOn();
 }
 //---------------------------------------------------------------------------
 void TMySucker::OnSuck()
 {
+    if(iGangCount>0)
+    {
+        for(int GangIndex=0; GangIndex<iGangCount; GangIndex++)
+            pGang[GangIndex]->OnSw.On();
+        return;
+    }
     OnSw.On();
 }
 //---------------------------------------------------------------------------
 void TMySucker::OffSuck()
 {
+    if(iGangCount>0)
+    {
+        for(int GangIndex=0; GangIndex<iGangCount; GangIndex++)
+            pGang[GangIndex]->OnSw.Off();
+        return;
+    }
     OnSw.Off();
 }
 //---------------------------------------------------------------------------
 void TMySucker::OnDestroy()
 {
+    if(iGangCount>0)
+    {
+        for(int GangIndex=0; GangIndex<iGangCount; GangIndex++)
+            pGang[GangIndex]->OffSw.On();
+        return;
+    }
     OffSw.On();
 }
 //---------------------------------------------------------------------------
 void TMySucker::OffDestroy()
 {
+    if(iGangCount>0)
+    {
+        for(int GangIndex=0; GangIndex<iGangCount; GangIndex++)
+            pGang[GangIndex]->OffSw.Off();
+        return;
+    }
     OffSw.Off();
 }
 //---------------------------------------------------------------------------
@@ -121,7 +192,7 @@ bool TMySucker::Suck()
     {
         On();
         Error=false;
-        if(Sensor.Enable==true && Sensor.IsOn()==false)
+        if(Sensor.Enable==true && SensorAllOn()==false && HSys.LastSet.iRealDummy==REALLY)
         {
             Delay.Clear();
             Delay.SetMS(OnAlarmTime);
@@ -139,7 +210,7 @@ bool TMySucker::Suck()
 
     if(Task==50)
     {
-        if(Sensor.IsOn())
+        if(SensorAllOn())
         {
             Delay.Clear();
             Delay.SetMS(OnDelayTime);
@@ -188,7 +259,7 @@ bool TMySucker::Destroy()
     {
         Off();
         Error=false;
-        if(Sensor.Enable==true && Sensor.IsOn()==true)
+        if(Sensor.Enable==true && SensorAnyOn()==true && HSys.LastSet.iRealDummy==REALLY)
         {
             Delay.Clear();
             Delay.SetMS(OffAlarmTime);
@@ -206,7 +277,7 @@ bool TMySucker::Destroy()
 
     if(Task==50)
     {
-        if(Sensor.IsOn()==false)
+        if(SensorAnyOn()==false)
         {
             Delay.Clear();
             Delay.SetMS(OffDelayTime);
@@ -251,14 +322,6 @@ void TMySucker::ResetSuckTask()
 void TMySucker::SetRetryCount(int Count)
 {
     (void)Count;
-}
-//---------------------------------------------------------------------------
-void TMySucker::CheckIsFallDown()
-{
-    if(Enable==false || Task>2)
-        return;
-    if(Sensor.IsOn()==false)
-        Normal();
 }
 //---------------------------------------------------------------------------
 void TMySucker::PushOnTime()

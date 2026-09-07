@@ -1,0 +1,13 @@
+正式區可驗證用內批 :
+1.	NQ7009YAA1
+2.	NQ7009CAA1
+3.	NQ70083AA1
+ 
+測式區可驗證用內批 :
+1.	NQ500BBAB1
+2.	NQ600I9AA1
+3.	NQ600IRAA1
+ 
+觸發WebService#11範例與先前提供相同 :
+正式區http://192.168.11.18:7825/api/GetBISummaryByLot?OSATLot=內批
+測試區http://192.168.11.18:7835/api/GetBISummaryByLot?OSATLot=內批

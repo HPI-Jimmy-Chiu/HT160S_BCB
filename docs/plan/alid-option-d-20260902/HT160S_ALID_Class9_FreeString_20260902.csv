@@ -1,0 +1,48 @@
+AlarmString,Class,Payload,OldALID,NewALID,Note
+MSuckZ_2_MotOverLimitErr,9,1441895,2001441895,901441895,runtime <MotorAlias>_MotOverLimitErr
+MEmptyY_MotOverLimitErr,9,3145418,3703145418,903145418,runtime <MotorAlias>_MotOverLimitErr
+Air Pressure Low,9,3364399,3603364399,903364399,
+MTrayArmX_MotOverLimitErr,9,5541040,2905541040,905541040,runtime <MotorAlias>_MotOverLimitErr
+Ion Fan Alarm,9,6795660,3106795660,906795660,
+MSuckZ_4_MotOverLimitErr,9,13093993,413093993,913093993,runtime <MotorAlias>_MotOverLimitErr
+MAutoY_1_MotOverLimitErr,9,19348512,2519348512,919348512,runtime <MotorAlias>_MotOverLimitErr
+MBottomCCDY_MotOverLimitErr,9,19554622,2919554622,919554622,runtime <MotorAlias>_MotOverLimitErr
+Loader 盤有 IC，請移除,9,23646915,3223646915,923646915,"UI-language dependent (ZH form, same alarm as 954803979)"
+SortArm SuckZ 1 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,9,23654317,1123654317,923654317,
+MAutoY_3_MotOverLimitErr,9,31000610,931000610,931000610,runtime <MotorAlias>_MotOverLimitErr
+SortArm SuckZ 4 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,9,33524810,3833524810,933524810,
+MAutoY_5_MotOverLimitErr,9,37620004,3637620004,937620004,runtime <MotorAlias>_MotOverLimitErr
+MLoaderY_1_MotOverLimitErr,9,43763836,743763836,943763836,runtime <MotorAlias>_MotOverLimitErr
+Safety Door Open,9,45115854,3445115854,945115854,
+SUC0001,9,45192866,3145192866,945192866,runtime sprintf SUC%03d%d
+SUC0002,9,45192867,3145192867,945192867,runtime sprintf SUC%03d%d
+SUC0003,9,45192868,3145192868,945192868,runtime sprintf SUC%03d%d
+SUC0011,9,45192897,3145192897,945192897,runtime sprintf SUC%03d%d
+SUC0012,9,45192898,3145192898,945192898,runtime sprintf SUC%03d%d
+SUC0013,9,45192899,3145192899,945192899,runtime sprintf SUC%03d%d
+SUC0021,9,45192928,3145192928,945192928,runtime sprintf SUC%03d%d
+SUC0022,9,45192929,3145192929,945192929,runtime sprintf SUC%03d%d
+SUC0023,9,45192930,3145192930,945192930,runtime sprintf SUC%03d%d
+SUC0031,9,45192959,3145192959,945192959,runtime sprintf SUC%03d%d
+SUC0032,9,45192960,3145192960,945192960,runtime sprintf SUC%03d%d
+SUC0033,9,45192961,3145192961,945192961,runtime sprintf SUC%03d%d
+MSuckZ_1_MotOverLimitErr,9,48132198,648132198,948132198,runtime <MotorAlias>_MotOverLimitErr
+MSuckZ_3_MotOverLimitErr,9,54751592,3354751592,954751592,runtime <MotorAlias>_MotOverLimitErr
+"Loader Tray has IC,please remove",9,54803979,2054803979,954803979,UI-language dependent (EN form)
+MColorY_MotOverLimitErr,9,59253364,3859253364,959253364,runtime <MotorAlias>_MotOverLimitErr
+MTopCCDX_Color_MotOverLimitErr,9,63157617,3363157617,963157617,runtime <MotorAlias>_MotOverLimitErr
+Motor Power Off,9,63283337,3763283337,963283337,
+TrayArm move blocked : the Z lift left its UP sensor. Check the TrayArmZ up cylinder / air pressure.,9,66462601,966462601,966462601,
+MPitchX_MotOverLimitErr,9,66833206,166833206,966833206,runtime <MotorAlias>_MotOverLimitErr
+SortArm SuckZ 3 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,9,66923115,66923115,966923115,
+MAutoY_2_MotOverLimitErr,9,72658209,3872658209,972658209,runtime <MotorAlias>_MotOverLimitErr
+MSortingArmX_MotOverLimitErr,9,79673604,1879673604,979673604,runtime <MotorAlias>_MotOverLimitErr
+Emergency Stop,9,83530353,1983530353,983530353,
+MAutoY_4_MotOverLimitErr,9,84310307,2284310307,984310307,runtime <MotorAlias>_MotOverLimitErr
+SnFKCleanOut,9,91410149,3891410149,991410149,
+SortArm SuckZ down did not complete within timeout. Check the suck-Z axis and MC88X1 card.,9,92930430,3992930430,992930430,
+SortArm SuckZ 2 down but Home sensor still ON : step loss / card busy / Home sensor fail. Re-home the suckers.,9,95288716,595288716,995288716,
+MTopCCDX_MotOverLimitErr,9,95631149,3495631149,995631149,runtime <MotorAlias>_MotOverLimitErr
+MAutoY_6_MotOverLimitErr,9,95962405,695962405,995962405,runtime <MotorAlias>_MotOverLimitErr
+MLoaderY_2_MotOverLimitErr,9,97073533,2097073533,997073533,runtime <MotorAlias>_MotOverLimitErr
+SortArm move blocked : a suck nozzle left its Home sensor (lost steps). Re-home the suckers.,9,99752848,2599752848,999752848,

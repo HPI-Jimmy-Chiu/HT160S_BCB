@@ -4,6 +4,7 @@
 
 #include "deviceinfo.h"
 #include "database.h"
+#include "cCsvDailyLog.h"    // cCsvDailyLog::CsvQuote for Production_Log fields
 #include <stdio.h>
 #include <FileCtrl.hpp>
 //---------------------------------------------------------------------------
@@ -37,6 +38,13 @@ void TDeviceInfo::Init()
     // Central log root constant (HSys.LogRootDir = "D:\\HT160S_Log")
     m_sBaseDir = HSys.LogRootDir + "\\Production_Log";
     ForceDirectories(m_sBaseDir);
+
+    //AI(ht160s-prodlog) 20260716 : ALSO open a per-DAY aggregate CSV so a full calendar
+    //day is one readable file (the per-lot file above is unchanged). Resolves to
+    //Production_Log/Daily/YYYY_MM/Production_YYYY_MM_DD.csv under HSys.LogRootDir. Same
+    //21-column header as the per-lot files (GetTitleLine). Retention set from ht160s.cpp.
+    m_dailyProd.InitLog("Production_Log\\Daily", "Production", GetTitleLine(),
+                        cCsvDailyLog::lgMonthlyFolder, ".csv");
 }
 
 //---------------------------------------------------------------------------
@@ -72,9 +80,21 @@ AnsiString TDeviceInfo::GetTitleLine()
     return "Start Time,Load_X,Load_Y,Load_Time,Tray_ID,"
            "Which Arm,Suck_X,Suck_Y,Which Auto,"
            "Bin,Output tray,Unload_X,Unload_Y,Unload_Time,Error log,"
-           "TraceCode,ErrorType";
+           "TraceCode,ErrorType,Lot,Code2D,Manual2D,PassFail";
 }
 
+//---------------------------------------------------------------------------
+//AI(ht160s-2dbin-import) 20260714 : RFC-4180 quote-if-needed for one
+//Production_Log field. A 2D code (Code2D/Manual2D) or free-text error may
+//contain a comma; quote it (doubling embedded ") so the comma cannot break the
+//column layout. Plain values stay bare so existing rows/consumers are
+//byte-identical. Mirrors cSoterOutput::CsvField. Production_Log is write-only.
+static AnsiString ProdCsvField(const AnsiString& s)
+{
+    if (s.Pos(",") > 0 || s.Pos("\"") > 0 || s.Pos("\n") > 0 || s.Pos("\r") > 0)
+        return cCsvDailyLog::CsvQuote(s);
+    return s;
+}
 //---------------------------------------------------------------------------
 AnsiString TDeviceInfo::GetDataLine(int iNozzle)
 {
@@ -86,7 +106,7 @@ AnsiString TDeviceInfo::GetDataLine(int iNozzle)
     {
         if (i > 0)
             sLine += ",";
-        sLine += m_records[iNozzle].sField[i];
+        sLine += ProdCsvField(m_records[iNozzle].sField[i]);
     }
     return sLine;
 }
@@ -154,6 +174,19 @@ void TDeviceInfo::AddInputInfo(int iNozzle, int iRow, int iCol,
 }
 
 //---------------------------------------------------------------------------
+void TDeviceInfo::AddIcIdentity(int iNozzle, const AnsiString& sLotID,
+                                const AnsiString& sCode2D, bool bManual2D)
+{
+    if (iNozzle < 0 || iNozzle >= 4)
+        return;
+    if (!m_records[iNozzle].bActive)
+        return;
+    m_records[iNozzle].sField[eLotID]  = sLotID;
+    m_records[iNozzle].sField[e2DCode] = sCode2D;
+    m_records[iNozzle].sField[eManual2D] = bManual2D ? "1" : "";
+}
+
+//---------------------------------------------------------------------------
 void TDeviceInfo::AddBinInfo(int iNozzle, int iBinIndex, int iGradeCode)
 {
     if (iNozzle < 0 || iNozzle >= 4)
@@ -173,6 +206,15 @@ void TDeviceInfo::AddBinInfo(int iNozzle, int iBinIndex, int iGradeCode)
     }
 }
 
+//---------------------------------------------------------------------------
+void TDeviceInfo::AddPassFail(int iNozzle, const AnsiString& sPassFail)
+{
+    if (iNozzle < 0 || iNozzle >= 4)
+        return;
+    if (!m_records[iNozzle].bActive)
+        return;
+    m_records[iNozzle].sField[ePassFail] = sPassFail;
+}
 //---------------------------------------------------------------------------
 // iTraceCode: 0 = no trace (normal); 999~1099 = trace code; mapped to ErrorType label.
 void TDeviceInfo::AddTraceInfo(int iNozzle, int iTraceCode)
@@ -198,6 +240,8 @@ void TDeviceInfo::AddTraceInfo(int iNozzle, int iTraceCode)
         case 1001: sLabel = "2DMapMissing";  break;
         case 1002: sLabel = "ParseFail";     break;
         case 1003: sLabel = "SortFail";      break;
+        case 1004: sLabel = "PFOverflow";    break;   //AI(ht160s-lotpassfail) 20260709 : PASS/FAIL product forced to Error Auto (all non-Error Autos taken)
+        case 1005: sLabel = "NotWhitelisted";break;   //AI(ht160s-whitelist) 20260716 : 2D read OK but code not in WhiteList.json (WhiteList sort mode)
         default:   sLabel = "TraceCode_" + IntToStr(iTraceCode); break;
     }
     m_records[iNozzle].sField[eErrorType] = sLabel;
@@ -220,8 +264,13 @@ void TDeviceInfo::AddOutputInfo(int iNozzle, const AnsiString& sAutoName,
     m_records[iNozzle].sField[eUnloadY]     = IntToStr(iRow);
     m_records[iNozzle].sField[eUnloadTime]  = NowTimeStr();
 
+    //AI(ht160s-prodlog) 20260716 : build the row ONCE and write it to BOTH the per-lot
+    //file and the per-DAY aggregate so the two stay byte-identical (m_records is not
+    //locked between the two appends).
     AnsiString sPath = GetLogFilePath();
-    AppendLine(sPath, GetDataLine(iNozzle));
+    AnsiString sLine = GetDataLine(iNozzle);
+    AppendLine(sPath, sLine);
+    m_dailyProd.AppendLine(sLine);
 }
 
 //---------------------------------------------------------------------------
@@ -239,8 +288,11 @@ void TDeviceInfo::SaveRejectRecord(int iNozzle, const AnsiString& sError)
     m_records[iNozzle].sField[eUnloadTime]  = NowTimeStr();
     m_records[iNozzle].sField[eErrorCode]   = sError;
 
+    //AI(ht160s-prodlog) 20260716 : build the row ONCE; write to per-lot + per-DAY (see AddOutputInfo).
     AnsiString sPath = GetLogFilePath();
-    AppendLine(sPath, GetDataLine(iNozzle));
+    AnsiString sLine = GetDataLine(iNozzle);
+    AppendLine(sPath, sLine);
+    m_dailyProd.AppendLine(sLine);
 }
 
 //---------------------------------------------------------------------------
@@ -248,5 +300,14 @@ void TDeviceInfo::ClearBatch()
 {
     for (int i = 0; i < 4; ++i)
         m_records[i].Clear();
+}
+
+//---------------------------------------------------------------------------
+//AI(ht160s-prodlog) 20260716 : set the per-day aggregate log retention. Called from the
+//ht160s.cpp boot block (same place as the other channels SetRetentionDays), so deviceinfo
+//need not depend on GeneralSetting. 0 = keep forever.
+void TDeviceInfo::SetDailyRetentionDays(int nDays)
+{
+    m_dailyProd.SetRetentionDays(nDays);
 }
 //---------------------------------------------------------------------------

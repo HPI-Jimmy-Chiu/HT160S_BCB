@@ -1,10 +1,10 @@
 object fSetup: TfSetup
-  Left = 242
-  Top = 56
+  Left = 234
+  Top = 3
   BorderStyle = bsSingle
   Caption = 'Product Setup'
-  ClientHeight = 939
-  ClientWidth = 1507
+  ClientHeight = 834
+  ClientWidth = 1198
   Color = 11250603
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,10 +18,10 @@ object fSetup: TfSetup
   PixelsPerInch = 96
   TextHeight = 13
   object pnlMenu: TPanel
-    Left = 1311
+    Left = 1002
     Top = 0
     Width = 196
-    Height = 939
+    Height = 834
     Align = alRight
     BevelOuter = bvNone
     Color = 12761254
@@ -74,9 +74,25 @@ object fSetup: TfSetup
       ParentFont = False
       OnClick = spbSetupMenuClick
     end
+    object spbSetupPnP: TSpeedButton
+      Left = 8
+      Top = 176
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'PnP'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbSetupMenuClick
+    end
     object spbSetupExit: TSpeedButton
       Left = 8
-      Top = 812
+      Top = 372
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -94,15 +110,15 @@ object fSetup: TfSetup
   object pnlClient: TPanel
     Left = 0
     Top = 0
-    Width = 1311
-    Height = 939
+    Width = 1002
+    Height = 834
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 1
     object pnlTitle: TPanel
       Left = 0
       Top = 0
-      Width = 1311
+      Width = 1002
       Height = 44
       Align = alTop
       Caption = 'Recipe'
@@ -118,8 +134,8 @@ object fSetup: TfSetup
     object pcSetup: TPageControl
       Left = 0
       Top = 44
-      Width = 1311
-      Height = 895
+      Width = 1002
+      Height = 790
       ActivePage = tsSetupBinSetting
       Align = alClient
       TabIndex = 2
@@ -130,7 +146,7 @@ object fSetup: TfSetup
         object pnlRecipeHeader: TPanel
           Left = 0
           Top = 0
-          Width = 1303
+          Width = 994
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -147,8 +163,8 @@ object fSetup: TfSetup
         object pnlRecipeBody: TPanel
           Left = 0
           Top = 31
-          Width = 1303
-          Height = 836
+          Width = 994
+          Height = 731
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -469,7 +485,7 @@ object fSetup: TfSetup
         object pnlTrayHeader: TPanel
           Left = 0
           Top = 0
-          Width = 1303
+          Width = 994
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -486,8 +502,8 @@ object fSetup: TfSetup
         object pnlTrayBody: TPanel
           Left = 0
           Top = 31
-          Width = 1303
-          Height = 836
+          Width = 994
+          Height = 731
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -13788,7 +13804,7 @@ object fSetup: TfSetup
         object pnlBinHeader: TPanel
           Left = 0
           Top = 0
-          Width = 1303
+          Width = 994
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -13805,8 +13821,8 @@ object fSetup: TfSetup
         object pnlBinBody: TPanel
           Left = 0
           Top = 31
-          Width = 1303
-          Height = 836
+          Width = 994
+          Height = 731
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -13998,7 +14014,7 @@ object fSetup: TfSetup
             end
             object spbBinLoadMap: TSpeedButton
               Left = 16
-              Top = 178
+              Top = 202
               Width = 116
               Height = 30
               Caption = 'Load Current'
@@ -14006,7 +14022,7 @@ object fSetup: TfSetup
             end
             object spbBinSaveMap: TSpeedButton
               Left = 148
-              Top = 178
+              Top = 202
               Width = 116
               Height = 30
               Caption = 'Save Map'
@@ -14014,7 +14030,7 @@ object fSetup: TfSetup
             end
             object spbBinValidate: TSpeedButton
               Left = 16
-              Top = 218
+              Top = 242
               Width = 116
               Height = 30
               Caption = 'Validate'
@@ -14022,7 +14038,7 @@ object fSetup: TfSetup
             end
             object spbBinClear: TSpeedButton
               Left = 148
-              Top = 218
+              Top = 242
               Width = 116
               Height = 30
               Caption = 'Clear All'
@@ -14030,7 +14046,7 @@ object fSetup: TfSetup
             end
             object spbBinDefault: TSpeedButton
               Left = 16
-              Top = 258
+              Top = 282
               Width = 116
               Height = 30
               Caption = 'Default 1-6'
@@ -14053,6 +14069,236 @@ object fSetup: TfSetup
                 'Auto5'
                 'Auto6')
             end
+          end
+        end
+      end
+      object tsSetupPnP: TTabSheet
+        Caption = 'PnP'
+        object pnlPnpHeader: TPanel
+          Left = 0
+          Top = 0
+          Width = 994
+          Height = 31
+          Align = alTop
+          BevelInner = bvLowered
+          Caption = 'Needle and PnP setting'
+          Color = clTeal
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWhite
+          Font.Height = -16
+          Font.Name = 'MS Sans Serif'
+          Font.Style = []
+          ParentFont = False
+          TabOrder = 0
+        end
+        object pnlPnpBody: TPanel
+          Left = 0
+          Top = 31
+          Width = 994
+          Height = 731
+          Align = alClient
+          BevelInner = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblPnpPickDelay: TLabel
+            Left = 32
+            Top = 56
+            Width = 146
+            Height = 16
+            Caption = 'Arm Pick Delay Time'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblPnpPickDelayUnit: TLabel
+            Left = 270
+            Top = 56
+            Width = 24
+            Height = 16
+            Caption = 'Sec'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblPnpPlaceDelay: TLabel
+            Left = 32
+            Top = 96
+            Width = 156
+            Height = 16
+            Caption = 'Arm Place Delay Time'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblPnpPlaceDelayUnit: TLabel
+            Left = 270
+            Top = 96
+            Width = 24
+            Height = 16
+            Caption = 'Sec'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblPnpDestroyCheckTime: TLabel
+            Left = 32
+            Top = 136
+            Width = 141
+            Height = 16
+            Caption = 'Destroy Check Time'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblPnpDestroyCheckTimeUnit: TLabel
+            Left = 270
+            Top = 136
+            Width = 24
+            Height = 16
+            Caption = 'Sec'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblSuckEnableTitle: TLabel
+            Left = 420
+            Top = 56
+            Width = 213
+            Height = 16
+            Caption = 'Sucker Enable (green = in use)'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblSortArmPickRetry: TLabel
+            Left = 420
+            Top = 216
+            Width = 115
+            Height = 16
+            Caption = 'Pick Retry Count'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -15
+            Font.Name = 'MS Sans Serif'
+            Font.Style = [fsBold]
+            ParentFont = False
+          end
+          object lblSortArmPickRetryHint: TLabel
+            Left = 420
+            Top = 244
+            Width = 250
+            Height = 16
+            Caption = '(retries after 1st fail; 0 = alarm immediately)'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object edPnpPickDelay: TEdit
+            Left = 200
+            Top = 53
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 0
+            Text = '0'
+          end
+          object edPnpPlaceDelay: TEdit
+            Left = 200
+            Top = 93
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 1
+            Text = '0'
+          end
+          object edtDestroyCheckTime: TEdit
+            Left = 200
+            Top = 133
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 2
+            Text = '0.3'
+          end
+          object rgPnpUseSuck: TRadioGroup
+            Left = 32
+            Top = 184
+            Width = 305
+            Height = 57
+            Caption = 'Use Suck'
+            Columns = 2
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ItemIndex = 0
+            Items.Strings = (
+              'Use All'
+              'Use Select')
+            ParentFont = False
+            TabOrder = 3
+          end
+          object grdSuckEnable: TTMyTray
+            Left = 420
+            Top = 88
+            Width = 440
+            Height = 110
+            XItem = 4
+            YItem = 1
+          end
+          object edSortArmPickRetry: TEdit
+            Left = 600
+            Top = 213
+            Width = 60
+            Height = 24
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clBlack
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+            TabOrder = 4
+            Text = '3'
           end
         end
       end

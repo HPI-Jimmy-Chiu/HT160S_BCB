@@ -77,6 +77,9 @@ void HTGem::Dispatch(int S, int F)
         case 3:  S1F4_SelectedStatusReply();         return;
         case 11: S1F12_StatusVariableNamelistReply();return;//AI(ht160s-secsgem) 20260611 : SV namelist
         case 13: S1F14_ConnectRequestAcknowledge();  return;
+        case 15: S1F16_OFFLINEAcknowledge();         return;//AI(secs-offline) 20260727 : S1F15 Request OFF-LINE -> S1F16 OFLACK
+        case 17: S1F18_ONLINEAcknowledge();          return;//AI(secs-online) 20260724 : S1F17 Request ONLINE -> S1F18 ONLACK
+        case 23: S1F24_CollectionEventNamelist();    return;//AI(secs-namelist) 20260730 : S1F23 Collection Event Namelist Request -> S1F24
         }
         break;
     case 2:
@@ -88,6 +91,10 @@ void HTGem::Dispatch(int S, int F)
         case 41: S2F42_Host_Command_Acknowledge();   return;
         case 13: S2F14_EquipmentConstanData();       return;
         case 15: S2F16_NewEquipmentConstantSendAcknowledge(); return;//AI(ht160s-secsgem) 20260611 : EC write
+        case 29: S2F30_EquipmentConstantNamelistReply();      return;//AI(secs-namelist) 20260730 : S2F29 EC Namelist Request -> S2F30
+        case 33: S2F34_DefineReportAcknowledge();             return;//AI(secs-reportdef) 20260724 : Define Report
+        case 35: S2F36_LinkEventReportAcknowledge();          return;//AI(secs-reportdef) 20260724 : Link Event Report
+        case 37: S2F38_EnableDisableEventReportAcknowledge(); return;//AI(secs-reportdef) 20260724 : Enable/Disable Event
         }
         break;
     case 5:
@@ -95,6 +102,19 @@ void HTGem::Dispatch(int S, int F)
         {
         case 3: S5F4_EnableDisableAlarmAcknowledge(); return;
         case 5: S5F6_ListAlarmData();                 return;
+        case 7: S5F8_ListEnableAlarmAcknowledge();    return;
+        }
+        break;
+    //AI(secs-msggap) 20260728 : S6F15 Event Report Request / S6F19 Individual Report Request.
+    //Both were unhandled -> fell through to S9F3_Unrecognized (log line only, ZERO bytes on
+    //the wire) -> host T3 timeout. S6F17 / S6F23 stay deliberately unhandled: the KYEC host
+    //has never sent them, and with only F15/F19 listed here they keep falling through to the
+    //same S9F3 log they hit today, so this case adds no behaviour for them.
+    case 6:
+        switch(F)
+        {
+        case 15: S6F16_EventReportData();       return;
+        case 19: S6F20_IndividualReportData();  return;
         }
         break;
     case 7:
@@ -107,6 +127,10 @@ void HTGem::Dispatch(int S, int F)
         case 19: S7F20_CurrentEPPDData();                  return;
         }
         break;
+    //AI(secs-msggap) 20260728 : S10F3/S10F5 already dispatched here BEFORE this patch, but
+    //landed on the base SendUnsupported stubs, which only StringOut and transmit nothing -
+    //that is why the host T3s on stream 10 even though the case exists. Fixed by the
+    //HT160Gem overrides, not here; this case is unchanged.
     case 10:
         switch(F)
         {
@@ -116,6 +140,15 @@ void HTGem::Dispatch(int S, int F)
         break;
     case 14:
         if(F==1) { ProcessS14F1_GetAttrRequest(""); return; }
+        break;
+    //AI(secs-msggap) 20260728 : S125F1 Enable/Disable EC Data Send (KYEC private stream).
+    //Was unhandled -> S9F3 log only -> host T3. Exactly ONE S125F2 is sent per request.
+    //HT9045 sends one ack PER ECID inside its parse loop, so the KYEC captures show 46
+    //secondaries for 2 primaries per session (3 x (1 + 45) = 138 vs 6). Because
+    //InitLocalHead reuses the request SystemByte for every even Function, those 45 replies
+    //all carry the SAME transaction id - a protocol defect, not a feature. Not ported.
+    case 125:
+        if(F==1) { S125F2_EnableDisableECDataAcknowledge(); return; }
         break;
     }
     // Unhandled primary message -> report unrecognized S/F.
@@ -133,6 +166,18 @@ void HTGem::SendUnsupported(AnsiString FunctionName)
 void HTGem::RefreshSVData(){ }
 //AI(ht160s-secsgem) 20260612 : base no-op; HT160Gem overrides to drive the main-screen SECS badge.
 void HTGem::RefreshSecsBadge(){ }
+//AI(ht160s-agv) 20260615 : base no-op; HT160Gem overrides to drive the AGV coordinator.
+void HTGem::ServiceAgv(){ }
+void HTGem::PollGemControlState(){ }   //AI(secs-controlstate) 20260803
+//AI(secs-e30-gate) 20260803 : base no-ops so the machine UI can call through an HTGem*.
+void HTGem::OperatorSetControlState(int /*iGemStdState*/){ }
+int  HTGem::GetControlState(){ return 0; }
+AnsiString HTGem::DescribeControlState(){ return AnsiString(""); }
+//AI(secs-kyec-rcmd4-fix) 20260728 : base no-op; HT160Gem overrides to release latched host state.
+void HTGem::OnCommunicationLost(){ }
+//AI(secs-lotstarttime) 20260730 : base no-op; HT160Gem overrides to latch SVID 1009.
+void HTGem::NoteLotStartTime(bool /*bStarted*/, AnsiString /*sWhen*/){ }
+void HTGem::ReportSkipICCount(int /*iCount*/){ }   //AI(secs-skipiccount) 20260802
 void HTGem::AddSV(){ }
 void HTGem::AddEC(){ }
 void HTGem::AddAlarmList(){ }

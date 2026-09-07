@@ -11,6 +11,7 @@
 
 #include "TopCcdSocket.h"
 #include "database.h"
+#include "GeneralSetting.h"   //AI(ht160s-ccd-2dsanitize) 20260807 : SanitizeScanned2D at the read source
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -40,6 +41,8 @@ __fastcall THT160TopCcdSocket::THT160TopCcdSocket()
     sLastError     = "";
     sCcdAddress    = DEFAULT_TOPCCD_ADDRESS;
     iCcdPort       = DEFAULT_TOPCCD_PORT;
+    bWantConnected = false;
+    iLastReconnectTick = 0;
 }
 //---------------------------------------------------------------------------
 __fastcall THT160TopCcdSocket::~THT160TopCcdSocket()
@@ -118,6 +121,9 @@ void __fastcall THT160TopCcdSocket::CloseSocket()
 //---------------------------------------------------------------------------
 bool __fastcall THT160TopCcdSocket::TopCcdConnect()
 {
+    //AI(HT160S-Maintainer) 20260612 : align HT172 (GAP E) - remember that a
+    //connection is wanted so TopCcdPoll can auto-reconnect if the link drops.
+    bWantConnected = true;
     if(iState == TOPCCD_CONNECTED || iState == TOPCCD_CONNECTING)
         return true;
 
@@ -163,6 +169,7 @@ bool __fastcall THT160TopCcdSocket::TopCcdConnect()
 //---------------------------------------------------------------------------
 void __fastcall THT160TopCcdSocket::TopCcdDisconnect()
 {
+    bWantConnected = false;   //AI(HT160S-Maintainer) 20260612 : stop auto-reconnect
     CloseSocket();
 }
 //---------------------------------------------------------------------------
@@ -213,14 +220,30 @@ void __fastcall THT160TopCcdSocket::PollReceive()
         Buffer[ReceiveLength] = '\0';
         sRecvBuffer += AnsiString(Buffer);
 
-        AnsiString sTrimmed = sRecvBuffer.Trim();
-        if(sTrimmed != "")
+        //AI(HT160S-Maintainer) 20260612 : align HT172 (GAP D) - only treat the
+        //reply as a complete 2D code once a line terminator (CR or LF) arrives,
+        //so a TCP-fragmented reply is not mistaken for a truncated code. Strip
+        //CR/LF like HT172 Barcode.cpp; keep any bytes after the terminator.
+        int iPos = sRecvBuffer.Pos("\n");
+        if(iPos == 0)
+            iPos = sRecvBuffer.Pos("\r");
+        if(iPos > 0)
         {
-            sTopCcd2D       = sTrimmed;
-            bTopCcdReadDone = true;
-            SaveTopCcd2DLog(sTopCcd2D);
+            AnsiString sLine = sRecvBuffer.SubString(1, iPos);
+            sLine = StringReplace(sLine, "\r", "", TReplaceFlags() << rfReplaceAll);
+            sLine = StringReplace(sLine, "\n", "", TReplaceFlags() << rfReplaceAll);
+            sLine = sLine.Trim();
+            sRecvBuffer = sRecvBuffer.SubString(iPos + 1, sRecvBuffer.Length());
+            if(sLine != "")
+            {
+                //AI(ht160s-ccd-2dsanitize) 20260807 : comma -> underscore at the read
+                //source (no-op unless GeneralSetting.bCcd2DCommaToUnderscore). The log
+                //below records the sanitized form - the form every consumer will see.
+                sTopCcd2D       = GeneralSetting.SanitizeScanned2D(sLine);
+                bTopCcdReadDone = true;
+                SaveTopCcd2DLog(sTopCcd2D);
+            }
         }
-        sRecvBuffer = "";
         return;
     }
 
@@ -244,6 +267,18 @@ void __fastcall THT160TopCcdSocket::TopCcdPoll()
         PollConnecting();
     if(iState == TOPCCD_CONNECTED)
         PollReceive();
+
+    //AI(HT160S-Maintainer) 20260612 : align HT172 TimerCCDConnect (GAP E) - if a
+    //connection is desired but the link is down, re-attempt at most every 2 s.
+    if(bWantConnected && iState == TOPCCD_IDLE)
+    {
+        unsigned long Tick = GetTickCount();
+        if(Tick - iLastReconnectTick > 2000)
+        {
+            iLastReconnectTick = Tick;
+            TopCcdConnect();
+        }
+    }
 }
 //---------------------------------------------------------------------------
 bool __fastcall THT160TopCcdSocket::IsTopCcdConnected()
@@ -279,12 +314,36 @@ void __fastcall THT160TopCcdSocket::SendTopCcdCmd(AnsiString sData)
     }
 }
 //---------------------------------------------------------------------------
+void __fastcall THT160TopCcdSocket::DrainSocketInput()
+{
+    //AI(HT160S-Maintainer) 20260612 : align HT172 FSM_PhotoInit (GAP D) - discard
+    //any stale bytes left in the OS socket buffer before a new shot, so the next
+    //read cannot return a code from the previous scan.
+    if(sckTopCcd == INVALID_SOCKET)
+        return;
+    char Buffer[1025];
+    for(;;)
+    {
+        int ReceiveLength = recv(sckTopCcd, Buffer, 1024, 0);
+        if(ReceiveLength <= 0)
+            break;
+    }
+}
+//---------------------------------------------------------------------------
 void __fastcall THT160TopCcdSocket::TopCcdTriggerShot()
 {
     bTopCcdReadDone = false;
     sTopCcd2D       = "";
     sRecvBuffer     = "";
-    SendTopCcdCmd("LON");
+    DrainSocketInput();
+    SendTopCcdCmd("LON\r\n");   //AI(HT160S-Maintainer) 20260612 : align HT172 - CRLF terminator (GAP B)
+}
+//---------------------------------------------------------------------------
+void __fastcall THT160TopCcdSocket::TopCcdEndShot()
+{
+    //AI(HT160S-Maintainer) 20260612 : align HT172 FSM_PhotoFinish (GAP C) - send
+    //LOFF to end the shot / lamp off after the code is read or on timeout.
+    SendTopCcdCmd("LOFF\r\n");
 }
 //---------------------------------------------------------------------------
 bool __fastcall THT160TopCcdSocket::TopCcdGetResult(AnsiString &sCode)

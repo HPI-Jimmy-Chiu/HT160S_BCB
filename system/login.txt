@@ -1,0 +1,3 @@
+# HT160S User Account Book - one account per line
+# format: ID,Password,Level  (Level 0=Operation 1=Supervisor 2=Engineer 3=Honprec)
+Honprec,27025312,3

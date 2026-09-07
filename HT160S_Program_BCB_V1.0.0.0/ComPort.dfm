@@ -1,7 +1,7 @@
 object fComPort: TfComPort
   Left = 601
   Top = 232
-  Width = 700
+  Width = 780
   Height = 430
   Caption = 'COM Port'
   Color = 12761254
@@ -134,6 +134,28 @@ object fComPort: TfComPort
       Caption = 'Clear Log'
       TabOrder = 4
       OnClick = btnClearMemoClick
+    end
+    object labPadBaud: TLabel
+      Left = 545
+      Top = 22
+      Width = 36
+      Height = 16
+      Caption = 'Baud'
+    end
+    object cbPadBaud: TComboBox
+      Left = 590
+      Top = 18
+      Width = 95
+      Height = 24
+      ItemHeight = 16
+      TabOrder = 5
+      Text = '115200'
+      Items.Strings = (
+        '9600'
+        '19200'
+        '38400'
+        '57600'
+        '115200')
     end
   end
   object pnlManual: TPanel

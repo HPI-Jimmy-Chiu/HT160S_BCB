@@ -49,6 +49,9 @@ typedef struct
     int TrayXArmToLoaderXPosition;
     int TrayXArmToColorXPosition;       //AI(HT160S-Maintainer) 20260605 : AMR identity-tray pickup at Color station
     int ColorRead2DXPosition;           //AI(HT160S-Maintainer) 20260608 : Color 2D CCD reader X (on stepper, like Loader Top CCD)
+    int ColorRead2DYPosition;           //AI(ht160s-color-3pos) 20260626 : Color carriage Y (MIDDLE) for the 2D CCD scan (was mislabeled "front")
+    int ColorTrayArmPickYPosition;      //AI(HT160S-Maintainer) 20260622 : Color carriage Y (rear) for TrayArm pickup
+    int ColorReceiveTrayYPosition;      //AI(ht160s-color-3pos) 20260626 : Color carriage Y (FRONT) to receive a tray from the destacker (Empty-feed analog)
     int TrayXArmToAuto1XPosition;
     int TrayXArmToAuto2XPosition;
     int TrayXArmToAuto3XPosition;
@@ -66,7 +69,6 @@ typedef struct
     int Loader2CarFirstSortYPosition;
 
     int LoaderCarFirstCCDXPosition;
-    int LoaderCarLastCCDXPosition;
 
     int SortArmToLoader1XPosition;
     int SortArmToLoader2XPosition;
@@ -200,13 +202,13 @@ __published:
     TEdit *edTarget;
     TEdit *edNowPos;
     TEdit *edEncoder;
+    TScrollBar *scbTeachSpeed;
     TListBox *lstMotors;
     TButton *btnSetTeach;
     TButton *btnGoTeach;
     TButton *btnSave;
     TButton *btnReload;
     TButton *btnIOForm;
-    TButton *btnClose;
     TButton *btnMotorSet;
     TButton *btnJogP;
     TButton *btnJogN;
@@ -217,72 +219,69 @@ __published:
     TButton *btnStop;
     TButton *btnRefresh;
     TTimer *tmrUpdate;
+    TTabSheet *tsAdvanced;
+    TPageControl *pgcAdvanced;
+    TTabSheet *tsSortArm;
+    TGroupBox *gbSortArmPickPlace;
+    TLabel *lbSuckUse;
+    TLabel *lbToArea;
+    TLabel *lbSaCol;
+    TLabel *lbSaRow;
+    TLabel *lblSaStatus;
+    TComboBox *cbSuckUse;
+    TComboBox *cbToArea;
+    TEdit *edSaCol;
+    TEdit *edSaRow;
+    TCheckBox *chkSaZDown;
+    TButton *btnSaGo;
+    TButton *btnSaAllZUp;
+    TTabSheet *tsChannel;
+    TGroupBox *gbCarGoUpGoDonw;
+    TLabel *lbCarArea;
+    TLabel *lbCarLoopTimes;
+    TLabel *lblCarStatus;
+    TComboBox *cbCarArea;
+    TCheckBox *chkCarLoop;
+    TEdit *edLoopTimes;
+    TButton *btnCarGo;
+    TGroupBox *gbAutoGoUp;
+    TLabel *lbAutoArea;
+    TLabel *lblAutoStatus;
+    TComboBox *cbAutoArea;
+    TButton *btnAutoGoUp;
+    TTabSheet *tsTrayArm;
+    TLabel *lblTaStatus;
+    TGroupBox *gbTaGrab;
+    TLabel *lbTaGrab;
+    TComboBox *cbTaGrabChannel;
+    TButton *btnTaGrab;
+    TGroupBox *gbTaPlace;
+    TLabel *lbTaPlace;
+    TComboBox *cbTaPlaceChannel;
+    TButton *btnTaPlace;
+    TTabSheet *tsCCD;
+    TLabel *lblCcdStatus;
+    TGroupBox *gbCcd;
+    TLabel *lbCcdChannel;
+    TComboBox *cbCcdChannel;
+    TLabel *lbCcdCol;
+    TLabel *lbCcdRow;
+    TEdit *edCcdCol;
+    TEdit *edCcdRow;
+    TButton *btnCcdGo;
+    TGroupBox *gbColorCcd;
+    TButton *btnColorCcdGo;
+    TLabel *lblColorCcdStatus;
 
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
-    void __fastcall btnCloseClick(TObject *Sender);
-private:
-    bool bUIBuilt;
-    bool bTeachReady;
-    bool bSelectingTeachItem;
-    bool bHomeRunning;
-    int ActiveMotorIndex;
-    int iHomeMotorIndex;
-    int SelectedTeachIndex;
-
-    TLabel *lblStatus[iMotLedTotalCnt];
-    TALed *ledStatus[iMotLedTotalCnt];
-
-    TECH_PARA TechPara[MAX_TEACH_ITEM];
-    int TECH_MAX_ITEM;
-
-    void BuildUI();
-    void BindDfmComponents();
-    void BuildClientPanel();
-    void BuildMotorPanel();
-    TTabSheet *CreateTeachTab(AnsiString Caption);
-    TStringGrid *CreateTeachGrid(TWinControl *Parent);
-    void ConfigureTeachGrid(TStringGrid *Grid);
-    TLabel *CreateLabel(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Caption);
-    TEdit *CreateEdit(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Text, bool ReadOnly);
-    TButton *CreateButton(TWinControl *Parent, int Left, int Top, int Width, int Height, AnsiString Caption, TNotifyEvent OnClick);
-    void ResetTeachGrid(TStringGrid *Grid);
-    void AddTeachItem(TStringGrid *Grid, AnsiString GroupName, AnsiString Caption, TTrayMotor *Motor, int *iPara);
-    int FindTeachItem(TStringGrid *Grid, int Row);
-    void SelectTeachItem(int Index);
-    void RefreshTeachGrids();
-    void RefreshTeachGrid(TStringGrid *Grid);
-    void RefreshTeachRow(int Index);
-    void FillMotorList();
-    void SetActiveMotor(int Index);
-    TTrayMotor *GetMotor(int Index);
-    TTrayMotor *GetActiveMotor();
-    int GetEditInt(TEdit *Edit, int DefaultValue);
-    AnsiString GetTeachFileName();
-    AnsiString GetWorkFileTeachName(AnsiString RootPath);
-    AnsiString FindTeachFileName();
-    AnsiString GetTeachKey(int Index);
-    int ParsePositionText(AnsiString Text);
-    AnsiString FormatPositionText(int Value);
-    AnsiString GetMotorCaption(int Index);
-    AnsiString GetSoftLimitCaption(TTrayMotor *Motor);
-    void UpdateMotorMonitor();
-    void UpdateStatusLed(int LedIndex, bool Value);
-    void StartJog(bool bPositive);
-    void StepMove(bool bPositive);
-    void MoveActiveMotorToTarget();
-    void MoveSelectedTeach();
-    void SetSelectedTeachFromNow();
-    void StopActiveMotor();
-    void SetMessage(AnsiString Text);
-    bool CheckSortArmZHome();
-    bool CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target);
-
     void __fastcall tmrUpdateTimer(TObject *Sender);
     void __fastcall grdTeachSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect);
     void __fastcall grdTeachDblClick(TObject *Sender);
     void __fastcall lstMotorsClick(TObject *Sender);
+    void __fastcall scbTeachSpeedScroll(TObject *Sender, TScrollCode ScrollCode, int &ScrollPos);
+    void __fastcall edSpeedChange(TObject *Sender);
     void __fastcall btnSetTeachClick(TObject *Sender);
     void __fastcall btnGoTeachClick(TObject *Sender);
     void __fastcall btnSaveClick(TObject *Sender);
@@ -297,6 +296,139 @@ private:
     void __fastcall btnHomeClick(TObject *Sender);
     void __fastcall btnStopClick(TObject *Sender);
     void __fastcall btnRefreshClick(TObject *Sender);
+    void __fastcall btnSaGoClick(TObject *Sender);
+    void __fastcall btnSaAllZUpClick(TObject *Sender);
+    void __fastcall btnCarGoClick(TObject *Sender);
+    void __fastcall btnAutoGoUpClick(TObject *Sender);
+    void __fastcall btnTaGrabClick(TObject *Sender);
+    void __fastcall btnTaPlaceClick(TObject *Sender);
+    void __fastcall btnCcdGoClick(TObject *Sender);
+    void __fastcall btnColorCcdGoClick(TObject *Sender);
+    void __fastcall edCcdColClick(TObject *Sender);
+    void __fastcall edCcdRowClick(TObject *Sender);
+    void __fastcall edSaColClick(TObject *Sender);
+    void __fastcall edSaRowClick(TObject *Sender);
+private:
+    bool bUIBuilt;
+    bool bTeachReady;
+    bool bSelectingTeachItem;
+    bool bHomeRunning;
+    int ActiveMotorIndex;
+    int iHomeMotorIndex;
+    int SelectedTeachIndex;
+
+    bool bSaTestRunning;
+    int iSaTask;
+    int iSaSlot;
+    int iSaTarget;
+    int iSaCol;
+    int iSaRow;
+    bool bSaZDown;
+    bool bSaZRecovering;
+    bool bSaAllZUpRunning;
+
+    bool bCarTestRunning;
+    int iCarArea;
+    int iCarPhase;
+    bool bCarLoop;
+    int iCarLoopTarget;
+    int iCarLoopDone;
+    bool bAutoTestRunning;
+    int iAutoIndex;
+
+    bool bTaTestRunning;
+    int iTaTask;
+    int iTaChannel;
+    bool bTaIsGrab;
+
+    bool bCcdTestRunning;
+    int iCcdTask;
+    int iCcdLoaderNo;
+    int iCcdCol;
+    int iCcdRow;
+
+    bool bColorCcdTestRunning;
+
+    TLabel *lblStatus[iMotLedTotalCnt];
+    TALed *ledStatus[iMotLedTotalCnt];
+
+    TECH_PARA TechPara[MAX_TEACH_ITEM];
+    int TECH_MAX_ITEM;
+
+    void BuildUI();
+    void BindDfmComponents();
+    void ConfigureTeachGrid(TStringGrid *Grid);
+    void ResetTeachGrid(TStringGrid *Grid);
+    void AddTeachItem(TStringGrid *Grid, AnsiString GroupName, AnsiString Caption, TTrayMotor *Motor, int *iPara);
+    int FindTeachItem(TStringGrid *Grid, int Row);
+    void SelectTeachItem(int Index);
+    void RefreshTeachGrids();
+    void RefreshTeachGrid(TStringGrid *Grid);
+    void RefreshTeachRow(int Index);
+    void FillMotorList();
+    void SetupSpeedControl();
+    void SetActiveMotor(int Index);
+    TTrayMotor *GetMotor(int Index);
+    TTrayMotor *GetActiveMotor();
+    int GetEditInt(TEdit *Edit, int DefaultValue);
+    AnsiString GetTeachFileName();
+    AnsiString GetWorkFileTeachName(AnsiString RootPath);
+    AnsiString FindTeachFileName();
+    AnsiString GetTeachKey(int Index);
+    int ParsePositionText(AnsiString Text);
+    AnsiString FormatPositionText(int Value);
+    AnsiString GetMotorCaption(int Index);
+    AnsiString GetSoftLimitCaption(TTrayMotor *Motor);
+    void UpdateMotorMonitor();
+    void UpdateStatusLed(int LedIndex, bool Enabled, bool Value);
+    void StartJog(bool bPositive);
+    void StepMove(bool bPositive);
+    void MoveActiveMotorToTarget();
+    void MoveSelectedTeach();
+    void SetSelectedTeachFromNow();
+    void StopActiveMotor();
+    void SetMessage(AnsiString Text);
+    bool CheckSortArmZHome();
+    bool CheckCanTeachMove(TTrayMotor *Motor, bool bRequireHome, bool bUseTarget, int Target, bool bAllowLimitAlarm=false);
+    void PopulateAdvancedCombos();
+    int ComboIndexToTarget(int Index);
+    TTrayMotor *GetSaTargetYMotor(int Target);
+    bool CheckSortArmTestReady(int SlotIndex, int Target);
+    void RunSortArmTest();
+    void StopSortArmTest();
+    void SetSaStatus(AnsiString Text);
+    void RunSaAllZUp();
+    bool AnyAdvancedTestRunning();
+    bool HasRealServoAlarm(AnsiString &Why);
+    bool IsFaultPopupShowing();
+    void PopulateChannelCombos();
+    bool CheckCarTestReady();
+    bool CallCarGoUp(int Area, int Flag);
+    bool CallCarGoDown(int Area, int Flag);
+    void StartCarPhase(int Phase);
+    void RunCarTest();
+    void StopCarTest();
+    void RunAutoTest();
+    void SetCarStatus(AnsiString Text);
+    void SetAutoStatus(AnsiString Text);
+    void PopulateTrayArmCombos();
+    int ComboIndexToPlaceChannel(int Index);
+    bool CheckTrayArmTestReady();
+    void RunTrayArmTest();
+    void StopTrayArmTest();
+    void SetTaStatus(AnsiString Text);
+    bool EditCellWithNumpad(TEdit *Edit, int MaxValue, AnsiString Caption);
+    void PopulateCcdCombos();
+    int ComboIndexToLoaderNo(int Index);
+    bool CheckCcdTestReady(int LoaderNo);
+    void RunCcdTest();
+    void StopCcdTest();
+    void SetCcdStatus(AnsiString Text);
+    bool CheckColorCcdTestReady();
+    void RunColorCcdTest();
+    void StopColorCcdTest();
+    void SetColorCcdStatus(AnsiString Text);
+    void StopAllAdvancedTests();
 public:
     __fastcall TfTeach(TComponent* Owner);
     void __fastcall InitialTeachParameter();
@@ -305,6 +437,7 @@ public:
 };
 //---------------------------------------------------------------------------
 extern TEACH Teach;
+extern TEACH TeachBase;   //AI 20260623 : Offset base; effective Teach = TeachBase + Offset
 extern PACKAGE TfTeach *fTeach;
 //---------------------------------------------------------------------------
 #endif

@@ -29,7 +29,14 @@ Folder: `D:\HT160S_StateRecord\<yyyy-mm-dd hh_mm_ss>\` (written by
 | `CurrentTasks.txt` | Module index table + current Task + last-change time |
 | `TaskHistory.csv` | Per module, last 30 `(Time_k,Task_k)` pairs. **Time_0 is NEWEST.** A sample is recorded **only when Task changes** (`SampleTasks`). |
 | `Snapshot.ini` | `TriggerReason` (Manual = operator pressed the button), `Time`, `Version` |
+| `SortArmDecision.txt` | **Place/discharge deadlock evidence.** SortArm held-IC routing (`DescribeHolding`: per-slot bin -> mapped Auto) + each Auto's live flags and **working-tray cell map** (`.`=EMPTY_IC `O`=HAS_OK_IC `?`=UNCHECK_IC `#`=other) with empty/ok counts. Read the two together to see WHICH cell blocks the held pattern, and why an Auto cannot discharge (needs every cell HAS_OK_IC). |
+| `MotionDetail.ini` | motor cmd/enc/tgt, SortArm Pick/PlaceTask, SuckZ, sucker vacuum bits |
 | `MachineConfig/` | Copied `system\` + active `recipe\` for reproduction |
+
+`CurrentTasks.txt` and `MachineState.ini [StuckMs]` also carry **StuckMs** = ms since
+each module's last Task change. NB: with `SystemStart=0` StuckMs is inflated by the
+operator notice->stop->snapshot delay (same caveat as the timestamps); it is exact
+only when a watchdog auto-triggers while the line still runs.
 
 Module order (index 0..6): **Empty, Loader1, Loader2, Auto1, TrayArm, SortArm,
 Color** (the 7 entries in `UserMotion` action list).
@@ -153,6 +160,71 @@ in the tool and §4 here.
 3. List FROZEN-on-handshake modules + CHURN-idle modules.
 4. Pick the **most upstream blocked actor** (here SortArm place) and read its
    wait function in source **before** asserting a cause. Confirm `.h` + `.cpp`.
+   For a SortArm-frozen-at-200 snapshot, open `SortArmDecision.txt` first: it shows
+   the held-IC routing + each target Auto's cell map, so "no contiguous EMPTY_IC run
+   fits the held pattern" becomes a direct read instead of an inference.
 5. Walk the cascade (place -> discharge -> request -> deliver) to confirm the
    circular wait. Label FACT (read) vs INFER (derived).
 6. Propose fixes; do NOT edit motion handshake code without user sign-off.
+
+## 8. Alarm-code -> EventLog -> source (the code-grep recipe)
+
+When the customer ships an **EventLog** (`D:\HT160S_Log\EventLog\YYYY_MM\HT160S_*.csv`)
+plus a time, the fast path is: read the `AlarmCode` column at that time, then grep
+the source to land on the exact call site that popped the alarm. Three code spaces
+coexist; grep each differently.
+
+Every alarm funnels through `ShowNoteAlarm` (note.cpp). It writes `edtAlarmCode->Text`
+(operator screen), `g_EventLog.Log(Code,...)` (EventLog **AlarmCode** column, verbatim),
+`AlarmReport(Code,...)` (SECS S5F1 ALID), and after the operator clears it,
+`g_EventLog.LogRecovery(recovery, pauseSec, Code, Message)` (the **Recovery** +
+**PauseTime** columns - so a shipped log now shows SKIP/RETRY/... and how long the
+line paused).
+
+### Tier 1 - free-string alarms (`ShowMyError`)
+```
+rg -n 'ShowMyError\(' HT160S_Program_BCB_V1.0.0.0
+```
+- 3-arg `ShowMyError("WAR0475", "msg", KCode)` = code-aligned (1st arg is the 9045
+  code, the EventLog AlarmCode). **Grep the code verbatim** - it lands on the line.
+- 1-arg `ShowMyError("text", KCode)` = not yet migrated; the English sentence IS the
+  AlarmCode, so grep the sentence verbatim.
+- Parameterized Auto sites build the code inline, e.g.
+  `ShowMyError(AnsiString().sprintf("JAM%d11", 11+iFeedAuto), ...)` - a literal
+  `JAM1211` won't grep; grep the **format** `JAM%d11` / `MES%d20` instead, then the
+  station = leading-2-digits (Auto1=11, Auto2=12, Auto3=13).
+
+### Tier 2 - structured numeric families (auto-generated, leading digit = family)
+```
+rg -n 'sprintf\("%d%03d%1d"' HT160S_Program_BCB_V1.0.0.0/database.cpp
+```
+- Leading `4`=Cylinder (eCynAlarm), `5`=Motor (eMotorAlarm), `6`=Sucker (eSuckAlarm),
+  shape `<fam><3-digit index><1-digit err>`. Generated in `CreateSystemAlarmCode()`.
+  A literal like `41210` is NOT in source - decode index/err from the digits, or grep
+  the raising wrapper: `rg -n 'ShowCylinderError|ShowMotorError|ShowSuckError'`.
+
+### Tier 3 - table-registered named codes (`ShowSystemError(Name)`, bilingual)
+```
+rg -n 'ShowSystemError\(' HT160S_Program_BCB_V1.0.0.0
+rg -n 'mapNameToAlarm|mapAlarmCodeList' HT160S_Program_BCB_V1.0.0.0/database.cpp
+```
+- Registration is ONLY in `CreateSystemAlarmCode()` (database.cpp). The high-value
+  CCD/vision alarms are registered there with their 9045 codes
+  (`TopCCD_Connect`->WAR16120, `TopCCD_2D`->WAR0462, `ColorCCD_Connect`->WAR16121,
+  `ColorCCD_2D`->WAR0970) and render bilingual EN/ZH + remedy. The call sites pass the
+  **Name** (`ShowSystemError("TopCCD_2D", ...)`), so to go code->site: look the code up
+  in the registration block to get the Name, then grep the Name.
+
+### 9045 reuse cross-check
+The WAR/JAM/MES codes are reused from HT9045 so the customer recognizes them.
+Cross-check any code against `D:\HT9045\Error\AlarmCodeList.txt` (KEY=VALUE) - a code
+absent from that file is an HT160-native allocation (e.g. JAM1101/MES1120/MES1125 Auto
+band), not a 9045 reuse. The startup dump `system\AlarmList.csv` lists every code the
+machine can raise (the HT160 analog of 9045's AlarmCodeList.txt).
+
+### Collision guard
+`CreateSystemAlarmCode()` ends with an observe-only sweep: any all-digit map key
+beginning 4/5/6 that is not the canonical 5-char structured shape is flagged via
+`OutputDebugString("[ALARM-COLLISION] ...")` (viewable in DebugView). WAR/JAM/MES keys
+start with a letter, so 9045 reuse never trips it; only a bad future bare-numeric
+allocation does.

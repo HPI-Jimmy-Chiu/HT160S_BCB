@@ -77,9 +77,14 @@ IOType,Alias,Lane,ModuleType,IP,Port,Bit,InType,ISABase,Enable,OnAlarmTime,OffAl
 ## 3. 命名慣例（比照 Empty）
 
 - 氣缸：`C_<Module>_<Function>`，托盤類動作加 `Tray` 字尾。
-  - 升降：`FrontRiseTray_1/_2`、`RearRiseTray`
-  - 分盤：`FrontSeparateTray_1`、`RearSeparateTray_1`
+  - 升降：`FrontRiseTray_1/_2`
+  - 分盤：`FrontSeparateTray_1`
   - 推/靠：`PushTray`、`LeanOnTray`
+  - ⚠ **不要再產生 `RearRiseTray` / `RearSeparateTray_1` / `C_Auto*_FrontSeparateTray_1`**：
+    這 16 支在 2026-07-20 經機構＋電控確認**實體不存在、也沒有配線**，已於 `6317107`
+    從 `CYLINDER_MODULAR` 與 `system/IO_Table.csv` 整批移除。汽缸警報碼是
+    `4<struct 索引 3 碼><錯誤 1 碼>`，所以多加一支就會把它後面每一支的警報碼往後推，
+    讓操作員手冊整份對不上（2026-08-02 就是為了修這個位移才重生了三份手冊）。
   - 台車（Color 專有，輔助定位）：`CartRotate`、`CartSlide`
 - 感測：`Sn<Module>_<Pos>`，例如 `SnColor_InputHasTray`、`SnColor_OutputBottomHasTray`。
 - `<Module>` = `Empty` / `Color` / `Loader` / `Auto1`...。
@@ -118,7 +123,7 @@ IOType,Alias,Lane,ModuleType,IP,Port,Bit,InType,ISABase,Enable,OnAlarmTime,OffAl
 | PushTray 10W11, On 11615/Off 11614 | `C_Color_PushTray` | `32,1,1` | ✅ |
 | LeanOnTray 10W12, On 11621/Off 11622 | `C_Color_LeanOnTray` | `32,1,2` | ✅ |
 | 前分Tray氣缸_1 10W13 | `C_Color_FrontSeparateTray_1` | `32,1,3` | ✅（純計時 On/Off 留空）|
-| （電控無此點）| `C_Color_RearRiseTray` | 無 | 殘留，待清 |
+| （電控無此點）| ~~`C_Color_RearRiseTray`~~ | 無 | 已於 `6317107` 清除，勿再產生 |
 
 > 台車旋轉/滑台缸（A 案輔助定位，本輪未建模）的實際輸出線號需重新向電控確認，
 > 不可沿用舊表的 10W11/10W12。

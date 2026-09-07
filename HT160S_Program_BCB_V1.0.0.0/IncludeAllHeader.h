@@ -26,5 +26,7 @@
 #include "csystem.h"
 #include "mymessbox.h"
 #include "note.h"
+#include "cmydef.h"
+#include "cEventLog.h"   //AI(ht160s-ladder-guard) 20260703 : LogLadderFault for state-ladder default guards
 //---------------------------------------------------------------------------
 #endif

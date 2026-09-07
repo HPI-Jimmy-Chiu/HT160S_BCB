@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeGraph 與 Superpowers — 白話評估 + 操作說明書</title>
+<style>
+  :root{ --ink:#1a2330; --muted:#5b6675; --line:#d6dde6; --accent:#16708a; --warn:#b4480b;
+         --bg:#f7f9fb; --good:#1f7a4d; --gold:#b8860b; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif; color:var(--ink);
+        max-width:960px; margin:24px auto; padding:0 20px; line-height:1.7; background:#fff; }
+  h1{ font-size:1.6rem; border-bottom:3px solid var(--accent); padding-bottom:.4rem; }
+  h2{ font-size:1.25rem; margin-top:2.2rem; color:var(--accent); border-left:5px solid var(--accent);
+      padding-left:.5rem; }
+  h3{ font-size:1.05rem; margin-top:1.3rem; }
+  p,li{ font-size:.95rem; }
+  blockquote{ background:var(--bg); border-left:4px solid var(--line); margin:1rem 0; padding:.6rem 1rem;
+              color:var(--muted); font-size:.92rem; }
+  blockquote.tldr{ border-left:5px solid var(--good); color:var(--ink); font-size:.98rem; background:#eef8f1; }
+  blockquote.warn{ border-left:5px solid var(--warn); color:#5a2604; background:#fdf1e7; }
+  table{ border-collapse:collapse; width:100%; margin:1rem 0; font-size:.9rem; }
+  th,td{ border:1px solid var(--line); padding:.5rem .65rem; text-align:left; vertical-align:top; }
+  th{ background:var(--accent); color:#fff; }
+  tr:nth-child(even) td{ background:var(--bg); }
+  code{ font-family:"Consolas","DejaVu Sans Mono",monospace; background:#eef1f4; padding:.05rem .35rem;
+        border-radius:4px; font-size:.88em; }
+  pre{ background:#10212b; color:#dfe7ec; border-radius:8px; padding:.9rem 1.1rem; overflow-x:auto;
+       font-family:"Consolas","DejaVu Sans Mono",monospace; font-size:.85rem; line-height:1.55; }
+  pre code{ background:none; color:inherit; padding:0; }
+  .star{ color:var(--gold); white-space:nowrap; letter-spacing:-1px; }
+  .ok{ color:var(--good); font-weight:700; }
+  .no{ color:var(--warn); font-weight:700; }
+  .pill{ display:inline-block; border-radius:999px; padding:.05rem .6rem; font-size:.78rem; font-weight:700; }
+  .pill.low{ background:#e3f3ea; color:var(--good); }
+  .pill.mid{ background:#fbeede; color:var(--warn); }
+  ol,ul{ padding-left:1.4rem; } li{ margin:.3rem 0; }
+  .rank{ font-weight:800; color:var(--accent); }
+  .note{ font-size:.85rem; color:var(--muted); }
+  hr{ border:none; border-top:1px solid var(--line); margin:2rem 0; }
+  @media print{ body{ margin:0; } h2{ break-after:avoid; } table,blockquote,pre{ break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<h1>CodeGraph 與 Superpowers — 白話評估 + 操作說明書</h1>
+
+<blockquote>
+對象：<b>HT160S_BCB</b> 專案（BCB6 / C++Builder 6 工控程式，單人開發、重度使用 Claude Code、大量從 HT172 移植）。日期：2026-06-29。<br>
+原始 Markdown：<code>docs/tools/codegraph-superpowers-evaluation.md</code>
+</blockquote>
+
+<blockquote class="tldr">
+<b>一句話結論：</b>CodeGraph <b>值得馬上試</b>（低風險、對大型舊碼很有用，重點用「影響分析」）；Superpowers <b>借觀念、只挑幾個技能裝</b>，不要整套照搬——TDD 與 git-worktree 不適合本專案。
+</blockquote>
+
+<h2>0. 懶人包</h2>
+<table>
+  <tr><th>工具</th><th>它是什麼（白話）</th><th>效益</th><th>風險</th><th>建議</th></tr>
+  <tr>
+    <td><b>CodeGraph</b></td>
+    <td>把整個程式碼先建成一張「索引地圖」放在本機，AI 不用一個一個檔翻，一次查詢就知道「誰呼叫誰、改這裡會炸到哪」</td>
+    <td><span class="star">★★★★★</span></td>
+    <td><span class="pill low">低</span></td>
+    <td><b>先試</b>，重點用 <code>impact</code> 影響分析</td>
+  </tr>
+  <tr>
+    <td><b>Superpowers</b></td>
+    <td>一套「開發方法論 + 技能包」外掛，逼 AI 先想清楚→寫計畫→再動手→做完驗證</td>
+    <td><span class="star">★★★</span>（挑著用）</td>
+    <td><span class="pill mid">中</span></td>
+    <td><b>選擇性裝</b>，關掉 TDD 與 worktree</td>
+  </tr>
+</table>
+
+<h2>1. CodeGraph 是什麼？</h2>
+<p>GitHub：<code>colbymchenry/codegraph</code>（MIT 授權，TypeScript）。</p>
+<p><b>問題情境：</b>現在 Claude 理解程式靠「一直開檔、一直 grep、一路追路徑」。在 HT160S 這種有 <code>main.cpp</code>、<code>csystem.cpp</code>、<code>aLoader.cpp</code>、<code>aColor.cpp</code>、一堆 form 與全域變數的大專案，既花時間又花 token（= 花錢）。</p>
+<p><b>CodeGraph 的做法：</b>先用 tree-sitter 解析整個專案，把「函式、類別、誰呼叫誰、誰 include 誰」存進<b>本機 SQLite</b>（<code>.codegraph/codegraph.db</code>）。之後 AI 查這張地圖，一兩次就拿到答案，不用翻檔。它以 <b>MCP server</b> 形式接進 Claude Code。</p>
+
+<h3>對本專案最關鍵的三件事</h3>
+<ol>
+  <li><b>影響分析（impact / blast radius）</b>——這是 grep 做不到的。改函式前先問「誰呼叫它？會影響哪？」。你最痛的就是改 A 壞 B 的回歸（hang up、silent stop、互鎖），這功能正中要害。</li>
+  <li><b>100% 本機、不外傳</b>——全程在你電腦上跑，無資料上雲。對公司專屬工控原始碼很重要。</li>
+  <li><b>支援 C++ 與 Pascal/Delphi</b>——涵蓋 <code>.cpp/.h</code>；BCB6 的 <code>.dfm</code> 屬 Pascal 系，部分也能吃。</li>
+</ol>
+<p class="note">官方/文章宣稱：tool call 大幅減少、速度更快、檔案讀取趨近於零（README 約「少 58% tool call、快 22%」，其他文章宣稱更高）。實際因專案而異，但方向正確：更省、更快、更準。</p>
+
+<blockquote class="warn">
+<b>⚠ 給本專案的誠實提醒</b>
+<ul>
+  <li><b>BCB6 解析品質要先驗：</b>tree-sitter 的 C++ 文法針對標準 C++，BCB6 有 <code>__published</code>、<code>__fastcall</code>、<code>AnsiString</code>、VCL 巨集等非標準語法。函式/類別大多能解析，但可能有漏。<b>裝完先跑 <code>codegraph status</code> 看符號數</b>再決定信任程度。</li>
+  <li><b>只在 <code>D:\HT160S_BCB</code> 跑 <code>init</code></b>，不要去 <code>D:\HT172</code>（唯讀參考，無需建索引）。</li>
+  <li><code>.codegraph/</code> 要加進 <code>.gitignore</code>。</li>
+  <li>它提供的是<b>唯讀程式碼情報</b>，不碰機台控制，安全。</li>
+</ul>
+</blockquote>
+
+<h2>2. Superpowers 是什麼？</h2>
+<p>GitHub：<code>obra/superpowers</code>（作者 Jesse Vincent / Prime Radiant；Claude Code 官方 marketplace 也收錄）。</p>
+<p><b>它不是工具，是一套「工作習慣」外掛。</b>安裝後塞進一堆「技能（skill）」，引導 Claude 不要一上來就寫扣，而照專業流程走：腦力激盪釐清需求 → 寫計畫 → 照計畫做 → 做完驗證。</p>
+<table>
+  <tr><th>分類</th><th>技能</th><th>白話</th></tr>
+  <tr><td>協作</td><td><code>brainstorming</code></td><td>動手前先問清楚、探索替代做法、產出設計文件</td></tr>
+  <tr><td>協作</td><td><code>writing-plans</code> / <code>executing-plans</code></td><td>把工作切成 2–5 分鐘小塊、寫成計畫再照做</td></tr>
+  <tr><td>除錯</td><td><code>systematic-debugging</code></td><td>4 階段找根因，不靠猜</td></tr>
+  <tr><td>驗證</td><td><code>verification-before-completion</code></td><td>做完一定要拿證據驗證才算完成</td></tr>
+  <tr><td>測試</td><td><code>test-driven-development</code></td><td>強制 RED→GREEN→REFACTOR（先寫失敗測試再寫扣）</td></tr>
+  <tr><td>協作</td><td><code>requesting/receiving-code-review</code></td><td>任務間自動 code review，嚴重問題擋下不准過</td></tr>
+  <tr><td>並行</td><td><code>dispatching-parallel-agents</code> / <code>subagent-driven-development</code></td><td>派多個子代理平行做、兩段式審查</td></tr>
+  <tr><td>並行</td><td><code>using-git-worktrees</code> / <code>finishing-a-development-branch</code></td><td>用 git worktree 隔離平行工作、收尾合併</td></tr>
+  <tr><td>後設</td><td><code>writing-skills</code></td><td>教 AI 怎麼寫新的 skill</td></tr>
+</table>
+
+<blockquote class="warn">
+<b>⚠ 給本專案的誠實提醒（重要）</b><br>
+你<b>已經自建一套很完整的治理系統</b>（<code>.github/instructions</code>、十幾個 domain skill、agents、hooks、70+ memory）。Superpowers 是「通用版」，整套照搬會跟你的硬規則打架：
+<ul>
+  <li><span class="no">✗ test-driven-development 不適合</span>——BCB6 工控程式沒有單元測試框架，驗證靠「上機台跑」。這 skill 會強迫「沒測試就刪扣重來」，直接衝突你的 build-gate + 上機驗證流程。<b>務必忽略/關掉。</b></li>
+  <li><span class="no">✗ using-git-worktrees / 平行子代理 風險高</span>——BCB6 單機編譯、有 <code>.obj</code> 產物、還有「designer 存檔會吃掉元件」陷阱。多 worktree 平行改 <code>.dfm/.h</code> 很危險。維持「一次一條線」較安全。</li>
+  <li><b>跟既有 skill 重疊</b>——你已有 <code>/code-review</code>、<code>docs/plan/</code> 計畫流程、State Record 除錯慣例。Superpowers 對應技能是補強而非取代。</li>
+</ul>
+<b>結論：</b>把它當成<b>一份高品質的觀念清單</b>，而非「裝了就照單全收」。真正值得吸收的是 4 個：<code>brainstorming</code>、<code>writing-plans</code>、<code>systematic-debugging</code>、<code>verification-before-completion</code>——而且可以直接寫進你自己的 <code>.github/skills</code>，不一定要裝整套外掛。
+</blockquote>
+
+<h2>3. 哪些功能對「現在的你」效益最大？</h2>
+<table>
+  <tr><th>排名</th><th>功能</th><th>來自</th><th>為什麼對你有用</th></tr>
+  <tr><td class="rank">🥇 1</td><td><b>影響分析 <code>codegraph impact &lt;符號&gt;</code></b></td><td>CodeGraph</td><td>移植/改函式前先看「誰呼叫它、會炸到哪」。直接降低你最痛的回歸風險（hang up、互鎖、silent stop）</td></tr>
+  <tr><td class="rank">🥈 2</td><td><b>快速理解架構 <code>codegraph explore</code></b></td><td>CodeGraph</td><td>大檔（main/csystem/aLoader/aColor）一次拿到入口點＋相關符號＋片段，省 token 省時間</td></tr>
+  <tr><td class="rank">🥉 3</td><td><b>系統化除錯 <code>systematic-debugging</code></b></td><td>Superpowers</td><td>完美貼合你「hang up → 分析 State Record」流程，逼出根因不靠猜</td></tr>
+  <tr><td class="rank">4</td><td>動手前腦力激盪 <code>brainstorming</code></td><td>Superpowers</td><td>移植任務常需先釐清需求/取捨，先想清楚再寫</td></tr>
+  <tr><td class="rank">5</td><td>寫計畫/照計畫 <code>writing-plans</code></td><td>Superpowers</td><td>把你已在做的 <code>docs/plan/</code> 流程正規化</td></tr>
+  <tr><td class="rank">6</td><td>完成前驗證 <code>verification-before-completion</code></td><td>Superpowers</td><td>強化你的「build EXIT 0 + 上機驗證」紀律</td></tr>
+  <tr><td class="rank">7</td><td>省 token / 省錢</td><td>CodeGraph</td><td>你重度使用 Claude，少翻檔 = 少花錢</td></tr>
+</table>
+<p><span class="no">不建議用（對本專案）：</span>CodeGraph 的 <code>.dfm</code> 純表單描述索引（價值低）、Superpowers 的 <code>test-driven-development</code>、<code>using-git-worktrees</code>、平行子代理。</p>
+
+<hr>
+
+<h2>4. 白話操作說明書</h2>
+
+<h3>4-A. CodeGraph 安裝與使用（Windows）</h3>
+<p><b>步驟 1：裝 CLI</b>（PowerShell，任選一種）</p>
+<pre><code># 方法 A：官方安裝腳本
+irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex
+
+# 方法 B：用 npm（若已有 Node）
+npm i -g @colbymchenry/codegraph</code></pre>
+<p class="note">CLI / MCP server 自帶 runtime，本身不需先裝 Node（只有方法 B 的 npm 才需要）。</p>
+
+<p><b>步驟 2：把 MCP 接進 Claude Code</b></p>
+<pre><code>codegraph install</code></pre>
+<p class="note">會自動偵測 Claude Code、寫入 MCP 設定並加上使用指引。</p>
+
+<p><b>步驟 3：在本專案建索引</b>（一定要在對的資料夾）</p>
+<pre><code>cd D:\HT160S_BCB
+codegraph init
+codegraph status      # 看抓到多少符號 -> 判斷 BCB6 解析品質</code></pre>
+
+<p><b>步驟 4：加進 .gitignore</b></p>
+<pre><code>.codegraph/</code></pre>
+
+<p><b>常用指令速查</b></p>
+<table>
+  <tr><th>指令</th><th>用途</th></tr>
+  <tr><td><code>codegraph explore &lt;問題&gt;</code></td><td>拿到相關符號＋呼叫流程＋片段</td></tr>
+  <tr><td><code>codegraph query &lt;名稱&gt;</code></td><td>用名字搜尋符號</td></tr>
+  <tr><td><code>codegraph impact &lt;符號&gt;</code></td><td><span class="ok">⭐ 影響分析：誰呼叫、改了影響哪</span></td></tr>
+  <tr><td><code>codegraph affected [檔案]</code></td><td>找受影響的測試/檔案</td></tr>
+  <tr><td><code>codegraph status</code></td><td>看索引統計</td></tr>
+  <tr><td><code>codegraph sync</code></td><td>手動增量更新（平常會自動偵測檔案變更同步）</td></tr>
+  <tr><td><code>codegraph upgrade</code></td><td>原地升級</td></tr>
+</table>
+<p><b>裝完怎麼用：</b>你不用每次下指令，Claude（透過 MCP）會自己查這張地圖。你只要正常描述任務即可——我會優先用它做影響分析再動手。</p>
+
+<h3>4-B. Superpowers 安裝與使用</h3>
+<p><b>步驟 1：在 Claude Code 裡裝外掛</b></p>
+<pre><code>/plugin install superpowers@claude-plugins-official</code></pre>
+<p class="note">或用作者的 marketplace：</p>
+<pre><code>/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace</code></pre>
+
+<p><b>步驟 2：（重要）先決定要不要全開</b></p>
+<ul>
+  <li><span class="ok">✓ 想用</span> → 直接描述任務，讓 <code>brainstorming</code> / <code>writing-plans</code> / <code>systematic-debugging</code> / <code>verification-before-completion</code> 自然介入。</li>
+  <li><span class="no">✗ 不想被 TDD 綁架</span> → 明確告訴我「這專案不做 TDD、不用 worktree、照 HT160S build-gate 驗證」，或乾脆<b>不裝外掛，改把這幾個觀念寫進你自己的 <code>.github/skills</code></b>。</li>
+</ul>
+
+<blockquote class="tldr">
+<b>最適合你的替代方案：</b>不裝外掛，請我把 Superpowers 的 <code>systematic-debugging</code>、<code>brainstorming</code>、<code>writing-plans</code> 三個流程，<b>改寫成符合 HT160S 規則的版本</b>放進 <code>.github/skills/</code>。好處：保留觀念精華、完全相容你的 Big5 / build-gate / 上機驗證 / write-boundary。
+</blockquote>
+
+<h2>5. 給本專案的最終建議</h2>
+<ol>
+  <li><b>CodeGraph：先 pilot 一週。</b>裝好跑 <code>codegraph status</code> 驗 BCB6 解析品質；若符號夠多，就把「改碼前先 impact」變成習慣。風險低、可隨時移除。</li>
+  <li><b>Superpowers：不要整套裝。</b>真正價值是 4 個觀念（brainstorm / plan / 系統化除錯 / 完成前驗證）。最佳做法是把它們<b>內化進你自己的 <code>.github/skills</code></b>，而非引入會推 TDD/worktree、跟硬規則衝突的通用外掛。</li>
+  <li><b>兩者都不碰機台控制、都可逆</b>——CodeGraph 是唯讀情報、Superpowers 是流程引導。可放心試，不滿意就移除。</li>
+</ol>
+
+<hr>
+<h3>參考來源</h3>
+<ul>
+  <li>CodeGraph — <code>https://github.com/colbymchenry/codegraph</code></li>
+  <li>CodeGraph 官網 — <code>https://colbymchenry.github.io/codegraph/</code></li>
+  <li>Superpowers — <code>https://github.com/obra/superpowers</code></li>
+  <li>Superpowers marketplace — <code>https://github.com/obra/superpowers-marketplace</code></li>
+  <li>作者文章（設計理念）— <code>https://blog.fsck.com/2025/10/09/superpowers/</code></li>
+</ul>
+
+</body>
+</html>

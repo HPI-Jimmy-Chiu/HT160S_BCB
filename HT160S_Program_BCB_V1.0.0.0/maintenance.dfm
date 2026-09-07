@@ -1,10 +1,10 @@
 object fMaintenance: TfMaintenance
-  Left = 375
-  Top = 187
+  Left = 327
+  Top = 106
   BorderStyle = bsSingle
   Caption = 'Maintance'
-  ClientHeight = 870
-  ClientWidth = 1043
+  ClientHeight = 987
+  ClientWidth = 1145
   Color = 11250603
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,10 +18,10 @@ object fMaintenance: TfMaintenance
   PixelsPerInch = 96
   TextHeight = 13
   object pnlMenu: TPanel
-    Left = 847
+    Left = 949
     Top = 0
     Width = 196
-    Height = 870
+    Height = 987
     Align = alRight
     BevelOuter = bvNone
     Color = 12761254
@@ -58,14 +58,14 @@ object fMaintenance: TfMaintenance
       ParentFont = False
       OnClick = spbMaintenanceMenuClick
     end
-    object spbMaintSoftSimu: TSpeedButton
+    object spbMaintAmr: TSpeedButton
       Left = 8
       Top = 120
       Width = 180
       Height = 50
       AllowAllUp = True
       GroupIndex = 1
-      Caption = 'Soft Simulate'
+      Caption = 'AMR'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -15
@@ -108,7 +108,7 @@ object fMaintenance: TfMaintenance
     end
     object spbMaintIO: TSpeedButton
       Left = 8
-      Top = 344
+      Top = 288
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -124,7 +124,7 @@ object fMaintenance: TfMaintenance
     end
     object spbMaintTeach: TSpeedButton
       Left = 8
-      Top = 400
+      Top = 344
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -140,7 +140,7 @@ object fMaintenance: TfMaintenance
     end
     object spbMaintMotor: TSpeedButton
       Left = 8
-      Top = 456
+      Top = 400
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -156,12 +156,12 @@ object fMaintenance: TfMaintenance
     end
     object spbMaintCOM: TSpeedButton
       Left = 8
-      Top = 512
+      Top = 456
       Width = 180
       Height = 50
       AllowAllUp = True
       GroupIndex = 1
-      Caption = 'COM Port'
+      Caption = 'Pad COM Port'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -15
@@ -172,7 +172,7 @@ object fMaintenance: TfMaintenance
     end
     object spbMaintSECS: TSpeedButton
       Left = 8
-      Top = 568
+      Top = 736
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -186,9 +186,89 @@ object fMaintenance: TfMaintenance
       ParentFont = False
       OnClick = spbMaintenanceMenuClick
     end
+    object spbMaintMCUDisplay: TSpeedButton
+      Left = 8
+      Top = 512
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'Bin Display'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
+    object spbMaintTopCcd: TSpeedButton
+      Left = 8
+      Top = 568
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'Top CCD'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
+    object spbMaintColorCcd: TSpeedButton
+      Left = 8
+      Top = 624
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'Color CCD'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
+    object spbMaintLotApi: TSpeedButton
+      Left = 8
+      Top = 680
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'Lot WebAPI'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
+    object spbMaintFtp: TSpeedButton
+      Left = 8
+      Top = 792
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'FTP'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
     object spbMaintExit: TSpeedButton
       Left = 8
-      Top = 812
+      Top = 932
       Width = 180
       Height = 50
       AllowAllUp = True
@@ -206,15 +286,15 @@ object fMaintenance: TfMaintenance
   object pnlClient: TPanel
     Left = 0
     Top = 0
-    Width = 847
-    Height = 870
+    Width = 949
+    Height = 987
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 1
     object pnlTitle: TPanel
       Left = 0
       Top = 0
-      Width = 847
+      Width = 949
       Height = 44
       Align = alTop
       Caption = 'Maintenance'
@@ -230,11 +310,11 @@ object fMaintenance: TfMaintenance
     object pcMaintenance: TPageControl
       Left = 0
       Top = 44
-      Width = 847
-      Height = 826
-      ActivePage = tsMaintHardware
+      Width = 949
+      Height = 943
+      ActivePage = tsMaintTopCcd
       Align = alClient
-      TabIndex = 4
+      TabIndex = 11
       TabOrder = 1
       TabWidth = 90
       object tsMaintTowerLight: TTabSheet
@@ -242,7 +322,7 @@ object fMaintenance: TfMaintenance
         object Panel2: TPanel
           Left = 0
           Top = 0
-          Width = 839
+          Width = 941
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -259,8 +339,8 @@ object fMaintenance: TfMaintenance
         object Panel12: TPanel
           Left = 0
           Top = 31
-          Width = 839
-          Height = 767
+          Width = 941
+          Height = 884
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -277,7 +357,7 @@ object fMaintenance: TfMaintenance
           object RGB40: TALed
             Tag = 12
             Left = 152
-            Top = 219
+            Top = 2000
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
@@ -357,7 +437,7 @@ object fMaintenance: TfMaintenance
           object RGB41: TALed
             Tag = 13
             Left = 208
-            Top = 219
+            Top = 2000
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
@@ -384,7 +464,7 @@ object fMaintenance: TfMaintenance
           object RGB42: TALed
             Tag = 14
             Left = 264
-            Top = 219
+            Top = 2000
             Width = 22
             Height = 22
             LEDStyle = LEDSqLarge
@@ -580,7 +660,7 @@ object fMaintenance: TfMaintenance
             Top = 209
             Width = 116
             Height = 31
-            Caption = 'Heating'
+            Caption = 'Reserved'
             Color = 8421440
             Font.Charset = DEFAULT_CHARSET
             Font.Color = clWhite
@@ -589,6 +669,7 @@ object fMaintenance: TfMaintenance
             Font.Style = []
             ParentFont = False
             TabOrder = 4
+            Visible = False
           end
           object Panel18: TPanel
             Left = 24
@@ -714,6 +795,7 @@ object fMaintenance: TfMaintenance
               '[ 4 ] Music 4')
             ParentFont = False
             TabOrder = 10
+            Visible = False
           end
           object RadioGroup7: TRadioGroup
             Tag = 6
@@ -795,16 +877,191 @@ object fMaintenance: TfMaintenance
       end
       object tsMaintPassword: TTabSheet
         Caption = 'Password'
+        object labPwHint: TLabel
+          Left = 16
+          Top = 12
+          Width = 720
+          Height = 20
+          AutoSize = False
+        end
+        object labPwIdCaption: TLabel
+          Left = 420
+          Top = 50
+          Width = 120
+          Height = 20
+          AutoSize = False
+        end
+        object labPwPassCaption: TLabel
+          Left = 420
+          Top = 110
+          Width = 120
+          Height = 20
+          AutoSize = False
+        end
+        object labPwLevelCaption: TLabel
+          Left = 420
+          Top = 170
+          Width = 120
+          Height = 20
+          AutoSize = False
+        end
+        object lbPwUsers: TListBox
+          Left = 16
+          Top = 44
+          Width = 380
+          Height = 320
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -13
+          Font.Name = 'Courier New'
+          Font.Style = []
+          ItemHeight = 16
+          ParentFont = False
+          TabOrder = 0
+          OnClick = PwListClick
+        end
+        object edPwId: TEdit
+          Left = 420
+          Top = 72
+          Width = 240
+          Height = 28
+          ReadOnly = True
+          TabOrder = 1
+          OnClick = PwIdClick
+        end
+        object edPwPass: TEdit
+          Left = 420
+          Top = 132
+          Width = 240
+          Height = 28
+          PasswordChar = '*'
+          ReadOnly = True
+          TabOrder = 2
+          OnClick = PwPassClick
+        end
+        object cbbPwLevel: TComboBox
+          Left = 420
+          Top = 192
+          Width = 240
+          Height = 28
+          Style = csDropDownList
+          ItemHeight = 0
+          TabOrder = 3
+        end
+        object btnPwAddUpdate: TButton
+          Left = 420
+          Top = 240
+          Width = 150
+          Height = 40
+          TabOrder = 4
+          OnClick = PwAddUpdateClick
+        end
+        object btnPwDelete: TButton
+          Left = 580
+          Top = 240
+          Width = 110
+          Height = 40
+          TabOrder = 5
+          OnClick = PwDeleteClick
+        end
+        object btnPwSave: TButton
+          Left = 420
+          Top = 296
+          Width = 150
+          Height = 40
+          TabOrder = 6
+          OnClick = PwSaveClick
+        end
+        object btnPwReload: TButton
+          Left = 580
+          Top = 296
+          Width = 110
+          Height = 40
+          TabOrder = 7
+          OnClick = PwReloadClick
+        end
       end
-      object tsMaintSoftSimu: TTabSheet
-        Caption = 'Soft Simulate'
+      object tsMaintAmr: TTabSheet
+        Caption = 'AMR'
+        object memAmrStatus: TMemo
+          Left = 0
+          Top = 0
+          Width = 430
+          Height = 915
+          Align = alLeft
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -13
+          Font.Name = 'Courier New'
+          Font.Style = []
+          ParentFont = False
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 0
+        end
+        object chkAmrTestMode: TCheckBox
+          Left = 440
+          Top = 8
+          Width = 490
+          Height = 20
+          Caption = 'Enable AMR manual-inject test mode (bypass sensor edge only)'
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -13
+          Font.Name = 'MS Sans Serif'
+          Font.Style = []
+          ParentFont = False
+          TabOrder = 1
+          OnClick = chkAmrTestModeClick
+        end
+        object pnlAmrTestBanner: TPanel
+          Left = 440
+          Top = 32
+          Width = 495
+          Height = 24
+          Caption = 
+            '*** AMR TEST MODE ON - injection active, do NOT run real product' +
+            'ion ***'
+          Color = clRed
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWhite
+          Font.Height = -13
+          Font.Name = 'MS Sans Serif'
+          Font.Style = [fsBold]
+          ParentFont = False
+          TabOrder = 2
+          Visible = False
+        end
+        object pnlAmrInject: TPanel
+          Left = 440
+          Top = 60
+          Width = 495
+          Height = 560
+          BevelInner = bvLowered
+          TabOrder = 3
+        end
+        object memAmrTx: TMemo
+          Left = 440
+          Top = 624
+          Width = 495
+          Height = 288
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -12
+          Font.Name = 'Courier New'
+          Font.Style = []
+          ParentFont = False
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 4
+        end
       end
       object tsMaintFunctionDef: TTabSheet
         Caption = 'Function Define'
         object pnlFunctionDefHeader: TPanel
           Left = 0
           Top = 0
-          Width = 839
+          Width = 941
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -821,8 +1078,8 @@ object fMaintenance: TfMaintenance
         object pnlFunctionDefBody: TPanel
           Left = 0
           Top = 31
-          Width = 839
-          Height = 767
+          Width = 941
+          Height = 884
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
@@ -830,14 +1087,197 @@ object fMaintenance: TfMaintenance
           object pgcFunctionDef: TPageControl
             Left = 2
             Top = 2
-            Width = 835
-            Height = 763
-            ActivePage = tsFunctionGeneral
+            Width = 937
+            Height = 880
+            ActivePage = tsNetwork
             Align = alClient
-            TabIndex = 0
+            TabIndex = 1
             TabOrder = 0
             object tsFunctionGeneral: TTabSheet
-              Caption = 'General'
+              Caption = 'G[General]'
+              object pnlPredictiveSupplyBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblPredictiveSupplyHint: TLabel
+                  Left = 320
+                  Top = 12
+                  Width = 600
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'When ON, supply the Auto SortArm is waiting for first; OFF = low' +
+                    'est-numbered Auto.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkUsePredictiveAutoSupply: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 300
+                  Height = 20
+                  Caption = 'Predictive Auto tray supply'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkUsePredictiveAutoSupplyClick
+                end
+              end
+              object pnlAmrDivertBox: TPanel
+                Left = 0
+                Top = 40
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblAmrDivertHint: TLabel
+                  Left = 320
+                  Top = 12
+                  Width = 600
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'When ON (AMR), a recovered Normal tray goes straight to an Auto ' +
+                    'that requests one, instead of parking at Empty first.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkUseAmrRecoveryDivert: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 300
+                  Height = 20
+                  Caption = 'AMR recovered-tray direct supply'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkUseAmrRecoveryDivertClick
+                end
+              end
+              object pnlSkip2DBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 3
+                object lblSkip2DHint: TLabel
+                  Left = 320
+                  Top = 12
+                  Width = 600
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'When ON, a 2D not found in any lot goes silently to Error (no WA' +
+                    'R0475 stop). Default OFF. A misread good IC also goes to Error.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkSkipUnknown2DAlarm: TCheckBox
+                  Left = 16
+                  Top = 10
+                  Width = 300
+                  Height = 20
+                  Caption = 'Skip unknown-2D alarm (WAR0475)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkSkipUnknown2DAlarmClick
+                end
+              end
+              object pnlUphSampleBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 44
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 2
+                object lblUphMinSample: TLabel
+                  Left = 16
+                  Top = 14
+                  Width = 170
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'UPH min sample (IC)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblUphMinSampleHint: TLabel
+                  Left = 300
+                  Top = 14
+                  Width = 620
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'Hide UPH until this many ICs are sorted (small-sample spike guar' +
+                    'd). 0 = auto (one full tray); >0 = fixed IC count.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edUphMinSampleIC: TEdit
+                  Left = 196
+                  Top = 10
+                  Width = 80
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '0'
+                  OnClick = edUphMinSampleICClick
+                end
+              end
+            end
+            object tsNetwork: TTabSheet
+              Caption = 'N[Network]'
+              ImageIndex = 1
+              object pnlNetworkBody: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                Visible = False
+              end
             end
           end
         end
@@ -847,7 +1287,7 @@ object fMaintenance: TfMaintenance
         object pnlHardwareHeader: TPanel
           Left = 0
           Top = 0
-          Width = 839
+          Width = 941
           Height = 31
           Align = alTop
           BevelInner = bvLowered
@@ -864,27 +1304,27 @@ object fMaintenance: TfMaintenance
         object pnlHardwareBody: TPanel
           Left = 0
           Top = 31
-          Width = 839
-          Height = 767
+          Width = 941
+          Height = 884
           Align = alClient
           BevelInner = bvLowered
           Color = 12761254
           TabOrder = 1
-          object PageControl1: TPageControl
+          object pgcMaintHardware: TPageControl
             Left = 2
             Top = 2
-            Width = 835
-            Height = 763
-            ActivePage = tsLoaderUnloader
+            Width = 937
+            Height = 880
+            ActivePage = tsLotInfo
             Align = alClient
-            TabIndex = 0
+            TabIndex = 4
             TabOrder = 0
             object tsLoaderUnloader: TTabSheet
               Caption = 'Loader/Unloader'
               object pnlHardwareOptionBox: TPanel
                 Left = 0
                 Top = 0
-                Width = 827
+                Width = 929
                 Height = 40
                 Align = alTop
                 BevelInner = bvLowered
@@ -924,7 +1364,7 @@ object fMaintenance: TfMaintenance
               object Panel3: TPanel
                 Left = 0
                 Top = 40
-                Width = 827
+                Width = 929
                 Height = 40
                 Align = alTop
                 BevelInner = bvLowered
@@ -945,6 +1385,542 @@ object fMaintenance: TfMaintenance
                   OnClick = chkUseAMRClick
                 end
               end
+              object pnlAutoEnableBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 80
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 2
+                object lblAutoEnableHint: TLabel
+                  Left = 16
+                  Top = 10
+                  Width = 780
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'Per-Auto enable (By Lot+Bin mode only). Unchecked Autos are skip' +
+                    'ped when binding new Lot+Bin pairs. Changing this needs a softwa' +
+                    're restart.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object chkAutoEnable1: TCheckBox
+                  Left = 16
+                  Top = 44
+                  Width = 110
+                  Height = 20
+                  Caption = 'Auto1'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 0
+                  OnClick = chkAutoEnableClick
+                end
+                object chkAutoEnable2: TCheckBox
+                  Left = 136
+                  Top = 44
+                  Width = 110
+                  Height = 20
+                  Caption = 'Auto2'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 1
+                  OnClick = chkAutoEnableClick
+                end
+                object chkAutoEnable3: TCheckBox
+                  Left = 256
+                  Top = 44
+                  Width = 110
+                  Height = 20
+                  Caption = 'Auto3'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 2
+                  OnClick = chkAutoEnableClick
+                end
+                object chkAutoEnable4: TCheckBox
+                  Left = 376
+                  Top = 44
+                  Width = 110
+                  Height = 20
+                  Caption = 'Auto4'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 3
+                  OnClick = chkAutoEnableClick
+                end
+                object chkAutoEnable5: TCheckBox
+                  Left = 496
+                  Top = 44
+                  Width = 110
+                  Height = 20
+                  Caption = 'Auto5'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 4
+                  OnClick = chkAutoEnableClick
+                end
+                object chkAutoEnable6: TCheckBox
+                  Left = 616
+                  Top = 44
+                  Width = 110
+                  Height = 20
+                  Caption = 'Auto6'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 5
+                  OnClick = chkAutoEnableClick
+                end
+              end
+              object plLoaderSafeDistanceSet: TPanel
+                Left = 0
+                Top = 160
+                Width = 929
+                Height = 80
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 3
+                object lblLoaderSafeDistance: TLabel
+                  Left = 36
+                  Top = 12
+                  Width = 157
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Loader safe distance'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lbmm: TLabel
+                  Left = 284
+                  Top = 12
+                  Width = 45
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'mm'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblLoaderSafeHint: TLabel
+                  Left = 36
+                  Top = 48
+                  Width = 860
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'Minimum separation between the two loader cars. Range 325-650 mm' +
+                    '.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edLoaderSafeDistance: TEdit
+                  Left = 216
+                  Top = 8
+                  Width = 65
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '100.00'
+                  OnClick = edLoaderSafeDistanceClick
+                end
+              end
+              object pnlMachineIdentity: TPanel
+                Left = 0
+                Top = 240
+                Width = 929
+                Height = 130
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 4
+                object lblMachineModel: TLabel
+                  Left = 36
+                  Top = 16
+                  Width = 120
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Machine Model'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblHandlerID: TLabel
+                  Left = 36
+                  Top = 52
+                  Width = 120
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Machine ID'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSerialNo: TLabel
+                  Left = 36
+                  Top = 88
+                  Width = 120
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Serial No'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edMachineModel: TEdit
+                  Left = 168
+                  Top = 12
+                  Width = 200
+                  Height = 21
+                  TabOrder = 0
+                  Text = 'HT160S'
+                end
+                object edHandlerID: TEdit
+                  Left = 168
+                  Top = 48
+                  Width = 200
+                  Height = 21
+                  TabOrder = 1
+                end
+                object edSerialNo: TEdit
+                  Left = 168
+                  Top = 84
+                  Width = 200
+                  Height = 21
+                  TabOrder = 2
+                end
+              end
+              object pnlSettleDelay: TPanel
+                Left = 0
+                Top = 370
+                Width = 929
+                Height = 232
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 5
+                object lblSettleDelayTitle: TLabel
+                  Left = 20
+                  Top = 8
+                  Width = 880
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Mechanism Settle Times (ms) - default = original fixed values'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle0: TLabel
+                  Left = 20
+                  Top = 36
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Empty destack (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle1: TLabel
+                  Left = 20
+                  Top = 72
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Color destack (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle2: TLabel
+                  Left = 20
+                  Top = 108
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Loader destack (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle3: TLabel
+                  Left = 20
+                  Top = 144
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto push confirm (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle4: TLabel
+                  Left = 20
+                  Top = 180
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto discharge-Y (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle5: TLabel
+                  Left = 480
+                  Top = 36
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto front-rise (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle6: TLabel
+                  Left = 480
+                  Top = 72
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto cleanout-rise (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle7: TLabel
+                  Left = 480
+                  Top = 108
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'TrayArm clamp (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle8: TLabel
+                  Left = 480
+                  Top = 144
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Empty feed-clamp (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblSettle9: TLabel
+                  Left = 480
+                  Top = 180
+                  Width = 210
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Color feed-clamp (ms)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edSettle0: TEdit
+                  Left = 240
+                  Top = 32
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle1: TEdit
+                  Tag = 1
+                  Left = 240
+                  Top = 68
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 1
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle2: TEdit
+                  Tag = 2
+                  Left = 240
+                  Top = 104
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 2
+                  Text = '1000'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle3: TEdit
+                  Tag = 3
+                  Left = 240
+                  Top = 140
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 3
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle4: TEdit
+                  Tag = 4
+                  Left = 240
+                  Top = 176
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 4
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle5: TEdit
+                  Tag = 5
+                  Left = 700
+                  Top = 32
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 5
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle6: TEdit
+                  Tag = 6
+                  Left = 700
+                  Top = 68
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 6
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle7: TEdit
+                  Tag = 7
+                  Left = 700
+                  Top = 104
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 7
+                  Text = '300'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle8: TEdit
+                  Tag = 8
+                  Left = 700
+                  Top = 140
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 8
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+                object edSettle9: TEdit
+                  Tag = 9
+                  Left = 700
+                  Top = 176
+                  Width = 70
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 9
+                  Text = '500'
+                  OnClick = edSettleDelayClick
+                end
+              end
             end
             object tsErrorMag: TTabSheet
               Caption = 'ErrorMag'
@@ -952,7 +1928,7 @@ object fMaintenance: TfMaintenance
               object pnlHardwareErrorBinBox: TPanel
                 Left = 0
                 Top = 0
-                Width = 827
+                Width = 929
                 Height = 170
                 Align = alTop
                 BevelInner = bvLowered
@@ -1015,11 +1991,412 @@ object fMaintenance: TfMaintenance
                 end
               end
             end
+            object tsSortArm: TTabSheet
+              Caption = 'Sort Arm'
+              ImageIndex = 2
+              object pnlSuckerEnableBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 80
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblSuckerEnableHint: TLabel
+                  Left = 16
+                  Top = 10
+                  Width = 905
+                  Height = 47
+                  AutoSize = False
+                  Caption = 
+                    'Per-nozzle enable (SortArm sucker). Unchecked nozzles are skippe' +
+                    'd during pick/place so a broken nozzle can be taken out of servi' +
+                    'ce. At least one must stay enabled.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkSuckEnable1: TCheckBox
+                  Left = 16
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle1'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 0
+                  OnClick = chkSuckEnableClick
+                end
+                object chkSuckEnable2: TCheckBox
+                  Left = 136
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle2'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 1
+                  OnClick = chkSuckEnableClick
+                end
+                object chkSuckEnable3: TCheckBox
+                  Left = 256
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle3'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 2
+                  OnClick = chkSuckEnableClick
+                end
+                object chkSuckEnable4: TCheckBox
+                  Left = 376
+                  Top = 52
+                  Width = 110
+                  Height = 20
+                  Caption = 'Nozzle4'
+                  Checked = True
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  State = cbChecked
+                  TabOrder = 3
+                  OnClick = chkSuckEnableClick
+                end
+              end
+              object pnlAutoSkipBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 84
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblAutoSkipHint: TLabel
+                  Left = 16
+                  Top = 10
+                  Width = 905
+                  Height = 32
+                  AutoSize = False
+                  Caption = 
+                    'Auto-skip a cell after pick-retries are exhausted, instead of st' +
+                    'opping for the operator. Each skipped IC is logged as a Reject a' +
+                    'nd counted on the main screen (Auto Skip). Default OFF.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkSortArmAutoSkip: TCheckBox
+                  Left = 16
+                  Top = 50
+                  Width = 400
+                  Height = 20
+                  Caption = 'Auto-skip cell on pick fail'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -15
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkSortArmAutoSkipClick
+                end
+              end
+            end
+            object tsOption: TTabSheet
+              Caption = 'Option'
+              ImageIndex = 3
+              object pnlBinDisplayBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 40
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblBinPanelType: TLabel
+                  Left = 32
+                  Top = 12
+                  Width = 110
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Bin Display Panel'
+                end
+                object cbBinPanelType: TComboBox
+                  Left = 150
+                  Top = 9
+                  Width = 160
+                  Height = 21
+                  Style = csDropDownList
+                  ItemHeight = 13
+                  ItemIndex = 0
+                  TabOrder = 0
+                  Text = 'LED (HT9046)'
+                  Items.Strings = (
+                    'LED (HT9046)'
+                    'TFT (HT9011)')
+                end
+                object cbCommType: TCheckBox
+                  Left = 360
+                  Top = 8
+                  Width = 97
+                  Height = 17
+                  Caption = 'CommType'
+                  TabOrder = 1
+                end
+              end
+              object pnlSuck2QuadBox: TPanel
+                Left = 0
+                Top = 40
+                Width = 929
+                Height = 64
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblSuck2QuadHint: TLabel
+                  Left = 16
+                  Top = 8
+                  Width = 897
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'Suck2 quad-vacuum : all 4 vacuum generator circuits feed the Suc' +
+                    'k2 nozzle (Nozzle2 only). Any sensor mismatch alarms. Restart re' +
+                    'quired.'
+                end
+                object chkSuck2QuadVacuum: TCheckBox
+                  Left = 16
+                  Top = 32
+                  Width = 250
+                  Height = 17
+                  Caption = 'Suck2 = 4 Vacuum Generators'
+                  TabOrder = 0
+                  OnClick = chkSuck2QuadVacuumClick
+                end
+              end
+              object pnlPrePickWaitBox: TPanel
+                Left = 0
+                Top = 104
+                Width = 929
+                Height = 64
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 2
+                object lblPrePickWaitHint: TLabel
+                  Left = 16
+                  Top = 8
+                  Width = 897
+                  Height = 16
+                  AutoSize = False
+                  Caption =
+                    'SortArm will not pick an IC until the Auto it is routed to alrea' +
+                    'dy holds a tray. Alarm MES1921 after this wait.  -1 = gate off.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblPrePickWait: TLabel
+                  Left = 16
+                  Top = 36
+                  Width = 200
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Pre-pick Auto wait (sec)'
+                end
+                object edPrePickWaitSec: TEdit
+                  Left = 220
+                  Top = 33
+                  Width = 80
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '300'
+                  OnClick = edPrePickWaitSecClick
+                end
+              end
+            end
+            object tsLotInfo: TTabSheet
+              Caption = 'Lot Info'
+              ImageIndex = 4
+              object pnlSortModeBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 80
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblLotBinModeHint: TLabel
+                  Left = 240
+                  Top = 8
+                  Width = 609
+                  Height = 68
+                  AutoSize = False
+                  Caption = 
+                    'Normal = static Bin->Auto recipe table.  By Lot+Bin = each (Lot,' +
+                    'Bin) pair binds to an Auto dynamically.  By Lot+PassFail = PASS/' +
+                    'FAIL (from each IC DiePass in the loaded 2D data) binds to an Au' +
+                    'to per lot.  Mode takes effect at the next Lot Start.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object rgSortMode: TRadioGroup
+                  Left = 8
+                  Top = 2
+                  Width = 224
+                  Height = 74
+                  Caption = 'Sort Mode'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ItemIndex = 0
+                  Items.Strings = (
+                    'Normal'
+                    'By Lot+Bin'
+                    'By Lot+PassFail')
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = rgSortModeClick
+                end
+              end
+              object pnlWhiteListModeBox: TPanel
+                Left = 0
+                Top = 80
+                Width = 929
+                Height = 89
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 1
+                object lblWhiteListModeHint: TLabel
+                  Left = 16
+                  Top = 32
+                  Width = 897
+                  Height = 49
+                  AutoSize = False
+                  Caption = 
+                    'By WhiteList: only 2D codes in HT160S_WhiteList\WhiteList.json a' +
+                    're sorted (by the file Bin); others go to Error. Customer specia' +
+                    'l mode, NOT normal production. Arms at Lot Start and auto-revert' +
+                    's to the base sort mode at Lot End. Changeable only while idle.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkWhiteListActive: TCheckBox
+                  Left = 16
+                  Top = 8
+                  Width = 470
+                  Height = 20
+                  Caption = 
+                    'Activate By WhiteList sorting for this lot only (customer specia' +
+                    'l)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkWhiteListActiveClick
+                end
+              end
+            end
+            object tsCcd: TTabSheet
+              Caption = 'CCD'
+              ImageIndex = 5
+              object pnlCcd2DSanitizeBox: TPanel
+                Left = 0
+                Top = 0
+                Width = 929
+                Height = 89
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 0
+                object lblCcd2DSanitizeHint: TLabel
+                  Left = 16
+                  Top = 32
+                  Width = 897
+                  Height = 49
+                  AutoSize = False
+                  Caption =
+                    'Every comma (half-width or full-width) in a 2D code read by the ' +
+                    'Top CCD or hand-entered / handheld-scanned is replaced with an u' +
+                    'nderscore before the code is used anywhere (routing, logs, CSV, ' +
+                    'SECS). The work-order data must already use the underscore form.' +
+                    ' Changeable only while idle.'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  WordWrap = True
+                end
+                object chkCcd2DCommaToUnderscore: TCheckBox
+                  Left = 16
+                  Top = 8
+                  Width = 470
+                  Height = 20
+                  Caption = 'Replace commas in scanned 2D codes with underscore'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                  TabOrder = 0
+                  OnClick = chkCcd2DCommaToUnderscoreClick
+                end
+              end
+            end
           end
           object Panel1: TPanel
             Left = 2
-            Top = 765
-            Width = 835
+            Top = 882
+            Width = 937
             Height = 0
             Align = alBottom
             Color = 12761254
@@ -1293,10 +2670,1142 @@ object fMaintenance: TfMaintenance
       end
       object tsMaintSECS: TTabSheet
         Caption = 'SECS/GEM'
+        object pnlSecsOverride: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 120
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblSecsOverrideTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 420
+            Height = 20
+            AutoSize = False
+            Caption = 'Host Panel Override (PP_SIGNALTOWER / PP_MUSIC)'
+          end
+          object lblSecsOverrideState: TLabel
+            Left = 16
+            Top = 54
+            Width = 500
+            Height = 20
+            AutoSize = False
+            Caption = 'Override: inactive'
+          end
+          object btnSecsOverrideRelease: TButton
+            Left = 560
+            Top = 48
+            Width = 190
+            Height = 32
+            Caption = 'Release Host Override'
+            TabOrder = 0
+            OnClick = btnSecsOverrideReleaseClick
+          end
+        end
+        object pnlSecsControlState: TPanel
+          Left = 20
+          Top = 152
+          Width = 780
+          Height = 150
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblSecsCtlTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 520
+            Height = 20
+            AutoSize = False
+            Caption = 'GEM Control State (SEMI E30)'
+          end
+          object lblSecsCtlState: TLabel
+            Left = 16
+            Top = 44
+            Width = 740
+            Height = 20
+            AutoSize = False
+            Caption = 'State: -'
+          end
+          object lblSecsCtlHint: TLabel
+            Left = 16
+            Top = 118
+            Width = 740
+            Height = 20
+            AutoSize = False
+            Caption = 
+              'Off-Line selected here is Equipment Off-Line: the host cannot li' +
+              'ft it with S1F17.'
+          end
+          object btnSecsCtlOffline: TButton
+            Left = 16
+            Top = 74
+            Width = 170
+            Height = 34
+            Caption = 'Off-Line'
+            TabOrder = 0
+            OnClick = btnSecsCtlOfflineClick
+          end
+          object btnSecsCtlLocal: TButton
+            Left = 200
+            Top = 74
+            Width = 170
+            Height = 34
+            Caption = 'On-Line Local'
+            TabOrder = 1
+            OnClick = btnSecsCtlLocalClick
+          end
+          object btnSecsCtlRemote: TButton
+            Left = 384
+            Top = 74
+            Width = 170
+            Height = 34
+            Caption = 'On-Line Remote'
+            TabOrder = 2
+            OnClick = btnSecsCtlRemoteClick
+          end
+          object chkSecsAcceptHostOnline: TCheckBox
+            Left = 574
+            Top = 80
+            Width = 190
+            Height = 21
+            Caption = 'Accept host S1F17'
+            TabOrder = 3
+            OnClick = chkSecsAcceptHostOnlineClick
+          end
+        end
       end
       object tsMaintCOM: TTabSheet
         Caption = 'COM Port'
       end
+      object tsMaintMCUDisplay: TTabSheet
+        Caption = 'Bin Display'
+        object pnlMCUSetup: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 210
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblMCUSetupTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 160
+            Height = 20
+            AutoSize = False
+            Caption = 'Bin Display TCP Setup'
+          end
+          object lblMCUIPCap: TLabel
+            Left = 16
+            Top = 82
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'COM Port'
+          end
+          object lblMCUPortCap: TLabel
+            Left = 16
+            Top = 118
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Baud'
+          end
+          object lblMCUReconnectCap: TLabel
+            Left = 310
+            Top = 118
+            Width = 120
+            Height = 20
+            AutoSize = False
+            Caption = 'Delay (s)'
+          end
+          object chkMCUEnabled: TCheckBox
+            Left = 16
+            Top = 46
+            Width = 240
+            Height = 24
+            Caption = 'Bin Display Installed'
+            TabOrder = 0
+          end
+          object edMCUIP: TEdit
+            Left = 108
+            Top = 78
+            Width = 160
+            Height = 24
+            TabOrder = 1
+            Text = 'COM5'
+          end
+          object edMCUPort: TComboBox
+            Left = 108
+            Top = 114
+            Width = 95
+            Height = 21
+            ItemHeight = 13
+            TabOrder = 2
+            Text = '9600'
+            Items.Strings = (
+              '9600'
+              '19200'
+              '38400'
+              '57600'
+              '115200')
+          end
+          object edMCUReconnect: TEdit
+            Left = 420
+            Top = 114
+            Width = 80
+            Height = 24
+            TabOrder = 3
+            Text = '5'
+          end
+          object btnMCUSave: TButton
+            Left = 560
+            Top = 76
+            Width = 90
+            Height = 28
+            Caption = 'Save'
+            TabOrder = 4
+            OnClick = btnMCUSaveClick
+          end
+          object btnMCUReload: TButton
+            Left = 660
+            Top = 76
+            Width = 90
+            Height = 28
+            Caption = 'Reload'
+            TabOrder = 5
+            OnClick = btnMCUReloadClick
+          end
+          object btnMCURefresh: TButton
+            Left = 560
+            Top = 114
+            Width = 190
+            Height = 28
+            Caption = 'Refresh Status'
+            TabOrder = 7
+            OnClick = btnMCURefreshClick
+          end
+          object pnlMCUStatus: TPanel
+            Left = 16
+            Top = 152
+            Width = 734
+            Height = 42
+            BevelOuter = bvLowered
+            TabOrder = 6
+            object lblMCUStatusEnabled: TLabel
+              Left = 8
+              Top = 12
+              Width = 130
+              Height = 20
+              AutoSize = False
+              Caption = 'Enabled: -'
+            end
+            object lblMCUStatusConnected: TLabel
+              Left = 146
+              Top = 12
+              Width = 150
+              Height = 20
+              AutoSize = False
+              Caption = 'Connected: -'
+            end
+            object lblMCUStatusQueue: TLabel
+              Left = 304
+              Top = 12
+              Width = 110
+              Height = 20
+              AutoSize = False
+              Caption = 'Queue: 0'
+            end
+            object lblMCUStatusError: TLabel
+              Left = 420
+              Top = 12
+              Width = 300
+              Height = 20
+              AutoSize = False
+              Caption = 'Last Error: '
+            end
+          end
+        end
+        object pnlMCUTest: TPanel
+          Left = 20
+          Top = 246
+          Width = 780
+          Height = 210
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblMCUTestTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 180
+            Height = 20
+            AutoSize = False
+            Caption = 'Manual Test'
+          end
+          object lblMCUAddressCap: TLabel
+            Left = 16
+            Top = 52
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Address'
+          end
+          object lblMCUTextCap: TLabel
+            Left = 16
+            Top = 88
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Text'
+          end
+          object lblMCUColorCap: TLabel
+            Left = 16
+            Top = 124
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Color'
+          end
+          object lblMCULightValueCap: TLabel
+            Left = 260
+            Top = 88
+            Width = 100
+            Height = 20
+            AutoSize = False
+            Caption = 'Color Code'
+          end
+          object edMCUAddress: TEdit
+            Left = 108
+            Top = 48
+            Width = 80
+            Height = 24
+            TabOrder = 0
+            Text = '0'
+          end
+          object edMCUText: TEdit
+            Left = 108
+            Top = 84
+            Width = 80
+            Height = 24
+            TabOrder = 1
+            Text = '9'
+          end
+          object cbbMCUColor: TComboBox
+            Left = 108
+            Top = 120
+            Width = 120
+            Height = 21
+            Style = csDropDownList
+            ItemHeight = 13
+            ItemIndex = 0
+            TabOrder = 2
+            Text = 'GREEN'
+            Items.Strings = (
+              'GREEN'
+              'RED')
+          end
+          object chkMCUCodeSymbol: TCheckBox
+            Left = 260
+            Top = 48
+            Width = 130
+            Height = 24
+            Caption = 'Symbol Code'
+            TabOrder = 3
+          end
+          object edMCULightValue: TEdit
+            Left = 370
+            Top = 84
+            Width = 80
+            Height = 24
+            TabOrder = 4
+            Text = '0'
+          end
+          object btnMCUSendDisplay: TButton
+            Left = 520
+            Top = 48
+            Width = 150
+            Height = 28
+            Caption = 'Send Display'
+            TabOrder = 5
+            OnClick = btnMCUSendDisplayClick
+          end
+          object btnMCUSendCode: TButton
+            Left = 520
+            Top = 86
+            Width = 150
+            Height = 28
+            Caption = 'Send Code'
+            TabOrder = 6
+            OnClick = btnMCUSendCodeClick
+          end
+          object btnMCUSendLight: TButton
+            Left = 520
+            Top = 124
+            Width = 150
+            Height = 28
+            Caption = 'Send Light'
+            TabOrder = 7
+            OnClick = btnMCUSendLightClick
+          end
+        end
+        object memMCULog: TMemo
+          Left = 20
+          Top = 474
+          Width = 780
+          Height = 300
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 2
+        end
+      end
+      object tsMaintTopCcd: TTabSheet
+        Caption = 'Top CCD'
+        object pnlTopCcdSetup: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 170
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblTopCcdSetupTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 200
+            Height = 20
+            AutoSize = False
+            Caption = 'Top CCD TCP Setup'
+          end
+          object lblTopCcdIPCap: TLabel
+            Left = 16
+            Top = 50
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'IP'
+          end
+          object lblTopCcdPortCap: TLabel
+            Left = 16
+            Top = 86
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Port'
+          end
+          object edTopCcdIP: TEdit
+            Left = 108
+            Top = 46
+            Width = 160
+            Height = 21
+            TabOrder = 0
+            Text = '172.16.8.89'
+          end
+          object edTopCcdPort: TEdit
+            Left = 108
+            Top = 82
+            Width = 80
+            Height = 21
+            TabOrder = 1
+            Text = '5001'
+          end
+          object chkTopCcdBottomReserved: TCheckBox
+            Left = 310
+            Top = 48
+            Width = 240
+            Height = 24
+            Caption = 'Bottom CCD (reserved)'
+            Enabled = False
+            TabOrder = 2
+          end
+          object chkTopCcdEnable: TCheckBox
+            Left = 310
+            Top = 84
+            Width = 240
+            Height = 24
+            Caption = 'Enable Top CCD'
+            TabOrder = 8
+            OnClick = chkTopCcdEnableClick
+          end
+          object btnTopCcdSave: TButton
+            Left = 560
+            Top = 44
+            Width = 90
+            Height = 28
+            Caption = 'Save'
+            TabOrder = 3
+            OnClick = btnTopCcdSaveClick
+          end
+          object btnTopCcdReload: TButton
+            Left = 660
+            Top = 44
+            Width = 90
+            Height = 28
+            Caption = 'Reload'
+            TabOrder = 4
+            OnClick = btnTopCcdReloadClick
+          end
+          object btnTopCcdConnect: TButton
+            Left = 560
+            Top = 82
+            Width = 90
+            Height = 28
+            Caption = 'Connect'
+            TabOrder = 5
+            OnClick = btnTopCcdConnectClick
+          end
+          object btnTopCcdDisconnect: TButton
+            Left = 660
+            Top = 82
+            Width = 90
+            Height = 28
+            Caption = 'Disconnect'
+            TabOrder = 6
+            OnClick = btnTopCcdDisconnectClick
+          end
+          object pnlTopCcdStatus: TPanel
+            Left = 16
+            Top = 118
+            Width = 734
+            Height = 42
+            BevelOuter = bvLowered
+            TabOrder = 7
+            object lblTopCcdStatusConn: TLabel
+              Left = 8
+              Top = 12
+              Width = 180
+              Height = 20
+              AutoSize = False
+              Caption = 'Connected: -'
+            end
+            object lblTopCcdStatusError: TLabel
+              Left = 200
+              Top = 12
+              Width = 520
+              Height = 20
+              AutoSize = False
+              Caption = 'Last Error: '
+            end
+          end
+        end
+        object pnlTopCcdTest: TPanel
+          Left = 20
+          Top = 206
+          Width = 780
+          Height = 110
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblTopCcdTestTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 240
+            Height = 20
+            AutoSize = False
+            Caption = 'Manual Shot (LON / LOFF)'
+          end
+          object lblTopCcdResultCap: TLabel
+            Left = 296
+            Top = 52
+            Width = 60
+            Height = 20
+            AutoSize = False
+            Caption = 'Result'
+          end
+          object btnTopCcdShot: TButton
+            Left = 16
+            Top = 48
+            Width = 130
+            Height = 28
+            Caption = 'Trigger Shot'
+            TabOrder = 0
+            OnClick = btnTopCcdShotClick
+          end
+          object btnTopCcdEndShot: TButton
+            Left = 154
+            Top = 48
+            Width = 130
+            Height = 28
+            Caption = 'End Shot (LOFF)'
+            TabOrder = 1
+            OnClick = btnTopCcdEndShotClick
+          end
+          object edTopCcdResult: TEdit
+            Left = 360
+            Top = 48
+            Width = 400
+            Height = 21
+            ReadOnly = True
+            TabOrder = 2
+          end
+        end
+        object memTopCcdLog: TMemo
+          Left = 20
+          Top = 332
+          Width = 780
+          Height = 300
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 2
+        end
+      end
+      object tsMaintColorCcd: TTabSheet
+        Caption = 'Color CCD'
+        object pnlColorCcdSetup: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 170
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblColorCcdSetupTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 200
+            Height = 20
+            AutoSize = False
+            Caption = 'Color CCD TCP Setup'
+          end
+          object lblColorCcdIPCap: TLabel
+            Left = 16
+            Top = 50
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'IP'
+          end
+          object lblColorCcdPortCap: TLabel
+            Left = 16
+            Top = 86
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Port'
+          end
+          object edColorCcdIP: TEdit
+            Left = 108
+            Top = 46
+            Width = 160
+            Height = 24
+            TabOrder = 0
+            Text = '172.16.8.100'
+          end
+          object edColorCcdPort: TEdit
+            Left = 108
+            Top = 82
+            Width = 80
+            Height = 24
+            TabOrder = 1
+            Text = '5000'
+          end
+          object chkColorCcdEnable: TCheckBox
+            Left = 310
+            Top = 48
+            Width = 240
+            Height = 24
+            Caption = 'Enable Color CCD'
+            TabOrder = 2
+            OnClick = chkColorCcdEnableClick
+          end
+          object btnColorCcdSave: TButton
+            Left = 560
+            Top = 44
+            Width = 90
+            Height = 28
+            Caption = 'Save'
+            TabOrder = 3
+            OnClick = btnColorCcdSaveClick
+          end
+          object btnColorCcdReload: TButton
+            Left = 660
+            Top = 44
+            Width = 90
+            Height = 28
+            Caption = 'Reload'
+            TabOrder = 4
+            OnClick = btnColorCcdReloadClick
+          end
+          object btnColorCcdConnect: TButton
+            Left = 560
+            Top = 82
+            Width = 90
+            Height = 28
+            Caption = 'Connect'
+            TabOrder = 5
+            OnClick = btnColorCcdConnectClick
+          end
+          object btnColorCcdDisconnect: TButton
+            Left = 660
+            Top = 82
+            Width = 90
+            Height = 28
+            Caption = 'Disconnect'
+            TabOrder = 6
+            OnClick = btnColorCcdDisconnectClick
+          end
+          object pnlColorCcdStatus: TPanel
+            Left = 16
+            Top = 118
+            Width = 734
+            Height = 42
+            BevelOuter = bvLowered
+            TabOrder = 7
+            object lblColorCcdStatusConn: TLabel
+              Left = 8
+              Top = 12
+              Width = 180
+              Height = 20
+              AutoSize = False
+              Caption = 'Connected: -'
+            end
+            object lblColorCcdStatusError: TLabel
+              Left = 200
+              Top = 12
+              Width = 520
+              Height = 20
+              AutoSize = False
+              Caption = 'Last Error: '
+            end
+          end
+        end
+        object pnlColorCcdTest: TPanel
+          Left = 20
+          Top = 206
+          Width = 780
+          Height = 110
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 1
+          object lblColorCcdTestTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 240
+            Height = 20
+            AutoSize = False
+            Caption = 'Manual Shot (LON / LOFF)'
+          end
+          object lblColorCcdResultCap: TLabel
+            Left = 296
+            Top = 52
+            Width = 60
+            Height = 20
+            AutoSize = False
+            Caption = 'Result'
+          end
+          object btnColorCcdShot: TButton
+            Left = 16
+            Top = 48
+            Width = 130
+            Height = 28
+            Caption = 'Trigger Shot'
+            TabOrder = 0
+            OnClick = btnColorCcdShotClick
+          end
+          object btnColorCcdEndShot: TButton
+            Left = 154
+            Top = 48
+            Width = 130
+            Height = 28
+            Caption = 'End Shot (LOFF)'
+            TabOrder = 1
+            OnClick = btnColorCcdEndShotClick
+          end
+          object edColorCcdResult: TEdit
+            Left = 360
+            Top = 48
+            Width = 400
+            Height = 24
+            ReadOnly = True
+            TabOrder = 2
+          end
+        end
+        object memColorCcdLog: TMemo
+          Left = 20
+          Top = 332
+          Width = 780
+          Height = 300
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 2
+        end
+      end
+      object tsMaintLotApi: TTabSheet
+        Caption = 'Lot WebAPI'
+        object pnlLotApiSetup: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 130
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object Label1: TLabel
+            Left = 16
+            Top = 16
+            Width = 80
+            Height = 16
+            Caption = 'WebAPI Path'
+            Font.Charset = DEFAULT_CHARSET
+            Font.Color = clWindowText
+            Font.Height = -13
+            Font.Name = 'MS Sans Serif'
+            Font.Style = []
+            ParentFont = False
+          end
+          object lblLotApiUrl: TLabel
+            Left = 16
+            Top = 46
+            Width = 620
+            Height = 20
+            AutoSize = False
+            Caption = 'URL: '
+          end
+          object lblLotApiSaveHint: TLabel
+            Left = 220
+            Top = 80
+            Width = 540
+            Height = 20
+            AutoSize = False
+            Caption = 
+              'Save/Reload persist the URL to system\General.ini [LotWebApi] Ba' +
+              'seUrl.'
+          end
+          object edWebapiPath: TEdit
+            Left = 110
+            Top = 12
+            Width = 560
+            Height = 21
+            TabOrder = 0
+          end
+          object btnLotApiSave: TButton
+            Left = 16
+            Top = 76
+            Width = 90
+            Height = 28
+            Caption = 'Save'
+            TabOrder = 1
+            OnClick = btnLotApiSaveClick
+          end
+          object btnLotApiReload: TButton
+            Left = 116
+            Top = 76
+            Width = 90
+            Height = 28
+            Caption = 'Reload'
+            TabOrder = 2
+            OnClick = btnLotApiReloadClick
+          end
+          object chkLotApiUsePull: TCheckBox
+            Left = 16
+            Top = 106
+            Width = 540
+            Height = 24
+            Caption = 
+              'Auto-pull on Lot Start / SECS LOTSTART (off until customer API r' +
+              'eady)'
+            TabOrder = 3
+          end
+        end
+        object pnlLotApiStatus: TPanel
+          Left = 20
+          Top = 160
+          Width = 780
+          Height = 42
+          BevelOuter = bvLowered
+          TabOrder = 1
+          object lblLotApiStatus: TLabel
+            Left = 8
+            Top = 12
+            Width = 260
+            Height = 20
+            AutoSize = False
+            Caption = 'State: idle'
+          end
+          object lblLotApiError: TLabel
+            Left = 280
+            Top = 12
+            Width = 490
+            Height = 20
+            AutoSize = False
+            Caption = 'Last Error: '
+          end
+        end
+        object pnlLotApiTest: TPanel
+          Left = 20
+          Top = 212
+          Width = 780
+          Height = 200
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 2
+          object lblLotApiTestTitle: TLabel
+            Left = 16
+            Top = 14
+            Width = 200
+            Height = 20
+            AutoSize = False
+            Caption = 'Manual Fetch (test)'
+          end
+          object lblLotApiTestLotCap: TLabel
+            Left = 16
+            Top = 50
+            Width = 80
+            Height = 20
+            AutoSize = False
+            Caption = 'Lot ID'
+          end
+          object edLotApiTestLot: TEdit
+            Left = 108
+            Top = 46
+            Width = 360
+            Height = 24
+            TabOrder = 0
+            Text = 'A5921.RCS.TEST99'
+          end
+          object btnLotApiFetch: TButton
+            Left = 480
+            Top = 44
+            Width = 120
+            Height = 28
+            Caption = 'Fetch'
+            TabOrder = 1
+            OnClick = btnLotApiFetchClick
+          end
+          object memLotApiResult: TMemo
+            Left = 16
+            Top = 82
+            Width = 748
+            Height = 104
+            ReadOnly = True
+            ScrollBars = ssBoth
+            TabOrder = 2
+            WordWrap = False
+          end
+        end
+        object memLotApiLog: TMemo
+          Left = 20
+          Top = 422
+          Width = 780
+          Height = 210
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 3
+        end
+      end
+      object tsMaintFtp: TTabSheet
+        Caption = 'FTP'
+        object pnlFtpSetup: TPanel
+          Left = 20
+          Top = 20
+          Width = 780
+          Height = 210
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 0
+          object lblFtpHost: TLabel
+            Left = 16
+            Top = 18
+            Width = 43
+            Height = 13
+            Caption = 'Host / IP'
+          end
+          object lblFtpPort: TLabel
+            Left = 380
+            Top = 18
+            Width = 19
+            Height = 13
+            Caption = 'Port'
+          end
+          object lblFtpUser: TLabel
+            Left = 16
+            Top = 50
+            Width = 22
+            Height = 13
+            Caption = 'User'
+          end
+          object lblFtpPwd: TLabel
+            Left = 380
+            Top = 50
+            Width = 46
+            Height = 13
+            Caption = 'Password'
+          end
+          object lblFtpRemoteDir: TLabel
+            Left = 16
+            Top = 82
+            Width = 53
+            Height = 13
+            Caption = 'Remote Dir'
+          end
+          object lblFtpSaveHint: TLabel
+            Left = 220
+            Top = 174
+            Width = 540
+            Height = 20
+            AutoSize = False
+            Caption = 'Save/Reload persist to system\General.ini [Ftp].'
+          end
+          object edFtpHost: TEdit
+            Left = 110
+            Top = 14
+            Width = 250
+            Height = 21
+            TabOrder = 0
+          end
+          object edFtpPort: TEdit
+            Left = 430
+            Top = 14
+            Width = 80
+            Height = 21
+            TabOrder = 1
+          end
+          object edFtpUser: TEdit
+            Left = 110
+            Top = 46
+            Width = 250
+            Height = 21
+            TabOrder = 2
+          end
+          object edFtpPwd: TEdit
+            Left = 470
+            Top = 46
+            Width = 180
+            Height = 21
+            PasswordChar = '*'
+            TabOrder = 3
+          end
+          object edFtpRemoteDir: TEdit
+            Left = 110
+            Top = 78
+            Width = 400
+            Height = 21
+            TabOrder = 4
+          end
+          object chkFtpEnable: TCheckBox
+            Left = 16
+            Top = 110
+            Width = 620
+            Height = 20
+            Caption = 
+              'Enable production upload (Lot End). Off = local report only, no ' +
+              'upload.'
+            TabOrder = 5
+          end
+          object chkFtpUploadReport: TCheckBox
+            Left = 16
+            Top = 136
+            Width = 620
+            Height = 20
+            Caption = 'Upload production report (Soter CSV) to KYEC FTP at Lot End'
+            TabOrder = 6
+          end
+          object btnFtpSave: TButton
+            Left = 16
+            Top = 170
+            Width = 90
+            Height = 28
+            Caption = 'Save'
+            TabOrder = 7
+            OnClick = btnFtpSaveClick
+          end
+          object btnFtpReload: TButton
+            Left = 116
+            Top = 170
+            Width = 90
+            Height = 28
+            Caption = 'Reload'
+            TabOrder = 8
+            OnClick = btnFtpReloadClick
+          end
+        end
+        object pnlFtpStatus: TPanel
+          Left = 20
+          Top = 242
+          Width = 780
+          Height = 42
+          BevelOuter = bvLowered
+          TabOrder = 1
+          object lblFtpState: TLabel
+            Left = 8
+            Top = 12
+            Width = 380
+            Height = 20
+            AutoSize = False
+            Caption = 'State: -'
+          end
+          object lblFtpLastError: TLabel
+            Left = 400
+            Top = 12
+            Width = 370
+            Height = 20
+            AutoSize = False
+            Caption = 'Last Error: '
+          end
+        end
+        object pnlFtpTest: TPanel
+          Left = 20
+          Top = 296
+          Width = 780
+          Height = 150
+          BevelOuter = bvLowered
+          Color = 12761254
+          TabOrder = 2
+          object lblFtpTestTitle: TLabel
+            Left = 16
+            Top = 12
+            Width = 400
+            Height = 20
+            AutoSize = False
+            Caption = 'Manual test (runs even when Enable is off)'
+          end
+          object btnFtpTestConn: TButton
+            Left = 16
+            Top = 40
+            Width = 140
+            Height = 28
+            Caption = 'Test Connection'
+            TabOrder = 0
+            OnClick = btnFtpTestConnClick
+          end
+          object btnFtpTestUpload: TButton
+            Left = 170
+            Top = 40
+            Width = 160
+            Height = 28
+            Caption = 'Test Upload'
+            TabOrder = 1
+            OnClick = btnFtpTestUploadClick
+          end
+          object memFtpResult: TMemo
+            Left = 16
+            Top = 76
+            Width = 748
+            Height = 64
+            ReadOnly = True
+            ScrollBars = ssBoth
+            TabOrder = 2
+            WordWrap = False
+          end
+        end
+        object memFtpLog: TMemo
+          Left = 20
+          Top = 458
+          Width = 780
+          Height = 210
+          ReadOnly = True
+          ScrollBars = ssVertical
+          TabOrder = 3
+        end
+      end
     end
+  end
+  object tmrTowerLightBlink: TTimer
+    Enabled = False
+    Interval = 300
+    OnTimer = tmrTowerLightBlinkTimer
+    Left = 8
+    Top = 8
   end
 end

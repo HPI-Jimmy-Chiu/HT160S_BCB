@@ -144,7 +144,10 @@ void TfSecsGemLog::RefreshECGrid()
     for(int i = 0; i < cnt; i++)
     {
         unsigned id = HGem->GetECIDByIndex(i);
-        bool bSettable = (id >= 2011 && id <= 2016);
+        //AI(ht160s-secsgem) 20260612 : tray-form EC band aligned to HT9045 Type1
+        //  (2758 X Pitch / 2759 Y Pitch / 2760 X Start / 2761 Y Start /
+        //   2762 X Division / 2763 Y Division) -- contiguous 2758..2763.
+        bool bSettable = (id >= 2758 && id <= 2763);
         GridEC->Cells[0][i + 1] = AnsiString((int)id);
         GridEC->Cells[1][i + 1] = HGem->GetECName(id);
         GridEC->Cells[2][i + 1] = HGem->GetECUnit(id);
@@ -252,7 +255,8 @@ void __fastcall TfSecsGemLog::GridECClick(TObject *Sender)
 
     unsigned id = (unsigned)StrToIntDef(GridEC->Cells[0][row], 0);
     uSelECID = id;
-    bool bSettable = (id >= 2011 && id <= 2016);
+    //AI(ht160s-secsgem) 20260612 : tray-form EC band aligned to HT9045 Type1 (2758..2763).
+    bool bSettable = (id >= 2758 && id <= 2763);
 
     LblECSel->Caption   = "EC " + AnsiString((int)id) + "  " + HGem->GetECName(id);
     EdtECValue->Text    = HGem->GetECValueString(id);

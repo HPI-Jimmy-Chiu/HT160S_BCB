@@ -44,6 +44,7 @@ HTMotor::HTMotor()
     iHomeStepRange  =0;
     bNeedHome       =false;
     bThreadHome     =false;
+    bHomePhaseTimeout=false;
     MotorIdleSafeDoorCheck=NULL;
 }
 //---------------------------------------------------------------------------

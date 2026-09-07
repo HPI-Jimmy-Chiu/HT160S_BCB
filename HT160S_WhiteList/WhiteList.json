@@ -1,0 +1,24 @@
+{
+  "QRCodeIDHis": [
+    {
+      "LOTID": "A5921.RCS.TEST99",
+      "KYECLotID": "NQ4000NAA1",
+      "Substage": "FT1",
+      "ProductCode": "TESTDEV-A123",
+      "ICInfo": [
+        { "QRCodeID": "WLTEST2D0001", "HBin": "1" },
+        { "QRCodeID": "WLTEST2D0002", "HBin": "2" },
+        { "QRCodeID": "WLTEST2D0003", "HBin": "3" },
+        { "QRCodeID": "WLTEST2D0004", "HBin": "4" },
+        { "QRCodeID": "WLTEST2D0005", "HBin": "5" },
+        { "QRCodeID": "WLTEST2D0006", "HBin": "6" },
+        { "QRCodeID": "WLTEST2D0007", "HBin": "1" },
+        { "QRCodeID": "WLTEST2D0008", "HBin": "2" },
+        { "QRCodeID": "WLTEST2D0009", "HBin": "3" },
+        { "QRCodeID": "WLTEST2D0010", "HBin": "4" },
+        { "QRCodeID": "WLTEST2D0011", "HBin": "5" },
+        { "QRCodeID": "WLTEST2D0012", "HBin": "6" }
+      ]
+    }
+  ]
+}

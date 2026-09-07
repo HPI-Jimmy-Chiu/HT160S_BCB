@@ -17,22 +17,29 @@ __published:
     TPanel *palPause;
     TPanel *palYes;
     TPanel *palNo;
-    TButton *Button2;
+    TButton *btnOffBuzzer;
+    TTimer *Timer1;
     void __fastcall palPauseClick(TObject *Sender);
     void __fastcall palYesClick(TObject *Sender);
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
-    void __fastcall Button2Click(TObject *Sender);
+    void __fastcall btnOffBuzzerClick(TObject *Sender);
+    void __fastcall Timer1Timer(TObject *Sender);
 private:
     int Status;
 public:
     __fastcall TMyMessageBox(TComponent* Owner);
+    void __fastcall ScanKey();
     int ret;
     bool flushState;
     int flushCT;
     bool fShow;
     bool fScanPanel;
     bool bFormShowNoStop;
+    //AI(HT160S-Maintainer) 20260622 : message-box buzzer-mute latch, HT172 bOffBuzzer parity.
+    //Set by btnOffBuzzerClick (Off Buzzer), cleared each FormShow/FormClose; read by DoSystemMessage
+    //so a muted message box drops out of the LED_Message buzzer state instead of re-sounding.
+    bool fBuzzerOff;
     char Message[256];
     char CHMessage[256];
     char ENMessage[256];
@@ -46,10 +53,12 @@ public:
 //---------------------------------------------------------------------------
 extern PACKAGE TMyMessageBox *MyMessageBox;
 void ShowMyMessage(AnsiString S);
+void ShowMyMessage(AnsiString S1, AnsiString S2);
 void ShowMyMessage(char *S);
 void ShowMyMessage(int Code);
 void ShowMyOKMessage(char *str);
 void ShowMyOKMessage(int Code);
+void ShowMyOKMessageNoStop(AnsiString S);
 void ShowMyMessage_Run(AnsiString S1, AnsiString S2);
 int  ShowMyMessageBox_YES_NO(AnsiString str);
 int  ShowMyMessageBox_YES_NO(char *str);

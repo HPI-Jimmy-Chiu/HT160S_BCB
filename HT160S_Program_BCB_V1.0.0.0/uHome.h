@@ -41,6 +41,7 @@ private:
     bool    fSeenStart;
     bool    fGridBuilt;
     void BuildMotorGrid();
+    void __fastcall ScanKey();
 public:
     enum eHomeLedColor { eHomeUnuse=0, eHomeOk=1, eHomeError=2, eHomeBusy=3 };
     __fastcall TfHome(TComponent* Owner);
@@ -48,6 +49,11 @@ public:
     void ShowMotorHomePos(int i);
     int iHomeStep;
     bool ProcessMotorHome();
+    bool IsShown() const;
+    bool SeenStart() const;
+    void MarkSeenStart();
+    void RequestClose();
+    void RequestCloseFinished();
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TfHome *fHome;

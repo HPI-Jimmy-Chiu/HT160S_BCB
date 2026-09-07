@@ -16,6 +16,7 @@
 #define K_TRAY_END   0x0008
 #define K_CLEAN_OUT  0x0010
 #define K_HOME       0x0020
+#define K_MANUAL_2D  0x0040
 //---------------------------------------------------------------------------
 class MyNoteStruct
 {
@@ -37,6 +38,7 @@ __published:
     TLabel *Label2;
     TEdit *edtAlarmCode;
     TEdit *edtAlarmMsg;
+    TEdit *edtManual2D;
     TPanel *Panel1;
     TPanel *PanelCommand;
     TPanel *BtnHome;
@@ -57,6 +59,7 @@ __published:
     void __fastcall BtnPauseClick(TObject *Sender);
     void __fastcall BtnOffBuzzerClick(TObject *Sender);
     void __fastcall BtnSkipClick(TObject *Sender);
+    void __fastcall edtManual2DKeyPress(TObject *Sender, char &Key);
 private:
     bool bMachineLayoutBuilt;
     bool bOffBuzzer;
@@ -70,12 +73,14 @@ public:
     int Code;
     int ReturnCode;
     bool fShow;
+    bool IsBuzzerOff() { return bOffBuzzer; }   //AI(HT160S-Maintainer) 20260622 : per-scan buzzer driver reads the OFF BUZZER latch (ErrJam silence, HT172 bAlarmBuzzer parity)
     int KeyCode;
     bool Select[6];
     int iBackOldMemo2Y;
     int iBackMemo2Height;
     bool fMemoPos;
     AnsiString sObjName;
+    AnsiString ManualText;
     TPanel *FlushPanel;
     TColor FlushPanelColor;
     MyNoteStruct *SystemError;
@@ -134,7 +139,6 @@ public:
     void __fastcall FlushLabel();
     void __fastcall ScanKey();
     void __fastcall ProcessErrMessage(AnsiString EC, AnsiString Str, int Type);
-    bool __fastcall CheckCodeIsExist(AnsiString Str);
     void __fastcall Start();
     void __fastcall UpdateButtonStatus(TObject *Sender);
     void __fastcall LevelProcessErrMessage();
@@ -148,6 +152,9 @@ extern PACKAGE TfNote *fNote;
 void ShowCylinderError(int Code, int Type);
 void ShowMotorError(AnsiString Code);
 void ShowMotorError(AnsiString Code, AnsiString sFunc);
+int  ShowMotorLimitError(AnsiString Code, AnsiString Message, AnsiString Detail);
+class TMyMotor;
+int  ShowMotorLimitError(AnsiString Code, AnsiString Message, TMyMotor *pMot, int p);
 int  ShowSuckError(TMySucker &Ptr, int CodeType, int KCode, AnsiString HappenRegion);
 int  ShowSuckError(TMyKitSuck &Ptr, int CodeType, int KCode, AnsiString errPart, int iDuplicate=0);
 int  ShowSystemError(int CodeType, int KCode);
@@ -158,17 +165,15 @@ int  ShowMagazineError(int iMagazine, int CodeType, int KCode);
 int  ShowSystemCommError(int CodeType, int KCode, AnsiString Note="");
 int  ShowCCDError(int CodeType, int KCode, AnsiString Note="");
 int  ShowMyError(AnsiString sMyError, int KCode);
+int  ShowMyError(AnsiString Code, AnsiString sMyError, int KCode);
+int  ShowMyError(AnsiString Code, AnsiString sMyError, AnsiString Detail, int KCode);
+AnsiString TriggerLine(TMySensor &Sn, bool bExpectedOn);
+int  ShowMyError(AnsiString Code, AnsiString sMyError, TMySensor *pSn, bool bExpectedOn, int KCode);
 int  ShowTNTError(int CodeType, int KCode);
 void ShowErrorMessage(AnsiString Code);
 void RecordProcess(AnsiString S);
-void LevelRecordProcess();
 void SearchMessage(AnsiString Code);
 void RecordAlarmMessagePassTime(AnsiString AlarmCode, DWORD StartTime, AnsiString HappenTime, int Type);
-bool CheckAlarmIsShow();
-void SetShowAlarmLocation(int iType=0, int iPosition=0);
-void SetShowSuckerLocation(AnsiString sSuckerName);
-void ShowImageTrayFuntion();
-AnsiString GetRefrenceCode(AnsiString S);
 extern DWORD RecordHappenTime;
 //---------------------------------------------------------------------------
 #endif

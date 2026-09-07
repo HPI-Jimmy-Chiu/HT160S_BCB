@@ -4,11 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #pragma hdrstop
+#include "language.h"
+#include "mymessbox.h"
 
 #include "database.h"
 #include "cmydef.h"
 #include "ComPort.h"
-#include "MCUDisplay.h"
+#include "MyBinDisp.h"
 #include "aLoader.h"
 #include "aEmpty.h"
 #include "aAuto1To6.h"
@@ -18,40 +20,75 @@
 #include "csystem.h"
 #include "myio_MN200.h"
 #include "CosFunction.h"
+#include "GeneralSetting.h"
 #include "SecsGem\uHGemClass.h"
+#include "SecsGem\UsecegemMainFrom.h"   //AI(secs-alid-optiond) 20260902 : ComputeAlarmAlid for the ALID self-check
+#include "cEventLog.h"                  //AI(secs-alid-optiond) 20260902 : g_EventLog, the ratified report channel
 #include "cStepTrace.h"
 #include "cStateRecordHT160.h"
+#include "systools.h"
+#include "uAmrInject.h"   //AI(ht160s-agv) 20260708 : clear AMR manual-inject on any HOME/init
 #pragma package(smart_init)
 #pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 SYSTEM_MODULAR HSys;
 TDataModule1 *DataModule1;
+//AI(secs-alid-optiond) 20260902 : AMENDMENT 2 verdict latch. CreateSystemAlarmCode()
+//runs inside HSys.Initial() at init progress 46; g_EventLog.Init() only runs at
+//ht160s.cpp progress 86, and cCsvDailyLog::AppendLine returns early while m_pCS is NULL,
+//so an EventLog write at self-check time is a silent no-op at power-on. The verdict is
+//latched here and flushed by ReportAlarmAlidAudit() from ht160s.cpp once the log is open.
+//gAlidAuditDetail is a program-lifetime singleton, bounded to K_ALID_AUDIT_MAX_LINES
+//strings, deliberately never freed (the iosetview re-run of CreateSystemAlarmCode reuses
+//it). 0 faults = clean.
+static const int K_ALID_AUDIT_MAX_LINES = 40;   //bound the EventLog burst; a rollback would otherwise log every row
+int          gAlidAuditRows       = 0;
+int          gAlidAuditFaults     = 0;
+int          gAlidAuditSuppressed = 0;
+TStringList *gAlidAuditDetail     = NULL;
 //---------------------------------------------------------------------------
 __fastcall TDataModule1::TDataModule1(TComponent* Owner)
     : TDataModule(Owner)
 {
 }
 //---------------------------------------------------------------------------
-void TDataModule1::InitialAllTask()
+#include "uAgvStation.h"   //AI(ht160s-home-resume-w5) 20260711 : AgvCoord.ReassertLocks at the InitialAllTask tail
+//---------------------------------------------------------------------------
+void TDataModule1::InitialAllTask(bool bKeepMaterial)
 {
+    AmrInject.Reset();   //AI(ht160s-agv) 20260708 : any HOME/init clears AMR manual-inject test mode + latches
     if(UserMotion==NULL)
         return;
 
     for(int ActionIndex=0; ActionIndex<UserMotion->ActionCount; ActionIndex++)
         UserMotion->Actions[ActionIndex]->Tag=1;
 
+    //AI(ht160s-home-resume-w1) 20260711 : on a recoverable full-machine home (bKeepMaterial)
+    //every module now keeps the state that is NOT re-derivable from sensors : Loader keeps
+    //the AMR car ledger (host count / car totals / feed serial), Empty keeps the return
+    //handshake, Color keeps the return handshake + a sensor-confirmed presented identity
+    //tray (scanned 2D is not re-derivable), and the three arms keep held material. Loader
+    //additionally preserves a sensor-confirmed settled rear tray independent of
+    //bKeepMaterial (ht160s-rearready-p0) : wiping it stranded the tray with no path back
+    //to pickable (TrayArm pinned, no alarm).
     if(LoaderModule!=NULL)
-        LoaderModule->InitialFlag();
+        LoaderModule->InitialFlag(bKeepMaterial);
     if(EmptyModule!=NULL)
-        EmptyModule->InitialFlag();
+        EmptyModule->InitialFlag(bKeepMaterial);
     if(AutoModule!=NULL)
-        AutoModule->InitialFlag();
+        AutoModule->InitialFlag(bKeepMaterial);
     if(TrayArmModule!=NULL)
-        TrayArmModule->InitialFlag();
+        TrayArmModule->InitialFlag(bKeepMaterial);
     if(SortArmModule!=NULL)
-        SortArmModule->InitialFlag();
+        SortArmModule->InitialFlag(bKeepMaterial);
     if(ColorModule!=NULL)
-        ColorModule->InitialFlag();
+        ColorModule->InitialFlag(bKeepMaterial);
+    //AI(ht160s-home-resume-w5) 20260711 : the InitialFlag calls above just wiped every
+    //module bAmrLocked while AgvCoord.Handshake[] survives -> re-couple the locks for
+    //stations whose AMR handshake is still in flight (owner D1 : a HOME during a docked
+    //exchange is allowed; the handshake stays alive, frozen by the Run_Home gate in
+    //ServiceHandshake, and resumes after this). No-op when all stations are IDLE.
+    AgvCoord.ReassertLocks();
 }
 //---------------------------------------------------------------------------
 void TDataModule1::DoAllProcess()
@@ -71,6 +108,7 @@ void TDataModule1::DoAllProcess()
                 HSys.DecStopAllMotor();
                 break;
             }
+            SetProcStep(UserMotion->Actions[ActionIndex]->Name, UserMotion->Actions[ActionIndex]->Tag);
             UserMotion->Actions[ActionIndex]->Execute();
         }
     }
@@ -83,13 +121,17 @@ void TDataModule1::DoAllProcess()
 
     //AI(general) 20260601 : numeric step trace (no FSM). Records the 7 module
     //Task values per cycle when D:\HT160S_Log\steptrace.on exists. No-op off.
+    SetProcStep("", 0);   //AI(ht160s-alarm-trace) 20260630 : clear breadcrumb (outside module dispatch)
     StepTraceTick();
 
     //AI(general) 20260608 : State Record task-history sampling (no FSM).
     //Cheap: only records a module's Task when it changes. Used by the manual
     //"Store Hangup" snapshot button to export TaskHistory.csv for analysis.
-    if(gStateRecord!=NULL)
-        gStateRecord->SampleTasks();
+    //AI(ht160s-stuckwatchdog) 20260805 : the SampleTasks() call MOVED to csystem.cpp
+    //MainProc, just after ProcessMotion(). It must run on every main cycle including
+    //while PAUSED, and this function is SystemStart-gated by its caller - which silently
+    //defeated the stuck watchdog's pause rebase and made it fire on every resume. Do NOT
+    //re-add the call here.
 }
 //---------------------------------------------------------------------------
 void __fastcall TDataModule1::InitialMotorNameExecute(TObject *Sender)
@@ -121,6 +163,10 @@ void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
 {
     static bool bRun=false;
 
+    //AI(ht160s-initflow) 20260624 : do not spin serial comm until startup done (ref HT9045 InitialOK)
+    if(InitialOK==false)
+        return;
+
     if(bRun)
         return;
 
@@ -128,7 +174,21 @@ void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
     try
     {
         SpinComPort();
-        SpinMCUDisplay();
+        //AI(ht160s-statusbar) 20260624 : derive a 1 Hz tick from this always-on
+        //100ms timer (10 ticks). RefreshMyTimeString self-throttles to once per
+        //changed second anyway, so calling it every tick is also safe; the counter
+        //just avoids the dynamic_cast loop 9 of every 10 ticks. NOT hung off the
+        //SECS THGem::Timer1 (that timer is SECS-paid-gated and dead on non-SECS units).
+        {
+            static int iSysToolTick=0;
+            iSysToolTick++;
+            if(iSysToolTick>=10)
+            {
+                iSysToolTick=0;
+                if(FormSysTools!=NULL)
+                    FormSysTools->RefreshMyTimeString();
+            }
+        }
     }
     catch(...)
     {
@@ -446,6 +506,10 @@ TMOTNO::TMOTNO()
     emotHomeOrder        =26;
     emotLimitLogic       =27;
     emotIn1Logic         =28;
+    emotEncoderDir       =-1;   // OPTIONAL; -1=absent -> TMOTDATA defaults iEncoderDir to 1
+    // HomeType is no longer a Mot_Table column. The MC88X1 home mode is fixed in code
+    // (TMyMC88X1Motor MC88X1_DEFAULT_HOME_TYPE = 90); the mechanism design is fixed so a
+    // settable column only added operator risk.
     emotTotal            =29;
 }
 //---------------------------------------------------------------------------
@@ -514,6 +578,11 @@ int TMOTNO::SetMOTTableNo(AnsiString Str)
     emotIn1Logic=FindMotColumn(SL, "In1Logic");
     if(emotIn1Logic<0 && Result==emotTotal) Result=28;
 
+    // OPTIONAL trailing column (per-axis MC88X1 encoder count direction). Deliberately
+    // NOT guarded against Result like the columns above: a missing EncoderDir must NOT
+    // fail the table load -- it just defaults to 1 (inverse) in TMOTDATA. emotTotal stays 29.
+    emotEncoderDir=FindMotColumn(SL, "EncoderDir");
+
     delete SL;
     return Result;
 }
@@ -554,6 +623,7 @@ TMOTDATA::TMOTDATA(AnsiString Str)
     iLimitLogic     =GetMotInt(SL, HSys.MotNo.emotLimitLogic, 0);
     iIn1Logic       =GetMotInt(SL, HSys.MotNo.emotIn1Logic, 0);
     iSimulateSpeed  =GetMotInt(SL, HSys.MotNo.emotSimulateSpeed, 10000);
+    iEncoderDir     =GetMotInt(SL, HSys.MotNo.emotEncoderDir, 1);
 
     if(No==AnsiString("") || Alias==AnsiString("") || CardModel==AnsiString("") ||
        iBoardID<0 || iPort<0)
@@ -607,6 +677,7 @@ SYSTEM_MODULAR::SYSTEM_MODULAR()
     SwPtr = NULL;
     SuckPtr = NULL;
     MyGem = NULL;
+    BinDisCtrl = new TMyBinDispHT9046;   //AI(ht160s-maintainer) 20260615 : LED bin display controller
     MotTable = new TList;
     IOTable = new TList;
     iTotalMotor = 0;
@@ -618,7 +689,9 @@ SYSTEM_MODULAR::SYSTEM_MODULAR()
     iTotalSubSucker = MAX_SUB_SUCKER_ITEM;
     memset(&Mot, 0, sizeof(Mot));
     memset(&VMot, 0, sizeof(VMot));
-    Initial();
+    //AI(ht160s-initflow) 20260624 : Initial() RELOCATED to WinMain (ht160s.cpp), called
+    //after the startup splash and before any CreateForm, so the heavy load + OpenMN200Card
+    //show progress instead of a dead pre-window screen. Ctor sets trivial members only.
 }
 //---------------------------------------------------------------------------
 SYSTEM_MODULAR::~SYSTEM_MODULAR()
@@ -627,6 +700,11 @@ SYSTEM_MODULAR::~SYSTEM_MODULAR()
     {
         delete MyGem;
         MyGem=NULL;
+    }
+    if(BinDisCtrl!=NULL)
+    {
+        delete BinDisCtrl;
+        BinDisCtrl=NULL;
     }
     if(MotPtr!=NULL)
     {
@@ -698,7 +776,9 @@ SYSTEM_MODULAR::~SYSTEM_MODULAR()
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::Initial()
 {
+    UpdateInitProgress(4);
     InitialCosFunction();
+    UpdateInitProgress(16);
     MotPtr=(TTrayMotor **)&Mot;
     VMotPtr=(TTrayMotor **)&VMot;
     SenPtr=(TMySensor *)&Sen;
@@ -723,6 +803,11 @@ void SYSTEM_MODULAR::Initial()
     InitialSwitchName();
     InitialSuckerName();
     LoadIoData();
+    UpdateInitProgress(26);
+    //AI(general) 20260613 : OPTION A - open MN200 card + start MotionNet rings once
+    //IO addresses are known. No-op under SOFT_SIMULATE / when MN200DLL.dll is absent.
+    OpenMN200Card();
+    UpdateInitProgress(40);
     LoadSensorParameterFromDataBase();
     LoadCylinderParameterFromDataBase();
     LoadSwitchParameterFromDataBase();
@@ -730,6 +815,7 @@ void SYSTEM_MODULAR::Initial()
     LoadMotorParameterFromDataBase();
     InitialVMotorParameter();
     CreateSystemAlarmCode();
+    UpdateInitProgress(46);
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260603 : build alarm-code text map, framework aligned with HT172
@@ -743,6 +829,15 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
 
     mapNameToAlarm.clear();
     mapAlarmCodeList.clear();
+    //AI(secs-alid-optiond) 20260903 : reset the AMENDMENT 2 verdict latch FIRST (owner ruling
+    //B2) so the 20260626 [ALARM-COLLISION] guard further down can add its findings to the same
+    //EventLog report instead of an OutputDebugString nobody on a shipped machine can see.
+    gAlidAuditRows       = 0;
+    gAlidAuditFaults     = 0;
+    gAlidAuditSuppressed = 0;
+    if(gAlidAuditDetail==NULL)
+        gAlidAuditDetail = new TStringList();
+    gAlidAuditDetail->Clear();
 
     for(int i=0; i<iTotalCylinder; i++)
     {
@@ -853,6 +948,211 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
         }
     }
 
+    //AI(HT160S-Maintainer) 20260626 : register the high-value CCD/vision alarms with their
+    //HT9045 code strings (WAR16120/WAR0462/WAR0930/WAR0971) so the operator sees the familiar
+    //code + a bilingual message/remedy, and they appear in system\AlarmList.csv. eOther class
+    //keeps them clear of the generated cylinder/motor/sucker numeric families. C_ fields are
+    //English for now (ASCII source rule); a later language pass fills Big5 Chinese.
+    {
+        AnsiString CcdDesc="[1] check CCD power/cable \\r\\n[2] check vision PC program \\r\\n[3] check COM/socket";
+        const char *CcdName[4]={"TopCCD_Connect","TopCCD_2D","ColorCCD_Connect","ColorCCD_2D"};
+        const char *CcdCode[4]={"WAR16120","WAR0462","WAR16121","WAR0970"};
+        const char *CcdEng [4]={
+            "Top CCD connect not ready (Loader Tray ID no respond)",
+            "Top CCD 2D no response (2DID communication time out)",
+            "Color CCD connect not ready (Color Tray ID no respond)",
+            "Color CCD 2D no response (Tray ID communication time out)"};
+        for(int ci=0; ci<4; ci++)
+        {
+            AnsiString cd=CcdCode[ci], eg=CcdEng[ci];
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, (int)eOther, eg, eg, CcdDesc, CcdDesc, "pn_System");
+            mapNameToAlarm[cd]=cd;
+            mapNameToAlarm[CcdName[ci]]=cd;
+        }
+    }
+
+    //AI(ht160s-alarm-registry) 20260630 : register the feed-shortage / output-full / feed
+    //handling free-string Notes (previously raised but absent from AlarmList.csv) so the
+    //operator catalog and (later slice) the SECS alarm list become complete. eMessageErr=MES,
+    //eJamErr=JAM, eOther=WAR. Auto sprintf families use the same 11+Index loop the aAuto1To6
+    //call sites use; the literal 6 mirrors AUTO_STATION_COUNT (aAuto1To6.cpp) and must track
+    //it (the build-gate alarm-registry guard flags drift).
+    {
+        //AI(cleanout) 20260703 : MES0922/MES0923 residual-removal alarms are RETIRED (user
+        //design : the machine collects every tray itself - Loader self-collects via the
+        //case-9500 mint path, Auto rear-collects via DoAllAutoCleanOut case 500). In their
+        //place : MES1023/MES1427 = Empty/Color supply-stack-FULL holds during the CleanOut
+        //drain (GoUp paused until the operator empties the stack; Full sensor gates finish).
+        //AI(ht160s-rearready-p0) 20260705 : MES0924 = Loader REAR leftover (mirror of Color
+        //MES1426). Unlike the retired front MES0922 there is NO self-collect path : the
+        //tray's Kind/ID are unknown after a cold start / mid-discharge abort, so auto-
+        //collecting could misroute a cover/identity tray; the operator removes it instead.
+        //AI(ht160s-rearready-p0) 20260705 : MES1721 opens the TrayArm 17xx family (next
+        //prefix after Auto6's 16xx; xx21 = the "supply not ready" slot, cf. MES1021/MES1421).
+        //Caveat : if AUTO_STATION_COUNT ever grows to 7 the generated Auto family would
+        //also want 17xx -- re-home the TrayArm family (e.g. 18xx) in that case.
+        //AI(ht160s-home-residue) 20260708 : MES1722 = TrayArm sensor-adopted residue tray
+        //(clamps physically held a tray through HOME while fHasTray was desynced) --
+        //operator removes it (same unknown-Kind/ID rationale as MES0924).
+        //AI(ht160s-home-resume-p0) 20260710 : MES1723 = TrayArm place blocked (DoPlaceToEmpty/
+        //Color case-500 rear-clear wait watchdog; xx23 = next free TrayArm-family slot).
+        //AI(ht160s-overcount-tripqueue) 20260721 : MES0921 "Loader Tray Count Mismatch"
+        //REMOVED from the SSOT (Q3). The over-count STOP is gone (extra trays are fed as Cover
+        //now), so the code is never raised; dropping it from the seed keeps AlarmList.csv +
+        //the S5F6/S5F8 host get-alarm-list catalog honest. Arrays resized 20 -> 19.
+        const char *SeedCode[19]={"MES0920","JAM0913","WAR0330","WAR0475",
+                                  "MES1021","MES1022","MES1023","MES1024","JAM1030",
+                                  "MES1421","MES1422","MES1424","MES1426","MES1427","WAR0154",
+                                  "MES0924","MES1721","MES1722","MES1723"};
+        const int   SeedType[19]={eMessageErr,eJamErr,eOther,eOther,
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eJamErr,
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr,eMessageErr,eOther,
+                                  eMessageErr,eMessageErr,eMessageErr,eMessageErr};
+        const char *SeedMsg[19]={"Loader Tray Empty","Loader Tray Lost On Carriage","Top CCD API not ready","2D code not found in any lot",
+                                 "Bottom Empty Tray Is Miss Error","Empty supply magazine empty","Empty supply stack full (sensor)","Front Empty Tray Is Miss Error","Empty Push Tray Miss",
+                                 "Color supply tray is not ready","Color Push Tray Miss","Color front supply tray is missing","Color rear has a leftover tray","Color supply stack full (sensor)","Sorting Arm X motor will out of limit",
+                                 "Loader rear has a leftover tray","TrayArm pick blocked - rear source not ready","TrayArm holds an unidentified tray","TrayArm place blocked - destination rear not free"};
+        for(int si=0; si<19; si++)
+        {
+            AnsiString cd=SeedCode[si], mg=SeedMsg[si];
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, SeedType[si], mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(ht160s-anti-ghost-d) 20260720 : Loader front rise-1 not retracted -> the
+        //SnLoader_InputHasTray read is untrustworthy (rise1 up falsely lights it). Registered
+        //standalone (not in the 20-seed arrays) to avoid resizing the parallel arrays.
+        {
+            AnsiString cd="MES0925", mg="Loader front rise cylinder not retracted (C_Loader_FrontRiseTray_1)";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(amr-unmanned W2) 20260721 : AGV/AMR handshake timeout (code aligned to HT9045
+        //WAR0962 asendic_Loader.cpp:1963 "waited too long for the AMR"). The ONLY alarm the
+        //unmanned AMR line raises for a logistics condition : full/empty states silently
+        //handshake with the AGV; this fires only when the AGV does not respond within
+        //GeneralSetting.iAgvTimeoutSec. Registered standalone (same idiom as MES0925).
+        {
+            AnsiString cd="WAR0962", mg="AGV/AMR handshake timeout - AGV did not respond";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(agv-linklost-hold) 20260819 : WAR0963 = an AMR handoff still held after the HSMS link
+        //dropped. PollAndCall no longer releases locks on a link event (a TCP drop is not evidence
+        //the AMR left, and there is no AMR-presence input), so this is the operator escape for a
+        //lock that outlived the link. Sibling slot to WAR0962 on purpose - same AMR family, and
+        //0963 was free machine-wide. Distinct code, NOT a reuse of WAR0962 : that one reads "AGV
+        //did not respond", which would blame the AGV for our own comms fault. Registered
+        //standalone, same idiom as MES0925 / WAR0962.
+        {
+            AnsiString cd="WAR0963", mg="SECS link lost - AMR handoff still held; clear the station then RETRY";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(secs-alid-optiond D2) 20260903 : MES0926 = Loader discharge tray still carries IC
+        //(aLoader.cpp DoLoaderDischarge case 1000). That alarm used to be raised through the
+        //1-arg ShowMyError with LangT("Loader Tray has IC,please remove") as BOTH code and
+        //message, so the TRANSLATED string became the alarm code : the S5F1 ALID changed with
+        //the UI language (EN vs Big5 ZH) and the alarm was absent from the S5F6/S5F8 catalog.
+        //Owner ruling D2 (20260903) : give it a real code. 0926 is the next free Loader slot
+        //after MES0925 and is unused in the customer's HT9046LS dictionary (theirs stops at
+        //MES0923 / MES0922x). The English text is kept byte-identical to the LangT key so
+        //system\language_phrases.txt:138 still resolves the Chinese message.
+        {
+            AnsiString cd="MES0926", mg="Loader Tray has IC,please remove";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(ht160s-phantom-tray) 20260805 : MES1428 = the Color CARRIAGE still claims a tray when
+        //the CleanOut drain has nothing left it can drain (aColor.cpp DoColor case 100). The drain
+        //only handles the front stack and the rear seat, so a tray held by the carriage used to
+        //block IsCleanOutFinish for ever with no alarm at all - that was the 2026-08-05 KYEC hang.
+        //Registered standalone (same idiom as MES0925 / WAR0962) to avoid resizing the 19-wide
+        //parallel seed arrays above. Slot choice : the Color family owns MES1421/1422/1424/1426/
+        //1427 while 1420/1423/1425 belong to the GENERATED Auto4 family (MES%d20/%d23/%d25 with
+        //11+ai), so 1428 is the first genuinely free Color code.
+        {
+            AnsiString cd="MES1428", mg="Color carriage still holds a tray after clean-out - remove it";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(ht160s-prepick) 20260806 : MES1921 opens the SORTARM 19xx family. xx21 = the
+        //"blocked / not ready" slot, matching MES1021 (Empty), MES1421 (Color) and MES1721
+        //(TrayArm). 19xx and not 18xx on purpose : the MES1721 note above earmarks 18xx as the
+        //TrayArm family's escape hatch if AUTO_STATION_COUNT ever grows to 7 and the generated
+        //Auto family claims 17xx. Raised by the SortArm pre-pick Auto-ready gate once the wait
+        //exceeds [SortArm] PrePickAutoWaitSec (default 300 s).
+        {
+            AnsiString cd="MES1921", mg="SortArm blocked - waiting for the destination Auto to receive a tray";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(ht160s-phantom-tray) 20260806 : MES1025 = the Empty CARRIAGE still claims a tray when
+        //the CleanOut drain has nothing left it can drain. Exact sibling of the Color MES1428
+        //added 20260805; the Empty family owns 10xx and 1021..1024 were taken, so 1025 is next.
+        {
+            AnsiString cd="MES1025", mg="Empty carriage still holds a tray after clean-out - remove it";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
+        //AI(cleanout) 20260706 : 6th family member MES%d23 = per-Auto clean-out residual
+        //watchdog (EventLog-only). Suffix 23 chosen because 27 (the first pick) collides with
+        //the Color seed MES1427 "Color supply stack full"; 23 is free across MES1123..MES1623.
+        const char *FamFmt[6]={"MES%d20","MES%d25","JAM%d11","WAR%d30","JAM%d02","MES%d23"};
+        const int   FamType[6]={eMessageErr,eMessageErr,eJamErr,eOther,eJamErr,eMessageErr};
+        const char *FamMsg[6]={"Auto output stack full (sensor)","Auto output car full","Auto rear tray data but no-tray sensor","Auto feed tray miss","Auto push tray miss","Auto clean-out residual tray after drain"};
+        for(int ai=0; ai<6; ai++)
+        {
+            for(int fi=0; fi<6; fi++)
+            {
+                AnsiString cd=AnsiString().sprintf(FamFmt[fi], 11+ai);
+                AnsiString mg=AnsiString().sprintf("Auto%d : %s", ai+1, FamMsg[fi]);
+                mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, FamType[fi], mg, mg, "", "", "pn_System");
+                mapNameToAlarm[cd]=cd;
+            }
+        }
+    }
+
+    //AI(HT160S-Maintainer) 20260626 : alarm-code collision guard. Any all-digit map key
+    //beginning 4/5/6 must be a generated structured family code (Cyn=4/Mot=5/Suck=6) of the
+    //canonical 5-char "<fam><3-index><1-err>" shape; flag anything else as a hand-allocated
+    //code that has shadowed the structured numeric space. WAR/JAM/MES keys start with a
+    //letter and are skipped, so 9045 reuse never trips this.
+    //AI(secs-alid-optiond) 20260903 : owner ruling B2 - (1) widened from 4/5/6 to '4'..'8' :
+    //Option D made 7 (eRecordProcess) and 8 (eOther) LIVE numeric ALID classes, so a
+    //non-5-char 7xxxx / 8xxxx key would silently fall to class 9 exactly like a 4xxxx one;
+    //(2) no longer observe-only : every hit is also counted and latched into the AMENDMENT 2
+    //verdict below, so it reaches the EventLog via ReportAlarmAlidAudit() - OutputDebugString
+    //alone is invisible on a shipped machine (no debugger attached).
+    {
+        std::map<AnsiString, AnsiString>::iterator itGuard;
+        for(itGuard=mapNameToAlarm.begin(); itGuard!=mapNameToAlarm.end(); ++itGuard)
+        {
+            AnsiString kk=itGuard->first;
+            if(kk.Length()<1)
+                continue;
+            char c0=kk[1];
+            if(c0<'4' || c0>'8')   //AI(secs-alid-optiond) 20260903 : B2 - classes 4..8
+                continue;
+            bool bAllDigit=true;
+            for(int p2=1; p2<=kk.Length(); p2++)
+                if(kk[p2]<'0' || kk[p2]>'9')
+                {
+                    bAllDigit=false;
+                    break;
+                }
+            if(bAllDigit==true && kk.Length()!=5)
+            {
+                OutputDebugString((AnsiString("[ALARM-COLLISION] non-canonical structured key: ")+kk+"\r\n").c_str());
+                //AI(secs-alid-optiond) 20260903 : B2 - same finding, into the EventLog report.
+                gAlidAuditFaults++;
+                if(gAlidAuditDetail!=NULL && gAlidAuditDetail->Count<K_ALID_AUDIT_MAX_LINES)
+                    gAlidAuditDetail->Add(AnsiString("non-canonical structured key ")+kk+" (mapNameToAlarm)");
+                else
+                    gAlidAuditSuppressed++;
+            }
+        }
+    }
+
     //AI(HT160S-Maintainer) 20260609 : ported from HT172 0420 CreateNewJamErrorTable.
     //Dump the complete alarm-code map to system\AlarmList.csv at startup so the
     //operator can see every alarm the machine can raise. Note: the PTI-only
@@ -869,6 +1169,116 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
     catch(...)
     {
     }
+    //AI(secs-alid-optiond) 20260902 : AMENDMENT 2 - the S5 ALID startup self-check
+    //(ratified spec section 2). Option D's "9 digits AND decodable" promise degrades
+    //SILENTLY the moment a code that does not fit the grammar is registered - a 6-digit
+    //family code, a 5-letter prefix, a non-canonical leading-zero tail ("MES01421"), a
+    //bare "30000" - each just becomes class 9 with no complaint, and the host is then
+    //told "not in the catalog" for a code that IS in the catalog. There is no ALID
+    //auditor anywhere else in the toolchain, so this is it.
+    //
+    //THE THREE RATIFIED CHECKS, per row of the FINAL mapAlarmCodeList :
+    //  NOT_9_DIGITS            ComputeAlarmAlid() is outside [100000000..999999999]
+    //  CLASS9_NOT_IN_CATALOG   a REGISTERED code encoded to class 9
+    //  DUPLICATE_OF_<code>     two codes share one ALID (the host cannot tell them apart)
+    //A host-decode round-trip check is deliberately NOT included : AMENDMENT 1b makes the
+    //round trip a THEOREM (one canonical string per payload for classes 1/2/3, payload ==
+    //the code for classes 4..8), verified exhaustively over all 350000 strings the
+    //classes 1..8 grammar accepts - 0 failures. It would be a permanently dead branch.
+    //Measured on the 20260902 map : 485 rows, 0 faults.
+    //
+    //RELATION TO THE 20260626 [ALARM-COLLISION] GUARD ~40 lines above : that guard flags
+    //an all-digit key beginning 4/5/6 whose length is not 5. Every such key now also
+    //fails CLASS9_NOT_IN_CATALOG here (a length other than 5 cannot be class 4..8), so
+    //this check STRICTLY SUBSUMES it for detection. The old guard is kept because it
+    //names the specific cause ("non-canonical structured key") and because it scans
+    //mapNameToAlarm, which this pass does not. Nothing is re-implemented.
+    //
+    //REPORT CHANNEL (ratified) : g_EventLog.Log() - one line per violation plus one
+    //summary line, into the daily EventLog CSV, which the State Record zip already
+    //carries. NEVER ShowMyMessage (it stops the machine), never a modal, and never a
+    //note.cpp alarm (ShowNoteAlarm calls DecStopAllMotor() and clears Sys.SystemStart -
+    //it would physically stop the machine at power-on over a catalog cosmetic, and it is
+    //self-defeating: the map is what feeds the alarm system being used to complain about
+    //the map). This self-check can NEVER block a production start.
+    //(the verdict latch was reset at the top of this function, before the 20260626 guard,
+    // so that guard's findings land in the same report - owner ruling B2, 20260903)
+    try
+    {
+        std::map<unsigned, AnsiString> mapAlidSeen;
+        //LOCAL iterator on purpose : the member IterAlarmCodeList is shared mutable state
+        //(note.cpp ShowSystemError assigns it too), so this pass does not touch it.
+        std::map<AnsiString, MyAlarmCodeStruct>::iterator itAudit;
+        for(itAudit=mapAlarmCodeList.begin(); itAudit!=mapAlarmCodeList.end(); ++itAudit)
+        {
+            AnsiString sCode = itAudit->second.AlarmCode;
+            unsigned   uAlid = ComputeAlarmAlid(sCode);
+            unsigned   uCls  = uAlid/100000000u;
+            AnsiString sBad  = "";
+            gAlidAuditRows++;
+
+            if(uAlid<100000000u || uAlid>999999999u)
+                sBad = "NOT_9_DIGITS";
+            else if(uCls==9u)
+                sBad = "CLASS9_NOT_IN_CATALOG";
+            else if(mapAlidSeen.find(uAlid)!=mapAlidSeen.end())
+                sBad = AnsiString("DUPLICATE_OF_")+mapAlidSeen[uAlid];
+
+            if(mapAlidSeen.find(uAlid)==mapAlidSeen.end())
+                mapAlidSeen[uAlid] = sCode;
+
+            if(sBad!="")
+            {
+                gAlidAuditFaults++;
+                if(gAlidAuditDetail->Count<K_ALID_AUDIT_MAX_LINES)
+                    gAlidAuditDetail->Add(AnsiString().sprintf("%s ALID=%u %s",
+                                          sCode.c_str(), uAlid, sBad.c_str()));
+                else
+                    gAlidAuditSuppressed++;
+            }
+        }
+    }
+    catch(...)
+    {
+    }
+    //Free second channel, and the only one that works before the EventLog opens. Same
+    //idiom and spirit as the [ALARM-COLLISION] guard above.
+    OutputDebugString(AnsiString().sprintf("[ALID-AUDIT] rows=%d faults=%d\r\n",
+                      gAlidAuditRows, gAlidAuditFaults).c_str());
+    //A no-op at power-on (the log is not open yet - see the latch note at the top of this
+    //file); this call is what covers the RUNTIME re-run from iosetview.cpp:942, where the
+    //log IS open. Power-on is covered by the single call from ht160s.cpp.
+    ReportAlarmAlidAudit();
+}
+//---------------------------------------------------------------------------
+void ReportAlarmAlidAudit()
+{
+    //AI(secs-alid-optiond) 20260902 : AMENDMENT 2's ratified report channel - one
+    //g_EventLog line per violation plus one summary line. Called from TWO places by
+    //design, and that is not a duplicate:
+    //  - from the tail of CreateSystemAlarmCode(), which is a silent no-op at power-on
+    //    (cCsvDailyLog::AppendLine early-returns while m_pCS is NULL) and is what covers
+    //    the RUNTIME re-run from iosetview.cpp:942, where the log IS open;
+    //  - once from ht160s.cpp, right after g_EventLog.Init(), which covers power-on.
+    //Exactly one set of lines lands on each path: WinMain is single-threaded and the
+    //ht160s.cpp call runs before the UI exists, so no iosetview re-run can precede it.
+    //Do NOT add a "already reported" static flag - the power-on no-op would consume it.
+    //Writes at most K_ALID_AUDIT_MAX_LINES+2 lines and returns. No modal, no machine
+    //stop, nothing that can block a production start.
+    int i;
+    if(gAlidAuditDetail!=NULL)
+        for(i=0; i<gAlidAuditDetail->Count; i++)
+            g_EventLog.Log("WRN_ALID_AUDIT", gAlidAuditDetail->Strings[i]);
+    if(gAlidAuditSuppressed>0)
+        g_EventLog.Log("WRN_ALID_AUDIT",
+                       AnsiString().sprintf("and %d further violation(s) not listed",
+                                            gAlidAuditSuppressed));
+    //The summary is written EVERY boot, clean or not. One line a day is nothing, and a
+    //report that only appears on failure cannot be diffed to prove nothing changed - a
+    //KYEC "your ALID is wrong" claim is then settled from the shipped EventLog.
+    g_EventLog.Log((gAlidAuditFaults>0) ? "WRN_ALID_AUDIT" : "INF_ALID_AUDIT",
+                   AnsiString().sprintf("S5 ALID self-check : %d alarm code(s), %d violation(s)",
+                                        gAlidAuditRows, gAlidAuditFaults));
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::InitialSensorName()
@@ -895,51 +1305,47 @@ void SYSTEM_MODULAR::InitialSensorName()
     Sen.SnSafeAuto6.Name="SnSafeAuto6";
     Sen.SnEmpty_InputHasTray.Name="SnEmpty_InputHasTray";
     Sen.SnEmpty_InputFullTray.Name="SnEmpty_InputFullTray";
-    Sen.SnEmpty_TrayPos1.Name="SnEmpty_TrayPos1";
-    Sen.SnEmpty_TrayPos2.Name="SnEmpty_TrayPos2";
-    Sen.SnEmpty_OutputHasTray.Name="SnEmpty_OutputHasTray";
     Sen.SnEmpty_OutputBottomHasTray.Name="SnEmpty_OutputBottomHasTray";
     Sen.SnEmpty_InputEnd.Name="SnEmpty_InputEnd";
     Sen.SnLoader_InputHasTray.Name="SnLoader_InputHasTray";
     Sen.SnLoader_InputFullTray.Name="SnLoader_InputFullTray";
     Sen.SnLoader_TrayPos1.Name="SnLoader_TrayPos1";
     Sen.SnLoader_TrayPos2.Name="SnLoader_TrayPos2";
-    Sen.SnLoader_OutputHasTray.Name="SnLoader_OutputHasTray";
     Sen.SnLoader_OutputBottomHasTray.Name="SnLoader_OutputBottomHasTray";
     Sen.SnLoader_Inputend.Name="SnLoader_Inputend";
     Sen.SnAuto1_InputHasTray.Name="SnAuto1_InputHasTray";
     Sen.SnAuto1_InputFullTray.Name="SnAuto1_InputFullTray";
-    Sen.SnAuto1_OutputHasTray.Name="SnAuto1_OutputHasTray";
+    Sen.SnAuto1_InputEnd.Name="SnAuto1_InputEnd";
     Sen.SnAuto1_OutputBottomHasTray.Name="SnAuto1_OutputBottomHasTray";
     Sen.SnAuto1_TrayPos1.Name="SnAuto1_TrayPos1";
     Sen.SnAuto1_TrayPos2.Name="SnAuto1_TrayPos2";
     Sen.SnAuto2_InputHasTray.Name="SnAuto2_InputHasTray";
     Sen.SnAuto2_InputFullTray.Name="SnAuto2_InputFullTray";
-    Sen.SnAuto2_OutputHasTray.Name="SnAuto2_OutputHasTray";
+    Sen.SnAuto2_InputEnd.Name="SnAuto2_InputEnd";
     Sen.SnAuto2_OutputBottomHasTray.Name="SnAuto2_OutputBottomHasTray";
     Sen.SnAuto2_TrayPos1.Name="SnAuto2_TrayPos1";
     Sen.SnAuto2_TrayPos2.Name="SnAuto2_TrayPos2";
     Sen.SnAuto3_InputHasTray.Name="SnAuto3_InputHasTray";
     Sen.SnAuto3_InputFullTray.Name="SnAuto3_InputFullTray";
-    Sen.SnAuto3_OutputHasTray.Name="SnAuto3_OutputHasTray";
+    Sen.SnAuto3_InputEnd.Name="SnAuto3_InputEnd";
     Sen.SnAuto3_OutputBottomHasTray.Name="SnAuto3_OutputBottomHasTray";
     Sen.SnAuto3_TrayPos1.Name="SnAuto3_TrayPos1";
     Sen.SnAuto3_TrayPos2.Name="SnAuto3_TrayPos2";
     Sen.SnAuto4_InputHasTray.Name="SnAuto4_InputHasTray";
     Sen.SnAuto4_InputFullTray.Name="SnAuto4_InputFullTray";
-    Sen.SnAuto4_OutputHasTray.Name="SnAuto4_OutputHasTray";
+    Sen.SnAuto4_InputEnd.Name="SnAuto4_InputEnd";
     Sen.SnAuto4_OutputBottomHasTray.Name="SnAuto4_OutputBottomHasTray";
     Sen.SnAuto4_TrayPos1.Name="SnAuto4_TrayPos1";
     Sen.SnAuto4_TrayPos2.Name="SnAuto4_TrayPos2";
     Sen.SnAuto5_InputHasTray.Name="SnAuto5_InputHasTray";
     Sen.SnAuto5_InputFullTray.Name="SnAuto5_InputFullTray";
-    Sen.SnAuto5_OutputHasTray.Name="SnAuto5_OutputHasTray";
+    Sen.SnAuto5_InputEnd.Name="SnAuto5_InputEnd";
     Sen.SnAuto5_OutputBottomHasTray.Name="SnAuto5_OutputBottomHasTray";
     Sen.SnAuto5_TrayPos1.Name="SnAuto5_TrayPos1";
     Sen.SnAuto5_TrayPos2.Name="SnAuto5_TrayPos2";
     Sen.SnAuto6_InputHasTray.Name="SnAuto6_InputHasTray";
     Sen.SnAuto6_InputFullTray.Name="SnAuto6_InputFullTray";
-    Sen.SnAuto6_OutputHasTray.Name="SnAuto6_OutputHasTray";
+    Sen.SnAuto6_InputEnd.Name="SnAuto6_InputEnd";
     Sen.SnAuto6_OutputBottomHasTray.Name="SnAuto6_OutputBottomHasTray";
     Sen.SnAuto6_TrayPos1.Name="SnAuto6_TrayPos1";
     Sen.SnAuto6_TrayPos2.Name="SnAuto6_TrayPos2";
@@ -1060,6 +1466,7 @@ void SYSTEM_MODULAR::InitialVMotorName()
     VMot.MMSuck_2     ->Alias="MMSuck_2";
     VMot.MMSuck_3     ->Alias="MMSuck_3";
     VMot.MMSuck_4     ->Alias="MMSuck_4";
+    VMot.MMColorY     ->Alias="MMColorY";
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::InitialVMotorParameter()
@@ -1084,8 +1491,6 @@ void SYSTEM_MODULAR::InitialCylinderName()
     Cyn.C_Empty_PushTray.CylinderName="C_Empty_PushTray";
     Cyn.C_Empty_LeanOnTray.CylinderName="C_Empty_LeanOnTray";
     Cyn.C_Empty_FrontSeparateTray_1.CylinderName="C_Empty_FrontSeparateTray_1";
-    Cyn.C_Empty_RearRiseTray.CylinderName="C_Empty_RearRiseTray";
-    Cyn.C_Empty_RearSeparateTray_1.CylinderName="C_Empty_RearSeparateTray_1";
 
     Cyn.C_Loader_FrontRiseTray_1.CylinderName="C_Loader_FrontRiseTray_1";
     Cyn.C_Loader_FrontRiseTray_2.CylinderName="C_Loader_FrontRiseTray_2";
@@ -1094,49 +1499,35 @@ void SYSTEM_MODULAR::InitialCylinderName()
     Cyn.C_Loader1_LeanOnTray.CylinderName="C_Loader1_LeanOnTray";
     Cyn.C_Loader2_LeanOnTray.CylinderName="C_Loader2_LeanOnTray";
     Cyn.C_Loader_FrontSeparateTray_1.CylinderName="C_Loader_FrontSeparateTray_1";
-    Cyn.C_Loader_RearRiseTray.CylinderName="C_Loader_RearRiseTray";
 
     Cyn.C_Auto1_FrontRiseTray.CylinderName="C_Auto1_FrontRiseTray";
     Cyn.C_Auto1_PushTray.CylinderName="C_Auto1_PushTray";
     Cyn.C_Auto1_LeanOnTray.CylinderName="C_Auto1_LeanOnTray";
-    Cyn.C_Auto1_RearRiseTray.CylinderName="C_Auto1_RearRiseTray";
-    Cyn.C_Auto1_FrontSeparateTray_1.CylinderName="C_Auto1_FrontSeparateTray_1";
 
     Cyn.C_Auto2_FrontRiseTray.CylinderName="C_Auto2_FrontRiseTray";
     Cyn.C_Auto2_PushTray.CylinderName="C_Auto2_PushTray";
     Cyn.C_Auto2_LeanOnTray.CylinderName="C_Auto2_LeanOnTray";
-    Cyn.C_Auto2_RearRiseTray.CylinderName="C_Auto2_RearRiseTray";
-    Cyn.C_Auto2_FrontSeparateTray_1.CylinderName="C_Auto2_FrontSeparateTray_1";
 
     Cyn.C_Auto3_FrontRiseTray.CylinderName="C_Auto3_FrontRiseTray";
     Cyn.C_Auto3_PushTray.CylinderName="C_Auto3_PushTray";
     Cyn.C_Auto3_LeanOnTray.CylinderName="C_Auto3_LeanOnTray";
-    Cyn.C_Auto3_RearRiseTray.CylinderName="C_Auto3_RearRiseTray";
-    Cyn.C_Auto3_FrontSeparateTray_1.CylinderName="C_Auto3_FrontSeparateTray_1";
 
     Cyn.C_Auto4_FrontRiseTray.CylinderName="C_Auto4_FrontRiseTray";
     Cyn.C_Auto4_PushTray.CylinderName="C_Auto4_PushTray";
     Cyn.C_Auto4_LeanOnTray.CylinderName="C_Auto4_LeanOnTray";
-    Cyn.C_Auto4_RearRiseTray.CylinderName="C_Auto4_RearRiseTray";
-    Cyn.C_Auto4_FrontSeparateTray_1.CylinderName="C_Auto4_FrontSeparateTray_1";
 
     Cyn.C_Auto5_FrontRiseTray.CylinderName="C_Auto5_FrontRiseTray";
     Cyn.C_Auto5_PushTray.CylinderName="C_Auto5_PushTray";
     Cyn.C_Auto5_LeanOnTray.CylinderName="C_Auto5_LeanOnTray";
-    Cyn.C_Auto5_RearRiseTray.CylinderName="C_Auto5_RearRiseTray";
-    Cyn.C_Auto5_FrontSeparateTray_1.CylinderName="C_Auto5_FrontSeparateTray_1";
 
     Cyn.C_Auto6_FrontRiseTray.CylinderName="C_Auto6_FrontRiseTray";
     Cyn.C_Auto6_PushTray.CylinderName="C_Auto6_PushTray";
     Cyn.C_Auto6_LeanOnTray.CylinderName="C_Auto6_LeanOnTray";
-    Cyn.C_Auto6_RearRiseTray.CylinderName="C_Auto6_RearRiseTray";
-    Cyn.C_Auto6_FrontSeparateTray_1.CylinderName="C_Auto6_FrontSeparateTray_1";
 
     Cyn.C_Color_FrontRiseTray_1.CylinderName="C_Color_FrontRiseTray_1";
     Cyn.C_Color_FrontRiseTray_2.CylinderName="C_Color_FrontRiseTray_2";
     Cyn.C_Color_PushTray.CylinderName="C_Color_PushTray";
     Cyn.C_Color_LeanOnTray.CylinderName="C_Color_LeanOnTray";
-    Cyn.C_Color_RearRiseTray.CylinderName="C_Color_RearRiseTray";
     Cyn.C_Color_FrontSeparateTray_1.CylinderName="C_Color_FrontSeparateTray_1";
 }
 //---------------------------------------------------------------------------
@@ -1307,6 +1698,20 @@ void SYSTEM_MODULAR::LoadSuckerParameterFromDataBase()
             }
         }
     }
+
+    //AI(ht160s-suck2-quad) 20260712 : boot latch for the Suck2 quad-vacuum machine
+    //variant (all 4 generator circuits plumbed to the single Suck2 nozzle).
+    //GeneralSetting is already loaded (InitialCosFunction runs earlier in the same
+    //init) and the gang is wired only here, so changing the option takes effect on
+    //RESTART. The Nozzle2-only pick mask is enforced inside
+    //THT160GeneralSetting::Load().
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        TMySucker *GangMaster=&Suck.SortArmSuck.Suck[0][1];
+        for(int GangIndex=0; GangIndex<MAX_SUB_SUCKER_ITEM; GangIndex++)
+            GangMaster->pGang[GangIndex]=&Suck.SortArmSuck.Suck[0][GangIndex];
+        GangMaster->iGangCount=MAX_SUB_SUCKER_ITEM;
+    }
 }
 //---------------------------------------------------------------------------
 void SYSTEM_MODULAR::ClearMotTable()
@@ -1359,8 +1764,8 @@ void SYSTEM_MODULAR::LoadMotData()
     ClearMotTable();
     if(!FileExists(MotTablePath))
     {
-        Msg.sprintf("File %s is not exist!", MotTablePath);
-        ShowMessage(Msg);
+        Msg.sprintf(LangT("File %s is not exist!").c_str(), MotTablePath);
+        ShowMyOKMessageNoStop(Msg);
         return;
     }
 
@@ -1370,8 +1775,8 @@ void SYSTEM_MODULAR::LoadMotData()
         StrList->LoadFromFile(MotTablePath);
         if(StrList->Count<=1)
         {
-            Msg.sprintf("File %s data is lose!", MotTablePath);
-            ShowMessage(Msg);
+            Msg.sprintf(LangT("File %s data is lose!").c_str(), MotTablePath);
+            ShowMyOKMessageNoStop(Msg);
         }
         else
         {
@@ -1385,23 +1790,23 @@ void SYSTEM_MODULAR::LoadMotData()
                     TMOTDATA *Data=new TMOTDATA(StrList->Strings[i]);
                     if(Data->Alias!=AnsiString("") && FindMotData(Data->Alias)!=NULL)
                     {
-                        Msg.sprintf("Motor %s alias is duplicated!", Data->Alias);
-                        ShowMessage(Msg);
+                        Msg.sprintf(LangT("Motor %s alias is duplicated!").c_str(), Data->Alias);
+                        ShowMyOKMessageNoStop(Msg);
                     }
                     MotTable->Add(Data);
                 }
             }
             else
             {
-                Msg.sprintf("File %s data is mistake! (%d)", MotTablePath, Result);
-                ShowMessage(Msg);
+                Msg.sprintf(LangT("File %s data is mistake! (%d)").c_str(), MotTablePath, Result);
+                ShowMyOKMessageNoStop(Msg);
             }
         }
     }
     catch(...)
     {
-        Msg.sprintf("File %s is opened by other software!", MotTablePath);
-        ShowMessage(Msg);
+        Msg.sprintf(LangT("File %s is opened by other software!").c_str(), MotTablePath);
+        ShowMyOKMessageNoStop(Msg);
     }
     delete StrList;
 }
@@ -1412,8 +1817,8 @@ void SYSTEM_MODULAR::LoadIoData()
     ClearIOTable();
     if(!FileExists(IoTablePath))
     {
-        Msg.sprintf("File %s is not exist!", IoTablePath);
-        ShowMessage(Msg);
+        Msg.sprintf(LangT("File %s is not exist!").c_str(), IoTablePath);
+        ShowMyOKMessageNoStop(Msg);
         return;
     }
 
@@ -1423,8 +1828,8 @@ void SYSTEM_MODULAR::LoadIoData()
         StrList->LoadFromFile(IoTablePath);
         if(StrList->Count<=1)
         {
-            Msg.sprintf("File %s data is lose!", IoTablePath);
-            ShowMessage(Msg);
+            Msg.sprintf(LangT("File %s data is lose!").c_str(), IoTablePath);
+            ShowMyOKMessageNoStop(Msg);
         }
         else
         {
@@ -1439,23 +1844,23 @@ void SYSTEM_MODULAR::LoadIoData()
                     TIODATA *Data=new TIODATA(Line);
                     if(Data->Alias!=AnsiString("") && FindIOData(Data->Alias)!=NULL)
                     {
-                        Msg.sprintf("IO %s alias is duplicated!", Data->Alias);
-                        ShowMessage(Msg);
+                        Msg.sprintf(LangT("IO %s alias is duplicated!").c_str(), Data->Alias);
+                        ShowMyOKMessageNoStop(Msg);
                     }
                     IOTable->Add(Data);
                 }
             }
             else
             {
-                Msg.sprintf("File %s data is mistake! (%d)", IoTablePath, Result);
-                ShowMessage(Msg);
+                Msg.sprintf(LangT("File %s data is mistake! (%d)").c_str(), IoTablePath, Result);
+                ShowMyOKMessageNoStop(Msg);
             }
         }
     }
     catch(...)
     {
-        Msg.sprintf("File %s is opened by other software!", IoTablePath);
-        ShowMessage(Msg);
+        Msg.sprintf(LangT("File %s is opened by other software!").c_str(), IoTablePath);
+        ShowMyOKMessageNoStop(Msg);
     }
     delete StrList;
 }
@@ -1520,11 +1925,15 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
             MotPtr[i]->SetMotNo(i);
         }
 
-        #ifdef SOFT_SIMULATE
-            MotPtr[i]->SetEnable(false);
-        #else
-            MotPtr[i]->SetEnable(Data->iEnable);
-        #endif
+        //AI(HT160S-Maintainer) 20260619 : SIMULATION now mirrors the real machine's
+        //per-axis enable (Mot_Table Enable column) instead of force-disabling EVERY axis.
+        //The old all-disabled sim made the whole machine a no-op : MoveTo/HomeFlag/MotionDone
+        //short-circuit on !Enable, so a simulated HOME homed nothing and per-axis execution
+        //could not be verified. With the deepened driver sim (InitMotor keeps an enabled axis
+        //enabled with no card; HomeObject reports done; MotionDone/MoveTo complete instantly;
+        //card reads default to OK) an enabled axis now executes and LOGS a full HOME exactly
+        //like the real machine -- identical case flow, only the leaf card ops are simulated.
+        MotPtr[i]->SetEnable(Data->iEnable);
 
         if(CardModel=="MC88X1" || CardModel=="MC88X1P")
             MotPtr[i]->SetMotionCardType(eMC88x1);
@@ -1558,12 +1967,36 @@ void SYSTEM_MODULAR::LoadMotorParameterFromDataBase(int Index, bool bInitial)
         else
             MotPtr[i]->SetMotorKind(eMotor);
         MotPtr[i]->FlushPanelName=Data->FlushPanel;
-        MotPtr[i]->OriginRange=Data->iRange;
-        MotPtr[i]->OriginRate=Data->iRate;
         MotPtr[i]->SimulateSpeed=Data->iSimulateSpeed;
         MotPtr[i]->bIsServoMotor=(Data->iServoAlarmOn==1)?true:false;
         MotPtr[i]->SetLimitLogic((Data->iLimitLogic==1)?true:false);
         MotPtr[i]->SetIn1Logic((Data->iIn1Logic==1)?true:false);
+        // HomeType is FIXED in code (no operator-settable Mot_Table column). ALL axes now
+        // use card-native type 7 (find Home -> leave -> re-enter -> stop): the sensor->stop
+        // timing is hardware-gated on IN3, so home repeatability is immune to PC/main-loop
+        // latency -- critical as the software grows and several axes home together. The
+        // software HomeType90() seek is retired (kept dormant in myMC88X1motor.cpp as a
+        // fallback; flip an axis back here if its mechanism ever needs the manual approach).
+        // Authority for the home model: docs/MC88X1_Driver/MC88X1_technical-note.
+        // Must run before InitMotor so the HomeType register is written for the axis.
+        MotPtr[i]->SetHomeType(7);
+        // AI 20260622 : MC88X1 A/B encoder input multiplier = x4 (value 3) for EVERY axis.
+        // All A6 drives now output Pr0.11=2500/rev on OA/OB, so card x4 = 2500*4 = 10000/rev
+        // matches the 10000/rev command resolution (Pr0.08) -> NowPos==Encoder on every axis.
+        // M12 MTopCCDX and M20 MTopCCDX_Color (same mechanism+drive) once shipped Pr0.11=10000
+        // and read 4x; their drives were reset to Pr0.11=2500 to match the rest, so no per-axis
+        // special case remains. Must run before InitMotor (the card register is written there).
+        MotPtr[i]->SetEncodeMultiple(3);
+        // AI 20260624 : MC88X1 encoder count direction (MC88X1PSetEncoderDir; manual P.51
+        // Value 0=normal, 1=inverse). Now sourced PER-AXIS from the OPTIONAL Mot_Table
+        // "EncoderDir" column (Data->iEncoderDir; default 1=inverse when the column or cell is
+        // absent). M05 MLoaderY_2 = 0=normal in the CSV because its A6 OA/OB feedback phase is
+        // wired reversed (its Encoder otherwise reads negated vs NowPos/command, e.g. -43.62 vs
+        // 43.62). The feedback (practical) counter is monitor-only (the drive closes the loop in
+        // pulse-train P mode), so this flips ONLY the Encoder display sign: command, positioning,
+        // soft limits and the home==0 check are unaffected. Clamp to 0/1 keeps a stray CSV value
+        // safe. Must run before InitMotor (card register written there).
+        MotPtr[i]->SetEncodeDir((Data->iEncoderDir==0)?0:1);
         MotPtr[i]->bHomeFlag=false;
         if(bInitial)
             MotPtr[i]->InitMotor(iAdder);

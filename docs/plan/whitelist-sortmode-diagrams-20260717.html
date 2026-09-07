@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HT160S 白名單分選模式 — 流程圖與泳道圖</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5;
+    --ink:#1a222c; --muted:#5b6675; --line:#d9dfe6;
+    --accent:#2b6f92; --accent-ink:#0f2b3a;
+    --sheet:#eef2f6; --sheet-line:#cfd8e2;
+    --good:#2e8f61; --bad:#c23b52; --warn:#b9791f;
+    --mono:"Cascadia Mono","Consolas",ui-monospace,"Menlo",monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,"Microsoft JhengHei","Noto Sans TC",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f141a; --surface:#161d25; --surface-2:#1d2630;
+      --ink:#e2e8ef; --muted:#93a1b2; --line:#2a343f;
+      --accent:#5aa8cc; --accent-ink:#cfe6f2;
+      --sheet:#eaeef2; --sheet-line:#c2ccd7;
+      --good:#4bba86; --bad:#e0687d; --warn:#d69b45;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5;
+    --ink:#1a222c; --muted:#5b6675; --line:#d9dfe6;
+    --accent:#2b6f92; --accent-ink:#0f2b3a;
+    --sheet:#eef2f6; --sheet-line:#cfd8e2;
+    --good:#2e8f61; --bad:#c23b52; --warn:#b9791f;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f141a; --surface:#161d25; --surface-2:#1d2630;
+    --ink:#e2e8ef; --muted:#93a1b2; --line:#2a343f;
+    --accent:#5aa8cc; --accent-ink:#cfe6f2;
+    --sheet:#eaeef2; --sheet-line:#c2ccd7;
+    --good:#4bba86; --bad:#e0687d; --warn:#d69b45;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+  .page{max-width:64rem;margin:0 auto;padding:2.4rem 1.4rem 4rem;line-height:1.6;}
+  code,.mono{font-family:var(--mono);font-size:.86em;}
+
+  header.head{border-bottom:1px solid var(--line);padding-bottom:1.4rem;margin-bottom:2rem;}
+  .eyebrow{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  h1{font-size:2rem;font-weight:650;letter-spacing:-.015em;line-height:1.15;margin:.5rem 0 .4rem;}
+  .thesis{color:var(--muted);font-size:1.02rem;max-width:52rem;margin:0;}
+  .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.1rem;}
+  .chip{font-family:var(--mono);font-size:.74rem;padding:.28rem .6rem;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);white-space:nowrap;}
+  .chip b{color:var(--ink);font-weight:600;}
+  .chip.ok{border-color:color-mix(in srgb,var(--good) 45%,var(--line));}
+  .chip.wait{border-color:color-mix(in srgb,var(--warn) 45%,var(--line));}
+
+  section{margin:2.4rem 0;}
+  h2{font-size:1.22rem;font-weight:640;letter-spacing:-.01em;margin:0 0 .2rem;display:flex;align-items:baseline;gap:.55rem;}
+  h2 .num{font-family:var(--mono);font-size:.82rem;color:var(--accent);font-weight:700;}
+  .lead{color:var(--muted);margin:.2rem 0 1rem;max-width:52rem;}
+
+  .callout{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:1.1rem 1.2rem;}
+  .callout p{margin:.35rem 0;}
+
+  .sheet{background:var(--sheet);border:1px solid var(--sheet-line);border-top:3px solid var(--accent);border-radius:10px;padding:1.1rem;overflow-x:auto;}
+  .sheet-label{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:#5b6675;font-weight:600;margin-bottom:.6rem;}
+  pre.mermaid{margin:0;background:transparent;display:flex;justify-content:center;min-width:min-content;border:0;padding:0;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.9rem;font-size:.82rem;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:.4rem;}
+  .sw{width:.85rem;height:.85rem;border-radius:3px;border:1px solid rgba(0,0,0,.25);display:inline-block;}
+  .sw.hit{background:#dcf0e4;} .sw.rej{background:#f7dde1;} .sw.gate{background:#fbf0da;}
+  .sw.set{background:#e3edf5;} .sw.io{background:#eef1f4;}
+
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;}
+  table{border-collapse:collapse;width:100%;font-size:.87rem;min-width:34rem;}
+  caption{text-align:left;padding:.7rem .9rem;font-weight:600;background:var(--surface-2);border-bottom:1px solid var(--line);}
+  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top;}
+  thead th{background:var(--surface-2);color:var(--muted);font-weight:600;font-size:.78rem;letter-spacing:.02em;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.mono,th.mono{font-family:var(--mono);font-size:.8rem;white-space:nowrap;}
+  .tag{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:.1rem .4rem;border-radius:5px;font-weight:600;}
+  .tag.g{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good);}
+  .tag.r{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad);}
+  .tag.w{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn);}
+  .tag.a{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);}
+
+  footer{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--muted);font-size:.82rem;}
+  footer b{color:var(--ink);}
+  a{color:var(--accent);}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad:true });</script>
+</head>
+<body>
+<div class="page">
+  <header class="head">
+    <div class="eyebrow">HT160S · Sort Mode</div>
+    <h1>白名單（WhiteList）分選模式</h1>
+    <p class="thesis">第 4 種分選模式 <code>smWhiteList=3</code>：把 2D→Bin 的資料來源從「WebAPI 拉取」換成「讀本地 <code>WhiteList.json</code>」，其餘完全走 Normal 靜態路由。只有名單內的 IC 可被分類，名單外＝正常拒收（靜默進 Error，不彈 modal）。</p>
+    <div class="chips">
+      <span class="chip">分支 <b>feat/iosetview-172-refactor</b></span>
+      <span class="chip">Phase 1 <b>a46b7e9</b></span>
+      <span class="chip">Phase 2 <b>4466cac</b></span>
+      <span class="chip ok">建置 <b>sim + 真機 EXIT 0</b></span>
+      <span class="chip wait">上機 host round-trip <b>pending</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="callout">
+      <p><b>核心模型（WebAPI-substitution）：</b>WhiteList 模式 = 在 Lot Start 時改呼叫 <code>LoadWhiteListFile()</code> 灌 <code>LotRegistry</code>（重用同一支 <code>LoadFromJsonString</code>、<code>"Maps"</code> schema），不觸發 WebAPI。掃描端 <code>FindByCode2D</code> 命中即照檔裡 Bin 走靜態 <code>BinAreaMap</code> 分選；未命中則走 miss 分支靜默 Error。</p>
+      <p><b>三個切入點：</b>①切模式（維護頁 radio / SECS LOTSTART 夾帶 SORTMODE）②Lot Start 載名單 ③執行期每顆 IC 命中/未命中判定。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">圖 1</span>流程圖 · 白名單分選生命週期</h2>
+    <p class="lead">從「選定模式」→「Lot Start 載名單」→「Machine Start 閘門」→「執行期每顆 IC 分選」的完整資料流。菱形為判斷點。</p>
+    <div class="sheet">
+      <div class="sheet-label">Flowchart — WhiteList classification lifecycle</div>
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'Segoe UI, system-ui, sans-serif','fontSize':'13px','lineColor':'#7c8aa0','primaryColor':'#eef1f4','primaryBorderColor':'#64748b','primaryTextColor':'#26303b'}}}%%
+flowchart TD
+  subgraph SW["① 選定分選模式（sticky 持久，跨重開機）"]
+    direction TB
+    UI["維護頁 Sort Mode 選「By WhiteList」<br/>(rgSortMode)"]:::set
+    UIG{"HasICUnderMachine?<br/>有在製 IC?"}:::gate
+    HOST["SECS 主機 S2F41 LOTSTART<br/>夾帶 SORTMODE pair"]:::set
+    UIBLK["還原選項 + 警示<br/>拒絕切換"]:::rej
+    SET["iSortMode = smWhiteList (3)<br/>GeneralSetting.Save()"]:::set
+    UI --> UIG
+    UIG -->|是| UIBLK
+    UIG -->|否 全閒| SET
+    HOST --> SET
+  end
+  SET --> LS
+  subgraph LSG["② Lot Start：載入 2D→Bin 名單"]
+    direction TB
+    LS{"IsWhiteListSortMode()?"}:::gate
+    WL["LoadWhiteListFile()<br/>1. LotRegistry.Clear() 先清空（權威來源）<br/>2. 讀 WhiteList.json（HT160S_WhiteList 資料夾）<br/>3. LoadFromJsonString（Maps schema）"]:::set
+    API["StartLotWebApiPullAll()<br/>WebAPI 拉取"]:::io
+    LS -->|是 WhiteList| WL
+    LS -->|否 其他模式| API
+  end
+  WL --> MS
+  API --> MS
+  subgraph MSG["③ Machine Start：CheckLotDataReady 閘門"]
+    direction TB
+    MS{"WhiteList 且名單為空<br/>GetItemCount ≤ 0 ?"}:::gate
+    BLK["擋下 Start<br/>Reason：WhiteList.json 缺失或空"]:::rej
+    OK["允許 Start"]:::hit
+    MS -->|名單空| BLK
+    MS -->|有名單| OK
+  end
+  OK --> SCAN
+  subgraph RUN["④ 執行期：每顆 IC（Top CCD → aLoader）"]
+    direction TB
+    SCAN{"2D 碼讀取?"}:::gate
+    FAIL["讀不到 → 操作員 retry / Manual2D<br/>(scan-fail 路徑不變)"]:::io
+    FIND{"FindByCode2D<br/>在名單內?"}:::gate
+    HIT["命中：依 Bin 靜態路由 (BinAreaMap)<br/>OnSorted、計數、正常分選"]:::hit
+    MISS["未命中 = 名單外<br/>靜默進 Error（無 modal）<br/>Bin=1001、Lot=-1、iUnknown2D++"]:::rej
+    SCAN -->|讀不到| FAIL
+    SCAN -->|讀到| FIND
+    FIND -->|是| HIT
+    FIND -->|否| MISS
+  end
+  HIT --> LOG["Production_Log<br/>trace 1000（一般 NoMap）"]:::io
+  MISS --> LOGR["Production_Log<br/>trace 1005 = NotWhitelisted<br/>(aSortArm 兩站 + deviceinfo)"]:::rej
+  SET -.->|回讀| SVID["主機回讀 SVID 66032<br/>S1F3 → iSortMode (0/1/2/3)"]:::io
+
+  classDef set fill:#e3edf5,stroke:#2b6f92,color:#0f2b3a;
+  classDef gate fill:#fbf0da,stroke:#b9791f,color:#4a2f08;
+  classDef hit fill:#dcf0e4,stroke:#2e8f61,color:#123b28;
+  classDef rej fill:#f7dde1,stroke:#c23b52,color:#4d1420;
+  classDef io fill:#eef1f4,stroke:#64748b,color:#26303b;
+</pre>
+    </div>
+    <div class="legend">
+      <span><i class="sw set"></i>切換 / 載入</span>
+      <span><i class="sw gate"></i>判斷閘門</span>
+      <span><i class="sw hit"></i>命中（名單內，正常分選）</span>
+      <span><i class="sw rej"></i>拒收 / 名單外</span>
+      <span><i class="sw io"></i>I/O · 記錄 · 回讀</span>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">圖 2</span>泳道圖 · 主機驅動的切換與分選</h2>
+    <p class="lead">以角色分泳道，展示 SECS 主機透過 <code>LOTSTART + SORTMODE</code> 切模式、載名單、回讀，以及執行期每顆 IC 的命中/未命中互動與時序。</p>
+    <div class="sheet">
+      <div class="sheet-label">Swimlane — host-driven switch &amp; per-IC classification</div>
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'Segoe UI, system-ui, sans-serif','fontSize':'12.5px','actorBkg':'#e3edf5','actorBorder':'#2b6f92','actorTextColor':'#0f2b3a','actorLineColor':'#9aa7b6','signalColor':'#4a5568','signalTextColor':'#26303b','labelBoxBkgColor':'#fbf0da','labelBoxBorderColor':'#b9791f','labelTextColor':'#4a2f08','noteBkgColor':'#eef1f4','noteBorderColor':'#64748b','noteTextColor':'#26303b'}}}%%
+sequenceDiagram
+  autonumber
+  participant H as SECS 主機 (KYEC EAP)
+  participant S as SECS 處理 (uHGemHT160)
+  participant C as 設定 (GeneralSetting)
+  participant U as 維護頁 (fMaintenance)
+  participant M as 主程式 (main / LotRegistry)
+  participant L as 掃描 (aLoader / Top CCD)
+  participant G as 記錄 (Production_Log)
+
+  H->>S: S2F41 LOTSTART { lot..., SORTMODE=WHITELIST }
+  Note over S: 緩衝 lot（bufLots[64]）；驗證 pair：<br/>len=2、name=SORTMODE、值 ∈ {NORMAL, WHITELIST}
+  alt 格式/參數錯（pair 長度≠2 / 值域外 / pair 無 lot / 截斷 / 超過 64）
+    S-->>H: S2F42 HCACK=2（整包拒絕，不留 ghost lot）
+  else lot 已 Start（bRunning=true）
+    S-->>H: S2F42 HCACK=4（忙碌，先 Lot End 再切）
+  else 解析成功且守衛通過
+    S->>M: LotRegistry.AddLot(每筆緩衝 lot)
+    S->>C: iSortMode = smWhiteList + Save()（sticky）
+    S->>U: SyncSortModeSelectorFromSetting()<br/>不觸發 OnClick、不彈 modal（免卡 T3）
+    S->>M: LoadWhiteListFile()
+    M->>M: Clear() → 讀 WhiteList.json → LoadFromJsonString(Maps)
+    S-->>H: S2F42 HCACK=0（模式已切、lot 已註冊）
+  end
+  H->>S: S1F3 查 SVID 66032
+  S-->>H: S1F4 = 3（WhiteList）
+  H->>M: START（或操作員按 Start）
+  M->>M: CheckLotDataReady：名單筆數 ≥ 1 ✓
+  loop 每顆 IC
+    L->>L: Top CCD 讀 2D → FindByCode2D
+    alt 命中（在名單內）
+      L->>M: 依 Bin 靜態路由 + OnSorted、計數
+      L->>G: trace 1000（正常）
+    else 未命中（名單外）
+      L->>L: 靜默 Error：Bin=1001、Lot=-1（無 modal）
+      L->>G: trace 1005 = NotWhitelisted
+    end
+  end
+</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">表 1</span>四種分選模式對照</h2>
+    <div class="tablewrap">
+      <table>
+        <caption>WhiteList 與既有三模式的差異（路由核心不變，只換 2D→Bin 來源與 miss 行為）</caption>
+        <thead>
+          <tr><th>面向</th><th>Normal</th><th>Lot+Bin</th><th>Lot+PassFail</th><th>WhiteList（新）</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>enum</td><td class="mono">smNormal=0</td><td class="mono">smLotBin=1</td><td class="mono">smLotPassFail=2</td><td class="mono">smWhiteList=3</td></tr>
+          <tr><td>路由方式</td><td>靜態 BinAreaMap</td><td>動態綁定</td><td>動態綁定</td><td><b>靜態 BinAreaMap（同 Normal）</b></td></tr>
+          <tr><td>2D→Bin 來源</td><td>WebAPI</td><td>WebAPI</td><td>WebAPI</td><td><b>本地 WhiteList.json</b></td></tr>
+          <tr><td>WebAPI 拉取</td><td>觸發</td><td>觸發</td><td>觸發</td><td><b>抑制</b></td></tr>
+          <tr><td>未命中 / 名單外 IC</td><td>WAR0475 modal→操作員</td><td>同左</td><td>同左</td><td><b>靜默 Error（無 modal）</b></td></tr>
+          <tr><td>Production_Log trace</td><td class="mono">1000</td><td class="mono">1000</td><td class="mono">1000</td><td class="mono">1005 NotWhitelisted</td></tr>
+          <tr><td>IsDynamicBindingMode()</td><td>false</td><td>true</td><td>true</td><td><b>false</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">表 2</span>SECS LOTSTART · SORTMODE 回覆對照（HCACK）</h2>
+    <p class="lead">電文：<code>S2F41 LOTSTART</code> 內層 lot 清單可夾帶至多一個 <code>L[2]{ A"SORTMODE", A值 }</code>，值域 <code>NORMAL | WHITELIST</code>（大小寫不敏感）。不帶 pair＝維持目前模式（sticky）。切換與 Lot Start 綁定，且套模式在 2D 載入決策<b>之前</b>。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="mono">HCACK</th><th>意義</th><th>觸發條件</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag g">0</span></td><td>接受：模式已切、lot 已註冊</td><td>清單解析成功且守衛通過</td></tr>
+          <tr><td><span class="tag w">1</span></td><td>電文清單格式錯</td><td>外層非預期 LIST</td></tr>
+          <tr><td><span class="tag r">2</span></td><td>參數錯（整包拒絕）</td><td>pair 長度≠2 / name 非 SORTMODE / 值域外 / <b>pair 無 lot</b> / 清單截斷 / 超過容量(64) / 型別不符</td></tr>
+          <tr><td><span class="tag r">4</span></td><td>設備忙（整包拒絕）</td><td>外層守衛 <code>SystemStart || HasICUnderMachine</code>，<b>或</b> pair 存在且 <code>bRunning==true</code>（lot 已開始）</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="margin-top:.9rem;">主機回讀：<code>S1F3</code> 查 SVID <b>66032</b>（INT_4）→ <code>S1F4</code> 回目前 <code>iSortMode</code>（<code>0=Normal / 1=LotBin / 2=LotPassFail / 3=WhiteList</code>）。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">表 3</span>涉及檔案與職責</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>層</th><th class="mono">檔案</th><th>職責</th></tr></thead>
+        <tbody>
+          <tr><td>設定</td><td class="mono">GeneralSetting.h/.cpp</td><td>enum <code>smWhiteList=3</code>、<code>IsWhiteListSortMode()</code>、clamp 上界放寬</td></tr>
+          <tr><td>UI</td><td class="mono">maintenance.h/.cpp/.dfm</td><td>第 4 radio「By WhiteList」、clamp、<code>HasICUnderMachine</code> 守衛、<code>SyncSortModeSelectorFromSetting()</code></td></tr>
+          <tr><td>載入</td><td class="mono">main.cpp</td><td><code>LoadWhiteListFile()</code>（Clear→讀檔→parse）、WebAPI 抑制 2 站、<code>CheckLotDataReady</code> 閘門</td></tr>
+          <tr><td>掃描</td><td class="mono">aLoader.cpp</td><td>未命中分支：WhiteList 模式靜默 Error（重用 Bin 1001）</td></tr>
+          <tr><td>追溯</td><td class="mono">aSortArm.cpp + deviceinfo.cpp</td><td>trace <code>1005</code>（兩站點）＋ 映射 <code>NotWhitelisted</code></td></tr>
+          <tr><td>SECS</td><td class="mono">SecsGem/uHGemHT160.cpp</td><td>LOTSTART SORTMODE pair 緩衝式解析、SVID 66032、UI 同步</td></tr>
+          <tr><td>模擬器</td><td class="mono">HT160S_SECS_Simulator/code/ht160s_presets.py</td><td>測試按鈕 <code>LOTSTART +WhiteList</code> / <code>+Normal</code>（夾帶 SORTMODE pair）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>白名單檔規格：</b><code>HT160S_WhiteList\WhiteList.json</code>，<code>"Maps"</code> schema（<code>LotNumber</code> / <code>Items[Code2D, Bin]</code>）；<code>LotNumber</code> 須對齊 host 宣告的真實 Lot ID、碼 byte-exact、不得重複。名單＝資格非額度（同碼重複投料不攔）。</p>
+    <p><b>現況：</b>Phase 1（<code>a46b7e9</code>）＋ Phase 2（<code>4466cac</code>）皆 SHIPPED、compile-clean、對抗式複驗 0 confirmed。<b>待辦：</b>① StateRecord JSON 4-way 具名標籤（延後，1 行三元；host 已可用 SVID 66032 讀）② KYEC 客戶規格書 ③ 上機 host round-trip 驗證。</p>
+    <p style="margin-top:.6rem;color:var(--muted);">SSOT：<code>docs/plan/whitelist-sortmode-plan-20260714.md</code> · 報告：<code>docs/plan/whitelist-phase2-report-20260716.md</code> · Markdown：<code>docs/plan/whitelist-sortmode-diagrams-20260717.md</code></p>
+  </footer>
+</div>
+</body>
+</html>

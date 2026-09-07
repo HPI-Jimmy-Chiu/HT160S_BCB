@@ -1,12 +1,17 @@
 //---------------------------------------------------------------------------
 #include <vcl.h>
 #pragma hdrstop
+#include "language.h"
 
 #include "setup.h"
 #include "CosFunction.h"
 #include "GeneralSetting.h"
+#include "aSortArm.h"   //AI(ht160s-pnp) 20260626 : SortArmModule global + SetPnPParameters for ApplyPnPToSortArm
+#include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID124 SaveRecipe
+#include "SecsGem/uHGemHT160.h"         //AI(secs-ceid-align9045) 20260729 : SECS_EVENT id dictionary
 #include "database.h"
 #include "mymessbox.h"   //AI(general) 20260608 : ShowMyMessageBox_YES_NO instead of Application->MessageBox
+#include "ComPort.h"   //AI(ht160s-bindisplay) 20260706 : fComPort + EnsureComPortCreated to repaint the bin panel on Save Map
 #include <Dialogs.hpp>
 #include <IniFiles.hpp>
 //---------------------------------------------------------------------------
@@ -25,6 +30,8 @@ typedef struct
 //---------------------------------------------------------------------------
 static const char *SETUP_INI_GROUP="Setup";
 static const char *TRAY_FORM_INI_GROUP="TrayForm";
+static const char *PNP_INI_GROUP="PnP";   //AI(ht160s-pnp) 20260626 : SortArm pick/place tuning section in recipe setup.ini
+static const int SORT_ARM_SUCKER_COUNT=4;   //AI(ht160s-pnp) 20260626 : SortArm nozzle count (mirrors GeneralSetting.bSuckerEnabled[4]); keep in sync with aSortArm.cpp
 enum
 {
     BIN_GRID_COL_AREA=0,
@@ -44,6 +51,7 @@ __fastcall TfSetup::TfSetup(TComponent* Owner)
     LastClickButton=NULL;
     bLoadingTrayForm=false;
     bLoadingBinGrid=false;
+    bLoadingPnP=false;
 
     for(PageIndex=0; PageIndex<MAX_SETUP_MENU_COUNT; PageIndex++)
     {
@@ -57,6 +65,7 @@ __fastcall TfSetup::TfSetup(TComponent* Owner)
     LayoutSetupButtons();
     BindTrayFormEvents();
     BuildBinSettingUI();
+    BuildPnPUI();
     SelectSetupPage(0);
 }
 //---------------------------------------------------------------------------
@@ -70,6 +79,7 @@ void __fastcall TfSetup::OpenWorkFile()
     RecipeManager.LoadLastRecipeName();
     RecipeManager.EnsureCurrentRecipeDir();
     LoadTrayFormSettings(RecipeManager.GetCurrentRecipeName());
+    LoadPnPSettings(RecipeManager.GetCurrentRecipeName());   //AI(ht160s-pnp) 20260626 : seed runtime SortArm PnP scalars from the active recipe
     BinAreaMap.LoadDefault();
     LoadBinMapToGrid();
     RefreshRecipeList();
@@ -84,6 +94,7 @@ void __fastcall TfSetup::SaveWorkFile(AnsiString S)
     RecipeManager.EnsureCurrentRecipeDir();
     WriteRecipeSetupFile(RecipeManager.GetCurrentRecipeName());
     SaveTrayFormSettings(RecipeManager.GetCurrentRecipeName());
+    SavePnPSettings(RecipeManager.GetCurrentRecipeName());   //AI(ht160s-pnp) 20260626 : persist + re-apply SortArm PnP scalars
     SaveBinSettingMap(false);
     WriteRecipeManifest(RecipeManager.GetCurrentRecipeName(), AnsiString(""));
     RecipeManager.SaveLastRecipeName();
@@ -95,6 +106,7 @@ void __fastcall TfSetup::RegisterSetupPages()
         {tsSetupRecipe,    spbSetupRecipe,    suShowPage,  false},
         {tsSetupTrayForm,  spbSetupTrayForm,  suShowPage,  false},
         {tsSetupBinSetting,spbSetupBinSetting,suShowPage,  false},
+        {tsSetupPnP,       spbSetupPnP,       suShowPage,  false},
         {NULL,             spbSetupExit,      suCloseForm, true}
     };
     int PageIndex;
@@ -185,9 +197,9 @@ void __fastcall TfSetup::RefreshRecipeStatus()
     lblRecipeDirValue->Caption=RecipeManager.GetRecipeDirName();
     lblSetupFileValue->Caption=SetupFileName;
     lblBinAreaMapValue->Caption=BinAreaFileName;
-    lblSetupFileStatusValue->Caption=FileExists(SetupFileName)?AnsiString("Ready"):AnsiString("Not Created");
-    lblBinMapStatusValue->Caption=FileExists(BinAreaFileName)?AnsiString("Ready"):AnsiString("Not Created");
-    lblManifestValue->Caption=FileExists(ManifestFileName)?AnsiString("Ready"):AnsiString("Not Created");
+    lblSetupFileStatusValue->Caption=FileExists(SetupFileName)?AnsiString(LangT("Ready")):AnsiString(LangT("Not Created"));
+    lblBinMapStatusValue->Caption=FileExists(BinAreaFileName)?AnsiString(LangT("Ready")):AnsiString(LangT("Not Created"));
+    lblManifestValue->Caption=FileExists(ManifestFileName)?AnsiString(LangT("Ready")):AnsiString(LangT("Not Created"));
     RefreshBinSettingStatus();
 }
 //---------------------------------------------------------------------------
@@ -343,7 +355,7 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
     ForceDirectories(ExtractFilePath(FileName));
     if(atoi(edXDivision->Text.c_str())>MAX_TRAY_X || atoi(edYDivision->Text.c_str())>MAX_TRAY_Y)
     {
-        ShowMessage(AnsiString("Tray division exceeds machine limit (X max=")+IntToStr(MAX_TRAY_X)+", Y max="+IntToStr(MAX_TRAY_Y)+"). Value clamped.");
+        ShowMyOKMessageNoStop(Format(LangT("Tray division exceeds machine limit (X max=%d, Y max=%d). Value clamped."), ARRAYOFCONST((MAX_TRAY_X, MAX_TRAY_Y))));
     }
     XDivision=GetTrayEditInt(edXDivision, 1, 1, MAX_TRAY_X);
     YDivision=GetTrayEditInt(edYDivision, 1, 1, MAX_TRAY_Y);
@@ -360,6 +372,231 @@ void __fastcall TfSetup::SaveTrayFormSettings(AnsiString RecipeName)
     //from the just-saved INI so Loader/SortArm/Auto/Monitor pick up the new
     //geometry immediately instead of reading stale Setup-form UI defaults.
     TrayForm.Load(Name);
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::BuildPnPUI()
+{
+    //AI(ht160s-pnp) 20260626 : one-time PnP tab wiring. Size the sucker-enable grid to the SortArm
+    //nozzle count (one row, N columns) and bind the grid-click + Use-Suck radio handlers in code so
+    //the .dfm carries no event bindings.
+    if(grdSuckEnable!=NULL)
+    {
+        grdSuckEnable->XItem=SORT_ARM_SUCKER_COUNT;
+        grdSuckEnable->YItem=1;
+        grdSuckEnable->OnMouseUp=grdSuckEnableMouseUp;
+    }
+    if(rgPnpUseSuck!=NULL)
+        rgPnpUseSuck->OnClick=rgPnpUseSuckClick;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::LoadPnPSettings(AnsiString RecipeName)
+{
+    //AI(ht160s-pnp) 20260626 : read the [PnP] scalar tuning from the recipe setup.ini into the edits,
+    //then push to the runtime model. Mirrors LoadTrayFormSettings (TIniFile + FileExists guard).
+    TIniFile *Ini;
+    AnsiString FileName;
+    AnsiString Name=RecipeManager.NormalizeRecipeName(RecipeName);
+
+    FileName=RecipeManager.GetRecipeFileName(Name, "setup.ini");
+    bLoadingPnP=true;
+    if(FileExists(FileName))
+    {
+        Ini=new TIniFile(FileName);
+        edPnpPickDelay->Text=FormatTrayDouble(Ini->ReadFloat(PNP_INI_GROUP, "PickDelaySec", 0.0));
+        edPnpPlaceDelay->Text=FormatTrayDouble(Ini->ReadFloat(PNP_INI_GROUP, "PlaceDelaySec", 0.0));
+        edtDestroyCheckTime->Text=FormatTrayDouble(Ini->ReadFloat(PNP_INI_GROUP, "DestroyCheckTime", 0.3));
+        delete Ini;
+    }
+    else
+    {
+        edPnpPickDelay->Text="0.000";
+        edPnpPlaceDelay->Text="0.000";
+        edtDestroyCheckTime->Text="0.300";
+    }
+    bLoadingPnP=false;
+    ApplyPnPToSortArm();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::SavePnPSettings(AnsiString RecipeName)
+{
+    //AI(ht160s-pnp) 20260626 : write the [PnP] scalar tuning back to the recipe setup.ini, then
+    //re-apply to the runtime model. Mirrors SaveTrayFormSettings (ForceDirectories + WriteFloat).
+    TIniFile *Ini;
+    AnsiString FileName;
+    AnsiString Name=RecipeManager.NormalizeRecipeName(RecipeName);
+
+    FileName=RecipeManager.GetRecipeFileName(Name, "setup.ini");
+    ForceDirectories(ExtractFilePath(FileName));
+    Ini=new TIniFile(FileName);
+    Ini->WriteFloat(PNP_INI_GROUP, "PickDelaySec", GetTrayEditDouble(edPnpPickDelay, 0.0));
+    Ini->WriteFloat(PNP_INI_GROUP, "PlaceDelaySec", GetTrayEditDouble(edPnpPlaceDelay, 0.0));
+    Ini->WriteFloat(PNP_INI_GROUP, "DestroyCheckTime", GetTrayEditDouble(edtDestroyCheckTime, 0.3));
+    delete Ini;
+
+    ApplyPnPToSortArm();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::ApplyPnPToSortArm()
+{
+    //AI(ht160s-pnp) 20260626 : push the [PnP] scalar tuning into the runtime SortArm model. Per-nozzle
+    //enable is NOT pushed here - it lives in GeneralSetting.bSuckerEnabled[4] and aSortArm reads it
+    //live each pick. SortArmModule can be NULL very early in startup; guard it.
+    if(SortArmModule==NULL)
+        return;
+    SortArmModule->SetPnPParameters(
+        GetTrayEditDouble(edPnpPickDelay, 0.0),
+        GetTrayEditDouble(edPnpPlaceDelay, 0.0),
+        GetTrayEditDouble(edtDestroyCheckTime, 0.3));
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::LoadSuckEnable()
+{
+    //AI(ht160s-pnp) 20260626 : per-nozzle enable is machine-level (GeneralSetting / General.ini),
+    //already loaded at startup. Reflect it into the grid + the Use-Suck mode selector. All-enabled
+    //-> "Use All" (index 0, grid locked); otherwise "Use Select" (index 1, grid editable).
+    int s;
+    int iEnabledCount;
+
+    bLoadingPnP=true;
+    iEnabledCount=0;
+    for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        if(GeneralSetting.bSuckerEnabled[s])
+            iEnabledCount++;
+    if(rgPnpUseSuck!=NULL)
+        rgPnpUseSuck->ItemIndex=(iEnabledCount==SORT_ARM_SUCKER_COUNT)?0:1;
+    RefreshSuckGrid();
+    if(rgPnpUseSuck!=NULL && grdSuckEnable!=NULL)
+        grdSuckEnable->Enabled=(rgPnpUseSuck->ItemIndex==1);
+    //AI(ht160s-suck2-quad) 20260712 : quad-vacuum variant - the pick mask is forced to
+    //Nozzle2-only by GeneralSetting.Load() and must not be edited here; lock both the
+    //mode selector and the grid (maintenance tsOption owns the option itself).
+    if(GeneralSetting.bSuck2QuadVacuum)
+    {
+        if(rgPnpUseSuck!=NULL)
+            rgPnpUseSuck->Enabled=false;
+        if(grdSuckEnable!=NULL)
+            grdSuckEnable->Enabled=false;
+    }
+    else if(rgPnpUseSuck!=NULL)
+        rgPnpUseSuck->Enabled=true;
+    //AI(ht160s-pick-retry) 20260706 : reflect machine-level [SortArm] PickRetryCount into the edit.
+    if(edSortArmPickRetry!=NULL)
+        edSortArmPickRetry->Text=IntToStr(GeneralSetting.iSortArmPickRetryCount);
+    bLoadingPnP=false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::SaveSuckEnable()
+{
+    //AI(ht160s-pnp) 20260626 : grid clicks already wrote GeneralSetting.bSuckerEnabled[]. Guarantee
+    //at least one nozzle stays enabled (mirrors the maintenance.cpp invariant), then persist to
+    //General.ini. aSortArm reads the array live, so no engine refresh is required.
+    int s;
+    int iEnabledCount;
+
+    iEnabledCount=0;
+    for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+        if(GeneralSetting.bSuckerEnabled[s])
+            iEnabledCount++;
+    if(iEnabledCount==0)
+        GeneralSetting.bSuckerEnabled[0]=true;
+    //AI(ht160s-pick-retry) 20260706 : persist the pick-retry budget (0..10; 0 = alarm on first fail).
+    //aSortArm reads GeneralSetting.iSortArmPickRetryCount live, so no engine refresh is required.
+    if(edSortArmPickRetry!=NULL)
+        GeneralSetting.iSortArmPickRetryCount=GetTrayEditInt(edSortArmPickRetry, 3, 0, 10);
+    GeneralSetting.Save();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::RefreshSuckGrid()
+{
+    //AI(ht160s-pnp) 20260626 : paint each nozzle cell green (enabled, color index 1) or white
+    //(disabled, color index 0) from GeneralSetting.bSuckerEnabled[]; label cells 1..N.
+    int s;
+
+    if(grdSuckEnable==NULL)
+        return;
+    grdSuckEnable->XItem=SORT_ARM_SUCKER_COUNT;
+    grdSuckEnable->YItem=1;
+    for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+    {
+        grdSuckEnable->SetCellNumber(s, 0, s+1);
+        grdSuckEnable->SetCellColorIndex(s, 0, GeneralSetting.bSuckerEnabled[s]?1:0);
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::grdSuckEnableMouseUp(TObject *Sender,
+      TMouseButton Button, TShiftState Shift, int X, int Y)
+{
+    //AI(ht160s-pnp) 20260626 : map pixel (X,Y) to a nozzle cell via TTMyTray::ConvertIndexCells
+    //(returns 1 on hit, rewriting X/Y to cell indices). Grid is one row so the nozzle index is X.
+    //Toggle GeneralSetting.bSuckerEnabled[] and recolor; never disable the last enabled nozzle.
+    int idx;
+    int s;
+    int iEnabledCount;
+
+    (void)Sender;
+    (void)Button;
+    (void)Shift;
+    if(grdSuckEnable==NULL)
+        return;
+    if(bLoadingPnP)
+        return;
+    if(GeneralSetting.bSuck2QuadVacuum)
+        return;
+    if(rgPnpUseSuck!=NULL && rgPnpUseSuck->ItemIndex==0)
+        return;
+    if(grdSuckEnable->ConvertIndexCells(X, Y)!=1)
+        return;
+    idx=X;
+    if(idx<0 || idx>=SORT_ARM_SUCKER_COUNT)
+        return;
+    if(GeneralSetting.bSuckerEnabled[idx])
+    {
+        iEnabledCount=0;
+        for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            if(GeneralSetting.bSuckerEnabled[s])
+                iEnabledCount++;
+        if(iEnabledCount<=1)
+        {
+            ShowMyOKMessageNoStop(LangT("At least one nozzle must stay enabled."));
+            return;
+        }
+        GeneralSetting.bSuckerEnabled[idx]=false;
+        grdSuckEnable->SetCellColorIndex(idx, 0, 0);
+    }
+    else
+    {
+        GeneralSetting.bSuckerEnabled[idx]=true;
+        grdSuckEnable->SetCellColorIndex(idx, 0, 1);
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfSetup::rgPnpUseSuckClick(TObject *Sender)
+{
+    //AI(ht160s-pnp) 20260626 : SortArm-only Use-Suck mode (the HT172 Mag Arm column is removed).
+    //Index 0 = Use All : force every nozzle enabled + green, lock the grid. Index 1 = Use Select :
+    //unlock the grid for per-nozzle clicking. bLoadingPnP suppresses the programmatic ItemIndex set.
+    int s;
+
+    (void)Sender;
+    if(bLoadingPnP)
+        return;
+    if(GeneralSetting.bSuck2QuadVacuum)
+        return;
+    if(rgPnpUseSuck==NULL)
+        return;
+    if(rgPnpUseSuck->ItemIndex==1)
+    {
+        if(grdSuckEnable!=NULL)
+            grdSuckEnable->Enabled=true;
+    }
+    else
+    {
+        for(s=0; s<SORT_ARM_SUCKER_COUNT; s++)
+            GeneralSetting.bSuckerEnabled[s]=true;
+        RefreshSuckGrid();
+        if(grdSuckEnable!=NULL)
+            grdSuckEnable->Enabled=false;
+    }
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSetup::WriteDefaultTrayFormSettings(AnsiString RecipeName)
@@ -463,16 +700,16 @@ void __fastcall TfSetup::ConfigureBinSettingGrid()
     grdBinAreaMap->Options=grdBinAreaMap->Options << goEditing << goTabs << goColSizing;
     grdBinAreaMap->OnExit=grdBinAreaMapExit;
     grdBinAreaMap->OnSelectCell=grdBinAreaMapSelectCell;
-    grdBinAreaMap->Cells[BIN_GRID_COL_AREA][0]="Area";
+    grdBinAreaMap->Cells[BIN_GRID_COL_AREA][0]=LangT("Area");
     grdBinAreaMap->Cells[BIN_GRID_COL_BIN][0]="Bin";
-    grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][0]="Status";
-    grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][0]="Note";
+    grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][0]=LangT("Status");
+    grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][0]=LangT("Note");
     grdBinAreaMap->ColWidths[BIN_GRID_COL_AREA]=120;
     grdBinAreaMap->ColWidths[BIN_GRID_COL_BIN]=80;
     grdBinAreaMap->ColWidths[BIN_GRID_COL_STATUS]=100;
     grdBinAreaMap->ColWidths[BIN_GRID_COL_NOTE]=300;
     if(spbBinDefault!=NULL)
-        spbBinDefault->Caption=AnsiString("Default 1-")+IntToStr(GetBinGridAreaCount());
+        spbBinDefault->Caption=Format(LangT("Default 1-%d"),ARRAYOFCONST((GetBinGridAreaCount())));
     RefreshBinErrorAreaOptions();
 }
 //---------------------------------------------------------------------------
@@ -497,6 +734,9 @@ void __fastcall TfSetup::LoadBinMapToGrid()
     }
     RefreshBinErrorAreaOptions();
     SelectBinErrorArea(BinAreaMap.GetErrorBinArea());
+    //AI(ht160s-lotpassfail) 20260730 : the Pass Bin combo is REMOVED. PASS/FAIL is decided by the
+    //customer per-IC DiePass carried in the 2D data (THT160LotRegistry::GetPassFailClass), so the
+    //machine has no Pass Bin setting to load any more.
     bLoadingBinGrid=false;
     ValidateBinSettingGrid(false);
     RefreshBinSettingStatus();
@@ -515,7 +755,7 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
     if(!ValidateBinSettingGrid(false))
     {
         if(ShowResultMessage)
-            ShowMessage("Bin map setting has invalid rows.");
+            ShowMyOKMessageNoStop(LangT("Bin map setting has invalid rows."));
         return false;
     }
 
@@ -528,11 +768,24 @@ bool __fastcall TfSetup::SaveBinSettingMap(bool ShowResultMessage)
             BinAreaMap.SetBinByArea(Bin, Area);
     }
     BinAreaMap.SetErrorBinArea(GetSelectedBinErrorArea());
+    //AI(ht160s-lotpassfail) 20260730 : the Pass Bin save + its mid-lot lock are REMOVED with the
+    //setting. Nothing on this page can re-partition a running By Lot+PassFail lot any more : the
+    //PASS/FAIL class is customer data frozen onto the cell at CCD scan.
     BinAreaMap.SaveDefault();
+    //AI(ht160s-bindisplay) 20260706 : the Error Bin area just changed in the live
+    //global BinAreaMap. Sort routing reads it live, but the physical bin display
+    //color is only repainted by ApplyBinDisplayConfig (via ConfigureBinDisplay at
+    //startup / maintenance Apply), so without this the panel red-Auto stayed stale
+    //until restart. Re-push per-unit color now so the panel matches the saved map.
+    //Lighter than ConfigureBinDisplay (no COM teardown); safe no-op when the
+    //controller is absent (ApplyBinDisplayConfig early-returns on BinDisCtrl==NULL).
+    EnsureComPortCreated(Application);
+    if(fComPort!=NULL)
+        fComPort->ApplyBinDisplayConfig();
     RefreshBinSettingStatus();
     RefreshRecipeStatus();
     if(ShowResultMessage)
-        ShowMessage("Bin map saved.");
+        ShowMyOKMessageNoStop(LangT("Bin map saved."));
     return true;
 }
 //---------------------------------------------------------------------------
@@ -559,8 +812,8 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
         Bin=GetBinGridValue(Row, ValidValue);
         if(!ValidValue)
         {
-            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Invalid";
-            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Bin must be 0-999. Error code starts from 1000.";
+            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Invalid");
+            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=LangT("Bin must be 0-999. Error code starts from 1000.");
             Result=false;
             continue;
         }
@@ -568,28 +821,28 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
         {
             if(Area==ErrorArea)
             {
-                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Error";
+                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Error");
                 grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Error bin collection.";
             }
             else
             {
-                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Empty";
-                grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Not assigned.";
+                grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Empty");
+                grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=LangT("Not assigned.");
             }
             continue;
         }
         DuplicateArea=TempMap.GetAreaByBin(Bin);
         if(DuplicateArea!=eHT160BinAreaNotUse && DuplicateArea!=Area)
         {
-            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="Duplicate";
-            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=AnsiString("Same bin as ")+BinAreaMap.GetAreaName(DuplicateArea)+AnsiString(".");
+            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("Duplicate");
+            grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]=Format(LangT("Same bin as %s."),ARRAYOFCONST((BinAreaMap.GetAreaName(DuplicateArea))));
             Result=false;
             continue;
         }
         TempMap.SetBinByArea(Bin, Area);
         if(Area==ErrorArea)
         {
-            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]="OK/Error";
+            grdBinAreaMap->Cells[BIN_GRID_COL_STATUS][Row]=LangT("OK/Error");
             grdBinAreaMap->Cells[BIN_GRID_COL_NOTE][Row]="Error bin collection.";
         }
         else
@@ -601,8 +854,8 @@ bool __fastcall TfSetup::ValidateBinSettingGrid(bool ShowResultMessage)
     RefreshBinSettingStatus();
     if(ShowResultMessage)
     {
-        Message=Result?AnsiString("Bin map setting is OK."):AnsiString("Bin map setting has invalid rows.");
-        ShowMessage(Message);
+        Message=Result?AnsiString(LangT("Bin map setting is OK.")):AnsiString(LangT("Bin map setting has invalid rows."));
+        ShowMyOKMessageNoStop(LangT(Message));
     }
     return Result;
 }
@@ -631,7 +884,7 @@ void __fastcall TfSetup::RefreshBinSettingStatus()
 
     CountText.sprintf("%d / %d", Count, GetBinGridAreaCount());
     if(lblBinMapStatusValue!=NULL)
-        lblBinMapStatusValue->Caption=(FileExists(FileName)?AnsiString("Ready "):AnsiString("Not Created "))+AnsiString("(")+CountText+AnsiString(")");
+        lblBinMapStatusValue->Caption=(FileExists(FileName)?AnsiString(LangT("Ready ")):AnsiString(LangT("Not Created ")))+AnsiString("(")+CountText+AnsiString(")");
     if(lblBinRecipeValue!=NULL)
         lblBinRecipeValue->Caption=RecipeManager.GetCurrentRecipeName();
     if(lblBinFileValue!=NULL)
@@ -639,7 +892,7 @@ void __fastcall TfSetup::RefreshBinSettingStatus()
     if(lblBinMappedValue!=NULL)
         lblBinMappedValue->Caption=CountText;
     if(lblBinColorValue!=NULL)
-        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
+        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString(LangT("Installed")):AnsiString(LangT("Not Installed"));
     if(cbbBinErrorArea!=NULL)
         SelectBinErrorArea(GetSelectedBinErrorArea());
 }
@@ -651,7 +904,7 @@ void __fastcall TfSetup::RefreshBinErrorAreaOptions()
     bool OldLoading;
 
     if(lblBinColorValue!=NULL)
-        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString("Installed"):AnsiString("Not Installed");
+        lblBinColorValue->Caption=GeneralSetting.bColorBinAreaInstalled?AnsiString(LangT("Installed")):AnsiString(LangT("Not Installed"));
     if(cbbBinErrorArea==NULL)
         return;
 
@@ -796,6 +1049,16 @@ void __fastcall TfSetup::grdBinAreaMapExit(TObject *Sender)
 void __fastcall TfSetup::grdBinAreaMapSelectCell(TObject *Sender, int ACol, int ARow, bool &CanSelect)
 {
     (void)Sender;
+    //AI(ht160s-lotbin) 20260615 : By Lot+Bin mode binds Auto<->Bin dynamically at run
+    //time, so the static Auto->Bin assignment must NOT be edited here (only the Error
+    //Bin selection stays usable). Block the Bin column from being focused/edited.
+    //AI(ht160s-lotpassfail) 20260709 : same for By Lot+PassFail (also dynamic). That mode needs
+    //no static Bin at all - its PASS/FAIL class comes from the customer per-IC DiePass.
+    if(GeneralSetting.IsDynamicBindingMode())
+    {
+        CanSelect=false;
+        return;
+    }
     CanSelect=(ARow==0 || ACol==BIN_GRID_COL_BIN);
 }
 //---------------------------------------------------------------------------
@@ -843,6 +1106,23 @@ bool __fastcall TfSetup::IsSystemRunning()
     return HSys.Sys.SystemStart;
 }
 //---------------------------------------------------------------------------
+//AI(poka-yoke) 20260616 : run-state lock for recipe operations. While running,
+//  disable Use/Delete recipe so the operator cannot change the live recipe
+//  mid-run. Pure visual interlock; the existing ShowMessage guards inside the
+//  click handlers stay as a harmless backstop (VCL ShowMessage does not stop the
+//  machine). Called every cycle from UpdateRunControlFlag, so it self-heals when
+//  the machine stops.
+void __fastcall TfSetup::UpdateRunStateLock()
+{
+    bool bRunning;
+
+    bRunning=HSys.Sys.SystemStart;
+    if(spbRecipeUse!=NULL)
+        spbRecipeUse->Enabled=(bRunning==false);
+    if(spbRecipeDelete!=NULL)
+        spbRecipeDelete->Enabled=(bRunning==false);
+}
+//---------------------------------------------------------------------------
 void __fastcall TfSetup::spbSetupMenuClick(TObject *Sender)
 {
     TSpeedButton *Button;
@@ -860,6 +1140,11 @@ void __fastcall TfSetup::spbRecipeSaveClick(TObject *Sender)
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(true))
         return;
+    //AI(secs-ceid-align9045) 20260729 : CEID 124 "Save Recipe". HT9045 reports it from its Setup
+    //save handler (cSetUp.cpp:3329) - the operator-initiated SAVE, not a value edit. Reported
+    //after SaveBinSettingMap succeeds so a rejected save sends nothing. HT9045 also fires CEID 45
+    //(Arm On Off) on the same line; that one is tester-only and has no HT160S mechanism.
+    EventReport(SECS_EVENT.SaveRecipe);
     RefreshRecipeList();
     RefreshRecipeStatus();
 }
@@ -872,7 +1157,7 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     (void)Sender;
     if(edRecipeName->Text.Trim()==AnsiString(""))
     {
-        ShowMessage("Please input new recipe name.");
+        ShowMyOKMessageNoStop(LangT("Please input new recipe name."));
         return;
     }
 
@@ -880,28 +1165,31 @@ void __fastcall TfSetup::spbRecipeSaveAsClick(TObject *Sender)
     NewName=RecipeManager.NormalizeRecipeName(edRecipeName->Text);
     if(RecipeManager.RecipeExists(NewName))
     {
-        ShowMessage("Recipe already exists.");
+        ShowMyOKMessageNoStop(LangT("Recipe already exists."));
         return;
     }
 
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(false))
     {
-        ShowMessage("Bin map setting is invalid.");
+        ShowMyOKMessageNoStop(LangT("Bin map setting is invalid."));
         return;
     }
     if(!RecipeManager.CopyRecipe(SourceName, NewName))
     {
-        ShowMessage("Save As recipe failed.");
+        ShowMyOKMessageNoStop(LangT("Save As recipe failed."));
         return;
     }
 
     WriteRecipeSetupFile(NewName);
     WriteRecipeManifest(NewName, SourceName);
+    //AI(secs-ceid-align9045) 20260729 : CEID 124 "Save Recipe" - Save As is also an operator save,
+    //so it reports the same id as spbRecipeSaveClick. Reported past every reject above.
+    EventReport(SECS_EVENT.SaveRecipe);
     RefreshRecipeList();
     SelectRecipeInList(NewName);
     RefreshRecipeStatus();
-    ShowMessage("Recipe saved as "+NewName+AnsiString("."));
+    ShowMyOKMessageNoStop(LangT("Recipe saved as ")+NewName+AnsiString(LangT(".")));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfSetup::spbRecipeUseClick(TObject *Sender)
@@ -911,21 +1199,21 @@ void __fastcall TfSetup::spbRecipeUseClick(TObject *Sender)
     (void)Sender;
     if(IsSystemRunning())
     {
-        ShowMessage("Can not change recipe while machine is running.");
+        ShowMyOKMessageNoStop(LangT("Can not change recipe while machine is running."));
         return;
     }
 
     Name=GetSelectedRecipeName();
     if(!RecipeManager.RecipeExists(Name))
     {
-        ShowMessage("Recipe does not exist.");
+        ShowMyOKMessageNoStop(LangT("Recipe does not exist."));
         return;
     }
 
     SaveWorkFile(GetSetUpFileName());
     if(!SaveBinSettingMap(false))
     {
-        ShowMessage("Bin map setting is invalid.");
+        ShowMyOKMessageNoStop(LangT("Bin map setting is invalid."));
         return;
     }
     RecipeManager.SetCurrentRecipeName(Name);
@@ -941,14 +1229,14 @@ void __fastcall TfSetup::spbRecipeNewBlankClick(TObject *Sender)
     (void)Sender;
     if(edRecipeName->Text.Trim()==AnsiString(""))
     {
-        ShowMessage("Please input new recipe name.");
+        ShowMyOKMessageNoStop(LangT("Please input new recipe name."));
         return;
     }
 
     Name=RecipeManager.NormalizeRecipeName(edRecipeName->Text);
     if(!RecipeManager.CreateRecipe(Name))
     {
-        ShowMessage("Create recipe failed or recipe already exists.");
+        ShowMyOKMessageNoStop(LangT("Create recipe failed or recipe already exists."));
         return;
     }
 
@@ -969,25 +1257,25 @@ void __fastcall TfSetup::spbRecipeDeleteClick(TObject *Sender)
     (void)Sender;
     if(IsSystemRunning())
     {
-        ShowMessage("Can not delete recipe while machine is running.");
+        ShowMyOKMessageNoStop(LangT("Can not delete recipe while machine is running."));
         return;
     }
 
     Name=GetSelectedRecipeName();
     if(Name.UpperCase()==RecipeManager.GetCurrentRecipeName().UpperCase())
     {
-        ShowMessage("Can not delete current recipe.");
+        ShowMyOKMessageNoStop(LangT("Can not delete current recipe."));
         return;
     }
 
     //AI(general) 20260608 : no Application->MessageBox - use the project message tool.
-    Ret=ShowMyMessageBox_YES_NO(AnsiString("Delete recipe ")+Name+AnsiString("?"));
+    Ret=ShowMyMessageBox_YES_NO(AnsiString(LangT("Delete recipe "))+Name+AnsiString(LangT("?")));
     if(Ret!=TMyMessageBox::msgrtnYES)
         return;
 
     if(!RecipeManager.DeleteRecipe(Name))
     {
-        ShowMessage("Delete recipe failed.");
+        ShowMyOKMessageNoStop(LangT("Delete recipe failed."));
         return;
     }
     RefreshRecipeList();
@@ -1019,6 +1307,7 @@ void __fastcall TfSetup::FormShow(TObject *Sender)
 {
     (void)Sender;
     OpenWorkFile();
+    LoadSuckEnable();   //AI(ht160s-pnp) 20260626 : reflect machine-level GeneralSetting.bSuckerEnabled[] into the PnP grid
     LayoutSetupButtons();
 }
 //---------------------------------------------------------------------------
@@ -1027,5 +1316,6 @@ void __fastcall TfSetup::FormClose(TObject *Sender, TCloseAction &Action)
     (void)Sender;
     (void)Action;
     SaveWorkFile(GetSetUpFileName());
+    SaveSuckEnable();   //AI(ht160s-pnp) 20260626 : enforce >=1 nozzle + persist GeneralSetting.bSuckerEnabled[] to General.ini
 }
 //---------------------------------------------------------------------------
