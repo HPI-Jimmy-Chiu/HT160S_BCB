@@ -86,6 +86,64 @@
 
 其中「超時就重送」後來由 R8 取消。所以 **D4 現在只剩兩件事**：
 
+> ## 🚨 §3.0 最重要的結論（第三輪對抗式複驗，判 UNSOUND）
+>
+> **機台沒有任何 sensor 能知道「出料車裡疊了成品」。** 這推翻了 R-C 的可實作性前提，也推翻了
+> 我先前寫在下面的「用 sensor 就能觸發」。
+>
+> ### (a) R-A「全部退出後 Lot End 立刻發」不是無條件成立的
+>
+> `csystem.cpp:2043` → `aAuto1To6.cpp:1278-1291` 真機分支，**四個條件任一成立就 `return false`**：
+>
+> | 條件 | sensor | 語意 |
+> |---|---|---|
+> | `Front->IsOn()` | `SnAutoX_InputHasTray` | 前段交件位置有殘留盤 |
+> | `Full->IsOn()` | `SnAutoX_InputFullTray` | 出料疊已滿 |
+> | `Rear->IsOn()` | `SnAutoX_OutputBottomHasTray` | 後段暫存有殘留盤 |
+> | `IsOutputCarFullForAmr()` | 同 `_InputFullTray` | 還欠一次 drain GoUp |
+>
+> 任一成立 → `CheckCleanOutFinish()` 恆 false → `csystem.cpp:1908` 的 `if(RunMode==Run_CleanOut)`
+> 永遠進不去 → **CEID 42 不發、自動 Lot End 不發、RunMode 也不會轉回 `Run_Normal`**。
+> 也就是**今天的機台其實就是「等 AMR 才 Lot End」** —— 那個等待藏在 sensor 條件裡，
+> 不是藏在一個叫 `bUseAMR` 的旗標裡。20260831 現場的 MES1623（Auto6 front=1 full=0）就是這個狀態。
+>
+> **但 9/4 那次 Lot End 有正常發** —— 因為那四個條件檢查的是 **sensor**，而不是車帳：
+> 15:24:22 六顆 `InputHasTray` 全 0、六顆 `InputFullTray` 全 0（Auto2 的要到 15:50 才變 1）。
+> 料已經疊進車裡、前段站空著，所以 sensor 說「清空了」，Lot End 就發了。
+>
+> ### (b) 這正好暴露真正的問題：**「車裡疊了成品」對所有 sensor 都是隱形的**
+>
+> 前段站有盤、滿盤、後段有盤 —— 這三個都看得到。**「車裡有 N 疊成品但沒滿」看不到。**
+> 9/4 就是實證：Auto1 收 5 顆、Auto2 收 7 顆、Auto3 收 3 顆，而六顆 `InputHasTray`
+> 在 Lot End 前後都是 0。
+>
+> ### (c) 所以 R-C 不能建在 sensor 上，只能建在車帳上 —— 而這讓 ①② 變成**同一個問題**
+>
+> 唯一知道「車裡疊了幾盤」的是 `Car[].iTrayCount`，而 Lot End 的 `InitialAllTask()` 會把它抹掉。
+> 所以：
+>
+> - **要能叫車** → 需要 `Car[].iTrayCount` 活過 Lot End
+> - **payload 不能是 0** → 也需要 `Car[].iTrayCount` / `CarID` / device count 活過 Lot End
+>
+> **→ 先做 ②（保留車帳），① 才有可能成立。順序不能顛倒。**
+>
+> ### (d) 複驗實測反證了「用 sensor 觸發」這條路
+>
+> 設計者提出的新述詞用 `IsFrontHasTrayForAmr`（`InputHasTray`），複驗指出它**在它要服務的狀態下
+> 必為 false**：走自動 Lot End 那條路，(a) 已證明六站 sensor 必須先全部 OFF 才進得去，
+> 所以窗口打開那一刻 sensor 已經是 0。當天四封 272 **全部**由既有的 `bTrueFull` 發出
+> （每封 4ms 後配一封 CEID 36）—— 新述詞一次都不會成立。
+>
+> 而它**唯二真正可達的路徑都是壞的**：
+> 1. **在 `Run_Normal` 按手動 Lot End** —— `DoLotEndProcess` 不改 RunMode、不呼叫
+>    `InitialAllTask`，所以 sensor / `Car[]` / 鎖全部原樣。而生產中只要車上有成品盤，
+>    `InputHasTray` 就是 ON → **幾乎每一條有產出的 lane 同時成立** → 配上 §3⑤ 的鎖，
+>    六站同時鎖死。（設計文件把代價估成「一站卡 → 下一批用五條 lane」，**低估很多**。）
+> 2. **停機後 sensor 自己亮** —— 就是 9/4 那個六 bit 同時翻轉的未解現象。
+>
+> ⚠ 這段推翻了我在 2026-09-07 對話中說過的兩件事：「R-A 零改碼」與「一顆 sensor 就能觸發」。
+> 兩者都不成立。
+
 ### ① 「`SnAutoX_InputEnd` 亮就叫車」這條觸發**還不存在**
 
 今天 `uAgvStation.cpp` `PollAndCall` 的 P4-P9 迴圈：
