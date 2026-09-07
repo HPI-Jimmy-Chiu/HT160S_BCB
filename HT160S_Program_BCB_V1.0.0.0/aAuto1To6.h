@@ -205,6 +205,15 @@ public:
     AnsiString DescribeStation(int Index);
     AnsiString DescribeModule();   //AI(auto-obsv) 20260801 : the six-station SHARED cursors (dumped nowhere before)
     AnsiString GetWorkingTrayID(int Index);  //AI(ht160s-motion-view) 20260618 : 2D TrayID at working pos for Unload Auto-info ID panel
+    //AI(auto-stack-identity) 20260907 : THE STACK IDENTITY - the 2D the Color CCD read off this
+    // Auto output car's IDENTITY TRAY. Owner rule 20260907 : in AMR mode one output stack has ONE
+    // shared identity; individual trays have no TrayID of their own (the Loader forces
+    // Tray.TrayID="" on every non-identity tray, aLoader.cpp:1993-1997). So this, not
+    // GetWorkingTrayID, is what "which stack is this" means. Written once per car
+    // (DoFeedTray case 7000, guarded by bUseAMR AND WorkingKind==eTrayKindIdentity), cleared only
+    // by TMyCar::Clear() on a car change. Same out-of-range contract as GetWorkingTrayID (returns
+    // "" rather than the NULL that GetAutoCar would hand back), so consumers stay one-token swaps.
+    AnsiString GetCarIdentityID(int Index);
 
     bool TestGoUpOnce(int Index, int Flag);   //AI(general) 20260617 : Teach Advanced single-cylinder FrontRise GoUp once (no GoDown)
 };

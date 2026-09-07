@@ -506,7 +506,12 @@ void TrayUphLog_Tick()
             g_UphTrayStart[i]=Now();
             g_UphTrayStartPause[i]=tUPH_PauseTime;
             g_UphTrayStartIC[i]=tRunData.TrayICCnt[eAuto1+i];
-            g_UphTrayID[i]=AutoModule->GetWorkingTrayID(i);
+            //AI(auto-stack-identity) 20260907 : the stack identity. This consumer could never
+            //have a correct value before: the snapshot is taken on the AS_IDLE->AS_SORTING edge and
+            //identity/cover trays never reach SORTING (they are flagged AS_FULL immediately), so
+            //only Normal trays open this window - and a Normal tray's WorkingTrayID is "" or a
+            //leaked code from another car.
+            g_UphTrayID[i]=AutoModule->GetCarIdentityID(i);
             //AI(secs-ceid-align9045) 20260729 : CEID 53 "UPH Record Start". HT9045 reports it at
             //the instant its UPH measurement window opens (asendic_Loader.cpp:934, right where it
             //sets bRecordUPH=true). This is the same edge on HT160S : a station entered SORTING and

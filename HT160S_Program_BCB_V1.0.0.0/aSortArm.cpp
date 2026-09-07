@@ -1800,7 +1800,10 @@ void TSortArmModule::TransferPlaceDataToAuto()
             {
                 AnsiString sSoterUnload="";
                 if(AutoModule!=NULL)
-                    sSoterUnload=AutoModule->GetWorkingTrayID(iActiveAutoIndex);
+                    //AI(auto-stack-identity) 20260907 : customer CSV column 9 "Unload Cover Tray
+                    //ID" = the destination STACK's identity, shared by every unit placed into that
+                    //Auto (owner rule 20260907). Was GetWorkingTrayID, which changed per tray.
+                    sSoterUnload=AutoModule->GetCarIdentityID(iActiveAutoIndex);
                 g_SoterOutput.CommitPlaceRow(SlotIndex, sSoterUnload);
             }
             ClearSlot(SlotIndex);

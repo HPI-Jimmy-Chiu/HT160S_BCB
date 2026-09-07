@@ -1368,6 +1368,20 @@ AnsiString TAutoModule::GetWorkingTrayID(int Index)
     return WorkingTrayID[Index];
 }
 //---------------------------------------------------------------------------
+//AI(auto-stack-identity) 20260907 : see the header for the contract. Read-only.
+//WHY THIS EXISTS : WorkingTrayID is overwritten unconditionally on EVERY rear->working promotion
+//(DoFeedTray case 7000), and a plain work tray carries either "" or - worse - the previous Color
+//read, i.e. ANOTHER car's identity code (aTrayArm.cpp DoPick case 4000 leaves iDeliverTrayID
+//untouched on the Empty-source branch). So it is neither "this car" nor "this tray". Confirmed in
+//delivered data: the 2026-09-04 Soter CSV gave THREE different values for one Auto2 car inside a
+//single production window with no AMR event between them, switching exactly on tray boundaries.
+AnsiString TAutoModule::GetCarIdentityID(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return "";
+    return Car[Index].CarID;
+}
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260604 : tag stack roles : tray[0]=identity,
 //   tray[1]=cover, tray[2..]=normal work trays.
 void TAutoModule::InitAutoCarStack(int Index)

@@ -1260,7 +1260,11 @@ void __fastcall TfMain::ShowUnloadAutoInfo()
 
         AnsiString sID="";
         if(AutoModule!=NULL)
-            sID=AutoModule->GetWorkingTrayID(i);
+            //AI(auto-stack-identity) 20260907 : the stack identity, not the working tray's 2D.
+            //The panel is one cell per lane, so it means "which car/stack is on this lane now",
+            //which is constant for the life of the car. Was GetWorkingTrayID, which blanked the
+            //moment the cover tray was promoted and then showed leaked values.
+            sID=AutoModule->GetCarIdentityID(i);
 
         AnsiString sCnt=IntToStr(tRunData.TrayICCnt[eAuto1+i]);
 
