@@ -2435,6 +2435,17 @@ int HT160Gem::S2F42_Host_Command_Acknowledge()
             {
                 RecordProcess("SECS CLEAR_LOT_INFO : lot end by host");
                 fMain->DoLotEndProcess("by host (SECS CLEAR_LOT_INFO)");   //AI(lotend-log-source) 20260902
+                //AI(lot-identity-retention) 20260907 : owner ruling - this command DISARMS the
+                // frozen-identity window that DoLotEndProcess just armed, so the retained snapshot
+                // is dropped and 1006 / 1009 / 66040-66045 / 38234-38236+38243-38245 go empty
+                // immediately. Rationale: the retention exists so the host can still pull an ENDED
+                // lot's identity across the idle window, but this command is the host explicitly
+                // asking for that information to be cleared - keeping data the host just asked to
+                // delete would be the wrong answer. The operator button and the AMR CleanOut-finish
+                // path keep the retention; only the explicit host clear opts out. Placed AFTER
+                // DoLotEndProcess on purpose: that call arms the window at its top, so disarming
+                // before it would be undone.
+                SetLotIdentityFrozen(false);
                 HCACK = 0;
             }
         }
