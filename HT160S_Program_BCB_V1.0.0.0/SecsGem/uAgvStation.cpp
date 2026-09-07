@@ -507,7 +507,22 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
             // from the per-Auto running IC total (GetAmrDeviceCount, tallied at discharge) -
             // NOT from summing the car's Tray[] grids, which are never filled with placed-IC
             // data and always summed to 0 (that was the original no-op bug).
-            TrayCount[si] = Car->iTrayCount;
+            //AI(amr-traycount-workonly) 20260907 : owner ruling 20260907 - the tray count handed
+            // to the AMR at unload counts WORK TRAYS ONLY; the identity tray and the cover tray are
+            // not product and must not be included. Car[].iTrayCount stays the PHYSICAL stack
+            // cursor (it indexes Car[].Tray[n] and drives GetNextTrayKindForAuto, so making it
+            // work-only would break the stack build order); the subtraction happens HERE, at the
+            // SECS publish boundary, and nothing about production reads this array.
+            // The header comes from the SAME config the INPUT side already uses for exactly this
+            // purpose - aLoader.cpp:656-657 computes iHeader the same way and adds it to the host's
+            // work-only LoaderTrayCount to get the physical total - so output now matches input
+            // instead of being a literal 2. Clamped at 0 for a car holding only a header.
+            int iHdr = ((GeneralSetting.iAmrCoverTray[si] > 0)    ? GeneralSetting.iAmrCoverTray[si]    : 0)
+                     + ((GeneralSetting.iAmrIdentityTray[si] > 0) ? GeneralSetting.iAmrIdentityTray[si] : 0);
+            int iWork = Car->iTrayCount - iHdr;
+            if(iWork < 0)
+                iWork = 0;
+            TrayCount[si] = iWork;
             DeviceCount[si] = AutoModule->GetAmrDeviceCount(a);
             CarrierID[si] = Car->CarID;
         }
