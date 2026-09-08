@@ -847,10 +847,10 @@
    "code": "MES1426",
    "message": "Color rear has a leftover tray",
    "category": "tray-flow",
-   "trigger": "TColorModule::DoFeedTray case 10 (start of a supply feed), aColor.cpp:973-987. RefreshStateFromSensors() runs (line 973), then `if(bRearHasTray)` (line 974) AND `if(HSys.LastSet.iRealDummy!=DUMMY)` (line 976) raise `ShowMyError(\"MES1426\", LangT(\"Color rear has a leftover tray - please remove it\"), K_RETRY)` at aColor.cpp:978. This is the 3-arg Code/Msg/KCode overload (no pSn), so NO IO name is printed on the Note. bRearHasTray is derived in RefreshStateFromSensors (aColor.cpp:274-289): bOutputState becomes true from SnColor_OutputBottomHasTray.IsOn() (line 277, only if .Enable==true) OR SnColor_TrayPos1.IsOn() (line 284, only if .Enable==true), then `if(bHasOutputSensor) bRearHasTray=bOutputState;` (line 288-289). Because the guard is iRealDummy!=DUMMY, IsSoftSimulate() is false and the sim early-out at line 253 is bypassed, so the sensor path above is the live one. In this supply context bTrayReady (pickup gate) is false and the return branch already ran, so a true bRearHasTray means a tray was stranded at the Color rear handoff slot on startup/recovery: not pickable and not re-stageable, so the operator must remove it. After the dialog, RefreshStateFromSensors re-runs (line 979); if still set the feed goes to DONE terminal case 13000, if cleared it proceeds to case 1000.",
+   "trigger": "TColorModule::DoFeedTray case 10 (start of a supply feed), aColor.cpp:973-987. RefreshStateFromSensors() runs (line 973), then `if(bRearHasTray)` (line 974) AND `if(HSys.LastSet.iRealDummy!=DUMMY)` (line 976) raise `ShowMyError(\"MES1426\", LangT(\"Color rear has a leftover tray - please remove it\"), K_RETRY)` at aColor.cpp:978. This is the 3-arg Code/Msg/KCode overload (no pSn), so NO IO name is printed on the Note. bRearHasTray is derived in RefreshStateFromSensors (aColor.cpp:274-289): bOutputState becomes true from SnColor_OutputBottomHasTray.IsOn() (line 277, only if .Enable==true), then `if(bHasOutputSensor) bRearHasTray=bOutputState;` (line 288-289). Because the guard is iRealDummy!=DUMMY, IsSoftSimulate() is false and the sim early-out at line 253 is bypassed, so the sensor path above is the live one. In this supply context bTrayReady (pickup gate) is false and the return branch already ran, so a true bRearHasTray means a tray was stranded at the Color rear handoff slot on startup/recovery: not pickable and not re-stageable, so the operator must remove it. After the dialog, RefreshStateFromSensors re-runs (line 979); if still set the feed goes to DONE terminal case 13000, if cleared it proceeds to case 1000.",
    "root_causes": [
     "A tray was left / stranded at the Color rear handoff slot after a prior fault, abort, or power-cycle",
-    "Rear presence sensor (SnColor_OutputBottomHasTray or SnColor_TrayPos1) stuck ON or misread, making bRearHasTray true with no real tray",
+    "Rear presence sensor (SnColor_OutputBottomHasTray) stuck ON or misread, making bRearHasTray true with no real tray",
     "bRearHasTray latch held true from an interrupted receive/recycle path before the sensor refresh"
    ],
    "devices": [
@@ -867,19 +867,12 @@
      "expected": "OFF when .Enable==true - no tray at the rear/output slot (line 277)",
      "actual": "ON - a leftover tray is present, or the sensor is stuck ON; drives bOutputState -> bRearHasTray",
      "check_where": "IOsetview (IO LED view)"
-    },
-    {
-     "name": "SnColor_TrayPos1",
-     "kind": "sensor",
-     "expected": "OFF when .Enable==true - no tray at the rear position (line 284)",
-     "actual": "ON - detects the leftover tray; parallel rear sensor that also drives bOutputState -> bRearHasTray",
-     "check_where": "IOsetview (IO LED view)"
     }
    ],
    "operator_action": "Physically remove the leftover tray from the Color rear handoff slot; the rear presence sensor then clears bRearHasTray. Press RETRY: RefreshStateFromSensors re-checks (aColor.cpp:979) and, if clear, the supply feed proceeds to case 1000. If still occupied, the feed drops to the DONE terminal (case 13000) without presenting a tray.",
-   "engineer_action": "If no tray is physically present but the alarm persists, check SnColor_OutputBottomHasTray and SnColor_TrayPos1 in IOsetview for a stuck-ON sensor (confirm each is Enabled; a stuck ON here forces bRearHasTray true). Review State Record / EventLog for an interrupted receive/recycle path that left bRearHasTray latched before the sensor refresh.",
+   "engineer_action": "If no tray is physically present but the alarm persists, check SnColor_OutputBottomHasTray in IOsetview for a stuck-ON sensor (confirm it is Enabled; a stuck ON here forces bRearHasTray true). Review State Record / EventLog for an interrupted receive/recycle path that left bRearHasTray latched before the sensor refresh.",
    "verdict": "CONFIRMED",
-   "verify_note": "Re-located the raise site independently. Trigger confirmed at aColor.cpp:978 inside DoFeedTray case 10, gated by if(bRearHasTray) && iRealDummy!=DUMMY, K_RETRY, 3-arg overload with no sensor pointer (no IO name on Note) - matches draft. bRearHasTray derivation confirmed at aColor.cpp:274-289 from SnColor_OutputBottomHasTray.IsOn() OR SnColor_TrayPos1.IsOn() (each only when .Enable==true), assigned via bOutputState. All three devices are real code identifiers, really read on this path, polarity correct (IsOn==true = tray present, so expected OFF / actual ON). Added the .Enable==true gating caveat to the two sensors; otherwise the draft was accurate."
+   "verify_note": "Re-located the raise site independently. Trigger confirmed at aColor.cpp:978 inside DoFeedTray case 10, gated by if(bRearHasTray) && iRealDummy!=DUMMY, K_RETRY, 3-arg overload with no sensor pointer (no IO name on Note) - matches draft. bRearHasTray derivation confirmed at aColor.cpp:274-289 from SnColor_OutputBottomHasTray.IsOn() (only when .Enable==true), assigned via bOutputState. Both devices are real code identifiers, really read on this path, polarity correct (IsOn==true = tray present, so expected OFF / actual ON). Added the .Enable==true gating caveat to the sensor; otherwise the draft was accurate."
   },
   {
    "code": "MES1424",
@@ -1130,7 +1123,7 @@
    "root_causes": [
     "Dest=Auto: target Auto rear physically holds a tray - SnAuto<n>_OutputBottomHasTray ON drives State[Index].bRearHasTray true via RefreshAutoState (aAuto1To6.cpp:404-423), so IsRearHasTray(iAutoTarget) true (aAuto1To6.cpp:494-499)",
     "Dest=Auto: OR the delivered-but-unconsumed latch bRearDeliveredPending[iAutoTarget] pins bRearHasTray true even with the sensor OFF (aAuto1To6.cpp:421-422)",
-    "Dest=Empty/Color: receiver rear not cleared - SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) or SnColor_OutputBottomHasTray/SnColor_TrayPos1 (aColor.cpp:274-289) still ON keeps IsRearHasTray()==true through the case-500 rear-clear wait",
+    "Dest=Empty/Color: receiver rear not cleared - SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) or SnColor_OutputBottomHasTray (aColor.cpp:274-289) still ON keeps IsRearHasTray()==true through the case-500 rear-clear wait",
     "Dest=Empty/Color: receiver stuck in the feed state - EmptyModule->GetStatus()==ES_FEEDING / ColorModule->GetStatus()==CS_FEEDING for the full 60s window (anti-collision gate, aTrayArm.cpp:1056-1060 / 1129-1133), independent of the rear sensor",
     "Mid-carry full-machine HOME wiped the receiver's bReturnTray handshake; resume re-signs RequestReturnTray at aTrayArm.cpp:1208-1214 only when IsCarriedTrayAlreadyDeposited()==false, so if that heal did not run the receiver kept/refilled its rear while the arm waited at case 500",
     "A destination rear sensor stuck/mis-adjusted ON with no physical tray, or receiver GoUp-clear never completed within TRAYARM_PLACE_GATE_ALARM_MS (60s)"
@@ -1151,10 +1144,10 @@
      "check_where": "IOsetview (Note detail prints \"(Empty)\")"
     },
     {
-     "name": "SnColor_OutputBottomHasTray (and SnColor_TrayPos1)",
+     "name": "SnColor_OutputBottomHasTray",
      "kind": "sensor",
-     "expected": "OFF at place time when Dest=Color (Color raised and freed its rear). Color's bRearHasTray is set true by EITHER SnColor_OutputBottomHasTray OR SnColor_TrayPos1 (aColor.cpp:274-289), so both must read OFF",
-     "actual": "ON - Color rear still occupied on one of the two sensors, IsRearHasTray()==true so the case-500 rear-clear wait never passes (aTrayArm.cpp:1135-1142)",
+     "expected": "OFF at place time when Dest=Color (Color raised and freed its rear). Color's bRearHasTray is set true by SnColor_OutputBottomHasTray (aColor.cpp:274-289), so it must read OFF",
+     "actual": "ON - Color rear still occupied, IsRearHasTray()==true so the case-500 rear-clear wait never passes (aTrayArm.cpp:1135-1142)",
      "check_where": "IOsetview (Note detail prints \"(Color)\")"
     },
     {
@@ -1180,9 +1173,9 @@
     }
    ],
    "operator_action": "The Note offers Retry (K_RETRY). Read the destination named in parentheses in the Note (Auto / Empty / Color). A tray is still sitting on that receiver's rear (or the receiver is mid-feed). Clear/remove the blocking tray so the rear is free, then Retry.",
-   "engineer_action": "In IOsetview confirm the destination rear sensor reads OFF when the rear is empty: for Dest=Auto that is SnAuto<n>_OutputBottomHasTray of the target station (get iAutoTarget from the TrayArm DumpStatus in the TrayArmPlaceBlocked_Auto snapshot); for Dest=Empty that is SnEmpty_OutputBottomHasTray; for Dest=Color check BOTH SnColor_OutputBottomHasTray and SnColor_TrayPos1. If a sensor stays ON with no physical tray it is stuck/mis-adjusted. If the rear reads clear but the alarm still fired for Empty/Color, check the receiver Status in the snapshot - a stuck ES_FEEDING/CS_FEEDING trips the anti-collision gate independently of the sensor. If the block followed a mid-carry full-machine HOME, the receiver's bReturnTray handshake was torn and only re-signed on resume when the carried tray was not already deposited (aTrayArm.cpp:1208-1214) - verify the receiver actually GoUp-clears its rear. Window = TRAYARM_PLACE_GATE_ALARM_MS (60s), aTrayArm.cpp:25.",
+   "engineer_action": "In IOsetview confirm the destination rear sensor reads OFF when the rear is empty: for Dest=Auto that is SnAuto<n>_OutputBottomHasTray of the target station (get iAutoTarget from the TrayArm DumpStatus in the TrayArmPlaceBlocked_Auto snapshot); for Dest=Empty that is SnEmpty_OutputBottomHasTray; for Dest=Color check SnColor_OutputBottomHasTray. If a sensor stays ON with no physical tray it is stuck/mis-adjusted. If the rear reads clear but the alarm still fired for Empty/Color, check the receiver Status in the snapshot - a stuck ES_FEEDING/CS_FEEDING trips the anti-collision gate independently of the sensor. If the block followed a mid-carry full-machine HOME, the receiver's bReturnTray handshake was torn and only re-signed on resume when the carried tray was not already deposited (aTrayArm.cpp:1208-1214) - verify the receiver actually GoUp-clears its rear. Window = TRAYARM_PLACE_GATE_ALARM_MS (60s), aTrayArm.cpp:25.",
    "verdict": "CORRECTED",
-   "verify_note": "Re-located the raise site independently: ShowMyError(\"MES1723\",...,K_RETRY) at aTrayArm.cpp:306 inside OnPlaceGateBlocked (277-307). CONFIRMED the trigger (bPlaceWaitArmed && PlaceWaitTimer.Off()==true, 60s window, 1500ms poll-gap re-arm), the Auto block condition (aTrayArm.cpp:882-887, AutoModule->IsRearHasTray reads SnAuto<n>_OutputBottomHasTray via RefreshAutoState, aAuto1To6.cpp:404-423,494-499), and the Empty/Color case-500 rear-clear blocks reading SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) / SnColor_OutputBottomHasTray (aColor.cpp:274-289). CORRECTED/ADDED: (1) the draft omitted the receiver-FEEDING anti-collision block source (aTrayArm.cpp:1056-1060 Empty ES_FEEDING, 1129-1133 Color CS_FEEDING) - a real third path that fires MES1723 with Dest=Empty/Color independent of the rear sensor; added as a logic device. (2) Color's rear-occupied latch is driven by SnColor_OutputBottomHasTray OR SnColor_TrayPos1 (aColor.cpp:281-285), so both must be checked - draft named only OutputBottomHasTray. (3) The Auto latch member is bRearDeliveredPending (aAuto1To6.cpp:421-422), distinct from the receiver-side bReturnTray handshake; clarified both. (4) Minor: stop line is HSys.Sys.SystemStart=false, not Sys.SystemStart. All named devices are real code identifiers read at the cited raise site; none invented or removed."
+   "verify_note": "Re-located the raise site independently: ShowMyError(\"MES1723\",...,K_RETRY) at aTrayArm.cpp:306 inside OnPlaceGateBlocked (277-307). CONFIRMED the trigger (bPlaceWaitArmed && PlaceWaitTimer.Off()==true, 60s window, 1500ms poll-gap re-arm), the Auto block condition (aTrayArm.cpp:882-887, AutoModule->IsRearHasTray reads SnAuto<n>_OutputBottomHasTray via RefreshAutoState, aAuto1To6.cpp:404-423,494-499), and the Empty/Color case-500 rear-clear blocks reading SnEmpty_OutputBottomHasTray (aEmpty.cpp:220-237) / SnColor_OutputBottomHasTray (aColor.cpp:274-289). CORRECTED/ADDED: (1) the draft omitted the receiver-FEEDING anti-collision block source (aTrayArm.cpp:1056-1060 Empty ES_FEEDING, 1129-1133 Color CS_FEEDING) - a real third path that fires MES1723 with Dest=Empty/Color independent of the rear sensor; added as a logic device. (2) Color's rear-occupied latch is driven by SnColor_OutputBottomHasTray (aColor.cpp:281-285). (3) The Auto latch member is bRearDeliveredPending (aAuto1To6.cpp:421-422), distinct from the receiver-side bReturnTray handshake; clarified both. (4) Minor: stop line is HSys.Sys.SystemStart=false, not Sys.SystemStart. All named devices are real code identifiers read at the cited raise site; none invented or removed."
   }
  ],
  "motor": {

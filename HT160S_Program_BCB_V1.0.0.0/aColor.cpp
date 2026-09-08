@@ -80,8 +80,6 @@ void TColorModule::InitialFlag(bool bKeepMaterial)
     {
         if(HSys.Sen.SnColor_OutputBottomHasTray.Enable && HSys.Sen.SnColor_OutputBottomHasTray.IsOn())
             bKeepPresented=true;
-        if(HSys.Sen.SnColor_TrayPos1.Enable && HSys.Sen.SnColor_TrayPos1.IsOn())
-            bKeepPresented=true;
     }
 #endif
     if(bKeepPresented==false)
@@ -333,13 +331,6 @@ void TColorModule::RefreshStateFromSensors()
     {
         bHasOutputSensor=true;
         if(HSys.Sen.SnColor_OutputBottomHasTray.IsOn())
-            bOutputState=true;
-    }
-
-    if(HSys.Sen.SnColor_TrayPos1.Enable==true)
-    {
-        bHasOutputSensor=true;
-        if(HSys.Sen.SnColor_TrayPos1.IsOn())
             bOutputState=true;
     }
 
@@ -1815,7 +1806,7 @@ bool TColorModule::IsRearHasTray()
 //  (2) the REAR SEAT sensors. There is exactly ONE window where the clamps are legitimately
 //      open with a tray still physically present : DoFeedTray pops them at the rear (5000/6000)
 //      and the tray then RESTS on the rear seat waiting for the TrayArm. SnColor_OutputBottom-
-//      HasTray / SnColor_TrayPos1 see precisely that tray, so both must read OFF as well.
+//      HasTray sees precisely that tray, so it must read OFF as well.
 //Only honest LIVE reads are used - TMySensor::IsOn(), and TMyCylinder OffSensor.IsOn() for the
 //retract confirm - never a Status()/GetStatus-style path that honours the iRealDummy back door
 //and can read permanently present.
@@ -1856,12 +1847,6 @@ bool TColorModule::IsCarriageTrayPhysicallyAbsent()
         if(HSys.Sen.SnColor_OutputBottomHasTray.IsOn())
             return false;
     }
-    if(HSys.Sen.SnColor_TrayPos1.Enable)
-    {
-        bAnyRearSensor=true;
-        if(HSys.Sen.SnColor_TrayPos1.IsOn())
-            return false;
-    }
     if(bAnyRearSensor==false)
         return false;                       //no rear sensor installed -> never claim "absent"
     return true;
@@ -1888,7 +1873,6 @@ AnsiString TColorModule::DescribePhysicalTrayEvidence()
        + " LeanOn out="       + IntToStr(HSys.Cyn.C_Color_LeanOnTray.GetOutBit() ? 1 : 0)
        + " off="              + IntToStr(TriReadSensor(HSys.Cyn.C_Color_LeanOnTray.OffSensor)) + "]";
     s += " sen[OutputBottomHasTray=" + IntToStr(TriReadSensor(HSys.Sen.SnColor_OutputBottomHasTray))
-       + " TrayPos1="                + IntToStr(TriReadSensor(HSys.Sen.SnColor_TrayPos1))
        + " InputHasTray="            + IntToStr(TriReadSensor(HSys.Sen.SnColor_InputHasTray))
        + " TrayArmZup="              + IntToStr(TriReadSensor(HSys.Cyn.C_TrayArmZ_Up.OnSensor)) + "]";
     s += " tier[softSim=" + IntToStr(IsSoftSimulate() ? 1 : 0)

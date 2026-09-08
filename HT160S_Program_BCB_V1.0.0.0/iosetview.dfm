@@ -183,9 +183,9 @@ object fiosetview: Tfiosetview
     Top = 40
     Width = 849
     Height = 729
-    ActivePage = ts_IOTapeLoadUnload
+    ActivePage = ts_IOLoader
     Style = tsButtons
-    TabIndex = 1
+    TabIndex = 0
     TabOrder = 2
     object ts_IOLoader: TTabSheet
       Caption = 'Loader'
@@ -627,22 +627,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'SnLoader_OutputBottomHasTray'
-            end
-            object mlSnLoader_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnLoader_TrayPos1'
-            end
-            object mlSnLoader_TrayPos2: TMyLed
-              Left = 567
-              Top = 168
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnLoader_TrayPos2'
             end
             object mlC_Loader_FrontRiseTray_2_On: TMyLed
               Left = 43
@@ -1234,9 +1218,9 @@ object fiosetview: Tfiosetview
         Top = 0
         Width = 841
         Height = 698
-        ActivePage = TabSheet3
+        ActivePage = TabSheet2
         Align = alClient
-        TabIndex = 0
+        TabIndex = 1
         TabOrder = 0
         object TabSheet3: TTabSheet
           Caption = 'Auto 1~3'
@@ -2955,14 +2939,6 @@ object fiosetview: Tfiosetview
               Height = 14
               LEDStyle = LEDHorizontal
               Alias = 'SnColor_OutputBottomHasTray'
-            end
-            object mlSnColor_TrayPos1: TMyLed
-              Left = 271
-              Top = 48
-              Width = 22
-              Height = 14
-              LEDStyle = LEDHorizontal
-              Alias = 'SnColor_TrayPos1'
             end
             object mlSnColor_InputEnd: TMyLed
               Left = 6

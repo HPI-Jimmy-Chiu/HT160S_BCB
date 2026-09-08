@@ -101,8 +101,6 @@ __published:
     TBtnPanel *bpC_Empty_PushTray;
     TMyLed *mlSnLoader_InputHasTray;
     TMyLed *mlSnLoader_OutputBottomHasTray;
-    TMyLed *mlSnLoader_TrayPos1;
-    TMyLed *mlSnLoader_TrayPos2;
     TMyLed *mlC_Loader_FrontRiseTray_2_On;
     TMyLed *mlC_Loader_FrontRiseTray_1_On;
     TMyLed *mlSnLoader_Inputend;
@@ -213,7 +211,6 @@ __published:
     TMyLed *mlSnColor_InputHasTray;
     TMyLed *mlSnColor_InputFullTray;
     TMyLed *mlSnColor_OutputBottomHasTray;
-    TMyLed *mlSnColor_TrayPos1;
     TBtnPanel *bpC_Color_LeanOnTray;
     TBtnPanel *bpC_Color_FrontRiseTray_1;
     TBtnPanel *bpC_Color_PushTray;
