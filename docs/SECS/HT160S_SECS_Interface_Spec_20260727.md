@@ -520,7 +520,7 @@ Tools button, which opened an empty form and has been removed with it; 17 moved 
 | 1 | Start Pressed | Start 且機內**無** IC;警報畫面的面板 START 鍵 |
 | 2 | Pause Pressed | Pause(畫面鍵或面板鍵) |
 | 3 | OneCycle Pressed | One Cycle 受理 |
-| 4 | CleanOut Pressed | Clean Out 受理 |
+| 4 | CleanOut Pressed | **Clean Out 受理(不分來源,每次排空只送一筆)**:畫面 Clean Out 鍵、面板 CLEAN OUT 鍵、`S2F41 CLEAN_OUT`、`MES0920 Loader Tray Empty` 對話框選 Clean Out(觸控或面板鍵皆可)、以及 **AMR 模式下 Loader 進料源乾且叫車視窗逾時的自動進入**。⚠ **2026-09-08 變更**:後兩者(對話框、AMR 自動)先前**完全不發**,host 只能由 CEID 27 的狀態文字推論;同版並移除「面板鍵在警報畫面上選取按鈕即發射」那一筆(選取之後操作員仍可改選 RETRY,那一筆會對應不到任何排空),改為一律在**真正進入 Clean Out 的瞬間**發射。與 HT-90XX 同義 —— 該機所有進入點亦共用同一發射點(`TfMain::CleanOut`) |
 | 5 | ClearCount Pressed | Clear Count,**操作員確認對話框之後** |
 | 6 | Lot Start | 手動 Lot Start |
 | 8 | Lot End | 手動 Lot End / Clean Out 完成後自動 Lot End |

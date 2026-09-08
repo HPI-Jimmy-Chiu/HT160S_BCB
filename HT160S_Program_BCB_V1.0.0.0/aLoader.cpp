@@ -1880,6 +1880,20 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     {
                         RecordProcess("AUTO CleanOut: Loader source dry, AMR car-window elapsed, no new car (side "+
                             IntToStr(LoaderNo)+")");   //AI(ht160s-obsv)
+                        //AI(secs-cleanout-start-ceid4) 20260908 : CEID 4 "CleanOut Pressed".
+                        //On HT9045 EVERY entry into Clean Out funnels through TfMain::CleanOut()
+                        //(main.cpp:4325), which emits CEID 4 under an iCleanOut==0 gate - and that
+                        //includes its OWN automatic paths : the Loader source-dry ones
+                        //(asendic_Loader.cpp:1846/1866/1881) and the AMR tray-count-exhausted one
+                        //(asendic_Loader.cpp:2104). So in the family the id means "Clean Out has
+                        //been accepted", not literally "a key was pressed", which is also how the
+                        //customer spec publishes it. HT160S emitted it only from CleanOutCore
+                        //(screen key / panel key / S2F41), so THIS branch - the automatic entry
+                        //KYEC actually runs unmanned - told the host nothing, leaving it to infer
+                        //the drain from CEID 27 status text. The enclosing RunMode==Run_Normal
+                        //guard makes this once-per-drain : the other Loader side cannot re-emit,
+                        //and it is the same gate CleanOutCore itself uses.
+                        EventReport(SECS_EVENT.DoCleanOut);
                         HSys.Sys.bCleanOut=true;
                         HSys.Sys.RunMode=Run_CleanOut;
                         break;
@@ -1899,6 +1913,15 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
                     //machine drains (resume CleanOut if OneCycle runs mid-drain).
                     //AI(ht160s-loader) 20260706 : route to 9500 (confirm + carry the tray physically
                     //present) instead of dead-ending at 10000, so CleanOut still drains that last tray.
+                    //AI(secs-cleanout-start-ceid4) 20260908 : CEID 4, same reasoning as the AMR
+                    //automatic branch above. This one is the operator answering the MES0920 modal
+                    //with Clean Out - literally the "CleanOut pressed" case - yet the only emit
+                    //site was CleanOutCore, so the DIALOG button reported nothing while the PANEL
+                    //key (note.cpp ScanKey) reported CEID 4. Guarded on Run_Normal so the second
+                    //Loader side answering a modal during an existing drain cannot emit twice.
+                    //The mechanical behaviour below is deliberately unchanged.
+                    if(HSys.Sys.RunMode==Run_Normal)
+                        EventReport(SECS_EVENT.DoCleanOut);
                     HSys.Sys.RunMode=Run_CleanOut;
                     HSys.Sys.bCleanOut=true;
                     State->FeedTask=9500;

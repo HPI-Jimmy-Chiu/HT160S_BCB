@@ -707,7 +707,17 @@ void __fastcall TfNote::ScanKey()
     else if(bKey[4] && bWasCleanOut==false)
     {
         RecordProcess("CLEAN OUT pressed");
-        EventReport(SECS_EVENT.DoCleanOut);
+        //AI(secs-cleanout-start-ceid4) 20260908 : CEID 4 is deliberately NOT reported here
+        //any more. This branch fires when the PHYSICAL Clean Out key SELECTS the recovery
+        //button - the loop above calls UpdateButtonStatus, which only sets ReturnCode. The
+        //operator still has to press START for the alarm to return it, and can pick RETRY
+        //instead, so this instant is a SELECTION, not an acceptance : it used to emit a
+        //CEID 4 for a Clean Out that never happened, and a SECOND one followed at the real
+        //entry. MES0920 (aLoader.cpp) is the ONLY alarm in the tree that offers K_CLEAN_OUT,
+        //and its K_CLEAN_OUT branch now emits CEID 4 when Clean Out is actually entered, so
+        //every accepted Clean Out is still reported - exactly once - and the TOUCH button,
+        //which never reached this function at all, is now covered too. RecordProcess stays :
+        //the machine log must still show the physical key press.
     }
     else if(bReset && bWasReset==false)
     {
