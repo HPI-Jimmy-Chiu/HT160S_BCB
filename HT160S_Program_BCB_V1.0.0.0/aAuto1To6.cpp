@@ -25,6 +25,21 @@ static const int AUTO_STATION_COUNT=6;
 //  AGVSupplement trigger. Real machine uses the SnAutoX_InputFullTray sensor instead.
 static const int AMR_FULL_TRAY_SIM=10;
 //---------------------------------------------------------------------------
+//AI(cleanout-tray-ledger) 20260908 : Auto n Unloadtray CEIDs. ONE table for BOTH exits a
+//tray can take out of a lane - DoDischargeTray case 1000 (a full tray) and the
+//DoAllAutoCleanOut case 7000 drain terminal (whatever was still at the working position).
+//It used to be a local inside DoDischargeTray, which is a large part of how the drain came
+//to book nothing at all; a CEID realignment must never again be able to reach one exit only.
+//AI(secs-ceid-align) 20260728 : Auto4-6 realigned to HT9045 (145/146/147). The old
+// 140/141/142 collided with 9045 CEID 140 Prepare Load Tray and 141 GEM Control State
+// Change, so a 9045-dictionary host misread them.
+//AI(secs-comment-truth) 20260805 : was "Unregistered on purpose: EventReport sends S6F11
+// with an empty report list". No longer true - ab1b99e's 1-292 loop registers all six of
+// these ids like every other 9045 number, so they now ship the default Report 1 (which
+// since the 20260804 alignment holds exactly one SV, 1027 System Time), not an empty L[0].
+// 136/137/138 and 145/146/147 are HT9045's own Unloadtray numbers.
+static const int AutoUnloadTrayCeid[6]={136, 137, 138, 145, 146, 147};
+//---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260623 : IsSensorOnReady/IsCylinderOnReady moved to mycylin.h/.cpp (shared by Empty/Loader/Auto)
 //---------------------------------------------------------------------------
 static bool IsCylinderOffReady(TMyCylinder *Cylinder, bool bSoftSimulate)
@@ -903,15 +918,8 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
     TTrayMotor *TrayMotor=NULL;
     TMyCylinder *PushCylinder=NULL;
     TMyCylinder *LeanCylinder=NULL;
-    //AI(secs-ceid-align) 20260728 : Auto4-6 Unloadtray CEIDs realigned to HT9045
-    // (145/146/147). The old 140/141/142 collided with 9045 CEID 140 Prepare Load
-    // Tray and 141 GEM Control State Change, so a 9045-dictionary host misread them.
-    // AI(secs-comment-truth) 20260805 : was "Unregistered on purpose: EventReport sends
-    // S6F11 with an empty report list". No longer true - ab1b99e's 1-292 loop registers all
-    // six of these ids like every other 9045 number, so they now ship the default Report 1
-    // (which since the 20260804 alignment holds exactly one SV, 1027 System Time), not an
-    // empty L[0]. 136/137/138 and 145/146/147 are HT9045's own Unloadtray numbers.
-    int AutoCeid[6]={136, 137, 138, 145, 146, 147};
+    //AI(cleanout-tray-ledger) 20260908 : the Unloadtray CEID table moved to file scope
+    //(AutoUnloadTrayCeid, top of this file) so the Clean Out drain books an exit the same way.
     int &Task = DischargeTask[Index];
     if(Flag==0)
     {
@@ -953,9 +961,10 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
                 RearGrid[Index].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
                 State[Index].bFrontHasTray=true;
                 //AI(secs-record-traycount) 20260810 : SVID 38237-38239 (Auto1-3) /
-                //38249-38251 (Auto4-6) Record Auto n Tray Count. This is the ONE place a
-                //full tray leaves an Auto lane, which is why the lane's Unloadtray CEID
-                //fires on the very next line - HT9045 counts at the same event
+                //38249-38251 (Auto4-6) Record Auto n Tray Count. This is ONE of TWO places a
+                //tray leaves an Auto lane - the other is the DoAllAutoCleanOut case 7000
+                //drain terminal, which books the same three acts - which is why the lane's
+                //Unloadtray CEID fires on the very next line - HT9045 counts at the same event
                 //(asendic_Auto.cpp:640, its KYEC branch). Bump BEFORE the EventReport so an
                 //S6F11 carrying this SV reports the tray that just came out, not the one
                 //before it. Index 0-5 -> eAuto1..eAuto6 = 1..6, the same +1 mapping
@@ -963,7 +972,7 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
                 if(Index>=0 && (Index+1)<eTrayCount)
                     tRunData.RecordTrayCnt[Index+1]++;
                 if(HGem!=NULL)
-                    HGem->EventReport(1, AutoCeid[Index]);
+                    HGem->EventReport(1, AutoUnloadTrayCeid[Index]);
                 Task=3000;
             }
             break;
@@ -1244,6 +1253,29 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                 TrayMotor=GetAutoVMotor(Index);
                 if(TrayMotor!=NULL)
                 {
+                    //AI(cleanout-tray-ledger) 20260908 : BOOK THE DRAINED TRAY. Cases 1000-6000
+                    //above ran the identical stacking stroke a normal discharge runs (MoveAutoY
+                    //to the discharge Y, Push Pop, Lean Pop, FrontRise), so this tray IS on the
+                    //output car - but this terminal only wiped the grid, so the whole drain was
+                    //invisible to SECS. KYEC 2026-09-08 : six trays (one per lane) reached the
+                    //cars with no Unloadtray CEID (the host saw 16 events for 22 trays actually
+                    //stacked, and the customer confirmed 22 was the right tray count) and three
+                    //sorted ICs were never tallied (DeviceCount published 12 against the 15 rows
+                    //in Production_2026_09_08.csv - Auto1 2, Auto2 1, both partial trays).
+                    //The three acts and their order are DoDischargeTray case 1000 : tally the
+                    //ICs BEFORE ClearTray wipes the grid, bump RecordTrayCnt before the report.
+                    //GATE ON fHasTray, NOT State[].bCarHasTray : this same loop cleared that
+                    //flag a few lines above, so it can no longer tell a drained lane from an
+                    //idle one. An empty working tray is still a tray on the car and still books
+                    //- the count the AMR is handed is the physical stack, header and empties in.
+                    if(TrayMotor->fHasTray)
+                    {
+                        iAmrDeviceCount[Index]+=TrayMotor->Tray.CountIC();
+                        if((Index+1)<eTrayCount)
+                            tRunData.RecordTrayCnt[Index+1]++;
+                        if(HGem!=NULL)
+                            HGem->EventReport(1, AutoUnloadTrayCeid[Index]);
+                    }
                     TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
                 }
             }
