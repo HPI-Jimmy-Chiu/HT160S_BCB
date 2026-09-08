@@ -43,6 +43,9 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
 //-1 (no verdict) so callers can tell "no tray" apart from "no evidence".
 //The GetOutBit gate matters : with the clamp retracted the On reed is legitimately dark, and
 //reporting that as "tray missing" would fire on every released carriage on the machine.
+//AI(auto-empty-car) 20260908 : the "1 = gripping" reading holds for the Loader/Empty/Color clamps
+//(20260805 on-site). It does NOT hold for C_Auto1..6_PushTray : that On reed lights on an empty
+//clamp (owner bench test 20260908), so Auto callers must read 1 as "stroke confirmed" only.
 int GetClampGripVerdict(TMyCylinder *Push, bool bSoftSimulate)
 {
     if(bSoftSimulate)

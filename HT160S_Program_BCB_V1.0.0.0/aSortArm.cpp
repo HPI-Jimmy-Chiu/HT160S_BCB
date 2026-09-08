@@ -2364,6 +2364,26 @@ bool TSortArmModule::DoPlaceToAuto(int Flag)
             //stay here and re-check. Deliberately does NOT clear the Auto software state the way
             //the Color diaper does - an Auto working tray holds already-placed ICs, so wiping its
             //grid would destroy the placed-IC record. The operator decides.
+            //AI(auto-empty-car) 20260908 : the Auto PushTray On reed LIGHTS on an empty clamp (owner
+            //bench test 20260908; on 2026-09-07 this gate read verdict 1 on an Auto2 car with no tray
+            //and two ICs went through to the machine base). So on Auto a verdict of 1 is NOT proof
+            //of a tray; only 0 (commanded out, reed dark = the stroke never confirmed) still says
+            //anything, and that test is kept below. The check that CAN catch an empty car is
+            //LEDGER CONSISTENCY : SelectPlaceAuto chose this car because fHasTray says it holds a
+            //working tray, and a held working tray is always clamped (feed case 5000 pushes before
+            //the case-7000 commit; discharge case 1000 clears before the case-3000 pop). A released
+            //clamp under a "loaded" ledger is the fingerprint of an interrupted CleanOut drain
+            //(case 2000 pops all six, occupancy cleared only at 7000) or a hand-opened clamp : the
+            //tray is gone or loose, so HOLD and ask. Same registered JAM%d02 code, honest text.
+            if(AutoModule!=NULL && AutoModule->IsCarPushClampOut(iActiveAutoIndex)==false)
+            {
+                AnsiString ErrClamp;
+                ErrClamp.sprintf("Auto%d working tray not clamped - the ledger says this car holds a tray but its push clamp is released; check the car (tray missing?) then RETRY", iActiveAutoIndex+1);
+                RecordProcess("SortArm place BLOCKED : "+ErrClamp);
+                ShowMyError(AnsiString().sprintf("JAM%d02", 11+iActiveAutoIndex), ErrClamp,
+                            AutoModule->GetCarTrayPushOnSensor(iActiveAutoIndex), true, K_RETRY);
+                break;   //hold at case 30 : never release an IC into an unclamped car
+            }
             if(AutoModule!=NULL && AutoModule->GetCarTrayGripVerdict(iActiveAutoIndex)==0)
             {
                 AnsiString ErrGrip;

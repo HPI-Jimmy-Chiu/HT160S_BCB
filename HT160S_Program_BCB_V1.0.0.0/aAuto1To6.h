@@ -195,7 +195,8 @@ public:
     void NotifyTrayArmDelivered(int Index, int Kind, AnsiString TrayID); // TrayArm placed a tray of Kind (and identity 2D TrayID) at rear
     void StageRearGrid(int Index, const TMyTray &Grid);   //AI(ht160s-tray-source) : TrayArm hands the carried grid to the rear staging slot (AMR + Normal)
     bool IsReadyForSortArmPlace(int Index);
-    int  GetCarTrayGripVerdict(int Index);   //AI(ht160s-clampgrip) 20260806 : physical PushTray grip verdict for the working car (1=gripping 0=tray gone -1=no verdict); SortArm place-Z boundary confirm
+    int  GetCarTrayGripVerdict(int Index);   //AI(ht160s-clampgrip) 20260806 : PushTray grip verdict for the working car (1=commanded out + reed confirmed, 0=commanded out + reed dark, -1=no verdict). AI(auto-empty-car) 20260908 : on Auto the reed lights on an EMPTY clamp, so 1 is NOT tray proof
+    bool IsCarPushClampOut(int Index);      //AI(auto-empty-car) 20260908 : is the working-car push clamp commanded out ? ledger-consistency check for the SortArm place gate (true when unknowable)
     TMySensor *GetCarTrayPushOnSensor(int Index);   //AI(ht160s-clampgrip) 20260806 : the grip reed, so the alarm screen can name the real IO point         // SortArm may fill working tray (Normal only in AMR)
     //AI(general) 20260608 : Stage1 demand API (Auto pulls trays on demand).
     //GetTrayRequest returns the eTrayKind this Auto wants at its rear now, or

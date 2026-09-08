@@ -153,9 +153,20 @@ bool TAutoModule::HomeDrainTick()
     {
         if(FeedTask[DrainIndex]!=6000 && FeedTask[DrainIndex]!=7000)
             continue;
+        //AI(auto-phantom-tray) 20260908 : the cursor alone is NOT proof of an in-flight feed.
+        //A completed feed used to leave FeedTask resting at 7000 (case 7000 resets it now, but
+        //keep the belt with the braces), so this stand-in re-ran the case-7000 commit on every
+        //HOME for every station fed since the last InitialFlag - minting fHasTray/bCarHasTray
+        //on an empty car and wiping the placed-IC grid (2026-09-07 KYEC : all six stations,
+        //two ICs then released into the empty Auto2 car). Status is the in-flight witness :
+        //case 100 sets AS_LOADING and case 7000 promotes to AS_SORTING, the same way
+        //TTrayArmModule::HomeDrainTick keys on its own Status. Log the commit - it used to run silently.
+        if(State[DrainIndex].Status!=AS_LOADING)
+            continue;
         FeedTask[DrainIndex]=7000;
         if(DoFeedTray(DrainIndex, 1))
         {
+            RecordProcess("HOME-DRAIN Auto: feed commit stand-in ran (Auto"+IntToStr(DrainIndex+1)+")");
             FeedTask[DrainIndex]=1;
             StationTask[DrainIndex]=0;
         }
@@ -175,6 +186,13 @@ bool TAutoModule::HomeDrainTick()
     {
         if(DischargeTask[TailIndex]!=5000 && DischargeTask[TailIndex]!=6000 &&
            DischargeTask[TailIndex]!=6100)
+            continue;
+        //AI(auto-phantom-tray) 20260908 : same disease as the feed stand-in above - a COMPLETED
+        //discharge used to rest at 6100 (case 6100 resets it now) and HOME latched it as an
+        //in-flight tail; resume then re-ran MoveAutoY-to-feed + FrontRise on a car that may hold
+        //a fresh working tray (2026-09-07 : Auto2/3/4/5 phantom tails). AS_DISCHARGING is set at
+        //case 100 and dropped at 6100, so it is the in-flight witness here.
+        if(State[TailIndex].Status!=AS_DISCHARGING)
             continue;
         if(bDischargeTailPending[TailIndex]==false)
             RecordProcess("HOME-DRAIN Auto: discharge-tail latched (Auto"+IntToStr(TailIndex+1)+
@@ -868,6 +886,10 @@ bool TAutoModule::DoFeedTray(int Index, int Flag)
             }
             else
                 WorkingKind[Index]=eTrayKindNormal;
+            //AI(auto-phantom-tray) 20260908 : the commit ran - park the cursor back at 1 so a
+            //finished feed can never be mistaken for one still in flight (HomeDrainTick used to
+            //re-run this case on every HOME because the cursor rested here; see there).
+            FeedTask[Index]=1;
             return true;
     }
     return false;
@@ -985,6 +1007,7 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
                 //after the FULL discharge tail (Y retreated + FrontRise pumped), later
                 //than the legacy flag clears at case 1000. Readers flip in phase 5b.
                 State[Index].Status=AS_IDLE;
+                Task=1;   //AI(auto-phantom-tray) 20260908 : finished eject parks the cursor at 1 - a completed discharge must never read as an in-flight tail (HomeDrainTick latch)
                 return true;
             }
             break;
@@ -1255,8 +1278,8 @@ bool TAutoModule::AllStationsDrainLatched()
 //      RefreshAutoState so a laptop with InType=0 phantom-present sensors still completes).
 //NOTE : NO FeedTask/DischargeTask/CleanOutTask idle-gate here. Unlike Empty/Color, Auto's
 //drain is a SEPARATE ladder (CleanOutTask) whose cursors legitimately rest at non-1 values
-//after completion (CleanOutTask stays 7000 ; the rear-collect leaves FeedTask at 100/7000 -
-//DoFeedTray only resets to 1 via Flag==0 at the NEXT cycle start). AllStationsDrainLatched
+//after completion (CleanOutTask stays 7000 ; an abandoned rear-collect lap leaves FeedTask at
+//100 - since 20260908 a COMPLETED feed resets FeedTask to 1 itself). AllStationsDrainLatched
 //is the correct "drain fully ran" proof for Auto; a FeedTask==1 gate would false-block forever.
 bool TAutoModule::IsAllCleanOutFinish()
 {
@@ -1571,11 +1594,36 @@ bool TAutoModule::IsReadyForSortArmPlace(int Index)
 //NOTE the deliberate asymmetry with the Color diaper : this only REPORTS. An Auto working tray
 //holds placed ICs, so auto-clearing its grid would destroy the placed-IC record; the operator
 //decides.
+//AI(auto-empty-car) 20260908 : CAVEAT - on the six Auto cars the PushTray On reed LIGHTS with
+//an empty clamp (owner bench test 20260908; the 2026-09-07 Auto2 drop read verdict 1 on a car
+//with no tray). So here 1 means only "commanded out and the stroke confirmed", never "a tray is
+//gripped". Do not use it as tray evidence; IsCarPushClampOut + the software ledger are what the
+//SortArm place gate checks now. The Loader/Empty/Color reeds keep the 20260805 semantics.
 int TAutoModule::GetCarTrayGripVerdict(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return -1;
     return GetClampGripVerdict(GetPush(Index), IsSoftSimulate());
+}
+//---------------------------------------------------------------------------
+//AI(auto-empty-car) 20260908 : is this station's working-car push clamp COMMANDED out ?
+//The ledger truth for "this car holds a working tray" (fHasTray / bCarHasTray) has no sensor
+//behind it, and the PushTray On reed lights on an empty Auto clamp, so the one thing that can
+//still be cross-checked is the command state : a loaded ledger with a released clamp is
+//impossible in a consistent machine (feed pushes at case 5000 before the case-7000 commit;
+//discharge clears at case 1000 before the case-3000 pop). GetOutBit reflects the commanded
+//output in both real and SOFT_SIMULATE builds (mycylin.cpp), so no sim special case. An
+//unknowable point (bad index / no cylinder) answers true : no evidence must never block.
+bool TAutoModule::IsCarPushClampOut(int Index)
+{
+    TMyCylinder *Push;
+
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return true;
+    Push=GetPush(Index);
+    if(Push==NULL)
+        return true;
+    return Push->GetOutBit();
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-clampgrip) 20260806 : the grip reed, so SortArm's alarm screen can name the real IO
