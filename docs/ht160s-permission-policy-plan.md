@@ -1,6 +1,6 @@
 # HT160S per-feature 權限強化 — 設計與施工計畫
 
-狀態：Stage 1 施工中
+狀態：Stage 1 / 2a / 4 完成（`0f42f9a`, `1e9d0d7`）；Stage 2b / 3 待辦
 日期：2026-09-09
 分支：`feat/amr-lot-identity-d4`
 
@@ -57,7 +57,7 @@ bool __fastcall TfSecurity::Insufficient(int iType, bool bAlarm)
 
 1. **編號槽位**：每個受控功能一個穩定整數 ID
 2. **每槽所需等級可設定 + 存檔**
-3. **雙形式 API**：靜默（灰化/隱藏）＋吵版（點擊拒絕，訊息集中處理）
+3. ~~雙形式 API~~ → **單一靜默 API**（見下方「API 修訂」：使用者裁定沒權限直接反灰，不跳訊息）
 4. **越界即拒絕**（fail-closed）
 5. **Honprec-only 特例**
 6. **槽位依選配隱藏**
@@ -69,7 +69,7 @@ bool __fastcall TfSecurity::Insufficient(int iType, bool bAlarm)
 | `"d:\\HT9045\\system\\levelset.dat"` 寫死絕對路徑 | 換槽/換機就爛 | `HSys.CurrentDir+"\\system\\security.txt"`（同 login.txt 慣例） |
 | `WriteData(..., sizeof(LevelSet))` 二進位 blob | 陣列一長就對不齊、記事本打不開 | **純文字** `slot,level`（延續 login.txt 明文可讀政策） |
 | `GetLevelSet()` 內散落魔術索引 `i==35 / 104 / 163` 硬改等級 | 政策散在載入器裡 | 預設值集中在**單一槽位表**，與名稱同列 |
-| `Insufficient()` 回傳 true 表示「**有**權限」 | 命名反義，`==false` 才是拒絕，極易誤讀 | 正名 `SecurityAllows()`（靜默）／`PermitAction()`（吵版） |
+| `Insufficient()` 回傳 true 表示「**有**權限」 | 命名反義，`==false` 才是拒絕，極易誤讀 | 正名 `SecurityAllows()`（唯一查詢，靜默） |
 | `bSecurityHave5Level` 讓等級編號在 4/5 級間浮動 | 編號漂移 | HT160 固定 4 級 `EHT160UserRoleLevel`，不引入浮動 |
 
 ---
@@ -107,15 +107,18 @@ HT160 對應條件是 `iRealDummy != REALLY`。**做法照 9045：在 START 前�
 ## 4. 關鍵地雷（施工必守）
 
 **`ShowMyMessage()` 會停機** — `mymessbox.cpp:83` 內含 `HSys.DecStopAllMotor()` + `HSys.Sys.SystemStart=false`。
-權限拒絕訊息**絕不可**用它：操作員誤點一下受管制按鈕就會停產。
+它是為「真實機台警報」設計的，停機正是它的目的。
 
-→ 一律用 **`ShowMyOKMessageNoStop()`**（`mymessbox.cpp:154`，OK-only、不停馬達、不清 SystemStart）。
+這原本是權限拒絕訊息的地雷：操作員誤點一下受管制按鈕就會停產。
+**使用者裁定「沒權限直接反灰不跳訊息」後，此風險結構性歸零** — 權限路徑完全不產生訊息，
+所以連 `ShowMyOKMessageNoStop()`（`mymessbox.cpp:154`，OK-only、不停馬達）都不需要。
+若未來要為任何權限情境加訊息，必須用 NoStop 版本，絕不可用 `ShowMyMessage()`。
 
 其他：
 - 靜默形式（灰化控件）**不得**跳任何訊息 — 它每次頁面刷新都會跑
 - 新增權限閘門必須與現有執行狀態互鎖 **AND**，不可取代（停機/無 Lot 的保護要留）
 - `SOFT_SIMULATE` 開發版開機即 Honprec，所有閘門在開發版都是 no-op；**只有真機版才驗得到**
-- BCB6：無 C++11、保留 `AnsiString`、新註解 ASCII、檔案 CRLF 不可轉 LF
+- BCB6：無 C++11、保留 `AnsiString`、新註解 ASCII、**行尾必須逐檔確認**（`main.cpp`/`maintenance.cpp`/`main.h` 是 CRLF，`csystem.cpp` 是純 LF）
 - 新增 `.cpp` 是**新編譯單元** → 必須進 `ht160s.bpr` / `.mak`，並跑 `-Full`
 
 ---
