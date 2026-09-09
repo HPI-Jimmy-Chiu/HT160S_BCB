@@ -158,7 +158,12 @@ mymessbox / language。停機風險因此歸零（不會有任何權限拒絕路
 
 - 萬能密碼：`IsServiceMasterCredential()` Honprec/27025312 → ROLE_HONPREC，編進二進位，commit `ec1f81e`
 - 另有時鐘後門：帳密皆等於當下小時（`UserRoleManager.cpp:180`）
-- `cprod.cpp:273` 仍會在帳號本為空時把 `Honprec,27025312,3` **明文**寫進 `system\login.txt`（外洩點，移除與否待裁）
+- ~~`cprod.cpp:273` 明文種子~~ → **已移除 `d9c3b7f`**。`ReadPassword()` 不再種任何預設帳號；空帳號本現在是正常狀態，靠編進二進位的萬能密碼進入。
+  連帶修正：`ForceDirectories` 從種子區塊移到 `SavePassword()`（它本來就該在寫入路徑上）——
+  `UserRoleManager::SaveToFile` 的例外被 catch 吞掉、`SavePassword` 又不看回傳值，
+  所以若只拿掉種子，全新機台（無 `system\` 資料夾）存帳號會**靜默失敗**。
+  也清掉了被 git 追蹤的 `system/login.txt` 內那行明文（每個 clone 都帶著同一組密碼）。
+  ⚠️ **git 歷史仍留有該行**（未改寫歷史）；**已出貨機台**上既有的 `login.txt` 需現場人工清。
 - `RefreshPasswordGrid()`(2818) 在鎖定前刷新 → Operation 級也看得到全部帳號 ID 與等級
 - 帳號頁寫入 handler（PwAddUpdate/Delete/Save/Reload）無內部再驗，只靠 `Enabled`
 
