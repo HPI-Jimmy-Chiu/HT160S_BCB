@@ -130,7 +130,10 @@ HT160 對應條件是 `iRealDummy != REALLY`。**做法照 9045：在 START 前�
 | 1 | `SecurityPolicy.h/.cpp`：31 槽位 enum（append-only）＋槽位表（group/name/預設等級）＋明文存檔 `system\security.txt`＋單一靜默查詢 `SecurityAllows()`；接進 .bpr/.mak | **DONE** `0f42f9a` |
 | 2a | 維修頁 + 主畫面閘門（畫面進入 + 逐動作，全部靜默灰化） | **DONE** `1e9d0d7` |
 | 2b | 其餘檔案逐動作再驗（`uteach` / `uOffset` / `iosetview` / `uMotorTest` / `setup` / `ComPort` / `uHGemLogForm`） | **不做**（使用者 20260909 裁定：畫面入口已擋，現行做法已足夠） |
-| 3 | 權限設定 UI（見 §7 設計） | 計畫中，待裁定放置方式 |
+| 3 | 權限設定 UI（見 §7 設計）— 採**方案 C** 獨立新頁 `tsMaintSecurity` | **DONE** `e6d8ffb` |
+| — | 修 Stage 2a 的 stale 反灰（三處閘門非週期性） | **DONE** `0901ea9` |
+| — | 帳號頁改 EventLog 稽核（見 §8） | **DONE** `0df4656` |
+| — | 維修頁 19 處資訊型彈窗改不停機版（另一 session） | **DONE** `d73dac4`（已合併 `bfc8c7d`） |
 | 4 | OP 模式生產必須 Real 硬規則（`MachineStart()`） | **DONE** `1e9d0d7` |
 
 ### API 修訂（使用者 20260909 裁定）
@@ -218,10 +221,21 @@ mymessbox / language。停機風險因此歸零（不會有任何權限拒絕路
 - **鎖不死自己**：三層退路 —— 編進二進位的萬能密碼永遠給 Honprec、`btnSecDefaults`、
   以及直接刪掉 `system\security.txt`（缺檔即回編譯預設）
 
-### 待裁定
+### 裁定結果：採方案 C（已施工 `e6d8ffb`）
 
-放 `tsMaintPassword` 空位（A/B）還是獨立新頁（C）。建議 C，主因是第 1 點：
-權限編輯器若不是最高階自成一閘，Engineer 可自我提權。
+實作與計畫一致，另有三點施工中才確定的事實：
+
+1. **選單容量剛好用完**。選單按鈕由 `LayoutMaintenanceButtons()` 程式排版
+   （Top=8、高 50、間隙 6）。原 15 顆非釘底按鈕最後一顆在 792..842，
+   新增的 Security 落在 **848..898**，釘底的 Exit 在 **929..979** → 只剩 31px，放得下；
+   但**再加一顆非釘底就會撞 Exit**（904..954）。下次要加頁必須先改版面常數。
+2. **`PERM_MAINT_SECURITY_POLICY` 設為 LOCKED**（`THT160SecurityPolicy::IsSlotLocked`）：
+   `SetRequiredLevel` 拒絕它、`LoadFromFile` 跳過它 → **UI 與手改 security.txt 兩條路都封**。
+   否則 Honprec 可把守門的門降到 Operation，等於自廢。這是 9045 forced-slot 的同義做法，
+   但集中宣告而非散在 loader 的魔術索引。
+3. **DFM 手寫已用實際載入驗證**：`ht160s.exe --selftest-home` 會跑完整啟動含
+   `CreateForm(TfMaintenance)`，exit 0 才證明手寫 DFM 與 `__published` header 對得上。
+   （`maintenance.h` 開頭已註明規則：欄位全部在前、handler 在後、`__published` 內不得有註解。）
 
 ---
 
@@ -244,5 +258,16 @@ API：`g_EventLog.Log(code, message, errorPart="")`（`cEventLog.h`，日檔 CSV
 適用範圍（帳號頁優先）：新增/修改/刪除帳號、存檔、重載 —— 記 `user=` 與前後值
 （例如 `Lv3 => Lv2`、`ADD OP1 Lv0`、`DELETE OP1 Lv0`）。**密碼永不入 log**，只記「密碼已變更」。
 
-⚠️ 與背景任務 `task_af437dca` 衝突：該任務是把帳號頁提示改成「不停機彈窗」，
-本裁定則是「不彈窗、改寫 EventLog」。以本裁定為準，該任務落地後需再改一次。
+### 已施工的區分（重要）
+
+背景任務 `d73dac4` 先把維修頁 19 處彈窗全換成不停機版（已合併 `bfc8c7d`），
+之後 `0df4656` 再依本裁定把**資訊型**改成 EventLog。兩者不是重工，是兩層：
+
+| 類別 | 例子 | 做法 | 理由 |
+|---|---|---|---|
+| **資訊/確認** | 已存檔、已重載、已存到記憶體 | **不彈窗**，寫 EventLog（含前後值） | 生產中彈窗是干擾；事後查得到誰改了什麼 |
+| **驗證/拒絕** | 請輸入帳號、帳號表已滿、請先選一列、此權限已鎖定 | **保留不停機彈窗** | 這是拒絕，操作員必須看到；改成純 log 會變**靜默失敗**，違反 [[silent-stop-must-notify]] |
+
+「Account saved in memory. Press 'Save to File'」是操作員唯一知道要存檔的線索，
+直接刪會造成改動遺失 → 其職責移到**頁面提示標籤**（`bPwDirty` / `bSecDirty`，每週期重貼），
+可見但非模態。
