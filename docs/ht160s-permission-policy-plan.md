@@ -124,10 +124,25 @@ HT160 對應條件是 `iRealDummy != REALLY`。**做法照 9045：在 START 前�
 
 | Stage | 內容 | 狀態 |
 |---|---|---|
-| 1 | `SecurityPolicy.h/.cpp`：槽位 enum（append-only）＋槽位表（group/name/預設等級）＋明文存檔 `system\security.txt`＋`SecurityAllows()` 靜默／`PermitAction()` 吵版；接進 .bpr/.mak | 施工中 |
-| 2 | 套用閘門：Hybrid（畫面進入 + 逐動作），靜默形式做灰化/隱藏 | 待辦 |
+| 1 | `SecurityPolicy.h/.cpp`：31 槽位 enum（append-only）＋槽位表（group/name/預設等級）＋明文存檔 `system\security.txt`＋單一靜默查詢 `SecurityAllows()`；接進 .bpr/.mak | **DONE** `0f42f9a` |
+| 2a | 維修頁 + 主畫面閘門（畫面進入 + 逐動作，全部靜默灰化） | **DONE** `1e9d0d7` |
+| 2b | 其餘檔案：`uteach.cpp` / `uOffset.cpp` / `iosetview.cpp` / `uMotorTest.cpp` / `setup.cpp` / `ComPort.cpp` / `uHGemLogForm.cpp` | 待辦 |
 | 3 | 維修頁權限設定頁（依 group 列槽位 + 等級選擇 + Save/Reload），仿 `tsMaintPassword` | 待辦 |
-| 4 | OP 模式生產必須 Real 硬規則 | 待辦 |
+| 4 | OP 模式生產必須 Real 硬規則（`MachineStart()`） | **DONE** `1e9d0d7` |
+
+### API 修訂（使用者 20260909 裁定）
+
+原計畫的「靜默＋吵版」雙形式**收成單一靜默查詢**：沒權限直接反灰，不跳訊息。
+因此 `PermitAction()` / `PermitHonprecOnly()` 未實作，`SecurityPolicy` 也不依賴
+mymessbox / language。停機風險因此歸零（不會有任何權限拒絕路徑碰到 `ShowMyMessage`）。
+
+### Stage 2a 施工中發現的兩個真實風險
+
+1. **FTP 密碼會被無聲清空**（已修）。`maintenance.cpp` FormClose 無條件呼叫
+   `SaveFtpConfigFromUi()` 當 commit-on-close backstop，其註解假設「未動過的欄位原值往返」。
+   一旦為低權限使用者不載入密碼，Operation 級使用者只要開關維修畫面就會清掉 FTP 密碼。
+   → 守衛必須放在 `SaveFtpConfigFromUi()` 最前面，早於任何欄位讀取。
+2. **`csystem.cpp` 是純 LF**（非 CRLF），與 `main.cpp` / `maintenance.cpp` 相反。編修必須逐檔確認行尾。
 
 每階段：刪改動 `.obj` → sim `-Clean` → 真機版（關 `SOFT_SIMULATE`）`-Full` → 還原 → 編碼檢查 → commit。
 
