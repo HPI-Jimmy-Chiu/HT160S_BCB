@@ -18,17 +18,17 @@ OBJFILES = ht160s.obj main.obj iosetview.obj uteach.obj uMotorTest.obj uHome.obj
     uQwertyKey.obj language.obj setup.obj data.obj maintenance.obj uOffset.obj \
     uspeed.obj systools.obj mymessbox.obj note.obj cmydef.obj cprod.obj \
     CosFunction.obj Include\cJSON.obj GeneralSetting.obj Config.obj \
-    UserRoleManager.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj \
-    cSelfCheck.obj cStepTrace.obj cStateRecordHT160.obj database.obj \
-    aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj aSortArm.obj aColor.obj \
-    csystem.obj uruncontrol.obj HTimer.obj myio.obj myio_MN200.obj \
-    mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj deviceinfo.obj \
-    cSoterOutput.obj MotorAndIO\HTMotor.obj MotorAndIO\MyMotor.obj \
-    MotorAndIO\mySMCmotor.obj MotorAndIO\myMN200motor.obj \
-    MotorAndIO\MC88X1PLazyLoad.obj MotorAndIO\myMC88X1motor.obj \
-    AutomationServer.obj TopCcdSocket.obj ColorCcdSocket.obj \
-    LotWebApiClient.obj uFtpUploadThread.obj ComPort.obj MyComm.obj \
-    MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj \
+    UserRoleManager.obj SecurityPolicy.obj cCsvDailyLog.obj cEventLog.obj \
+    cCommLog.obj cSelfCheck.obj cStepTrace.obj cStateRecordHT160.obj \
+    database.obj aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj \
+    aSortArm.obj aColor.obj csystem.obj uruncontrol.obj HTimer.obj myio.obj \
+    myio_MN200.obj mysensor.obj myswitch.obj mycylin.obj MyKitSuck.obj \
+    deviceinfo.obj cSoterOutput.obj MotorAndIO\HTMotor.obj \
+    MotorAndIO\MyMotor.obj MotorAndIO\mySMCmotor.obj \
+    MotorAndIO\myMN200motor.obj MotorAndIO\MC88X1PLazyLoad.obj \
+    MotorAndIO\myMC88X1motor.obj AutomationServer.obj TopCcdSocket.obj \
+    ColorCcdSocket.obj LotWebApiClient.obj uFtpUploadThread.obj ComPort.obj \
+    MyComm.obj MyBinDisp.obj uPadInterface.obj SecsGem\uHGemEquipment.obj \
     SecsGem\UsecegemMainFrom.obj SecsGem\uHGemClass.obj SecsGem\uHGemHT160.obj \
     SecsGem\uAgvStation.obj SecsGem\uHGemLogForm.obj
 RESFILES = ht160s.res
@@ -40,8 +40,8 @@ RESDEPEN = $(RESFILES) main.dfm iosetview.dfm uteach.dfm uMotorTest.dfm uHome.df
 LIBFILES = D:\ProgramFiles\Borland\CBuilder6\Lib\Debug\vclx.lib
 IDLFILES = 
 IDLGENFILES = 
-LIBRARIES = bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib wininet.lib rtl.lib \
-    vcl.lib
+LIBRARIES = vclx.lib bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib \
+    wininet.lib rtl.lib vcl.lib
 PACKAGES = vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx.bpi \
     bdertl.bpi vcldbx.bpi ibxpress.bpi dsnap.bpi cds.bpi bdecds.bpi qrpt.bpi \
     teeui.bpi teedb.bpi tee.bpi dss.bpi teeqr.bpi visualclx.bpi \
@@ -50,7 +50,7 @@ PACKAGES = vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx
     bcbie.bpi websnap.bpi soaprtl.bpi dclocx.bpi dbexpress.bpi dbxcds.bpi \
     indy.bpi dclusr60.bpi
 SPARELIBS = vcl.lib rtl.lib wininet.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib \
-    bdertl.lib
+    bdertl.lib vclx.lib
 DEFFILE = 
 OTHERFILES = 
 # ---------------------------------------------------------------------------

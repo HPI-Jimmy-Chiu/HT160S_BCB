@@ -8,7 +8,7 @@
       uQwertyKey.obj language.obj setup.obj data.obj maintenance.obj uOffset.obj 
       uspeed.obj systools.obj mymessbox.obj note.obj cmydef.obj cprod.obj 
       CosFunction.obj Include\cJSON.obj GeneralSetting.obj Config.obj 
-      UserRoleManager.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj 
+      UserRoleManager.obj SecurityPolicy.obj cCsvDailyLog.obj cEventLog.obj cCommLog.obj 
       cSelfCheck.obj cStepTrace.obj cStateRecordHT160.obj database.obj 
       aLoader.obj aEmpty.obj aAuto1To6.obj aTrayArm.obj aSortArm.obj aColor.obj 
       csystem.obj uruncontrol.obj HTimer.obj myio.obj myio_MN200.obj 
@@ -30,10 +30,10 @@
       uspeed.dfm systools.dfm mymessbox.dfm note.dfm database.dfm ComPort.dfm 
       uPadInterface.dfm SecsGem\uHGemLogForm.dfm"/>
     <LIBFILES value="D:\ProgramFiles\Borland\CBuilder6\Lib\Debug\vclx.lib"/>
-    <LIBRARIES value="bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib wininet.lib rtl.lib 
-      vcl.lib"/>
+    <LIBRARIES value="vclx.lib bdertl.lib vcldb.lib dbrtl.lib dclusr60.lib ws2_32.lib 
+      wininet.lib rtl.lib vcl.lib"/>
     <SPARELIBS value="vcl.lib rtl.lib wininet.lib ws2_32.lib dclusr60.lib dbrtl.lib vcldb.lib 
-      bdertl.lib"/>
+      bdertl.lib vclx.lib"/>
     <PACKAGES value="vcl.bpi rtl.bpi bcb2kaxserver.bpi dbrtl.bpi adortl.bpi vcldb.bpi vclx.bpi 
       bdertl.bpi vcldbx.bpi ibxpress.bpi dsnap.bpi cds.bpi bdecds.bpi qrpt.bpi 
       teeui.bpi teedb.bpi tee.bpi dss.bpi teeqr.bpi visualclx.bpi 
@@ -102,6 +102,7 @@
       <FILE FILENAME="GeneralSetting.cpp" FORMNAME="" UNITNAME="GeneralSetting" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="Config.cpp" FORMNAME="" UNITNAME="Config" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="UserRoleManager.cpp" FORMNAME="" UNITNAME="UserRoleManager" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
+      <FILE FILENAME="SecurityPolicy.cpp" FORMNAME="" UNITNAME="SecurityPolicy" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cCsvDailyLog.cpp" FORMNAME="" UNITNAME="cCsvDailyLog" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cEventLog.cpp" FORMNAME="" UNITNAME="cEventLog" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="cCommLog.cpp" FORMNAME="" UNITNAME="cCommLog" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
@@ -159,7 +160,7 @@ AutoIncBuild=0
 MajorVer=1
 MinorVer=0
 Release=0
-Build=0
+Build=2
 Debug=0
 PreRelease=0
 Special=0
@@ -171,7 +172,7 @@ CodePage=1200
 [Version Info Keys]
 CompanyName=Hon. Precision, Inc.
 FileDescription=HT160S Series High Speed Logic Handler
-FileVersion=1.0.0.0
+FileVersion=1.0.0.2
 InternalName=ht160s
 LegalCopyright=(c) 2025 Hon. Precision, Inc.
 LegalTrademarks=

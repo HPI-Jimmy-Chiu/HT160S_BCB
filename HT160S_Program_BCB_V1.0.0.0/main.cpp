@@ -218,6 +218,7 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     LoadRunModePicture();
     LoadStartModePicture();
     ReadPassword();   //AI(ht160s-password) 20260624 : load system\login.txt user book (seed default if missing)
+    ReadSecurityPolicy();   //AI(ht160s-security) 20260909 : load system\security.txt per-feature level table (compiled defaults if absent)
     UserRoleManager.InitializeByBuildMode();
     //AI(secs-operatorid) 20260803 : SVID/ECID 1007. GeneralSetting is already loaded here
     //(HSys.Initial -> InitialCosFunction -> GeneralSetting.Load, well before CreateForm), so

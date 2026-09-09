@@ -8,6 +8,7 @@
 #include "uteach.h"   //AI 20260623 : TEACH Teach/TeachBase for Offset fold
 #include "uOffset.h"  //AI 20260623 : RUN_OFFSET Offset for Offset fold
 #include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : text login book persistence
+#include "SecurityPolicy.h"    //AI(ht160s-security) 20260909 : per-feature permission policy persistence
 #include "aAuto1To6.h"         //AI(ht160s-uph) 20260706 : AutoModule/GetStationStatus/AS_SORTING (read-only observer)
 #include "cCsvDailyLog.h"      //AI(ht160s-uph) 20260706 : PruneFolderTree + CsvQuote
 #include "SecsGem/UsecegemMainFrom.h"   //AI(secs-ceid-align9045) 20260729 : EventReport for CEID53/54 UPH record
@@ -273,6 +274,28 @@ void ReadPassword()
         UserRoleManager.AddOrUpdateUser("Honprec", "27025312", ROLE_HONPREC);
         UserRoleManager.SaveToFile(FileName);
     }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : per-feature permission policy book, same
+// notepad-openable text convention as the login book above. A missing file is
+// NOT an error: THT160SecurityPolicy keeps its compiled defaults, and the file
+// is written the first time the policy is saved from the configuration page.
+static AnsiString GetSecurityFileName()
+{
+    return HSys.CurrentDir+"\\system\\security.txt";
+}
+//---------------------------------------------------------------------------
+void SaveSecurityPolicy()
+{
+    AnsiString FileName=GetSecurityFileName();
+
+    ForceDirectories(ExtractFilePath(FileName));
+    SecurityPolicy.SaveToFile(FileName);
+}
+//---------------------------------------------------------------------------
+void ReadSecurityPolicy()
+{
+    SecurityPolicy.LoadFromFile(GetSecurityFileName());
 }
 //---------------------------------------------------------------------------
 void CheckLastData()

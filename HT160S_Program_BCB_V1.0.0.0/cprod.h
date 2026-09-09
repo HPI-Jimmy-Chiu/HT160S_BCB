@@ -236,6 +236,8 @@ bool CheckFileExist(char *cFName);
 void ClearLastSet();
 void SavePassword();
 void ReadPassword();
+void SaveSecurityPolicy();
+void ReadSecurityPolicy();
 void CheckLastData();
 bool CheckFileCanAccess(char *cFName);
 void ReadLastDataIni();
