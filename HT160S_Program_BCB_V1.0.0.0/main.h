@@ -558,6 +558,7 @@ public:		// User declarations
     void __fastcall EmitSafeDoorChange();    //AI(secs-ceid-align9045) 20260729 : S6F11 CEID123 SafeDoorOnOff (any safety-door sensor edge); called from csystem ReportSafeDoorChangeToSecs
     void __fastcall EmitEnterIOPage();       //AI(secs-ceid-align9045) 20260729 : S6F11 CEID21 EnterIO; called from maintenance.cpp (that unit has no SECS includes)
     void __fastcall EmitMessageBoxClosed();  //AI(secs-ceid-align9045) 20260729 : S6F11 CEID73 MymessboxOK; called from mymessbox.cpp FormClose
+    void __fastcall UpdateMainPermissionLock();   //AI(ht160s-security) 20260909 : grey out main-screen controls the current level may not use; called every cycle from csystem UpdateRunControlFlag
     eOneCycleResult OneCycleCore(bool bRequireRunning, AnsiString &Reason);   //AI(secs-kyec-rcmd4) 20260728 : shared One Cycle gate (operator button + SECS ONE_CYCLE); bRequireRunning is the SECS-only stale-arm guard
 };
 //---------------------------------------------------------------------------

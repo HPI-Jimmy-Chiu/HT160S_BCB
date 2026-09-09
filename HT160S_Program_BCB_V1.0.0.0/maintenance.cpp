@@ -21,6 +21,7 @@
 #include "uMotorTest.h"
 #include "uQwertyKey.h"
 #include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : account book + level gating
+#include "SecurityPolicy.h"    //AI(ht160s-security) 20260909 : per-feature permission slots
 #include "mymessbox.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : ShowSecsGemLog
 #include "SecsGem/uAgvStation.h"   //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState for AMR tab
@@ -969,13 +970,30 @@ void __fastcall TfMaintenance::LoadFtpConfigToUi()
     bool bEnable, bUploadReport;
     FtpUploadThd->GetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
                             bEnable, bUploadReport, iTimeoutMs, iRetry);
+    //AI(ht160s-security) 20260909 : FTP credentials are a Honprec slot, and the ruling
+    // covers VIEWING them, so the stored password is not even loaded into the
+    // field for an under-level user - greying alone would still display it.
+    // SaveFtpConfigFromUi() carries the matching guard so the blanked field can
+    // never be committed back over the real credential.
+    bool bAllowFtp=SecurityAllows(PERM_FTP_CREDENTIALS);
     if(edFtpHost!=NULL)          edFtpHost->Text=sHost;
     if(edFtpPort!=NULL)          edFtpPort->Text=IntToStr(iPort);
     if(edFtpUser!=NULL)          edFtpUser->Text=sUser;
-    if(edFtpPwd!=NULL)           edFtpPwd->Text=sPwd;
+    if(edFtpPwd!=NULL)           edFtpPwd->Text=(bAllowFtp?sPwd:AnsiString(""));
     if(edFtpRemoteDir!=NULL)     edFtpRemoteDir->Text=sRemoteDir;
     if(chkFtpEnable!=NULL)       chkFtpEnable->Checked=bEnable;
     if(chkFtpUploadReport!=NULL) chkFtpUploadReport->Checked=bUploadReport;
+    if(edFtpHost!=NULL)          edFtpHost->Enabled=bAllowFtp;
+    if(edFtpPort!=NULL)          edFtpPort->Enabled=bAllowFtp;
+    if(edFtpUser!=NULL)          edFtpUser->Enabled=bAllowFtp;
+    if(edFtpPwd!=NULL)           edFtpPwd->Enabled=bAllowFtp;
+    if(edFtpRemoteDir!=NULL)     edFtpRemoteDir->Enabled=bAllowFtp;
+    if(chkFtpEnable!=NULL)       chkFtpEnable->Enabled=bAllowFtp;
+    if(chkFtpUploadReport!=NULL) chkFtpUploadReport->Enabled=bAllowFtp;
+    if(btnFtpSave!=NULL)         btnFtpSave->Enabled=bAllowFtp;
+    if(btnFtpReload!=NULL)       btnFtpReload->Enabled=bAllowFtp;
+    if(btnFtpTestConn!=NULL)     btnFtpTestConn->Enabled=bAllowFtp;
+    if(btnFtpTestUpload!=NULL)   btnFtpTestUpload->Enabled=bAllowFtp;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-ftp) 20260721 : push the FTP maintenance fields into the worker and
@@ -984,6 +1002,14 @@ void __fastcall TfMaintenance::LoadFtpConfigToUi()
 void __fastcall TfMaintenance::SaveFtpConfigFromUi()
 {
     if(FtpUploadThd==NULL)
+        return;
+    //AI(ht160s-security) 20260909 : MANDATORY, and it must stay ahead of every field
+    // read below. LoadFtpConfigToUi deliberately leaves the password field EMPTY
+    // for an under-level user, and FormClose calls this routine UNCONDITIONALLY as
+    // a commit-on-close backstop - so without this guard an Operation-level user
+    // who merely opened and closed the Maintenance screen would silently wipe the
+    // stored FTP password. Silent by ruling; the buttons are greyed anyway.
+    if(SecurityAllows(PERM_FTP_CREDENTIALS)==false)
         return;
     AnsiString sHost, sUser, sPwd, sRemoteDir;
     int iPort, iTimeoutMs, iRetry;
@@ -1086,6 +1112,10 @@ void __fastcall TfMaintenance::RefreshAmrStatus()
     //operator is typing in it (do not clobber an in-progress edit; Save commits it).
     if(edAgvTimeoutSec!=NULL && edAgvTimeoutSec->Focused()==false)
         edAgvTimeoutSec->Text = IntToStr(GeneralSetting.iAgvTimeoutSec);
+    //AI(ht160s-security) 20260909 : AMR/AGV injection forges SECS handshake edges, so
+    // it is a permission slot. Greyed out silently on this refresh path.
+    if(chkAmrTestMode!=NULL)
+        chkAmrTestMode->Enabled=SecurityAllows(PERM_MAINT_AMR_INJECT);
     if(chkAmrTestMode!=NULL && chkAmrTestMode->Checked!=AmrInject.IsTestMode())
         chkAmrTestMode->Checked = AmrInject.IsTestMode();
     if(pnlAmrTestBanner!=NULL)
@@ -1172,6 +1202,13 @@ void __fastcall TfMaintenance::btnAgvTimeoutSaveClick(TObject *Sender)
 void __fastcall TfMaintenance::chkAmrTestModeClick(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-security) 20260909 : defence in depth. RefreshAmrStatus re-syncs the
+    // checkbox to the real test-mode state, so a blocked click visibly snaps back.
+    if(SecurityAllows(PERM_MAINT_AMR_INJECT)==false)
+    {
+        RefreshAmrStatus();
+        return;
+    }
     if(chkAmrTestMode!=NULL)
         AmrInject.SetTestMode(chkAmrTestMode->Checked);
     RefreshAmrStatus();
@@ -1180,6 +1217,10 @@ void __fastcall TfMaintenance::chkAmrTestModeClick(TObject *Sender)
 void __fastcall TfMaintenance::AmrInjectButtonClick(TObject *Sender)
 {
     if(Sender==NULL)
+        return;
+    //AI(ht160s-security) 20260909 : defence in depth - injection must never fire from a
+    // path that bypassed the grey-out.
+    if(SecurityAllows(PERM_MAINT_AMR_INJECT)==false)
         return;
     int Tag  = ((TButton *)Sender)->Tag;
     int kind = Tag / 1000;
@@ -1502,12 +1543,18 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
     }
     //AI(ht160s-statusbar) 20260624 : capture machine identity from the edits before
     //GeneralSetting.Save(), then push it to the cmydef globals + status-bar panels.
-    if(edMachineModel!=NULL)
-        GeneralSetting.sMachineModel=edMachineModel->Text;
-    if(edHandlerID!=NULL)
-        GeneralSetting.sHandlerID=edHandlerID->Text;
-    if(edSerialNo!=NULL)
-        GeneralSetting.sSerialNo=edSerialNo->Text;
+    //AI(ht160s-security) 20260909 : defence in depth for the shipping identity: the
+    // edits are greyed by ApplyHardwareEditLock and the commit is re-checked here,
+    // so no other path can persist them. Silent by ruling.
+    if(SecurityAllows(PERM_MACHINE_IDENTITY))
+    {
+        if(edMachineModel!=NULL)
+            GeneralSetting.sMachineModel=edMachineModel->Text;
+        if(edHandlerID!=NULL)
+            GeneralSetting.sHandlerID=edHandlerID->Text;
+        if(edSerialNo!=NULL)
+            GeneralSetting.sSerialNo=edSerialNo->Text;
+    }
     GeneralSetting.Save();
     BinAreaMap.LoadDefault();
     UpdateMachineIdentity();
@@ -1522,10 +1569,12 @@ void __fastcall TfMaintenance::SaveHardwareSettings()
 void __fastcall TfMaintenance::ApplyHardwareEditLock()
 {
     TCheckBox *Locked[13];
-    bool bEnable;
+    bool bEnable, bIdentity;
     int i;
 
-    bEnable=(MachineRun.bRunning==false);
+    //AI(ht160s-security) 20260909 : hardware install setup is a permission slot,
+    // ANDed with the existing mid-lot interlock so the lot lock is never weakened.
+    bEnable=(MachineRun.bRunning==false && SecurityAllows(PERM_MAINT_HARDWARE_SETUP));
     Locked[0]=chkHardwareColorBinArea;
     Locked[1]=chkUseAMR;
     Locked[2]=chkAutoEnable1; Locked[3]=chkAutoEnable2; Locked[4]=chkAutoEnable3;
@@ -1556,6 +1605,13 @@ void __fastcall TfMaintenance::ApplyHardwareEditLock()
     //bRunning gate - the mode cannot flip mid-lot (would corrupt in-progress routing).
     if(chkWhiteListActive!=NULL)
         chkWhiteListActive->Enabled=bEnable;
+    //AI(ht160s-security) 20260909 : machine model / handler ID / serial number are the
+    // shipping identity, a higher slot than the rest of this page. Still locked
+    // mid-lot on the same bRunning fact.
+    bIdentity=(MachineRun.bRunning==false && SecurityAllows(PERM_MACHINE_IDENTITY));
+    if(edMachineModel!=NULL) edMachineModel->Enabled=bIdentity;
+    if(edHandlerID!=NULL)    edHandlerID->Enabled=bIdentity;
+    if(edSerialNo!=NULL)     edSerialNo->Enabled=bIdentity;
     //AI(ht160s-ccd-2dsanitize) 20260807 : same bRunning lock - flipping the sanitize
     //mid-lot would mix sanitized and raw code forms in one run (routing + logs).
     if(chkCcd2DCommaToUnderscore!=NULL)
@@ -1792,9 +1848,14 @@ void __fastcall TfMaintenance::RefreshSecsControlState()
     else
         lblSecsCtlState->Caption="State: "+sText;
     //Grey out the state we are already in, so the panel doubles as the indicator.
-    if(btnSecsCtlOffline!=NULL) btnSecsCtlOffline->Enabled=(iState!=0 && iState!=1);
-    if(btnSecsCtlLocal  !=NULL) btnSecsCtlLocal  ->Enabled=(iState!=0 && iState!=4);
-    if(btnSecsCtlRemote !=NULL) btnSecsCtlRemote ->Enabled=(iState!=0 && iState!=5);
+    //AI(ht160s-security) 20260909 : changing the control state is a permission slot;
+    // the grey-out-the-current-state logic is ANDed with it, not replaced.
+    bool bAllowCtl=SecurityAllows(PERM_SECS_CONTROL_STATE);
+    if(btnSecsCtlOffline!=NULL) btnSecsCtlOffline->Enabled=(bAllowCtl && iState!=0 && iState!=1);
+    if(btnSecsCtlLocal  !=NULL) btnSecsCtlLocal  ->Enabled=(bAllowCtl && iState!=0 && iState!=4);
+    if(btnSecsCtlRemote !=NULL) btnSecsCtlRemote ->Enabled=(bAllowCtl && iState!=0 && iState!=5);
+    if(chkSecsAcceptHostOnline!=NULL)
+        chkSecsAcceptHostOnline->Enabled=SecurityAllows(PERM_SECS_ACCEPT_ONLINE);
     if(chkSecsAcceptHostOnline!=NULL &&
        chkSecsAcceptHostOnline->Checked!=GeneralSetting.bAcceptHostOnlineRequest)
         chkSecsAcceptHostOnline->Checked=GeneralSetting.bAcceptHostOnlineRequest;
@@ -1831,6 +1892,16 @@ void __fastcall TfMaintenance::chkSecsAcceptHostOnlineClick(TObject *Sender)
     (void)Sender;
     if(chkSecsAcceptHostOnline==NULL)
         return;
+    //AI(ht160s-security) 20260909 : defence in depth. The control is greyed out by
+    // RefreshSecsControlState, but assigning Checked fires OnClick, so a racing
+    // refresh must not be able to commit. Restore the stored value and leave
+    // silently - the re-assignment lands on the idempotent early-out below.
+    if(SecurityAllows(PERM_SECS_ACCEPT_ONLINE)==false)
+    {
+        if(chkSecsAcceptHostOnline->Checked!=GeneralSetting.bAcceptHostOnlineRequest)
+            chkSecsAcceptHostOnline->Checked=GeneralSetting.bAcceptHostOnlineRequest;
+        return;
+    }
     if(GeneralSetting.bAcceptHostOnlineRequest==chkSecsAcceptHostOnline->Checked)
         return;
     GeneralSetting.bAcceptHostOnlineRequest=chkSecsAcceptHostOnline->Checked;
@@ -2019,18 +2090,30 @@ void __fastcall TfMaintenance::UpdateRunStateLock()
     int PageIndex;
     bool bRunning;
     bool bLocked;
+    int iSlot;
 
     bRunning=HSys.Sys.SystemStart;
     for(PageIndex=0; PageIndex<iMaintenanceMenuCount; PageIndex++)
     {
         if(MenuButtons[PageIndex]==NULL)
             continue;
-        bLocked=(MenuActions[PageIndex]==maOpenIOView ||
-                 MenuActions[PageIndex]==maOpenTeach ||
-                 MenuActions[PageIndex]==maOpenMotorTest ||
-                 MenuActions[PageIndex]==maOpenComPort);
+        //AI(ht160s-security) 20260909 : screen-entry permission for the dedicated
+        // engineering screens, ANDed with the run-state interlock above so the run
+        // lock is never weakened. Silent by ruling: an entry the user may not open
+        // is simply greyed out, and this routine runs every cycle so it self-heals
+        // the moment the level changes.
+        iSlot=-1;
+        if(MenuActions[PageIndex]==maOpenIOView)
+            iSlot=PERM_IO_SCREEN;
+        else if(MenuActions[PageIndex]==maOpenTeach)
+            iSlot=PERM_TEACH_SCREEN;
+        else if(MenuActions[PageIndex]==maOpenMotorTest)
+            iSlot=PERM_MOTORTEST_SCREEN;
+        else if(MenuActions[PageIndex]==maOpenComPort)
+            iSlot=PERM_COMPORT_SCREEN;
+        bLocked=(iSlot>=0);
         if(bLocked)
-            MenuButtons[PageIndex]->Enabled=(bRunning==false);
+            MenuButtons[PageIndex]->Enabled=(bRunning==false && SecurityAllows(iSlot));
     }
 }
 //---------------------------------------------------------------------------
@@ -2798,7 +2881,10 @@ void __fastcall TfMaintenance::ShowPasswordPage()
 
     RefreshPasswordGrid();
 
-    bCanEdit=UserRoleManager.HasLevel(ROLE_ENGINEER);
+    //AI(ht160s-security) 20260909 : migrated from the hardcoded
+    // HasLevel(ROLE_ENGINEER) threshold onto the tunable policy slot. The default
+    // for that slot is still Engineer, so shipped behaviour is unchanged.
+    bCanEdit=SecurityAllows(PERM_MAINT_ACCOUNT_EDIT);
     if(edPwId!=NULL)         edPwId->Enabled=bCanEdit;
     if(edPwPass!=NULL)       edPwPass->Enabled=bCanEdit;
     if(cbbPwLevel!=NULL)     cbbPwLevel->Enabled=bCanEdit;
@@ -2811,7 +2897,11 @@ void __fastcall TfMaintenance::ShowPasswordPage()
         if(bCanEdit)
             labPwHint->Caption=LangT("Accounts: ID / password / level 0-3. Stored in system\\login.txt.");
         else
-            labPwHint->Caption=LangT("View only. Engineer level (2) or above is required to edit.");
+            //AI(ht160s-security) 20260909 : name the level the SLOT asks for, so the
+            // hint stays truthful after the policy is retuned.
+            labPwHint->Caption=Format(LangT("View only. %s level or above is required to edit."),
+                                      ARRAYOFCONST((THT160UserRoleManager::GetLevelName(
+                                          SecurityPolicy.GetRequiredLevel(PERM_MAINT_ACCOUNT_EDIT)))));
     }
 }
 //---------------------------------------------------------------------------
@@ -2881,6 +2971,10 @@ void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
     int iLevel;
 
     (void)Sender;
+    //AI(ht160s-security) 20260909 : defence in depth: these handlers had no internal
+    // re-check, they relied purely on the greyed controls. Silent by ruling.
+    if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
+        return;
     if(edPwId==NULL || edPwPass==NULL || cbbPwLevel==NULL)
         return;
     sID=edPwId->Text.Trim();
@@ -2917,6 +3011,10 @@ void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
     AnsiString sID;
 
     (void)Sender;
+    //AI(ht160s-security) 20260909 : defence in depth: these handlers had no internal
+    // re-check, they relied purely on the greyed controls. Silent by ruling.
+    if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
+        return;
     if(lbPwUsers==NULL)
         return;
     idx=lbPwUsers->ItemIndex;
@@ -2936,6 +3034,10 @@ void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
 void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-security) 20260909 : defence in depth: these handlers had no internal
+    // re-check, they relied purely on the greyed controls. Silent by ruling.
+    if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
+        return;
     SavePassword();
     ShowMyMessage(LangT("User accounts saved to system\\login.txt."));
 }
@@ -2943,6 +3045,10 @@ void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
 void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-security) 20260909 : defence in depth: these handlers had no internal
+    // re-check, they relied purely on the greyed controls. Silent by ruling.
+    if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
+        return;
     ReadPassword();
     RefreshPasswordGrid();
     if(edPwId!=NULL)    edPwId->Text="";

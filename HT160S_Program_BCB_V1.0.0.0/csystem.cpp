@@ -10,6 +10,7 @@
 #include "main.h"
 #include "maintenance.h"
 #include "setup.h"                       //AI(poka-yoke) 20260616 : fSetup->UpdateRunStateLock from UpdateRunControlFlag
+#include "UserRoleManager.h"             //AI(ht160s-security) 20260909 : OP-level production must be Real mode (MachineStart gate)
 #include "uruncontrol.h"
 #include "aAuto1To6.h"
 #include "aLoader.h"
@@ -122,6 +123,11 @@ static void UpdateRunControlFlag()
 		fMaintenance->UpdateRunStateLock();
 	if(fSetup!=NULL && fSetup->Visible)
 		fSetup->UpdateRunStateLock();
+	//AI(ht160s-security) 20260909 : same idea one level up: grey out the
+	//  main-screen controls the current user level may not use. Silent, and it
+	//  self-heals on the next cycle after a level change.
+	if(fMain!=NULL)
+		fMain->UpdateMainPermissionLock();
 }
 //---------------------------------------------------------------------------
 //AI(amr-unmanned W4) 20260721 : consume the AGV coordinator's per-station handshake-
@@ -1551,6 +1557,22 @@ eMachineStartResult MachineStart(eMachineTrigger trig, AnsiString &Reason)
 		return msRejBusy;
 	if(fMain->CheckLotDataReady(Reason)==false)
 		return msRejNotReady;
+	//AI(ht160s-security) 20260909 : OP-mode production MUST be Real mode. Dummy and
+	//  Has-Tray are engineering test modes: what a run produces in them is not real
+	//  product data. Without this, an engineer who left the machine in Dummy and
+	//  handed it to an operator would have that operator produce untracked output
+	//  that still looks like a normal run in the logs and to the host. Shape copied
+	//  from HT9045 (main.cpp:6061 / 6223), which rejects the start the same way when
+	//  AccessLevel==0 and the tester is off-line - it REFUSES rather than silently
+	//  switching the mode, so the operator is told instead of the machine changing
+	//  under them. Surfaced through Reason, never a popup here: this choke point is
+	//  shared with the SECS receive thread, which must answer HCACK instead.
+	if(UserRoleManager.GetLevel()==ROLE_OPERATION &&
+	   HSys.LastSet.iRealDummy!=REALLY)
+	{
+		Reason="Operation level must run in Real mode. Ask an engineer to switch the run mode or log in at a higher level.";
+		return msRejNotReady;
+	}
 	AmrInject.Reset();   //AI(ht160s-agv) 20260708 : any machine start clears AMR manual-inject test mode + latches (no leak into a real run)
 	RecordProcess(AnsiString("MACHINE START by ")+MachineTriggerName(trig));
 	fMain->DoStartArm();

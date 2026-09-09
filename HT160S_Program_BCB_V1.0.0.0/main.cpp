@@ -15,6 +15,7 @@
 #include "cprod.h"
 #include "aAuto1To6.h"   //AI(ht160s-motion-view) 20260618 : AutoModule->GetWorkingTrayID for Unload Auto info
 #include "UserRoleManager.h"
+#include "SecurityPolicy.h"   //AI(ht160s-security) 20260909 : per-feature permission slots
 #include "uQwertyKey.h"   //AI(ht160s-password) 20260624 : on-screen keypad for login ID/password
 #include "uruncontrol.h"
 #include "iosetview.h"
@@ -423,6 +424,22 @@ void __fastcall TfMain::RefreshMainUserSelect()
     cbbUserSelect->Text = UserRoleManager.GetLevelName();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : grey out the main-screen controls the current
+//level may not use. Called every cycle from csystem UpdateRunControlFlag, the same
+//hook the maintenance/setup run-state locks ride, so it self-heals the moment the
+//operator changes level. Silent by ruling - it must never pop a message here, and
+//it must never touch a control's run-state logic: the handlers keep their own
+//stopped-machine checks, this only ANDs the permission on top.
+void __fastcall TfMain::UpdateMainPermissionLock()
+{
+    if(sbProduct!=NULL)
+        sbProduct->Enabled=SecurityAllows(PERM_SETUP_SCREEN);
+    if(btnClearCount!=NULL)
+        btnClearCount->Enabled=SecurityAllows(PERM_MAIN_CLEAR_COUNT);
+    if(pnRealDummy!=NULL)
+        pnRealDummy->Enabled=SecurityAllows(PERM_MAIN_REAL_DUMMY);
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260616 : the SECS/SAFE/AMR badges now live in main.dfm as
 //  static layout (panel geometry, fonts, name caption, default value color). This
 //  routine no longer creates VCL objects - it only binds the array slots to the
@@ -652,6 +669,10 @@ void __fastcall TfMain::sbLaguageClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfMain::sbProductClick(TObject *Sender)
 {
+    //AI(ht160s-security) 20260909 : screen-entry gate; the button is greyed by
+    // UpdateMainPermissionLock and this is the defence-in-depth re-check.
+    if(SecurityAllows(PERM_SETUP_SCREEN)==false)
+        return;
     ShowTopForm(fSetup, sbProduct);
 }
 //---------------------------------------------------------------------------
@@ -904,6 +925,11 @@ void __fastcall TfMain::ClearProductInfoAtLotStart()
 void __fastcall TfMain::btnClearCountClick(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-security) 20260909 : clearing production counters is destructive and
+    // irreversible, so it sits one level above the operator. Silent re-check; the
+    // button is greyed by UpdateMainPermissionLock.
+    if(SecurityAllows(PERM_MAIN_CLEAR_COUNT)==false)
+        return;
     if(HSys.Sys.SystemStart)
     {
         ShowMyMessage(LangT("Stop the machine before Clear Count."));
@@ -1914,6 +1940,12 @@ void __fastcall TfMain::pnStartModeClick(TObject *Sender)
 void __fastcall TfMain::pnRealDummyClick(TObject *Sender)
 {
     if(HSys.Sys.SystemStart)
+        return;
+    //AI(ht160s-security) 20260909 : Dummy / Has-Tray are engineering test modes, so
+    // only an engineer may select one. This is the other half of the OP-mode rule in
+    // MachineStart (csystem.cpp): an operator can neither enter a test mode here nor
+    // start production while the machine is left in one.
+    if(SecurityAllows(PERM_MAIN_REAL_DUMMY)==false)
         return;
 
     HSys.LastSet.iRealDummy++;
