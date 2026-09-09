@@ -502,6 +502,7 @@ private:
     void __fastcall SaveHardwareSettings();
     void __fastcall RefreshHardwareSettingsStatus();
     void __fastcall ApplyHardwareEditLock();
+    bool bPwDirty;   //AI(ht160s-audit) 20260909 : account book edited in memory but not yet written to system\login.txt
     void __fastcall LoadMCUDisplaySettings();
     void __fastcall SaveMCUDisplaySettings();
     void __fastcall RestartMCUDisplay();

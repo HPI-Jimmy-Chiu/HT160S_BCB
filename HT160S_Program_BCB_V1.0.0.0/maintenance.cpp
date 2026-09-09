@@ -22,6 +22,7 @@
 #include "uQwertyKey.h"
 #include "UserRoleManager.h"   //AI(ht160s-password) 20260624 : account book + level gating
 #include "SecurityPolicy.h"    //AI(ht160s-security) 20260909 : per-feature permission slots
+#include "cEventLog.h"         //AI(ht160s-audit) 20260909 : operator audit trail instead of popups
 #include "mymessbox.h"
 #include "SecsGem/uHGemLogForm.h"   //AI(ht160s-secsgem) 20260611 : ShowSecsGemLog
 #include "SecsGem/uAgvStation.h"   //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState for AMR tab
@@ -309,6 +310,7 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     LastClickButton=NULL;
     bTowerLightBlinkPhase=false;
     bTopCcdShotOpen=false;     //AI(ht160s-maintainer) 20260804 : no manual shot open at power-on
+    bPwDirty=false;            //AI(ht160s-audit) 20260909 : no pending account edits at power-on
     bColorCcdShotOpen=false;
     edAgvTimeoutSec=NULL;   //AI(amr-unmanned W5) 20260722 : dynamically built on the AMR page (BuildAgvTimeoutField)
     //AI(ht160s-maintainer) 20260613 : Bin Display (MCU) / Top CCD / Color CCD / Lot
@@ -2902,6 +2904,61 @@ void __fastcall TfMaintenance::edUphMinSampleICClick(TObject *Sender)
 // level combo once, applies all bilingual captions via LangT so they follow the
 // language toggle, sets the role-based edit lock, and refreshes the user list.
 //---------------------------------------------------------------------------
+//AI(ht160s-audit) 20260909 : operator audit trail for the account book. Per the 20260909
+//ruling a successful settings change is NOT announced with a popup - a modal
+//interrupts production (and the stopping variant would halt it outright) - it is
+//recorded in the EventLog with the BEFORE and AFTER value, so the question "who
+//changed what, from what to what" is answerable after the fact. Same shape as the
+//offset audit in uOffset.cpp. A password is NEVER written to the log; only the
+//fact that one was set.
+static void LogAccountAudit(AnsiString sWhat)
+{
+    AnsiString sUser=UserRoleManager.GetUserID();
+
+    if(sUser.Trim()==AnsiString(""))
+        sUser="(no login)";
+    g_EventLog.Log("PARAM_ACCOUNT", sWhat+AnsiString(" | user=")+sUser);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-audit) 20260909 : the account book is keyed by (ID, level) - FindUser matches BOTH
+//- so saving an existing ID at a DIFFERENT level ADDS a second record instead of
+//moving the account. The audit line has to say which of the two actually happened,
+//so the ID is looked up at the requested level and, separately, anywhere else.
+static bool AccountExistsAtLevel(AnsiString sID, int iLevel)
+{
+    AnsiString sFind=sID.Trim().UpperCase();
+    int i;
+
+    for(i=0; i<UserRoleManager.GetUserCount(); i++)
+    {
+        if(UserRoleManager.GetUserLevel(i)!=iLevel)
+            continue;
+        if(UserRoleManager.GetUserID(i).Trim().UpperCase()==sFind)
+            return true;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
+static AnsiString DescribeOtherAccountLevels(AnsiString sID, int iSkipLevel)
+{
+    AnsiString sFind=sID.Trim().UpperCase();
+    AnsiString sOut="";
+    int i, iLv;
+
+    for(i=0; i<UserRoleManager.GetUserCount(); i++)
+    {
+        if(UserRoleManager.GetUserID(i).Trim().UpperCase()!=sFind)
+            continue;
+        iLv=UserRoleManager.GetUserLevel(i);
+        if(iLv==iSkipLevel)
+            continue;
+        if(sOut!=AnsiString(""))
+            sOut=sOut+",";
+        sOut=sOut+"Lv"+IntToStr(iLv);
+    }
+    return sOut;
+}
+//---------------------------------------------------------------------------
 void __fastcall TfMaintenance::ShowPasswordPage()
 {
     int i;
@@ -2943,7 +3000,13 @@ void __fastcall TfMaintenance::ApplyPasswordPermissionLock()
     if(btnPwReload!=NULL)    btnPwReload->Enabled=bCanEdit;
     if(labPwHint!=NULL)
     {
-        if(bCanEdit)
+        if(bCanEdit && bPwDirty)
+            //AI(ht160s-audit) 20260909 : replaces the old "saved in memory" modal. Add /
+            // Update / Delete only change memory, so without a cue the operator could
+            // leave the page and lose the edit. Shown in the hint instead of a popup so
+            // production is never interrupted, and re-applied every cycle.
+            labPwHint->Caption=LangT("Unsaved account changes - press 'Save to File' to keep them.");
+        else if(bCanEdit)
             labPwHint->Caption=LangT("Accounts: ID / password / level 0-3. Stored in system\\login.txt.");
         else
             //AI(ht160s-security) 20260909 : name the level the SLOT asks for, so the
@@ -3016,8 +3079,9 @@ void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
 {
-    AnsiString sID, sPass;
+    AnsiString sID, sPass, sOther;
     int iLevel;
+    bool bExisted;
 
     (void)Sender;
     //AI(ht160s-security) 20260909 : defence in depth: these handlers had no internal
@@ -3044,14 +3108,29 @@ void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
         ShowMyOKMessageNoStop(LangT("Please select a level (0-3)."));
         return;
     }
+    //AI(ht160s-audit) 20260909 : capture the BEFORE state while the book still holds it.
+    bExisted=AccountExistsAtLevel(sID, iLevel);
+    sOther=DescribeOtherAccountLevels(sID, iLevel);
     if(UserRoleManager.AddOrUpdateUser(sID, sPass, iLevel)==false)
     {
         ShowMyOKMessageNoStop(LangT("Account table is full (max 30)."));
         return;
     }
     edPwPass->Text="";
+    bPwDirty=true;
     RefreshPasswordGrid();
-    ShowMyOKMessageNoStop(LangT("Account saved in memory. Press 'Save to File' to keep it."));
+    ApplyPasswordPermissionLock();   //refresh the hint to show the unsaved state
+    //AI(ht160s-audit) 20260909 : success is logged, not announced. The unsaved state is
+    // carried by the page hint (bPwDirty) instead of the old modal, so the operator
+    // still knows a Save to File is outstanding without production being paused.
+    if(bExisted)
+        LogAccountAudit(AnsiString("UPDATE ")+sID+" Lv"+IntToStr(iLevel)+" : password changed");
+    else if(sOther!=AnsiString(""))
+        LogAccountAudit(AnsiString("ADD ")+sID+" Lv"+IntToStr(iLevel)+
+                        " : same ID also present at "+sOther+
+                        " (book is keyed by ID+level, so this did not move the account)");
+    else
+        LogAccountAudit(AnsiString("ADD ")+sID+" Lv"+IntToStr(iLevel));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
@@ -3077,7 +3156,10 @@ void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
     if(ShowMyMessageBox_YES_NO(Format(LangT("Delete account: %s ?"), ARRAYOFCONST((sID)))) !=1)
         return;
     UserRoleManager.DeleteUser(sID, iLevel);
+    bPwDirty=true;
     RefreshPasswordGrid();
+    ApplyPasswordPermissionLock();   //refresh the hint to show the unsaved state
+    LogAccountAudit(AnsiString("DELETE ")+sID+" Lv"+IntToStr(iLevel));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
@@ -3088,19 +3170,30 @@ void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
     if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
         return;
     SavePassword();
-    ShowMyOKMessageNoStop(LangT("User accounts saved to system\\login.txt."));
+    bPwDirty=false;
+    ApplyPasswordPermissionLock();
+    LogAccountAudit(AnsiString("SAVE account book to system\\login.txt : ")+
+                    IntToStr(UserRoleManager.GetUserCount())+" account(s)");
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
 {
+    int iWas;
+
     (void)Sender;
     //AI(ht160s-security) 20260909 : defence in depth: these handlers had no internal
     // re-check, they relied purely on the greyed controls. Silent by ruling.
     if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
         return;
+    //AI(ht160s-audit) 20260909 : count before/after, so a reload that discarded pending
+    // in-memory edits is visible in the log rather than silent.
+    iWas=UserRoleManager.GetUserCount();
     ReadPassword();
+    bPwDirty=false;
     RefreshPasswordGrid();
+    ApplyPasswordPermissionLock();
     if(edPwId!=NULL)    edPwId->Text="";
     if(edPwPass!=NULL)  edPwPass->Text="";
-    ShowMyOKMessageNoStop(LangT("User accounts reloaded from system\\login.txt."));
+    LogAccountAudit(AnsiString("RELOAD account book from system\\login.txt : ")+
+                    IntToStr(iWas)+" => "+IntToStr(UserRoleManager.GetUserCount())+" account(s)");
 }
