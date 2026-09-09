@@ -8,6 +8,7 @@
 #include <Forms.hpp>
 #include <Buttons.hpp>
 #include <ComCtrls.hpp>
+#include <Grids.hpp>
 #include <ExtCtrls.hpp>
 #include "aled.hpp"
 #include "ALed.hpp"
@@ -405,6 +406,18 @@ __published:
     TButton *btnPwDelete;
     TButton *btnPwSave;
     TButton *btnPwReload;
+    TTabSheet *tsMaintSecurity;
+    TSpeedButton *spbMaintSecurity;
+    TLabel *labSecHint;
+    TLabel *labSecLevelCaption;
+    TStringGrid *sgSecSlots;
+    TButton *btnSecLvOperation;
+    TButton *btnSecLvSupervisor;
+    TButton *btnSecLvEngineer;
+    TButton *btnSecLvHonprec;
+    TButton *btnSecSave;
+    TButton *btnSecReload;
+    TButton *btnSecDefaults;
     void __fastcall btnMCUSaveClick(TObject *Sender);
     void __fastcall btnMCUReloadClick(TObject *Sender);
     void __fastcall btnMCURefreshClick(TObject *Sender);
@@ -469,6 +482,11 @@ __published:
     void __fastcall btnSecsCtlLocalClick(TObject *Sender);
     void __fastcall btnSecsCtlRemoteClick(TObject *Sender);
     void __fastcall chkSecsAcceptHostOnlineClick(TObject *Sender);
+    void __fastcall SecGridClick(TObject *Sender);
+    void __fastcall SecSetLevelClick(TObject *Sender);
+    void __fastcall SecSaveClick(TObject *Sender);
+    void __fastcall SecReloadClick(TObject *Sender);
+    void __fastcall SecDefaultsClick(TObject *Sender);
 private:
     int iMaintenanceMenuCount;
     TSpeedButton *MenuButtons[MAX_MAINTENANCE_MENU_COUNT];
@@ -503,6 +521,10 @@ private:
     void __fastcall RefreshHardwareSettingsStatus();
     void __fastcall ApplyHardwareEditLock();
     bool bPwDirty;   //AI(ht160s-audit) 20260909 : account book edited in memory but not yet written to system\login.txt
+    bool bSecDirty;  //AI(ht160s-security) 20260909 : policy edited in memory but not yet written to system\security.txt
+    void __fastcall ShowSecurityPage();
+    void __fastcall RefreshSecurityGrid();
+    void __fastcall ApplySecurityPermissionLock();
     void __fastcall LoadMCUDisplaySettings();
     void __fastcall SaveMCUDisplaySettings();
     void __fastcall RestartMCUDisplay();

@@ -266,6 +266,22 @@ object fMaintenance: TfMaintenance
       ParentFont = False
       OnClick = spbMaintenanceMenuClick
     end
+    object spbMaintSecurity: TSpeedButton
+      Left = 8
+      Top = 848
+      Width = 180
+      Height = 50
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'Security'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -15
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      OnClick = spbMaintenanceMenuClick
+    end
     object spbMaintExit: TSpeedButton
       Left = 8
       Top = 932
@@ -3797,6 +3813,104 @@ object fMaintenance: TfMaintenance
           ReadOnly = True
           ScrollBars = ssVertical
           TabOrder = 3
+        end
+      end
+      object tsMaintSecurity: TTabSheet
+        Caption = 'Security'
+        object labSecHint: TLabel
+          Left = 16
+          Top = 12
+          Width = 900
+          Height = 20
+          AutoSize = False
+        end
+        object labSecLevelCaption: TLabel
+          Left = 648
+          Top = 44
+          Width = 270
+          Height = 20
+          AutoSize = False
+        end
+        object sgSecSlots: TStringGrid
+          Left = 16
+          Top = 44
+          Width = 616
+          Height = 820
+          TabStop = False
+          ColCount = 3
+          DefaultColWidth = 120
+          DefaultRowHeight = 22
+          FixedCols = 0
+          RowCount = 2
+          Font.Charset = ANSI_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -12
+          Font.Name = 'MS Sans Serif'
+          Font.Style = []
+          ParentFont = False
+          ScrollBars = ssVertical
+          TabOrder = 0
+          OnClick = SecGridClick
+        end
+        object btnSecLvOperation: TButton
+          Left = 648
+          Top = 72
+          Width = 270
+          Height = 46
+          Tag = 0
+          TabOrder = 1
+          OnClick = SecSetLevelClick
+        end
+        object btnSecLvSupervisor: TButton
+          Left = 648
+          Top = 126
+          Width = 270
+          Height = 46
+          Tag = 1
+          TabOrder = 2
+          OnClick = SecSetLevelClick
+        end
+        object btnSecLvEngineer: TButton
+          Left = 648
+          Top = 180
+          Width = 270
+          Height = 46
+          Tag = 2
+          TabOrder = 3
+          OnClick = SecSetLevelClick
+        end
+        object btnSecLvHonprec: TButton
+          Left = 648
+          Top = 234
+          Width = 270
+          Height = 46
+          Tag = 3
+          TabOrder = 4
+          OnClick = SecSetLevelClick
+        end
+        object btnSecSave: TButton
+          Left = 648
+          Top = 312
+          Width = 130
+          Height = 46
+          TabOrder = 5
+          OnClick = SecSaveClick
+        end
+        object btnSecReload: TButton
+          Left = 788
+          Top = 312
+          Width = 130
+          Height = 46
+          TabOrder = 6
+          OnClick = SecReloadClick
+        end
+        object btnSecDefaults: TButton
+          Left = 648
+          Top = 368
+          Width = 270
+          Height = 46
+          TabOrder = 7
+          OnClick = SecDefaultsClick
         end
       end
     end

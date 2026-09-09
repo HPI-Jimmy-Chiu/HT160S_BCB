@@ -55,7 +55,8 @@ static const THT160PermSlotDef PermSlotTable[HT160_PERM_SLOT_COUNT]=
     { "SECS",        "Equipment constant (EC) write",              ROLE_HONPREC    },
     { "SECS",        "Accept host on-line request switch",         ROLE_HONPREC    },
     { "Service",     "FTP credentials view / edit / test",         ROLE_HONPREC    },
-    { "Service",     "Machine model / handler ID / serial number", ROLE_HONPREC    }
+    { "Service",     "Machine model / handler ID / serial number", ROLE_HONPREC    },
+    { "Security",    "Security policy edit (locked)",              ROLE_HONPREC    }
 };
 //---------------------------------------------------------------------------
 __fastcall THT160SecurityPolicy::THT160SecurityPolicy()
@@ -66,6 +67,17 @@ __fastcall THT160SecurityPolicy::THT160SecurityPolicy()
 bool THT160SecurityPolicy::IsValidSlot(int iSlot)
 {
     return (iSlot>=0 && iSlot<HT160_PERM_SLOT_COUNT);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : the gate that guards the gates. Anyone who can rewrite the
+// policy can grant themselves every permission, so the slot controlling the
+// policy editor is pinned to its compiled level: SetRequiredLevel refuses it and
+// LoadFromFile skips it, which closes the UI path AND the hand-edited-file path.
+// Same intent as the HT9045 forced slots in GetLevelSet(), but declared here in
+// one place instead of as magic indices inside the loader.
+bool THT160SecurityPolicy::IsSlotLocked(int iSlot)
+{
+    return (iSlot==PERM_MAINT_SECURITY_POLICY);
 }
 //---------------------------------------------------------------------------
 void THT160SecurityPolicy::LoadDefaults()
@@ -91,6 +103,8 @@ int THT160SecurityPolicy::GetRequiredLevel(int iSlot) const
 bool THT160SecurityPolicy::SetRequiredLevel(int iSlot, int iLevel)
 {
     if(!IsValidSlot(iSlot))
+        return false;
+    if(IsSlotLocked(iSlot))
         return false;
     if(!THT160UserRoleManager::IsValidLevel(iLevel))
         return false;
@@ -182,6 +196,8 @@ bool THT160SecurityPolicy::LoadFromFile(AnsiString FileName)
                 iSlot=StrToIntDef(sSlot, -1);
                 iLevel=StrToIntDef(sLevel, -1);
                 if(!IsValidSlot(iSlot))
+                    continue;
+                if(IsSlotLocked(iSlot))
                     continue;
                 if(!THT160UserRoleManager::IsValidLevel(iLevel))
                     continue;

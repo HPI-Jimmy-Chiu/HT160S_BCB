@@ -76,10 +76,13 @@ enum EHT160PermSlot
 
     // --- Most sensitive: shipping identity and remote credentials ---
     PERM_FTP_CREDENTIALS        = 29,
-    PERM_MACHINE_IDENTITY       = 30
+    PERM_MACHINE_IDENTITY       = 30,
+
+    // --- The gate that guards the gates. LOCKED: see IsSlotLocked(). ---
+    PERM_MAINT_SECURITY_POLICY  = 31
 };
 //---------------------------------------------------------------------------
-#define HT160_PERM_SLOT_COUNT 31
+#define HT160_PERM_SLOT_COUNT 32
 //---------------------------------------------------------------------------
 class THT160SecurityPolicy
 {
@@ -103,6 +106,11 @@ public:
     bool Allows(int iSlot) const;
 
     static bool IsValidSlot(int iSlot);
+    // A locked slot's required level can never be lowered - not from the UI and
+    // not by hand-editing system\security.txt. Whoever can rewrite the policy can
+    // grant themselves everything, so the slot that guards the policy editor must
+    // stay at its compiled level.
+    static bool IsSlotLocked(int iSlot);
 };
 //---------------------------------------------------------------------------
 extern THT160SecurityPolicy SecurityPolicy;

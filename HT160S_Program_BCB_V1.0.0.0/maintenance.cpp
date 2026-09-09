@@ -311,6 +311,7 @@ __fastcall TfMaintenance::TfMaintenance(TComponent* Owner)
     bTowerLightBlinkPhase=false;
     bTopCcdShotOpen=false;     //AI(ht160s-maintainer) 20260804 : no manual shot open at power-on
     bPwDirty=false;            //AI(ht160s-audit) 20260909 : no pending account edits at power-on
+    bSecDirty=false;           //AI(ht160s-security) 20260909 : no pending policy edits at power-on
     bColorCcdShotOpen=false;
     edAgvTimeoutSec=NULL;   //AI(amr-unmanned W5) 20260722 : dynamically built on the AMR page (BuildAgvTimeoutField)
     //AI(ht160s-maintainer) 20260613 : Bin Display (MCU) / Top CCD / Color CCD / Lot
@@ -1959,6 +1960,7 @@ void __fastcall TfMaintenance::RegisterMaintenancePages()
         {tsMaintLotApi,      spbMaintLotApi,      maShowPage, false},
         {tsMaintSECS,        spbMaintSECS,        maOpenSecs, false},
         {tsMaintFtp,         spbMaintFtp,         maShowPage, false},
+        {tsMaintSecurity,    spbMaintSecurity,    maShowPage, false},
         {NULL,               spbMaintExit,        maCloseForm, true}
     };
     int PageIndex;
@@ -2077,6 +2079,8 @@ void __fastcall TfMaintenance::SelectMaintenancePage(int PageIndex)
     pcMaintenance->ActivePage=MenuPages[PageIndex];
     if(MenuPages[PageIndex]==tsMaintPassword)
         ShowPasswordPage();   //AI(ht160s-password) 20260624 : build-once + refresh + level lock
+    if(MenuPages[PageIndex]==tsMaintSecurity)
+        ShowSecurityPage();   //AI(ht160s-security) 20260909 : captions + slot grid + level lock
     pnlTitle->Caption=MenuPages[PageIndex]->Caption;
     MenuButtons[PageIndex]->Down=true;
     LastClickButton=MenuButtons[PageIndex];
@@ -2154,6 +2158,7 @@ void __fastcall TfMaintenance::RefreshPermissionLocks()
     ApplyHardwareEditLock();
     ApplyFtpPermissionLock();
     ApplyPasswordPermissionLock();
+    ApplySecurityPermissionLock();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenIOView(TSpeedButton *Button)
@@ -2911,13 +2916,23 @@ void __fastcall TfMaintenance::edUphMinSampleICClick(TObject *Sender)
 //changed what, from what to what" is answerable after the fact. Same shape as the
 //offset audit in uOffset.cpp. A password is NEVER written to the log; only the
 //fact that one was set.
-static void LogAccountAudit(AnsiString sWhat)
+static void LogMaintAudit(AnsiString sCode, AnsiString sWhat)
 {
     AnsiString sUser=UserRoleManager.GetUserID();
 
     if(sUser.Trim()==AnsiString(""))
         sUser="(no login)";
-    g_EventLog.Log("PARAM_ACCOUNT", sWhat+AnsiString(" | user=")+sUser);
+    g_EventLog.Log(sCode, sWhat+AnsiString(" | user=")+sUser);
+}
+//---------------------------------------------------------------------------
+static void LogAccountAudit(AnsiString sWhat)
+{
+    LogMaintAudit("PARAM_ACCOUNT", sWhat);
+}
+//---------------------------------------------------------------------------
+static void LogSecurityAudit(AnsiString sWhat)
+{
+    LogMaintAudit("PARAM_SECURITY", sWhat);
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-audit) 20260909 : the account book is keyed by (ID, level) - FindUser matches BOTH
@@ -3196,4 +3211,188 @@ void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
     if(edPwPass!=NULL)  edPwPass->Text="";
     LogAccountAudit(AnsiString("RELOAD account book from system\\login.txt : ")+
                     IntToStr(iWas)+" => "+IntToStr(UserRoleManager.GetUserCount())+" account(s)");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : the permission-policy page. Modeled on HT9045's TfSecurity,
+//which lists every numbered capability slot with a per-slot level selector, but
+//data-driven off one grid instead of ~60 hand-authored child controls: adding a
+//slot needs no DFM change at all. The four level buttons replace a dropdown
+//deliberately - this is a touch panel (even text entry goes through the on-screen
+//keyboard), so big targets beat a combo. That is also what HT9045's per-slot
+//TRadioGroup was for, at 4 controls instead of 4 per slot.
+//  The page lives on its OWN tab, gated by its OWN slot at Honprec, rather than
+//sharing the account tab: whoever can rewrite the policy can grant themselves
+//every permission, so an Engineer-level account page must not be able to reach
+//it. PERM_MAINT_SECURITY_POLICY is additionally LOCKED (see
+//THT160SecurityPolicy::IsSlotLocked) so not even Honprec can lower the gate that
+//guards the gates, from the UI or by hand-editing security.txt.
+void __fastcall TfMaintenance::ShowSecurityPage()
+{
+    if(labSecLevelCaption!=NULL) labSecLevelCaption->Caption=LangT("Select a row, then a level");
+    if(btnSecLvOperation!=NULL)  btnSecLvOperation->Caption=THT160UserRoleManager::GetLevelName(ROLE_OPERATION);
+    if(btnSecLvSupervisor!=NULL) btnSecLvSupervisor->Caption=THT160UserRoleManager::GetLevelName(ROLE_SUPERVISOR);
+    if(btnSecLvEngineer!=NULL)   btnSecLvEngineer->Caption=THT160UserRoleManager::GetLevelName(ROLE_ENGINEER);
+    if(btnSecLvHonprec!=NULL)    btnSecLvHonprec->Caption=THT160UserRoleManager::GetLevelName(ROLE_HONPREC);
+    if(btnSecSave!=NULL)         btnSecSave->Caption=LangT("Save to File");
+    if(btnSecReload!=NULL)       btnSecReload->Caption=LangT("Reload");
+    if(btnSecDefaults!=NULL)     btnSecDefaults->Caption=LangT("Reset to Defaults");
+
+    RefreshSecurityGrid();
+    ApplySecurityPermissionLock();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::RefreshSecurityGrid()
+{
+    int i, iCount, iLevel;
+    AnsiString sLevel;
+
+    if(sgSecSlots==NULL)
+        return;
+
+    iCount=SecurityPolicy.GetSlotCount();
+    sgSecSlots->ColCount=3;
+    sgSecSlots->RowCount=iCount+1;
+    sgSecSlots->FixedRows=1;
+    sgSecSlots->ColWidths[0]=110;
+    sgSecSlots->ColWidths[1]=330;
+    sgSecSlots->ColWidths[2]=160;
+    sgSecSlots->Cells[0][0]=LangT("Group");
+    sgSecSlots->Cells[1][0]=LangT("Function");
+    sgSecSlots->Cells[2][0]=LangT("Needs level");
+    for(i=0; i<iCount; i++)
+    {
+        iLevel=SecurityPolicy.GetRequiredLevel(i);
+        sLevel=IntToStr(iLevel)+" - "+THT160UserRoleManager::GetLevelName(iLevel);
+        if(THT160SecurityPolicy::IsSlotLocked(i))
+            sLevel=sLevel+"  "+LangT("(locked)");
+        sgSecSlots->Cells[0][i+1]=SecurityPolicy.GetSlotGroup(i);
+        sgSecSlots->Cells[1][i+1]=SecurityPolicy.GetSlotName(i);
+        sgSecSlots->Cells[2][i+1]=sLevel;
+    }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : silent grey-out for this page, re-applied every cycle by
+//RefreshPermissionLocks so a level change while the page is open cannot leave the
+//editor live. The unsaved-changes state rides the hint, not a modal.
+void __fastcall TfMaintenance::ApplySecurityPermissionLock()
+{
+    bool bCanEdit=SecurityAllows(PERM_MAINT_SECURITY_POLICY);
+
+    if(btnSecLvOperation!=NULL)  btnSecLvOperation->Enabled=bCanEdit;
+    if(btnSecLvSupervisor!=NULL) btnSecLvSupervisor->Enabled=bCanEdit;
+    if(btnSecLvEngineer!=NULL)   btnSecLvEngineer->Enabled=bCanEdit;
+    if(btnSecLvHonprec!=NULL)    btnSecLvHonprec->Enabled=bCanEdit;
+    if(btnSecSave!=NULL)         btnSecSave->Enabled=bCanEdit;
+    if(btnSecReload!=NULL)       btnSecReload->Enabled=bCanEdit;
+    if(btnSecDefaults!=NULL)     btnSecDefaults->Enabled=bCanEdit;
+    if(labSecHint!=NULL)
+    {
+        if(bCanEdit && bSecDirty)
+            labSecHint->Caption=LangT("Unsaved permission changes - press 'Save to File' to keep them.");
+        else if(bCanEdit)
+            labSecHint->Caption=LangT("Sets the lowest user level each function needs. Stored in system\\security.txt.");
+        else
+            labSecHint->Caption=Format(LangT("View only. %s level or above is required to edit."),
+                                       ARRAYOFCONST((THT160UserRoleManager::GetLevelName(
+                                           SecurityPolicy.GetRequiredLevel(PERM_MAINT_SECURITY_POLICY)))));
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::SecGridClick(TObject *Sender)
+{
+    int iSlot;
+
+    (void)Sender;
+    if(sgSecSlots==NULL || labSecLevelCaption==NULL)
+        return;
+    iSlot=sgSecSlots->Row-1;
+    if(THT160SecurityPolicy::IsValidSlot(iSlot)==false)
+    {
+        labSecLevelCaption->Caption=LangT("Select a row, then a level");
+        return;
+    }
+    labSecLevelCaption->Caption=SecurityPolicy.GetSlotGroup(iSlot)+AnsiString(" - ")+
+                                SecurityPolicy.GetSlotName(iSlot);
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : apply the tapped level to the selected slot. The button Tag IS
+//the EHT160UserRoleLevel value (set in the DFM), so there is no parallel mapping
+//table to drift. A locked slot is REFUSED with a visible message: that is a
+//refusal the operator must see, so it stays a popup (the non-stopping variant).
+void __fastcall TfMaintenance::SecSetLevelClick(TObject *Sender)
+{
+    TButton *Button;
+    int iSlot, iNew, iOld;
+
+    if(SecurityAllows(PERM_MAINT_SECURITY_POLICY)==false)
+        return;
+    Button=dynamic_cast<TButton *>(Sender);
+    if(Button==NULL || sgSecSlots==NULL)
+        return;
+    iSlot=sgSecSlots->Row-1;
+    if(THT160SecurityPolicy::IsValidSlot(iSlot)==false)
+    {
+        ShowMyOKMessageNoStop(LangT("Please select a function row first."));
+        return;
+    }
+    if(THT160SecurityPolicy::IsSlotLocked(iSlot))
+    {
+        ShowMyOKMessageNoStop(LangT("This permission is locked and cannot be changed."));
+        return;
+    }
+    iNew=Button->Tag;
+    iOld=SecurityPolicy.GetRequiredLevel(iSlot);
+    if(SecurityPolicy.SetRequiredLevel(iSlot, iNew)==false)
+        return;
+    if(iOld!=iNew)
+    {
+        bSecDirty=true;
+        LogSecurityAudit(AnsiString("slot ")+IntToStr(iSlot)+" "+
+                         SecurityPolicy.GetSlotGroup(iSlot)+" - "+SecurityPolicy.GetSlotName(iSlot)+
+                         " : "+THT160UserRoleManager::GetLevelName(iOld)+
+                         " => "+THT160UserRoleManager::GetLevelName(iNew));
+    }
+    RefreshSecurityGrid();
+    ApplySecurityPermissionLock();
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::SecSaveClick(TObject *Sender)
+{
+    (void)Sender;
+    if(SecurityAllows(PERM_MAINT_SECURITY_POLICY)==false)
+        return;
+    SaveSecurityPolicy();
+    bSecDirty=false;
+    ApplySecurityPermissionLock();
+    LogSecurityAudit("SAVE permission policy to system\\security.txt");
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMaintenance::SecReloadClick(TObject *Sender)
+{
+    (void)Sender;
+    if(SecurityAllows(PERM_MAINT_SECURITY_POLICY)==false)
+        return;
+    ReadSecurityPolicy();
+    bSecDirty=false;
+    RefreshSecurityGrid();
+    ApplySecurityPermissionLock();
+    LogSecurityAudit("RELOAD permission policy from system\\security.txt");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : the escape hatch: put every slot back to its compiled default.
+//Confirmed first because it discards the whole table. Together with the
+//compiled-in service master and simply deleting security.txt, this is why a bad
+//policy edit can never lock everyone out of the machine.
+void __fastcall TfMaintenance::SecDefaultsClick(TObject *Sender)
+{
+    (void)Sender;
+    if(SecurityAllows(PERM_MAINT_SECURITY_POLICY)==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Reset every permission to its default level ?"))!=1)
+        return;
+    SecurityPolicy.LoadDefaults();
+    bSecDirty=true;
+    RefreshSecurityGrid();
+    ApplySecurityPermissionLock();
+    LogSecurityAudit("RESET every permission to its compiled default (not yet saved)");
 }
