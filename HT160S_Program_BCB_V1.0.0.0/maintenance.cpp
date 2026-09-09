@@ -970,19 +970,34 @@ void __fastcall TfMaintenance::LoadFtpConfigToUi()
     bool bEnable, bUploadReport;
     FtpUploadThd->GetConfig(sHost, iPort, sUser, sPwd, sRemoteDir,
                             bEnable, bUploadReport, iTimeoutMs, iRetry);
-    //AI(ht160s-security) 20260909 : FTP credentials are a Honprec slot, and the ruling
-    // covers VIEWING them, so the stored password is not even loaded into the
-    // field for an under-level user - greying alone would still display it.
-    // SaveFtpConfigFromUi() carries the matching guard so the blanked field can
-    // never be committed back over the real credential.
-    bool bAllowFtp=SecurityAllows(PERM_FTP_CREDENTIALS);
     if(edFtpHost!=NULL)          edFtpHost->Text=sHost;
     if(edFtpPort!=NULL)          edFtpPort->Text=IntToStr(iPort);
     if(edFtpUser!=NULL)          edFtpUser->Text=sUser;
-    if(edFtpPwd!=NULL)           edFtpPwd->Text=(bAllowFtp?sPwd:AnsiString(""));
+    //AI(ht160s-security) 20260909 : FTP credentials are a Honprec slot and the ruling
+    // covers VIEWING them, so the stored password only reaches the screen for a
+    // permitted user - greying alone would still display it. SaveFtpConfigFromUi()
+    // carries the matching guard, so a blank field can never be committed back
+    // over the real credential.
+    if(edFtpPwd!=NULL && SecurityAllows(PERM_FTP_CREDENTIALS))
+        edFtpPwd->Text=sPwd;
     if(edFtpRemoteDir!=NULL)     edFtpRemoteDir->Text=sRemoteDir;
     if(chkFtpEnable!=NULL)       chkFtpEnable->Checked=bEnable;
     if(chkFtpUploadReport!=NULL) chkFtpUploadReport->Checked=bUploadReport;
+    ApplyFtpPermissionLock();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : the FTP panel grey-out, split out of LoadFtpConfigToUi so the
+//PERIODIC refresh can re-apply it. LoadFtpConfigToUi runs only on page open /
+//save / reload, so a level change while the page was already open used to leave
+//the panel enabled AND the password still on screen. Blanks the password on
+//denial but NEVER re-fills it: the value is not available here, and writing it
+//every cycle would clobber in-progress typing.
+void __fastcall TfMaintenance::ApplyFtpPermissionLock()
+{
+    bool bAllowFtp=SecurityAllows(PERM_FTP_CREDENTIALS);
+
+    if(edFtpPwd!=NULL && bAllowFtp==false && edFtpPwd->Text!=AnsiString(""))
+        edFtpPwd->Text="";
     if(edFtpHost!=NULL)          edFtpHost->Enabled=bAllowFtp;
     if(edFtpPort!=NULL)          edFtpPort->Enabled=bAllowFtp;
     if(edFtpUser!=NULL)          edFtpUser->Enabled=bAllowFtp;
@@ -2115,6 +2130,28 @@ void __fastcall TfMaintenance::UpdateRunStateLock()
         if(bLocked)
             MenuButtons[PageIndex]->Enabled=(bRunning==false && SecurityAllows(iSlot));
     }
+    RefreshPermissionLocks();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : re-apply EVERY permission grey-out on this screen, every
+//cycle. Without this the locks were STALE: ApplyHardwareEditLock runs only from
+//LoadHardwareSettings and the quad-vacuum click, LoadFtpConfigToUi only on page
+//open / save / reload, and ShowPasswordPage only when its page is selected - so a
+//user who opened a page at Engineer level and then dropped to Operation kept a
+//fully enabled page. Routing them through UpdateRunStateLock (already called every
+//cycle from csystem UpdateRunControlFlag) makes them self-heal, the same way the
+//menu-button lock does.
+//  ApplyHardwareEditLock also carries the mid-lot run-state interlock, so calling
+//it here fixes a SECOND staleness that predates the permission work: open the
+//Hardware page while idle, start a lot, and its checkboxes stayed enabled.
+//  All three routines only assign ->Enabled (plus the FTP password blank-on-deny),
+//never ->Checked and never a list rebuild, so re-running them every cycle cannot
+//fire an OnClick or clobber a selection. Silent by ruling - no popups here.
+void __fastcall TfMaintenance::RefreshPermissionLocks()
+{
+    ApplyHardwareEditLock();
+    ApplyFtpPermissionLock();
+    ApplyPasswordPermissionLock();
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::OpenIOView(TSpeedButton *Button)
@@ -2868,7 +2905,6 @@ void __fastcall TfMaintenance::edUphMinSampleICClick(TObject *Sender)
 void __fastcall TfMaintenance::ShowPasswordPage()
 {
     int i;
-    bool bCanEdit;
 
     if(cbbPwLevel!=NULL && cbbPwLevel->Items->Count==0)
     {
@@ -2886,11 +2922,18 @@ void __fastcall TfMaintenance::ShowPasswordPage()
     if(btnPwReload!=NULL)       btnPwReload->Caption=LangT("Reload");
 
     RefreshPasswordGrid();
+    ApplyPasswordPermissionLock();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260909 : the account-page grey-out, split out of ShowPasswordPage so the
+//PERIODIC refresh can re-apply it. ShowPasswordPage runs only when the page is
+//selected, so a level change while the page was already open used to leave the
+//editor enabled. Deliberately does NOT rebuild the account list: this runs every
+//cycle and RefreshPasswordGrid would clobber the operator's row selection.
+void __fastcall TfMaintenance::ApplyPasswordPermissionLock()
+{
+    bool bCanEdit=SecurityAllows(PERM_MAINT_ACCOUNT_EDIT);
 
-    //AI(ht160s-security) 20260909 : migrated from the hardcoded
-    // HasLevel(ROLE_ENGINEER) threshold onto the tunable policy slot. The default
-    // for that slot is still Engineer, so shipped behaviour is unchanged.
-    bCanEdit=SecurityAllows(PERM_MAINT_ACCOUNT_EDIT);
     if(edPwId!=NULL)         edPwId->Enabled=bCanEdit;
     if(edPwPass!=NULL)       edPwPass->Enabled=bCanEdit;
     if(cbbPwLevel!=NULL)     cbbPwLevel->Enabled=bCanEdit;

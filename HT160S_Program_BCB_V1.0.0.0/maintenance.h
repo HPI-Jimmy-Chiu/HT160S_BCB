@@ -542,6 +542,9 @@ public:
     void __fastcall OpenWorkFile();
     void __fastcall SaveWorkFile(AnsiString S);
     void __fastcall UpdateRunStateLock();
+    void __fastcall RefreshPermissionLocks();      //AI(ht160s-security) 20260909 : re-apply every permission grey-out; called every cycle from UpdateRunStateLock
+    void __fastcall ApplyFtpPermissionLock();      //AI(ht160s-security) 20260909 : FTP panel grey-out, split out so the periodic refresh can re-apply it
+    void __fastcall ApplyPasswordPermissionLock(); //AI(ht160s-security) 20260909 : account-page grey-out, split out so the periodic refresh can re-apply it
     void __fastcall SyncSortModeSelectorFromSetting();
 };
 //---------------------------------------------------------------------------
