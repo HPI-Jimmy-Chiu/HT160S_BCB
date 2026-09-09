@@ -260,20 +260,28 @@ static AnsiString GetLoginFileName()
 //---------------------------------------------------------------------------
 void SavePassword()
 {
-    UserRoleManager.SaveToFile(GetLoginFileName());
+    AnsiString FileName=GetLoginFileName();
+
+    //AI(ht160s-password) 20260909 : ForceDirectories moved here from the removed
+    // seed block below. It has to stay on the WRITE path: SaveToFile swallows its
+    // exception (bSaved=false in the catch) and SavePassword ignores the return
+    // value, so on a machine with no system\ directory yet, saving accounts would
+    // fail completely silently.
+    ForceDirectories(ExtractFilePath(FileName));
+    UserRoleManager.SaveToFile(FileName);
 }
 //---------------------------------------------------------------------------
 void ReadPassword()
 {
-    AnsiString FileName=GetLoginFileName();
-
-    UserRoleManager.LoadFromFile(FileName);
-    if(UserRoleManager.GetUserCount()<=0)
-    {
-        ForceDirectories(ExtractFilePath(FileName));
-        UserRoleManager.AddOrUpdateUser("Honprec", "27025312", ROLE_HONPREC);
-        UserRoleManager.SaveToFile(FileName);
-    }
+    //AI(ht160s-password) 20260909 : NO default account is seeded any more. This used
+    // to write the Honprec service account into system\login.txt on every machine
+    // whose book loaded empty, publishing the service master password in CLEARTEXT to
+    // a file the customer can open in notepad - defeating the point of compiling the
+    // credential into the binary. THT160UserRoleManager::IsServiceMasterCredential()
+    // is now the way in on a machine with no accounts, so an empty book is a normal
+    // state and not a lockout. An empty book is safe everywhere else too: the only
+    // GetUserCount() readers are bounds checks on the maintenance account list.
+    UserRoleManager.LoadFromFile(GetLoginFileName());
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-security) 20260909 : per-feature permission policy book, same
