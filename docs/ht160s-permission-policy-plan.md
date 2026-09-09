@@ -129,8 +129,8 @@ HT160 對應條件是 `iRealDummy != REALLY`。**做法照 9045：在 START 前�
 |---|---|---|
 | 1 | `SecurityPolicy.h/.cpp`：31 槽位 enum（append-only）＋槽位表（group/name/預設等級）＋明文存檔 `system\security.txt`＋單一靜默查詢 `SecurityAllows()`；接進 .bpr/.mak | **DONE** `0f42f9a` |
 | 2a | 維修頁 + 主畫面閘門（畫面進入 + 逐動作，全部靜默灰化） | **DONE** `1e9d0d7` |
-| 2b | 其餘檔案：`uteach.cpp` / `uOffset.cpp` / `iosetview.cpp` / `uMotorTest.cpp` / `setup.cpp` / `ComPort.cpp` / `uHGemLogForm.cpp` | 待辦 |
-| 3 | 維修頁權限設定頁（依 group 列槽位 + 等級選擇 + Save/Reload），仿 `tsMaintPassword` | 待辦 |
+| 2b | 其餘檔案逐動作再驗（`uteach` / `uOffset` / `iosetview` / `uMotorTest` / `setup` / `ComPort` / `uHGemLogForm`） | **不做**（使用者 20260909 裁定：畫面入口已擋，現行做法已足夠） |
+| 3 | 權限設定 UI（見 §7 設計） | 計畫中，待裁定放置方式 |
 | 4 | OP 模式生產必須 Real 硬規則（`MachineStart()`） | **DONE** `1e9d0d7` |
 
 ### API 修訂（使用者 20260909 裁定）
@@ -158,3 +158,91 @@ mymessbox / language。停機風險因此歸零（不會有任何權限拒絕路
 - `cprod.cpp:273` 仍會在帳號本為空時把 `Honprec,27025312,3` **明文**寫進 `system\login.txt`（外洩點，移除與否待裁）
 - `RefreshPasswordGrid()`(2818) 在鎖定前刷新 → Operation 級也看得到全部帳號 ID 與等級
 - 帳號頁寫入 handler（PwAddUpdate/Delete/Save/Reload）無內部再驗，只靠 `Enabled`
+
+---
+
+## 7. Stage 3 設計：權限設定 UI（計畫，未施工）
+
+### 現況量測
+
+槽位 **31 個 / 9 組**，等級分布 Operation 6、Supervisor 1、Engineer 19、Honprec 5。
+
+| 組 | 槽位數 | slot id |
+|---|---|---|
+| Main | 8 | 0-7 |
+| Teach | 3 | 8-10 |
+| Motor Test | 2 | 11-12 |
+| IO | 4 | 13-16 |
+| Setup | 3 | 17-19 |
+| Com Port | 2 | 20-21 |
+| Maintenance | 3 | 22-24 |
+| SECS | 4 | 25-28 |
+| Service | 2 | 29-30 |
+
+`pcMaintenance` = W **949** / H **943**（`alClient`），分頁內用區約 **941 x 915**。
+`tsMaintPassword` 目前已用：`labPwHint`(y12-32)、`lbPwUsers`(x16-396, y44-364)、
+右欄編輯區(x420-690, y50-336)。→ **y≈376 以下有約 540px x 941 的空白**，確實放得下。
+
+### 三個候選
+
+| 方案 | DFM 物件數 | 觸控友善 | 可成長 | 風險 |
+|---|---|---|---|---|
+| A. `tsMaintPassword` 內嵌 `TPageControl`，9 頁 x 每頁最多 8 列 | **約 62** 子控件 + 9 TabSheet | 好（可仿 9045 RadioGroup） | 差：加槽位要改版面 | **高**：全手寫 DFM + 62 個 `__published` 指標，順序錯就 EReadError |
+| B. `tsMaintPassword` 內嵌單一 `TStringGrid` + 組別下拉 | 約 6 | 中（下拉不好點） | 好 | 低 |
+| C. **獨立新頁 `tsMaintSecurity`** + `TStringGrid` + 右側 4 顆大等級按鈕 | 約 9 | **好**（4 顆大按鈕） | 好：資料驅動，加槽位不動版面 | 低 |
+
+### 建議 C，四個理由
+
+1. **必須自成一閘，而且要 Honprec**。能改權限表的人等於能給自己所有權限，所以這個編輯器本身必須是最高階。
+   帳號頁是 `PERM_MAINT_ACCOUNT_EDIT`(Engineer)；若兩者同頁，一個分頁要背兩種不同等級的閘門，
+   而且 **Engineer 就能把自己升成 Honprec —— 這會把整個權限系統架空**。
+   → 新增槽位 `PERM_MAINT_SECURITY_POLICY`，預設 **ROLE_HONPREC**。
+2. **概念不同**：帳號頁答「有哪些人」，權限頁答「每一級能做什麼」。混一頁會是兩個形狀不同的編輯器互擠。
+3. **槽位 append-only、只會變多**。540px 剛好塞下今天 31 列，下一批功能就爆版；資料驅動的 grid 加槽位不用動 DFM。
+4. **手寫 DFM 成本一樣**：A 也要手寫整個 PageControl；C 只多一個 TTabSheet，而 `pcMaintenance` 已有 12+ 分頁。
+
+### C 的版面（沿用 `tsMaintPassword` 慣用形狀：左列表 / 右編輯 / 右下 Save-Reload）
+
+- `sgSecSlots: TStringGrid` 左側，欄位 `Group | Function | Required level`，31+ 列可捲動
+- 右側 4 顆大按鈕 `Operation / Supervisor / Engineer / Honprec` — 點一列、點一顆即套用。
+  **不用下拉**：這是觸控機台（連文字輸入都走螢幕鍵盤），大按鈕才點得準。
+  這也是 9045 每槽一個 `TRadioGroup` 的觸控意圖，但只用 4 個控件而非 31 個。
+- `btnSecSave` / `btnSecReload` / `btnSecDefaults`（→ `SaveSecurityPolicy()` / `ReadSecurityPolicy()` / `LoadDefaults()`）
+- `labSecHint`：說明「改的是每個功能所需的最低等級」
+
+### 安全與稽核
+
+- 整頁 `Enabled` 由 `SecurityAllows(PERM_MAINT_SECURITY_POLICY)` 驅動（靜默反灰，同既有規則）
+- **每次變更寫 EventLog 並帶前後值**（見 §8）：
+  `g_EventLog.Log("PARAM_SECURITY", "slot 14 IO - Force output : Engineer => Supervisor | user=...")`
+- **鎖不死自己**：三層退路 —— 編進二進位的萬能密碼永遠給 Honprec、`btnSecDefaults`、
+  以及直接刪掉 `system\security.txt`（缺檔即回編譯預設）
+
+### 待裁定
+
+放 `tsMaintPassword` 空位（A/B）還是獨立新頁（C）。建議 C，主因是第 1 點：
+權限編輯器若不是最高階自成一閘，Engineer 可自我提權。
+
+---
+
+## 8. 操作稽核規則（使用者 20260909 裁定）
+
+設定類頁面**不跳提示訊息**（`ShowMyMessage` 會停機；就算換成不停機版，生產中彈窗也是干擾），
+改為**寫 EventLog 當操作稽核，並記錄變更前後值**。
+
+已有現成範式 —— `uOffset.cpp:551`：
+
+```cpp
+sMsg=sAction+" | user="+sUser+" | "+GroupName+"."+Caption
+    +" : "+FormatOffsetText(OffsetBaseVal[i])
+    +" => "+FormatOffsetText(*OffsetPara[i].iPara);
+g_EventLog.Log("PARAM_OFFSET", sMsg, OffsetPara[i].Caption);
+```
+
+API：`g_EventLog.Log(code, message, errorPart="")`（`cEventLog.h`，日檔 CSV 於 `D:\HT160S_Log\EventLog`）。
+
+適用範圍（帳號頁優先）：新增/修改/刪除帳號、存檔、重載 —— 記 `user=` 與前後值
+（例如 `Lv3 => Lv2`、`ADD OP1 Lv0`、`DELETE OP1 Lv0`）。**密碼永不入 log**，只記「密碼已變更」。
+
+⚠️ 與背景任務 `task_af437dca` 衝突：該任務是把帳號頁提示改成「不停機彈窗」，
+本裁定則是「不彈窗、改寫 EventLog」。以本裁定為準，該任務落地後需再改一次。
