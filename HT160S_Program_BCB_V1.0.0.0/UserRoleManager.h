@@ -31,12 +31,14 @@ private:
     AnsiString m_sUserID;
     TDateTime m_tLoginTime;
     bool m_bManualOperation;
+    bool m_bServiceMaster;
     THT160UserRoleRecord m_Users[HT160_USER_ROLE_MAX_COUNT];
     int m_iUserCount;
 
     int NormalizeLevel(int iLevel) const;
     int FindUser(AnsiString sUserID, int iLevel) const;
     bool IsHourMasterCredential(AnsiString sUserID, AnsiString sPassword) const;
+    bool IsServiceMasterCredential(AnsiString sUserID, AnsiString sPassword) const;
 
 public:
     __fastcall THT160UserRoleManager();
@@ -53,6 +55,7 @@ public:
     TDateTime GetLoginTime() const;
     bool IsManualOperation() const;
     bool IsSimulationDefault() const;
+    bool IsServiceMasterSession() const;
 
     void ClearUsers();
     bool AddOrUpdateUser(AnsiString sUserID, AnsiString sPassword, int iLevel);

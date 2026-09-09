@@ -1799,6 +1799,8 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
     if(OldRoleLevel != UserRoleManager.GetLevel())
     {
         LogText = AnsiString("Change User to ")+UserRoleManager.GetLevelName();
+        if(UserRoleManager.IsServiceMasterSession())
+            LogText = LogText + AnsiString(" (service master)");
         RecordProcess(LogText);
         EventReport(SECS_EVENT.SwitchUser);
     }

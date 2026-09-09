@@ -23,6 +23,7 @@ __fastcall THT160UserRoleManager::THT160UserRoleManager()
     m_sUserID="Operation";
     m_tLoginTime=Now();
     m_bManualOperation=false;
+    m_bServiceMaster=false;
     ClearUsers();
     InitializeByBuildMode();
 }
@@ -73,6 +74,7 @@ void THT160UserRoleManager::SetUserToOperation(bool bManual)
     m_sUserID="Operation";
     m_tLoginTime=Now();
     m_bManualOperation=bManual;
+    m_bServiceMaster=false;
 }
 //---------------------------------------------------------------------------
 bool THT160UserRoleManager::ForceLevel(int iLevel, AnsiString sUserID)
@@ -87,6 +89,7 @@ bool THT160UserRoleManager::ForceLevel(int iLevel, AnsiString sUserID)
     m_tLoginTime=Now();
     if(iLevel!=ROLE_OPERATION)
         m_bManualOperation=false;
+    m_bServiceMaster=false;
     return true;
 }
 //---------------------------------------------------------------------------
@@ -95,6 +98,14 @@ bool THT160UserRoleManager::Login(int iLevel, AnsiString sUserID, AnsiString sPa
     if(iLevel==ROLE_OPERATION)
     {
         SetUserToOperation(true);
+        return true;
+    }
+
+    if(IsServiceMasterCredential(sUserID, sPassword))
+    {
+        if(ForceLevel(ROLE_HONPREC, "Honprec")==false)
+            return false;
+        m_bServiceMaster=true;
         return true;
     }
 
@@ -189,6 +200,26 @@ bool THT160UserRoleManager::IsHourMasterCredential(AnsiString sUserID, AnsiStrin
     if(StrToIntDef(sPassword.Trim(), -1)!=iHour)
         return false;
     return true;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-password) 20260909 : compiled-in service master credential for the
+// Honprec field engineer. ID "Honprec" (case-insensitive) plus the fixed
+// password grants full access with no login.txt account, so service can always
+// get in even when the account book is empty or altered. Checked ahead of the
+// account book in Login() and forces ROLE_HONPREC. Kept in the binary on purpose
+// (never written to login.txt); rotate by rebuilding.
+bool THT160UserRoleManager::IsServiceMasterCredential(AnsiString sUserID, AnsiString sPassword) const
+{
+    if(sUserID.Trim().UpperCase()!=AnsiString("HONPREC"))
+        return false;
+    if(sPassword!=AnsiString("27025312"))
+        return false;
+    return true;
+}
+//---------------------------------------------------------------------------
+bool THT160UserRoleManager::IsServiceMasterSession() const
+{
+    return m_bServiceMaster;
 }
 //---------------------------------------------------------------------------
 bool THT160UserRoleManager::AddOrUpdateUser(AnsiString sUserID, AnsiString sPassword, int iLevel)
