@@ -2433,6 +2433,12 @@ void __fastcall TfMaintenance::chkUseAMRClick(TObject *Sender)
     RefreshHardwareSettingsStatus();
 }
 //---------------------------------------------------------------------------
+//AI(poka-yoke) 20260909 : popup API rule for this screen. Maintenance can be open while
+//the machine runs (that is why UpdateRunStateLock exists), so every informational or
+//validation popup below uses ShowMyOKMessageNoStop - the OK-only variant that leaves the
+//motors and SystemStart alone. ShowMyMessage / ShowMyOKMessage call DecStopAllMotor and
+//clear SystemStart, i.e. they STOP PRODUCTION, and are for real machine alarms only.
+//Do not "simplify" these back to ShowMyMessage.
 //AI(ht160s-lotpassfail) 20260709 : Sort mode selector (Normal / By Lot+Bin / By Lot+PassFail).
 //iSortMode drives the routing core (GetMappedAutoIndex), the CCD-scan class freeze and the
 //dynamic binding table, all read across the run loop, so a clean restart is the safe way to
@@ -2455,8 +2461,8 @@ void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
             rgSortMode->ItemIndex=GeneralSetting.iSortMode;
             bLoadingHardwareSettings=false;
         }
-        ShowMyMessage("Cannot change Sort mode while ICs are still under the machine. "
-                      "Finish or clear the current material first.");
+        ShowMyOKMessageNoStop("Cannot change Sort mode while ICs are still under the machine. "
+                              "Finish or clear the current material first.");
         return;
     }
     if(rgSortMode!=NULL)
@@ -2471,7 +2477,7 @@ void __fastcall TfMaintenance::rgSortModeClick(TObject *Sender)
         fMain->UpdateSortModeFeatureBadge();   //AI(ht160s-whitelist-override) 20260717 : Main mode badge
     //AI(ht160s-whitelist) 20260715 : mode is a live value consumed at the next Lot Start
     // (2D->Bin load) + per-scan routing; no software restart needed.
-    ShowMyMessage("Sort mode changed. It takes effect at the next Lot Start.");
+    ShowMyOKMessageNoStop("Sort mode changed. It takes effect at the next Lot Start.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-whitelist-override) 20260717 : local activation of the WhiteList overlay for the NEXT
@@ -2491,8 +2497,8 @@ void __fastcall TfMaintenance::chkWhiteListActiveClick(TObject *Sender)
             chkWhiteListActive->Checked=GeneralSetting.bWhiteListActive;
             bLoadingHardwareSettings=false;
         }
-        ShowMyMessage("Cannot change WhiteList while ICs are still under the machine. "
-                      "Finish or clear the current material first.");
+        ShowMyOKMessageNoStop("Cannot change WhiteList while ICs are still under the machine. "
+                              "Finish or clear the current material first.");
         return;
     }
     if(chkWhiteListActive!=NULL)
@@ -2501,10 +2507,10 @@ void __fastcall TfMaintenance::chkWhiteListActiveClick(TObject *Sender)
     if(fMain!=NULL)
         fMain->UpdateSortModeFeatureBadge();
     if(GeneralSetting.bWhiteListActive)
-        ShowMyMessage("By WhiteList armed. It takes effect at the next Lot Start and reverts to "
-                      "the base sort mode at Lot End.");
+        ShowMyOKMessageNoStop("By WhiteList armed. It takes effect at the next Lot Start and reverts to "
+                              "the base sort mode at Lot End.");
     else
-        ShowMyMessage("By WhiteList cleared. The base sort mode will be used.");
+        ShowMyOKMessageNoStop("By WhiteList cleared. The base sort mode will be used.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-whitelist) 20260716 : re-sync the Sort-mode radio to GeneralSetting.iSortMode
@@ -2579,18 +2585,18 @@ void __fastcall TfMaintenance::chkCcd2DCommaToUnderscoreClick(TObject *Sender)
             chkCcd2DCommaToUnderscore->Checked=GeneralSetting.bCcd2DCommaToUnderscore;
             bLoadingHardwareSettings=false;
         }
-        ShowMyMessage("Cannot change 2D comma replacement while ICs are still under the machine. "
-                      "Finish or clear the current material first.");
+        ShowMyOKMessageNoStop("Cannot change 2D comma replacement while ICs are still under the machine. "
+                              "Finish or clear the current material first.");
         return;
     }
     if(chkCcd2DCommaToUnderscore!=NULL)
         GeneralSetting.bCcd2DCommaToUnderscore=chkCcd2DCommaToUnderscore->Checked;
     if(GeneralSetting.bCcd2DCommaToUnderscore)
-        ShowMyMessage("2D comma replacement ON : every comma in a scanned or hand-entered 2D "
-                      "code becomes an underscore. The work-order data must already use the "
-                      "underscore form.");
+        ShowMyOKMessageNoStop("2D comma replacement ON : every comma in a scanned or hand-entered 2D "
+                              "code becomes an underscore. The work-order data must already use the "
+                              "underscore form.");
     else
-        ShowMyMessage("2D comma replacement OFF : 2D codes are used exactly as read.");
+        ShowMyOKMessageNoStop("2D comma replacement OFF : 2D codes are used exactly as read.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-lotbin) 20260615 : Per-Auto enable (By Lot+Bin mode only). Disabled
@@ -2611,8 +2617,8 @@ void __fastcall TfMaintenance::chkAutoEnableClick(TObject *Sender)
         if(AutoChk[a]!=NULL)
             GeneralSetting.bAutoEnabled[a]=AutoChk[a]->Checked;
     RefreshHardwareSettingsStatus();
-    ShowMyMessage("Auto enable changed. Please restart the software so the new "
-                  "Lot+Bin routing takes effect cleanly.");
+    ShowMyOKMessageNoStop("Auto enable changed. Please restart the software so the new "
+                          "Lot+Bin routing takes effect cleanly.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-suck2-quad) 20260712 : Suck2 quad-vacuum machine option (all 4 vacuum
@@ -2647,8 +2653,8 @@ void __fastcall TfMaintenance::chkSuck2QuadVacuumClick(TObject *Sender)
     GeneralSetting.Save();
     ApplyHardwareEditLock();
     RefreshHardwareSettingsStatus();
-    ShowMyMessage("Suck2 quad-vacuum mode changed. Please restart the software "
-                  "so the new vacuum gang takes effect cleanly.");
+    ShowMyOKMessageNoStop("Suck2 quad-vacuum mode changed. Please restart the software "
+                          "so the new vacuum gang takes effect cleanly.");
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-maintainer) 20260616 : Per-nozzle (SortArm sucker) enable. Unchecked
@@ -2678,7 +2684,7 @@ void __fastcall TfMaintenance::chkSuckEnableClick(TObject *Sender)
         TCheckBox *Box=dynamic_cast<TCheckBox *>(Sender);
         if(Box!=NULL)
             Box->Checked=true;
-        ShowMyMessage(LangT("At least one nozzle must stay enabled."));
+        ShowMyOKMessageNoStop(LangT("At least one nozzle must stay enabled."));
         return;
     }
 
@@ -2982,27 +2988,27 @@ void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
     iLevel=cbbPwLevel->ItemIndex;
     if(sID==AnsiString(""))
     {
-        ShowMyMessage(LangT("Please enter an account ID."));
+        ShowMyOKMessageNoStop(LangT("Please enter an account ID."));
         return;
     }
     if(sPass==AnsiString(""))
     {
-        ShowMyMessage(LangT("Please enter a password."));
+        ShowMyOKMessageNoStop(LangT("Please enter a password."));
         return;
     }
     if(!UserRoleManager.IsValidLevel(iLevel))
     {
-        ShowMyMessage(LangT("Please select a level (0-3)."));
+        ShowMyOKMessageNoStop(LangT("Please select a level (0-3)."));
         return;
     }
     if(UserRoleManager.AddOrUpdateUser(sID, sPass, iLevel)==false)
     {
-        ShowMyMessage(LangT("Account table is full (max 30)."));
+        ShowMyOKMessageNoStop(LangT("Account table is full (max 30)."));
         return;
     }
     edPwPass->Text="";
     RefreshPasswordGrid();
-    ShowMyMessage(LangT("Account saved in memory. Press 'Save to File' to keep it."));
+    ShowMyOKMessageNoStop(LangT("Account saved in memory. Press 'Save to File' to keep it."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
@@ -3020,7 +3026,7 @@ void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
     idx=lbPwUsers->ItemIndex;
     if(idx<0 || idx>=UserRoleManager.GetUserCount())
     {
-        ShowMyMessage(LangT("Please select an account to delete."));
+        ShowMyOKMessageNoStop(LangT("Please select an account to delete."));
         return;
     }
     sID=UserRoleManager.GetUserID(idx);
@@ -3039,7 +3045,7 @@ void __fastcall TfMaintenance::PwSaveClick(TObject *Sender)
     if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
         return;
     SavePassword();
-    ShowMyMessage(LangT("User accounts saved to system\\login.txt."));
+    ShowMyOKMessageNoStop(LangT("User accounts saved to system\\login.txt."));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
@@ -3053,5 +3059,5 @@ void __fastcall TfMaintenance::PwReloadClick(TObject *Sender)
     RefreshPasswordGrid();
     if(edPwId!=NULL)    edPwId->Text="";
     if(edPwPass!=NULL)  edPwPass->Text="";
-    ShowMyMessage(LangT("User accounts reloaded from system\\login.txt."));
+    ShowMyOKMessageNoStop(LangT("User accounts reloaded from system\\login.txt."));
 }
