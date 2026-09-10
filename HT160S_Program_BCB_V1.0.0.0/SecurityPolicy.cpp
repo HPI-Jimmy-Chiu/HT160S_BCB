@@ -60,7 +60,8 @@ static const THT160PermSlotDef PermSlotTable[HT160_PERM_SLOT_COUNT]=
     //AI(ht160s-security) 20260910 : appended out of group order on purpose - a shipped
     // slot ID is never renumbered (system\security.txt keys on it), so a new Main-screen
     // slot still lands at the end of the table.
-    { "Main",        "Map Tray page (tray dump / simulation)",     ROLE_HONPREC    }
+    { "Main",        "Map Tray page (tray dump / simulation)",     ROLE_HONPREC    },
+    { "Main",        "Simulation tools (virtual 2D / sim trays)",  ROLE_HONPREC    }
 };
 //---------------------------------------------------------------------------
 __fastcall THT160SecurityPolicy::THT160SecurityPolicy()

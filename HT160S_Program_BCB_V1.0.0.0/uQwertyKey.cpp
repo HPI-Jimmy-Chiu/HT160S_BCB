@@ -363,7 +363,22 @@ bool __fastcall TfQwertyKey::ShowQwertyKey(TCustomEdit *Edit, int Function, int 
     edContent->Text=sBackup;
     edContent->SelStart=edContent->Text.Length();
     ConfigureMode(TitleText);
-    ShowModal();
+    //AI(ht160s-qwertykey) 20260910 : bShow is the ONLY guard on this entry point and it used to
+    //  be cleared exclusively in FormClose. Any ShowModal unwind that skips OnClose (an exception
+    //  from a handler, a forced close) therefore latched the flag true and the keypad refused to
+    //  open for the rest of the session - and because ShowQwertyKey reports that refusal as the
+    //  same false an operator Cancel gives, EVERY later keypad in the program (login, teach,
+    //  offset, lot editing) just did nothing, silently. Own the flag here with __finally so the
+    //  latch cannot survive; FormShow/FormClose still set the same value and stay harmless.
+    try
+    {
+        bShow=true;
+        ShowModal();
+    }
+    __finally
+    {
+        bShow=false;
+    }
     Text=edContent->Text;
     if(bAccepted)
     {

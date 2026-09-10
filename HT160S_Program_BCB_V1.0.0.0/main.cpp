@@ -226,6 +226,17 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     //the field shows the persisted value from the first paint instead of the DFM placeholder.
     LoadOperatorIDToDisplay();
 
+    //AI(ht160s-security) 20260910 : cbbUserSelect ships from the DFM with no Style property,
+    //  i.e. VCL default csDropDown = EDITABLE. cbbUserSelectChange authenticates off
+    //  ItemIndex, so an operator who TYPES the account name into the box instead of picking
+    //  a level drops ItemIndex to -1 and the whole attempt is swallowed silently : no keypad,
+    //  no message, nothing logged. Pin it to a pick-only list HERE rather than in main.dfm,
+    //  because fMain must never be re-saved by the BCB designer (it would strip hand-authored
+    //  components). Text= still selects the matching item on a csDropDownList combo, so
+    //  RefreshMainUserSelect keeps working unchanged.
+    if(cbbUserSelect != NULL)
+        cbbUserSelect->Style = csDropDownList;
+
     bUpdatingMainSelections = true;
     UpdateWorkFileComboBox();
     RefreshMainUserSelect();
@@ -438,6 +449,7 @@ void __fastcall TfMain::RefreshMainUserSelect()
 void __fastcall TfMain::UpdateMainPermissionLock()
 {
     bool bMapTrayAllowed;
+    bool bSimToolsAllowed;
 
     if(sbProduct!=NULL)
         sbProduct->Enabled=SecurityAllows(PERM_SETUP_SCREEN);
@@ -464,6 +476,21 @@ void __fastcall TfMain::UpdateMainPermissionLock()
         if(spbTrayStatus!=NULL)
             spbTrayStatus->Down=true;
     }
+
+    //AI(ht160s-security) 20260910 : the simulation tools get their OWN slot on top of the page
+    //  slot. Enable Simulation swaps every 2D code for a virtual one, which is a production-data
+    //  hazard (2026-08-06 : the only way to prove it had been ticked was a statistical analysis
+    //  of the customer CSVs), so lowering PERM_MAIN_MAP_TRAY_PAGE later must NOT hand the switch
+    //  out with the page. Enabled only - never touch ->Checked, that fires OnClick.
+    bSimToolsAllowed=SecurityAllows(PERM_MAIN_SIMULATION_TOOLS);
+    if(cbEnableSimulation!=NULL)
+        cbEnableSimulation->Enabled=bSimToolsAllowed;
+    if(btnLoadSimuData!=NULL)
+        btnLoadSimuData->Enabled=bSimToolsAllowed;
+    if(sgSimMaxTray!=NULL)
+        sgSimMaxTray->Enabled=bSimToolsAllowed;
+    if(btnSaveSimMax!=NULL)
+        btnSaveSimMax->Enabled=bSimToolsAllowed;
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260616 : the SECS/SAFE/AMR badges now live in main.dfm as
@@ -1597,6 +1624,12 @@ void __fastcall TfMain::SyncMonitorTrayDivision()
 void __fastcall TfMain::cbEnableSimulationClick(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-security) 20260910 : defence in depth for PERM_MAIN_SIMULATION_TOOLS. The
+    //  controls are greyed by UpdateMainPermissionLock and the whole page is hidden below
+    //  Honprec, but a programmatic Click() or a racing refresh could still land here.
+    //  Silent by policy. Never write ->Checked from a guard: that fires OnClick again.
+    if(SecurityAllows(PERM_MAIN_SIMULATION_TOOLS)==false)
+        return;
     tSimuData.bRunSimulation=cbEnableSimulation->Checked;
     //AI(ht160s-virtual2d) 20260808 : the operator action that flips the 2D source is itself
     //part of the evidence chain - on 2026-08-06 the ONLY way to prove this checkbox was ticked
@@ -1613,6 +1646,12 @@ void __fastcall TfMain::cbEnableSimulationClick(TObject *Sender)
 void __fastcall TfMain::btnSaveSimMaxClick(TObject *Sender)
 {
     (void)Sender;
+    //AI(ht160s-security) 20260910 : defence in depth for PERM_MAIN_SIMULATION_TOOLS. The
+    //  controls are greyed by UpdateMainPermissionLock and the whole page is hidden below
+    //  Honprec, but a programmatic Click() or a racing refresh could still land here.
+    //  Silent by policy. Never write ->Checked from a guard: that fires OnClick again.
+    if(SecurityAllows(PERM_MAIN_SIMULATION_TOOLS)==false)
+        return;
     if(sgSimMaxTray==NULL)
         return;
     for(int i=0;i<9;i++)
@@ -1640,6 +1679,12 @@ void __fastcall TfMain::btnLoadSimuDataClick(TObject *Sender)
     int CodeSeq;
 
     (void)Sender;
+    //AI(ht160s-security) 20260910 : defence in depth for PERM_MAIN_SIMULATION_TOOLS. The
+    //  controls are greyed by UpdateMainPermissionLock and the whole page is hidden below
+    //  Honprec, but a programmatic Click() or a racing refresh could still land here.
+    //  Silent by policy. Never write ->Checked from a guard: that fires OnClick again.
+    if(SecurityAllows(PERM_MAIN_SIMULATION_TOOLS)==false)
+        return;
     tSimuData.Clear();
     tSimuData.bRunSimulation=cbEnableSimulation->Checked;
 
@@ -1759,6 +1804,17 @@ void __fastcall TfMain::cb_WorkFileChange(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 #ifndef SOFT_SIMULATE   //AI(ht160s-password) 20260624 : login keypad helper (real build only; sim auto-grants)
+//AI(ht160s-security) 20260910 : login audit trail. Before this a FAILED login left no trace
+// anywhere (the failure branch popped a dialog and returned), and a success was recorded only
+// when the numeric level actually changed - so "why could nobody log in?" was unanswerable
+// from a State Record, and repeated password guessing was invisible. The PASSWORD IS NEVER
+// LOGGED : only the typed ID, the target level and the outcome. Same shape as LogMaintAudit
+// in maintenance.cpp, and it uses the EventLog (not a popup) per the 20260909 ruling.
+static void LogLoginAudit(AnsiString sWhat)
+{
+    g_EventLog.Log("AUTH_LOGIN", sWhat);
+}
+//---------------------------------------------------------------------------
 // Prompt one text value via the on-screen QWERTY keypad using a hidden scratch
 // edit (parented so the VCL handle is valid). Returns false if operator cancels.
 static bool PromptLoginInput(TWinControl *AParent, AnsiString ATitle, int AFunc, AnsiString &AValue)
@@ -1819,16 +1875,28 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         #else
         AnsiString sLoginID="";
         AnsiString sLoginPass="";
-        if(PromptLoginInput(this, "Login User ID", N_NO_SPACE, sLoginID)==false ||
+        //AI(ht160s-security) 20260910 : both prompt titles now go through LangT - they were bare
+        //  English while the error message below them was translated, so on a Chinese UI the two
+        //  identical-looking keypads gave the operator no way to tell ID from password.
+        if(PromptLoginInput(this, LangT("Login User ID"), N_NO_SPACE, sLoginID)==false ||
            sLoginID.Trim()==AnsiString(""))
         {
+            LogLoginAudit(AnsiString("LOGIN ABANDONED at the ID prompt : level=")
+                          +UserRoleManager.GetLevelName(RoleLevel));
             bUpdatingMainSelections = true;
             RefreshMainUserSelect();
             bUpdatingMainSelections = false;
             return;
         }
-        if(PromptLoginInput(this, "Login Password", N_PASSWORD|N_NO_SPACE, sLoginPass)==false)
+        //AI(ht160s-security) 20260910 : N_NO_NUM_PAD hides the numeric pad on the masked password
+        //  field. Its +1/-1/+10/-10/+100/-100, +- and . keys sit right beside the digits on a touch
+        //  panel and rewrite the WHOLE field via atof(text)+delta, so one stray touch turned
+        //  27025312 into 27025322 with an unchanged number of '*' - a rejected login from a
+        //  correctly remembered password, with no visual cue at all. The QWERTY digit row stays.
+        if(PromptLoginInput(this, LangT("Login Password"), N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD, sLoginPass)==false)
         {
+            LogLoginAudit(AnsiString("LOGIN ABANDONED at the password prompt : id=")+sLoginID.Trim()
+                          +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel));
             bUpdatingMainSelections = true;
             RefreshMainUserSelect();
             bUpdatingMainSelections = false;
@@ -1836,12 +1904,26 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         }
         if(UserRoleManager.Login(RoleLevel, sLoginID, sLoginPass)==false)
         {
-            ShowMyMessage(LangT("User ID or password is incorrect."));
+            //AI(ht160s-security) 20260910 : a refusal must be VISIBLE but must never stop the line.
+            //  This used to call the stopping ShowMyMessage (DecStopAllMotor + SystemStart=false,
+            //  mymessbox.cpp), so one mistyped service password halted production. Refusals stay a
+            //  popup on purpose (a silent failure would violate the notify rule) - just a
+            //  non-stopping one, plus an audit line.
+            LogLoginAudit(AnsiString("LOGIN REJECTED : id=")+sLoginID.Trim()
+                          +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel));
+            ShowMyOKMessageNoStop(LangT("User ID or password is incorrect."));
             bUpdatingMainSelections = true;
             RefreshMainUserSelect();
             bUpdatingMainSelections = false;
             return;
         }
+        //AI(ht160s-security) 20260910 : audit the success too. The RecordProcess line further down
+        //  fires only when the LEVEL changed and never carries the ID, so a re-login at the same
+        //  level was invisible.
+        LogLoginAudit(AnsiString("LOGIN OK : id=")+sLoginID.Trim()
+                      +AnsiString(" level=")+UserRoleManager.GetLevelName()
+                      +(UserRoleManager.IsServiceMasterSession()?AnsiString(" (service master)")
+                                                                :AnsiString("")));
         #endif
     }
 

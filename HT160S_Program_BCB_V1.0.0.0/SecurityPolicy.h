@@ -84,10 +84,14 @@ enum EHT160PermSlot
     // --- Main screen, appended out of group order: slot IDs are append-only ---
     // Map Tray page = tray dump memo + the simulation tools (Enable Simulation,
     // simulated 2D data, max-tray table). Honprec only by default.
-    PERM_MAIN_MAP_TRAY_PAGE     = 32
+    PERM_MAIN_MAP_TRAY_PAGE     = 32,
+
+    // Simulation tools live ON that page but keep their own slot: virtual 2D codes are a
+    // production-data hazard, so lowering the page must not hand the switch out with it.
+    PERM_MAIN_SIMULATION_TOOLS  = 33
 };
 //---------------------------------------------------------------------------
-#define HT160_PERM_SLOT_COUNT 33
+#define HT160_PERM_SLOT_COUNT 34
 //---------------------------------------------------------------------------
 class THT160SecurityPolicy
 {

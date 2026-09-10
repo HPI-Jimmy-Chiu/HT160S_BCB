@@ -139,6 +139,8 @@ Loader Tray has IC,please remove	Loader 盤有 IC，請移除
 Loader Y motor will out of limit	上料機構 Y 馬達將超出限位
 Loader still holds a tray. Please MANUALLY REMOVE ALL trays on Loader L and R, then press OK.	Loader 仍夾持著盤。請手動移除 Loader L 與 R 上的所有盤，然後按 OK。
 Loader top-CCD X capture fine-tune	上料機構上視 CCD X 取像微調
+Login Password	登入密碼
+Login User ID	登入帳號
 Loop	循環
 Lot "%s" has no 2D data loaded yet.\n(Work-order JSON not downloaded for this Lot.)	Lot "%s" 尚未載入 2D 資料。\n(此 Lot 的工單 JSON 尚未下載。)
 Lot No.	Lot 編號
