@@ -12,6 +12,7 @@ int CUSTOMER_CODE=HT160S_DEFAULT_CUSTOMER_CODE;
 //asSerialNo default empty and are overwritten by UpdateMachineIdentity() from
 //GeneralSetting once it is loaded.
 AnsiString MainVersion="HT160S " HT160S_VERSION;   //AI(ht160s-version-ssot) 20260805 : adjacent string literals concatenate at compile time - no runtime init order
+AnsiString MainBuildID=HT160S_BUILD_ID;            //AI(ht160s-buildstamp) 20260910 : compile-time literal for the same reason - no static-init order dependency
 AnsiString asModel="HT160S";
 AnsiString asHandlerID="";
 AnsiString asSerialNo="";

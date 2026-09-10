@@ -216,7 +216,10 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //AI(ht160s-statusbar) 20260624 : HT172 program-start version log (was logged
          //from the systools timer reading the version panel). Routed through the HT160
          //event-log path (RecordProcess -> g_EventLog). fNote already exists (created above).
-         RecordProcess(AnsiString("Program Start with version ")+MainVersion);
+         //AI(ht160s-buildstamp) 20260910 : the version alone could not tell two machines apart
+         //(both KYEC tools logged "HT160S 1.0.0.0" while running different exes). The build id
+         //rides alongside it so every on-site log names the code state it came from.
+         RecordProcess(AnsiString("Program Start with version ")+MainVersion+" build "+MainBuildID);
          //AI(secs-alid-optiond) 20260902 : flush the AMENDMENT 2 S5-ALID self-check
          //verdict now that the EventLog is open. HSys.Initial() ran the check at progress
          //46 while the log was still shut (its own call there is a no-op), so this is the

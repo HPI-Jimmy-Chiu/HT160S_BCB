@@ -20,7 +20,11 @@
 #include "uAgvStation.h"      //AI(ht160s-agv) 20260625 : AgvCoord.DescribeAgvState() for the AMR handshake block in FeederDecision.txt
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
-static const AnsiString SR_VERSION = "HT160S 1.0.0.0";
+//AI(ht160s-buildstamp) 20260910 : was a hand-kept SECOND copy of the version string, so a
+//snapshot could silently disagree with the status bar and with SVID 1003. Built from the
+//cmydef SSOT plus the build id - all compile-time literals, so no static-init order issue
+//(the reason cmydef keeps the version as a #define in the first place).
+static const AnsiString SR_VERSION = "HT160S " HT160S_VERSION " build " HT160S_BUILD_ID;
 //---------------------------------------------------------------------------
 cStateRecordHT160 *gStateRecord = NULL;
 //---------------------------------------------------------------------------

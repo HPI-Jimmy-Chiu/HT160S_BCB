@@ -4,8 +4,8 @@ MAINICON ICON "HT160s.ico"
    NSIS !getdllversion in the updater (HT160_MUI.nsi) reads FILEVERSION below.
    Raw hex literals are used so no windows.h / winver.h include is required. */
 1 VERSIONINFO
- FILEVERSION 1,0,0,0
- PRODUCTVERSION 1,0,0,0
+ FILEVERSION 1,0,0,3
+ PRODUCTVERSION 1,0,0,3
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS 0x40004L
@@ -18,12 +18,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Hon. Precision, Inc.\0"
             VALUE "FileDescription", "HT160S Series High Speed Logic Handler\0"
-            VALUE "FileVersion", "1.0.0.0\0"
+            VALUE "FileVersion", "1.0.0.3\0"
             VALUE "InternalName", "ht160s\0"
             VALUE "LegalCopyright", "(c) 2025 Hon. Precision, Inc.\0"
             VALUE "OriginalFilename", "ht160s.exe\0"
             VALUE "ProductName", "HT160S Series High Speed Logic Handler\0"
-            VALUE "ProductVersion", "1.0.0.0\0"
+            VALUE "ProductVersion", "1.0.0.3\0"
         END
     END
     BLOCK "VarFileInfo"

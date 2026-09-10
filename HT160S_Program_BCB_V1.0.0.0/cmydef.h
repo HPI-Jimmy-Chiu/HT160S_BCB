@@ -4,6 +4,18 @@
 //---------------------------------------------------------------------------
 #include <Classes.hpp>
 #include "MachineType.h"
+//AI(ht160s-buildstamp) 20260910 : the build identity (git short SHA + build time), which the
+//build script stamps into BuildInfo.h for the duration of a build. Included HERE because
+//cmydef.h is the version SSOT and already reaches every TU. The #ifndef fallback below keeps
+//a hand-made or IDE build compiling even if BuildInfo.h ever loses its define.
+//DELIBERATELY NOT folded into HT160S_VERSION or MainVersion : those feed SVID 1003 Software
+//Version and the S1F2 / S1F14 SOFTREV items, and the customer EAP compares that string. The
+//stamp rides its own global (MainBuildID), consumed only by the EventLog Program-Start line
+//and the State Record.
+#include "BuildInfo.h"
+#ifndef HT160S_BUILD_ID
+#define HT160S_BUILD_ID "dev"
+#endif
 //---------------------------------------------------------------------------
 #define SERVER_MOTOR_POWER_ON_DELAY 10
 #define TEST_MAX_BIN 999
@@ -16,7 +28,7 @@
 // A #define of a string LITERAL on purpose: it needs no header ordering, introduces no
 // static-initialisation-order dependency, and lets "HT160S " HT160S_VERSION concatenate at
 // compile time. Do NOT turn it into a global AnsiString.
-#define HT160S_VERSION "1.0.0.0"
+#define HT160S_VERSION "1.0.0.3"
 //---------------------------------------------------------------------------
 extern int CUSTOMER_CODE;
 //AI(ht160s-statusbar) 20260624 : version + machine-identity globals (HT172 parity).
@@ -24,6 +36,10 @@ extern int CUSTOMER_CODE;
 //asHandlerID/asSerialNo mirror HT172 cmydef and are copied from GeneralSetting by
 //UpdateMachineIdentity(). asModel is seeded "HT160S" (NOT "HT172").
 extern AnsiString MainVersion;
+//AI(ht160s-buildstamp) 20260910 : "<git short sha>[+] <yyyymmdd-hhmm>", or "dev" for an IDE
+//build. NEVER published on SECS - EventLog + State Record only. A trailing + on the sha means
+//the project tree had uncommitted changes when the exe was built.
+extern AnsiString MainBuildID;
 extern AnsiString asModel;
 extern AnsiString asHandlerID;
 extern AnsiString asSerialNo;
