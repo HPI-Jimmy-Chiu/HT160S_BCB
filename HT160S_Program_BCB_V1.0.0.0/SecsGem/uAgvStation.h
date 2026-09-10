@@ -94,6 +94,13 @@ public:
     unsigned char Handshake[AGV_STATION_COUNT];      // eAgvHandshake
     unsigned char PrepDone[AGV_STATION_COUNT];
     unsigned char ShortageLatch[AGV_STATION_COUNT];  // one-shot: fire CEID272 once
+    //AI(amr-errorlane-nocall) 20260910 : one-shot for the discrete "AutoN car full" CEID on a
+    //lane that does NOT call the AMR. On a calling lane the IDLE->CALLED transition is itself
+    //the edge, so the emit cannot repeat; a no-call lane never leaves IDLE, so without this it
+    //would re-fire 35/36/37/148/149/150 on every 1 s tick for as long as the car sat full.
+    //Set on the true-full rising edge, cleared when the sensor drops or the lane becomes
+    //AMR-owned again. Auto stations only; P1-P3 entries stay 0.
+    unsigned char FullNoteLatch[AGV_STATION_COUNT];
     int           ShortageDebounce[AGV_STATION_COUNT];  // AI(ht160s-agv) 20260625 : per-station PREP/READY age (ServiceHandshake watchdog ticks)
     unsigned char ReadyEntrySensor[AGV_STATION_COUNT]; // edge baseline for Finish
     //AI(amr-unmanned W3) 20260721 : one-shot per-station "AGV handshake timed out" latch.

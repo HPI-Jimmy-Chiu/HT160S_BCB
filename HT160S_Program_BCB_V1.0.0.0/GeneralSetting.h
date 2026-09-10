@@ -288,6 +288,14 @@ public:
 	// Set [AGV] LoaderCallsAmr=1 to restore the pre-20260902 behaviour without a rebuild.
 	// Empty (P2) / Color (P3) are NOT affected - they keep calling.
 	bool bLoaderCallsAmr;
+	//AI(amr-errorlane-nocall) 20260910 : does the ERROR lane call the AMR? [AGV] ErrorLaneCallsAmr.
+	//1 (DEFAULT) = yes, unchanged behaviour - the Error lane raises CEID 272 like any other Auto.
+	//0 = no : that ONE lane is collected by hand. Customer request 2026-09-10 - the Error lane is
+	//never bound to a lot, so its CEID 272 reaches the EAP with an empty SVID 66040 and KYEC
+	//cannot route the car. Temporary, until their AMR dispatch is finished. WHICH lane is the
+	//Error lane follows the RECIPE (BinAreaMap ErrorBinArea, currently Auto1), never a hard-coded
+	//index - see TAutoModule::IsAmrCollectLane.
+	bool bErrorLaneCallsAmr;
 	// Machine identity (status-bar panels 1-3). Persisted in General.ini
 	// [MachineIdentity]. sMachineModel defaults "HT160S". These are the HT160
 	// source of truth; UpdateMachineIdentity() copies them into the cmydef

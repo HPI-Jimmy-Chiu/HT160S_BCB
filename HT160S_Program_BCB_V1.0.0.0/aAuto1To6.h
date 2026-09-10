@@ -216,6 +216,11 @@ public:
     int GetStationStatus(int Index);   //AI(ht160s-status) 20260703 : eAutoStatus for stbMain display / peers
     int GetStationCursor(int Index);   //AI(auto-obsv-perstation) 20260910 : ONE int per station for the State Record rows - 0=idle, 2ttttt=DoFeedTray case ttttt, 4ttttt=DoDischargeTray case ttttt, -1=bad index
     //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
+    //AI(amr-errorlane-nocall) 20260910 : THE single answer to "is the AMR expected to collect
+    //this Auto car?". Every site that used to test GeneralSetting.bUseAMR for that question now
+    //asks this instead, so the CALL, the Clean-Out drain gate and ServiceCarFull can never
+    //disagree about one lane - a disagreement there is either a silent stall or a double owner.
+    bool IsAmrCollectLane(int Index);
     void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer
     bool IsAmrLocked(int Index);
     bool IsDrainedForAmr(int Index);           // Ready : no working/rear/full tray left (all GoUp to car)

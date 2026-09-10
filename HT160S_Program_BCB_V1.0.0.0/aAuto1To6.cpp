@@ -1155,14 +1155,28 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                             //Full -> OFF) -> next tick GoUp proceeds. AGV not responding -> WAR0962
                             //(W3/W4). Normally the car was already collected during the sorting
                             //phase (continuous full-CALL), so this hold is the rare AGV-slow edge.
-                            if(GeneralSetting.bUseAMR)
+                            //AI(amr-errorlane-nocall) 20260910 : PER LANE now, not per machine.
+                            //With [AGV] ErrorLaneCallsAmr=0 the Error lane is never CALLED, so no
+                            //AMR is coming for it and holding here would be a silent permanent
+                            //stall - and with no handshake to age, WAR0962 could not fire either.
+                            //Owner ruling 2026-09-10 : that lane stops the machine and alarms so a
+                            //human clears it. Removing the stack drops SnAutoX_InputEnd, which is
+                            //the same term the Clean-Out finish gate waits on, so the lot boundary
+                            //releases itself once the operator answers - no change needed there.
+                            if(IsAmrCollectLane(Index))
                                 continue;
                             TMySensor *FullSensor=GetInputFullTray(Index);
                             AnsiString ErrorText;
                             ErrorText.sprintf("Auto%d output stack FULL (sensor) - remove finished trays", Index+1);
                             //AI(auto-lane-label) 20260901 : same label as the ServiceCarFull modal - this
                             //is the SAME alarm code (MES1x20) and the same operator action, so it must not
-                            //say less. AMR=0 only (the bUseAMR case returned above), hence no counts here.
+                            //say less.
+                            //AI(amr-errorlane-nocall) 20260910 : the old note said "AMR=0 only, hence no
+                            //counts here". That stopped being true the moment a no-call Error lane could
+                            //reach this branch with bUseAMR=1 - and in THAT case the counts are valid
+                            //(Car[].iTrayCount is incremented inside the bUseAMR branch of
+                            //DoDischargeTray). Show them on the same condition the sibling modal uses,
+                            //so the two never say different things about the same car.
                             AnsiString sLotDrain=DescribeLaneLotForOperator(Index);
                             if(sLotDrain!="")
                                 ErrorText=ErrorText+" | Lot="+sLotDrain;
@@ -1672,6 +1686,28 @@ TMySensor *TAutoModule::GetCarTrayPushOnSensor(int Index)
 //  raise AGVSupplement (CEID272). Simulation has no sensor, so it uses a logical tray
 //  threshold; the real machine reads the per-Auto InputFullTray sensor (same source
 //  ServiceCarFull treats as the physical last line of defense).
+//AI(amr-errorlane-nocall) 20260910 : is the AMR expected to collect THIS Auto car?
+//false means "a human collects this one", which is what makes the operator modal the correct
+//escalation instead of an AMR call. Three cases:
+//  bUseAMR=0                    -> false for every lane (Normal production, operator collects)
+//  ErrorLaneCallsAmr=1(default) -> true for every lane (unchanged AMR behaviour)
+//  ErrorLaneCallsAmr=0          -> true for every lane EXCEPT the recipe Error lane
+//WHICH lane is the Error lane comes from the RECIPE via LotBinBinding.GetErrorAutoIndex()
+//(BinAreaMap ErrorBinArea, currently Auto1) and is re-read every call, so changing the recipe
+//moves this with it. Deliberately NOT cached and NOT hard-coded to Auto1.
+//A bad index answers true : the safe direction is "AMR owns it", because that is the
+//pre-20260910 behaviour and it cannot invent an operator modal on a station that does not exist.
+bool TAutoModule::IsAmrCollectLane(int Index)
+{
+    if(GeneralSetting.bUseAMR==false)
+        return false;
+    if(GeneralSetting.bErrorLaneCallsAmr)
+        return true;
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return true;
+    return (Index != LotBinBinding.GetErrorAutoIndex());
+}
+//---------------------------------------------------------------------------
 bool TAutoModule::IsOutputCarFullForAmr(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)

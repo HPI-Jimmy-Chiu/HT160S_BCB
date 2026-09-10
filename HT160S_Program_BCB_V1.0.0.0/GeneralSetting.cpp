@@ -140,6 +140,7 @@ void THT160GeneralSetting::SetDefault()
 	iAmrHandshakeWaitSec=240;
 	iAgvTimeoutSec=300;   //AI(amr-unmanned W1) 20260721 : unified AGV handshake timeout -> WAR0962
 	bLoaderCallsAmr=false;   //AI(amr-loader-nocall) 20260902 : Loader source-dry -> Clean Out, not an AMR call
+	bErrorLaneCallsAmr=true;   //AI(amr-errorlane-nocall) 20260910 : default ON = the Error lane calls the AMR, i.e. no behaviour change
 	sMachineModel="HT160S";
 	sHandlerID="";
 	sSerialNo="";
@@ -280,6 +281,7 @@ void THT160GeneralSetting::Load()
 	iAmrHandshakeWaitSec=Ini->ReadInteger("AGV", "AmrHandshakeWaitSec", 240);
 	iAgvTimeoutSec=Ini->ReadInteger("AGV", "AgvTimeoutSec", 300);   //AI(amr-unmanned W1) 20260721
 	bLoaderCallsAmr=Ini->ReadBool("AGV", "LoaderCallsAmr", false);   //AI(amr-loader-nocall) 20260902 : default OFF (owner ruling)
+	bErrorLaneCallsAmr=Ini->ReadBool("AGV", "ErrorLaneCallsAmr", true);   //AI(amr-errorlane-nocall) 20260910 : default ON (owner ruling) - set 0 only while the customer AMR cannot route the Error car
 	sMachineModel=Ini->ReadString("MachineIdentity", "Model", "HT160S");
 	sHandlerID=Ini->ReadString("MachineIdentity", "HandlerID", "");
 	sSerialNo=Ini->ReadString("MachineIdentity", "SerialNo", "");
@@ -375,6 +377,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("AGV", "AmrHandshakeWaitSec", iAmrHandshakeWaitSec);
 	Ini->WriteInteger("AGV", "AgvTimeoutSec", iAgvTimeoutSec);   //AI(amr-unmanned W1) 20260721
 	Ini->WriteBool("AGV", "LoaderCallsAmr", bLoaderCallsAmr);   //AI(amr-loader-nocall) 20260902
+	Ini->WriteBool("AGV", "ErrorLaneCallsAmr", bErrorLaneCallsAmr);   //AI(amr-errorlane-nocall) 20260910
 	Ini->WriteString("MachineIdentity", "Model", sMachineModel);
 	Ini->WriteString("MachineIdentity", "HandlerID", sHandlerID);
 	Ini->WriteString("MachineIdentity", "SerialNo", sSerialNo);

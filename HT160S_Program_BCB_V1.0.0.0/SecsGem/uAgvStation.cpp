@@ -188,6 +188,7 @@ void TAgvCoordinator::Reset()
         Handshake[i]        = AGV_IDLE;
         PrepDone[i]         = 0;
         ShortageLatch[i]    = 0;
+        FullNoteLatch[i]    = 0;   //AI(amr-errorlane-nocall) 20260910
         ShortageDebounce[i] = 0;
         ReadyEntrySensor[i] = 0;
         TimeoutPending[i]   = 0;   //AI(amr-unmanned W3) 20260721
@@ -567,6 +568,41 @@ void TAgvCoordinator::PollAndCall(THGem *Gem)
         // the same value, or a collect-call raised on one tick is revoked on the next.
         bool bCollect = IsCleanOutCollectDueForAmr(a);
         bool bFull = bTrueFull || bCollect;
+        //AI(amr-errorlane-nocall) 20260910 : THIS LANE IS COLLECTED BY HAND ([AGV]
+        //ErrorLaneCallsAmr=0 and this is the recipe Error lane). No CEID 272 and no module lock:
+        //the Error lane is never bound to a lot, so its 272 reached the customer EAP with an
+        //empty SVID 66040 and they could not route the car. The discrete "AutoN car full"
+        //pre-notification IS still emitted - owner ruling 2026-09-10, "only make sure 272 is not
+        //sent" - because the human dispatcher still needs to know the car is full. It needs its
+        //own one-shot: on a calling lane the IDLE->CALLED transition is the edge, and this lane
+        //never leaves IDLE. The operator escalation is the MES1x20 modal in aAuto1To6
+        //(ServiceCarFull in Run_Normal, the drain gate in Run_CleanOut), which stops the machine
+        //and holds until the stack is physically removed - so this lane is never silent.
+        //bCollect is deliberately ignored here too : a clean-out collect is still an AMR call.
+        if(AutoModule->IsAmrCollectLane(a)==false)
+        {
+            if(bTrueFull && FullNoteLatch[si]==0)
+            {
+                FullNoteLatch[si] = 1;
+                Gem->EventReport(1, AutoFullCeid[a]);
+                RecordProcess(AnsiString("AGV: ")+AgvStation[si].Name+" full - CEID "+IntToStr(AutoFullCeid[a])
+                    +" sent, CEID 272 SUPPRESSED ([AGV] ErrorLaneCallsAmr=0) - operator collects this lane");
+            }
+            else if(bTrueFull==false)
+                FullNoteLatch[si] = 0;
+            //A CALLED left over from ErrorLaneCallsAmr=1 (config flipped mid-run) has no answer
+            //coming. Drop it and release the lock, exactly as the P1 no-call branch does below.
+            //PREP/READY are NOT touched : those mean a host-initiated handoff is in flight, and
+            //BeginPrep never required a CALL, so the host can still drive this lane on purpose.
+            if(Handshake[si]==AGV_CALLED)
+            {
+                AutoModule->SetAmrLock(a, false);
+                Handshake[si] = AGV_IDLE;
+                RecordProcess(AnsiString("AGV: ")+AgvStation[si].Name+" CALLED dropped - lane switched to operator collect");
+            }
+            continue;
+        }
+        FullNoteLatch[si] = 0;   //AMR owns this lane again : re-arm the no-call one-shot
         // AI(ht160s-agv) 20260627 : full car + station idle -> CALL the AGV to collect it.
         if(bFull && Handshake[si]==AGV_IDLE)
         {
@@ -924,7 +960,13 @@ AnsiString TAgvCoordinator::DescribeAgvState()
 {
     int iSelected = (HGem!=NULL && HGem->IsSelected()) ? 1 : 0;
     int iUseAmr   = (GeneralSetting.bUseAMR) ? 1 : 0;
-    AnsiString s = "Selected=" + IntToStr(iSelected) + " bUseAMR=" + IntToStr(iUseAmr) + "\r\n";
+    //AI(amr-errorlane-nocall) 20260910 : the flag and the resolved Error lane, so a State Record
+    //post-mortem can tell "this lane was never called" from "this lane was called and ignored".
+    int iErrLaneCalls = (GeneralSetting.bErrorLaneCallsAmr) ? 1 : 0;
+    int iErrAuto      = LotBinBinding.GetErrorAutoIndex();
+    AnsiString s = "Selected=" + IntToStr(iSelected) + " bUseAMR=" + IntToStr(iUseAmr)
+                 + " ErrorLaneCallsAmr=" + IntToStr(iErrLaneCalls)
+                 + " ErrorAuto=AUTO" + IntToStr(iErrAuto+1) + "\r\n";
     for(int i = 0; i < AGV_STATION_COUNT; i++)
     {
         int iLock  = 0;
@@ -957,8 +999,14 @@ AnsiString TAgvCoordinator::DescribeAgvState()
             if(LinkLostPending[i]!=0)
                 sHold = sHold + " WAR0963-pending";
         }
+        //AI(amr-errorlane-nocall) 20260910 : call=0 marks a lane the AMR is NOT expected to
+        //collect, i.e. one whose full car raises the operator modal instead of CEID 272.
+        AnsiString sCall = "";
+        if(AgvStation[i].Kind==ASK_AUTO && AutoModule!=NULL
+           && AutoModule->IsAmrCollectLane(AgvStation[i].AutoIndex)==false)
+            sCall = " call=0(operator)";
         s += "P" + IntToStr(AgvStation[i].PIndex) + " " + AnsiString(AgvStation[i].Name)
-           + ": lock=" + IntToStr(iLock)
+           + ": lock=" + IntToStr(iLock) + sCall
            + " hs="    + AnsiString(AgvHsName(Handshake[i]))
            + " ready=" + IntToStr(iReady) + sBins + sHold + "\r\n";
     }
