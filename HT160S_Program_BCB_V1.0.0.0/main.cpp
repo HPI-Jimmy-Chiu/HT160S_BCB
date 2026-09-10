@@ -2951,7 +2951,7 @@ void __fastcall TfMain::StartNextLotApiPull()
         {
             //machine-log only (SECS stays silent per the customer rule) : say WHY no 9001
             //followed this sweep, so on-site diagnosis does not need the per-attempt lines.
-            RecordProcess("Lot WebAPI sweep closed with dropped lot(s) - CEID 9001 withheld");
+            RecordProcess("Lot WebAPI sweep closed with dropped or empty lot(s) - CEID 9001 withheld");
         }
     }
 }
@@ -3224,7 +3224,27 @@ void __fastcall TfMain::PollLotDataWebApi()
                 int iNewItems=LotRegistry.GetItemCount()-iItemsBefore;
                 int iRefreshed=LotRegistry.GetRefreshCount();
                 if(iNewItems==0 && iRefreshed==0)
+                {
+                    //AI(ht160s-webapi-emptypull) 20260910 : THE MISSING GATE. LoadFromJsonString
+                    //is deliberately permissive - it returns true for any parseable JSON - so a
+                    //200 OK carrying an EMPTY history set bAttemptOk=true, advanced the sweep, and
+                    //the sweep-close gate then announced success on data the server never sent.
+                    //On 2026-09-09 17:40:14 five SIMU_LOT_* lots each answered 200 with an empty
+                    //QRCodeIDHis, logged "parsed 0 ICs" five times, and the machine still emitted
+                    //"exchange OK for all 5 lot(s), 100 2D code(s) - CEID 9001". Those 100 codes
+                    //were already in the registry from elsewhere, so CountLotsWithoutItems() saw
+                    //nothing wrong. This is the same stale-data loophole bLotApiAnyGiveUp closed
+                    //for HTTP give-ups (20260813), through the one door it left open.
+                    //WHY THIS EXACT TEST : the customer WebAPI returns the WHOLE 2D history for a
+                    //lot on every GET and a same-lot re-pull upserts every code in place, so a
+                    //legitimate mid-lot refresh that brings no NEW data still yields iRefreshed>0
+                    //and stays a success. iNewItems==0 AND iRefreshed==0 means the body carried
+                    //ZERO usable items for this lot, i.e. THIS sweep did not confirm its map.
+                    //bAttemptOk stays true on purpose : the server DID answer, so retrying it
+                    //would only burn the retry budget. Only the 9001 claim is withheld.
                     RecordProcess("Lot WebAPI parsed 0 ICs (schema mismatch or empty history): "+sLotApiPullLot);
+                    bLotApiAnyGiveUp=true;
+                }
                 else
                     RecordProcess("Lot WebAPI data loaded: "+sLotApiPullLot+" (new lots="+IntToStr(iNewLots)+", new ICs="+IntToStr(iNewItems)+", refreshed="+IntToStr(iRefreshed)+")");
             }

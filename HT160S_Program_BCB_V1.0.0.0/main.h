@@ -98,8 +98,9 @@ enum TMainFeatureStatusIndex
 //     iLotApiPullCursor     - raw registry slot being pulled NOW (advances only after
 //                             a lot succeeds or its retries are used up).
 //     iLotApiRetryCount     - failed attempts on the current lot.
-//     bLotApiAnyGiveUp      - a lot was dropped this sweep (retries used up or start
-//                             refused) -> CEID 9001 is withheld at sweep close.
+//     bLotApiAnyGiveUp      - a lot was dropped this sweep (retries used up, start refused,
+//                             or a 200 OK whose body parsed zero ICs - 20260910) -> CEID 9001
+//                             is withheld at sweep close.
 //   FeatureBadgeSecsClick() - SECS badge -> open GEM log. (secsgem 20260611)
 //   sgLotListDblClick()     - double-click a Lot row to inspect the 2D/Bin data
 //                             downloaded for that Lot (operator confirms the work-order
