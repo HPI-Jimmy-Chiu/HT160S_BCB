@@ -198,6 +198,7 @@ void TLoaderModule::ResetSide(TLoaderSideState *State)
     State->CcdTask=1;
     State->DischargeTask=1;
     State->DestackTask=1;
+    State->ReleaseTask=0;   //AI(ht160s-cleanout-release) 20260910 : 0 = not releasing (a HOME re-arms the ladder from scratch)
     State->bTrayEmpty=false;
     State->bCcdLeftToRight=true;
     State->CcdX=0;
@@ -1100,6 +1101,72 @@ void TLoaderModule::ReleaseFrontOwner(int LoaderNo)
         iFrontOwner=0;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-cleanout-release) 20260910 : release BOTH tray clamps on one Loader side, in
+//the order the machine mandates - Pop PushTray FIRST, Pop LeanOnTray only once PushTray
+//has confirmed off. Same order as every other release ladder here (DoDischargeTray case
+//2000 -> 3000, and the HOME batch release in uHome.cpp): popping the lean while the front
+//stopper still presses lets the tray spring out of the pocket.
+//Reset() does NOT retract - it only rewinds the Task that Push and Pop SHARE, so that a
+//direction change re-arms the confirm and the watchdog. The retract IS the Pop().
+//Non-blocking: returns false while a stroke is still confirming, true once both are off.
+//Cheap no-op when neither clamp is commanded out, so a caller may call it every scan.
+bool TLoaderModule::ReleaseSideClamps(int LoaderNo)
+{
+    TLoaderSideState *State=GetSide(LoaderNo);
+    TMyCylinder *PushCylinder=NULL;
+    TMyCylinder *LeanCylinder=NULL;
+
+    if(State==NULL)
+        return false;
+    if(LoaderNo==1)
+    {
+        PushCylinder=&HSys.Cyn.C_Loader1_PushTray;
+        LeanCylinder=&HSys.Cyn.C_Loader1_LeanOnTray;
+    }
+    else
+    {
+        PushCylinder=&HSys.Cyn.C_Loader2_PushTray;
+        LeanCylinder=&HSys.Cyn.C_Loader2_LeanOnTray;
+    }
+
+    switch(State->ReleaseTask)
+    {
+        case 0:
+            //neither clamp commanded out : already open. No strokes, no log noise.
+            if(PushCylinder->GetOutBit()==false && LeanCylinder->GetOutBit()==false)
+                return true;
+            RecordProcess("Loader"+IntToStr(LoaderNo)+" clamp release start (PushOut="
+                +IntToStr(PushCylinder->GetOutBit() ? 1 : 0)+" LeanOut="
+                +IntToStr(LeanCylinder->GetOutBit() ? 1 : 0)+")");
+            PushCylinder->Reset();
+            LeanCylinder->Reset();
+            State->ReleaseTask=100;
+            break;
+
+        case 100:
+            if(PushCylinder->Pop() || IsSoftSimulate())
+                State->ReleaseTask=200;
+            break;
+
+        case 200:
+            if(LeanCylinder->Pop() || IsSoftSimulate())
+            {
+                RecordProcess("Loader"+IntToStr(LoaderNo)+" clamp release done");
+                State->ReleaseTask=0;
+                return true;
+            }
+            break;
+
+        default:
+            //AI(ht160s-ladder-guard) : a state number with no matching case. Log it so a
+            //dead jump is a diagnosable EventLog event, not a silent stall, and restart.
+            LogLadderFault("Loader.ReleaseSideClamps", State->ReleaseTask);
+            State->ReleaseTask=0;
+            break;
+    }
+    return false;
+}
+//---------------------------------------------------------------------------
 void TLoaderModule::PrepareTrayMap(int LoaderNo)
 {
     TTrayMotor *TrayMotor=NULL;
@@ -1413,9 +1480,25 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
                     " FeedTask="+IntToStr(State->FeedTask)+" - releasing the front station");   //AI(ht160s-cleanout-preempt)
             ReleaseFrontOwner(LoaderNo);
             State->FeedTask=1;
-            State->bCleanOutFinish=true;
             State->Status=LS_IDLE;
             Task=1;
+            //AI(ht160s-cleanout-release) 20260910 : this retire used to latch
+            //bCleanOutFinish and return WITHOUT ever retracting the clamps. FeedTask 9000
+            //is reached from 8300, i.e. with PushTray and LeanOnTray already PUSHED by
+            //cases 8200/8300, so retiring from there parks the side clamped on nothing.
+            //Logged verbatim twice on 2026-09-09 ("CLEANOUT retire preempts feed: Loader2
+            //FeedTask=9000") at 15:41:12.601 and 17:51:08.247, and the 17:00:13 IoDetail
+            //then read C_Loader2_PushTray Out=1 SnOn=0 SnOff=0 UNCONFIRMED and
+            //C_Loader2_LeanOnTray Out=1 SnOn=1 OUT_OK against Loader1 IN_OK.
+            //bCleanOutFinish is what IsAllCleanOutFinish reads, so latching it before the
+            //clamps are confirmed off declares the Loader drained with two cylinders still
+            //commanded out. Release both first, in the mandated order. Not finished yet ->
+            //return WITHOUT latching; the guard re-enters next scan with the same terms and
+            //the ladder advances. FeedTask is already 1 so the preempt line cannot repeat,
+            //and the bCleanOutFinish test keeps this a one-shot once the side is drained.
+            if(State->bCleanOutFinish==false && ReleaseSideClamps(LoaderNo)==false)
+                return;
+            State->bCleanOutFinish=true;
             return;
         }
         //supply car still has stock (or carriage still loaded) : do NOT finish; the switch
@@ -2035,6 +2118,15 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 10000:
+            //AI(ht160s-cleanout-release) 20260910 : the SAME leave-them-clamped gap as the
+            //CleanOut retire. 10000 is reached ONLY from the JAM0913 "Loader Tray Lost On
+            //Carriage" SKIP at case 9500, and 9500 is reached from 8300 - so PushTray and
+            //LeanOnTray are both EXTENDED here, clamped on a tray the operator has just
+            //confirmed is not there. Retract before ending the feed, in the mandated order.
+            //This only brings forward what the next feed cases 2000/3000 would do anyway;
+            //it removes the clamped-on-nothing posture from an idle side.
+            if(ReleaseSideClamps(LoaderNo)==false)
+                return false;
             ReleaseFrontOwner(LoaderNo);
             State->FeedTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
             return true;

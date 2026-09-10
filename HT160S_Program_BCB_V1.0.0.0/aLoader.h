@@ -40,6 +40,7 @@ struct TLoaderSideState
     HTimer FeedWaitTimer;     //AI(ht160s-agv) 20260626 : AMR feed deferral countdown (wait for AMR refill before MES0920)
     bool bRise1Waiting;       //AI(ht160s-anti-ghost-d) 20260720 : case-10 rise1-not-retracted wait latch (mirrors bWaitingAmrFeed idiom)
     HTimer Rise1WaitTimer;    //AI(ht160s-anti-ghost-d) 20260720 : case-10 rise1-settle countdown before the named MES0925 Note
+    int ReleaseTask;          //AI(ht160s-cleanout-release) 20260910 : clamp-release sub-step (0=idle 100=popping PushTray 200=popping LeanOnTray). Per side, like DestackTask - both sides share every Do* body.
 };
 //---------------------------------------------------------------------------
 //AI(ht160s-overcount-tripqueue) 20260721 : per-car feed trip. iTotal = physical
@@ -97,6 +98,7 @@ private:
     bool IsValidLoaderNo(int LoaderNo);
 
     void ResetSide(TLoaderSideState *State);
+    bool ReleaseSideClamps(int LoaderNo);   //AI(ht160s-cleanout-release) 20260910 : non-blocking two-stroke clamp release (Pop PushTray, then Pop LeanOnTray); true once BOTH confirm off
     void PrepareTrayMap(int LoaderNo);
     bool HasActiveTrayData(int LoaderNo, int Data);
     bool ActiveTrayAllData(int LoaderNo, int Data);
