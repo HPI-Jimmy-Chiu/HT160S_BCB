@@ -3354,6 +3354,37 @@ void __fastcall TfMain::DoLotEndProcess(const char *pSource)
     SoftStop=true;
     MachineRun.bRunning=false;
 
+    //AI(ht160s-lotend-cleanout) 20260910 : RELEASE THE CLEAN-OUT MODE WITH THE LOT.
+    //This function cleared the lot registry but never touched RunMode or bCleanOut, so a
+    //Lot End pressed during a drain left the machine in Run_CleanOut with bCleanOut still
+    //latched and nothing to run it with. Every way out was then refused : START by
+    //CheckLotDataReady (the registry it just emptied), CLEAN OUT by the already-in-CleanOut
+    //guard in CleanOutCore, ONE CYCLE by the same lot-data gate, and HOME re-entered
+    //Run_CleanOut + SoftStop from the still-latched flag. On 2026-09-09 the operator escaped
+    //it by restarting the program : LOT END pressed 17:22:34.584, "Program Start with
+    //version" 17:39:07. The automatic CleanOut-finish path (csystem ProcessMotion) has
+    //always cleared both - this only gives the manual and host paths the same release.
+    //ALSO REMOVES A LATENT TRAP : with the flag latched, a Lot End followed by a fresh Lot
+    //Start and START landed straight in the Run_CleanOut branch of ProcessMotion with every
+    //drain latch still satisfied, i.e. the brand-new lot auto-ended on its first cycle.
+    //GATED ON bCleanOut, NOT ON RunMode : the automatic path clears bCleanOut immediately
+    //BEFORE calling here and sets Run_Normal immediately after, so gating on RunMode would
+    //make this block fire on a NORMAL finish and log a false "abandoned".
+    //BOTH HALVES TOGETHER, NEVER ONE : csystem MachineStop records that bCleanOut=true with
+    //RunMode==Run_Normal silently abandons a drain and lets a later HOME drag the machine
+    //back into Clean Out out of nowhere. The Run_OneCycle arm is the CARRIER of a nested
+    //drain, so if one is riding this drain its SortArm half is cleared with it - same
+    //"clear both halves or neither" rule as the hard-stop discard.
+    if(HSys.Sys.bCleanOut==true)
+    {
+        RecordProcess(AnsiString("LOT END : pending Clean Out abandoned (RunMode=")
+                      +IntToStr((int)HSys.Sys.RunMode)+") - mode released to Normal");
+        if(HSys.Sys.RunMode==Run_OneCycle && SortArmModule!=NULL)
+            SortArmModule->ClearOneCycleFinish();
+        HSys.Sys.bCleanOut=false;
+        ChangeRunMode(Run_Normal);
+    }
+
     //AI(ht160s-whitelist-override) 20260717 : revert the per-lot WhiteList overlay to the base sort
     //mode as the lot closes. Placed EARLY (right after bRunning clears, before any file I/O or CEID
     //emit that could pump the message loop) so a host LOTSTART(WHITELIST) for the NEXT lot is not
