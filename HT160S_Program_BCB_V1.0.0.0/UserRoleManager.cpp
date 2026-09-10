@@ -113,7 +113,15 @@ bool THT160UserRoleManager::Login(int iLevel, AnsiString sUserID, AnsiString sPa
         return ForceLevel(iLevel, sUserID);
 
     if(!CheckPassword(iLevel, sUserID, sPassword))
+    {
+        //AI(ht160s-security) 20260910 : fail-closed, HT9045 parity. HT9045 main.cpp
+        // stOperatorClick sets AccessLevel=0 the moment its password keypad closes and only
+        // then re-raises the level from the entered password, so a rejected credential can
+        // never leave the previous - possibly privileged - session standing. Do the same here
+        // in the engine so it holds for every caller, not just the main-screen combobox.
+        SetUserToOperation(false);
         return false;
+    }
     return ForceLevel(iLevel, sUserID);
 }
 //---------------------------------------------------------------------------

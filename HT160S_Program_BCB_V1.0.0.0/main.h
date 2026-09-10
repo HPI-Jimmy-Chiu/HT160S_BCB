@@ -479,6 +479,7 @@ private:	// User declarations
     void __fastcall FeatureBadgeSecsClick(TObject *Sender);
     void __fastcall UpdateWorkFileComboBox();
     void __fastcall RefreshMainUserSelect();
+    void __fastcall DropLoginToOperation(int OldRoleLevel, AnsiString sWhy);   //AI(ht160s-security) 20260910 : any login attempt that does not authenticate ends at Operation (HT9045 parity)
     void __fastcall InitSimulateScreenBinding();
     void __fastcall SyncMonitorTrayDivision();
     void __fastcall SetupLotListGrid();

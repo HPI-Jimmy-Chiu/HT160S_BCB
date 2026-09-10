@@ -440,6 +440,29 @@ void __fastcall TfMain::RefreshMainUserSelect()
     cbbUserSelect->Text = UserRoleManager.GetLevelName();
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-security) 20260910 : HT9045 parity for a login that does not authenticate. HT9045
+//(main.cpp stOperatorClick) does AccessLevel=0 unconditionally as soon as its password keypad
+//closes and only then re-raises the level from what was typed - so a wrong password, a blank
+//entry and a cancel all land the operator back at level 0. HT160S now behaves the same way:
+//every exit from the login flow that did not authenticate drops the session to Operation. The
+//demotion is a real user change, so it is recorded and reported to the host like any other one.
+void __fastcall TfMain::DropLoginToOperation(int OldRoleLevel, AnsiString sWhy)
+{
+    AnsiString LogText;
+
+    UserRoleManager.SetUserToOperation(false);
+    bUpdatingMainSelections = true;
+    RefreshMainUserSelect();
+    bUpdatingMainSelections = false;
+    if(OldRoleLevel != UserRoleManager.GetLevel())
+    {
+        LogText = AnsiString("Change User to ")+UserRoleManager.GetLevelName()
+                  +AnsiString(" (")+sWhy+AnsiString(")");
+        RecordProcess(LogText);
+        EventReport(SECS_EVENT.SwitchUser);
+    }
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-security) 20260909 : grey out the main-screen controls the current
 //level may not use. Called every cycle from csystem UpdateRunControlFlag, the same
 //hook the maintenance/setup run-state locks ride, so it self-heals the moment the
@@ -1878,14 +1901,15 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         //AI(ht160s-security) 20260910 : both prompt titles now go through LangT - they were bare
         //  English while the error message below them was translated, so on a Chinese UI the two
         //  identical-looking keypads gave the operator no way to tell ID from password.
-        if(PromptLoginInput(this, LangT("Login User ID"), N_NO_SPACE, sLoginID)==false ||
+        //  N_NO_NUM_PAD on the ID prompt too (operator report 20260910 : the +/- step keys showed up
+        //  on the account keypad) - the pad has no business on ANY credential field.
+        if(PromptLoginInput(this, LangT("Login User ID"), N_NO_SPACE|N_NO_NUM_PAD, sLoginID)==false ||
            sLoginID.Trim()==AnsiString(""))
         {
             LogLoginAudit(AnsiString("LOGIN ABANDONED at the ID prompt : level=")
-                          +UserRoleManager.GetLevelName(RoleLevel));
-            bUpdatingMainSelections = true;
-            RefreshMainUserSelect();
-            bUpdatingMainSelections = false;
+                          +UserRoleManager.GetLevelName(RoleLevel)
+                          +AnsiString(" -> back to Operation"));
+            DropLoginToOperation(OldRoleLevel, "login abandoned");
             return;
         }
         //AI(ht160s-security) 20260910 : N_NO_NUM_PAD hides the numeric pad on the masked password
@@ -1896,10 +1920,9 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         if(PromptLoginInput(this, LangT("Login Password"), N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD, sLoginPass)==false)
         {
             LogLoginAudit(AnsiString("LOGIN ABANDONED at the password prompt : id=")+sLoginID.Trim()
-                          +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel));
-            bUpdatingMainSelections = true;
-            RefreshMainUserSelect();
-            bUpdatingMainSelections = false;
+                          +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel)
+                          +AnsiString(" -> back to Operation"));
+            DropLoginToOperation(OldRoleLevel, "login abandoned");
             return;
         }
         if(UserRoleManager.Login(RoleLevel, sLoginID, sLoginPass)==false)
@@ -1910,11 +1933,12 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
             //  popup on purpose (a silent failure would violate the notify rule) - just a
             //  non-stopping one, plus an audit line.
             LogLoginAudit(AnsiString("LOGIN REJECTED : id=")+sLoginID.Trim()
-                          +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel));
+                          +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel)
+                          +AnsiString(" -> back to Operation"));
+            //State first, notification second : the session is already demoted by the time the
+            //  modal is on screen, so nothing privileged stays reachable behind it.
+            DropLoginToOperation(OldRoleLevel, "login rejected");
             ShowMyOKMessageNoStop(LangT("User ID or password is incorrect."));
-            bUpdatingMainSelections = true;
-            RefreshMainUserSelect();
-            bUpdatingMainSelections = false;
             return;
         }
         //AI(ht160s-security) 20260910 : audit the success too. The RecordProcess line further down

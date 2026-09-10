@@ -3081,7 +3081,11 @@ void __fastcall TfMaintenance::PwIdClick(TObject *Sender)
     (void)Sender;
     if(edPwId==NULL || fQwertyKey==NULL || edPwId->Enabled==false)
         return;
-    fQwertyKey->ShowQwertyKey(edPwId, N_NO_SPACE, 0, false, 0, 0, LangT("Account ID"));
+    //AI(ht160s-security) 20260910 : N_NO_NUM_PAD on every credential field. The numeric pad's
+    //  +1/-1/+10/-10/+100/-100, +- and . keys rewrite the WHOLE field via atof(text)+delta, which
+    //  is nonsense for an account name and invisible behind a '*' mask for a password. The QWERTY
+    //  panel still types digits (top row 1..0), so an all-digit credential stays enterable.
+    fQwertyKey->ShowQwertyKey(edPwId, N_NO_SPACE|N_NO_NUM_PAD, 0, false, 0, 0, LangT("Account ID"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
@@ -3089,7 +3093,7 @@ void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
     (void)Sender;
     if(edPwPass==NULL || fQwertyKey==NULL || edPwPass->Enabled==false)
         return;
-    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE, 0, false, 0, 0, LangT("Password"));
+    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD, 0, false, 0, 0, LangT("Password"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
