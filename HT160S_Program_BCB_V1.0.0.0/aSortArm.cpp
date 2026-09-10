@@ -1767,7 +1767,13 @@ void TSortArmModule::TransferPlaceDataToAuto()
             //palAutoXXCnt display (HT172 ShowBinCount used tRunData.TrayICCnt). eAuto1=index 1.
             if(iActiveAutoIndex>=0 && iActiveAutoIndex<SORT_ARM_AUTO_COUNT)
                 tRunData.TrayICCnt[iActiveAutoIndex+1]++;
-            g_DeviceInfo.AddBinInfo(SlotIndex, iActiveAutoIndex, Slot[SlotIndex].TrayData);
+            //AI(prodlog-bin-column) 20260910 : Production_Log Bin column carried Slot.TrayData, the
+            //CELL STATUS code (HAS_OK_IC==2, cmydef.cpp:43), so every placed IC logged the
+            //constant 2 while AddBinInfo writes that argument straight into sField[eBin]
+            //(deviceinfo.cpp:200). BinValue is the real bin, frozen at pick from
+            //TrayMotor->GetTrayBin (aSortArm.cpp:1005) - the same field the sibling call to
+            //LotRegistry.OnSorted five lines up already uses. Owner ruling 20260910.
+            g_DeviceInfo.AddBinInfo(SlotIndex, iActiveAutoIndex, Slot[SlotIndex].BinValue);
             {   //AI(ht160s-bin-passfail) 20260708 : per-IC PASS/FAIL from the customer DiePass.
                 //AI(ht160s-lotpassfail) 20260709 : read the class FROZEN at CCD scan (Slot.PassClass)
                 //so the logged result matches the class the IC was actually routed on; 0 -> blank.
