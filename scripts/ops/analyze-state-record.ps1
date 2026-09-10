@@ -78,6 +78,14 @@ $TaskMaps = @{
         2000='DoFeedTray (rear tray -> car)'; 3000='CheckAutoTray + FindDischargeAuto decide';
         4000='DoDischargeTray (full tray out)'; 5000='DoAllAutoCleanOut'
     }
+    # AI(auto-obsv-perstation) 20260910 : the UserMotion row was renamed Auto1 -> AutoModule,
+    # because its Tag is the MODULE ladder cursor, not a station. 'Auto1' is kept so snapshots
+    # taken before that rename still resolve.
+    'AutoModule' = @{
+        1='idle->100'; 100='CheckAutoTray ->1000'; 1000='FindFeedAuto decide (feed/none)';
+        2000='DoFeedTray (rear tray -> car)'; 3000='CheckAutoTray + FindDischargeAuto decide';
+        4000='DoDischargeTray (full tray out)'; 5000='DoAllAutoCleanOut'
+    }
     'TrayArm' = @{
         1='idle->10'; 10='->100'; 100='idle: HasTray + DecideJob';
         1000='DoPick (source rear)'; 2000='DoPlace (-> Auto / EmptyTray)'
@@ -101,6 +109,7 @@ $StallPhase = @{
     'SortArm' = @(100, 200)
     'TrayArm' = @(1000, 2000)
     'Auto1'   = @(2000, 4000)
+    'AutoModule' = @(2000, 4000)
     'Empty'   = @(1000, 2000, 3000)
     'Color'   = @(1000, 1200, 1500)
 }

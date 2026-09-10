@@ -69,6 +69,7 @@ static AnsiString SR_Tri(int V)
 cStateRecordHT160::cStateRecordHT160()
 {
     ModuleCount = 0;
+    AutoStaBase = -1;                     //AI(auto-obsv-perstation) 20260910 : set by EnsureInited
     bInited     = false;
     bPrevRunGate = false;                 //AI(ht160s-obsv) 20260724
     bRunGateNow  = false;                 //AI(ht160s-obsv-p2) 20260806 : run-gate edge journal
@@ -84,6 +85,7 @@ cStateRecordHT160::cStateRecordHT160()
         Modules[i].LastTask  = -1;
         Modules[i].bHasLast  = false;
         Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1)
+        Modules[i].bWatchdog   = false;   //AI(auto-obsv-perstation) 20260910 : opt-in, true only for real action rows
         Modules[i].WatchBase = Now();     //AI(ht160s-obsv) 20260724 : real base set at EnsureInited seed
         Modules[i].HistHead  = 0;
         Modules[i].HistCount = 0;
@@ -218,8 +220,43 @@ void cStateRecordHT160::EnsureInited()
         Modules[i].SlowCount = 0;
         Modules[i].bHasLast  = false;
         Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1)
+        Modules[i].bWatchdog   = true;    //AI(auto-obsv-perstation) 20260910 : real UserMotion action - watchdog behaviour unchanged
         // Seed an initial sample so every module has at least one entry.
         PushSample(i, Motion->Actions[i]->Tag);
+    }
+    //AI(auto-obsv-perstation) 20260910 : DUMP-ONLY per-Auto-station rows. UserMotion holds ONE
+    //Auto action and its Tag is the MODULE ladder cursor (DoAuto), so the six real per-station
+    //cursors appeared in no State Record at all and the row LABELLED Auto1 was not a station.
+    //Append six synthetic rows fed from the module own per-station cursors: each then gets its
+    //own TaskHistory ring, LastChangeTime and StuckMs, and flows into TaskHistory.csv,
+    //CurrentTasks.txt, [Tasks] and [StuckMs] for free - every one of those writers already
+    //loops to ModuleCount. bWatchdog=false : DUMPED ONLY. Letting the stuck watchdog trip on
+    //them would add new auto-snapshot triggers, which is a behaviour change needing its own
+    //ruling. Guarded on SR_MAX_MODULE so a future action added to UserMotion cannot overrun.
+    if(ModuleCount + AUTO_STATION_COUNT <= SR_MAX_MODULE)
+    {
+        AutoStaBase = ModuleCount;
+        for(int k=0; k<AUTO_STATION_COUNT; k++)
+        {
+            int si = AutoStaBase + k;
+            int Seed = 0;
+            if(AutoModule!=NULL)
+                Seed = AutoModule->GetStationCursor(k);
+            Modules[si].Name       = "AutoSta" + IntToStr(k+1);
+            Modules[si].HistHead   = 0;
+            Modules[si].HistCount  = 0;
+            Modules[si].SlowHead   = 0;
+            Modules[si].SlowCount  = 0;
+            Modules[si].bHasLast   = false;
+            Modules[si].bStuckFired= false;
+            Modules[si].bWatchdog  = false;
+            PushSample(si, Seed);
+        }
+        ModuleCount = AutoStaBase + AUTO_STATION_COUNT;
+    }
+    else
+    {
+        RecordProcess("STATE RECORD: no room for the six per-Auto-station rows (SR_MAX_MODULE reached) - they are NOT dumped");
     }
     bInited = true;
 
@@ -264,6 +301,22 @@ void cStateRecordHT160::SampleTasks()
         {
             PushSample(i, Tag);
             Modules[i].bStuckFired = false;   //AI(ht160s-obsv-p1) : task moved -> re-arm episode
+        }
+    }
+    //AI(auto-obsv-perstation) 20260910 : the six dump-only rows are not in the action list, so
+    //they are sampled here, on the same tick and through the same PushSample, which keeps their
+    //TaskHistory/StuckMs semantics identical to a real row.
+    if(AutoStaBase>=0 && AutoModule!=NULL)
+    {
+        for(int k=0; k<AUTO_STATION_COUNT; k++)
+        {
+            int si  = AutoStaBase + k;
+            int Cur = AutoModule->GetStationCursor(k);
+            if(Modules[si].bHasLast==false || Modules[si].LastTask!=Cur)
+            {
+                PushSample(si, Cur);
+                Modules[si].bStuckFired = false;
+            }
         }
     }
     CheckStuckWatchdog();
@@ -316,6 +369,8 @@ void cStateRecordHT160::CheckStuckWatchdog()
     AnsiString sStuck;
     for(int i=0; i<ModuleCount; i++)
     {
+        if(Modules[i].bWatchdog==false)
+            continue;   //AI(auto-obsv-perstation) 20260910 : dump-only synthetic row, never a trigger
         if(Modules[i].bHasLast==false || Modules[i].bStuckFired)
             continue;
         double dMs=double(tNow-Modules[i].WatchBase)*86400000.0;

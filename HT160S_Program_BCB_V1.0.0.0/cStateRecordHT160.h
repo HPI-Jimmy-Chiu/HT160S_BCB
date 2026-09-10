@@ -55,6 +55,11 @@ private:
         int         HistHead;               // next write index
         int         HistCount;              // filled entries (<= SR_MAX_HISTORY)
         bool        bStuckFired;            //AI(ht160s-obsv-p1) : one auto-snapshot per stuck episode
+        //AI(auto-obsv-perstation) 20260910 : true = a real UserMotion action row, which the
+        //STUCK WATCHDOG may trip on. false = a DUMP-ONLY synthetic row (the six Auto stations):
+        //sampled, historied and dumped, but CheckStuckWatchdog skips it. Flipping a synthetic
+        //row to true is a BEHAVIOUR change (new auto-snapshot triggers) and needs its own ruling.
+        bool        bWatchdog;
         TDateTime   WatchBase;              //AI(ht160s-obsv) 20260724 : stuck-clock base (last task change OR last production resume) - immune to Pause/Stop wall-clock inflation
         //AI(ht160s-obsv-p2) 20260806 : SLOW ring - only tasks dwelt in >= SR_SLOW_DWELL_MS
         //(entry = the task + the time it was ENTERED, pushed when it is LEFT). Survives the
@@ -85,6 +90,11 @@ private:
     //AI(staterecord-retention) 20260901 : true once PurgeOldSnapshots has run this program
     //start, so the boot sweep happens exactly once even if EnsureInited is re-entered.
     bool         bPurgedThisRun;
+    //AI(auto-obsv-perstation) 20260910 : index of the "AutoSta1" row in Modules[]; the six
+    //per-Auto-station rows occupy AutoStaBase .. AutoStaBase+5. -1 = not appended (EnsureInited
+    //has not run, or SR_MAX_MODULE left no room). Stored rather than recomputed as
+    //ModuleCount-6, which would silently point at the wrong rows after a partial append.
+    int          AutoStaBase;
 
     void       EnsureInited();
     void       PushSample(int ModuleIndex, int Task);

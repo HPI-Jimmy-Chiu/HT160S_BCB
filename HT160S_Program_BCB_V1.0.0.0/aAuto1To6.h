@@ -15,6 +15,12 @@ class TMySensor;
 //that GetNextTrayKindForAuto already returns when a car is full.
 #define eTrayReqNone (-1)
 //---------------------------------------------------------------------------
+//AI(auto-obsv-perstation) 20260910 : moved here from aAuto1To6.cpp, where it was a
+//file-static and therefore invisible to every peer that has to size a per-station loop
+//(the State Record now dumps one row per station and needs exactly this bound). Still ONE
+//definition - the .cpp copy is gone - so there is no second source of truth.
+static const int AUTO_STATION_COUNT=6;
+//---------------------------------------------------------------------------
 //AI(ht160s-status) 20260703 : explicit per-station status (approved unified-status
 //design, docs/plan/module-status-enum-design-20260703.md). Ladder-owned; SHADOW phase
 //5a : written everywhere, read only by logging/UI until the flag readers are flipped
@@ -208,6 +214,7 @@ public:
     //to target only Autos wanting a plain Normal tray. Default = legacy behavior.
     int FindTrayRequestAuto(int &OutKind, int WantKind=eTrayReqNone);
     int GetStationStatus(int Index);   //AI(ht160s-status) 20260703 : eAutoStatus for stbMain display / peers
+    int GetStationCursor(int Index);   //AI(auto-obsv-perstation) 20260910 : ONE int per station for the State Record rows - 0=idle, 2ttttt=DoFeedTray case ttttt, 4ttttt=DoDischargeTray case ttttt, -1=bad index
     //AI(ht160s-agv) 20260615 : E87/AGV output-car handoff support (SECS coordinator).
     void SetAmrLock(int Index, bool bLock);   // lock/unlock TrayArm feed + modal defer
     bool IsAmrLocked(int Index);

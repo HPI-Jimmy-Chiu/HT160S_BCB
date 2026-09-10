@@ -62,7 +62,7 @@ object DataModule1: TDataModule1
       OnExecute = actLoader2Execute
     end
     object actAuto1to6: TAction
-      Caption = 'Auto1'
+      Caption = 'AutoModule'
       OnExecute = actAuto1to6Execute
     end
     object actTrayArm: TAction

@@ -20,7 +20,6 @@
 //---------------------------------------------------------------------------
 TAutoModule *AutoModule=NULL;
 //---------------------------------------------------------------------------
-static const int AUTO_STATION_COUNT=6;
 //AI(ht160s-agv) 20260615 : simulation output-car-full threshold (trays) for the AGV
 //  AGVSupplement trigger. Real machine uses the SnAutoX_InputFullTray sensor instead.
 static const int AMR_FULL_TRAY_SIM=10;
@@ -1867,6 +1866,31 @@ int TAutoModule::GetStationStatus(int Index)
     return State[Index].Status;
 }
 //---------------------------------------------------------------------------
+//AI(auto-obsv-perstation) 20260910 : ONE integer naming what THIS station is doing, for the
+//State Record per-station rows. [Tasks], [StuckMs], CurrentTasks.txt and TaskHistory.csv all
+//key exactly one int per row, and the single UserMotion "Auto" action carries the MODULE
+//ladder cursor (DoAuto), not a station - machine 2 2026-09-09 18:11 read "Auto1=5000" when
+//5000 was the DoAllAutoCleanOut pump case and no station at all, while the six real cursors
+//appeared in no dump anywhere. Both sub-ladders park at 1 when idle and at most one of them
+//is live on a station at a time, so a 2/4 prefix separates them inside one int - the same
+//2000=feed / 4000=discharge convention StationTask already uses. Values :
+//   0      = idle, no ladder in flight on this station
+//   2ttttt = DoFeedTray      at case ttttt
+//   4ttttt = DoDischargeTray at case ttttt
+//  -1      = bad index
+//Discharge is tested first : it is the later phase, so if both ever read non-idle the dump
+//shows the one nearer the handoff. Read-only, no state change.
+int TAutoModule::GetStationCursor(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return -1;
+    if(DischargeTask[Index]>1)
+        return 400000+DischargeTask[Index];
+    if(FeedTask[Index]>1)
+        return 200000+FeedTask[Index];
+    return 0;
+}
+//---------------------------------------------------------------------------
 //AI(auto-obsv) 20260801 : the Auto module cursors. Unlike the Loader - whose per-side
 //FeedTask/CcdTask/DischargeTask/DestackTask are already in FeederDecision.txt - none of
 //these appeared in any State Record, even though ALL SIX stations share them. DoAuto is a
@@ -1878,7 +1902,11 @@ int TAutoModule::GetStationStatus(int Index)
 AnsiString TAutoModule::DescribeModule()
 {
     AnsiString s;
-    s  = "[AutoModule] (cursors SHARED by all six stations)\r\n";
+    //AI(auto-obsv-perstation) 20260910 : the old header said every cursor was shared. That
+    //stopped being true at 20260802 (auto-per-station) for FeedTask/DischargeTask/
+    //DischargeSub/StationTask, and reading it as gospel is what made "Auto1=5000" look like
+    //a station. Say which half is which.
+    s  = "[AutoModule] Concurrency/CleanOutTask/iFeedAuto/iDischargeAuto are MODULE-WIDE; the per-Auto rows below are PER STATION\r\n";
     //AI(auto-per-station) 20260802 : feed/discharge cursors are per station now; the two
     //i*Auto values are dispatch-only (which station the serial lap picked).
     s += "  Concurrency="   + IntToStr(GeneralSetting.iAutoConcurrency)
@@ -1893,7 +1921,8 @@ AnsiString TAutoModule::DescribeModule()
            + "  DischargeSub="  + IntToStr(DischargeSubTask[DumpIndex])
            + "  StationTask="   + IntToStr(StationTask[DumpIndex])
            + "  FeedElig="      + IntToStr(IsFeedEligible(DumpIndex) ? 1 : 0)
-           + "  DischElig="     + IntToStr(IsDischargeEligible(DumpIndex) ? 1 : 0) + "\r\n";
+           + "  DischElig="     + IntToStr(IsDischargeEligible(DumpIndex) ? 1 : 0)
+           + "  Cursor="        + IntToStr(GetStationCursor(DumpIndex)) + "\r\n";   //AI(auto-obsv-perstation) 20260910 : the exact value the AutoSta<n> State Record row carries, so the two dumps cross-check in one read
     }
     return s;
 }
