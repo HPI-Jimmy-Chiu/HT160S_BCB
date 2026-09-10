@@ -162,6 +162,7 @@ private:
     void UpdateKeyCaptions();
     void ConfigureMode(AnsiString TitleText);
     void ChangeDecimalPoint();
+    void ApplyNumPadStepVisibility();   //AI(ht160s-qwertykey) 20260910 : HT9045 parity - steppers only on numeric, never on a password
     void InsertContent(AnsiString Text);
     void BackspaceContent();
     bool ValidateAndClamp(AnsiString &Text);

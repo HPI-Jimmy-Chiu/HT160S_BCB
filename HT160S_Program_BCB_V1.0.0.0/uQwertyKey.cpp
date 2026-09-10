@@ -204,6 +204,7 @@ void TfQwertyKey::ConfigureMode(AnsiString TitleText)
         palNumKey->Visible=!(KeyCode&N_NO_NUM_PAD);
     }
     ChangeDecimalPoint();
+    ApplyNumPadStepVisibility();
     UpdateKeyCaptions();
 }
 //---------------------------------------------------------------------------
@@ -225,6 +226,35 @@ void TfQwertyKey::UpdateKeyCaptions()
         if(KeyType[i]==QKT_SPACE)
             btnKeys[i]->Visible=!(KeyCode&N_NO_SPACE);
     }
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-qwertykey) 20260910 : RESTORED HT9045 GUARD. HT9045 myQwertyKeyBoard.cpp:194-201 makes
+//every value stepper conditional - `spbAdd1->Visible=((iFunction&N_INTEGER || iFunction&N_DOUBLE)
+//&& !(iFunction&N_PASSWORD));` and the same for -1/+10/-10/+100/-100, the decimal point and the
+//percent key - so on a 9045 credential the pad shows DIGITS ONLY. The HT160S port kept the
+//buttons but lost that gate: they appeared on plain text fields and on masked password fields
+//too, where btnStepClick rewrites the WHOLE content as atof(text)+delta. That turns a lot number
+//like "LOT-A123" into "1" on one stray touch, and an 8-digit password into a different 8-digit
+//number with an unchanged run of '*' (the 20260910 operator report). Re-applied on every open by
+//ConfigureMode, so it cannot go stale. The digit keys themselves are never touched.
+void TfQwertyKey::ApplyNumPadStepVisibility()
+{
+    bool bStepAllowed;
+    bool bDecimalAllowed;
+
+    bStepAllowed=(IsNumericMode() && !(KeyCode&N_PASSWORD));
+    bDecimalAllowed=(bStepAllowed && (KeyCode&N_DOUBLE)!=0);
+
+    if(spbAdd1!=NULL)     spbAdd1->Visible=bStepAllowed;
+    if(spbMinus1!=NULL)   spbMinus1->Visible=bStepAllowed;
+    if(spbAdd10!=NULL)    spbAdd10->Visible=bStepAllowed;
+    if(spbMinus10!=NULL)  spbMinus10->Visible=bStepAllowed;
+    if(spbAdd100!=NULL)   spbAdd100->Visible=bStepAllowed;
+    if(spbMinus100!=NULL) spbMinus100->Visible=bStepAllowed;
+    if(spbMinus!=NULL)    spbMinus->Visible=bStepAllowed;
+    //Decimal point follows N_DOUBLE only : edContentKeyPress already refuses '.' on an integer
+    //field, so showing the key there would just be a dead button.
+    if(spbDecimal!=NULL)  spbDecimal->Visible=bDecimalAllowed;
 }
 //---------------------------------------------------------------------------
 void TfQwertyKey::ChangeDecimalPoint()
