@@ -56,7 +56,11 @@ static const THT160PermSlotDef PermSlotTable[HT160_PERM_SLOT_COUNT]=
     { "SECS",        "Accept host on-line request switch",         ROLE_HONPREC    },
     { "Service",     "FTP credentials view / edit / test",         ROLE_HONPREC    },
     { "Service",     "Machine model / handler ID / serial number", ROLE_HONPREC    },
-    { "Security",    "Security policy edit (locked)",              ROLE_HONPREC    }
+    { "Security",    "Security policy edit (locked)",              ROLE_HONPREC    },
+    //AI(ht160s-security) 20260910 : appended out of group order on purpose - a shipped
+    // slot ID is never renumbered (system\security.txt keys on it), so a new Main-screen
+    // slot still lands at the end of the table.
+    { "Main",        "Map Tray page (tray dump / simulation)",     ROLE_HONPREC    }
 };
 //---------------------------------------------------------------------------
 __fastcall THT160SecurityPolicy::THT160SecurityPolicy()

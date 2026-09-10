@@ -79,10 +79,15 @@ enum EHT160PermSlot
     PERM_MACHINE_IDENTITY       = 30,
 
     // --- The gate that guards the gates. LOCKED: see IsSlotLocked(). ---
-    PERM_MAINT_SECURITY_POLICY  = 31
+    PERM_MAINT_SECURITY_POLICY  = 31,
+
+    // --- Main screen, appended out of group order: slot IDs are append-only ---
+    // Map Tray page = tray dump memo + the simulation tools (Enable Simulation,
+    // simulated 2D data, max-tray table). Honprec only by default.
+    PERM_MAIN_MAP_TRAY_PAGE     = 32
 };
 //---------------------------------------------------------------------------
-#define HT160_PERM_SLOT_COUNT 32
+#define HT160_PERM_SLOT_COUNT 33
 //---------------------------------------------------------------------------
 class THT160SecurityPolicy
 {

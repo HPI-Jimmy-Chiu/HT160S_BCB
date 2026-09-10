@@ -336,6 +336,11 @@ void __fastcall TfMain::RefreshEventLogView()
 //---------------------------------------------------------------------------
 void __fastcall TfMain::btnTrayMapClick(TObject *Sender)
 {
+    //AI(ht160s-security) 20260910 : defence in depth. The button is hidden below Honprec by
+    //  UpdateMainPermissionLock, but a panel scan key, a programmatic Click() or a racing
+    //  refresh could still reach this handler. Silent by policy - no popup.
+    if(SecurityAllows(PERM_MAIN_MAP_TRAY_PAGE)==false)
+        return;
     if(pgcLog != NULL)
         pgcLog->ActivePage = tsMapTray;
 }
@@ -432,12 +437,33 @@ void __fastcall TfMain::RefreshMainUserSelect()
 //stopped-machine checks, this only ANDs the permission on top.
 void __fastcall TfMain::UpdateMainPermissionLock()
 {
+    bool bMapTrayAllowed;
+
     if(sbProduct!=NULL)
         sbProduct->Enabled=SecurityAllows(PERM_SETUP_SCREEN);
     if(btnClearCount!=NULL)
         btnClearCount->Enabled=SecurityAllows(PERM_MAIN_CLEAR_COUNT);
     if(pnRealDummy!=NULL)
         pnRealDummy->Enabled=SecurityAllows(PERM_MAIN_REAL_DUMMY);
+
+    //AI(ht160s-security) 20260910 : the Map Tray page holds the tray dump memo and the
+    //  simulation tools (Enable Simulation / simulated 2D data / max tray table), so the
+    //  operator must not even SEE it - PERM_MAIN_MAP_TRAY_PAGE defaults to Honprec. The
+    //  pgcLog tab row is hidden (SetInitialWindowFrame), so btnTrayMap is the only way in:
+    //  hide the button rather than grey it, and if the page is already open when the level
+    //  drops, fall back to Tray Status on this same cycle. Runs every cycle from
+    //  UpdateRunControlFlag, so it self-heals both ways and can never go stale.
+    bMapTrayAllowed=SecurityAllows(PERM_MAIN_MAP_TRAY_PAGE);
+    if(btnTrayMap!=NULL)
+        btnTrayMap->Visible=bMapTrayAllowed;
+    if(bMapTrayAllowed==false && pgcLog!=NULL && pgcLog->ActivePage==tsMapTray)
+    {
+        pgcLog->ActivePage=tsTrayStatus;
+        //TSpeedButton::Down= does NOT fire OnClick (unlike TCheckBox::Checked=), so this
+        //  only keeps the GroupIndex=1 button row in step with the page we just forced.
+        if(spbTrayStatus!=NULL)
+            spbTrayStatus->Down=true;
+    }
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-secsgem) 20260616 : the SECS/SAFE/AMR badges now live in main.dfm as
