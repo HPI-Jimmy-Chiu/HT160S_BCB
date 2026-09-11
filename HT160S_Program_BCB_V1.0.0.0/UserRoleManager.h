@@ -34,9 +34,10 @@ private:
     bool m_bServiceMaster;
     THT160UserRoleRecord m_Users[HT160_USER_ROLE_MAX_COUNT];
     int m_iUserCount;
+    AnsiString m_sLoadDuplicateIDs;
 
     int NormalizeLevel(int iLevel) const;
-    int FindUser(AnsiString sUserID, int iLevel) const;
+    int FindUser(AnsiString sUserID) const;
     bool IsHourMasterCredential(AnsiString sUserID, AnsiString sPassword) const;
     bool IsServiceMasterCredential(AnsiString sUserID, AnsiString sPassword) const;
 
@@ -59,12 +60,14 @@ public:
 
     void ClearUsers();
     bool AddOrUpdateUser(AnsiString sUserID, AnsiString sPassword, int iLevel);
-    bool DeleteUser(AnsiString sUserID, int iLevel);
-    bool CheckPassword(int iLevel, AnsiString sUserID, AnsiString sPassword) const;
+    bool DeleteUser(AnsiString sUserID);
+    bool CheckPassword(AnsiString sUserID, AnsiString sPassword) const;
+    int FindUserLevel(AnsiString sUserID) const;   //AI(ht160s-security) 20260911 : the book row's level IS the level (HT9045 book-path model); -1 when the ID is not in the book
     bool LoadFromFile(AnsiString FileName);
     bool SaveToFile(AnsiString FileName);
 
     int GetUserCount() const;
+    AnsiString GetLoadDuplicateIDs() const;   //AI(ht160s-security) 20260911 : IDs whose 2nd+ row LoadFromFile dropped (ID is the key now)
     AnsiString GetUserID(int iIndex) const;
     int GetUserLevel(int iIndex) const;
     bool IsUserEnabled(int iIndex) const;

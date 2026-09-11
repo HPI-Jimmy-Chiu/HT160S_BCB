@@ -187,6 +187,10 @@ void __fastcall TDataModule1::Timer1Timer(TObject *Sender)
                 iSysToolTick=0;
                 if(FormSysTools!=NULL)
                     FormSysTools->RefreshMyTimeString();
+                //AI(ht160s-security) 20260911 : same 1 Hz derivation drives the auto-logout window.
+                //A TTimer keeps firing inside ShowModal (that is why note.cpp/mymessbox.cpp self-pump
+                //here), so the count ages correctly behind the keypad and the message boxes.
+                MainAutoLogoutTick();
             }
         }
     }

@@ -24,6 +24,7 @@ __fastcall THT160UserRoleManager::THT160UserRoleManager()
     m_tLoginTime=Now();
     m_bManualOperation=false;
     m_bServiceMaster=false;
+    m_sLoadDuplicateIDs="";
     ClearUsers();
     InitializeByBuildMode();
 }
@@ -109,10 +110,21 @@ bool THT160UserRoleManager::Login(int iLevel, AnsiString sUserID, AnsiString sPa
         return true;
     }
 
+    //AI(ht160s-security) 20260911 : the hour master now grants HONPREC outright. It used to grant
+    //  "whatever level the operator picked", but with the level coming from the account book the
+    //  picker no longer means anything - honouring it would silently downgrade the field-service
+    //  backdoor to whatever the combo happened to sit on, on exactly the machines whose book is
+    //  broken. It is deliberately NOT flagged as m_bServiceMaster: that marker means the compiled
+    //  Honprec credential, and the EventLog has to keep the two apart.
     if(IsHourMasterCredential(sUserID, sPassword))
-        return ForceLevel(iLevel, sUserID);
+        return ForceLevel(ROLE_HONPREC, sUserID);
 
-    if(!CheckPassword(iLevel, sUserID, sPassword))
+    //AI(ht160s-security) 20260911 : ID IMPLIES LEVEL (HT9045 book path, main.cpp:15245-15250). The
+    //  iLevel argument is now only the Operation/logout selector handled at the top of this
+    //  function; for a real account the level comes from the matched book row, so an operator who
+    //  picks the wrong entry in the combo is no longer rejected.
+    iLevel=FindUserLevel(sUserID);
+    if(iLevel<0 || !CheckPassword(sUserID, sPassword))
     {
         //AI(ht160s-security) 20260910 : fail-closed, HT9045 parity. HT9045 main.cpp
         // stOperatorClick sets AccessLevel=0 the moment its password keypad closes and only
@@ -172,7 +184,14 @@ void THT160UserRoleManager::ClearUsers()
     m_iUserCount=0;
 }
 //---------------------------------------------------------------------------
-int THT160UserRoleManager::FindUser(AnsiString sUserID, int iLevel) const
+//AI(ht160s-security) 20260911 : the book is now keyed by ID ALONE. It used to match (ID, level),
+// which forced the operator to pick the right level in the main-screen combo before the account
+// would even be found - picking wrong looked exactly like a wrong password. HT9045's book path
+// (main.cpp:15238-15250) instead takes the level FROM the matched row, so the ID decides the role.
+// Consequences of the key change, all deliberate: AddOrUpdateUser now MOVES an account between
+// levels instead of spawning a second row, DeleteUser needs no level, and LoadFromFile keeps the
+// FIRST row for a duplicated ID (see there).
+int THT160UserRoleManager::FindUser(AnsiString sUserID) const
 {
     AnsiString sFind=sUserID.Trim().UpperCase();
     int i;
@@ -183,8 +202,6 @@ int THT160UserRoleManager::FindUser(AnsiString sUserID, int iLevel) const
     {
         if(!m_Users[i].bEnabled)
             continue;
-        if(m_Users[i].iLevel!=iLevel)
-            continue;
         if(m_Users[i].sUserID.Trim().UpperCase()==sFind)
             return i;
     }
@@ -194,8 +211,10 @@ int THT160UserRoleManager::FindUser(AnsiString sUserID, int iLevel) const
 //AI(ht160s-password) 20260624 : hardcoded time-based service master login. The
 // entered ID AND password must both equal the current hour (24h clock, 0-23) -
 // e.g. at 22:xx the credential is 22 / 22. Not stored in login.txt and never
-// listed in the UI; it authorizes whatever level the operator selected. Because
-// it changes every hour it is not a static, leakable secret.
+// listed in the UI. Because it changes every hour it is not a static, leakable
+// secret. 20260911 : it now grants ROLE_HONPREC outright - it used to grant the
+// level picked in the main-screen combo, which stopped meaning anything when the
+// account book started deciding the level (see Login()).
 bool THT160UserRoleManager::IsHourMasterCredential(AnsiString sUserID, AnsiString sPassword) const
 {
     unsigned short H, M, S, MS;
@@ -239,7 +258,10 @@ bool THT160UserRoleManager::AddOrUpdateUser(AnsiString sUserID, AnsiString sPass
     if(sUserID.Trim()==AnsiString(""))
         return false;
 
-    iIndex=FindUser(sUserID, iLevel);
+    //AI(ht160s-security) 20260911 : ID-keyed, so saving an existing ID at another level MOVES the
+    //  account instead of creating a second row. That is what the ID-implies-level model needs :
+    //  one ID can only mean one role.
+    iIndex=FindUser(sUserID);
     if(iIndex<0)
     {
         if(m_iUserCount>=HT160_USER_ROLE_MAX_COUNT)
@@ -255,9 +277,9 @@ bool THT160UserRoleManager::AddOrUpdateUser(AnsiString sUserID, AnsiString sPass
     return true;
 }
 //---------------------------------------------------------------------------
-bool THT160UserRoleManager::DeleteUser(AnsiString sUserID, int iLevel)
+bool THT160UserRoleManager::DeleteUser(AnsiString sUserID)
 {
-    int iIndex=FindUser(sUserID, iLevel);
+    int iIndex=FindUser(sUserID);
     int i;
 
     if(iIndex<0)
@@ -270,16 +292,26 @@ bool THT160UserRoleManager::DeleteUser(AnsiString sUserID, int iLevel)
     return true;
 }
 //---------------------------------------------------------------------------
-bool THT160UserRoleManager::CheckPassword(int iLevel, AnsiString sUserID, AnsiString sPassword) const
+bool THT160UserRoleManager::CheckPassword(AnsiString sUserID, AnsiString sPassword) const
 {
     int iIndex;
 
-    if(!IsValidLevel(iLevel))
-        return false;
-    iIndex=FindUser(sUserID, iLevel);
+    iIndex=FindUser(sUserID);
     if(iIndex<0)
         return false;
+    //The ID is matched case-insensitively (FindUser trims and upper-cases); the password is NOT -
+    //it stays a byte-exact compare. HT9045 upper-cases both, which quietly makes its passwords
+    //case-insensitive; HT160S keeps the stronger compare.
     return (m_Users[iIndex].sPassword==sPassword);
+}
+//---------------------------------------------------------------------------
+int THT160UserRoleManager::FindUserLevel(AnsiString sUserID) const
+{
+    int iIndex=FindUser(sUserID);
+
+    if(iIndex<0)
+        return -1;
+    return m_Users[iIndex].iLevel;
 }
 //---------------------------------------------------------------------------
 bool THT160UserRoleManager::LoadFromFile(AnsiString FileName)
@@ -290,6 +322,7 @@ bool THT160UserRoleManager::LoadFromFile(AnsiString FileName)
     bool bLoaded;
 
     ClearUsers();
+    m_sLoadDuplicateIDs="";
     if(!FileExists(FileName))
         return false;
 
@@ -331,6 +364,19 @@ bool THT160UserRoleManager::LoadFromFile(AnsiString FileName)
 
                 if(sID==AnsiString("") || !IsValidLevel(iLevel))
                     continue;
+                //AI(ht160s-security) 20260911 : FIRST row wins for a duplicated ID, matching HT9045
+                //  (its book scan returns on the first match, main.cpp:15299-15302). Without this
+                //  skip the now ID-keyed AddOrUpdateUser would be LAST-wins and would silently
+                //  re-level a customer account on every boot. A book written before the key change
+                //  can legitimately hold the same ID twice, so this is not theoretical; the
+                //  collapsed IDs are reported through GetLoadDuplicateIDs().
+                if(FindUser(sID)>=0)
+                {
+                    if(m_sLoadDuplicateIDs!=AnsiString(""))
+                        m_sLoadDuplicateIDs=m_sLoadDuplicateIDs+",";
+                    m_sLoadDuplicateIDs=m_sLoadDuplicateIDs+sID;
+                    continue;
+                }
                 AddOrUpdateUser(sID, sPass, iLevel);
             }
         }
@@ -382,6 +428,11 @@ bool THT160UserRoleManager::SaveToFile(AnsiString FileName)
 int THT160UserRoleManager::GetUserCount() const
 {
     return m_iUserCount;
+}
+//---------------------------------------------------------------------------
+AnsiString THT160UserRoleManager::GetLoadDuplicateIDs() const
+{
+    return m_sLoadDuplicateIDs;
 }
 //---------------------------------------------------------------------------
 AnsiString THT160UserRoleManager::GetUserID(int iIndex) const

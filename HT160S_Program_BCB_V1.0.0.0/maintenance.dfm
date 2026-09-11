@@ -1280,6 +1280,55 @@ object fMaintenance: TfMaintenance
                   OnClick = edUphMinSampleICClick
                 end
               end
+              object pnlAutoLogoutBox: TPanel
+                Left = 0
+                Top = 200
+                Width = 929
+                Height = 44
+                Align = alTop
+                BevelInner = bvLowered
+                TabOrder = 4
+                object lblAutoLogout: TLabel
+                  Left = 16
+                  Top = 14
+                  Width = 170
+                  Height = 16
+                  AutoSize = False
+                  Caption = 'Auto logout after (sec)'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clWindowText
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object lblAutoLogoutHint: TLabel
+                  Left = 300
+                  Top = 14
+                  Width = 620
+                  Height = 16
+                  AutoSize = False
+                  Caption = 
+                    'Drop a logged-in user back to Operation after this many seconds' +
+                    ' on the MAIN screen (held while a sub-screen is open). 0 = never'
+                  Font.Charset = DEFAULT_CHARSET
+                  Font.Color = clNavy
+                  Font.Height = -13
+                  Font.Name = 'MS Sans Serif'
+                  Font.Style = []
+                  ParentFont = False
+                end
+                object edAutoLogoutSec: TEdit
+                  Left = 196
+                  Top = 10
+                  Width = 80
+                  Height = 21
+                  ReadOnly = True
+                  TabOrder = 0
+                  Text = '600'
+                  OnClick = edAutoLogoutSecClick
+                end
+              end
             end
             object tsNetwork: TTabSheet
               Caption = 'N[Network]'

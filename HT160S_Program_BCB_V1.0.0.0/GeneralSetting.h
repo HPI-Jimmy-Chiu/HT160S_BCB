@@ -357,6 +357,16 @@ public:
 	// [UPH] MinSampleIC. Does NOT change GetCalculateUPH (lot-end value stays exact).
 	int iUphMinSampleIC;
 
+	// AI(ht160s-security) 20260911 : auto logout, ported from HT9045 (main.cpp Timer3Timer
+	// iOperatorModeCount / [A01] iA01ChangeOpTime). Seconds an ELEVATED login may sit on the
+	// MAIN SCREEN before the session drops back to Operation. It is NOT an idle timer: HT160S
+	// has no keyboard/mouse hook anywhere, so nothing an operator touches can reset it. The
+	// count is held at 0 whenever a sub-screen is open (Screen->ActiveForm!=fMain), exactly like
+	// the HT9045 screen hold, and restarts on every successful login. 0 = never log out.
+	// Edited on the maintenance tsFunctionGeneral tab. Stored in General.ini [Security]
+	// AutoLogoutSec. Clamped to 0 or 30..36000 on load.
+	int iAutoLogoutSec;
+
 	// Per-unit fixed label text + color, old-160 style. Index order (P0 lock):
 	// 0=Empty 1=Loader 2..7=Auto1..6 8=Color. Text is one char: digit/letter/blank.
 	// Color is the raw LED code sent to the board (e.g. 1 or 3).

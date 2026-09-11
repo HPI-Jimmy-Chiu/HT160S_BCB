@@ -394,6 +394,10 @@ __published:
     TLabel *lblPrePickWaitHint;
     TLabel *lblPrePickWait;
     TEdit *edPrePickWaitSec;
+    TPanel *pnlAutoLogoutBox;
+    TLabel *lblAutoLogout;
+    TLabel *lblAutoLogoutHint;
+    TEdit *edAutoLogoutSec;
     TLabel *labPwHint;
     TLabel *labPwIdCaption;
     TLabel *labPwPassCaption;
@@ -471,6 +475,7 @@ __published:
     void __fastcall edSettleDelayClick(TObject *Sender);
     void __fastcall edUphMinSampleICClick(TObject *Sender);
     void __fastcall edPrePickWaitSecClick(TObject *Sender);
+    void __fastcall edAutoLogoutSecClick(TObject *Sender);
     void __fastcall PwListClick(TObject *Sender);
     void __fastcall PwIdClick(TObject *Sender);
     void __fastcall PwPassClick(TObject *Sender);

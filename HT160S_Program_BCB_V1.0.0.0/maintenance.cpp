@@ -1502,6 +1502,7 @@ void __fastcall TfMaintenance::LoadHardwareSettings()
     if(edUphMinSampleIC!=NULL) edUphMinSampleIC->Text=IntToStr(GeneralSetting.iUphMinSampleIC);
     //AI(ht160s-prepick) 20260806 : SortArm pre-pick Auto-ready wait budget (Option page).
     if(edPrePickWaitSec!=NULL) edPrePickWaitSec->Text=IntToStr(GeneralSetting.iSortArmPrePickAutoWaitSec);
+    if(edAutoLogoutSec!=NULL)  edAutoLogoutSec->Text=IntToStr(GeneralSetting.iAutoLogoutSec);
     bLoadingHardwareSettings=false;
     RefreshHardwareSettingsStatus();
     ApplyHardwareEditLock();
@@ -2935,43 +2936,71 @@ static void LogSecurityAudit(AnsiString sWhat)
     LogMaintAudit("PARAM_SECURITY", sWhat);
 }
 //---------------------------------------------------------------------------
-//AI(ht160s-audit) 20260909 : the account book is keyed by (ID, level) - FindUser matches BOTH
-//- so saving an existing ID at a DIFFERENT level ADDS a second record instead of
-//moving the account. The audit line has to say which of the two actually happened,
-//so the ID is looked up at the requested level and, separately, anywhere else.
-static bool AccountExistsAtLevel(AnsiString sID, int iLevel)
+//AI(ht160s-security) 20260911 : auto-logout time (General.ini [Security] AutoLogoutSec), the HT9045
+//[A01] iA01ChangeOpTime equivalent. Deliberately NOT called an idle timer anywhere in the UI :
+//HT160S has no keyboard or mouse hook, so what it measures is how long an elevated login has sat on
+//the MAIN screen (the count is held while any sub-screen is open). 0 disables it. The keypad's low
+//bound is 0 because that is the disable sentinel; anything between 1 and 29 is pulled up to the 30 s
+//floor by GeneralSetting::Load's clamp on the next start, and by the same clamp here.
+void __fastcall TfMaintenance::edAutoLogoutSecClick(TObject *Sender)
+{
+    int v;
+    TEdit *ed;
+
+    if(bLoadingHardwareSettings)
+        return;
+    if(fQwertyKey==NULL || Sender==NULL)
+        return;
+    //Defence in depth for PERM_MAINT_ACCOUNT_EDIT - the edit is greyed by
+    //ApplyPasswordPermissionLock every cycle, but a scan key or a racing refresh could still land
+    //here. Silent by ruling.
+    if(SecurityAllows(PERM_MAINT_ACCOUNT_EDIT)==false)
+        return;
+    ed=(TEdit*)Sender;
+    if(fQwertyKey->ShowQwertyKey(ed, N_INTEGER, 0, true, 0.0, 36000.0,
+        LangT("Auto logout after (sec); 0=never"))==false)
+        return;
+    if(ShowMyMessageBox_YES_NO(LangT("Save auto logout time?"))!=1)
+    {
+        ed->Text=IntToStr(GeneralSetting.iAutoLogoutSec);
+        return;
+    }
+    v=ed->Text.ToIntDef(GeneralSetting.iAutoLogoutSec);
+    if(v<0)
+        v=0;
+    if(v>0 && v<30)
+        v=30;
+    if(v>36000)
+        v=36000;
+    //AI(ht160s-audit) 20260911 : settings changes are logged with before/after instead of announced
+    //  (20260909 ruling). This one is a security control, so the trail matters more than usual.
+    if(v!=GeneralSetting.iAutoLogoutSec)
+        LogMaintAudit("PARAM_SECURITY", AnsiString("Auto logout (sec) : ")
+                      +IntToStr(GeneralSetting.iAutoLogoutSec)+" => "+IntToStr(v));
+    GeneralSetting.iAutoLogoutSec=v;
+    GeneralSetting.Save();
+    ed->Text=IntToStr(v);
+    if(fMain!=NULL)
+        fMain->ResetAutoLogoutCount();   //a fresh setting starts a fresh window
+    RefreshHardwareSettingsStatus();
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260911 : the account book is keyed by the ID ALONE now (the row's level IS
+//the granted level - see UserRoleManager::FindUser). Saving an existing ID at a different level
+//therefore MOVES the account instead of adding a second record, so the audit line has to be able
+//to say ADD / UPDATE / MOVE. Both helpers return the BEFORE state and must be called before
+//AddOrUpdateUser.
+static int FindAccountLevel(AnsiString sID)
 {
     AnsiString sFind=sID.Trim().UpperCase();
     int i;
 
     for(i=0; i<UserRoleManager.GetUserCount(); i++)
     {
-        if(UserRoleManager.GetUserLevel(i)!=iLevel)
-            continue;
         if(UserRoleManager.GetUserID(i).Trim().UpperCase()==sFind)
-            return true;
+            return UserRoleManager.GetUserLevel(i);
     }
-    return false;
-}
-//---------------------------------------------------------------------------
-static AnsiString DescribeOtherAccountLevels(AnsiString sID, int iSkipLevel)
-{
-    AnsiString sFind=sID.Trim().UpperCase();
-    AnsiString sOut="";
-    int i, iLv;
-
-    for(i=0; i<UserRoleManager.GetUserCount(); i++)
-    {
-        if(UserRoleManager.GetUserID(i).Trim().UpperCase()!=sFind)
-            continue;
-        iLv=UserRoleManager.GetUserLevel(i);
-        if(iLv==iSkipLevel)
-            continue;
-        if(sOut!=AnsiString(""))
-            sOut=sOut+",";
-        sOut=sOut+"Lv"+IntToStr(iLv);
-    }
-    return sOut;
+    return -1;
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::ShowPasswordPage()
@@ -3013,6 +3042,10 @@ void __fastcall TfMaintenance::ApplyPasswordPermissionLock()
     if(btnPwDelete!=NULL)    btnPwDelete->Enabled=bCanEdit;
     if(btnPwSave!=NULL)      btnPwSave->Enabled=bCanEdit;
     if(btnPwReload!=NULL)    btnPwReload->Enabled=bCanEdit;
+    //AI(ht160s-security) 20260911 : the auto-logout time lives on the tsFunctionGeneral page but it is
+    //  an account-security setting (whoever can set it to 0 disables the logout), so it rides the same
+    //  slot and the same per-cycle refresh - RefreshPermissionLocks calls this from UpdateRunStateLock.
+    if(edAutoLogoutSec!=NULL) edAutoLogoutSec->Enabled=bCanEdit;
     if(labPwHint!=NULL)
     {
         if(bCanEdit && bPwDirty)
@@ -3093,13 +3126,15 @@ void __fastcall TfMaintenance::PwPassClick(TObject *Sender)
     (void)Sender;
     if(edPwPass==NULL || fQwertyKey==NULL || edPwPass->Enabled==false)
         return;
-    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD, 0, false, 0, 0, LangT("Password"));
+    //AI(ht160s-security) 20260911 : N_NO_SYMBOL here too, so a password typed on this page can always
+    //  be typed back at the login prompt (HT9045 Password.cpp:248 parity).
+    fQwertyKey->ShowQwertyKey(edPwPass, N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD|N_NO_SYMBOL, 0, false, 0, 0, LangT("Password"));
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
 {
-    AnsiString sID, sPass, sOther;
-    int iLevel;
+    AnsiString sID, sPass;
+    int iLevel, iOldLevel;
     bool bExisted;
 
     (void)Sender;
@@ -3128,8 +3163,8 @@ void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
         return;
     }
     //AI(ht160s-audit) 20260909 : capture the BEFORE state while the book still holds it.
-    bExisted=AccountExistsAtLevel(sID, iLevel);
-    sOther=DescribeOtherAccountLevels(sID, iLevel);
+    iOldLevel=FindAccountLevel(sID);
+    bExisted=(iOldLevel>=0);
     if(UserRoleManager.AddOrUpdateUser(sID, sPass, iLevel)==false)
     {
         ShowMyOKMessageNoStop(LangT("Account table is full (max 30)."));
@@ -3142,12 +3177,11 @@ void __fastcall TfMaintenance::PwAddUpdateClick(TObject *Sender)
     //AI(ht160s-audit) 20260909 : success is logged, not announced. The unsaved state is
     // carried by the page hint (bPwDirty) instead of the old modal, so the operator
     // still knows a Save to File is outstanding without production being paused.
-    if(bExisted)
+    if(bExisted && iOldLevel!=iLevel)
+        LogAccountAudit(AnsiString("MOVE ")+sID+" : Lv"+IntToStr(iOldLevel)+" => Lv"+IntToStr(iLevel)+
+                        " (password also set)");
+    else if(bExisted)
         LogAccountAudit(AnsiString("UPDATE ")+sID+" Lv"+IntToStr(iLevel)+" : password changed");
-    else if(sOther!=AnsiString(""))
-        LogAccountAudit(AnsiString("ADD ")+sID+" Lv"+IntToStr(iLevel)+
-                        " : same ID also present at "+sOther+
-                        " (book is keyed by ID+level, so this did not move the account)");
     else
         LogAccountAudit(AnsiString("ADD ")+sID+" Lv"+IntToStr(iLevel));
 }
@@ -3174,7 +3208,7 @@ void __fastcall TfMaintenance::PwDeleteClick(TObject *Sender)
     iLevel=UserRoleManager.GetUserLevel(idx);
     if(ShowMyMessageBox_YES_NO(Format(LangT("Delete account: %s ?"), ARRAYOFCONST((sID)))) !=1)
         return;
-    UserRoleManager.DeleteUser(sID, iLevel);
+    UserRoleManager.DeleteUser(sID);
     bPwDirty=true;
     RefreshPasswordGrid();
     ApplyPasswordPermissionLock();   //refresh the hint to show the unsaved state

@@ -156,6 +156,7 @@ void THT160GeneralSetting::SetDefault()
 	iLogRetentionProdDailyDays=365; // Production_Log Daily aggregate : keep ~1 year (per-lot files permanent)
 	iLogRetentionStateRecordDays=90; // State Record snapshots : high volume (each re-copies the whole day's logs), keep 90d
 	iUphMinSampleIC=0;             // 0 = auto (one full tray); hide UPH below this IC count
+	iAutoLogoutSec=600;            // 0 = never; seconds an elevated login may sit on the main screen (KYEC value on HT9045)
 	// Defaults mirror old-160: Empty=E, Loader=L, Auto1..6=1..6, Color=C.
 	{
 		const char *DefText[9]={"E","L","1","2","3","4","5","6","C"};
@@ -297,6 +298,7 @@ void THT160GeneralSetting::Load()
 	iLogRetentionProdDailyDays=Ini->ReadInteger("LogRetention", "ProdDailyDays", 365);
 	iLogRetentionStateRecordDays=Ini->ReadInteger("LogRetention", "StateRecordDays", 90);
 	iUphMinSampleIC=Ini->ReadInteger("UPH", "MinSampleIC", 0);
+	iAutoLogoutSec=Ini->ReadInteger("Security", "AutoLogoutSec", 600);
 	for(int i=0;i<9;i++)
 	{
 		sBinDispText[i]=Ini->ReadString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);
@@ -308,6 +310,12 @@ void THT160GeneralSetting::Load()
 	if(iAmrHandshakeWaitSec < 5) iAmrHandshakeWaitSec = 5;
 	if(iRise1SettleWaitSec  < 5) iRise1SettleWaitSec  = 5;   //AI(ht160s-anti-ghost-d) 20260720 : same HTimer 0=instant / negative=49.7d footgun as the AGV waits
 	if(iAgvTimeoutSec       < 5) iAgvTimeoutSec       = 5;   //AI(amr-unmanned W1) 20260721 : same HTimer footgun
+	// AI(ht160s-security) 20260911 : auto-logout clamp. 0 stays 0 (disabled), anything positive gets a
+	// 30 s floor so a hand-edited 5 cannot log the engineer out mid-sentence, and HT9045's own bug is
+	// not inherited (its outer gate is `if(iOperatorModeCount>=10)`, so a value below 10 never expires).
+	if(iAutoLogoutSec < 0)                        iAutoLogoutSec = 0;
+	if(iAutoLogoutSec > 0 && iAutoLogoutSec < 30) iAutoLogoutSec = 30;
+	if(iAutoLogoutSec > 36000)                    iAutoLogoutSec = 36000;
 	delete Ini;
 }
 //---------------------------------------------------------------------------
@@ -393,6 +401,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("LogRetention", "ProdDailyDays", iLogRetentionProdDailyDays);
 	Ini->WriteInteger("LogRetention", "StateRecordDays", iLogRetentionStateRecordDays);
 	Ini->WriteInteger("UPH", "MinSampleIC", iUphMinSampleIC);
+	Ini->WriteInteger("Security", "AutoLogoutSec", iAutoLogoutSec);
 	for(int i=0;i<9;i++)
 	{
 		Ini->WriteString("BinDisplay", "Text"+IntToStr(i), sBinDispText[i]);

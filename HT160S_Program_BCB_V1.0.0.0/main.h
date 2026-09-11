@@ -458,6 +458,7 @@ private:	// User declarations
     TLabel *FeatureStatusNameLabels[MAIN_FEATURE_STATUS_COUNT];
     TLabel *FeatureStatusValueLabels[MAIN_FEATURE_STATUS_COUNT];
     bool bUpdatingMainSelections;
+    int iAutoLogoutCount;   //AI(ht160s-security) 20260911 : seconds an elevated login has sat on the main screen
     int  iLastSecsBadgeState;
     int  iLastSortModeBadge;   //AI(ht160s-whitelist-override) 20260717 : edge-trigger guard for the sort-mode badge
     //AI(secs-lot-multilot) 20260730 : the ACTIVE lot, latched at Lot Start and cleared at Lot
@@ -496,6 +497,8 @@ private:	// User declarations
     void __fastcall AppActivate(TObject *Sender);   //AI(HT160S-Maintainer) 20260622 : Application->OnActivate; re-front modal child after desktop task-switch (z-order hang fix)
 public:		// User declarations
     __fastcall TfMain(TComponent* Owner);
+    void __fastcall AutoLogoutTick();          //AI(ht160s-security) 20260911 : 1 Hz, driven by DataModule1 Timer1 through MainAutoLogoutTick()
+    void __fastcall ResetAutoLogoutCount();    //AI(ht160s-security) 20260911 : restart the window (called on every successful login)
     void __fastcall RefreshLotListFromRegistry();
     void __fastcall SaveWorkOrder();
     bool __fastcall LoadWorkOrder();

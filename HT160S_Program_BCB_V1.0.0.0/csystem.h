@@ -15,6 +15,7 @@ void AddNoNeedHomeSensorList();
 void DoTemptureControl();
 void ProcessStartMode();
 void DoSystem();
+void MainAutoLogoutTick();               //AI(ht160s-security) 20260911 : 1 Hz auto-logout tick; defined in main.cpp so database.cpp need not include main.h
 void DoSystemMessage();                  //AI(ht160s-maintainer) 20260627 : exposed so the modal Note Timer1 can re-drive tower light + buzzer + panel recovery LEDs while MainProc is suspended (HT172 note Timer1 -> DoSystemMessage parity)
 //AI(HT160S-Maintainer) 20260622 : immediate FormShow buzzer kicks for the modal dialogs
 //(MyMessageBox -> PlayMessageBuzzer, fNote -> PlayAlarmBuzzer). A modal ShowModal suspends

@@ -176,6 +176,7 @@ __fastcall TfMain::TfMain(TComponent* Owner)
     }
 
     bUpdatingMainSelections = false;
+    iAutoLogoutCount = 0;                  //AI(ht160s-security) 20260911 : auto-logout window starts closed
     bFeatureBadgeOverflowWarned = false;   //AI(ht160s-mainui) 20260617 : badge-grid overflow warning not shown yet
     iLastSecsBadgeState = -1;   //AI(ht160s-secsgem) 20260612 : force the first periodic tick to paint the real HSMS state
     iLastSortModeBadge = -1;    //AI(ht160s-whitelist-override) 20260717 : force the first sort-mode badge paint
@@ -461,6 +462,68 @@ void __fastcall TfMain::DropLoginToOperation(int OldRoleLevel, AnsiString sWhy)
         RecordProcess(LogText);
         EventReport(SECS_EVENT.SwitchUser);
     }
+}
+//---------------------------------------------------------------------------
+void __fastcall TfMain::ResetAutoLogoutCount()
+{
+    iAutoLogoutCount=0;
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260911 : auto logout, ported from HT9045 (main.cpp Timer3Timer
+//iOperatorModeCount vs IniConfig.iA01ChangeOpTime, [A01], KYEC runs 600 s). Driven at 1 Hz from
+//DataModule1::Timer1Timer through the MainAutoLogoutTick() wrapper - NOT from MainProc, which runs
+//at the SleepEx(1) scan rate, freezes under every modal and early-returns while the IO Set View is
+//open. A TTimer keeps firing inside ShowModal, which is exactly what this needs.
+//
+//IT IS NOT AN IDLE TIMER, and the panel label must not call it one : HT160S has no keyboard hook,
+//no mouse hook and no Application->OnMessage/OnIdle anywhere, so nothing the operator touches can
+//reset it. What it measures is how long an ELEVATED session has been sitting on the MAIN SCREEN.
+//HT9045 is the same mechanism (its counter is pinned to 0 only while a privileged screen is open,
+//never by a keypress) - the difference is that our label says so.
+void __fastcall TfMain::AutoLogoutTick()
+{
+    if(GeneralSetting.iAutoLogoutSec<=0)
+    {
+        iAutoLogoutCount=0;                    //0 = disabled
+        return;
+    }
+    if(UserRoleManager.GetLevel()==ROLE_OPERATION)
+    {
+        iAutoLogoutCount=0;                    //nothing to drop (HT9045's else-pin, main.cpp:26051)
+        return;
+    }
+    if(UserRoleManager.IsSimulationDefault())
+    {
+        iAutoLogoutCount=0;                    //dev build auto-grants Honprec at boot; do not fight it
+        return;
+    }
+    if(Screen->ActiveForm!=NULL && Screen->ActiveForm!=this)
+    {
+        //HT9045 holds the count at 0 while a privileged screen is open (main.cpp:25939). Every
+        //HT160S sub-screen and popup is ShowModal, so this one test covers Setup, Maintenance,
+        //Teach, Offset, Motor Test, IO Set View, Com Port, Home, Note, the message boxes AND the
+        //login keypad - which also stops this timer from demoting the operator while
+        //cbbUserSelectChange is still mid-login with the keypad on the stack.
+        iAutoLogoutCount=0;
+        return;
+    }
+
+    iAutoLogoutCount++;
+    if(iAutoLogoutCount<GeneralSetting.iAutoLogoutSec)
+        return;
+    iAutoLogoutCount=0;
+    //Silent, like HT9045 : no popup. The stopping ShowMyMessage would halt production, and even a
+    //non-stopping modal would sit unattended on an unmanned machine. DropLoginToOperation does the
+    //demotion, the combo refresh, the RecordProcess line and the CEID SwitchUser report.
+    DropLoginToOperation(UserRoleManager.GetLevel(), "auto logout");
+}
+//---------------------------------------------------------------------------
+//AI(ht160s-security) 20260911 : free wrapper so the 1 Hz host (database.cpp) does not have to
+//include main.h - it only includes csystem.h, where this is declared.
+void MainAutoLogoutTick()
+{
+    if(fMain!=NULL)
+        fMain->AutoLogoutTick();
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-security) 20260909 : grey out the main-screen controls the current
@@ -1917,7 +1980,11 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         //  panel and rewrite the WHOLE field via atof(text)+delta, so one stray touch turned
         //  27025312 into 27025322 with an unchanged number of '*' - a rejected login from a
         //  correctly remembered password, with no visual cue at all. The QWERTY digit row stays.
-        if(PromptLoginInput(this, LangT("Login Password"), N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD, sLoginPass)==false)
+        //AI(ht160s-security) 20260911 : N_NO_SYMBOL matches HT9045 Password.cpp:248
+        //  (N_NO_SYMBOL|N_NO_SPACE|N_PASSWORD) - a password is letters and digits only. It also kills
+        //  the last shift-key trap: with bNoSymbol set, UpdateKeyCaptions keeps the top row on 1..0
+        //  even when Case is toggled, so the digits can never turn into !@# under the operator.
+        if(PromptLoginInput(this, LangT("Login Password"), N_PASSWORD|N_NO_SPACE|N_NO_NUM_PAD|N_NO_SYMBOL, sLoginPass)==false)
         {
             LogLoginAudit(AnsiString("LOGIN ABANDONED at the password prompt : id=")+sLoginID.Trim()
                           +AnsiString(" level=")+UserRoleManager.GetLevelName(RoleLevel)
@@ -1944,10 +2011,14 @@ void __fastcall TfMain::cbbUserSelectChange(TObject *Sender)
         //AI(ht160s-security) 20260910 : audit the success too. The RecordProcess line further down
         //  fires only when the LEVEL changed and never carries the ID, so a re-login at the same
         //  level was invisible.
+        //AI(ht160s-security) 20260911 : requested and granted can now differ - the account book row
+        //  decides the level, so the combo pick is only a request. Log both.
         LogLoginAudit(AnsiString("LOGIN OK : id=")+sLoginID.Trim()
-                      +AnsiString(" level=")+UserRoleManager.GetLevelName()
+                      +AnsiString(" requested=")+UserRoleManager.GetLevelName(RoleLevel)
+                      +AnsiString(" granted=")+UserRoleManager.GetLevelName()
                       +(UserRoleManager.IsServiceMasterSession()?AnsiString(" (service master)")
                                                                 :AnsiString("")));
+        ResetAutoLogoutCount();   //a fresh login restarts the window (HT9045 forgets to)
         #endif
     }
 

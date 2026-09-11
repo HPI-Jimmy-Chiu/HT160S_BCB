@@ -33,6 +33,7 @@ USEFORM("uPadInterface.cpp", fPadInterface);
 #include "database.h"
 #include "uruncontrol.h"
 #include "cEventLog.h"
+#include "UserRoleManager.h"   //AI(ht160s-security) 20260911 : report duplicate account IDs collapsed at load
 #include "cCommLog.h"
 #include "GeneralSetting.h"
 #include "deviceinfo.h"
@@ -220,6 +221,13 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
          //(both KYEC tools logged "HT160S 1.0.0.0" while running different exes). The build id
          //rides alongside it so every on-site log names the code state it came from.
          RecordProcess(AnsiString("Program Start with version ")+MainVersion+" build "+MainBuildID);
+         //AI(ht160s-security) 20260911 : the account book is keyed by the ID alone now (the row's
+         //level IS the granted level), so a book written under the old (ID, level) key can hold the
+         //same ID twice. LoadFromFile keeps the FIRST row and drops the rest; say so out loud here,
+         //because the dropped row silently changes what that operator can do.
+         if(UserRoleManager.GetLoadDuplicateIDs()!=AnsiString(""))
+             g_EventLog.Log("AUTH_LOGIN", AnsiString("Account book : duplicate ID(s) ignored (first row wins) : ")
+                            +UserRoleManager.GetLoadDuplicateIDs());
          //AI(secs-alid-optiond) 20260902 : flush the AMENDMENT 2 S5-ALID self-check
          //verdict now that the EventLog is open. HSys.Initial() ran the check at progress
          //46 while the log was still shut (its own call there is a no-op), so this is the
