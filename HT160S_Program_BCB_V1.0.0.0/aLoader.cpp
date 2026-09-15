@@ -1129,6 +1129,22 @@ bool TLoaderModule::ReleaseSideClamps(int LoaderNo)
         LeanCylinder=&HSys.Cyn.C_Loader2_LeanOnTray;
     }
 
+    //AI(ht160s-clamp-regress) 20260915 : STALE-CURSOR RE-ENTRY GUARD. ReleaseTask is ONE
+    //per-side cursor shared by both call sites, and a caller can abandon the ladder mid-stroke
+    //- the CleanOut retire guard stops calling the instant any of its terms flips, and the
+    //on-site log shows those terms flipping ("CLEANOUT un-retire" then a fresh retire 3.3 s
+    //later, 20260914 15:41:28/15:41:31 and 17:42:57/17:43:00). A cursor stranded at 200 would,
+    //on the next call, Pop LeanOnTray while PushTray is EXTENDED again from cases 8200/8300 -
+    //the exact order this function exists to forbid (popping the lean while the front stopper
+    //still presses lets the tray spring out of the pocket).
+    //ONLY 200 is tested, never 100 : case 0 sets the cursor to 100 while PushTray is still
+    //commanded OUT (Reset() does not retract), so a !=0 test would bounce the ladder back to 0
+    //every scan and never stroke anything. At 200 PushTray has already confirmed OFF, so
+    //finding it commanded OUT again means a feed re-clamped underneath us : restart from the
+    //top and re-establish the mandated PushTray-first order.
+    if(State->ReleaseTask==200 && PushCylinder->GetOutBit())
+        State->ReleaseTask=0;
+
     switch(State->ReleaseTask)
     {
         case 0:
@@ -1496,9 +1512,22 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
             //return WITHOUT latching; the guard re-enters next scan with the same terms and
             //the ladder advances. FeedTask is already 1 so the preempt line cannot repeat,
             //and the bCleanOutFinish test keeps this a one-shot once the side is drained.
-            if(State->bCleanOutFinish==false && ReleaseSideClamps(LoaderNo)==false)
-                return;
+            //AI(ht160s-clamp-regress) 20260915 : LATCH FIRST, then pump the release. The
+            //20260910 form returned early while a stroke was still confirming, so a clamp whose
+            //Off reed never confirms (sticky cylinder, drifting reed, dirty sensor) made
+            //ReleaseSideClamps return false on EVERY scan - TMyCylinder::Pop raises its cylinder
+            //alarm on timeout and then RE-ARMS (Task=1, return false), it never gives up - so
+            //bCleanOutFinish was never latched, IsAllCleanOutFinish never reported the Loader
+            //drained, and Clean Out could not finish. The old build latched unconditionally and
+            //always finished; that wedge is NEW and must not ship.
+            //The guard re-enters with identical terms every scan (bCleanOutFinish is not one of
+            //its terms and FeedTask is already 1, so the preempt line cannot repeat), therefore
+            //calling the ladder here and ignoring its result still drives it to completion; once
+            //both clamps are off case 0 is a silent no-op, so calling it every scan is free.
+            //A clamp that will not retract is now reported by its own cylinder alarm - the right
+            //channel for it - instead of by a Clean Out that never ends.
             State->bCleanOutFinish=true;
+            ReleaseSideClamps(LoaderNo);
             return;
         }
         //supply car still has stock (or carriage still loaded) : do NOT finish; the switch
@@ -2118,15 +2147,39 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             break;
 
         case 10000:
-            //AI(ht160s-cleanout-release) 20260910 : the SAME leave-them-clamped gap as the
-            //CleanOut retire. 10000 is reached ONLY from the JAM0913 "Loader Tray Lost On
-            //Carriage" SKIP at case 9500, and 9500 is reached from 8300 - so PushTray and
-            //LeanOnTray are both EXTENDED here, clamped on a tray the operator has just
-            //confirmed is not there. Retract before ending the feed, in the mandated order.
-            //This only brings forward what the next feed cases 2000/3000 would do anyway;
-            //it removes the clamped-on-nothing posture from an idle side.
-            if(ReleaseSideClamps(LoaderNo)==false)
-                return false;
+            //AI(ht160s-cleanout-release) 20260910 : retract a side that ends its feed holding
+            //NOTHING, so an idle side never parks clamped on air (the JAM0913 SKIP case).
+            //AI(ht160s-clamp-regress) 20260915 : the 20260910 note here claimed "10000 is
+            //reached ONLY from the JAM0913 SKIP at case 9500". That is FALSE, and it shipped.
+            //Case 9500 SUCCESS also ends with State->FeedTask=10000, right after the mint, the
+            //CEID 66 Load Tray Finish report and the tray-kind tagging - so 10000 is the NORMAL
+            //terminator of EVERY successful feed (the MES0920 K_RETRY / K_CLEAN_OUT routes come
+            //back through 9500 too). The unconditional release therefore popped PushTray and
+            //LeanOnTray on every tray, a few ladder ticks after cases 8200/8300 clamped it :
+            //the operator sees the destacker land a tray, the clamps hook it and let go at
+            //once. KYEC 20260914 17:12 on the 1.0.0.3 build - CEID 66 at 17:12:43.629 then
+            //"Loader1 clamp release start (PushOut=1 LeanOut=1)" 7 ms later, RunMode=Normal,
+            //and not one JAM0913 in the whole day. 1 release / 1 feed on that build, 0 / 14 on
+            //the 1.0.0.0 build either side of it.
+            //The tray then rode the CCD Y index, every SortArm pick row and the ~427 mm
+            //discharge traverse UNRESTRAINED, permanently : the only Push() sites for these two
+            //cylinders are cases 8200/8300 upstream, and case 10 short-circuits the next feed
+            //on fHasTray, so nothing ever re-closes them.
+            //fHasTray is the discriminator this ladder already holds : case 9500 sets it true
+            //on the confirm-then-mint success path and leaves it false on the JAM0913 SKIP, and
+            //case 10 short-circuits the whole feed when it is already true - so INSIDE a feed,
+            //fHasTray==false means "clamped on nothing". A real tray keeps its clamps until
+            //DoDischargeTray pops them at the rear station (cases 2000/3000), which is the
+            //invariant this ladder has always honoured.
+            //WHY A CLEAN BUILD PROVED NOTHING : TMyCylinder::Push/Pop return true before they
+            //touch the switch under SOFT_SIMULATE, so GetOutBit() is always false and the whole
+            //of ReleaseSideClamps is dead code in a sim build. Only a real-machine RUN can
+            //exercise this path.
+            if(TrayMotor->fHasTray==false)
+            {
+                if(ReleaseSideClamps(LoaderNo)==false)
+                    return false;
+            }
             ReleaseFrontOwner(LoaderNo);
             State->FeedTask=1;   //AI(ht160s-feeder-unify) 20260706 : return true -> reset task to idle(1)
             return true;
