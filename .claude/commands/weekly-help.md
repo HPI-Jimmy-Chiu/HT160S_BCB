@@ -22,8 +22,8 @@ description: "顯示 HT160S 週報/案件管理（Hub 模式，共用 Weekly_AI 
 | 說法 | 效果 |
 |------|------|
 | 「今天是新的一周」 | 建立下週週報（先確認再執行） |
-| 「京元反應 HT160S 異常，如圖」 | 建/重啟 case，回報 `01_intake` 放檔路徑 |
-| 「京元 HT160S Clean out 全空盤退出已驗證通過」 | 更新該事件進度 |
+| 「京元反應 HT160S 異常，如圖」 | 新開一列 + 建 case（每筆異常獨立，ADR-008），回報 `01_intake` 放檔路徑 |
+| 「京元 HT160S Clean out 全空盤退出已驗證通過」 | 更新該 case 的列（不是量產維護列） |
 | 「這週有哪些未完成？」 | 列 open 項目 |
 | 「幫我做健康檢查」 | 完整分析 |
 
@@ -31,12 +31,13 @@ description: "顯示 HT160S 週報/案件管理（Hub 模式，共用 Weekly_AI 
 - 根目錄：`d:\Work-jimmychiu\document\WeeklyReport\Weekly_AI`
 - 唯一真相：`weekly_data.json`（HT9045/HT172/HT160S 共用）；Excel 產出：`output/`
 - 客戶 case：`Customer/<客戶>/<CASE>/01_intake~04_release/`
-- HT160S 現況：`京元竹南 / HT160S / 機台開發 (in-progress)`（row 會隨重排變動，以 `list_open.py` 查為準）
+- HT160S 現況：京元竹南 HT160S 已是**量產機**（3 台）。每筆客訴獨立一列 + 一個 `CASE-KYEC_CHEN-…`（Weekly_AI ADR-008，2026-09-15 起）；另有一列「HT160S 量產維護（非客訴開發紀錄）」只收非客訴工作。row 會隨重排變動，以 `list_open.py` / `case_registry.py --customer 京元竹南` 查為準
 - 詳細 SOP：`weekly-case-flow` skill
 
 ## HT160S 專屬提醒
 - 客戶名稱只用使用者原話（勿把 HT9045/HT172 客戶帶進來）。
-- 結案**不用** `close_case.py`（內含 HT9045 專用 release-note 會失敗）；改 `update_report.py` 設 done + 重產 Excel。
+- 建 case 必填 HT160S 專屬欄位：`--serial`（京元機台編號 / 交機序 KYEC-0N）、`--component`（HT160S 模組字彙）、`--tags HT160S,<模組>,KYEC`、`add --version 部署YYYYMMDD`；見 ADR-008。
+- 結案**不用** `close_case.py`（內含 HT9045 專用 release-note 會失敗）；五步：`update_report.py update --status done --allow-direct-done` → `generate_report.py` → `archive_issue.py <row> --skeleton-only` 同步 issue.md → NSIS 包放 `04_release/installer/` → `case_registry.py` + `check_case_integrity.py`。
 - release note / 安裝包走 `ht160s-installer` skill / NSIS updater。
 
 ## 狀態圖標

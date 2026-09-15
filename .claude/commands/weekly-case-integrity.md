@@ -22,7 +22,7 @@ python tools/check_case_integrity.py
 3. `row` 會因排序變動，只當臨時定位。
 4. CASE-ID 跨客戶同號：**舊格式** `CASE-YYYYMMDD-NNN` 跨客戶同號允許（NNN 每客戶獨立計數）；**新格式** `CASE-<EngCode>-YYYYMMDD-NNN`（ADR-007）自帶客戶代號、全域唯一。任一格式「同客戶同號」才是錯誤。
 5. `[FAIL]` 是工具/資料問題，不可靠猜回答。
-6. `[WARN] weekly open item has no case` 表示該未完成事項尚未歸檔（HT160S「京元竹南 / 機台開發」目前即屬未歸檔的開發項，屬正常）。
+6. `[WARN] weekly open item has no case` 表示該未完成事項尚未歸檔。HT160S 自 ADR-008（2026-09-15）起每筆客訴都應有 case，出現此 WARN 就是漏建，要補 `archive_issue.py`；「HT160S 量產維護（非客訴開發紀錄）」列掛 `CASE-KYEC_CHEN-20260715-001`，不會出現此 WARN。
 
 回覆表格：
 

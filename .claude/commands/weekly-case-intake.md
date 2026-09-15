@@ -16,6 +16,8 @@ argument-hint: "例如：京元 反應 HT160S 異常，如附圖"
 4. 原始客訴資料放 `01_intake/`；推論與 root cause 假設放 `02_analysis/`。
 5. **最後完成時，必須回報「放異常資料的資料夾」的完整絕對路徑**（該 case 的 `01_intake/`，以 `d:\...` 開頭），讓使用者可直接開啟並把原始截圖/log/State Record 放入。
 6. **客戶名稱鎖定**：只用使用者原話逐字的客戶名稱。本 repo 的 git log/branch 可能出現 HT9045/HT172 的客戶（力成PTI、甬矽…）——**那是不相關的上下文，不可帶入**。HT160S 端主客戶為「京元竹南」。委派時 prompt 裡只能出現 Step 0 解析出的精確客戶名稱。
+7. **每筆異常 = 一列 weekly item + 一個 case（Weekly_AI ADR-008，2026-09-15 起）**。京元 HT160S 已是量產機；「京元竹南 / HT160S / HT160S 量產維護（非客訴開發紀錄）」列**不是** case、不可 reuse、不可 append 客訴。
+8. **HT160S 專屬欄位必填**（區隔 9045/172）：`--serial`（京元機台編號 / 交機序 `KYEC-0N`，不得 Default）、`--component`（HT160S 模組字彙：Loader/Empty/Color/TrayArm/SortArm/Auto/AMR/SECS/WebAPI/TopCCD/ColorCCD/BinDisplay/Soter/StateRecord/HOME/Panel/Motion）、`--tags HT160S,<模組>,KYEC`、`--category` B/P/R/E/Q、`add --version "部署YYYYMMDD"|"待確認"`。規則見 `weekly-case-flow` skill「HT160S 專屬欄位定義」。
 
 ## 流程
 0. 客戶名稱解析（精確比對，不可省略）：`cd tools && python _customers.py "<使用者原話客戶名稱逐字>"` → 取得 `RESOLVED` 正式名稱才能往下；`UNKNOWN` 先跟使用者確認，不可自行猜測代換。
@@ -24,11 +26,15 @@ argument-hint: "例如：京元 反應 HT160S 異常，如附圖"
 3. **先說明**將新增或重啟哪一筆、要建哪個 case 資料夾（京元首次歸檔會建 `Customer/京元竹南/`，先與使用者確認命名），經我同意後：
    ```
    cd /d/Work-jimmychiu/document/WeeklyReport/Weekly_AI/tools
-   # 先新增 weekly item → 先 generate_report.py 定案 row → 再 archive（見 weekly-report agent 順序鐵律）
+   # 1) 新增 weekly 列（title=現象+條件+影響；--desc 詳細 / --brief 白話，雙層制）
+   python update_report.py add --customer 京元竹南 --machine HT160S --version "部署YYYYMMDD" --title "<title>" --desc "<詳細>" --brief "<白話>"
+   # 2) 先 generate_report.py 定案 row → list_open.py 取最終 row（順序鐵律）
+   python generate_report.py && python list_open.py
+   # 3) 用最終 row 建 case（HT160S 專屬欄位必填）
    # 有原始檔：
-   python archive_issue.py <最終row> "<source_file>" --desc "<短描述>" --expect-customer "京元竹南"
+   python archive_issue.py <最終row> "<source_file>" --desc "<短描述>" --expect-customer "京元竹南" --category B --serial KYEC-0N --component <模組> --tags HT160S,<模組>,KYEC --severity P1
    # 尚無檔案（只有圖片描述）：
-   python archive_issue.py <最終row> --skeleton-only --desc "<短描述>" --expect-customer "京元竹南"
+   python archive_issue.py <最終row> --skeleton-only --desc "<短描述>" --expect-customer "京元竹南" --category B --serial KYEC-0N --component <模組> --tags HT160S,<模組>,KYEC --severity P1
    ```
 4. 重產 Excel：`python generate_report.py`
 5. 只有圖片描述時，建立 `01_intake/YYYYMMDD_<slug>_summary.md` 摘要，提醒我把原始截圖/log/State Record 放同夾。
