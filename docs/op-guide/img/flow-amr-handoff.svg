@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="956" height="744" viewBox="0 0 956 744" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker></defs>
+<rect x="0" y="0" width="956" height="744" fill="#FFFFFF"/>
+<text x="28" y="28" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="19" font-weight="bold" fill="#111827">圖 7  AMR 模式：一個站台的交接（以 Auto 出料車滿為例）</text>
+<g transform="translate(0,0)">
+<rect x="28.0" y="42" width="300.0" height="662" fill="#F9FAFB"/>
+<rect x="28.0" y="42" width="300.0" height="28" fill="#1F2937"/>
+<text x="178.0" y="62" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">HT160S 機台</text>
+<rect x="328.0" y="42" width="300.0" height="662" fill="#F3F4F6"/>
+<rect x="328.0" y="42" width="300.0" height="28" fill="#1F2937"/>
+<text x="478.0" y="62" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">主機 EAP / AMR 車</text>
+<line x1="328.0" y1="42" x2="328.0" y2="704" stroke="#D1D5DB" stroke-width="1"/>
+<rect x="628.0" y="42" width="300.0" height="662" fill="#F9FAFB"/>
+<rect x="628.0" y="42" width="300.0" height="28" fill="#1F2937"/>
+<text x="778.0" y="62" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">OP 操作員</text>
+<line x1="628.0" y1="42" x2="628.0" y2="704" stroke="#D1D5DB" stroke-width="1"/>
+<path d="M178.0,166.0 L178.0,194.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M304.0,232.0 L352.0,232.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M478.0,270.0 L478.0,298.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M352.0,336.0 L328.0,336.0 L328.0,440.0 L304.0,440.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M304.0,440.0 L328.0,440.0 L328.0,544.0 L352.0,544.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M352.0,544.0 L328.0,544.0 L328.0,648.0 L304.0,648.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M304.0,232.0 L652.0,232.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<path d="M604.0,336.0 L652.0,336.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<path d="M304.0,440.0 L652.0,440.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<rect x="455.0" y="419.0" width="46.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="478.0" y="432.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="middle">斷線時</text>
+<path d="M604.0,544.0 L652.0,544.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<rect x="52.0" y="90.0" width="252.0" height="76.0" rx="8" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="2"/>
+<text x="60.0" y="104.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#1D4ED8">機台</text>
+<text x="178.0" y="126.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#0F172A" text-anchor="middle"><tspan x="178.0" dy="0">AutoN 出料車滿</tspan><tspan x="178.0" dy="21">（滿盤感測器亮）</tspan></text>
+<rect x="52.0" y="194.0" width="252.0" height="76.0" rx="8" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="2"/>
+<text x="60.0" y="208.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#1D4ED8">機台</text>
+<text x="178.0" y="230.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#0F172A" text-anchor="middle"><tspan x="178.0" dy="0">鎖住該站：不再往這台車送盤</tspan><tspan x="178.0" dy="21">發叫車事件 CEID 272</tspan></text>
+<rect x="352.0" y="194.0" width="252.0" height="76.0" rx="8" fill="#EDE9FE" stroke="#6D28D9" stroke-width="2"/>
+<text x="360.0" y="208.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#6D28D9">主機/AMR</text>
+<text x="478.0" y="230.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#2E1065" text-anchor="middle"><tspan x="478.0" dy="0">主機收到叫車</tspan><tspan x="478.0" dy="21">派 AMR 前往 AutoN</tspan></text>
+<rect x="352.0" y="298.0" width="252.0" height="76.0" rx="8" fill="#EDE9FE" stroke="#6D28D9" stroke-width="2"/>
+<text x="360.0" y="312.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#6D28D9">主機/AMR</text>
+<text x="478.0" y="334.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#2E1065" text-anchor="middle"><tspan x="478.0" dy="0">主機下 START_AGV</tspan><tspan x="478.0" dy="21">（車已到站前）</tspan></text>
+<rect x="52.0" y="402.0" width="252.0" height="76.0" rx="8" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="2"/>
+<text x="60.0" y="416.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#1D4ED8">機台</text>
+<text x="178.0" y="438.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#0F172A" text-anchor="middle"><tspan x="178.0" dy="0">作業位的盤收完、氣缸歸位</tspan><tspan x="178.0" dy="21">發「可交車」CEID 273</tspan></text>
+<rect x="352.0" y="516.5" width="252.0" height="55.0" rx="8" fill="#EDE9FE" stroke="#6D28D9" stroke-width="2"/>
+<text x="360.0" y="530.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#6D28D9">主機/AMR</text>
+<text x="478.0" y="552.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#2E1065" text-anchor="middle"><tspan x="478.0" dy="0">AMR 取走整台滿車</tspan></text>
+<rect x="52.0" y="599.5" width="252.0" height="97.0" rx="8" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="2"/>
+<text x="60.0" y="613.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#1D4ED8">機台</text>
+<text x="178.0" y="635.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#0F172A" text-anchor="middle"><tspan x="178.0" dy="0">感測器熄滅 = 車已被取走</tspan><tspan x="178.0" dy="21">發「完成」CEID 274</tspan><tspan x="178.0" dy="21">解鎖、清車帳、生產恢復</tspan></text>
+<rect x="652.0" y="194.0" width="252.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="660.0" y="208.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="778.0" y="230.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="778.0" dy="0">不用做任何事</tspan><tspan x="778.0" dy="21">（其他站照常生產）</tspan></text>
+<rect x="652.0" y="495.5" width="252.0" height="97.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="660.0" y="509.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="778.0" y="531.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="778.0" dy="0">AMR 在站前作業時：</tspan><tspan x="778.0" dy="21">不要開門、不要碰車、</tspan><tspan x="778.0" dy="21">不要手動搬盤</tspan></text>
+<rect x="652.0" y="287.5" width="252.0" height="97.0" rx="8" fill="#FEE2E2" stroke="#B91C1C" stroke-width="2"/>
+<text x="660.0" y="301.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#B91C1C">畫面警報</text>
+<text x="778.0" y="323.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#450A0A" text-anchor="middle"><tspan x="778.0" dy="0">若 300 秒內車沒來：</tspan><tspan x="778.0" dy="21">WAR0962 逾時警報</tspan><tspan x="778.0" dy="21">→ 見圖 8</tspan></text>
+<rect x="652.0" y="391.5" width="252.0" height="97.0" rx="8" fill="#FEE2E2" stroke="#B91C1C" stroke-width="2"/>
+<text x="660.0" y="405.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#B91C1C">畫面警報</text>
+<text x="778.0" y="427.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#450A0A" text-anchor="middle"><tspan x="778.0" dy="0">若 SECS 斷線：</tspan><tspan x="778.0" dy="21">改由 OP 人工換車</tspan><tspan x="778.0" dy="21">(MES1x20 警報 → 搬走 → RETRY)</tspan></text>
+</g>
+<rect x="28" y="714" width="22" height="18" rx="3" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="1.5"/>
+<text x="56" y="728" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">機台自動動作</text>
+<rect x="154" y="714" width="22" height="18" rx="3" fill="#DCFCE7" stroke="#15803D" stroke-width="1.5"/>
+<text x="182" y="728" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">操作員 (OP) 要做的事</text>
+<polygon points="343.3,714.0 354.3,723.0 343.3,732.0 332.3,723.0" fill="#FEF9C3" stroke="#A16207" stroke-width="1.5"/>
+<text x="360" y="728" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">判斷 / 分岐</text>
+<rect x="454" y="714" width="22" height="18" rx="3" fill="#FEE2E2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="482" y="728" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">畫面彈出的警報或訊息</text>
+<rect x="628" y="714" width="22" height="18" rx="3" fill="#EDE9FE" stroke="#6D28D9" stroke-width="1.5"/>
+<text x="656" y="728" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">主機 (EAP) / AMR 車自動</text>
+</svg>

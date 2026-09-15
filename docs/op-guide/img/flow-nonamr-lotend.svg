@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="896" height="1220" viewBox="0 0 896 1220" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker></defs>
+<rect x="0" y="0" width="896" height="1220" fill="#FFFFFF"/>
+<text x="28" y="28" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="19" font-weight="bold" fill="#111827">圖 4  非 AMR 模式：批尾清機與結批</text>
+<g transform="translate(0,0)">
+<path d="M448.0,139.0 L448.0,182.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M360.5,224.0 L168.0,224.0 L168.0,298.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="235.2" y="203.0" width="58.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="264.2" y="216.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="middle">警報時選</text>
+<path d="M535.5,224.0 L728.0,224.0 L728.0,298.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="602.8" y="203.0" width="58.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="631.8" y="216.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="middle">直接按鈕</text>
+<path d="M168.0,374.0 L168.0,388.0 L448.0,388.0 L448.0,399.5" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M728.0,374.0 L728.0,388.0 L448.0,388.0 L448.0,399.5" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M573.0,448.0 L603.0,448.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<path d="M448.0,496.5 L448.0,532.5" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M448.0,587.5 L448.0,634.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M448.0,710.0 L448.0,746.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M448.0,822.0 L448.0,858.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M448.0,934.0 L448.0,970.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M573.0,1008.0 L603.0,1008.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<path d="M448.0,1046.0 L448.0,1093.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="323.0" y="85.0" width="250.0" height="54.0" rx="27.0" fill="#E5E7EB" stroke="#4B5563" stroke-width="2"/>
+<text x="448.0" y="114.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#111827" text-anchor="middle" font-weight="bold"><tspan x="448.0" dy="0">本批來料全部進完</tspan></text>
+<polygon points="448.0,182.0 535.5,224.0 448.0,266.0 360.5,224.0" fill="#FEF9C3" stroke="#A16207" stroke-width="2"/>
+<text x="448.0" y="226.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#1C1917" text-anchor="middle"><tspan x="448.0" dy="0">怎麼進入清機？</tspan></text>
+<rect x="43.0" y="298.0" width="250.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="51.0" y="312.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="168.0" y="334.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="168.0" dy="0">Loader Tray Empty 警報</tspan><tspan x="168.0" dy="21">→ 選 CLEAN OUT → START</tspan></text>
+<rect x="603.0" y="298.0" width="250.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="611.0" y="312.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="728.0" y="334.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="728.0" dy="0">Monitor → Clean Out</tspan><tspan x="728.0" dy="21">「Confirm Clean Out?」→ Yes</tspan></text>
+<rect x="323.0" y="399.5" width="250.0" height="97.0" rx="8" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="2"/>
+<text x="331.0" y="413.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#1D4ED8">機台</text>
+<text x="448.0" y="435.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#0F172A" text-anchor="middle"><tspan x="448.0" dy="0">狀態文字 Clean Out（黃）</tspan><tspan x="448.0" dy="21">機內剩餘 IC 全部放完</tspan><tspan x="448.0" dy="21">Auto 作業位的盤堆入出料車</tspan></text>
+<rect x="603.0" y="416.0" width="250.0" height="64.0" rx="8" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2" stroke-dasharray="6,4"/>
+<text x="728.0" y="440.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#334155" text-anchor="middle"><tspan x="728.0" dy="0">清機中若彈警報：</tspan><tspan x="728.0" dy="21">照圖 5 排除後 START 續跑</tspan></text>
+<rect x="323.0" y="532.5" width="250.0" height="55.0" rx="8" fill="#FEE2E2" stroke="#B91C1C" stroke-width="2"/>
+<text x="331.0" y="546.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#B91C1C">畫面警報</text>
+<text x="448.0" y="568.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#450A0A" text-anchor="middle"><tspan x="448.0" dy="0">清機完成提示（只有 SKIP 鍵）</tspan></text>
+<rect x="323.0" y="634.0" width="250.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="331.0" y="648.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="448.0" y="670.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="448.0" dy="0">選 SKIP → 按 PAUSE</tspan><tspan x="448.0" dy="21">機台回 Normal 並停機 (HALT)</tspan></text>
+<rect x="323.0" y="746.0" width="250.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="331.0" y="760.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="448.0" y="782.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="448.0" dy="0">取走 Auto1~6 出料車上的盤</tspan><tspan x="448.0" dy="21">交給下一站</tspan></text>
+<rect x="323.0" y="858.0" width="250.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="331.0" y="872.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="448.0" y="894.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="448.0" dy="0">核對主畫面 Total 與</tspan><tspan x="448.0" dy="21">Unload Auto1~6 各站 Cnt</tspan></text>
+<rect x="323.0" y="970.0" width="250.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="331.0" y="984.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="448.0" y="1006.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="448.0" dy="0">Lot 分頁 → Lot End</tspan><tspan x="448.0" dy="21">（Lot 清單清空 = 結批完成）</tspan></text>
+<rect x="603.0" y="965.5" width="250.0" height="85.0" rx="8" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2" stroke-dasharray="6,4"/>
+<text x="728.0" y="989.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#334155" text-anchor="middle"><tspan x="728.0" dy="0">非 AMR 模式清機完成</tspan><tspan x="728.0" dy="21">不會自動結批，一定要按</tspan><tspan x="728.0" dy="21">Lot End（或由主機結批）</tspan></text>
+<rect x="323.0" y="1093.0" width="250.0" height="54.0" rx="27.0" fill="#E5E7EB" stroke="#4B5563" stroke-width="2"/>
+<text x="448.0" y="1122.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#111827" text-anchor="middle" font-weight="bold"><tspan x="448.0" dy="0">本批結束，可建下一批</tspan></text>
+</g>
+<rect x="28" y="1190" width="22" height="18" rx="3" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="1.5"/>
+<text x="56" y="1204" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">機台自動動作</text>
+<rect x="154" y="1190" width="22" height="18" rx="3" fill="#DCFCE7" stroke="#15803D" stroke-width="1.5"/>
+<text x="182" y="1204" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">操作員 (OP) 要做的事</text>
+<polygon points="343.3,1190.0 354.3,1199.0 343.3,1208.0 332.3,1199.0" fill="#FEF9C3" stroke="#A16207" stroke-width="1.5"/>
+<text x="360" y="1204" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">判斷 / 分岐</text>
+<rect x="454" y="1190" width="22" height="18" rx="3" fill="#FEE2E2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="482" y="1204" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">畫面彈出的警報或訊息</text>
+<rect x="628" y="1190" width="22" height="18" rx="3" fill="#EDE9FE" stroke="#6D28D9" stroke-width="1.5"/>
+<text x="656" y="1204" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">主機 (EAP) / AMR 車自動</text>
+</svg>

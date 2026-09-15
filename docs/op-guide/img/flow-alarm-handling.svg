@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="911" height="996" viewBox="0 0 911 996" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker></defs>
+<rect x="0" y="0" width="911" height="996" fill="#FFFFFF"/>
+<text x="28" y="28" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="19" font-weight="bold" fill="#111827">圖 5  警報視窗（Note）處理通則 — 兩種模式共用</text>
+<g transform="translate(0,0)">
+<path d="M455.5,150.0 L455.5,186.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M581.5,224.0 L614.5,224.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<path d="M455.5,262.0 L455.5,287.5" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M455.5,384.5 L455.5,406.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M455.5,490.0 L455.5,501.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="459.5" y="486.5" width="22.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="463.5" y="499.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="start">是</text>
+<path d="M540.5,448.0 L614.5,448.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="566.5" y="427.0" width="22.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="577.5" y="440.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="middle">否</text>
+<path d="M329.5,560.0 L296.5,560.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="7,5"/>
+<path d="M455.5,619.0 L455.5,630.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M370.5,672.0 L170.5,672.0 L170.5,746.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="259.5" y="651.0" width="22.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="270.5" y="664.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="middle">是</text>
+<path d="M540.5,672.0 L740.5,672.0 L740.5,746.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="629.5" y="651.0" width="22.0" height="17" rx="3" fill="#FFFFFF" fill-opacity="0.92"/>
+<text x="640.5" y="664.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151" text-anchor="middle">否</text>
+<path d="M170.5,822.0 L170.5,845.5 L455.5,845.5 L455.5,869.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M740.5,822.0 L740.5,845.5 L455.5,845.5 L455.5,869.0" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="329.5" y="74.0" width="252.0" height="76.0" rx="8" fill="#FEE2E2" stroke="#B91C1C" stroke-width="2"/>
+<text x="337.5" y="88.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#B91C1C">畫面警報</text>
+<text x="455.5" y="110.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#450A0A" text-anchor="middle"><tspan x="455.5" dy="0">蜂鳴 + 紅燈 + 彈出 Note 視窗</tspan><tspan x="455.5" dy="21">機台已自動停止</tspan></text>
+<rect x="329.5" y="186.0" width="252.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="337.5" y="200.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="455.5" y="222.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="455.5" dy="0">讀 Err Code 與 Message</tspan><tspan x="455.5" dy="21">看示意圖哪個機構在紅色閃爍</tspan></text>
+<rect x="614.5" y="186.0" width="252.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="622.5" y="200.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="740.5" y="222.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="740.5" dy="0">太吵可先按 Off Buzzer</tspan><tspan x="740.5" dy="21">（只消音，視窗不會關）</tspan></text>
+<rect x="329.5" y="287.5" width="252.0" height="97.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="337.5" y="301.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="455.5" y="323.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="455.5" dy="0">到現場排除：</tspan><tspan x="455.5" dy="21">補料 / 搬走滿盤 / 移除卡料 /</tspan><tspan x="455.5" dy="21">關好安全門 / 釋放急停</tspan></text>
+<polygon points="455.5,406.0 540.5,448.0 455.5,490.0 370.5,448.0" fill="#FEF9C3" stroke="#A16207" stroke-width="2"/>
+<text x="455.5" y="450.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#1C1917" text-anchor="middle"><tspan x="455.5" dy="0">排除得了？</tspan></text>
+<rect x="329.5" y="501.0" width="252.0" height="118.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="337.5" y="515.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="455.5" y="537.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="455.5" dy="0">選一個回復鍵：</tspan><tspan x="455.5" dy="21">RETRY（重試）/ SKIP（跳過）</tspan><tspan x="455.5" dy="21">TRAY END / CLEAN OUT</tspan><tspan x="455.5" dy="21">HOME &amp; RETRY</tspan></text>
+<polygon points="455.5,630.0 540.5,672.0 455.5,714.0 370.5,672.0" fill="#FEF9C3" stroke="#A16207" stroke-width="2"/>
+<text x="455.5" y="674.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#1C1917" text-anchor="middle"><tspan x="455.5" dy="0">要繼續生產？</tspan></text>
+<rect x="44.5" y="746.0" width="252.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="52.5" y="760.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="170.5" y="782.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="170.5" dy="0">按 START</tspan><tspan x="170.5" dy="21">機台續跑</tspan></text>
+<rect x="614.5" y="746.0" width="252.0" height="76.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="622.5" y="760.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="740.5" y="782.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="740.5" dy="0">按 PAUSE</tspan><tspan x="740.5" dy="21">機台停機，稍後再 Start</tspan></text>
+<rect x="614.5" y="389.0" width="252.0" height="118.0" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2"/>
+<text x="622.5" y="403.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="11" font-weight="bold" fill="#15803D">OP</text>
+<text x="740.5" y="425.0" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#052E16" text-anchor="middle"><tspan x="740.5" dy="0">排除不了：</tspan><tspan x="740.5" dy="21">1. 按 Store Hangup 存快照</tspan><tspan x="740.5" dy="21">2. 記下時間 + Err Code</tspan><tspan x="740.5" dy="21">3. 通知工程師</tspan></text>
+<rect x="44.5" y="517.5" width="252.0" height="85.0" rx="8" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2" stroke-dasharray="6,4"/>
+<text x="170.5" y="541.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#334155" text-anchor="middle"><tspan x="170.5" dy="0">沒選回復鍵時</tspan><tspan x="170.5" dy="21">START / PAUSE 都不會關閉視窗</tspan><tspan x="170.5" dy="21">（防止警報被帶過）</tspan></text>
+<rect x="329.5" y="869.0" width="252.0" height="54.0" rx="27.0" fill="#E5E7EB" stroke="#4B5563" stroke-width="2"/>
+<text x="455.5" y="898.5" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="15" fill="#111827" text-anchor="middle" font-weight="bold"><tspan x="455.5" dy="0">視窗關閉，蜂鳴停止</tspan></text>
+</g>
+<rect x="28" y="966" width="22" height="18" rx="3" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="1.5"/>
+<text x="56" y="980" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">機台自動動作</text>
+<rect x="154" y="966" width="22" height="18" rx="3" fill="#DCFCE7" stroke="#15803D" stroke-width="1.5"/>
+<text x="182" y="980" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">操作員 (OP) 要做的事</text>
+<polygon points="343.3,966.0 354.3,975.0 343.3,984.0 332.3,975.0" fill="#FEF9C3" stroke="#A16207" stroke-width="1.5"/>
+<text x="360" y="980" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">判斷 / 分岐</text>
+<rect x="454" y="966" width="22" height="18" rx="3" fill="#FEE2E2" stroke="#B91C1C" stroke-width="1.5"/>
+<text x="482" y="980" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">畫面彈出的警報或訊息</text>
+<rect x="628" y="966" width="22" height="18" rx="3" fill="#EDE9FE" stroke="#6D28D9" stroke-width="1.5"/>
+<text x="656" y="980" font-family="Microsoft JhengHei, PMingLiU, Noto Sans TC, sans-serif" font-size="12" fill="#374151">主機 (EAP) / AMR 車自動</text>
+</svg>
