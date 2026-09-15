@@ -142,6 +142,7 @@ private:
     //waits on. bNoNewJobs starts nothing new and only drains what is already running.
     bool ServiceStations(bool bNoNewJobs);
     bool DoAllAutoCleanOut(int Flag);
+    void BookDrainedTray(int Index);                //AI(cleanout-per-station-clear) 20260915 : book (ICs + RecordTrayCnt + Unloadtray CEID) and release ONE station whose working tray has just been stacked by the drain. Gated on fHasTray, so it is safe to call twice.
     void ServiceCleanOutResidualWatchdog();         //AI(cleanout) 20260706 : EventLog-only residual notice (log-once per episode)
     bool DoFrontRiseOnce(int Index, int &SubTask, HTimer &Delay);   //AI(general) 20260617 : shared single-cylinder FrontRise On->settle->Off
     //AI(HT160S-Maintainer) 20260612 : AMR output-car full service. Sim auto-clears

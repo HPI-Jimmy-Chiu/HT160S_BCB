@@ -1023,9 +1023,50 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
     return false;
 }
 //---------------------------------------------------------------------------
+//AI(cleanout-per-station-clear) 20260915 : release ONE drained station the moment its
+//GoUp is confirmed, instead of holding the ledger until the six-station lockstep
+//terminal (case 7000).
+//WHY : cases 2000/3000 pop the push+lean clamps on ALL six stations and case 4000 lifts
+//the working tray onto the output stack, but until 20260915 the occupancy ledger was only
+//cleared at case 7000. Anything that stopped the ladder in between left physically empty
+//working positions that the software still read as loaded. KYEC 2026-09-07 16:26 : the
+//drain hit the Auto4 stack-FULL modal and the operator PAUSEd, so all six lanes sat empty
+//with a loaded ledger; the 17:59 HOME re-minted that stale ledger into phantom working
+//trays and two ICs were released into an empty Auto2 car. Owner ruling 2026-09-15 : clear
+//per station at the GoUp confirm, do not wait for 7000.
+//The three booking acts travel WITH the clear - they are gated on fHasTray, so whichever
+//call site reaches a station first books its tray exactly once and the other is a no-op.
+//Order is DoDischargeTray case 1000 : tally the ICs BEFORE ClearTray wipes the grid, bump
+//RecordTrayCnt before the report (KYEC 2026-09-08 : this terminal used to only wipe the
+//grid, losing six Unloadtray CEIDs and three ICs - see the 20260908 note on that commit).
+//NOT cleared here : bRearHasTray / bRearCanUse / bFrontHasTray / bCleanOutFinish / Status.
+//Those describe the rear and the lane EPISODE, not the working position, and case 7000 is
+//still their only owner - IsAllCleanOutFinish gates on bCleanOutFinish, so releasing the
+//working position early cannot make a drain look finished before the ladder has run.
+void TAutoModule::BookDrainedTray(int Index)
+{
+    if(Index<0 || Index>=AUTO_STATION_COUNT)
+        return;
+    TTrayMotor *TrayMotor=GetAutoVMotor(Index);
+    if(TrayMotor!=NULL)
+    {
+        if(TrayMotor->fHasTray)
+        {
+            iAmrDeviceCount[Index]+=TrayMotor->Tray.CountIC();
+            if((Index+1)<eTrayCount)
+                tRunData.RecordTrayCnt[Index+1]++;
+            if(HGem!=NULL)
+                HGem->EventReport(1, AutoUnloadTrayCeid[Index]);
+            RecordProcess("CleanOut drain: Auto"+IntToStr(Index+1)+" working tray stacked, booked and released");
+        }
+        TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
+    }
+    State[Index].bCarHasTray=false;
+    State[Index].bFullIC=false;
+}
+//---------------------------------------------------------------------------
 bool TAutoModule::DoAllAutoCleanOut(int Flag)
 {
-    TTrayMotor *TrayMotor=NULL;
     TMyCylinder *Cylinder=NULL;
 
     if(Flag==0)
@@ -1204,7 +1245,14 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                             continue;   //AI(ht160s-agv) drain raise suspended during AMR handoff
                         Cylinder->On();
                         if(IsCylinderOnReady(Cylinder, IsSoftSimulate()))
+                        {
+                            //AI(cleanout-per-station-clear) 20260915 : GoUp confirmed = THIS station's
+                            //working tray is on the output stack and its working position is empty.
+                            //Book and release it now; waiting for the lockstep terminal is exactly what
+                            //left the 2026-09-07 ledger lying about six empty lanes.
                             bCleanOutCheck[Index]=true;
+                            BookDrainedTray(Index);
+                        }
                     }
                 }
             }
@@ -1254,43 +1302,19 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
             }
             for(int Index=0; Index<AUTO_STATION_COUNT; Index++)
             {
-                State[Index].bCarHasTray=false;
+                //AI(cleanout-per-station-clear) 20260915 : the working-position acts (book +
+                //ClearTray + bCarHasTray + bFullIC) now run at the case-4000 GoUp confirm. This
+                //call is the belt with the braces : gated on fHasTray, it is a no-op for a station
+                //that already drained and still books one that somehow reached the terminal holding
+                //a tray. The rear/front/episode flags below stay owned by this terminal.
+                BookDrainedTray(Index);
                 State[Index].bRearHasTray=false;
                 State[Index].bRearCanUse=false;
                 bRearDeliveredPending[Index]=false;  //AI(general) 20260608 : Stage0 latch clear
                 RearGrid[Index].Clear();   //AI(ht160s-tray-source) : cleared rear => cleared staged grid
                 State[Index].bFrontHasTray=false;
-                State[Index].bFullIC=false;
                 State[Index].bCleanOutFinish=true;
                 State[Index].Status=AS_CLEANOUT_DONE;   //AI(ht160s-status) 20260703
-                TrayMotor=GetAutoVMotor(Index);
-                if(TrayMotor!=NULL)
-                {
-                    //AI(cleanout-tray-ledger) 20260908 : BOOK THE DRAINED TRAY. Cases 1000-6000
-                    //above ran the identical stacking stroke a normal discharge runs (MoveAutoY
-                    //to the discharge Y, Push Pop, Lean Pop, FrontRise), so this tray IS on the
-                    //output car - but this terminal only wiped the grid, so the whole drain was
-                    //invisible to SECS. KYEC 2026-09-08 : six trays (one per lane) reached the
-                    //cars with no Unloadtray CEID (the host saw 16 events for 22 trays actually
-                    //stacked, and the customer confirmed 22 was the right tray count) and three
-                    //sorted ICs were never tallied (DeviceCount published 12 against the 15 rows
-                    //in Production_2026_09_08.csv - Auto1 2, Auto2 1, both partial trays).
-                    //The three acts and their order are DoDischargeTray case 1000 : tally the
-                    //ICs BEFORE ClearTray wipes the grid, bump RecordTrayCnt before the report.
-                    //GATE ON fHasTray, NOT State[].bCarHasTray : this same loop cleared that
-                    //flag a few lines above, so it can no longer tell a drained lane from an
-                    //idle one. An empty working tray is still a tray on the car and still books
-                    //- the count the AMR is handed is the physical stack, header and empties in.
-                    if(TrayMotor->fHasTray)
-                    {
-                        iAmrDeviceCount[Index]+=TrayMotor->Tray.CountIC();
-                        if((Index+1)<eTrayCount)
-                            tRunData.RecordTrayCnt[Index+1]++;
-                        if(HGem!=NULL)
-                            HGem->EventReport(1, AutoUnloadTrayCeid[Index]);
-                    }
-                    TrayMotor->ClearTray();   //AI(ht160s-tray-source) : Auto never self-fabricates a tray; ClearTray resets data+fHasTray=false+bHasCover=false (rule #4)
-                }
             }
             return true;
     }
