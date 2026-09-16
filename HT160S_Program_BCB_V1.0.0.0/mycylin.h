@@ -60,8 +60,10 @@ public:
     //TrayArm's two clamps are excluded : they have no _Off reed at all
     //(system/IO_Table.csv:212-213, addresses blank and Enable=0).
     bool bTrayClamp;
-    //AI(ht160s-clamp-geom) 20260916 : index into GeneralSetting.bClampNewGeometry
-    //(uHome.cpp HomeParkCarriage order). -1 = not a tray clamp.
+    //AI(ht160s-clamp-geom) 20260916 : carriage identity in uHome.cpp HomeParkCarriage
+    //order (0/1=Loader1/2, 2..7=Auto1..6, 8=Empty, 9=Color). -1 = not a tray clamp.
+    //Range-checked by IsClampNewGeometry so a cylinder outside the ten can never take
+    //the new reading; kept as a stable identity for diagnostics and future per-car work.
     int iClampGeomIdx;
 
     bool Push();
@@ -104,8 +106,8 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate);
 //  call site. The rename forces each one to be looked at. Geometry per carriage :
 //    OLD : _On lit = a tray (hook stopped on the tray edge) ; dark = over-travelled, empty
 //    NEW : _On lit = EMPTY (piston reached the end stop) ; both reeds dark = a tray
-//  Which carriage is on which geometry comes from GeneralSetting.bTwoBandClamp +
-//  bClampNewGeometry[iClampGeomIdx]; all-zero defaults keep the OLD reading everywhere.
+//  Which reading applies comes from GeneralSetting.bTwoBandClamp, ONE switch covering
+//  all ten clamps; its default 0 keeps the OLD reading on every carriage.
 int GetTrayClampVerdict(TMyCylinder *Push, bool bSoftSimulate);
 //AI(ht160s-clamp-geom) 20260916 : is this carriage on the reworked reed geometry ?
 //  False for every unknown index, so a point we cannot place always answers "old".

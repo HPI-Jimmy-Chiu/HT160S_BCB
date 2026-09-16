@@ -135,8 +135,6 @@ void THT160GeneralSetting::SetDefault()
 	bFrontSeparateInterlock=true;
 	bCleanOutRefillGuard=true;
 	bTwoBandClamp=false;
-	for(int cg=0;cg<10;cg++)
-		bClampNewGeometry[cg]=false;
 	iTrayClampSettleMs=500;
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
@@ -282,8 +280,6 @@ void THT160GeneralSetting::Load()
 	bFrontSeparateInterlock=Ini->ReadBool("Safety", "FrontSeparateInterlock", true);
 	bCleanOutRefillGuard=Ini->ReadBool("Safety", "CleanOutRefillGuard", true);
 	bTwoBandClamp=Ini->ReadBool("ClampGeometry", "TwoBandClamp", false);
-	for(int cg=0;cg<10;cg++)
-		bClampNewGeometry[cg]=Ini->ReadBool("ClampGeometry", "NewGeometry"+IntToStr(cg), false);
 	iTrayClampSettleMs=Ini->ReadInteger("SettleDelay", "TrayClampSettleMs", 500);
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
@@ -390,8 +386,6 @@ void THT160GeneralSetting::Save()
 	Ini->WriteBool("Safety", "FrontSeparateInterlock", bFrontSeparateInterlock);
 	Ini->WriteBool("Safety", "CleanOutRefillGuard", bCleanOutRefillGuard);
 	Ini->WriteBool("ClampGeometry", "TwoBandClamp", bTwoBandClamp);
-	for(int cg=0;cg<10;cg++)
-		Ini->WriteBool("ClampGeometry", "NewGeometry"+IntToStr(cg), bClampNewGeometry[cg]);
 	Ini->WriteInteger("SettleDelay", "TrayClampSettleMs", iTrayClampSettleMs);
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);

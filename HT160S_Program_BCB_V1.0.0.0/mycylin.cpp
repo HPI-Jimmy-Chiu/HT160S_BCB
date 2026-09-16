@@ -49,11 +49,16 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
 //which INVERTS the reading on a reworked carriage; see IsClampNewGeometry below.
 bool IsClampNewGeometry(int iGeomIdx)
 {
+    //AI(ht160s-clamp-geom) 20260916 : ONE switch for all ten clamps (owner ruling) -
+    //the mechanical rework lands on every carriage together, so there is no staging to
+    //express and a per-carriage list would only be a way to get it wrong. iGeomIdx is
+    //still the carriage identity (uHome HomeParkCarriage order) and still range-checked,
+    //so a cylinder that is not one of the ten can never take the new reading.
     if(GeneralSetting.bTwoBandClamp==false)
         return false;                    //feature off : every carriage reads the OLD way
     if(iGeomIdx<0 || iGeomIdx>=10)
         return false;                    //not a tray clamp, or an index we cannot place
-    return GeneralSetting.bClampNewGeometry[iGeomIdx];
+    return true;
 }
 //---------------------------------------------------------------------------
 bool IsTrayClampDeparted(TMyCylinder *Cylinder)

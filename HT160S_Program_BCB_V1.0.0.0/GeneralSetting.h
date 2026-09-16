@@ -286,15 +286,18 @@ public:
 	// leaves it dark (Loader/Empty/Color, 2026-08-05 on-site sweep).
 	// NEW geometry : the _On band is at the end stop, so an EMPTY clamp lights it and
 	// a tray holds the piston BETWEEN the two bands with both reeds dark.
-	// The two readings are exact opposites, so a reed can only be interpreted per
-	// carriage - there is no machine-wide rule any more.
-	// bTwoBandClamp is the master switch; bClampNewGeometry says which cars the
-	// mechanical team has already reworked. Index order is uHome.cpp
-	// HomeParkCarriage : 0/1=Loader1/2, 2..7=Auto1..6, 8=Empty, 9=Color.
-	// WARNING that is NOT the [AMR]/[SimAMR] index order.
-	// ALL ZERO (the default) keeps today's behaviour bit for bit.
+	// The two readings are exact opposites, so the same reed means opposite things
+	// before and after a carriage is reworked.
+	// ONE switch for all ten tray clamps (owner ruling 2026-09-16 : the mechanical
+	// work lands on every carriage together, so a per-carriage list would only be a
+	// way to get it wrong). [ClampGeometry] TwoBandClamp : 0 = every carriage reads
+	// the OLD way, 1 = every carriage reads the NEW way. Read live, no restart.
+	// DEFAULT 0, and it must stay 0. Turning this on against UN-reworked mechanics
+	// makes a held tray read as "clamped on nothing" everywhere at once : the SortArm
+	// place and pick gates, the Auto feed confirm, the Loader arrival gate and the
+	// Empty/Color GoUp would each alarm on every single tray - the machine could not
+	// move one tray. Set it to 1 only on a machine whose clamps have been reworked.
 	bool bTwoBandClamp;
-	bool bClampNewGeometry[10];
 	// Settle before a NEW-geometry tray clamp is believed. There is no in-position
 	// reed for a loaded clamp, so the stroke is confirmed by DEPARTURE from the
 	// retracted seat and this is the only guard against sampling mid-flight.
