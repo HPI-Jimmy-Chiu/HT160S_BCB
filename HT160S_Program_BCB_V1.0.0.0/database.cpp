@@ -1561,6 +1561,25 @@ void SYSTEM_MODULAR::LoadCylinderParameterFromDataBase()
         CynData->Enable=IsValidIOData(SwitchData);
         CynData->EnableAtDataBase=CynData->Enable;
         CynData->Tag=i;
+        //AI(ht160s-clamp-geom) 20260916 : mark the ten MotorY tray clamps and give each
+        //its rollout index. Named explicitly rather than by suffix so a future C_*_PushTray
+        //cannot silently inherit the behaviour. TrayArm's C_TrayArm_FrontClamp /
+        //_RearClamp are NOT tray clamps here : system/IO_Table.csv:212-213 give their _Off
+        //rows blank addresses and Enable=0, so the departure test has nothing to read.
+        //Bound HERE because this is the only step that runs both at boot and on an
+        //IO-editor reload. Index order is uHome.cpp HomeParkCarriage, NOT the AMR order.
+        CynData->iClampGeomIdx=-1;
+        if(CynData->CylinderName==AnsiString("C_Loader1_PushTray"))     CynData->iClampGeomIdx=0;
+        else if(CynData->CylinderName==AnsiString("C_Loader2_PushTray")) CynData->iClampGeomIdx=1;
+        else if(CynData->CylinderName==AnsiString("C_Auto1_PushTray"))   CynData->iClampGeomIdx=2;
+        else if(CynData->CylinderName==AnsiString("C_Auto2_PushTray"))   CynData->iClampGeomIdx=3;
+        else if(CynData->CylinderName==AnsiString("C_Auto3_PushTray"))   CynData->iClampGeomIdx=4;
+        else if(CynData->CylinderName==AnsiString("C_Auto4_PushTray"))   CynData->iClampGeomIdx=5;
+        else if(CynData->CylinderName==AnsiString("C_Auto5_PushTray"))   CynData->iClampGeomIdx=6;
+        else if(CynData->CylinderName==AnsiString("C_Auto6_PushTray"))   CynData->iClampGeomIdx=7;
+        else if(CynData->CylinderName==AnsiString("C_Empty_PushTray"))   CynData->iClampGeomIdx=8;
+        else if(CynData->CylinderName==AnsiString("C_Color_PushTray"))   CynData->iClampGeomIdx=9;
+        CynData->bTrayClamp=(CynData->iClampGeomIdx>=0);
 
         if(CynData->Enable==false)
         {

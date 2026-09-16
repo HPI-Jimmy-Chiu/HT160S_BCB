@@ -1016,7 +1016,7 @@ int TLoaderModule::GetCarriageGripVerdict(int LoaderNo)
         Push=&HSys.Cyn.C_Loader1_PushTray;
     else
         Push=&HSys.Cyn.C_Loader2_PushTray;
-    return GetClampGripVerdict(Push, IsSoftSimulate());
+    return GetTrayClampVerdict(Push, IsSoftSimulate());
 }
 //---------------------------------------------------------------------------
 //AI(ht160s-clampgrip) 20260806 : the On reed SortArm hands to ShowMyError so the alarm screen
@@ -1967,13 +1967,19 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             //unchecked = fall through to the "Loader Tray Empty" alarm.
             //AI(ht160s-agv) 20260627 : real presence now ANDs the supply-car InputEnd
             //(SnLoader_Inputend ON = car still has stock - the source-dry truth the AGV-call
-            //path already uses) with the push-cylinder On sensor (a tray actually reached the
-            //destacker - kept as the physical-arrival interlock, do NOT lower it). A disabled
-            //sensor is treated as present so an uninstalled point never blocks the feed.
+            //path already uses) with the push-cylinder arrival interlock (a tray actually
+            //reached the destacker - do NOT lower it). A disabled sensor is treated as
+            //present so an uninstalled point never blocks the feed.
+            //AI(ht160s-clamp-geom) 20260916 : that interlock used to read the On reed direct;
+            //it now asks GetTrayClampVerdict, which answers the same on the OLD geometry
+            //(reed lit = 1 = pass, dark = 0 = block, disabled = -1 = pass) and keeps
+            //answering correctly once this carriage is reworked, where a held tray leaves
+            //BOTH reeds dark. Second-order failure point : case 9000 is only entered from
+            //case 8300, whose Push() would already have alarmed first.
             if(IsSoftSimulate()
                    ? IsContinuousFeed()
                    : ((HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOn())
-                      && (PushCylinder->OnSensor.Enable==false || PushCylinder->OnSensor.IsOn())))
+                      && GetTrayClampVerdict(PushCylinder, IsSoftSimulate())!=0))
             {
                 State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : tray present (incl. AMR refill arriving during the deferral wait) - clear the wait
                 State->FeedWaitTimer.Clear();

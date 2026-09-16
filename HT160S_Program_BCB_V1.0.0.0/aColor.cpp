@@ -978,7 +978,21 @@ bool TColorModule::DoGoUpTray(int Flag)
 
         case 4000:
             if(PushCylinder(HSys.Cyn.C_Color_PushTray))
+            {
+                //AI(ht160s-clamp-geom) 20260916 : RESTORE THE GRIP EVIDENCE - the Color twin
+                //of the Empty GoUp test, same reason. On the NEW reed geometry Push() proves
+                //the stroke finished, not that anything is held, and this production path has
+                //no downstream re-confirm. Verdict 0 blocks; 1 and -1 pass; on the OLD
+                //geometry it cannot be reached because Push() already required the On reed.
+                if(GetTrayClampVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())==0)
+                {
+                    ShowMyError("MES1422", LangT("Color Push Tray Miss"),
+                                &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
+                    HSys.Cyn.C_Color_PushTray.Reset();   //re-arm the stroke, stay in 4000 and retry
+                    break;
+                }
                 GoUpTask=5000;
+            }
             break;
 
         case 5000:
@@ -2319,7 +2333,7 @@ AnsiString TColorModule::DescribeState()
     //diaper counters. 1=gripping 0=tray gone -1=no verdict (sim / disabled / not clamped).
     s += "  PhantomFires=" + IntToStr(iPhantomTrayFireCount)
        + "  CleanOutCarriageAlarmed=" + IntToStr(bCleanOutCarriageAlarmed ? 1 : 0)
-       + "  Grip=" + IntToStr(GetClampGripVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())) + "\r\n";
+       + "  Grip=" + IntToStr(GetTrayClampVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())) + "\r\n";
     return s;
 }
 //---------------------------------------------------------------------------

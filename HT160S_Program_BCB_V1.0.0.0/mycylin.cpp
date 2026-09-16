@@ -43,10 +43,29 @@ bool IsCylinderOnReady(TMyCylinder *Cylinder, bool bSoftSimulate)
 //-1 (no verdict) so callers can tell "no tray" apart from "no evidence".
 //The GetOutBit gate matters : with the clamp retracted the On reed is legitimately dark, and
 //reporting that as "tray missing" would fire on every released carriage on the machine.
-//AI(auto-empty-car) 20260908 : the "1 = gripping" reading holds for the Loader/Empty/Color clamps
-//(20260805 on-site). It does NOT hold for C_Auto1..6_PushTray : that On reed lights on an empty
-//clamp (owner bench test 20260908), so Auto callers must read 1 as "stroke confirmed" only.
-int GetClampGripVerdict(TMyCylinder *Push, bool bSoftSimulate)
+//AI(auto-empty-car) 20260908 : the "1 = gripping" reading held for the Loader/Empty/Color clamps
+//(20260805 on-site) but NOT for C_Auto1..6_PushTray - that On reed lights on an empty clamp
+//(owner bench test 20260908). The 2026-09 mechanical rework fixes that by moving the band,
+//which INVERTS the reading on a reworked carriage; see IsClampNewGeometry below.
+bool IsClampNewGeometry(int iGeomIdx)
+{
+    if(GeneralSetting.bTwoBandClamp==false)
+        return false;                    //feature off : every carriage reads the OLD way
+    if(iGeomIdx<0 || iGeomIdx>=10)
+        return false;                    //not a tray clamp, or an index we cannot place
+    return GeneralSetting.bClampNewGeometry[iGeomIdx];
+}
+//---------------------------------------------------------------------------
+bool IsTrayClampDeparted(TMyCylinder *Cylinder)
+{
+    if(Cylinder==NULL)
+        return false;
+    if(Cylinder->OffSensor.Enable==false)
+        return true;                     //cannot read the seat reed -> never block
+    return (Cylinder->OffSensor.IsOn()==false);
+}
+//---------------------------------------------------------------------------
+int GetTrayClampVerdict(TMyCylinder *Push, bool bSoftSimulate)
 {
     if(bSoftSimulate)
         return -1;                       //no IO card; every read is meaningless
@@ -56,9 +75,19 @@ int GetClampGripVerdict(TMyCylinder *Push, bool bSoftSimulate)
         return -1;                       //cannot read the grip reed -> no verdict
     if(Push->GetOutBit()==false)
         return -1;                       //not clamped at all -> says nothing about a tray
+    if(IsClampNewGeometry(Push->iClampGeomIdx)==false)
+    {
+        if(Push->OnSensor.IsOn())
+            return 1;                    //OLD : hook stopped against a tray edge : gripping
+        return 0;                        //OLD : commanded out but over-travelled : tray gone
+    }
     if(Push->OnSensor.IsOn())
-        return 1;                        //hook stopped against a tray edge : gripping
-    return 0;                            //commanded out but over-travelled : tray gone
+        return 0;                        //NEW : reached the end stop : clamped on NOTHING
+    if(Push->OffSensor.Enable==false)
+        return -1;                       //NEW : both-dark is ambiguous without the seat reed
+    if(IsTrayClampDeparted(Push)==false)
+        return 0;                        //NEW : still seated home : the stroke never happened
+    return 1;                            //NEW : left the seat, never reached the stop : a tray
 }
 //---------------------------------------------------------------------------
 //AI(HT160S-Maintainer) 20260623 : standardized dual-cylinder tray clamp shared
@@ -93,7 +122,13 @@ int DoClampTray(TMyCylinder &Lean, TMyCylinder &Push, int &SubTask,
         case 20:  // settle then confirm push reached its on-sensor
             if(Delay.Off())
             {
-                if(IsCylinderOnReady(&Push, bSoftSimulate))
+                //AI(ht160s-clamp-geom) 20260916 : ask the tray question, not the
+                //in-position question - 0 is the ONLY answer that means "clamped on
+                //nothing", which is what this case exists to catch. 1 and -1 both pass
+                //(-1 is never evidence of a miss). On the OLD geometry this is
+                //equivalent to the IsCylinderOnReady test it replaces at every
+                //reachable point, because case 20 is only entered after Push() succeeded.
+                if(GetTrayClampVerdict(&Push, bSoftSimulate)!=0)
                 {
                     SubTask=0;
                     return 1;
@@ -176,6 +211,8 @@ __fastcall TMyCylinder::TMyCylinder()
     OnDelayTime=0;
     OffDelayTime=0;
     Tag=0;
+    bTrayClamp=false;      //AI(ht160s-clamp-geom) 20260916
+    iClampGeomIdx=-1;      //AI(ht160s-clamp-geom) 20260916
     CylinderName="";
     OnSensorName="";
     OffSensorName="";
@@ -256,7 +293,22 @@ bool TMyCylinder::Push()
         //skip would abandon -> stale "can not on" alarm next cycle. HAS_TRAY/REALLY
         //still confirm + alarm. Re-adds the iRealDummy!=DUMMY gate removed 2026-06-22
         //(user reversed that call; the clamp has a real sensor the DUMMY bench cannot satisfy).
-        if(OnSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
+        //AI(ht160s-clamp-geom) 20260916 : NEW-geometry tray clamp. A loaded clamp rests
+        //BETWEEN the two reed bands, so there is no in-position reed to wait for and the
+        //old On-reed confirm would time out on every good tray. The remaining positive
+        //evidence is DEPARTURE from the retracted seat, then a settle. Whether a tray is
+        //in there is a separate question, answered by GetTrayClampVerdict at the check
+        //points - Push() only ever says "the stroke finished". Same iRealDummy gate as
+        //the branch below, so a DUMMY bench still skips confirm + watchdog.
+        if(bTrayClamp && IsClampNewGeometry(iClampGeomIdx) &&
+           OffSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
+        {
+            Delay.Clear();
+            Delay.SetMS(OnAlarmTime);
+            Delay.On();
+            Task=60;
+        }
+        else if(OnSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
         {
             if(OnSensor.IsOn())
             {
@@ -302,6 +354,40 @@ bool TMyCylinder::Push()
             }
             return false;
         }
+    }
+
+    //AI(ht160s-clamp-geom) 20260916 : NEW-geometry confirm, cases 60 and 70. 60 waits for
+    //the piston to leave the retracted seat under the SAME OnAlarmTime watchdog and the
+    //SAME OnAlarmCode as the old path (the ALID catalogue is a shipped SECS contract and
+    //must not move); only the alarm context text says what actually failed. 70 is the
+    //settle, after which the shared Task>=100 tail below clears the alarm and returns true.
+    if(Task==60)
+    {
+        if(IsTrayClampDeparted(this))
+        {
+            Delay.Clear();
+            Delay.SetMS(GeneralSetting.iTrayClampSettleMs);
+            Delay.On();
+            Task=70;
+        }
+        else
+        {
+            if(Delay.Off())
+            {
+                Task=1;
+                UpdateSimulateCompomentPosition(true);
+                SetCylinderAlarm(OnAlarmCode, AnsiString().sprintf("Cylinder=%s Func=Push (never left the retracted seat)", CylinderName.c_str()));
+                return false;
+            }
+            return false;
+        }
+    }
+
+    if(Task==70)
+    {
+        if(Delay.Off()==false)
+            return false;
+        Task=100;
     }
 
     if(Task>=100)

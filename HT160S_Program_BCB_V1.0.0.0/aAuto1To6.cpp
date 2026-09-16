@@ -821,7 +821,17 @@ bool TAutoModule::DoFeedTray(int Index, int Flag)
             if(FeedDelay[Index].Off())
             {
                 PushCylinder=GetPush(Index);
-                if(IsCylinderOnReady(PushCylinder, IsSoftSimulate()))
+                //AI(ht160s-clamp-geom) 20260916 : ask the TRAY question, not the in-position
+                //question. Verdict 0 is the only answer that means "the clamp closed on
+                //nothing"; 1 and -1 both pass (-1 is never evidence of a miss). On the OLD
+                //geometry this is bit-identical to the IsCylinderOnReady test it replaces at
+                //every reachable point here - the clamp is commanded out (case 5000 just
+                //succeeded) so the -1 branches cannot fire, and the reed answers the same way.
+                //On the NEW geometry it becomes the first real defence against minting a
+                //phantom working tray : fHasTray is only set at case 7000, so a miss here
+                //diverts to 5200 and the ledger never learns about a tray that is not there.
+                //That is the head of the chain that dropped two ICs on 2026-09-07.
+                if(GetTrayClampVerdict(PushCylinder, IsSoftSimulate())!=0)
                     FeedTask[Index]=6000;
                 else
                     FeedTask[Index]=5200;
@@ -1717,7 +1727,7 @@ int TAutoModule::GetCarTrayGripVerdict(int Index)
 {
     if(Index<0 || Index>=AUTO_STATION_COUNT)
         return -1;
-    return GetClampGripVerdict(GetPush(Index), IsSoftSimulate());
+    return GetTrayClampVerdict(GetPush(Index), IsSoftSimulate());
 }
 //---------------------------------------------------------------------------
 //AI(auto-empty-car) 20260908 : is this station's working-car push clamp COMMANDED out ?

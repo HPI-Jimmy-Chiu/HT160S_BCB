@@ -1090,7 +1090,26 @@ bool TEmptyModule::DoGoUpTray(int Flag)
 
         case 4000:
             if(PushCylinder(HSys.Cyn.C_Empty_PushTray))
+            {
+                //AI(ht160s-clamp-geom) 20260916 : RESTORE THE GRIP EVIDENCE. Push() used to
+                //be the whole test here - on the OLD geometry it only returns true with the
+                //On reed lit, i.e. with a tray between the hook and the stop, so a clamp that
+                //closed on nothing failed the stroke and raised 40063. On the NEW geometry
+                //Push() confirms DEPARTURE from the seat instead, and an empty clamp departs
+                //exactly like a loaded one - so without this test a reworked carriage would
+                //stack a tray that is not there, silently. This GoUp is a production path and
+                //has no downstream check, unlike the feed ladder which re-confirms at
+                //DoFeedTray. Verdict 0 is the only blocking answer; on the OLD geometry it is
+                //never reached (Push() already required the reed), so this is a no-op there.
+                if(GetTrayClampVerdict(&HSys.Cyn.C_Empty_PushTray, IsSoftSimulate())==0)
+                {
+                    ShowMyError("JAM1030", LangT("Empty Push Tray Miss"),
+                                &HSys.Cyn.C_Empty_PushTray.OnSensor, true, K_RETRY);
+                    HSys.Cyn.C_Empty_PushTray.Reset();   //re-arm the stroke, stay in 4000 and retry
+                    break;
+                }
                 GoUpTask=5000;
+            }
             break;
 
         case 5000:
@@ -1688,7 +1707,7 @@ AnsiString TEmptyModule::DescribeState()
        //equivalent Color line never printed fHasTray - the very flag it was blocked on.
        + "  MotYHasTray=" + IntToStr((HSys.VMot.MMEmptyY!=NULL && HSys.VMot.MMEmptyY->fHasTray) ? 1 : 0)
        + "  PhantomFires=" + IntToStr(iPhantomTrayFireCount)
-       + "  Grip=" + IntToStr(GetClampGripVerdict(&HSys.Cyn.C_Empty_PushTray, IsSoftSimulate())) + "\r\n";
+       + "  Grip=" + IntToStr(GetTrayClampVerdict(&HSys.Cyn.C_Empty_PushTray, IsSoftSimulate())) + "\r\n";
     s += "  bReturnTray=" + IntToStr(bReturnTray ? 1 : 0)
        + "  bTrayXToEmptyFinish=" + IntToStr(bTrayXToEmptyFinish ? 1 : 0)
        + "  bLotFinish=" + IntToStr(bLotFinish ? 1 : 0)

@@ -280,6 +280,26 @@ public:
 	// disable.
 	bool bCleanOutRefillGuard;
 
+	// Clamp geometry (2026-09 mechanical rework of the MotorY tray-clamp reeds).
+	// OLD geometry : the _On band sits where the hook stops against a TRAY edge, so
+	// _On lit = a tray is clamped, and an empty clamp over-travels PAST the band and
+	// leaves it dark (Loader/Empty/Color, 2026-08-05 on-site sweep).
+	// NEW geometry : the _On band is at the end stop, so an EMPTY clamp lights it and
+	// a tray holds the piston BETWEEN the two bands with both reeds dark.
+	// The two readings are exact opposites, so a reed can only be interpreted per
+	// carriage - there is no machine-wide rule any more.
+	// bTwoBandClamp is the master switch; bClampNewGeometry says which cars the
+	// mechanical team has already reworked. Index order is uHome.cpp
+	// HomeParkCarriage : 0/1=Loader1/2, 2..7=Auto1..6, 8=Empty, 9=Color.
+	// WARNING that is NOT the [AMR]/[SimAMR] index order.
+	// ALL ZERO (the default) keeps today's behaviour bit for bit.
+	bool bTwoBandClamp;
+	bool bClampNewGeometry[10];
+	// Settle before a NEW-geometry tray clamp is believed. There is no in-position
+	// reed for a loaded clamp, so the stroke is confirmed by DEPARTURE from the
+	// retracted seat and this is the only guard against sampling mid-flight.
+	int iTrayClampSettleMs;
+
 	// Hardware install : does this machine physically have the LED bin display
 	// boards (HT9046 style, COM connected)? Commissioning fact. When false the
 	// bin display controller stays idle. Set via [BinDisplay] in General.ini.
