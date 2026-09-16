@@ -1016,6 +1016,21 @@ bool TAutoModule::DoDischargeTray(int Index, int Flag)
                 //than the legacy flag clears at case 1000. Readers flip in phase 5b.
                 State[Index].Status=AS_IDLE;
                 Task=1;   //AI(auto-phantom-tray) 20260908 : finished eject parks the cursor at 1 - a completed discharge must never read as an in-flight tail (HomeDrainTick latch)
+                //AI(cleanout-book-at-release) 20260916 : belt with the braces. case 1000 already
+                //cleared this ledger on every NORMAL discharge, and nothing can re-set fHasTray in
+                //between (legacy DoAuto stays in case 4000 until the whole discharge returns true;
+                //per-station StationTask is one cursor per station, so a feed cannot start while the
+                //discharge runs). So this is normally a no-op. It exists for the ONE entry that skips
+                //case 1000 : the HOME discharge-tail latch re-enters the eject at 5000
+                //(ServiceStations case 0 / DoAuto case 3000). Re-assert the clear so that path can
+                //never finish with the ledger still loaded.
+                //DELIBERATELY NOT BookDrainedTray : case 1000 has ALREADY emitted this tray's
+                //Unloadtray CEID, bumped RecordTrayCnt and tallied its ICs into iAmrDeviceCount.
+                //Booking again here would report one physical tray twice to the host.
+                TrayMotor=GetAutoVMotor(Index);
+                if(TrayMotor!=NULL)
+                    TrayMotor->ClearTray();
+                State[Index].bCarHasTray=false;
                 return true;
             }
             break;
@@ -1139,7 +1154,34 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                     {
                         Cylinder->Pop();
                         if(IsCylinderOffReady(Cylinder, IsSoftSimulate()))
+                        {
+                            //AI(cleanout-book-at-release) 20260916 : BOOK AND RELEASE THE MOMENT THE
+                            //CLAMP LETS GO. Owner ruling 20260916. This is the primary book+clear for
+                            //the drain; the case-4000 GoUp call below is now only the belt with the
+                            //braces (BookDrainedTray is gated on fHasTray, so whichever site reaches a
+                            //station first books its tray exactly once).
+                            //WHY HERE AND NOT AT THE RISE : cases 2000/3000 pop the push and lean clamps
+                            //on ALL six stations as a lockstep barrier, and the tray is no longer held
+                            //from that instant. Every interruption between the release and the old clear
+                            //- the case-4000 stack-FULL modal, a PAUSE, a HOME, a power cut - used to
+                            //leave six loaded ledgers over six unheld trays. KYEC 2026-09-15 walked that
+                            //exact path: 15:46:39 drain starts, 15:46:42 MES1320 at case 4000, PAUSE
+                            //clears SystemStart so the ladder never gets another scan, the case-7000
+                            //terminal never runs, and the HOME that follows re-clamps and re-publishes
+                            //the lie (uHome.cpp PARK reads fHasTray, RE-ACQUIRE re-pushes the clamp, and
+                            //the Auto push reed lights on an empty clamp so nothing catches it).
+                            //THE TRADE : the Unloadtray CEID and RecordTrayCnt now fire a few hundred ms
+                            //earlier, and their meaning becomes - the tray has left the clamp - rather
+                            //than - the tray is on the stack. That is the same convention the production
+                            //path already uses: DoDischargeTray books at case 1000, BEFORE its own clamp
+                            //release at 3000/4000 and long before the rise at 6100. Booking here is
+                            //strictly later than that, so it is the more conservative of the two.
+                            //An aborted drain can therefore over-report by one tray on a lane whose tray
+                            //is then removed by hand. That is deliberate: an over-counted tray is a
+                            //reconcilable number, a phantom working tray drops ICs on the floor.
                             bCleanOutCheck[Index]=true;
+                            BookDrainedTray(Index);
+                        }
                     }
                 }
             }
@@ -1248,8 +1290,11 @@ bool TAutoModule::DoAllAutoCleanOut(int Flag)
                         {
                             //AI(cleanout-per-station-clear) 20260915 : GoUp confirmed = THIS station's
                             //working tray is on the output stack and its working position is empty.
-                            //Book and release it now; waiting for the lockstep terminal is exactly what
-                            //left the 2026-09-07 ledger lying about six empty lanes.
+                            //AI(cleanout-book-at-release) 20260916 : since the owner ruling this is the
+                            //SECOND of three call sites - case 2000 (the clamp release) books first and
+                            //this one is then a no-op. Kept because a station skipped at case 2000 (a
+                            //NULL cylinder, a disabled point) still has to be booked somewhere, and
+                            //because fHasTray gating makes a double call free.
                             bCleanOutCheck[Index]=true;
                             BookDrainedTray(Index);
                         }
