@@ -27,6 +27,12 @@
 //---------------------------------------------------------------------------
 TLoaderModule *LoaderModule=NULL;
 //---------------------------------------------------------------------------
+//AI(cleanout-refill-guard) 20260916 : how long SnLoader_Inputend must read ON without a
+//break before a Clean Out refill is believed. Same number and same reason as
+//aEmpty.cpp EMPTY_PHANTOM_TRAY_CONFIRM_MS : the front destacker rise can flick the beam,
+//and a single scan of ON is not an operator loading trays.
+static const int CLEANOUT_REFILL_CONFIRM_MS=1500;
+//---------------------------------------------------------------------------
 static int ClampIntValue(int Value, int MinValue, int MaxValue)
 {
     if(Value<MinValue)
@@ -136,6 +142,8 @@ void TLoaderModule::InitialFlag(bool bKeepMaterial)
     }
     bRearDischargeInProgress=false;   //AI(ht160s-trayarm-empty-handoff) 20260701 : no discharge settling in flight at init (all ladders reset to 1)
     bRearResidualAlarmed=false;       //AI(ht160s-rearready-p0) 20260705 : a new stranded episode after a reset may alarm again
+    bCleanOutSourceSeenDry=false;     //AI(cleanout-refill-guard) 20260916 : a reset starts a fresh Clean Out refill watch
+    dwCleanOutRefillTick=0;           //AI(cleanout-refill-guard) 20260916
     iFrontOwner=0;
     iTopCcdCount=0;
     iYOwner[0]=LOADER_Y_OWNER_NONE;
@@ -1443,6 +1451,60 @@ void TLoaderModule::DoLoader(int LoaderNo, int &Task)
         bRearResidualAlarmed=true;
         ShowMyError("MES0924", LangT("Loader rear has a leftover tray - please remove it"),
                     &HSys.Sen.SnLoader_OutputBottomHasTray, false, K_RETRY);
+    }
+
+    //AI(cleanout-refill-guard) 20260916 : A CLEAN OUT MUST NOT BE FED. Owner ruling 20260916.
+    //IsSupplyCarDry() (:782) is a term of the retire guard below, so trays dropped into the
+    //shared supply car AFTER the drain started keep this side on the ladder - the un-retire
+    //line below fires, TLoaderModule::IsAllCleanOutFinish() stays false (:1055) and
+    //csystem.cpp CheckCleanOutFinish therefore never completes. The machine does not jam or
+    //crash; it silently keeps producing over a Clean Out that can never end. That is the
+    //operator sequence behind the 2026-09-15 empty-car drop, as the owner described it:
+    //Clean Out not finished -> Full alarm -> HOME -> keep loading the Loader -> production
+    //resumes while the Auto ledger still claims trays.
+    //EDGE, NOT LEVEL. Pressing Clean Out with stock still in the car is LEGAL and is the
+    //user-confirmed 20260701 semantics recorded below (:1454-1458) : keep feeding and sorting
+    //the remaining car until it is DRY, THEN empty the pipeline. A level test would alarm the
+    //instant Clean Out is pressed. So latch "this car has been seen dry in THIS episode"
+    //first, and treat only the dry-then-wet transition as a refill.
+    //NO one-shot latch : the alarm is the enforcement. If the operator answers RETRY without
+    //removing the trays the beam is still ON and it fires again after the next confirm window,
+    //which is what "you must wait for Clean Out to finish" has to mean. Removing the trays
+    //drops the beam, re-latches seen-dry and it goes quiet by itself.
+    //bUseAMR==false only : with an AMR the refill is the AGV doing its job, not a violation.
+    //LoaderNo==1 : DoLoader is called twice per cycle on one object (database.cpp has two
+    //actions), so evaluate once per cycle or one physical event alarms twice.
+    //PLACED HERE, above the retire guard and above switch(Task) : the retire guard at :1461
+    //is skipped for an unbounded time whenever SortArm owns this side Y, and this is the last
+    //point reached on every scan. It is also a point with no stroke in flight - the 20260730
+    //site deadlock came from releasing resources mid-destack.
+    if(LoaderNo==1 && GeneralSetting.bCleanOutRefillGuard &&
+       GeneralSetting.bUseAMR==false &&
+       IsSoftSimulate()==false && HSys.LastSet.iRealDummy!=DUMMY &&
+       HSys.Sen.SnLoader_Inputend.Enable==true)
+    {
+        if(HSys.Sys.RunMode!=Run_CleanOut)
+        {
+            bCleanOutSourceSeenDry=false;   //episode over : re-arm for the next Clean Out
+            dwCleanOutRefillTick=0;
+        }
+        else if(HSys.Sen.SnLoader_Inputend.IsOn()==false)
+        {
+            bCleanOutSourceSeenDry=true;    //the car really did run dry inside this episode
+            dwCleanOutRefillTick=0;
+        }
+        else if(bCleanOutSourceSeenDry)
+        {
+            if(dwCleanOutRefillTick==0)
+                dwCleanOutRefillTick=GetTickCount();
+            else if((int)(GetTickCount()-dwCleanOutRefillTick)>=CLEANOUT_REFILL_CONFIRM_MS)
+            {
+                dwCleanOutRefillTick=0;     //cleared BEFORE the modal : ShowMyError blocks
+                RecordProcess("CLEANOUT refill blocked: new stock in the supply car while the drain is still running");
+                ShowMyError("MES0927", LangT("Clean Out still running - remove the new trays and let the drain finish"),
+                            &HSys.Sen.SnLoader_Inputend, false, K_RETRY);
+            }
+        }
     }
 
     //AI(cleanout) 20260703 : the MES0922 front-residual manual-removal alarm that lived here is

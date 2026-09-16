@@ -133,6 +133,7 @@ void THT160GeneralSetting::SetDefault()
 	iEmptyFeedClampSettleMs=500;
 	iColorFeedClampSettleMs=500;
 	bFrontSeparateInterlock=true;
+	bCleanOutRefillGuard=true;
 	bBinDisplayInstalled=false;
 	sBinDispComPort="COM5";
 	iBinDispDelaySec=5;
@@ -275,6 +276,7 @@ void THT160GeneralSetting::Load()
 	iEmptyFeedClampSettleMs=Ini->ReadInteger("SettleDelay", "EmptyFeedClampSettleMs", 500);
 	iColorFeedClampSettleMs=Ini->ReadInteger("SettleDelay", "ColorFeedClampSettleMs", 500);
 	bFrontSeparateInterlock=Ini->ReadBool("Safety", "FrontSeparateInterlock", true);
+	bCleanOutRefillGuard=Ini->ReadBool("Safety", "CleanOutRefillGuard", true);
 	bBinDisplayInstalled=Ini->ReadBool("BinDisplay", "Installed", false);
 	sBinDispComPort=Ini->ReadString("BinDisplay", "ComPort", "COM5");
 	iBinDispDelaySec=Ini->ReadInteger("BinDisplay", "DelaySec", 5);
@@ -378,6 +380,7 @@ void THT160GeneralSetting::Save()
 	Ini->WriteInteger("SettleDelay", "EmptyFeedClampSettleMs", iEmptyFeedClampSettleMs);
 	Ini->WriteInteger("SettleDelay", "ColorFeedClampSettleMs", iColorFeedClampSettleMs);
 	Ini->WriteBool("Safety", "FrontSeparateInterlock", bFrontSeparateInterlock);
+	Ini->WriteBool("Safety", "CleanOutRefillGuard", bCleanOutRefillGuard);
 	Ini->WriteBool("BinDisplay", "Installed", bBinDisplayInstalled);
 	Ini->WriteString("BinDisplay", "ComPort", sBinDispComPort);
 	Ini->WriteInteger("BinDisplay", "DelaySec", iBinDispDelaySec);

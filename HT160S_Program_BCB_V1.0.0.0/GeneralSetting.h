@@ -269,6 +269,17 @@ public:
 	// reworked so both can run concurrently again.
 	bool bFrontSeparateInterlock;
 
+	// Safety : refuse a supply-car refill during Clean Out. IsSupplyCarDry() is a term
+	// of the Loader Clean Out retire guard, so trays dropped into the car after the
+	// drain started keep the side on the ladder ("CLEANOUT un-retire"),
+	// TLoaderModule::IsAllCleanOutFinish stays false and the Clean Out can never
+	// complete - the machine keeps producing over a drain that will not end. When true
+	// (default) the Loader raises MES0927 once the source is seen dry and then goes wet
+	// again inside a Clean Out. Non-AMR machines only : with an AMR the refill is the
+	// AGV's job, not an operator violation. Set [Safety] CleanOutRefillGuard=0 to
+	// disable.
+	bool bCleanOutRefillGuard;
+
 	// Hardware install : does this machine physically have the LED bin display
 	// boards (HT9046 style, COM connected)? Commissioning fact. When false the
 	// bin display controller stays idle. Set via [BinDisplay] in General.ini.

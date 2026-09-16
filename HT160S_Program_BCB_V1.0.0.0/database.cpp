@@ -1030,6 +1030,14 @@ void SYSTEM_MODULAR::CreateSystemAlarmCode()
             mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
             mapNameToAlarm[cd]=cd;
         }
+        //AI(cleanout-refill-guard) 20260916 : the supply car was topped up while a Clean
+        //Out was still draining. Registered standalone (same idiom as MES0925) so the
+        //19-slot parallel seed arrays above do not have to be resized.
+        {
+            AnsiString cd="MES0927", mg="Clean Out still running - remove the new trays and let the drain finish";
+            mapAlarmCodeList[cd]=MyAlarmCodeStruct(cd, eMessageErr, mg, mg, "", "", "pn_System");
+            mapNameToAlarm[cd]=cd;
+        }
         //AI(amr-unmanned W2) 20260721 : AGV/AMR handshake timeout (code aligned to HT9045
         //WAR0962 asendic_Loader.cpp:1963 "waited too long for the AMR"). The ONLY alarm the
         //unmanned AMR line raises for a logistics condition : full/empty states silently
