@@ -218,6 +218,7 @@ __fastcall TMyCylinder::TMyCylinder()
     Tag=0;
     bTrayClamp=false;      //AI(ht160s-clamp-geom) 20260916
     iClampGeomIdx=-1;      //AI(ht160s-clamp-geom) 20260916
+    bSeatConfirmed=false;  //AI(clamp-review-B) 20260916
     CylinderName="";
     OnSensorName="";
     OffSensorName="";
@@ -287,6 +288,11 @@ bool TMyCylinder::Push()
     if(Enable==false && Task==1)
         Task=100;
 
+    //AI(clamp-review-B) 20260916 : sample the commanded state BEFORE Switch.On() - it is
+    //the only way to tell a fresh stroke (clamp was retracted, so the piston MUST be on
+    //the seat right now) from a re-push of an already extended clamp (seat legitimately
+    //dark, nothing left to depart from).
+    bool bWasCommandedOut=GetOutBit();
     Switch.On();
     ClearCylinderAlarm(OnAlarmCode);
     if(Task==1)
@@ -308,6 +314,13 @@ bool TMyCylinder::Push()
         if(bTrayClamp && IsClampNewGeometry(iClampGeomIdx) &&
            OffSensor.Enable==true && HSys.LastSet.iRealDummy!=DUMMY)
         {
+            //AI(clamp-review-B) 20260916 : a stroke that starts from the retracted state
+            //must be able to SEE the seat reed lit, or its later darkness proves nothing.
+            //A re-push of an already-out clamp starts with the seat legitimately dark and
+            //is accepted as confirmed. If a fresh stroke cannot see the seat, Task 60 will
+            //never accept the departure and the existing OnAlarmTime watchdog raises the
+            //cylinder alarm - the SAME fail-safe direction the old On-reed path had.
+            bSeatConfirmed=bWasCommandedOut ? true : OffSensor.IsOn();
             Delay.Clear();
             Delay.SetMS(OnAlarmTime);
             Delay.On();
@@ -368,7 +381,11 @@ bool TMyCylinder::Push()
     //settle, after which the shared Task>=100 tail below clears the alarm and returns true.
     if(Task==60)
     {
-        if(IsTrayClampDeparted(this))
+        //AI(clamp-review-B) 20260916 : keep looking for the seat until the watchdog gives
+        //up - a reed that is merely slow still confirms, a reed that is dead never does.
+        if(bSeatConfirmed==false && OffSensor.IsOn())
+            bSeatConfirmed=true;
+        if(bSeatConfirmed && IsTrayClampDeparted(this))
         {
             Delay.Clear();
             Delay.SetMS(GeneralSetting.iTrayClampSettleMs);
@@ -381,7 +398,8 @@ bool TMyCylinder::Push()
             {
                 Task=1;
                 UpdateSimulateCompomentPosition(true);
-                SetCylinderAlarm(OnAlarmCode, AnsiString().sprintf("Cylinder=%s Func=Push (never left the retracted seat)", CylinderName.c_str()));
+                SetCylinderAlarm(OnAlarmCode, AnsiString().sprintf("Cylinder=%s Func=Push (%s)", CylinderName.c_str(),
+                                 bSeatConfirmed ? "never left the retracted seat" : "retracted seat reed never read ON - check the _Off reed"));
                 return false;
             }
             return false;

@@ -1974,12 +1974,25 @@ bool TLoaderModule::DoFeedTray(int LoaderNo, int Flag)
             //it now asks GetTrayClampVerdict, which answers the same on the OLD geometry
             //(reed lit = 1 = pass, dark = 0 = block, disabled = -1 = pass) and keeps
             //answering correctly once this carriage is reworked, where a held tray leaves
-            //BOTH reeds dark. Second-order failure point : case 9000 is only entered from
-            //case 8300, whose Push() would already have alarmed first.
+            //BOTH reeds dark.
+            //AI(clamp-review-A) 20260916 : the GetOutBit test is LOAD BEARING, do not fold it
+            //away. GetTrayClampVerdict answers -1 for a clamp that is not commanded out, and
+            //-1 passes - but the reed test it replaced simply read dark and BLOCKED. case 9000
+            //has TWO entries, not one : case 8300 after a successful Push (clamp out), and the
+            //case-3500 source-dry branch, which arrives with BOTH clamps popped by cases
+            //2000/3000. Without this gate that second entry degrades the whole interlock to
+            //the Inputend term alone, so the first flicker of SnLoader_Inputend (no debounce)
+            //or an AGV delivering a fresh car would jump straight to case 9500 - skipping the
+            //destack, the lean and the clamp - and then report JAM0913 "tray left on the
+            //carriage" for what is really a dry source, throwing away the AMR wait and the
+            //automatic Clean Out this branch is built around. Found by adversarial review of
+            //f7e3f76; it bit with every geometry flag still 0.
             if(IsSoftSimulate()
                    ? IsContinuousFeed()
                    : ((HSys.Sen.SnLoader_Inputend.Enable==false || HSys.Sen.SnLoader_Inputend.IsOn())
-                      && GetTrayClampVerdict(PushCylinder, IsSoftSimulate())!=0))
+                      && (PushCylinder->OnSensor.Enable==false
+                          || (PushCylinder->GetOutBit()
+                              && GetTrayClampVerdict(PushCylinder, IsSoftSimulate())!=0))))
             {
                 State->bWaitingAmrFeed=false;   //AI(ht160s-agv) 20260626 : tray present (incl. AMR refill arriving during the deferral wait) - clear the wait
                 State->FeedWaitTimer.Clear();

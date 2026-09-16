@@ -1101,14 +1101,33 @@ bool TEmptyModule::DoGoUpTray(int Flag)
                 //has no downstream check, unlike the feed ladder which re-confirms at
                 //DoFeedTray. Verdict 0 is the only blocking answer; on the OLD geometry it is
                 //never reached (Push() already required the reed), so this is a no-op there.
-                if(GetTrayClampVerdict(&HSys.Cyn.C_Empty_PushTray, IsSoftSimulate())==0)
-                {
-                    ShowMyError("JAM1030", LangT("Empty Push Tray Miss"),
-                                &HSys.Cyn.C_Empty_PushTray.OnSensor, true, K_RETRY);
-                    HSys.Cyn.C_Empty_PushTray.Reset();   //re-arm the stroke, stay in 4000 and retry
-                    break;
-                }
-                GoUpTask=5000;
+                //AI(clamp-review-C) 20260916 : DUMMY gate. Push() skips its reed confirm on a
+                //DUMMY bench but GetTrayClampVerdict does not, so without this a dry run that
+                //used to pass would alarm on an over-travelled empty clamp. Same idiom as the
+                //tray-presence checks in this file.
+                if(HSys.LastSet.iRealDummy!=DUMMY &&
+                   GetTrayClampVerdict(&HSys.Cyn.C_Empty_PushTray, IsSoftSimulate())==0)
+                    GoUpTask=4200;
+                else
+                    GoUpTask=5000;
+            }
+            break;
+
+        case 4200:
+            //AI(clamp-review-C) 20260916 : the clamp closed on nothing. RETRACT FIRST, then
+            //alarm - the first version only Reset() the cylinder, which re-arms the state
+            //machine without dropping the output, so the operator was asked to reseat a tray
+            //into a clamp that was still shut and RETRY could only reproduce the same result.
+            //Same shape as the two sibling miss handlers, DoClampTray case 30 and
+            //DoFeedTray case 5200 in aAuto1To6.cpp : Pop, alarm, consume the key, rewind.
+            //Rewind to 3000, not 4000 : that step re-pushes the lean stop and Resets the
+            //push clamp, which is what a genuine retry needs.
+            if(PopCylinder(HSys.Cyn.C_Empty_PushTray))
+            {
+                int iKeyMiss=ShowMyError("JAM1030", LangT("Empty Push Tray Miss"),
+                                         &HSys.Cyn.C_Empty_PushTray.OnSensor, true, K_RETRY);
+                if(iKeyMiss==K_RETRY)
+                    GoUpTask=3000;
             }
             break;
 

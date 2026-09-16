@@ -65,6 +65,11 @@ public:
     //Range-checked by IsClampNewGeometry so a cylinder outside the ten can never take
     //the new reading; kept as a stable identity for diagnostics and future per-car work.
     int iClampGeomIdx;
+    //AI(clamp-review-B) 20260916 : did this stroke ever see the piston ON the retracted
+    //seat ? A NEW-geometry clamp confirms by DEPARTURE, so a seat reed stuck dark would
+    //otherwise read as "already departed" in the same scan the coil is energised - the
+    //cylinder would be reported as clamped, and holding a tray, without moving at all.
+    bool bSeatConfirmed;
 
     bool Push();
     bool Pop();

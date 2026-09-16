@@ -363,6 +363,11 @@ bool TfHome::ProcessMotorHome()
 	//logged RE-ACQUIRE at 17:29:22.571 and the 17:29:27.358 IO sweep showed C_Loader1_PushTray
 	//commanded out with a dark On reed (grip verdict 0), yet HOME still reported success.
 	static bool bCarReclamped[10]={false,false,false,false,false,false,false,false,false,false};
+	//AI(clamp-review-D) 20260916 : the re-acquire found this carriage clamped on NOTHING.
+	//Only Empty/Color can ever set it : they are the haul carriages, they end RELEASED by
+	//design and the summary audit below cannot test them, so the verdict has to be taken
+	//and remembered while the clamp is still out.
+	static bool bCarEmptyClamp[10]={false,false,false,false,false,false,false,false,false,false};
 	static int  iReacqCar=0;
 	static int  iReacqStep=0;
 	//AI(ht160s-home-resume-drain) 20260711 : W2 drain stage state. Phase 0=arm, 1=pump,
@@ -478,6 +483,7 @@ bool TfHome::ProcessMotorHome()
 				iCarHaulTarget[pk]=-1;
 				bCarUnparkedCarry[pk]=false;
 				bCarReclamped[pk]=false;   //AI(ht160s-home-grip) 20260808 : fresh round
+				bCarEmptyClamp[pk]=false;  //AI(clamp-review-D) 20260916 : fresh round
 				if(PMot==NULL || PV==NULL || PF==NULL || PR==NULL)
 					continue;
 				bool bCarry=false;
@@ -1015,10 +1021,20 @@ bool TfHome::ProcessMotorHome()
 					TTrayMotor *GMot; TTrayMotor *GV; TMyCylinder *GF; TMyCylinder *GR; AnsiString GName;
 					int iGrip=-1;
 
+					HomeParkCarriage(pg, &GMot, &GV, &GF, &GR, &GName);
+					//AI(clamp-review-D) 20260916 : the haul carriages report here, before the
+					//bCarReclamped gate - they never set that flag because they end RELEASED.
+					if(bCarEmptyClamp[pg])
+					{
+						bCarEmptyClamp[pg]=false;
+						RecordProcess("Home: RE-ACQUIRE "+GName+" clamp was EMPTY - no tray was hauled");
+						if(sLostGrip!=AnsiString(""))
+							sLostGrip+=", ";
+						sLostGrip+=GName;
+					}
 					if(bCarReclamped[pg]==false)
 						continue;
 					bCarReclamped[pg]=false;
-					HomeParkCarriage(pg, &GMot, &GV, &GF, &GR, &GName);
 					if(pg<=1 && LoaderModule!=NULL)
 						iGrip=LoaderModule->GetCarriageGripVerdict(pg+1);
 					else if(pg>=2 && pg<=7 && AutoModule!=NULL)
@@ -1090,6 +1106,26 @@ bool TfHome::ProcessMotorHome()
 					case 3:   //push LAST, at park, where the tray edge is its stop
 						if(PF->Push())
 						{
+							//AI(clamp-review-D) 20260916 : Empty/Color have NO grip test anywhere. PARK
+							//refuses a pk>=8 carriage without a haul target (see case 1), so they can only
+							//ever take the haul branch, and the summary audit below is gated to pg<=7. On
+							//the OLD geometry Push() itself was the test - it only returned true with the
+							//On reed lit. On the NEW geometry an empty clamp departs the seat exactly like
+							//a loaded one, so this ladder would haul nothing to the module target and then
+							//log HAUL-FINISH for a tray lying on the floor. Take the verdict HERE, while
+							//the clamp is still out - after the step 5/6 release it reads -1 for ever.
+							//No alarm inside the ladder : ShowNoteAlarm clears SystemStart and
+							//ProcessMotorHome would stop being pumped, which would freeze HOME itself.
+							//Release at the park spot instead and let the summary report it.
+							if(iCarHaulTarget[iReacqCar]>=0 &&
+							   GetTrayClampVerdict(PF, false)==0)
+							{
+								RecordProcess("Home: RE-ACQUIRE "+PName+" clamp is EMPTY - haul skipped, no tray on the carriage");
+								bCarEmptyClamp[iReacqCar]=true;
+								iCarHaulTarget[iReacqCar]=-1;   //no haul happened : step 6 must not claim one
+								iReacqStep=5;
+								break;
+							}
 							if(iCarHaulTarget[iReacqCar]>=0)
 								iReacqStep=4;   //Empty/Color : haul on to the module target
 							else
@@ -1113,7 +1149,8 @@ bool TfHome::ProcessMotorHome()
 					case 6:   //...then Pop LeanOnTray; destination sensors take over on resume
 						if(PR->Pop())
 						{
-							RecordProcess("Home: HAUL-FINISH "+PName+" tray to Y="+IntToStr(iCarHaulTarget[iReacqCar]));
+							if(bCarEmptyClamp[iReacqCar]==false)   //AI(clamp-review-D) 20260916 : never claim a haul that did not happen
+								RecordProcess("Home: HAUL-FINISH "+PName+" tray to Y="+IntToStr(iCarHaulTarget[iReacqCar]));
 							iCarHaulTarget[iReacqCar]=-1;
 							bCarParked[iReacqCar]=false;
 							iReacqCar++;

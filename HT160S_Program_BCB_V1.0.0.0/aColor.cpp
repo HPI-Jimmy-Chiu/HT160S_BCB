@@ -984,14 +984,27 @@ bool TColorModule::DoGoUpTray(int Flag)
                 //the stroke finished, not that anything is held, and this production path has
                 //no downstream re-confirm. Verdict 0 blocks; 1 and -1 pass; on the OLD
                 //geometry it cannot be reached because Push() already required the On reed.
-                if(GetTrayClampVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())==0)
-                {
-                    ShowMyError("MES1422", LangT("Color Push Tray Miss"),
-                                &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
-                    HSys.Cyn.C_Color_PushTray.Reset();   //re-arm the stroke, stay in 4000 and retry
-                    break;
-                }
-                GoUpTask=5000;
+                //AI(clamp-review-C) 20260916 : DUMMY gate - Push() skips its reed confirm on a
+                //DUMMY bench but GetTrayClampVerdict does not. Twin of the Empty guard.
+                if(HSys.LastSet.iRealDummy!=DUMMY &&
+                   GetTrayClampVerdict(&HSys.Cyn.C_Color_PushTray, IsSoftSimulate())==0)
+                    GoUpTask=4200;
+                else
+                    GoUpTask=5000;
+            }
+            break;
+
+        case 4200:
+            //AI(clamp-review-C) 20260916 : RETRACT FIRST, then alarm. Reset() alone re-arms
+            //the state machine without dropping the output, so the clamp stayed shut and the
+            //RETRY the dialog offers could only reproduce the same verdict. Twin of the Empty
+            //handler; rewind to 3000 so the lean stop is re-pushed and the clamp re-armed.
+            if(PopCylinder(HSys.Cyn.C_Color_PushTray))
+            {
+                int iKeyMiss=ShowMyError("MES1422", LangT("Color Push Tray Miss"),
+                                         &HSys.Cyn.C_Color_PushTray.OnSensor, true, K_RETRY);
+                if(iKeyMiss==K_RETRY)
+                    GoUpTask=3000;
             }
             break;
 
