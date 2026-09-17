@@ -28,7 +28,7 @@
 // A #define of a string LITERAL on purpose: it needs no header ordering, introduces no
 // static-initialisation-order dependency, and lets "HT160S " HT160S_VERSION concatenate at
 // compile time. Do NOT turn it into a global AnsiString.
-#define HT160S_VERSION "1.0.0.3"
+#define HT160S_VERSION "1.0.0.4"
 //---------------------------------------------------------------------------
 extern int CUSTOMER_CODE;
 //AI(ht160s-statusbar) 20260624 : version + machine-identity globals (HT172 parity).
