@@ -72,6 +72,17 @@ python archive_issue.py <最終row> <log或截圖...> \
 
 還沒拿到檔案時先建殼：把 `<log或截圖...>` 換成 `--skeleton-only`。
 
+#### 補建歷史案件 → 用 `--case-date`
+
+case-id 的日期段預設取**建立日**。補建過去的事件時，要讓它反映**事件發生日**：
+
+```bash
+python archive_issue.py <最終row> <證據...> --case-date 20260907 ...
+```
+
+例：2026-09-17 補建 9/07 掉料事件 → `CASE-HT160S_KYEC_CHEN-20260907-001`（不是 `-20260917-`）。
+weekly 列的日期仍是建檔當天，**不要回填 weekly 日期**，否則會擾動本週週報。
+
 #### HT160S 專屬欄位
 
 | 欄位 | 規則 |
