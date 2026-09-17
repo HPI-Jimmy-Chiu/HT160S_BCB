@@ -2835,6 +2835,15 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     AnsiString LotText;
 
     (void)Sender;
+    //AI(ht160s-lot-buttons) 20260917 : the RULE. SyncLotButtons() greys this button while a
+    //lot is open, but that is only the hint - a click queued in the cycle the lot opened
+    //still lands here. Silent refusal + EventLog trace ; see SyncLotButtons for why no popup.
+    if(IsLotStartAllowed()==false)
+    {
+        RecordProcess("LOT START refused : a lot is already open");
+        SyncLotButtons();
+        return;
+    }
     if(sgLotList==NULL)
         return;
 
@@ -2856,6 +2865,7 @@ void __fastcall TfMain::btnLotStartClick(TObject *Sender)
     }
 
     LotStartCore(FirstLot, "pressed");
+    SyncLotButtons();   //AI(ht160s-lot-buttons) 20260917 : feedback on the press itself, not one MainProc cycle later
 }
 //---------------------------------------------------------------------------
 //AI(secs-lot-additive) 20260730 : modal-free Lot-Start body, shared by the operator
@@ -3358,6 +3368,71 @@ void __fastcall TfMain::SyncLotApiUpdateButton()
         btnLotApiUpdate->Caption=sWant;
 }
 //---------------------------------------------------------------------------
+//AI(ht160s-lot-buttons) 20260917 : make the two Lot buttons mutually exclusive, derived
+// from state every cycle exactly like SyncLotApiUpdateButton above - no press-time latch,
+// so every path that opens or closes a lot (operator button, SECS host, the CleanOut-finish
+// auto path, the power-on work-order restore) puts the pair back by itself with no
+// bookkeeping to forget.
+//  btnLotStart : only with NO lot open. MachineRun.bRunning is the lot-open latch (set by
+//                LotStartCore, cleared by DoLotEndProcess ; pause / alarm / stop / HOME
+//                never touch it). A second Lot Start on a live work order clears the
+//                (Lot,Bin) bindings, zeroes the per-lot counters, drops the un-flushed
+//                Soter buckets and fires a second CEID 6 - and does NOT stop the machine
+//                while doing it, so it lands on live material. That mis-press is what the
+//                grey-out removes.
+//  btnLotEnd   : deliberately WIDER than !bRunning instead of its mirror image. Three real
+//                states have work to close out while bRunning is false, and keying this
+//                button on bRunning alone would trap the operator in every one of them :
+//                  - a bare START run : DoStartArm never sets bRunning, yet the UPH / Soter
+//                    / lastdata flush exists ONLY inside DoLotEndProcess ;
+//                  - a latched Clean Out : the only manual release is the bCleanOut block
+//                    inside DoLotEndProcess (before it existed the operator escaped by
+//                    restarting the program - see the 20260910 note there) ;
+//                  - lots declared but never started (Add Lot / host SET_LOT_INFO), where
+//                    Lot End is how the staged work order is dropped.
+//                Plus HasICUnderMachine(), the same safety widening the SECS LOTSTART
+//                handler applies to its own lot-open test. So the button stays live
+//                whenever there is anything to end, and greys out only when genuinely idle.
+//THE BUTTON IS THE HINT, THE HANDLER IS THE RULE : both OnClick handlers re-test the same
+//predicates, because a click can be queued in the cycle the state flips. Same split as
+//btnLotApiUpdate. The refusal is SILENT (EventLog only) : every ShowMyMessage variant except
+//the NoStop one calls DecStopAllMotor() + clears SystemStart, so a poka-yoke that popped a
+//box would stop production to say no.
+void __fastcall TfMain::SyncLotButtons()
+{
+    bool bStartAllowed;
+    bool bEndAllowed;
+
+    bStartAllowed=IsLotStartAllowed();
+    bEndAllowed=IsLotEndAllowed();
+    //Compare before assigning : this runs every MainProc cycle and a blind write would
+    //repaint the buttons ~50 times a second.
+    if(btnLotStart!=NULL && btnLotStart->Enabled!=bStartAllowed)
+        btnLotStart->Enabled=bStartAllowed;
+    if(btnLotEnd!=NULL && btnLotEnd->Enabled!=bEndAllowed)
+        btnLotEnd->Enabled=bEndAllowed;
+}
+//---------------------------------------------------------------------------
+bool __fastcall TfMain::IsLotStartAllowed()
+{
+    return (MachineRun.bRunning==false);
+}
+//---------------------------------------------------------------------------
+bool __fastcall TfMain::IsLotEndAllowed()
+{
+    if(MachineRun.bRunning==true)
+        return true;                    //a lot is open
+    if(HSys.Sys.SystemStart==true)
+        return true;                    //bare START run : its close-out flush is Lot End only
+    if(HSys.Sys.bCleanOut==true)
+        return true;                    //latched Clean Out : Lot End is the manual release
+    if(LotRegistry.GetLotCount()>0)
+        return true;                    //lots staged but never started : Lot End drops them
+    if(HasICUnderMachine()==true)
+        return true;                    //material still inside : same widening the SECS side uses
+    return false;
+}
+//---------------------------------------------------------------------------
 //AI(ht160s-lot-webapi) 20260612 : Stage 4 : drive the in-flight pull. Called every
 // MainProc cycle (VCL main thread via Synchronize). Cheap no-op when idle. When the
 // response arrives it is parsed straight into LotRegistry and the on-screen Lot list
@@ -3530,7 +3605,17 @@ void __fastcall TfMain::btnLotEndClick(TObject *Sender)
     //DoLotEndProcess() so the CleanOut-finish path (csystem) can auto-run the identical
     //sequence (CEID12 + work-order / LotBinBinding clear). Button behaviour byte-unchanged.
     (void)Sender;
+    //AI(ht160s-lot-buttons) 20260917 : OPERATOR entry only. The guard lives HERE and never in
+    //DoLotEndProcess : that body is shared with the CleanOut-finish auto path (csystem) and the
+    //SECS CLEAR_LOT_INFO handler, and both have their own, different admission rules.
+    if(IsLotEndAllowed()==false)
+    {
+        RecordProcess("LOT END refused : no lot open and nothing to close out");
+        SyncLotButtons();
+        return;
+    }
     DoLotEndProcess();
+    SyncLotButtons();   //AI(ht160s-lot-buttons) 20260917 : feedback on the press itself
 }
 //---------------------------------------------------------------------------
 void __fastcall TfMain::DoLotEndProcess(const char *pSource)
@@ -5236,3 +5321,4 @@ void __fastcall TfMain::RefreshModuleStatusGrid()
         Row++;
     }
 }
+

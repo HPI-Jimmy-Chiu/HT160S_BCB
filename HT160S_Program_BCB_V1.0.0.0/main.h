@@ -511,6 +511,10 @@ public:		// User declarations
     void __fastcall StartNextLotApiPull();
     void __fastcall StartLotWebApiPullAll();
     void __fastcall SyncLotApiUpdateButton();   //AI(ht160s-lot-webapi) 20260811 : btnLotApiUpdate Enabled/Caption <- lot-open + sweep state
+    //AI(ht160s-lot-buttons) 20260917 : Lot Start / Lot End mutual exclusion.
+    void __fastcall SyncLotButtons();       // btnLotStart/btnLotEnd Enabled <- lot-open state (called from UpdateRunControlFlag)
+    bool __fastcall IsLotStartAllowed();    // ONE definition of each rule, shared by the greying helper and the OnClick guard
+    bool __fastcall IsLotEndAllowed();
     void __fastcall UpdateSecsFeatureBadge();
     void __fastcall UpdateAmrFeatureBadge();   //AI(ht160s-agv) 20260615 : sync AMR badge to GeneralSetting.bUseAMR
     void __fastcall UpdateSortModeFeatureBadge();   //AI(ht160s-whitelist-override) 20260717 : sync sort-mode badge to effective mode

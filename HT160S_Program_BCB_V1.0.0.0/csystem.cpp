@@ -127,7 +127,14 @@ static void UpdateRunControlFlag()
 	//  main-screen controls the current user level may not use. Silent, and it
 	//  self-heals on the next cycle after a level change.
 	if(fMain!=NULL)
+	{
 		fMain->UpdateMainPermissionLock();
+		//AI(ht160s-lot-buttons) 20260917 : same self-healing idea for the Lot Start /
+		//  Lot End pair. Hosted here rather than beside SyncLotApiUpdateButton because
+		//  this function ALSO runs on the IO Set View early-return branch above, so the
+		//  buttons keep tracking the lot state while that screen is open.
+		fMain->SyncLotButtons();
+	}
 }
 //---------------------------------------------------------------------------
 //AI(amr-unmanned W4) 20260721 : consume the AGV coordinator's per-station handshake-
