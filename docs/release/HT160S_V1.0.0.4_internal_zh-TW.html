@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>Release Note V1.0.0.4 - 京元竹南</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "微軟正黑體","Microsoft JhengHei","Calibri",sans-serif;
+  background:#f4f6f9; padding:32px 24px; color:#2c2c2c; line-height:1.7; font-size:14px; }
+.page { max-width: 900px; margin: 0 auto; }
+header { display:flex; align-items:center; gap:18px; border-left:6px solid #1f4e79;
+  padding:14px 18px; margin-bottom:28px; background:#fff; border-radius:0 6px 6px 0;
+  box-shadow:0 1px 4px rgba(0,0,0,.08); }
+header img { height:56px; object-fit:contain; }
+header h1 { font-size:20px; color:#1f4e79; margin-bottom:4px; }
+header p { font-size:12px; color:#888; }
+h1 { font-size:22px; color:#1f4e79; margin:24px 0 12px; }
+h2 { font-size:15px; background:#1f4e79; color:#fff; padding:6px 14px;
+  border-radius:4px; margin:28px 0 12px 0; }
+h3 { font-size:14px; color:#1f4e79; margin:18px 0 8px; }
+table { width:100%; border-collapse:collapse; background:#fff; margin-bottom:16px; }
+th, td { border:1px solid #e0e0e0; padding:9px 14px; font-size:13px; vertical-align:top; }
+th { background:#f4f4f4; font-weight:bold; color:#444; text-align:left; }
+code { background:#f0f0f0; padding:1px 6px; border-radius:3px;
+  font-family:Consolas,monospace; font-size:12px; }
+pre { background:#f6f6f6; border:1px solid #ddd; border-left:4px solid #1f4e79;
+  padding:12px 16px; border-radius:4px; overflow-x:auto; font-family:Consolas,monospace; font-size:12px; }
+ul, ol { padding-left:24px; margin-bottom:14px; }
+li { margin-bottom:8px; line-height:1.7; }
+hr { border:none; border-top:1px solid #ddd; margin:20px 0; }
+blockquote { border-left:4px solid #1f4e79; padding:10px 16px; background:#eef3fa;
+  color:#555; margin:12px 0; }
+footer { margin-top:36px; font-size:11px; color:#bbb; border-top:1px solid #ddd;
+  padding-top:10px; text-align:center; }
+@page { size: A4; margin: 12mm 10mm 14mm 10mm; }
+@media print {
+  body { background:#fff; padding:0; }
+  header, table, pre, blockquote { box-shadow:none; }
+  h2, h3 { page-break-after: avoid; }
+  tr, pre, blockquote { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <img src="data:image/png;base64,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" alt="鴻勁精密 Logo">
+  <div>
+    <h1>Release Note V1.0.0.4 - 京元竹南</h1>
+    <p>鴻勁精密股份有限公司 HONPREC INC.</p>
+  </div>
+</header>
+
+<h1>Release Note V1.0.0.4</h1>
+<h2>版本資訊</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>版本</td>
+<td><code>V1.0.0.4</code></td>
+</tr>
+<tr>
+<td>前一版</td>
+<td><code>V1.0.0.3</code>（<code>f96f786</code>，2026-09-10）</td>
+</tr>
+<tr>
+<td>發行日期</td>
+<td>2026-09-17</td>
+</tr>
+<tr>
+<td>客戶</td>
+<td>京元竹南（KYEC）— HT160S-02 為 2026-09-07 事故機台，現場共 3 台</td>
+</tr>
+<tr>
+<td>代理商</td>
+<td>（無，廠內直銷）</td>
+</tr>
+<tr>
+<td>受眾</td>
+<td><strong>廠內版</strong></td>
+</tr>
+<tr>
+<td>開發者</td>
+<td>JimmyChiu</td>
+</tr>
+<tr>
+<td>版號來源</td>
+<td><code>HT160S_Program_BCB_V1.0.0.0/cmydef.h:31</code>（SSOT）；<code>ht160s.rc:7/8/21/26</code> 隨行</td>
+</tr>
+<tr>
+<td>建置身分</td>
+<td>開機 EventLog 第一行印 <code>HT160S 1.0.0.4 build &lt;short-sha&gt;+ &lt;yyyyMMdd-HHmm&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠ 版號會上 SECS：<code>cmydef.h</code> 的 <code>HT160S_VERSION</code> 同時餵 SVID 1003 Software Version 與 S1F2 / S1F14 的 SOFTREV。客戶 EAP 會比對這個字串，<strong>升版後京元主機端看到的軟體版本會從 1.0.0.3 變成 1.0.0.4</strong>。這是刻意的：有本次防呆的機台必須和沒有的區分得出來。</p>
+</blockquote>
+<hr />
+<h2>本版主體（客戶要求項）</h2>
+<p><strong>清機（Clean Out）排空未完成前不得補料 — 防呆</strong>
+客戶 2026-09-16 提出，要求 9/18 前交機。對應 commit <code>3b8010b</code>。</p>
+<h3>問題現象</h3>
+<p>清機排空尚未完成時，若操作員往 Loader 供料車放新料盤，清機流程會永遠停在未完成，而機台<strong>繼續正常生產</strong>。畫面上沒有任何提示，只在 EventLog 留下一行 <code>CLEANOUT un-retire: LoaderN resumed the ladder</code>。</p>
+<p>機台<strong>不會卡住、不會撞機、不會掉料</strong>——它只是把清機無聲地無限延後。這正是 2026-09-07 掉料事故序列裡「讓生產重新跑起來」的那一步。</p>
+<h3>根因</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>位置</th>
+<th>問題</th>
+<th>1.0.0.3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td><code>aLoader.cpp:793</code> <code>TLoaderModule::IsSupplyCarDry()</code></td>
+<td>供料車是否乾是清機退場條件之一。排空途中補料讓它轉為 false，該側重回生產階梯（<code>aLoader.cpp:1609</code> 只寫 EventLog，畫面無提示）。<strong>必要條件</strong></td>
+<td>無守衛</td>
+</tr>
+<tr>
+<td>B</td>
+<td><code>aLoader.cpp:1033</code> <code>TLoaderModule::IsAllCleanOutFinish()</code></td>
+<td>A 成立時完成條件永不成立，<code>csystem.cpp:2069</code> 因此永遠不放行 <code>CheckCleanOutFinish</code>，CEID 42 不發、六台 Auto 車仍在生產模式。<strong>與 A 合起來充分</strong></td>
+<td>無守衛</td>
+</tr>
+</tbody>
+</table>
+<h3>本版行為</h3>
+<p>判定採「<strong>由無到有的變化</strong>」而非單純看有無料：</p>
+<pre><code>清機期間持續觀察 SnLoader_Inputend
+  讀到 OFF                → latch「本次排空期間車真的乾過」
+  乾過之後又讀到 ON，
+  且連續維持 ≥ 1500 ms    → MES0927 停機
+離開清機模式              → 兩個旗標清除，等下一次排空
+</code></pre>
+<ul>
+<li><strong>按下清機時車上原本還有料是合法的</strong>，不會誤報——這是 2026-07-01 已確認的語意（先把車喂乾，再清管線），純準位判定會在按下的瞬間就停機。</li>
+<li><strong>1500 ms 連續確認是必要的</strong>：前分盤上升會讓光束瞬變。常數與理由與 <code>aEmpty.cpp</code> 的 <code>EMPTY_PHANTOM_TRAY_CONFIRM_MS</code> 相同。</li>
+<li><strong>沒有 one-shot latch</strong>：警報就是強制手段。按 RETRY 但沒把盤拿走 → 光束仍亮 → 下一個確認窗又跳。把盤拿走 → 光束滅 → 重新 latch、自動安靜。</li>
+</ul>
+<h3>生效條件（六道閘，<code>aLoader.cpp:1481-1484</code>）</h3>
+<pre><code class="language-cpp">if(LoaderNo==1 &amp;&amp; GeneralSetting.bCleanOutRefillGuard &amp;&amp;
+   GeneralSetting.bUseAMR==false &amp;&amp;
+   IsSoftSimulate()==false &amp;&amp; HSys.LastSet.iRealDummy!=DUMMY &amp;&amp;
+   HSys.Sen.SnLoader_Inputend.Enable==true)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>閘</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LoaderNo==1</code></td>
+<td><code>DoLoader</code> 每個 cycle 對同一物件呼叫兩次，兩次都評估會雙重警報</td>
+</tr>
+<tr>
+<td><code>bCleanOutRefillGuard</code></td>
+<td><code>[Safety] CleanOutRefillGuard</code>，預設 <strong>true</strong>，即時讀取不需重開程式</td>
+</tr>
+<tr>
+<td><code>bUseAMR==false</code></td>
+<td>用 AMR 時補料是 AGV 的工作，不是操作員違規。讀 <code>[HardwareInstall] UseAMR</code></td>
+</tr>
+<tr>
+<td><code>IsSoftSimulate()==false</code></td>
+<td>模擬無實體 IO</td>
+</tr>
+<tr>
+<td><code>iRealDummy!=DUMMY</code></td>
+<td>DUMMY 乾跑不報</td>
+</tr>
+<tr>
+<td><code>SnLoader_Inputend.Enable</code></td>
+<td>未安裝的點永不擋料</td>
+</tr>
+</tbody>
+</table>
+<h3>警報</h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>碼</td>
+<td><code>MES0927</code>（<code>database.cpp:1037</code> 獨立註冊，未動 19 格 seed 陣列）</td>
+</tr>
+<tr>
+<td>文字</td>
+<td><code>Clean Out still running - remove the new trays and let the drain finish</code></td>
+</tr>
+<tr>
+<td>按鍵</td>
+<td><strong>只有 <code>K_RETRY</code></strong>（不給 SKIP——跳過等於默許違規料流進管線）</td>
+</tr>
+<tr>
+<td>效果</td>
+<td><code>ShowNoteAlarm</code> 會 <code>DecStopAllMotor()</code> + <code>SystemStart=false</code>，<strong>是真停機不是提示</strong></td>
+</tr>
+<tr>
+<td>S5 ALID</td>
+<td><code>300000927</code>（9 碼 Option D 編碼），開機自檢 487 碼 / 0 違規</td>
+</tr>
+<tr>
+<td>EventLog</td>
+<td>停機前先寫 <code>CLEANOUT refill blocked: new stock in the supply car while the drain is still running</code></td>
+</tr>
+</tbody>
+</table>
+<h3>變更明細</h3>
+<table>
+<thead>
+<tr>
+<th>檔案</th>
+<th>行</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>aLoader.cpp</code></td>
+<td>34</td>
+<td><code>CLEANOUT_REFILL_CONFIRM_MS = 1500</code></td>
+</tr>
+<tr>
+<td><code>aLoader.cpp</code></td>
+<td>145-146</td>
+<td><code>InitialFlag</code> 清 <code>bCleanOutSourceSeenDry</code> / <code>dwCleanOutRefillTick</code></td>
+</tr>
+<tr>
+<td><code>aLoader.cpp</code></td>
+<td>1456-1480</td>
+<td>守衛設計理由註解</td>
+</tr>
+<tr>
+<td><code>aLoader.cpp</code></td>
+<td>1481-1508</td>
+<td>守衛本體</td>
+</tr>
+<tr>
+<td><code>aLoader.cpp</code></td>
+<td>1504</td>
+<td><code>ShowMyError("MES0927", …, K_RETRY)</code></td>
+</tr>
+<tr>
+<td><code>aLoader.h</code></td>
+<td>66-74</td>
+<td>註解 + 兩個 module 級狀態成員</td>
+</tr>
+<tr>
+<td><code>database.cpp</code></td>
+<td>1033-1041</td>
+<td>MES0927 註冊</td>
+</tr>
+<tr>
+<td><code>GeneralSetting.h</code></td>
+<td>279-281</td>
+<td><code>bCleanOutRefillGuard</code> 宣告</td>
+</tr>
+<tr>
+<td><code>GeneralSetting.cpp</code></td>
+<td>136 / 281 / 387</td>
+<td>預設 true / 讀 ini / 寫 ini</td>
+</tr>
+<tr>
+<td><code>system/AlarmList.csv</code></td>
+<td>440</td>
+<td>MES0927 文字（開機由 <code>mapAlarmCodeList</code> 重生）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>放置位置的理由</strong>：守衛在 <code>DoLoader</code> 最上方、清機退場守衛與 <code>switch(Task)</code> <strong>之前</strong>。退場守衛在 SortArm 佔著該側 Y 時會被整段跳過且時間無界；而這裡是每個 scan 都到得了、且沒有任何行程在飛的點（2026-07-30 現場那次死結就是在 destack 中途放掉資源造成的）。</p>
+<p><strong>狀態變數放 module 級不用 function static</strong>：<code>DoLoader</code> 每 cycle 被兩個 VCL action 對同一物件呼叫兩次，static 會被交錯覆寫。</p>
+<hr />
+<h2>同版一起交付的其他改動</h2>
+<p>⚠ <strong>這些都在同一支 exe 裡。</strong> 安裝 1.0.0.4 就會全部生效（除標明「預設關閉」者）。</p>
+<h3>一、Auto 工作盤帳目（2026-09-07 掉料事故的根因鏈）</h3>
+<table>
+<thead>
+<tr>
+<th>commit</th>
+<th>內容</th>
+<th>行為變更</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>afccda1</code></td>
+<td>清機排空改為逐站在自己的舉升確認就釋放帳目，不等六站同步的收尾步驟</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>27c5f72</code></td>
+<td>排空記帳再提前到<strong>鬆夾確認當下</strong>（case 2000）；退盤尾段（case 6100）加純清除保險絲</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<p><strong>副作用要知道</strong>：<code>Unloadtray</code> CEID 與 <code>RecordTrayCnt</code> 現在比以往早幾百毫秒發出，語意從「盤已上疊料」變成「盤已離開夾持」。這與生產路徑既有慣例一致（<code>DoDischargeTray</code> 本來就在 case 1000 記帳，比它自己的鬆夾和舉升都早）。<strong>中途中止的排空可能把某條流道多報一片盤</strong>——多報的數字可以對帳，幽靈工作盤會把 IC 掉在地上。</p>
+<h3>二、雙 reed 夾盤幾何（<strong>預設關閉，等機構改造</strong>）</h3>
+<table>
+<thead>
+<tr>
+<th>commit</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f7e3f76</code></td>
+<td>十支 MotorY 托盤夾支援新 reed 幾何：<code>Push()</code> 改用「離座 + 靜置」確認，<code>GetClampGripVerdict</code> 改名 <code>GetTrayClampVerdict</code> 並具幾何感知</td>
+</tr>
+<tr>
+<td><code>f069f4b</code></td>
+<td>收成單一開關 <code>[ClampGeometry] TwoBandClamp</code>（預設 0）管全部十台</td>
+</tr>
+<tr>
+<td><code>3eff652</code></td>
+<td>對抗式複驗確認的四個缺陷修正（Loader 到位互鎖、<code>Push()</code> 安全失效方向、Empty/Color 夾空處理、HOME 重夾空夾偵測）</td>
+</tr>
+</tbody>
+</table>
+<p>🚫 <strong><code>TwoBandClamp</code> 必須維持 0，直到該台機器的推盤夾機構完成改造。</strong> 對未改造的機構開啟，會讓每一片正常夾住的盤被判成「夾住但沒盤」，SortArm 取料／放料、Auto 進料、Loader 到料、Empty/Color 回收<strong>每一條路都停機，機器一片盤都動不了</strong>。</p>
+<p>判別式（改造後）：<code>_On=off</code> 且 <code>_Off=off</code> ＝ 夾住有盤；<code>_On=on</code> ＝ 夾住但沒盤。</p>
+<h3>三、Loader / Lot 操作</h3>
+<table>
+<thead>
+<tr>
+<th>commit</th>
+<th>內容</th>
+<th>行為變更</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0154889</code></td>
+<td>不再對每一片已供料的盤鬆開托盤夾</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>70739b3</code></td>
+<td>Lot Start / Lot End 兩顆按鈕不再互相矛盾（互斥閘）</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h3>四、帳號與權限（<strong>操作方式有變，FE 必讀</strong>）</h3>
+<table>
+<thead>
+<tr>
+<th>commit</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>702022d</code></td>
+<td>登入頁可達、可見、可稽核</td>
+</tr>
+<tr>
+<td><code>866368a</code></td>
+<td>憑證欄位不再彈數字鍵盤；權限判定失敗時<strong>降級到 Operation</strong>（fail closed）</td>
+</tr>
+<tr>
+<td><code>efa6956</code></td>
+<td>還原 HT9045 的守衛：數值步進鍵不作用在文字與密碼欄</td>
+</tr>
+<tr>
+<td><code>c894a29</code></td>
+<td>帳號簿決定權限層級；新增自動登出；密碼不含符號</td>
+</tr>
+<tr>
+<td><code>2455553</code></td>
+<td>Map Tray 頁面改為 Honprec 專用</td>
+</tr>
+</tbody>
+</table>
+<h3>五、AMR</h3>
+<table>
+<thead>
+<tr>
+<th>commit</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>89c35f9</code></td>
+<td>新增 <code>[AGV] ErrorLaneCallsAmr</code>：<code>1</code>＝Error 流道照送 CEID 272（預設）；<code>0</code>＝改由人工處理並以 MES1120 停機。<strong>修改後需重開程式</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>京元常規生產是 <code>UseAMR=0</code>，此項對現況無影響。</p>
+</blockquote>
+<h3>六、文件（無行為變更）</h3>
+<table>
+<thead>
+<tr>
+<th>commit</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>77a9c72</code></td>
+<td>2026-09-07 掉落兩顆 IC 的作廢清單（<code>docs/kyec/</code>）</td>
+</tr>
+<tr>
+<td><code>ee91adc</code></td>
+<td>操作員面向的非 AMR / AMR 操作流程（md + pdf + 流程圖）</td>
+</tr>
+<tr>
+<td><code>0ffc5c0</code></td>
+<td>週報治理 ADR-008：京元 HT160S 為量產機，每筆客訴獨立建案</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>建置與編碼驗證</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>真機建置（<code>SOFT_SIMULATE</code> 註解掉）<code>build-ht160s.ps1 -Full</code></td>
+<td>✅ exit 0</td>
+</tr>
+<tr>
+<td>模擬建置（<code>SOFT_SIMULATE</code> 啟用）<code>-Full</code></td>
+<td>✅ exit 0</td>
+</tr>
+<tr>
+<td>Headless 全機 HOME 自測 <code>--selftest-home</code></td>
+<td>✅ exit 0，18 軸 HOMED，M13/M18 維持 disabled</td>
+</tr>
+<tr>
+<td><code>check-ht160s-source-encoding.ps1</code></td>
+<td>✅ 169 檔通過</td>
+</tr>
+<tr>
+<td>S5 ALID 開機自檢</td>
+<td>✅ 487 碼 / 0 違規</td>
+</tr>
+<tr>
+<td>exe 版號</td>
+<td>✅ 開機字串 <code>HT160S 1.0.0.4 build &lt;sha&gt;+</code>；Windows 檔案屬性 FileVersion / ProductVersion 皆 1.0.0.4</td>
+</tr>
+</tbody>
+</table>
+<p>⚠ <strong>模擬建置驗不到任何 reed 或感測器行為</strong>（<code>mycylin.cpp</code> 在碰 Switch 之前就 <code>return true</code>）。模擬只證明「編得過、舊行為未變」。</p>
+<hr />
+<h2>安裝包狀態</h2>
+<p>🚫 <strong>尚未產出本版安裝包。</strong> 出貨前有兩個 blocker：</p>
+<ol>
+<li>
+<p><strong><code>installer.nsi:15</code> 還是 <code>1.0.0.0</code></strong>
+   <code>D:\AI_Area\ClassTool\HT160S_Installer\installer.nsi:15</code> 的 <code>!define APP_VERSION "1.0.0.0"</code> 未同步。它流進安裝包檔名、<code>BrandingText</code>、<code>VIProductVersion</code> 與 <code>VIAddVersionKey</code>。證據：2026-09-17 09:02 打出的 <code>build\HT160S_Setup_1.0.0.0_20260917090032_MC.exe</code> 仍叫 1.0.0.0，而它包的源碼已是 1.0.0.4。</p>
+</li>
+<li>
+<p><strong><code>MachineType.h</code> 目前是真機狀態（未提交的工作區改動）</strong>
+   <code>build-installer.ps1:74-75</code> 會 <code>throw "Active '#define SOFT_SIMULATE' not found in MachineType.h"</code>，完整安裝包打不出來。打包前要先還原成 committed 的 dev 狀態。</p>
+</li>
+</ol>
+<p>🚫 <strong>既有的 <code>D:\HT160S_Updater_NSIS\HT160S_V1.0.0.4_2026.09.16_15.43_BETA_Installer.exe</code> 不可使用。</strong> 它的 payload 是 2026-09-16 15:42，早於 <code>3eff652</code>、<code>70739b3</code>、<code>eb22a4e</code>——<strong>檔名寫 1.0.0.4 但不含本次防呆的完整內容</strong>。</p>
+<hr />
+<h2>真機回歸清單（尚未執行）</h2>
+<h3>本版主體</h3>
+<ol>
+<li><strong>MES0927 正向</strong>：進清機 → 等供料車跑乾 → 往 Loader 放新盤 → 約 1.5 秒後應跳警報停機；把盤拿走後自動安靜。</li>
+<li><strong>MES0927 負向（不可誤報）</strong>：按下清機時車上仍有料 → <strong>不應</strong>跳警報，應照既有語意把車喂乾再清管線。</li>
+<li><strong>清機可完成</strong>：補料 → 跳警報 → 移除 → 確認清機正常收尾（CEID 42 發出、六台 Auto 車退出生產模式）。</li>
+</ol>
+<h3>Auto 帳目</h3>
+<ol>
+<li><strong>復刻 2026-09-07 序列</strong>：清機未完成 → Auto 疊料滿警報 → PAUSE → HOME → 續產。預期 HOME 之後 <code>HOME-RESUME Auto:</code> 印 <code>kept none</code>，SortArm 不再選中空車。</li>
+<li><strong>排空盤數與 CEID 對帳</strong>：跑完一次完整清機，確認每條流道的 <code>Unloadtray</code> 事件與盤數正確。<strong>記帳點提前，需與京元主機端對帳確認可接受。</strong></li>
+</ol>
+<h3>帳號權限</h3>
+<ol>
+<li>登入 / 自動登出 / 權限降級（fail closed）/ Map Tray 頁面 Honprec 專用。</li>
+</ol>
+<h3>夾盤幾何</h3>
+<ol>
+<li><strong>維持 <code>TwoBandClamp=0</code> 驗一輪正常生產</strong>，確認與 1.0.0.3 行為一致。</li>
+<li>機構改造完成後才開 1，且開之前先量測：夾住真盤時 <code>C_xxx_PushTray</code> 必須讀到 <code>SnOn=0 SnOff=0</code>。</li>
+</ol>
+<hr />
+<h2>已查證但本次未修</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>位置</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>疊料滿警報是阻塞迴圈</td>
+<td><code>aAuto1To6.cpp:1266-1271</code></td>
+<td><code>do/while</code> 內呼叫 <code>ShowMyError</code>，違反「機台控制路徑不得有阻塞迴圈」的房規，也是 2026-09-15 復刻時游標被釘死在 case 4000 的實際機制</td>
+</tr>
+<tr>
+<td><code>[SettleDelay]</code> 十一把鍵無範圍檢查</td>
+<td><code>GeneralSetting.cpp</code></td>
+<td>裸 <code>ReadInteger</code>，填負數會讓計時器約 49 天不到期</td>
+</tr>
+<tr>
+<td><code>iosetview</code> 汽缸自檢會誤判空夾</td>
+<td><code>iosetview.cpp:2558-2590</code></td>
+<td>純 reed 到位測試、無幾何概念。<strong>今天就會誤判</strong>，純報表不報警</td>
+</tr>
+<tr>
+<td>State Record <code>Verdict</code> 欄語意</td>
+<td><code>cStateRecordHT160.cpp:1343-1349</code></td>
+<td>它是<strong>汽缸位置</strong>判定不是<strong>托盤</strong>判定；托盤答案在同一包的 <code>Grip=</code> 欄</td>
+</tr>
+<tr>
+<td>冷啟 <code>InitialFlag</code> 不清 Auto 工作位 <code>fHasTray</code></td>
+<td><code>aAuto1To6.cpp:116-135</code></td>
+<td>幽靈工作盤可跨 Lot End、跨重開程式存活。待裁定（反向風險：真有盤時會變成帳說空）</td>
+</tr>
+<tr>
+<td><code>ht160s.bpr</code> 第二套 VERSIONINFO</td>
+<td><code>ht160s.bpr:158/175/181</code></td>
+<td><code>IncludeVerInfo=1</code> 且 <code>ProductVersion=1.0.0.3</code>。<strong>IDE 路徑 build 會由 .bpr 蓋 VERSIONINFO</strong>，<code>brcc32</code>（腳本路徑）才由 .rc 蓋 → IDE build 仍可能出 ProductVersion 不一致的 exe。待裁定</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>分析產物</h2>
+<table>
+<thead>
+<tr>
+<th>產物</th>
+<th>路徑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-07 掉料事故原始證據</td>
+<td><code>D:\HT160S_StateRecord\2026-09-07 18_16_55.zip</code></td>
+</tr>
+<tr>
+<td>兩顆 IC 作廢清單</td>
+<td><code>D:\HT160S_BCB\docs\kyec\void-list-20260907-LQ81CC0AA1.md</code></td>
+</tr>
+<tr>
+<td>操作員流程圖</td>
+<td><code>D:\HT160S_BCB\docs\</code> （<code>ee91adc</code>）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>缺口</strong>：掉料當下的狀態快照是 <code>2026-09-07 18_01_26.zip</code>，<strong>不在手上</strong>。18_16_55 那包是重開程式並再次 HOME 之後拍的，<code>IoDetail.txt</code> / <code>SortArmDecision.txt</code> 顯示的是乾淨狀態。若需要「帳目說有盤而所有感測器全暗」的對照圖，要去機台撈 18_01_26 那包。</p>
+<hr />
+<p><em>Generated: 2026-09-17 | Developer: JimmyChiu</em></p>
+</div>
+</body>
+</html>
