@@ -18,9 +18,14 @@ applyTo: "**/*"
 > - 機型固定 **HT160S**；主要客戶 **京元竹南 (KYEC_CHEN)**。
 > - **建案粒度與 9045 相同（ADR-008，2026-09-15 起）**：每筆客訴 = 一列 weekly item + 一個 `CASE-KYEC_CHEN-YYYYMMDD-NNN` + 一個 case 資料夾。
 >   京元 HT160S 已是**量產機**（現場 3 台）；原「機台開發」列已改名「HT160S 量產維護（非客訴開發紀錄）」，只收非客訴工作，**禁止**再把客訴 append 進去。
-> - **release note / proposal 工具（`make_release_note.py` / `make_proposal.py` / `close_case.py`）為 HT9045 專用**，
->   寫死掃 `d:\HT9045\HT9011UC_Code_V*`，對 HT160S 會失敗——**HT160S 不使用**。出貨走 `ht160s-installer` skill / NSIS updater。
-> - 本 skill 不內建 logo / CSS 模板（release-note 未接，用不到）。
+> - **`make_release_note.py` / `make_proposal.py` / `close_case.py` 為 HT9045 專用**，
+>   寫死掃 `d:\HT9045\HT9011UC_Code_V*`，對 HT160S 會失敗——**HT160S 不呼叫這三支**。
+>   安裝包走 `ht160s-installer` skill / NSIS updater。
+> - **release note 已接（2026-09-17）**：原稿 `.md` 寫在 `D:\HT160S_BCB\docs\release\`，用
+>   `scripts\ops\make-release-note-html.py --pdf` 轉成鴻勁品牌 HTML/PDF（客戶版紅 `#c0392b`、
+>   廠內版藍 `#1f4e79`，CSS/logo 逐字取自 HT9045 模板），成品再複製到 case 的
+>   `04_release\<CASE-ID>_{customer,internal}_zh-TW.{md,html,pdf}`。
+> - **完整建案／結案 SOP**：`D:\HT160S_BCB\docs\ops\weekly\ht160s-case-sop.md`（含驗收清單與常見錯誤表）。
 
 ## 核心識別碼
 
@@ -31,7 +36,11 @@ applyTo: "**/*"
 | `Customer/<folder>/CASE-*/` | 案件實體位置 | 永久 |
 
 - **京元竹南 的 EngCode**：`KYEC_CHEN`（code 920；alt 921/922/924/925），對照表在 `tools/customer_code_map.json`。
-  → CASE-ID = `CASE-KYEC_CHEN-YYYYMMDD-NNN`。
+- **2026-09-17 起，HT160S 的 CASE-ID 帶機型**：`CASE-HT160S_KYEC_CHEN-YYYYMMDD-NNN`。
+  機型前綴由 weekly row 的 `machine` 欄自動產生（`tools/archive_issue.py` 的 `machine_prefix()`，只對 `HT160*` 生效，
+  HT9045 / HT172 不受影響）。**必須用底線併進 EngCode 段**——全庫 11 個工具檔共用的正規式
+  `CASE-(?:[A-Za-z][A-Za-z0-9_]*-)?\d{8}-\d{3}` 的 EngCode 段只准一段，破折號寫法會讓整套工具認不得。
+  2026-09-17 之前的舊 case（`CASE-KYEC_CHEN-20260715-001`）不改名。
 - **京元 case 資料夾命名**：`weekly_data.json` 的 customer 字串是「京元竹南」，而 `config.json.customers` 的 key 是「京元」
   （「京元竹南」只是 alias），且 `Customer\` 下已有空的 `KYEC\`。`archive_issue.py` 首次歸檔會依 customer 字串建
   `Customer\京元竹南\`（與 row 一致，`check_case_integrity` 才不 FAIL）。**首次歸檔前先向使用者確認命名**。

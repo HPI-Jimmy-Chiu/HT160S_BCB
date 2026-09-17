@@ -84,96 +84,61 @@ footer { margin-top:36px; font-size:11px; color:#bbb; border-top:1px solid #ddd;
 </tr>
 <tr>
 <td>受眾</td>
-<td><strong>客戶版</strong></td>
+<td>客戶版</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<p>本版本（V1.0.0.4）針對貴司 2026-09-16 提出之「<strong>清機（Clean Out）排空未完成前不得補料</strong>」防呆需求交付。</p>
-<p>此需求源自 <strong>2026-09-07 空車掉料事件</strong>；該事件的分析與報廢清單已另行提供貴司。
-本版即是針對該事件序列中「排空未完成卻讓生產重新跑起來」這一步所做的防呆。</p>
+<p>本版本（V1.0.0.4）針對貴司 2026-09-16 提出之「<strong>清機（Clean Out）排空未完成前不得在上料端補料</strong>」防呆需求交付。</p>
 <h2>【問題現象】</h2>
-<p>清機排空尚未結束時，若操作員把新的料盤放上上料車，清機流程會一直停在未完成，機台卻繼續生產。系統紀錄（EventLog）會留下一筆記錄，但畫面上沒有任何提示，因此現場不易察覺。</p>
-<p>若按下清機時車上原本就還有料，屬正常情形，不在此列。</p>
+<p>清機排空尚未結束時，若操作員把新的料盤放上 Loader 上料車，清機流程會一直停在未完成，
+機台卻<strong>繼續正常生產</strong>。系統紀錄（EventLog）雖會留下一筆記錄，但畫面上沒有任何提示，
+因此現場不易察覺清機其實並未完成。</p>
+<p>若<strong>按下清機時車上原本就還有料</strong>，屬正常作業（先把車上的料喂乾，再清管線），不在此列。</p>
 <h2>【原因】</h2>
-<p>機台判斷「該側可以退出生產」的條件之一是上料來源已經沒有料。排空途中補料會讓這個條件重新變成不成立，該側便重新加入生產排程，清機的完成條件因此永遠無法達成。</p>
+<p>機台判斷「該側可以退出生產」的條件之一，是上料來源已經沒有料。
+排空途中補料會讓這個條件重新變成不成立，該側便重新加入生產排程，
+清機的完成條件因此永遠無法達成。</p>
 <h2>【本版修正】</h2>
+<p>清機期間若在 Loader 上料端補料，機台會<strong>停機並跳警報</strong>。</p>
+<p>判定方式採「<strong>由無到有的變化</strong>」，而非單純看有沒有料：</p>
 <ol>
-<li>本次清機期間，若上料來源曾被判定為沒有料，之後又<strong>持續 1.5 秒</strong>偵測到有料，機台判定為「排空中補料」。</li>
-<li>判定成立時發出 <strong>MES0927 停機</strong>，畫面提示
-   <code>Clean Out still running - remove the new trays and let the drain finish</code>
-   請操作員將新放的料盤取回後再繼續。
-   此警報<strong>只提供 RETRY，不提供 SKIP</strong>（刻意設計，避免防呆被略過）。
-   <strong>請先把料盤取走，再按 RETRY</strong>；若未取走就按 RETRY，約 1.5 秒後會再次跳出，屬正常行為。</li>
-<li>採用「<strong>由無到有的變化</strong>」判定，而非單純看有無料，因此按下清機時車上仍有料的正常作業<strong>不受影響</strong>。</li>
+<li>清機期間持續監看上料來源，一旦判定為「已經沒有料」，記住這個狀態。</li>
+<li>之後若又<strong>連續 1.5 秒</strong>偵測到有料，判定為「排空中補料」。</li>
+<li>發出 <strong><code>MES0927</code> 停機</strong>，畫面提示：
+   <code>Clean Out still running - remove the new trays and let the drain finish</code></li>
 </ol>
+<p>因為採用變化判定，<strong>按下清機時車上仍有料的正常作業不會誤報</strong>。</p>
+<h3>操作員處置</h3>
+<ul>
+<li>此警報<strong>只提供 RETRY，不提供 SKIP</strong>（刻意設計，避免防呆被略過）。</li>
+<li><strong>請先把新放上去的料盤取走，再按 RETRY。</strong></li>
+<li>若未取走就按 RETRY，約 1.5 秒後會再次跳出，屬正常行為；把盤取走後即自動恢復安靜。</li>
+</ul>
 <h2>【操作上的影響】</h2>
 <ul>
-<li>清機的操作方式不變，<strong>不需任何手動處理或重新設定</strong>（帳號與權限部分另有變動，詳見下節）。</li>
-<li>此防呆<strong>預設開啟</strong>。開關位於機台設定檔 <code>[Safety]</code> 區段的 <code>CleanOutRefillGuard</code>，修改後重開「維護／硬體」頁面即生效，不需重新編譯。</li>
-<li><strong>確認時間 1.5 秒目前為程式內固定值，無法由設定檔調整</strong>；若貴司需要不同的確認時間，我方須另出一版軟體，請告知需求值。</li>
+<li>清機以外的操作方式<strong>完全不變</strong>，安裝後<strong>不需任何手動處理或重新設定</strong>。</li>
+<li>此防呆<strong>預設開啟</strong>。開關位於機台設定檔 <code>[Safety]</code> 區段的 <code>CleanOutRefillGuard</code>，
+  修改後重新開啟「維護／硬體」頁面即生效，不需重新編譯。</li>
+<li><strong>確認時間 1.5 秒目前為程式內固定值，無法由設定檔調整。</strong> 若貴司需要不同的確認時間，
+  我方須另出一版軟體，請告知需求值。</li>
 <li>此防呆<strong>僅在未使用 AMR 的模式下生效</strong>。使用 AMR 時，補料屬於搬運車的正常作業，不視為異常。</li>
-<li>此防呆另需<strong>機台為實機模式</strong>且 <strong>Loader InputEnd 感測器在 IO 表中為啟用狀態</strong>。若該感測器因保養被停用，防呆不會作動且畫面不會提示，請保養後務必復原。</li>
+<li>此防呆另需<strong>機台為實機模式</strong>，且 <strong>Loader InputEnd 感測器在 IO 表中為啟用狀態</strong>。
+  若該感測器因保養被停用，防呆不會作動且畫面不會提示，<strong>請保養後務必復原</strong>。</li>
 </ul>
-<h2>【同版一併交付的其他改善】</h2>
-<p>本版另含下列改善，安裝後即生效：</p>
-<table>
-<thead>
-<tr>
-<th>項目</th>
-<th>內容</th>
-<th>操作方式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>出料盤紀錄</td>
-<td>清機排空時，盤離開夾持的時點即完成帳務登錄，避免中途中斷造成機台誤認車上仍有盤。連帶影響：出料盤事件與盤數的回報時點提前約數百毫秒。</td>
-<td>不變（惟需對帳確認，見下）</td>
-</tr>
-<tr>
-<td>上料夾持</td>
-<td>修正供料後不必要的鬆夾動作。</td>
-<td>不變</td>
-</tr>
-<tr>
-<td>批次操作</td>
-<td>Lot Start / Lot End 兩顆按鈕改為互斥，避免誤操作。</td>
-<td>不變</td>
-</tr>
-<tr>
-<td>帳號與權限</td>
-<td>見下方獨立說明。</td>
-<td><strong>有變動</strong></td>
-</tr>
-</tbody>
-</table>
-<h3>帳號與權限（<strong>操作方式有變動，請現場人員先行了解</strong>）</h3>
-<ul>
-<li>新增<strong>自動登出</strong>：閒置達設定時間後會自動登出，需重新登入才能操作受限功能。</li>
-<li>權限層級改由<strong>帳號簿</strong>決定；當權限判定失敗時，一律降為最低權限（Operation），而非放行。</li>
-<li>密碼<strong>不接受符號字元</strong>。</li>
-<li><code>Map Tray</code> 頁面改為<strong>設備商專用</strong>，貴司帳號將不再看到該頁。</li>
-</ul>
-<h3>出料盤帳務時點變更 — 需請貴司確認</h3>
-<p>帳務登錄時點提前後，<strong>在清機排空被中途中止的情況下，某條流道有可能多報一片盤</strong>。
-此為已知且可接受範圍內的副作用，但會反映在貴司主機端的盤數對帳上。
-<strong>請貴司先行確認此提前的記帳時點與 EAP 對帳規則相容</strong>，我方再安排部署。</p>
-<blockquote>
-<p>另有一項「托盤夾持感測判定」的新功能已隨本版交付，但<strong>預設為關閉</strong>，需待機構調整完成後才會啟用；在啟用前對機台行為完全沒有影響。</p>
-</blockquote>
 <h2>【版本說明】</h2>
 <ul>
-<li>本次修正自 <strong>V1.0.0.4</strong> 起生效。</li>
-<li>升版後，貴司主機端（EAP）查詢到的軟體版本會由 <code>1.0.0.3</code> 變更為 <code>1.0.0.4</code>（SVID 1003 / S1F2 / S1F14 SOFTREV）。</li>
-<li><strong>關於 2026-09-16 提供之測試包（<code>HT160S_V1.0.0.4_2026.09.16_15.43_BETA</code>）</strong>：
-  該測試包<strong>已包含</strong>本項清機防呆，但它是開發機直接編譯的版本，<strong>對外仍自報為 <code>1.0.0.3</code></strong>
-  （貴司 EAP 查到的 SOFTREV 會是 1.0.0.3，與檔名不符），且不含其後的夾持與批次按鈕修正。
+<li>本項防呆自 <strong>V1.0.0.4</strong> 起生效。</li>
+<li>升版後，貴司主機端（EAP）查詢到的軟體版本會由 <code>1.0.0.3</code> 變更為 <code>1.0.0.4</code>
+  （SVID 1003 / S1F2 / S1F14 SOFTREV）。</li>
+<li><strong>關於 2026-09-16 提供之測試包</strong>（<code>HT160S_V1.0.0.4_2026.09.16_15.43_BETA</code>）：
+  該測試包<strong>已包含</strong>本項防呆，但它是開發機直接編譯的版本，<strong>對外仍自報為 <code>1.0.0.3</code></strong>
+  （貴司 EAP 查到的 SOFTREV 會是 1.0.0.3，與檔名不符）。
   <strong>請勿以該測試包作為正式版本使用</strong>，請等候我方正式提供之 V1.0.0.4 安裝包。</li>
 <li>正式安裝包交付時，我方會以完整檔名告知，請以該檔為準。</li>
 </ul>
 <hr />
-<p><em>Generated: 2026-09-17 | Developer: JimmyChiu</em></p>
+<p><em>鴻勁精密股份有限公司 HONPREC INC.</em></p>
 </div>
 </body>
 </html>
